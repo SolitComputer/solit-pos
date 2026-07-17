@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Inbox, X } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
     ACCOUNT_TYPE_LABEL,
@@ -143,6 +144,52 @@ export default function JurnalUmum({ period }: { period: string }) {
             await load();
         } finally {
             setBusy(false);
+        }
+    };
+
+    const handleDragEnd = async (result: DropResult) => {
+        if (!result.destination) return;
+        const sourceIndex = result.source.index;
+        const destinationIndex = result.destination.index;
+        if (sourceIndex === destinationIndex) return;
+
+        if (search.trim() !== "") {
+            setToast("Harap kosongkan pencarian sebelum mengubah urutan.");
+            return;
+        }
+
+        const newEntries = Array.from(entries);
+        const [removed] = newEntries.splice(sourceIndex, 1);
+        
+        const destEntry = newEntries[destinationIndex];
+        if (destEntry && destEntry.tanggal !== removed.tanggal) {
+            setToast("Hanya bisa mengubah urutan di tanggal yang sama.");
+            return;
+        }
+
+        newEntries.splice(destinationIndex, 0, removed);
+        setEntries(newEntries);
+
+        const targetDate = removed.tanggal;
+        const sameDateEntries = newEntries.filter(e => e.tanggal === targetDate);
+
+        try {
+            const res = await fetch("/api/akutansi/jurnal/reorder", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    date: targetDate,
+                    orderedIds: sameDateEntries.map(e => e.id)
+                })
+            });
+            const json = await res.json();
+            if (!json.success) {
+                setToast(json.message ?? "Gagal menyimpan urutan.");
+                load();
+            }
+        } catch (e) {
+            setToast("Gagal menyimpan urutan.");
+            load();
         }
     };
 
@@ -287,142 +334,173 @@ export default function JurnalUmum({ period }: { period: string }) {
             {/* ── Tabel Jurnal Umum ── */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full border-collapse" style={{ minWidth: "900px" }}>
-                        <thead>
-                            <tr className="border-b-2 border-gray-200 bg-gray-50">
-                                <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[110px]">Tanggal</th>
-                                <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
-                                <th className="px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[80px]">Ref</th>
-                                <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[150px]">Debit</th>
-                                <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[150px]">Kredit</th>
-                                <th className="px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[110px]">Aksi</th>
-                            </tr>
-                        </thead>
+                    <DragDropContext onDragEnd={handleDragEnd}>
+                        <Droppable droppableId="journal-entries">
+                            {(provided) => (
+                                <table 
+                                    className="w-full border-collapse" 
+                                    style={{ minWidth: "900px" }}
+                                    ref={provided.innerRef}
+                                    {...provided.droppableProps}
+                                >
+                                    <thead>
+                                        <tr className="border-b-2 border-gray-200 bg-gray-50">
+                                            <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[110px]">Tanggal</th>
+                                            <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
+                                            <th className="px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[80px]">Ref</th>
+                                            <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[150px]">Debit</th>
+                                            <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[150px]">Kredit</th>
+                                            <th className="px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[110px]">Aksi</th>
+                                        </tr>
+                                    </thead>
 
-                        <tbody>
-                            {loading ? (
-                                Array.from({ length: 4 }).map((_, i) => (
-                                    <tr key={i} className="border-b border-gray-50">
-                                        {Array.from({ length: 6 }).map((__, j) => (
-                                            <td key={j} className="px-4 py-4">
-                                                <div className="h-3 bg-gray-100 rounded animate-pulse" />
-                                            </td>
-                                        ))}
-                                    </tr>
-                                ))
-                            ) : filtered.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="py-16 text-center">
-                                        <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
-                                        <p className="text-sm text-gray-500 font-medium">Belum ada jurnal di periode ini</p>
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            Konfirmasi data pending di atas, atau buat jurnal manual.
-                                        </p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                filtered.map((entry) => {
-                                    const badge = SOURCE_BADGE[entry.source_type];
-                                    return entry.lines.map((line, i) => {
-                                        const first = i === 0;
-                                        const isKredit = line.side === "KREDIT";
-                                        return (
-                                            <tr
-                                                key={line.id}
-                                                className={`${first ? "border-t-2 border-gray-200" : ""} hover:bg-blue-50/30 transition`}
-                                            >
-                                                {/* Tanggal — hanya di baris pertama */}
-                                                <td className="px-4 py-2 align-top">
-                                                    {first && (
-                                                        <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap">
-                                                            {fmtTgl(entry.tanggal)}
-                                                        </span>
-                                                    )}
-                                                </td>
-
-                                                {/* Keterangan — kredit di-indent (posisinya "lebih ke bawah & masuk") */}
-                                                <td className="px-4 py-2 align-top">
-                                                    {first && (
-                                                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
-                                                                {badge.label}
-                                                            </span>
-                                                            {entry.is_edited && (
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
-                                                                    diedit · {entry.updated_by_user?.name ?? "—"}
-                                                                </span>
-                                                            )}
-                                                            <span className="text-[11px] font-bold text-gray-900">{entry.keterangan}</span>
-                                                        </div>
-                                                    )}
-                                                    <div className={`text-[11px] ${isKredit ? "pl-10 text-emerald-800" : "pl-1 text-blue-800"} font-medium`}>
-                                                        {line.account_name}
-                                                    </div>
-                                                </td>
-
-                                                {/* Ref = kode akun (post reference) */}
-                                                <td className="px-4 py-2 text-center align-bottom">
-                                                    <span className="text-[10px] font-mono font-bold text-gray-400">
-                                                        {line.account_code}
-                                                    </span>
-                                                    {first && entry.ref && (
-                                                        <div className="text-[9px] text-gray-300 font-mono mt-0.5">{entry.ref}</div>
-                                                    )}
-                                                </td>
-
-                                                {/* Debit */}
-                                                <td className="px-4 py-2 text-right align-bottom">
-                                                    {!isKredit && (
-                                                        <span className="text-[12px] font-bold text-gray-900 font-mono">
-                                                            {rp(line.nominal)}
-                                                        </span>
-                                                    )}
-                                                </td>
-
-                                                {/* Kredit */}
-                                                <td className="px-4 py-2 text-right align-bottom">
-                                                    {isKredit && (
-                                                        <span className="text-[12px] font-bold text-gray-900 font-mono">
-                                                            {rp(line.nominal)}
-                                                        </span>
-                                                    )}
-                                                </td>
-
-                                                {/* Aksi — hanya baris pertama */}
-                                                <td className="px-4 py-2 align-top">
-                                                    {first && (
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <button
-                                                                onClick={() => setEditEntry(entry)}
-                                                                className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition"
-                                                                title="Edit jurnal"
-                                                            >
-                                                                ✏️
-                                                            </button>
-                                                            <button
-                                                                onClick={() => setLogEntry(entry)}
-                                                                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"
-                                                                title="Riwayat perubahan"
-                                                            >
-                                                                🕐
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(entry)}
-                                                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
-                                                                title="Hapus"
-                                                            >
-                                                                🗑️
-                                                            </button>
-                                                        </div>
-                                                    )}
+                                    {loading ? (
+                                        <tbody>
+                                            {Array.from({ length: 4 }).map((_, i) => (
+                                                <tr key={i} className="border-b border-gray-50">
+                                                    {Array.from({ length: 6 }).map((__, j) => (
+                                                        <td key={j} className="px-4 py-4">
+                                                            <div className="h-3 bg-gray-100 rounded animate-pulse" />
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    ) : filtered.length === 0 ? (
+                                        <tbody>
+                                            <tr>
+                                                <td colSpan={6} className="py-16 text-center">
+                                                    <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
+                                                    <p className="text-sm text-gray-500 font-medium">Belum ada jurnal di periode ini</p>
+                                                    <p className="text-xs text-gray-400 mt-1">
+                                                        Konfirmasi data pending di atas, atau buat jurnal manual.
+                                                    </p>
                                                 </td>
                                             </tr>
-                                        );
-                                    });
-                                })
+                                        </tbody>
+                                    ) : (
+                                        filtered.map((entry, index) => {
+                                            const badge = SOURCE_BADGE[entry.source_type];
+                                            return (
+                                                <Draggable key={entry.id} draggableId={entry.id} index={index}>
+                                                    {(provided, snapshot) => (
+                                                        <tbody
+                                                            ref={provided.innerRef}
+                                                            {...provided.draggableProps}
+                                                            {...provided.dragHandleProps}
+                                                            className={snapshot.isDragging ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400" : ""}
+                                                            style={provided.draggableProps.style}
+                                                        >
+                                                            {entry.lines.map((line, i) => {
+                                                                const first = i === 0;
+                                                                const isKredit = line.side === "KREDIT";
+                                                                return (
+                                                                    <tr
+                                                                        key={line.id}
+                                                                        className={`${first ? "border-t-2 border-gray-200" : ""} hover:bg-blue-50/30 transition`}
+                                                                    >
+                                                                        {/* Tanggal — hanya di baris pertama */}
+                                                                        <td className="px-4 py-2 align-top">
+                                                                            {first && (
+                                                                                <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap flex items-center gap-2">
+                                                                                    <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+                                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                                                                                    </div>
+                                                                                    {fmtTgl(entry.tanggal)}
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+
+                                                                        {/* Keterangan — kredit di-indent (posisinya "lebih ke bawah & masuk") */}
+                                                                        <td className="px-4 py-2 align-top">
+                                                                            {first && (
+                                                                                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
+                                                                                        {badge.label}
+                                                                                    </span>
+                                                                                    {entry.is_edited && (
+                                                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
+                                                                                            diedit · {entry.updated_by_user?.name ?? "—"}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    <span className="text-[11px] font-bold text-gray-900">{entry.keterangan}</span>
+                                                                                </div>
+                                                                            )}
+                                                                            <div className={`text-[11px] ${isKredit ? "pl-10 text-emerald-800" : "pl-1 text-blue-800"} font-medium`}>
+                                                                                {line.account_name}
+                                                                            </div>
+                                                                        </td>
+
+                                                                        {/* Ref = kode akun (post reference) */}
+                                                                        <td className="px-4 py-2 text-center align-bottom">
+                                                                            <span className="text-[10px] font-mono font-bold text-gray-400">
+                                                                                {line.account_code}
+                                                                            </span>
+                                                                            {first && entry.ref && (
+                                                                                <div className="text-[9px] text-gray-300 font-mono mt-0.5">{entry.ref}</div>
+                                                                            )}
+                                                                        </td>
+
+                                                                        {/* Debit */}
+                                                                        <td className="px-4 py-2 text-right align-bottom">
+                                                                            {!isKredit && (
+                                                                                <span className="text-[12px] font-bold text-gray-900 font-mono">
+                                                                                    {rp(line.nominal)}
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+
+                                                                        {/* Kredit */}
+                                                                        <td className="px-4 py-2 text-right align-bottom">
+                                                                            {isKredit && (
+                                                                                <span className="text-[12px] font-bold text-gray-900 font-mono">
+                                                                                    {rp(line.nominal)}
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+
+                                                                        {/* Aksi — hanya baris pertama */}
+                                                                        <td className="px-4 py-2 align-top">
+                                                                            {first && (
+                                                                                <div className="flex items-center justify-center gap-1">
+                                                                                    <button
+                                                                                        onClick={() => setEditEntry(entry)}
+                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition"
+                                                                                        title="Edit jurnal"
+                                                                                    >
+                                                                                        ✏️
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => setLogEntry(entry)}
+                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                                                                                        title="Riwayat perubahan"
+                                                                                    >
+                                                                                        🕐
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => handleDelete(entry)}
+                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                                                                                        title="Hapus"
+                                                                                    >
+                                                                                        🗑️
+                                                                                    </button>
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    )}
+                                                </Draggable>
+                                            );
+                                        })
+                                    )}
+                                    {provided.placeholder}
+                                </table>
                             )}
-                        </tbody>
-                    </table>
+                        </Droppable>
+                    </DragDropContext>
                 </div>
             </div>
 

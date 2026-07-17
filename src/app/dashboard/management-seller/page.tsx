@@ -66,10 +66,10 @@ const FOCUS_RING =
 const fmtDate = (d?: string | null) =>
   d
     ? new Date(d).toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
     : "—";
 
 const daysDiff = (nextISO: string) =>
@@ -84,10 +84,10 @@ function toWaNumber(phone: string): string {
 
 function buildWaMessage(f: Followup): string {
   const nama = (f.customer_name || "").split(" ")[0] || "Kak";
-  if (f.seller_type === "PEDAGANG") {
-    return `Halo Kak ${nama}, ini dari Solit 03 \n\nMau follow-up nih, gimana stok laptopnya? Kalau butuh restock atau ada unit yang lagi dicari, langsung info ke kami ya. Banyak unit ready baru nih `;
-  }
-  return `Halo Kak ${nama}, ini dari Solit 03 \n\nMau follow-up nih, gimana kabar laptopnya? Semua lancar kan? Kalau ada kendala atau lagi nyari unit lain, langsung chat aja ya `;
+  return `Halo ka ${nama}, Kami dari solit 03 😊
+Kami dari Solit Computer. Semoga Kakak sehat dan aktivitasnya lancar ya.
+Kami hanya ingin memastikan laptop yang pernah dibeli di Solit masih nyaman digunakan. Kalau ada kendala, mau tanya-tanya, atau butuh bantuan seputar laptop, jangan sungkan untuk chat kami ya.
+Terima kasih sudah mempercayakan pembelian laptop di Solit Computer. Semoga laptopnya selalu awet dan bermanfaat untuk aktivitas Kakak. 🙏`;
 }
 
 const waLink = (f: Followup) =>
@@ -861,7 +861,7 @@ function ConfirmFollowupModal({
 
               <div className="rounded-xl bg-amber-50 border border-amber-200 px-3.5 py-3">
                 <p className="text-xs font-black text-amber-800 leading-relaxed">
-                   Apakah Anda yakin sudah Follow-Up (FU) ke customer ini?
+                  Apakah Anda yakin sudah Follow-Up (FU) ke customer ini?
                 </p>
                 <p className="text-[11px] text-amber-600 mt-1 leading-relaxed">
                   Data ini akan tersimpan permanen dan tidak bisa dibatalkan. Jadwal follow-up
@@ -974,7 +974,7 @@ function PicBlock({ f }: { f: Followup }) {
   return (
     <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 border-dashed px-3 py-2.5">
       <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-base flex-shrink-0">
-        
+
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider leading-none mb-1">
@@ -1083,7 +1083,7 @@ function FollowupCard({
           {f.last_followup_by && (
             <StatPill>
               <span className="truncate max-w-[120px] sm:max-w-[140px]">
-                 FU terakhir: {f.last_followup_by}
+                FU terakhir: {f.last_followup_by}
               </span>
             </StatPill>
           )}
@@ -1096,7 +1096,7 @@ function FollowupCard({
                 FOCUS_RING
               )}
             >
-               Lihat bukti
+              Lihat bukti
             </ExternalLink>
           )}
         </div>
@@ -1188,32 +1188,32 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
   const cards =
     scope === "ARCHIVED"
       ? [
-          { emoji: "", label: "Total Arsip", short: "Arsip", value: total, danger: false },
-          {
-            emoji: "",
-            label: "Total Follow-up",
-            short: "Total FU",
-            value: totalFU,
-            danger: false,
-          },
-        ]
+        { emoji: "", label: "Total Arsip", short: "Arsip", value: total, danger: false },
+        {
+          emoji: "",
+          label: "Total Follow-up",
+          short: "Total FU",
+          value: totalFU,
+          danger: false,
+        },
+      ]
       : [
-          { emoji: "", label: "Customer", short: "Customer", value: total, danger: false },
-          {
-            emoji: "",
-            label: "Perlu Follow-up",
-            short: "Perlu FU",
-            value: totalDue,
-            danger: totalDue > 0,
-          },
-          {
-            emoji: "",
-            label: "Total Follow-up",
-            short: "Total FU",
-            value: totalFU,
-            danger: false,
-          },
-        ];
+        { emoji: "", label: "Customer", short: "Customer", value: total, danger: false },
+        {
+          emoji: "",
+          label: "Perlu Follow-up",
+          short: "Perlu FU",
+          value: totalDue,
+          danger: totalDue > 0,
+        },
+        {
+          emoji: "",
+          label: "Total Follow-up",
+          short: "Total FU",
+          value: totalFU,
+          danger: false,
+        },
+      ];
 
   return (
     <div

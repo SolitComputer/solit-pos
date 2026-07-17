@@ -26,22 +26,29 @@ type Q = ReturnType<typeof supabaseAdmin.from> extends never ? never : any;
  */
 function applyStatusFilter(q: Q, status: CCStatus): Q {
   switch (status) {
+    case "BATAL":
+      return q.eq("is_cancelled", true);
     case "SELESAI":
-      return q.eq("posting_done", true);
+      return q.eq("posting_done", true).eq("is_cancelled", false);
+    case "REVISI":
+      return q.eq("posting_done", false).eq("is_cancelled", false).eq("needs_revision", true);
     case "POSTED":
-      return q.eq("posting_done", false).gt("posting_count", 0);
+      return q.eq("posting_done", false).eq("is_cancelled", false)
+        .eq("needs_revision", false).gt("posting_count", 0);
     case "SIAP_POSTING":
-      return q.eq("posting_done", false).eq("posting_count", 0).eq("edit_done", true);
+      return q.eq("posting_done", false).eq("is_cancelled", false).eq("needs_revision", false)
+        .eq("posting_count", 0).eq("edit_done", true);
     case "PROSES":
-      return q.eq("posting_done", false).eq("posting_count", 0)
-        .eq("edit_done", false).eq("take_done", true);
+      return q.eq("posting_done", false).eq("is_cancelled", false).eq("needs_revision", false)
+        .eq("posting_count", 0).eq("edit_done", false).eq("take_done", true);
     case "BELUM_SELESAI":
-      return q.eq("posting_done", false).eq("posting_count", 0)
-        .eq("edit_done", false).eq("take_done", false);
+      return q.eq("posting_done", false).eq("is_cancelled", false).eq("needs_revision", false)
+        .eq("posting_count", 0).eq("edit_done", false).eq("take_done", false);
   }
 }
 
-const STATUSES: CCStatus[] = ["BELUM_SELESAI", "PROSES", "SIAP_POSTING", "POSTED", "SELESAI"];
+
+const STATUSES: CCStatus[] = ["BELUM_SELESAI", "PROSES", "REVISI", "SIAP_POSTING", "POSTED", "SELESAI", "BATAL"];
 
 // GET /api/cc-reports?brand=&status=&q=&page=1&limit=20
 export async function GET(req: NextRequest) {
@@ -62,6 +69,9 @@ export async function GET(req: NextRequest) {
 
   if (statusRaw && STATUSES.includes(statusRaw as CCStatus)) {
     q = applyStatusFilter(q, statusRaw as CCStatus);
+  } else {
+    // ✅ Filter "Semua" (tanpa status spesifik) tetap sembunyikan yang Batal
+    q = q.eq("is_cancelled", false);
   }
 
   if (search) {

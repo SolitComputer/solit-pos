@@ -35,9 +35,11 @@ export function normalizeBrand(v: unknown): CCBrand {
 export type CCStatus =
   | "BELUM_SELESAI"
   | "PROSES"
+  | "REVISI"
   | "SIAP_POSTING"
   | "POSTED"
-  | "SELESAI";
+  | "SELESAI"
+  | "BATAL";
 
 export interface CCPosting {
   id: string;
@@ -50,7 +52,7 @@ export interface CCPosting {
   comments: number;
 
   external_id?: string | null;
-  provider_media_id?: string | null;  
+  provider_media_id?: string | null;
   auto_sync?: boolean;
   last_synced_at?: string | null;
   sync_status?: SyncStatus | null;
@@ -74,8 +76,10 @@ export interface CCReport {
   take_start: string | null;
   take_end: string | null;
   take_received_editor: string | null;
+  device: string | null;
 
   edit_done: boolean;
+  needs_revision?: boolean;
   editor_name: string | null;
   editor_work: string | null;
   edit_start: string | null;
@@ -84,6 +88,7 @@ export interface CCReport {
 
   posting_done: boolean;
   posting_done_at: string | null;
+  is_cancelled?: boolean;
 
   created_by: string | null;
   created_by_name: string | null;
@@ -103,9 +108,13 @@ export function computeStatus(
     posting_done?: boolean;
     posting_count?: number;
     postings?: CCPosting[];
+    needs_revision?: boolean;
+    is_cancelled?: boolean;
   }
 ): CCStatus {
+  if (r.is_cancelled) return "BATAL"; // ✅ prioritas tertinggi — override semua status lain
   if (r.posting_done) return "SELESAI";
+  if (r.needs_revision) return "REVISI"; // ✅ dicek duluan, sebelum posts>0
   const posts = r.posting_count ?? r.postings?.length ?? 0;
   if (posts > 0) return "POSTED";
   if (r.edit_done) return "SIAP_POSTING";
@@ -124,9 +133,11 @@ export function canFinish(r: { postings?: CCPosting[]; posting_done?: boolean })
 export const CC_STATUS_META: Record<CCStatus, { label: string; className: string }> = {
   BELUM_SELESAI: { label: "Belum Mulai", className: "bg-gray-100 text-gray-600 ring-1 ring-gray-200" },
   PROSES: { label: "Menunggu Edit", className: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+  REVISI: { label: "Revisi", className: "bg-red-50 text-red-700 ring-1 ring-red-200" },
   SIAP_POSTING: { label: "Siap Posting", className: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" },
   POSTED: { label: "Sudah Posting", className: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" },
   SELESAI: { label: "Selesai ✓", className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
+  BATAL: { label: "Batal", className: "bg-gray-200 text-gray-500 ring-1 ring-gray-300" },
 };
 
 /* ── Platform ────────────────────────────────────────────────────────────── */
