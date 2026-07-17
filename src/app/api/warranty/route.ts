@@ -9,9 +9,9 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     const status = searchParams.get("status") || "ALL";
     const includeArchived = searchParams.get("archived") === "true";
 
-    // Toleransi 30 hari setelah expired
+    // Toleransi 90 hari (3 bulan) setelah expired
     const toleranceDate = new Date();
-    toleranceDate.setDate(toleranceDate.getDate() - 30);
+    toleranceDate.setDate(toleranceDate.getDate() - 90);
     const toleranceDateStr = toleranceDate.toISOString().split("T")[0];
 
     let query = supabase
@@ -19,7 +19,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       .select("*")
       .order("warranty_end", { ascending: true });
 
-    // Filter arsip: sembunyikan yang expired > 30 hari
+    // Filter arsip: sembunyikan yang expired > 90 hari
     if (!includeArchived) {
       query = query.gte("warranty_end", toleranceDateStr);
     }

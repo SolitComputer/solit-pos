@@ -1315,6 +1315,7 @@ export default function ManagementSellerPage() {
   const [tab, setTab] = useState<Tab>("USER");
   const [scope, setScope] = useState<Scope>("ACTIVE");
   const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"ALL" | "SUDAH" | "BELUM">("ALL");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [confirmFu, setConfirmFu] = useState<Followup | null>(null);
 
@@ -1478,7 +1479,14 @@ export default function ManagementSellerPage() {
   const pedagangDue = useMemo(() => pedagangItems.filter((i) => i.is_due).length, [pedagangItems]);
 
   const visible = useMemo(() => {
-    const base = tab === "USER" ? userItems : pedagangItems;
+    let base = tab === "USER" ? userItems : pedagangItems;
+
+    if (filterStatus === "SUDAH") {
+      base = base.filter((i) => !i.is_due);
+    } else if (filterStatus === "BELUM") {
+      base = base.filter((i) => i.is_due);
+    }
+
     if (!search.trim()) return base;
     const q = search.toLowerCase();
     return base.filter(
@@ -1487,7 +1495,7 @@ export default function ManagementSellerPage() {
         i.customer_phone?.toLowerCase().includes(q) ||
         (i.invoice_number ?? "").toLowerCase().includes(q)
     );
-  }, [tab, userItems, pedagangItems, search]);
+  }, [tab, userItems, pedagangItems, search, filterStatus]);
 
   const dueCount = visible.filter((i) => i.is_due).length;
 
@@ -1642,13 +1650,25 @@ export default function ManagementSellerPage() {
             })}
           </div>
 
-          {/* Search — full-width di HP, sejajar tab di laptop.
-              text-base (16px) di HP supaya iOS Safari tidak auto-zoom saat input difokus. */}
-          <div className="relative lg:w-80 lg:flex-shrink-0">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-              <SearchIcon />
-            </span>
-            <input
+          {/* Filter & Search */}
+          <div className="flex flex-col sm:flex-row gap-2.5 lg:w-auto lg:flex-shrink-0">
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as "ALL" | "SUDAH" | "BELUM")}
+              className={cx(
+                "w-full sm:w-36 border border-gray-200 rounded-xl h-12 sm:h-11 px-3 text-base sm:text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 transition cursor-pointer"
+              )}
+            >
+              <option value="ALL">Semua Status</option>
+              <option value="BELUM">Belum FU</option>
+              <option value="SUDAH">Sudah FU</option>
+            </select>
+            
+            <div className="relative w-full sm:w-64 lg:w-80">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <SearchIcon />
+              </span>
+              <input
               type="text"
               inputMode="search"
               placeholder="Cari nama, HP, atau invoice…"
@@ -1669,6 +1689,7 @@ export default function ManagementSellerPage() {
                 <CloseIcon />
               </button>
             )}
+            </div>
           </div>
         </div>
 
