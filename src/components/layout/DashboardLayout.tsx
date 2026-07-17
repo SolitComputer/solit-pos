@@ -69,7 +69,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
        * akan membuka kunci autoplay browser.
        */}
       <div
-        className="flex min-h-screen bg-[#f5f4f0]"
+        className="flex min-h-screen bg-[#F7F7F8]"
         onClick={() => { void unlockRef.current(); unlockReminderAudio(); }}
         onKeyDown={() => { void unlockRef.current(); unlockReminderAudio(); }}
         onTouchStart={() => { void unlockRef.current(); unlockReminderAudio(); }}
