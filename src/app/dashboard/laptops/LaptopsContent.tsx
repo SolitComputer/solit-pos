@@ -342,15 +342,23 @@ export function LaptopsContent() {
         try {
             const res = await fetch("/api/laptops");
             const result = await res.json();
-            const normalized = (result.data || []).map((l: Laptop) => ({
-                ...l,
-                selling_price: Math.round(Number(l.selling_price) || 0),
-                qty: (l.laptop_units || []).length,
-                stok_tersedia: (l.laptop_units || []).filter((u: LaptopUnit) => u.status !== "SOLD").length,
-                siap_jual: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length,
-                stok_minus: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length,
-                terjual: (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SOLD").length,
-            }));
+            const normalized = (result.data || []).map((l: Laptop) => {
+                const units = l.laptop_units || [];
+                const siapJual = units.filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
+                const stokMinus = units.filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
+                return {
+                    ...l,
+                    selling_price: Math.round(Number(l.selling_price) || 0),
+                    qty: units.length,
+                    // ✅ Stok Tersisa = Siap Jual + Minus saja.
+                    // Unit RESERVED/HELD/PACKING sengaja TIDAK dihitung sebagai stok tersedia
+                    // karena statusnya sudah "diproses" (dipesan/ditahan/dikemas), bukan stok bebas.
+                    stok_tersedia: siapJual + stokMinus,
+                    siap_jual: siapJual,
+                    stok_minus: stokMinus,
+                    terjual: units.filter((u: LaptopUnit) => u.status === "SOLD").length,
+                };
+            });
             setLaptops(normalized);
         } catch {
             setLaptops([]);
@@ -375,8 +383,6 @@ export function LaptopsContent() {
             list = list.filter(x => (x.siap_jual ?? 0) > 0);
         } else if (filterStatus === "BELUM_SIAP") {
             list = list.filter(x => (x.stok_minus ?? 0) > 0);
-        } else if (filterStatus === "TERJUAL") {
-            list = list.filter(x => (x.terjual ?? 0) > 0);
         }
         if (filterBrand !== "ALL") list = list.filter(x => x.brand === filterBrand);
         if (filterProcessor !== "ALL") {
@@ -538,25 +544,20 @@ export function LaptopsContent() {
         // Tentukan konteks berdasarkan filter status aktif
         const isSiapJualOnly = filterStatus === "SIAP_JUAL";
         const isMinusOnly = filterStatus === "BELUM_SIAP";
-        const isTerjualOnly = filterStatus === "TERJUAL";
-        const isAllMode = !isSiapJualOnly && !isMinusOnly && !isTerjualOnly;
+        const isAllMode = !isSiapJualOnly && !isMinusOnly;
 
         // Sheet name & file suffix mengikuti filter
         const sheetLabel = isSiapJualOnly
             ? "Laptop Siap Jual"
             : isMinusOnly
                 ? "Laptop Minus"
-                : isTerjualOnly
-                    ? "Laptop Terjual"
-                    : "Data Laptop";
+                : "Data Laptop";
 
         const fileSuffix = isSiapJualOnly
             ? "_siap_jual"
             : isMinusOnly
                 ? "_minus"
-                : isTerjualOnly
-                    ? "_terjual"
-                    : "";
+                : "";
 
         const ws = wb.addWorksheet(sheetLabel, {
             views: [{ state: "frozen", ySplit: 1 }],
@@ -574,8 +575,6 @@ export function LaptopsContent() {
             siapFg: "FF065F46", // green-900
             minusBg: "FFFEE2E2", // red-100
             minusFg: "FF7F1D1D", // red-900
-            terjualBg: "FFDBEAFE", // blue-100
-            terjualFg: "FF1E3A8A", // blue-900
         };
 
         //  Definisi kolom dinamis: mode filter menentukan kolom stok yang ditampilkan
@@ -595,7 +594,6 @@ export function LaptopsContent() {
             ...(isAllMode ? [
                 { header: "Siap Jual", key: "siap_jual", width: 12 },
                 { header: "Minus", key: "minus", width: 10 },
-                { header: "Terjual", key: "terjual", width: 10 },
             ] : []),
             { header: "Price Store", key: "price_store", width: 18 },
         ];
@@ -623,7 +621,6 @@ export function LaptopsContent() {
             // Hitung per-jenis unit dari raw laptop_units (bukan dari field cached)
             const siapJualCount = units.filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
             const minusCount = units.filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
-            const terjualCount = units.filter((u: LaptopUnit) => u.status === "SOLD").length;
             const tersediaCount = units.filter((u: LaptopUnit) => u.status !== "SOLD").length;
 
             //  Nilai kolom "stock" disesuaikan dengan konteks filter
@@ -647,7 +644,6 @@ export function LaptopsContent() {
             if (isAllMode) {
                 rowData.siap_jual = siapJualCount;
                 rowData.minus = minusCount;
-                rowData.terjual = terjualCount;
             }
 
             const row = ws.addRow(rowData);
@@ -719,15 +715,6 @@ export function LaptopsContent() {
                     if (minusCount > 0) {
                         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.minusBg } };
                         cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.minusFg } };
-                    } else {
-                        cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-                    }
-
-                } else if (key === "terjual") {
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                    if (terjualCount > 0) {
-                        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.terjualBg } };
-                        cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.terjualFg } };
                     } else {
                         cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
                     }
@@ -828,7 +815,7 @@ export function LaptopsContent() {
                     </div>
 
                     {/* ── STAT CARDS ───────────────────────────────────── */}
-                    <div className={`grid gap-3 animate-slideDown ${canViewTotalStok ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1"}`}>
+                    <div className={`grid gap-3 animate-slideDown ${canViewTotalStok ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"}`}>
                         {canViewTotalStok && (
                             <StatCard label="Stok Tersisa" value={`${totalSisa} unit`} accent="bg-gray-700"
                                 icon={<svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
@@ -842,11 +829,6 @@ export function LaptopsContent() {
                                 icon={<svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>}
                             />
                         )}
-                        {canViewTotalStok && (
-                            <StatCard label="Terjual" value={`${totalTerjual} unit`} accent="bg-blue-500"
-                                icon={<svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
-                            />
-                        )}
                     </div>
 
                     {/* ── FILTER PANEL ─────────────────────────────────── */}
@@ -856,9 +838,8 @@ export function LaptopsContent() {
                             <SearchInput placeholder="Cari Serial Number..." value={filterSN} onChange={e => setFilterSN(e.target.value)} icon="sn" />
                             <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                                 <option value="ALL">Semua Status</option>
-                                <option value="SIAP_JUAL"> Siap Jual</option>
-                                <option value="BELUM_SIAP"> Minus</option>
-                                <option value="TERJUAL"> Terjual</option>
+                                <option value="SIAP_JUAL">✅ Siap Jual</option>
+                                <option value="BELUM_SIAP">⚠️ Minus</option>
                             </FilterSelect>
                             <FilterSelect value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
                                 {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
@@ -934,7 +915,6 @@ export function LaptopsContent() {
                                             {canViewTotalStok && <Th right>Stok Tersisa</Th>}
                                             <Th right>Siap Jual</Th>
                                             {canViewTotalStok && <Th right>Minus</Th>}
-                                            {canViewTotalStok && <Th right>Terjual</Th>}
                                             <Th right>Aksi</Th>
                                         </tr>
                                     </thead>
@@ -978,13 +958,6 @@ export function LaptopsContent() {
                                                     <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                                         <span className={`text-sm font-semibold tabular-nums ${(item.stok_minus ?? 0) > 0 ? "text-red-500" : "text-gray-200"}`}>
                                                             {(item.stok_minus ?? 0) > 0 ? `-${item.stok_minus}` : "—"}
-                                                        </span>
-                                                    </td>
-                                                )}
-                                                {canViewTotalStok && (
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                        <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.terjual ?? 0) > 0 ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200" : "text-gray-200"}`}>
-                                                            {item.terjual ?? 0}
                                                         </span>
                                                     </td>
                                                 )}
@@ -1037,10 +1010,7 @@ export function LaptopsContent() {
                                     {canViewTotalStok && <FooterStat label="Stok Tersisa" value={totalSisa} dot="bg-gray-400" color="text-gray-800" />}
                                     <FooterStat label="Siap Jual" value={totalSiapJual} dot="bg-green-500" color="text-green-700" />
                                     {canViewTotalStok && (
-                                        <>
-                                            <FooterStat label="Minus" value={totalMinus} dot="bg-red-500" color="text-red-500" />
-                                            <FooterStat label="Terjual" value={totalTerjual} dot="bg-blue-500" color="text-blue-600" />
-                                        </>
+                                        <FooterStat label="Minus" value={totalMinus} dot="bg-red-500" color="text-red-500" />
                                     )}
                                 </div>
                             </div>
@@ -1159,7 +1129,7 @@ export function LaptopsContent() {
                                     })()}
                                     {selectedLaptop.ready_to_sell && (
                                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                                             Ready to Sell
+                                            Ready to Sell
                                         </span>
                                     )}
                                 </div>
