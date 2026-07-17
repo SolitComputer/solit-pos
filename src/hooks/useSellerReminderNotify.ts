@@ -9,14 +9,16 @@ export interface SellerReminder {
   target_user_id: string;
   sent_by: string;
   sent_by_name: string;
+  sent_by_role: string;
   message: string;
   is_read: boolean;
   created_at: string;
 }
 
 export function useSellerReminderNotify(userId: string | null | undefined) {
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [reminders, setReminders] = useState<SellerReminder[]>([]);
   const [latest, setLatest] = useState<SellerReminder | null>(null);
+  const [forbidden, setForbidden] = useState(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -26,21 +28,29 @@ export function useSellerReminderNotify(userId: string | null | undefined) {
     };
   }, []);
 
-  // ── Hydrate unread count (kalau reminder masuk saat user offline) ──
-  useEffect(() => {
+  const fetchReminders = useCallback(async () => {
     if (!userId) return;
-    fetch("/api/seller-followup-reminders")
-      .then((r) => r.json())
-      .then((res) => {
-        if (!mountedRef.current || !res.success) return;
-        setUnreadCount((res.data ?? []).length);
-      })
-      .catch(() => {});
+    try {
+      const res = await fetch("/api/seller-followup-reminders");
+      if (res.status === 403) {
+        if (mountedRef.current) setForbidden(true);
+        return;
+      }
+      const result = await res.json();
+      if (!mountedRef.current || !result.success) return;
+      setReminders(result.data ?? []);
+    } catch {
+      // silent — realtime tetap jalan, coba lagi di render berikutnya
+    }
   }, [userId]);
 
-  // ── Realtime: reminder baru masuk saat user online ──
   useEffect(() => {
-    if (!userId) return;
+    fetchReminders();
+  }, [fetchReminders]);
+
+  // ── Realtime: reminder MANUAL baru dari Admin ──
+  useEffect(() => {
+    if (!userId || forbidden) return;
 
     const channel = supabase
       .channel(`seller-reminder-${userId}`)
@@ -55,7 +65,7 @@ export function useSellerReminderNotify(userId: string | null | undefined) {
         (payload: any) => {
           if (!mountedRef.current) return;
           const row = payload.new as SellerReminder;
-          setUnreadCount((c) => c + 1);
+          setReminders((prev) => [row, ...prev]);
           setLatest(row);
         }
       )
@@ -64,21 +74,26 @@ export function useSellerReminderNotify(userId: string | null | undefined) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [userId, forbidden]);
 
   const markAllRead = useCallback(async () => {
-    setUnreadCount(0);
+    setReminders([]);
     setLatest(null);
     try {
       await fetch("/api/seller-followup-reminders/read-all", { method: "PATCH" });
     } catch {
-      // silent — badge sudah 0 secara optimistic, tidak fatal kalau gagal sync
+      // silent — badge sudah 0 secara optimistic
     }
   }, []);
 
-  const dismissLatest = useCallback(() => {
-    setLatest(null);
-  }, []);
+  const dismissLatest = useCallback(() => setLatest(null), []);
 
-  return { unreadCount, latest, markAllRead, dismissLatest };
+  return {
+    reminders,
+    unreadCount: reminders.length,
+    latest,
+    markAllRead,
+    dismissLatest,
+    forbidden,
+  };
 }
