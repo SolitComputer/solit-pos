@@ -11,6 +11,8 @@ import ConfirmDialog from "../ui/ConfirmDialog";
 import { BirthdayBanner } from "@/components/ui/BirthdayBanner";
 import { MissionSoundNotifier } from "@/components/layout/MissionSoundNotifier";
 import { useMissionSound } from "@/hooks/useMissionSound";
+import { SellerReminderNotifier } from "@/components/layout/SellerReminderNotifier";
+import { unlockReminderAudio } from "@/lib/reminderSound";
 
 function ScrollRestorer() {
   const pathname = usePathname();
@@ -68,9 +70,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
        */}
       <div
         className="flex min-h-screen bg-[#f5f4f0]"
-        onClick={() => void unlockRef.current()}
-        onKeyDown={() => void unlockRef.current()}
-        onTouchStart={() => void unlockRef.current()}
+        onClick={() => { void unlockRef.current(); unlockReminderAudio(); }}
+        onKeyDown={() => { void unlockRef.current(); unlockReminderAudio(); }}
+        onTouchStart={() => { void unlockRef.current(); unlockReminderAudio(); }}
       >
         <ScrollRestorer />
         <Sidebar />
@@ -81,6 +83,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           unlockAudio={unlockAudio}
           playMissionSound={playMissionSound}
         />
+
+        <SellerReminderNotifier userId={soundUserId} />
 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile topbar */}

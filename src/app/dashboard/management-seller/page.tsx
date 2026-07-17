@@ -5,6 +5,7 @@ import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
+import { toast } from "sonner";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Followup {
@@ -182,6 +183,13 @@ const LockIcon = () => (
   </svg>
 );
 
+const BellIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 01-3.46 0" />
+  </svg>
+);
+
 const SearchIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <circle cx="11" cy="11" r="8" />
@@ -307,6 +315,8 @@ function PicAccessDropdown({
   savingId,
   onToggle,
   onRetry,
+  onSendReminder,
+  sendingReminderId,
 }: {
   pics: PicCandidate[];
   loading: boolean;
@@ -314,6 +324,8 @@ function PicAccessDropdown({
   savingId: string | null;
   onToggle: (userId: string, next: boolean) => void;
   onRetry: () => void;
+  onSendReminder: (userId: string, name: string) => void;
+  sendingReminderId: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -417,44 +429,68 @@ function PicAccessDropdown({
                     </p>
                     {g.items.map((p) => {
                       const saving = savingId === p.user_id;
+                      const sendingReminder = sendingReminderId === p.user_id;
                       return (
-                        <button
-                          key={p.user_id}
-                          onClick={() => onToggle(p.user_id, !p.is_active)}
-                          disabled={saving}
-                          className={cx(
-                            "w-full min-h-[52px] px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50 text-left",
-                            FOCUS_RING
-                          )}
-                        >
-                          <span
+                        <div key={p.user_id} className="w-full min-h-[52px] flex items-center gap-1 pr-2">
+                          <button
+                            onClick={() => onToggle(p.user_id, !p.is_active)}
+                            disabled={saving}
                             className={cx(
-                              "w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-all",
-                              p.is_active
-                                ? "bg-emerald-600 border-emerald-600 text-white"
-                                : "bg-white border-gray-300"
+                              "flex-1 min-w-0 px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50 text-left rounded-lg",
+                              FOCUS_RING
                             )}
                           >
-                            {saving ? (
-                              <Spinner dark={!p.is_active} />
-                            ) : p.is_active ? (
-                              <CheckIcon />
-                            ) : null}
-                          </span>
-                          <span className="flex-1 min-w-0">
-                            <span className="block text-xs font-bold text-gray-800 truncate">
-                              {p.name}
-                            </span>
                             <span
                               className={cx(
-                                "block text-[10px] truncate",
-                                p.is_active ? "text-emerald-600 font-semibold" : "text-gray-400"
+                                "w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-all",
+                                p.is_active
+                                  ? "bg-emerald-600 border-emerald-600 text-white"
+                                  : "bg-white border-gray-300"
                               )}
                             >
-                              {p.is_active ? "Boleh follow-up" : "Nonaktif"}
+                              {saving ? (
+                                <Spinner dark={!p.is_active} />
+                              ) : p.is_active ? (
+                                <CheckIcon />
+                              ) : null}
                             </span>
-                          </span>
-                        </button>
+                            <span className="flex-1 min-w-0">
+                              <span className="block text-xs font-bold text-gray-800 truncate">
+                                {p.name}
+                              </span>
+                              <span
+                                className={cx(
+                                  "block text-[10px] truncate",
+                                  p.is_active ? "text-emerald-600 font-semibold" : "text-gray-400"
+                                )}
+                              >
+                                {p.is_active ? "Boleh follow-up" : "Nonaktif"}
+                              </span>
+                            </span>
+                          </button>
+
+                          {/* ── Lonceng: kirim reminder follow-up ke PIC ini ── */}
+                          <button
+                            onClick={() => onSendReminder(p.user_id, p.name)}
+                            disabled={!p.is_active || sendingReminder}
+                            title={
+                              p.is_active
+                                ? `Ingatkan ${p.name} untuk follow-up`
+                                : "Aktifkan PIC ini dulu sebelum mengirim reminder"
+                            }
+                            className={cx(
+                              "flex-shrink-0 w-9 h-9 rounded-lg border flex items-center justify-center transition-all",
+                              FOCUS_RING,
+                              !p.is_active
+                                ? "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed"
+                                : sendingReminder
+                                  ? "bg-amber-50 border-amber-200 text-amber-400"
+                                  : "bg-white border-gray-200 text-gray-400 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-200 active:scale-95"
+                            )}
+                          >
+                            {sendingReminder ? <Spinner dark /> : <BellIcon />}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -1323,6 +1359,28 @@ export default function ManagementSellerPage() {
   const [picsLoading, setPicsLoading] = useState(false);
   const [picsError, setPicsError] = useState<string | null>(null);
   const [savingPicId, setSavingPicId] = useState<string | null>(null);
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
+
+  const sendReminder = async (targetUserId: string, name: string) => {
+    setSendingReminderId(targetUserId);
+    try {
+      const res = await fetch("/api/seller-followup-reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_user_id: targetUserId }),
+      });
+      const result = await res.json();
+      if (!result.success) {
+        toast.error(result.message ?? `Gagal mengirim reminder ke ${name}`);
+        return;
+      }
+      toast.success(`Reminder terkirim ke ${name}`);
+    } catch {
+      toast.error("Terjadi kesalahan koneksi");
+    } finally {
+      setSendingReminderId(null);
+    }
+  };
 
   // ── Auth ──
   useEffect(() => {
@@ -1544,6 +1602,8 @@ export default function ManagementSellerPage() {
                 savingId={savingPicId}
                 onToggle={togglePic}
                 onRetry={loadPics}
+                onSendReminder={sendReminder}
+                sendingReminderId={sendingReminderId}
               />
             )}
 
