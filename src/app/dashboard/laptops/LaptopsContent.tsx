@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import Link from "next/link";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
+import { Laptop } from "lucide-react";
 
 interface LaptopUnit {
     id: string;
@@ -1158,7 +1159,7 @@ export function LaptopsContent() {
                 ) : selectedLaptop ? (
                     <div className="space-y-5">
                         <div className="flex flex-col sm:flex-row gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100">
-                            <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0"></div>
+                            <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0"><Laptop size={30} className="text-gray-700" /></div>
                             <div className="flex-1 min-w-0">
                                 <h3 className="font-black text-gray-900 text-lg tracking-tight leading-snug">{selectedLaptop.laptop_name}</h3>
                                 <p className="text-sm text-gray-400 mt-0.5 font-medium">{selectedLaptop.brand || "—"}</p>

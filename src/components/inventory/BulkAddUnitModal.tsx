@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import * as XLSX from "xlsx";
-import { Inbox } from "lucide-react";
+import { Inbox, Hash, Pencil, BarChart3, Download, CheckCircle2, Clock } from "lucide-react";
 
 export default function BulkAddUnitModal({
     laptopId,
@@ -180,9 +180,9 @@ export default function BulkAddUnitModal({
     };
 
     const TABS = [
-        { id: "range", label: "Range SN", icon: "" },
-        { id: "manual", label: "Manual", icon: "" },
-        { id: "excel", label: "Import Excel", icon: "" },
+        { id: "range", label: "Range SN", icon: Hash },
+        { id: "manual", label: "Manual", icon: Pencil },
+        { id: "excel", label: "Import Excel", icon: BarChart3 },
     ] as const;
 
     return (
@@ -205,7 +205,9 @@ export default function BulkAddUnitModal({
 
                 {/* Tab selector */}
                 <div className="flex px-5 pt-4 gap-2 flex-shrink-0">
-                    {TABS.map(t => (
+                    {TABS.map(t => {
+                        const Icon = t.icon;
+                        return (
                         <button
                             key={t.id}
                             onClick={() => { setTab(t.id); setError(""); }}
@@ -214,10 +216,11 @@ export default function BulkAddUnitModal({
                                 : "bg-white text-gray-500 border-gray-200 active:bg-gray-50"
                                 }`}
                         >
-                            <span>{t.icon}</span>
+                            <Icon className="w-3.5 h-3.5" />
                             {t.label}
                         </button>
-                    ))}
+                        );
+                    })}
                 </div>
 
                 {/* Body */}
@@ -283,7 +286,7 @@ export default function BulkAddUnitModal({
                                 <p className="text-xs text-blue-700 mb-2">
                                     Upload file Excel (.xlsx/.xls). Kolom yang dikenali: <code className="bg-blue-100 px-1 rounded font-mono">serial_number</code>, <code className="bg-blue-100 px-1 rounded font-mono">grade</code>, <code className="bg-blue-100 px-1 rounded font-mono">purchase_price</code>, <code className="bg-blue-100 px-1 rounded font-mono">selling_price</code>, <code className="bg-blue-100 px-1 rounded font-mono">condition_note</code>.
                                 </p>
-                                <button onClick={downloadTemplate} className="text-xs text-blue-600 font-semibold underline underline-offset-2">Download Template Excel</button>
+                                <button onClick={downloadTemplate} className="inline-flex items-center gap-1 text-xs text-blue-600 font-semibold underline underline-offset-2"><Download className="w-3 h-3" />Download Template Excel</button>
                             </div>
                             <div onClick={() => fileInputRef.current?.click()}
                                 className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer active:bg-gray-50 transition">
@@ -294,7 +297,7 @@ export default function BulkAddUnitModal({
                             </div>
                             {excelRows.length > 0 && (
                                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-                                    <p className="text-xs font-semibold text-emerald-700 mb-2"> {excelRows.length} baris berhasil dibaca</p>
+                                    <p className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 mb-2"><CheckCircle2 className="w-3.5 h-3.5" />{excelRows.length} baris berhasil dibaca</p>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-[10px]">
                                             <thead>
@@ -338,14 +341,18 @@ export default function BulkAddUnitModal({
                                             key={s}
                                             type="button"
                                             onClick={() => setStatus(s)}
-                                            className={`flex-1 h-9 rounded-lg text-xs font-semibold border transition ${status === s
+                                            className={`flex-1 h-9 flex items-center justify-center gap-1 rounded-lg text-xs font-semibold border transition ${status === s
                                                 ? s === "SIAP_JUAL"
                                                     ? "bg-emerald-600 text-white border-emerald-600"
                                                     : "bg-amber-500 text-white border-amber-500"
                                                 : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                                 }`}
                                         >
-                                            {s === "SIAP_JUAL" ? " Siap Jual" : " Belum Siap"}
+                                            {s === "SIAP_JUAL" ? (
+                                                <><CheckCircle2 className="w-3.5 h-3.5" /> Siap Jual</>
+                                            ) : (
+                                                <><Clock className="w-3.5 h-3.5" /> Belum Siap</>
+                                            )}
                                         </button>
                                     ))}
                                 </div>

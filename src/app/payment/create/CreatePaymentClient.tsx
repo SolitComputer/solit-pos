@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
+import { User, RefreshCw, Handshake, Hand, Tag, Repeat, Gift, Store, Package, Banknote, Landmark, QrCode, Shuffle, Check, Shield, Smartphone, Cake, Wallet, Laptop } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createPaymentSchema, CreatePaymentType, UnitItem } from "@/lib/validation";
@@ -57,7 +58,7 @@ function fmt(n: number) {
 
 // ─── ConfirmRow Helper ────────────────────────────────────────────────────────
 function ConfirmRow({ icon, label, value, bold, mono }: {
-    icon: string; label: string; value: string; bold?: boolean; mono?: boolean;
+    icon: ReactNode; label: string; value: string; bold?: boolean; mono?: boolean;
 }) {
     return (
         <div className="flex items-center justify-between gap-3">
@@ -683,9 +684,9 @@ export default function CreatePaymentPage() {
                                 <label className="text-xs text-gray-500 mb-1.5 block">Tipe Customer *</label>
                                 <div className="grid grid-cols-3 gap-2">
                                     {[
-                                        { value: "UMUM", label: "Umum", icon: "", desc: "Pembeli biasa" },
-                                        { value: "RESELLER", label: "Reseller", icon: "", desc: "Jual kembali" },
-                                        { value: "MITRA", label: "Mitra", icon: "", desc: "Mitra bisnis" },
+                                        { value: "UMUM", label: "Umum", icon: <User size={20} />, desc: "Pembeli biasa" },
+                                        { value: "RESELLER", label: "Reseller", icon: <RefreshCw size={20} />, desc: "Jual kembali" },
+                                        { value: "MITRA", label: "Mitra", icon: <Handshake size={20} />, desc: "Mitra bisnis" },
                                     ].map(o => (
                                         <button key={o.value} type="button"
                                             onClick={() => { setCustomerType(o.value as any); setValue("customer_type", o.value as any); }}
@@ -706,8 +707,8 @@ export default function CreatePaymentPage() {
                                 <label className="text-xs text-gray-500 mb-1.5 block">Kategori Seller *</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {[
-                                        { value: "USER", label: "User", icon: "", desc: "Follow-up 7 hari" },
-                                        { value: "PEDAGANG", label: "Pedagang", icon: "", desc: "Follow-up 3 hari" },
+                                        { value: "USER", label: "User", icon: <Hand size={20} />, desc: "Follow-up 7 hari" },
+                                        { value: "PEDAGANG", label: "Pedagang", icon: <Tag size={20} />, desc: "Follow-up 3 hari" },
                                     ].map(o => (
                                         <button key={o.value} type="button"
                                             onClick={() => setSellerType(o.value as any)}
@@ -895,7 +896,7 @@ export default function CreatePaymentPage() {
                                                 }`}
                                         >
                                             <div className="flex items-center gap-2">
-                                                <span className="text-base"></span>
+                                                <Repeat size={16} />
                                                 <div className="text-left">
                                                     <p className="text-xs font-semibold text-gray-700">Tukar Tambah</p>
                                                     <p className="text-[10px] text-gray-400">Customer punya barang untuk ditukar</p>
@@ -1026,8 +1027,8 @@ export default function CreatePaymentPage() {
 
                                                 {/* Toggle Bonus */}
                                                 <button type="button" onClick={() => updateAccessory(i, { is_bonus: !a.is_bonus })}
-                                                    className={`h-9 px-3 rounded-lg text-xs font-semibold border transition ${a.is_bonus ? "bg-amber-500 text-white border-amber-500" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-                                                     Bonus
+                                                    className={`h-9 px-3 rounded-lg text-xs font-semibold border transition inline-flex items-center gap-1 ${a.is_bonus ? "bg-amber-500 text-white border-amber-500" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                                                    <Gift size={14} /> Bonus
                                                 </button>
 
                                                 {/* Harga (disembunyikan kalau bonus) */}
@@ -1158,19 +1159,19 @@ export default function CreatePaymentPage() {
                                     <button type="button" onClick={() => { setIsEcommerce(false); setEcommercePlatform(""); }}
                                         className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${!isEcommerce ? "bg-gray-700 text-white border-gray-700 shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                                             }`}>
-                                         Offline / Langsung
+                                        <Store size={16} /> Offline / Langsung
                                     </button>
                                     <button type="button" onClick={() => setIsEcommerce(true)}
                                         className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-sm font-medium transition ${isEcommerce ? "bg-gray-600 text-white border-gray-600 shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                                             }`}>
-                                         E-Commerce
+                                        <Package size={16} /> E-Commerce
                                     </button>
                                 </div>
                             </div>
 
                             {isEcommerce && (
                                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
-                                    <p className="text-xs font-semibold text-gray-700"> Status PACKING sampai dana cair</p>
+                                    <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5"><Package size={14} /> Status PACKING sampai dana cair</p>
                                     <div>
                                         <label className="text-xs text-gray-500 mb-1.5 block">Platform *</label>
                                         <div className="grid grid-cols-2 gap-2">
@@ -1193,10 +1194,10 @@ export default function CreatePaymentPage() {
                                 <label className="text-xs text-gray-500 mb-1.5 block">Metode Pembayaran</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {[
-                                        { value: "CASH", label: " Cash", desc: "Uang tunai" },
-                                        { value: "TRANSFER", label: " Transfer", desc: "Transfer bank" },
-                                        { value: "QRIS", label: " QRIS", desc: "QR Code" },
-                                        { value: "TF_CASH", label: " TF + Cash", desc: "Sebagian TF, sebagian tunai" },
+                                        { value: "CASH", label: "Cash", icon: <Banknote size={18} />, desc: "Uang tunai" },
+                                        { value: "TRANSFER", label: "Transfer", icon: <Landmark size={18} />, desc: "Transfer bank" },
+                                        { value: "QRIS", label: "QRIS", icon: <QrCode size={18} />, desc: "QR Code" },
+                                        { value: "TF_CASH", label: "TF + Cash", icon: <Shuffle size={18} />, desc: "Sebagian TF, sebagian tunai" },
                                     ].map(m => (
                                         <button key={m.value} type="button"
                                             onClick={() => {
@@ -1208,8 +1209,8 @@ export default function CreatePaymentPage() {
                                                 : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                                                 }`}
                                         >
-                                            <span className="text-base leading-none">{m.label.split(" ")[0]}</span>
-                                            <span className="text-xs">{m.label.split(" ").slice(1).join(" ")}</span>
+                                            <span className="leading-none">{m.icon}</span>
+                                            <span className="text-xs">{m.label}</span>
                                             <span className={`text-[9px] ${paymentMethod === m.value ? "text-gray-300" : "text-gray-400"}`}>{m.desc}</span>
                                         </button>
                                     ))}
@@ -1219,7 +1220,7 @@ export default function CreatePaymentPage() {
                                 {paymentMethod === "TF_CASH" && rawDealPrice > 0 && (
                                     <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-3">
                                         <p className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
-                                             Rincian Pembayaran — Total: <span className="font-bold">{fmt(rawDealPrice)}</span>
+                                            <Shuffle size={14} /> Rincian Pembayaran — Total: <span className="font-bold">{fmt(rawDealPrice)}</span>
                                         </p>
                                         <div className="grid grid-cols-2 gap-2">
                                             <div>
@@ -1265,7 +1266,7 @@ export default function CreatePaymentPage() {
                                             <div className={`flex justify-between text-xs px-1 ${splitTF + splitCash === rawDealPrice ? "text-green-700" : "text-red-600"
                                                 }`}>
                                                 <span>Total diisi: {fmt(splitTF + splitCash)}</span>
-                                                <span>{splitTF + splitCash === rawDealPrice ? " Sesuai" : `Kurang/Lebih ${fmt(Math.abs(rawDealPrice - splitTF - splitCash))}`}</span>
+                                                <span>{splitTF + splitCash === rawDealPrice ? <span className="inline-flex items-center gap-0.5"><Check size={12} /> Sesuai</span> : `Kurang/Lebih ${fmt(Math.abs(rawDealPrice - splitTF - splitCash))}`}</span>
                                             </div>
                                         )}
                                     </div>
@@ -1275,7 +1276,7 @@ export default function CreatePaymentPage() {
                             {/* Garansi */}
                             <div>
                                 <label className="text-xs text-gray-500 mb-1.5 block flex items-center gap-1.5">
-                                     Durasi Garansi
+                                    <Shield size={14} /> Durasi Garansi
                                 </label>
                                 <div className="flex gap-2">
                                     {[7, 14, 30, 90].map(d => (
@@ -1302,7 +1303,7 @@ export default function CreatePaymentPage() {
                                     className="border border-gray-200 rounded-xl p-3 text-sm w-full bg-white file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 transition"
                                     onChange={handlePhotoChange}
                                 />
-                                {paymentPhoto && <p className="text-xs text-gray-600 mt-1"> {paymentPhoto.name}</p>}
+                                {paymentPhoto && <p className="text-xs text-gray-600 mt-1 inline-flex items-center gap-1"><Check size={12} /> {paymentPhoto.name}</p>}
                             </div>
 
                             {/* GPS */}
@@ -1310,13 +1311,13 @@ export default function CreatePaymentPage() {
                                 <div>
                                     <p className="text-sm font-medium text-gray-800">GPS Lokasi</p>
                                     <p className="text-xs text-gray-400 mt-0.5">
-                                        {latitude ? " Koordinat berhasil diambil" : "Wajib diambil sebelum simpan"}
+                                        {latitude ? <span className="inline-flex items-center gap-1"><Check size={12} /> Koordinat berhasil diambil</span> : "Wajib diambil sebelum simpan"}
                                     </p>
                                 </div>
                                 <button type="button" onClick={getLocation}
                                     className={`px-4 py-2 rounded-xl text-sm font-medium transition active:scale-95 ${latitude ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-gray-700 text-white hover:bg-gray-800"
                                         }`}>
-                                    {gpsLoading ? "..." : latitude ? " Diambil" : "Ambil GPS"}
+                                    {gpsLoading ? "..." : latitude ? <span className="inline-flex items-center gap-1"><Check size={14} /> Diambil</span> : "Ambil GPS"}
                                 </button>
                             </div>
 
@@ -1378,16 +1379,16 @@ export default function CreatePaymentPage() {
                                 </div>
 
                                 <div className="space-y-2.5 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                                    <ConfirmRow icon="" label="Pembeli" value={watch("customer_name") || "—"} />
-                                    <ConfirmRow icon="" label="WhatsApp" value={watch("customer_phone") || "—"} />
+                                    <ConfirmRow icon={<User size={14} />} label="Pembeli" value={watch("customer_name") || "—"} />
+                                    <ConfirmRow icon={<Smartphone size={14} />} label="WhatsApp" value={watch("customer_phone") || "—"} />
                                     {customerBirthDate && (
-                                        <ConfirmRow icon="" label="Tgl Lahir" value={new Date(customerBirthDate + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })} />
+                                        <ConfirmRow icon={<Cake size={14} />} label="Tgl Lahir" value={new Date(customerBirthDate + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })} />
                                     )}
                                     <div className="h-px bg-gray-200" />
 
                                     {/* Unit list */}
                                     <div>
-                                        <p className="text-xs text-gray-400 mb-1.5"> Unit ({selectedUnits.length})</p>
+                                        <p className="text-xs text-gray-400 mb-1.5 inline-flex items-center gap-1"><Laptop size={12} /> Unit ({selectedUnits.length})</p>
                                         {selectedUnits.map((u, i) => (
                                             <div key={u.unit_id} className="flex justify-between text-xs mb-1">
                                                 <span className="text-gray-600 truncate max-w-[45%]">{i + 1}. {u.laptop_name}</span>
@@ -1401,19 +1402,19 @@ export default function CreatePaymentPage() {
                                         <>
                                             <div className="h-px bg-gray-200" />
                                             <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 space-y-1">
-                                                <p className="text-[10px] font-bold text-amber-700"> Tukar Tambah</p>
-                                                <ConfirmRow icon="" label="Barang" value={tradeInItem} />
-                                                <ConfirmRow icon="" label="Nilai" value={fmt(tradeInValue)} />
-                                                <ConfirmRow icon="" label="Cash terima" value={fmt(Math.max(0, rawDealPrice - tradeInValue))} bold />
+                                                <p className="text-[10px] font-bold text-amber-700 inline-flex items-center gap-1"><Repeat size={11} /> Tukar Tambah</p>
+                                                <ConfirmRow icon={<Package size={14} />} label="Barang" value={tradeInItem} />
+                                                <ConfirmRow icon={<Wallet size={14} />} label="Nilai" value={fmt(tradeInValue)} />
+                                                <ConfirmRow icon={<Banknote size={14} />} label="Cash terima" value={fmt(Math.max(0, rawDealPrice - tradeInValue))} bold />
                                             </div>
                                         </>
                                     )}
 
                                     <div className="h-px bg-gray-200" />
-                                    <ConfirmRow icon="" label="Pickup" value={watch("pickup_method") === "DATANG" ? "Datang ke Toko" : "Diantar"} />
-                                    <ConfirmRow icon="" label="Garansi" value={`${warrantyDuration} hari`} />
+                                    <ConfirmRow icon={<Package size={14} />} label="Pickup" value={watch("pickup_method") === "DATANG" ? "Datang ke Toko" : "Diantar"} />
+                                    <ConfirmRow icon={<Shield size={14} />} label="Garansi" value={`${warrantyDuration} hari`} />
                                     {isEcommerce && (
-                                        <ConfirmRow icon="" label="Platform" value={ecommercePlatform} />
+                                        <ConfirmRow icon={<Package size={14} />} label="Platform" value={ecommercePlatform} />
                                     )}
                                 </div>
 

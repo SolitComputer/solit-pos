@@ -5,7 +5,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
 import { createPortal } from "react-dom";
 import ExcelJS from "exceljs";
-import { ImageIcon, Pencil, CheckCircle2, Receipt, Inbox } from "lucide-react";
+import { ImageIcon, Pencil, CheckCircle2, Receipt, Inbox, Store, Building2, User, Landmark, Banknote, QrCode, CreditCard, type LucideIcon } from "lucide-react";
 
 // ─── Photo Modal ────────────────────────────────────────────────────
 function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
@@ -154,11 +154,11 @@ function getCompanyBadge(company: string): { label: string; color: string } {
   return { label: company.trim(), color: "bg-gray-50 text-gray-600 ring-1 ring-gray-200" };
 }
 
-function getCustomerTypeBadge(type: string): { text: string; icon: string } {
+function getCustomerTypeBadge(type: string): { text: string; icon: LucideIcon } {
   const t = (type ?? "UMUM").toUpperCase();
-  if (t === "RESELLER") return { text: "Reseller", icon: "" };
-  if (t === "CORPORATE") return { text: "Korporat", icon: "" };
-  return { text: "Umum", icon: "" };
+  if (t === "RESELLER") return { text: "Reseller", icon: Store };
+  if (t === "CORPORATE") return { text: "Korporat", icon: Building2 };
+  return { text: "Umum", icon: User };
 }
 
 // ─── RESTORE MODAL ────────────────────────────────────────────────────
@@ -250,12 +250,12 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
   if (!method2 || amount1 <= 0 || amount2 <= 0) return null;
 
   const fmt = (n: number) => `Rp${n.toLocaleString("id-ID")}`;
-  const getMethodMeta = (m: string): { label: string; icon: string; color: string } => {
+  const getMethodMeta = (m: string): { label: string; icon: LucideIcon; color: string } => {
     const upper = m.toUpperCase();
-    if (upper.includes("TRANSFER") || upper.includes("TF") || upper.includes("BCA") || upper.includes("BRI")) return { label: "Transfer", icon: "", color: "blue" };
-    if (upper.includes("TUNAI") || upper.includes("CASH")) return { label: "Tunai", icon: "", color: "emerald" };
-    if (upper.includes("QRIS") || upper.includes("QR")) return { label: "QRIS", icon: "", color: "purple" };
-    return { label: m, icon: "", color: "gray" };
+    if (upper.includes("TRANSFER") || upper.includes("TF") || upper.includes("BCA") || upper.includes("BRI")) return { label: "Transfer", icon: Landmark, color: "blue" };
+    if (upper.includes("TUNAI") || upper.includes("CASH")) return { label: "Tunai", icon: Banknote, color: "emerald" };
+    if (upper.includes("QRIS") || upper.includes("QR")) return { label: "QRIS", icon: QrCode, color: "purple" };
+    return { label: m, icon: CreditCard, color: "gray" };
   };
 
   const colorMap: Record<string, { bg: string; border: string; text: string; label: string }> = {
@@ -274,9 +274,10 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
       <div className="mt-2 grid grid-cols-2 gap-1.5">
         {entries.map(({ meta, amount }, i) => {
           const c = colorMap[meta.color] ?? colorMap.gray;
+          const MIcon = meta.icon;
           return (
             <div key={i} className={`${c.bg} border ${c.border} rounded-lg px-2.5 py-1.5`}>
-              <p className={`text-[9px] ${c.label} font-semibold uppercase tracking-wide mb-0.5`}>{meta.icon} {meta.label}</p>
+              <p className={`text-[9px] ${c.label} font-semibold uppercase tracking-wide mb-0.5 inline-flex items-center gap-0.5`}><MIcon className="w-2.5 h-2.5" /> {meta.label}</p>
               <p className={`text-xs font-bold ${c.text} font-mono tabular-nums`}>{fmt(amount)}</p>
             </div>
           );
@@ -289,9 +290,10 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
     <div className="flex items-center justify-center gap-1 mt-1 flex-wrap">
       {entries.map(({ meta, amount }, i) => {
         const c = colorMap[meta.color] ?? colorMap.gray;
+        const MIcon = meta.icon;
         return (
           <span key={i} className={`inline-flex items-center gap-0.5 text-[8px] font-bold px-1.5 py-0.5 rounded ${c.bg} ${c.text} border ${c.border} whitespace-nowrap tabular-nums`}>
-            {meta.icon} {fmt(amount)}
+            <MIcon className="w-2.5 h-2.5" /> {fmt(amount)}
           </span>
         );
       })}
@@ -458,6 +460,7 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
   const payStyle = getPaymentStyle(item.payment_method ?? "");
   const platformBadge = getSourcePlatformBadge(item.source_platform ?? "");
   const customerTypeBadge = getCustomerTypeBadge(item.customer_type ?? "");
+  const CustomerTypeIcon = customerTypeBadge.icon;
   const timeStr = new Date(item.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
   const dot = statusDot[item.status] ?? "bg-gray-400";
 
@@ -493,8 +496,8 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             <span className={`px-2 py-0.5 rounded-lg font-semibold text-[10px] whitespace-nowrap ${platformBadge.color}`}>{platformBadge.text}</span>
           )}
           {item.customer_type && item.customer_type !== "UMUM" && (
-            <span className="px-2 py-0.5 rounded-lg font-semibold text-[10px] bg-amber-100 text-amber-800 ring-1 ring-amber-200 whitespace-nowrap">
-              {customerTypeBadge.icon} {customerTypeBadge.text}
+            <span className="px-2 py-0.5 rounded-lg font-semibold text-[10px] bg-amber-100 text-amber-800 ring-1 ring-amber-200 whitespace-nowrap inline-flex items-center gap-1">
+              <CustomerTypeIcon className="w-3 h-3" /> {customerTypeBadge.text}
             </span>
           )}
           {item.sales_name && (
@@ -845,8 +848,8 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         <td className="px-4 py-3.5">
           <div className="text-xs font-bold text-gray-900 leading-snug mb-1">{item.customer_name}</div>
           {item.customer_type && item.customer_type !== "UMUM" && (
-            <span className="inline-flex text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 whitespace-nowrap">
-              {getCustomerTypeBadge(item.customer_type).icon} {getCustomerTypeBadge(item.customer_type).text}
+            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 whitespace-nowrap">
+              {(() => { const ct = getCustomerTypeBadge(item.customer_type); const CtIcon = ct.icon; return <><CtIcon className="w-2.5 h-2.5" /> {ct.text}</>; })()}
             </span>
           )}
         </td>
@@ -1013,8 +1016,8 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
               <p className="text-sm font-bold text-gray-800">{item.customer_name}</p>
               {item.customer_phone && <p className="text-xs text-gray-500 mt-0.5"> {item.customer_phone}</p>}
               {item.customer_type && item.customer_type !== "UMUM" && (
-                <span className="inline-flex items-center mt-2 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
-                  {getCustomerTypeBadge(item.customer_type).icon} {getCustomerTypeBadge(item.customer_type).text}
+                <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
+                  {(() => { const ct = getCustomerTypeBadge(item.customer_type); const CtIcon = ct.icon; return <><CtIcon className="w-3 h-3" /> {ct.text}</>; })()}
                 </span>
               )}
             </div>

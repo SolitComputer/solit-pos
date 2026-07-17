@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Radio, Phone } from "lucide-react";
 import { useHTCall } from "@/contexts/HTCallContext";
 
 interface Props {
@@ -28,7 +29,7 @@ export default function DeliveryVoiceHT({ orderId }: Props) {
     <div className="mt-3 bg-[#1a1a2e] rounded-2xl p-4 text-white">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-base"></span>
+          <Radio size={16} />
           <div>
             <p className="text-sm font-black leading-none">HT Pengantaran <span className="text-emerald-300">· Realtime</span></p>
             <p className="text-[10px] text-gray-400 mt-0.5">Pilih tim belakang yang online untuk dipanggil</p>
@@ -57,7 +58,7 @@ export default function DeliveryVoiceHT({ orderId }: Props) {
                     <p className="text-sm font-bold truncate">{u.name}</p>
                     <p className="text-[10px] text-gray-400">{u.role}</p>
                   </div>
-                  <span className="text-lg flex-shrink-0"></span>
+                  <Phone size={18} className="flex-shrink-0" />
                 </button>
               ))}
             </div>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { PartyPopper, AlertTriangle, CheckCircle2, RefreshCw, Ban, ClipboardList, MessageCircle, Megaphone, ShoppingCart, Package, Wrench, Target, Laptop, Upload } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type UserRole = string;
@@ -33,19 +34,19 @@ const KEPALA_ROLES = [
 ];
 
 const DIVISIONS = [
-    { id: "MARKETING", label: "Marketing", emoji: "", color: "bg-pink-100 text-pink-700 border-pink-200" },
-    { id: "SALES", label: "Sales", emoji: "", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-    { id: "PENYEDIA_BARANG", label: "Penyedia Barang", emoji: "", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-    { id: "TEKNISI", label: "Teknisi", emoji: "", color: "bg-orange-100 text-orange-700 border-orange-200" },
-    { id: "ONPOINT", label: "Onpoint", emoji: "", color: "bg-blue-100 text-blue-700 border-blue-200" },
-    { id: "SOTECH", label: "Sotech", emoji: "", color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
-    { id: "UMUM", label: "Umum", emoji: "", color: "bg-gray-100 text-gray-700 border-gray-200" },
+    { id: "MARKETING", label: "Marketing", emoji: Megaphone, color: "bg-pink-100 text-pink-700 border-pink-200" },
+    { id: "SALES", label: "Sales", emoji: ShoppingCart, color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+    { id: "PENYEDIA_BARANG", label: "Penyedia Barang", emoji: Package, color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+    { id: "TEKNISI", label: "Teknisi", emoji: Wrench, color: "bg-orange-100 text-orange-700 border-orange-200" },
+    { id: "ONPOINT", label: "Onpoint", emoji: Target, color: "bg-blue-100 text-blue-700 border-blue-200" },
+    { id: "SOTECH", label: "Sotech", emoji: Laptop, color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+    { id: "UMUM", label: "Umum", emoji: ClipboardList, color: "bg-gray-100 text-gray-700 border-gray-200" },
 ];
 
 const STATUS_CONFIG = {
-    SUBMITTED: { label: "Terkirim", emoji: "", bg: "bg-blue-100", color: "text-blue-700", border: "border-blue-200" },
-    REVIEWED: { label: "Disetujui", emoji: "", bg: "bg-emerald-100", color: "text-emerald-700", border: "border-emerald-200" },
-    REVISION: { label: "Revisi", emoji: "", bg: "bg-amber-100", color: "text-amber-700", border: "border-amber-200" },
+    SUBMITTED: { label: "Terkirim", emoji: Upload, bg: "bg-blue-100", color: "text-blue-700", border: "border-blue-200" },
+    REVIEWED: { label: "Disetujui", emoji: CheckCircle2, bg: "bg-emerald-100", color: "text-emerald-700", border: "border-emerald-200" },
+    REVISION: { label: "Revisi", emoji: RefreshCw, bg: "bg-amber-100", color: "text-amber-700", border: "border-amber-200" },
 };
 
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni",
@@ -111,7 +112,7 @@ function formatDateShort(iso: string) {
     return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 function getDivisionInfo(id: string) {
-    return DIVISIONS.find(d => d.id === id) ?? { id, label: id, emoji: "", color: "bg-gray-100 text-gray-700 border-gray-200" };
+    return DIVISIONS.find(d => d.id === id) ?? { id, label: id, emoji: ClipboardList, color: "bg-gray-100 text-gray-700 border-gray-200" };
 }
 function shiftMonth(ym: string, delta: number) {
     const [y, m] = ym.split("-").map(Number);
@@ -484,7 +485,7 @@ function MonthInsight({
 
                 {isPKLUser && missing.length === 0 && workDays.length > 0 && (
                     <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#ecfdf5] border border-[#a7f3d0]">
-                        <span className="text-lg"></span>
+                        <PartyPopper size={18} />
                         <p className="text-[11px] font-bold text-[#047857]">Semua hari kerja sudah dilaporkan!</p>
                     </div>
                 )}
@@ -626,7 +627,7 @@ function ReportFormModal({
                 <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
                     {error && (
                         <div className="bg-[#fff1f2] border border-[#fecdd3] text-[#be123c] text-xs px-4 py-3 rounded-xl flex items-center gap-2">
-                            <span></span>{error}
+                            <AlertTriangle size={14} className="flex-shrink-0" />{error}
                         </div>
                     )}
 
@@ -652,7 +653,9 @@ function ReportFormModal({
                         <div>
                             <label className={labelCls}>Divisi Penempatan</label>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {DIVISIONS.map(div => (
+                                {DIVISIONS.map(div => {
+                                    const DivIcon = div.emoji;
+                                    return (
                                     <button
                                         key={div.id}
                                         type="button"
@@ -662,10 +665,11 @@ function ReportFormModal({
                                             ? { background: NAVY_GRADIENT, color: "#fff", borderColor: "transparent", boxShadow: NAVY_SHADOW }
                                             : { background: "#fff", color: "#64748b", borderColor: "#e2e8f0" }}
                                     >
-                                        <span>{div.emoji}</span>
+                                        <DivIcon size={14} className="flex-shrink-0" />
                                         <span className="truncate">{div.label}</span>
                                     </button>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -720,9 +724,11 @@ function ReportFormModal({
                         <div className="bg-[#fafbff] border border-[#f0f0f8] rounded-2xl px-4 py-3.5">
                             <p className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wide mb-2">Pratinjau</p>
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                {(() => { const PrevIcon = getDivisionInfo(form.division).emoji; return (
                                 <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${getDivisionInfo(form.division).color}`}>
-                                    {getDivisionInfo(form.division).emoji} {getDivisionInfo(form.division).label}
+                                    <PrevIcon size={11} className="flex-shrink-0" /> {getDivisionInfo(form.division).label}
                                 </span>
+                                ); })()}
                                 <span className="text-[10px] text-[#94a3b8]">{formatDateShort(form.report_date)}</span>
                             </div>
                             <p className="text-xs text-[#64748b] line-clamp-2 leading-relaxed">{form.description}</p>
@@ -809,9 +815,11 @@ function ReviewModal({
                     {/* Isi laporan */}
                     <div className="bg-[#fafbff] border border-[#f0f0f8] rounded-2xl p-4">
                         <div className="flex items-center gap-2 mb-3 flex-wrap">
+                            {(() => { const DivIcon = div.emoji; return (
                             <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${div.color}`}>
-                                {div.emoji} {div.label}
+                                <DivIcon size={11} className="flex-shrink-0" /> {div.label}
                             </span>
+                            ); })()}
                             <span className="text-xs text-[#94a3b8]">{formatDate(report.report_date)}</span>
                         </div>
                         {report.title && <p className="font-bold text-[#0f172a] text-sm mb-1">{report.title}</p>}
@@ -827,14 +835,14 @@ function ReviewModal({
                                     ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/25"
                                     : "bg-white text-[#64748b] border-[#e2e8f0] hover:bg-[#f8fafc]"
                                     }`}>
-                                <span></span> Disetujui
+                                <CheckCircle2 size={14} /> Disetujui
                             </button>
                             <button type="button" onClick={() => setStatus("REVISION")}
                                 className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-xs font-bold border transition-all active:scale-[0.98] ${status === "REVISION"
                                     ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/25"
                                     : "bg-white text-[#64748b] border-[#e2e8f0] hover:bg-[#f8fafc]"
                                     }`}>
-                                <span></span> Perlu Revisi
+                                <RefreshCw size={14} /> Perlu Revisi
                             </button>
                         </div>
                     </div>
@@ -912,12 +920,16 @@ function ReportDetailModal({
                 <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
                     {/* Meta */}
                     <div className="flex items-center gap-2 flex-wrap">
+                        {(() => { const DivIcon = div.emoji; return (
                         <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${div.color}`}>
-                            {div.emoji} {div.label}
+                            <DivIcon size={11} className="flex-shrink-0" /> {div.label}
                         </span>
+                        ); })()}
+                        {(() => { const StatusIcon = status.emoji; return (
                         <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${status.bg} ${status.color} ${status.border}`}>
-                            {status.emoji} {status.label}
+                            <StatusIcon size={11} className="flex-shrink-0" /> {status.label}
                         </span>
+                        ); })()}
                         {report.created_by_admin && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-violet-100 text-violet-700 border-violet-200">
                                  Input Admin
@@ -1139,7 +1151,7 @@ export default function PKLReportsPage() {
             <DashboardLayout>
                 <div className="flex flex-col items-center justify-center min-h-[60vh]">
                     <div className="w-16 h-16 rounded-2xl bg-[#fff1f2] flex items-center justify-center mb-4">
-                        <span className="text-3xl"></span>
+                        <Ban size={30} className="text-gray-300" />
                     </div>
                     <p className="text-base font-bold text-[#334155]">Akses Ditolak</p>
                     <p className="text-sm text-[#94a3b8] mt-1">Halaman ini hanya untuk PKL dan pemantau divisi</p>
@@ -1321,18 +1333,21 @@ export default function PKLReportsPage() {
                                         >
                                              Semua Divisi
                                         </button>
-                                        {DIVISIONS.map(div => (
+                                        {DIVISIONS.map(div => {
+                                            const DivIcon = div.emoji;
+                                            return (
                                             <button
                                                 key={div.id}
                                                 onClick={() => setActiveDivision(div.id)}
-                                                className="px-4 py-2 rounded-xl text-xs font-bold transition-all border flex-shrink-0 active:scale-[0.97]"
+                                                className="px-4 py-2 rounded-xl text-xs font-bold transition-all border flex-shrink-0 active:scale-[0.97] inline-flex items-center gap-1.5"
                                                 style={activeDivision === div.id
                                                     ? { background: NAVY_GRADIENT, color: "#fff", borderColor: "transparent", boxShadow: NAVY_SHADOW }
                                                     : { background: "#fff", color: "#64748b", borderColor: "#e2e8f0" }}
                                             >
-                                                {div.emoji} {div.label}
+                                                <DivIcon size={13} className="flex-shrink-0" /> {div.label}
                                             </button>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -1340,10 +1355,11 @@ export default function PKLReportsPage() {
                             {/* Info divisi untuk kepala — read only */}
                             {isKepalaUser && activeDivision !== "ALL" && (() => {
                                 const div = getDivisionInfo(activeDivision);
+                                const DivIcon = div.emoji;
                                 return (
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border ${div.color}`}>
-                                            {div.emoji} Divisi {div.label}
+                                            <DivIcon size={13} className="flex-shrink-0" /> Divisi {div.label}
                                         </span>
                                         <span className="text-[10px] text-[#94a3b8]">Kamu hanya dapat melihat laporan PKL divisimu</span>
                                     </div>
@@ -1477,7 +1493,7 @@ export default function PKLReportsPage() {
 
                                             {topDiv && (
                                                 <p className="text-[10px] text-[#94a3b8]">
-                                                    Divisi utama: <span className="font-bold text-[#475569]">{getDivisionInfo(topDiv[0]).emoji} {getDivisionInfo(topDiv[0]).label}</span>
+                                                    Divisi utama: {(() => { const TopIcon = getDivisionInfo(topDiv[0]).emoji; return (<span className="inline-flex items-center gap-1 font-bold text-[#475569]"><TopIcon size={11} className="flex-shrink-0" /> {getDivisionInfo(topDiv[0]).label}</span>); })()}
                                                 </p>
                                             )}
                                         </div>
@@ -1529,7 +1545,7 @@ export default function PKLReportsPage() {
                         ) : reports.length === 0 ? (
                             <div className="py-16 text-center px-4">
                                 <div className="w-14 h-14 rounded-2xl bg-[#f5f7ff] flex items-center justify-center mx-auto mb-4">
-                                    <span className="text-3xl opacity-40"></span>
+                                    <ClipboardList size={30} className="opacity-40" />
                                 </div>
                                 <p className="text-sm text-[#475569] font-bold">Belum ada laporan di rentang ini</p>
                                 <p className="text-xs text-[#94a3b8] mt-1">Ubah filter bulan/status, atau buat laporan baru.</p>
@@ -1578,12 +1594,16 @@ export default function PKLReportsPage() {
                                                         {!isPKLUser && (
                                                             <p className="text-sm font-bold text-[#0f172a]">{report.users?.name ?? "—"}</p>
                                                         )}
+                                                        {(() => { const DivIcon = div.emoji; return (
                                                         <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${div.color}`}>
-                                                            {div.emoji} {div.label}
+                                                            <DivIcon size={11} className="flex-shrink-0" /> {div.label}
                                                         </span>
+                                                        ); })()}
+                                                        {(() => { const StatusIcon = status.emoji; return (
                                                         <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${status.bg} ${status.color} ${status.border}`}>
-                                                            {status.emoji} {status.label}
+                                                            <StatusIcon size={11} className="flex-shrink-0" /> {status.label}
                                                         </span>
+                                                        ); })()}
                                                         {isToday && (
                                                             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full">
                                                                 Hari ini
@@ -1606,7 +1626,7 @@ export default function PKLReportsPage() {
                                                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                                             : "bg-amber-50 text-amber-700 border border-amber-200"
                                                             }`}>
-                                                            <span className="flex-shrink-0"></span>
+                                                            <MessageCircle size={12} className="flex-shrink-0 mt-0.5" />
                                                             <span className="line-clamp-1">{report.review_note}</span>
                                                         </div>
                                                     )}

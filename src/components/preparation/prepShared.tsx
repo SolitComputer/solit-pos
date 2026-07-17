@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { type LucideIcon, User, Bike, Package } from "lucide-react";
 
 export interface PrepItem { id: string; serial_number: string; laptop_name: string | null; is_checked: boolean }
 export interface PrepOrder {
@@ -20,10 +21,10 @@ export const STATUS_META: Record<string, { label: string; badge: string; dot: st
   DIBATALKAN: { label: "Batal", badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400" },
 };
 
-export const DELIVERY_META: Record<string, { label: string; icon: string }> = {
-  DIAMBIL_CUSTOMER: { label: "Diambil Customer", icon: "" },
-  PENGANTARAN: { label: "Pengantaran", icon: "" },
-  KURIR: { label: "Kurir", icon: "" },
+export const DELIVERY_META: Record<string, { label: string; icon: LucideIcon }> = {
+  DIAMBIL_CUSTOMER: { label: "Diambil Customer", icon: User },
+  PENGANTARAN: { label: "Pengantaran", icon: Bike },
+  KURIR: { label: "Kurir", icon: Package },
 };
 
 export const fmtDate = (iso: string) =>
@@ -67,7 +68,7 @@ export function OrderCard({ o, canReceive = false, receivingId = null, onReceive
             <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${sm.badge}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`} />{sm.label}
             </span>
-            {dm && <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200">{dm.icon} {dm.label}</span>}
+            {dm && <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200"><dm.icon size={11} /> {dm.label}</span>}
             {isNew && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-500 text-white animate-pulse">BARU</span>}
           </div>
           <p className="text-base font-black text-gray-900 leading-tight">{o.customer_name}</p>

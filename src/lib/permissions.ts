@@ -322,6 +322,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/done": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/history": [...SERVICE_VIEW_ROLES],
+  "/dashboard/service/statistik": [...SERVICE_VIEW_ROLES],
 
   "/payment": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
@@ -438,6 +439,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
   "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
   "/dashboard/preparation/history": [...PREPARATION_VIEW_ROLES],
+  "/dashboard/preparation/statistik": [...DELIVERY_LEADERBOARD_VIEW_ROLES],
 
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
   "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],

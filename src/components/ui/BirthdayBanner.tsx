@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
+import { Cake, PartyPopper } from "lucide-react";
 
 interface BirthdayUser {
     id: string;
@@ -136,12 +137,12 @@ export function BirthdayBanner() {
             >
                 {/* Header row */}
                 <div className="flex items-center gap-3 px-4 pt-3 pb-2">
-                    <span className="text-2xl flex-shrink-0"></span>
+                    <Cake size={24} className="flex-shrink-0 text-amber-700" />
                     <div className="flex-1 min-w-0">
-                        <p className="text-xs font-black text-amber-900"> Selamat Ulang Tahun!</p>
+                        <p className="text-xs font-black text-amber-900 flex items-center gap-1"><PartyPopper size={14} className="flex-shrink-0" />Selamat Ulang Tahun!</p>
                         <p className="text-[11px] text-amber-800 font-semibold mt-0.5 truncate">{names}</p>
                     </div>
-                    <span className="text-2xl flex-shrink-0"></span>
+                    <PartyPopper size={24} className="flex-shrink-0 text-amber-700" />
                     {/* Close button */}
                     <button
                         onClick={handleDismiss}
@@ -164,7 +165,7 @@ export function BirthdayBanner() {
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                 </svg>
-                                Ucapan terkirim via chat! 
+                                Ucapan terkirim via chat! <PartyPopper size={14} className="flex-shrink-0" />
                             </div>
                         ) : (
                             <div className="flex gap-1.5">

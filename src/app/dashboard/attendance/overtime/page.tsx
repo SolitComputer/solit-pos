@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation"; //  ADD
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2 } from "lucide-react";
+import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2, AlertTriangle, Camera, Inbox, Pencil, Play, Check, X, Ban, ClipboardList, Circle, HelpCircle, type LucideIcon } from "lucide-react";
 
 type OvertimeRequest = {
   id: string; user_id: string; request_date: string;
@@ -147,18 +147,18 @@ function addWatermarkToImage(imageDataUrl: string, callback: (blob: Blob, url: s
 }
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<string, { label: string; icon: string; bg: string; text: string; border: string; dot: string }> = {
-  PENDING: { label: "Pending", icon: "", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-400" },
-  APPROVED: { label: "Disetujui", icon: "", bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
-  ONGOING: { label: "Berjalan", icon: "", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
-  COMPLETED: { label: "Selesai", icon: "", bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
-  NEED_PROOF: { label: "Upload Foto", icon: "", bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500" },
-  REJECTED: { label: "Ditolak", icon: "", bg: "bg-red-50", text: "text-red-700", border: "border-red-200", dot: "bg-red-500" },
-  CANCELLED: { label: "Dibatalkan", icon: "⊘", bg: "bg-gray-50", text: "text-gray-500", border: "border-gray-200", dot: "bg-gray-400" },
+const STATUS_CONFIG: Record<string, { label: string; icon: LucideIcon; bg: string; text: string; border: string; dot: string }> = {
+  PENDING: { label: "Pending", icon: Clock, bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-400" },
+  APPROVED: { label: "Disetujui", icon: CheckCircle2, bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", dot: "bg-violet-500" },
+  ONGOING: { label: "Berjalan", icon: Play, bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" },
+  COMPLETED: { label: "Selesai", icon: Check, bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", dot: "bg-blue-500" },
+  NEED_PROOF: { label: "Upload Foto", icon: Camera, bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", dot: "bg-orange-500" },
+  REJECTED: { label: "Ditolak", icon: X, bg: "bg-red-50", text: "text-red-700", border: "border-red-200", dot: "bg-red-500" },
+  CANCELLED: { label: "Dibatalkan", icon: Ban, bg: "bg-gray-50", text: "text-gray-500", border: "border-gray-200", dot: "bg-gray-400" },
 };
 
 function StatusBadge({ status }: { status: OvertimeRequest["status"] }) {
-  const c = STATUS_CONFIG[status] ?? { label: status, icon: "?", bg: "bg-gray-50", text: "text-gray-600", border: "border-gray-200", dot: "bg-gray-400" };
+  const c = STATUS_CONFIG[status] ?? { label: status, icon: HelpCircle, bg: "bg-gray-50", text: "text-gray-600", border: "border-gray-200", dot: "bg-gray-400" };
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${c.bg} ${c.text} ${c.border}`}>
       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${c.dot}`} />{c.label}
@@ -182,7 +182,7 @@ const secondaryBtn = "flex-1 h-10 bg-white border border-gray-200 text-gray-600 
 function ErrorBanner({ msg }: { msg: string }) {
   return (
     <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-3 rounded-xl">
-      <span className="flex-shrink-0 mt-px"></span>
+      <AlertTriangle size={14} className="flex-shrink-0 mt-px" />
       <span className="font-medium leading-relaxed">{msg}</span>
     </div>
   );
@@ -415,7 +415,7 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
       <div className="flex gap-2.5">
         <button onClick={onCancel} className={secondaryBtn} style={{ flex: "0 0 auto", padding: "0 16px" }}>Batal</button>
         <button onClick={capture} disabled={!ready || processing || !!error} className={primaryBtn}>
-          {processing ? <Spinner /> : <><span></span><span>Ambil Foto</span></>}
+          {processing ? <Spinner /> : <><Camera size={16} /><span>Ambil Foto</span></>}
         </button>
       </div>
     </div>
@@ -546,10 +546,10 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
 }
 
 const REASON_OPTIONS = [
-  { value: "Tugas Mendesak", icon: "", desc: "Harus diselesaikan segera" },
-  { value: "Pekerjaan Belum Selesai", icon: "", desc: "Pekerjaan hari ini belum tuntas" },
-  { value: "Permintaan Atasan", icon: "", desc: "Diminta langsung oleh atasan" },
-  { value: "Lainnya", icon: "", desc: "Alasan lain" },
+  { value: "Tugas Mendesak", icon: Circle, iconClass: "text-red-500 fill-red-500", desc: "Harus diselesaikan segera" },
+  { value: "Pekerjaan Belum Selesai", icon: Circle, iconClass: "text-amber-400 fill-amber-400", desc: "Pekerjaan hari ini belum tuntas" },
+  { value: "Permintaan Atasan", icon: Circle, iconClass: "text-blue-500 fill-blue-500", desc: "Diminta langsung oleh atasan" },
+  { value: "Lainnya", icon: Pencil, iconClass: "text-gray-500", desc: "Alasan lain" },
 ] as const;
 
 function ReasonGrid({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -557,10 +557,11 @@ function ReasonGrid({ value, onChange }: { value: string; onChange: (v: string) 
     <div className="grid grid-cols-2 gap-2">
       {REASON_OPTIONS.map(opt => {
         const sel = value === opt.value;
+        const Icon = opt.icon;
         return (
           <button key={opt.value} type="button" onClick={() => onChange(opt.value)}
             className={`flex items-start gap-2.5 px-3 py-3 rounded-xl border text-left transition-all active:scale-[0.98] ${sel ? "bg-violet-600 border-violet-600 shadow-sm shadow-violet-200" : "bg-white border-gray-200 hover:border-violet-300 hover:bg-violet-50/50"}`}>
-            <span className="text-sm flex-shrink-0 mt-px">{opt.icon}</span>
+            <span className="flex-shrink-0 mt-px"><Icon size={14} className={opt.iconClass} /></span>
             <div>
               <p className={`text-[11px] font-semibold leading-tight ${sel ? "text-white" : "text-gray-800"}`}>{opt.value}</p>
               <p className={`text-[9px] mt-0.5 ${sel ? "text-violet-200" : "text-gray-400"}`}>{opt.desc}</p>
@@ -832,7 +833,7 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
         {photoStep === "idle" && (
           <button onClick={() => setPhotoStep("camera")}
             className={`w-full flex items-center justify-center gap-3 border-2 border-dashed rounded-xl p-7 text-center transition-all group ${mustUpload ? "border-orange-300 bg-orange-50/40 hover:border-orange-400 hover:bg-orange-50/70" : "border-gray-200 hover:border-violet-300 hover:bg-violet-50/20"}`}>
-            <span className="text-2xl"></span>
+            <Camera size={24} className="text-gray-400" />
             <div className="text-left">
               <p className={`text-xs font-semibold ${mustUpload ? "text-orange-700" : "text-gray-700"}`}>Buka Kamera</p>
               <p className={`text-[10px] mt-0.5 ${mustUpload ? "text-orange-500" : "text-gray-400"}`}>{mustUpload ? "Wajib ambil foto bukti" : "Ambil foto bukti lemburan"}</p>
@@ -1050,7 +1051,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             ? <div><img src={photoPreview} alt="Preview" className="w-full h-36 object-cover rounded-xl border border-gray-100 mb-2 shadow-sm" /><button onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoStep("idle"); }} className="text-[10px] font-semibold text-gray-400 hover:text-gray-700 transition-colors">↺ Ambil Ulang</button></div>
             : photoStep === "camera"
               ? <CameraCapture onCapture={(f, url) => { setPhotoFile(f); setPhotoPreview(url); setPhotoStep("preview"); setError(""); }} onCancel={() => setPhotoStep("idle")} />
-              : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2.5 border-2 border-dashed border-gray-200 rounded-xl p-5 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><span className="text-xl"></span><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
+              : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2.5 border-2 border-dashed border-gray-200 rounded-xl p-5 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><Camera size={20} className="text-gray-400" /><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
         </div>
       </div>
       {photoStep !== "camera" && (
@@ -1168,7 +1169,7 @@ function EditOvertimeModal({ overtime: o, onClose, onSaved }: { overtime: Overti
             ? <div><img src={photoPreview} alt="Preview" className="w-full h-36 object-cover rounded-xl border border-gray-100 mb-2 shadow-sm" /><button onClick={() => { setPhotoFile(null); setPhotoPreview(null); setPhotoStep("idle"); }} className="text-[10px] font-semibold text-gray-400 hover:text-gray-700 transition-colors">↺ Hapus Foto</button></div>
             : photoStep === "camera"
               ? <CameraCapture onCapture={(f, url) => { setPhotoFile(f); setPhotoPreview(url); setPhotoStep("preview"); setError(""); }} onCancel={() => setPhotoStep("idle")} />
-              : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2.5 border-2 border-dashed border-gray-200 rounded-xl p-5 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><span className="text-xl"></span><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
+              : <button onClick={() => setPhotoStep("camera")} className="w-full flex items-center justify-center gap-2.5 border-2 border-dashed border-gray-200 rounded-xl p-5 hover:border-violet-300 hover:bg-violet-50/20 transition-all"><Camera size={20} className="text-gray-400" /><span className="text-xs font-semibold text-gray-600">Buka Kamera</span></button>}
         </div>
       </div>
       {photoStep !== "camera" && (
@@ -1297,10 +1298,11 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
           {["Semua", ...statuses].map(s => {
             const c = s !== "Semua" ? STATUS_CONFIG[s] : null;
             const active = filterStatus === s;
+            const Icon = c?.icon;
             return (
               <button key={s} onClick={() => setFilterStatus(s)}
                 className={`flex-shrink-0 h-7 px-3 rounded-lg text-[10px] font-semibold transition-all border ${active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"}`}>
-                {c ? `${c.icon} ${c.label}` : "Semua"}
+                {c && Icon ? <span className="inline-flex items-center gap-1"><Icon size={12} />{c.label}</span> : "Semua"}
               </button>
             );
           })}
@@ -1308,7 +1310,7 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
       )}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-2">
-          <span className="text-3xl"></span>
+          <Inbox size={30} className="text-gray-300" />
           <p className="text-xs text-gray-400 font-medium">Tidak ada data</p>
         </div>
       ) : (
@@ -1384,10 +1386,11 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
               {["Semua", ...statuses].map(s => {
                 const c = s !== "Semua" ? STATUS_CONFIG[s] : null;
                 const active = filterStatus === s;
+                const Icon = c?.icon;
                 return (
                   <button key={s} onClick={() => setFilterStatus(s)}
                     className={`flex-shrink-0 h-9 px-3 rounded-xl text-[10px] font-semibold transition-all border ${active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"}`}>
-                    {c ? `${c.icon} ${c.label}` : "Semua"}
+                    {c && Icon ? <span className="inline-flex items-center gap-1"><Icon size={12} />{c.label}</span> : "Semua"}
                   </button>
                 );
               })}
@@ -1410,7 +1413,7 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
         </div>
       ) : groupedByUser.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-2.5">
-          <span className="text-3xl"></span>
+          <Inbox size={30} className="text-gray-300" />
           <p className="text-xs font-semibold text-gray-400">Tidak ada data lemburan</p>
           <p className="text-[10px] text-gray-300">Coba ubah filter atau hapus pencarian</p>
         </div>
@@ -1645,7 +1648,7 @@ export default function OvertimePage() {
               {canInputManual(currentUser?.roles ?? (currentUser?.role ? [currentUser.role] : [])) && (
                 <button onClick={() => setShowManualModal(true)}
                   className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow">
-                  <span></span><span className="hidden sm:inline">Input Manual</span>
+                  <Pencil size={16} /><span className="hidden sm:inline">Input Manual</span>
                 </button>
               )}
               <button onClick={() => setShowRequestModal(true)}

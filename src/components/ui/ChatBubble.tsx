@@ -7,6 +7,7 @@ import { getSupabaseClient } from "@/services/supabaseClient";
 import { useChatContext } from "@/contexts/ChatContext";
 import { GroupChatPanel } from "@/components/ui/GroupChatPanel";
 import { VoicePlayer, VoiceRecorder } from "@/components/ui/VoiceNote";
+import { Check, CheckCheck, MessageCircle } from "lucide-react";
 
 const supabase = getSupabaseClient();
 
@@ -267,7 +268,7 @@ function MessageItem({ msg, isMine, onEdit, onDelete }: {
                             {isMine && (
                                 <span className="text-[10px]"
                                     style={{ color: msg.is_read ? "#93c5fd" : "rgba(255,255,255,0.35)" }}>
-                                    {msg.is_read ? "" : ""}
+                                    {msg.is_read ? <CheckCheck size={12} /> : <Check size={12} />}
                                 </span>
                             )}
                         </div>
@@ -616,7 +617,7 @@ export function ChatPanel({ currentUser, targetUser, isMinimized, onToggleMinimi
                     </div>
                 ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-                        <div className="text-3xl opacity-20"></div>
+                        <MessageCircle size={30} className="opacity-20" />
                         <p className="text-[11px] text-gray-400">Mulai percakapan!</p>
                     </div>
                 ) : messages.map(msg => (

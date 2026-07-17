@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
+import { AlertTriangle, Clock, Sunrise, Sunset, type LucideIcon } from "lucide-react";
 
 type UserInfo = { id: string; name: string; role: string; shift?: "PAGI" | "SORE" | null };
 
@@ -10,8 +11,8 @@ const DAY_FULL = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 const SHIFT_PREVIEW = {
-  PAGI: { open: "07:30", late: "08:00", close: "12:00", emoji: "", label: "Pagi" },
-  SORE: { open: "14:00", late: "16:00", close: "18:00", emoji: "", label: "Sore" },
+  PAGI: { open: "07:30", late: "08:00", close: "12:00", emoji: Sunrise, label: "Pagi" },
+  SORE: { open: "14:00", late: "16:00", close: "18:00", emoji: Sunset, label: "Sore" },
 } as const;
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -188,7 +189,7 @@ export function ShiftScheduleTab({
     <div className="space-y-5">
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2">
-          <span></span>{error}
+          <AlertTriangle size={14} className="flex-shrink-0" />{error}
         </div>
       )}
 
@@ -252,8 +253,8 @@ export function ShiftScheduleTab({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[11px] font-black truncate">{u.name}</span>
-                  <span className={`block text-[9px] truncate ${sel ? "text-white/60" : "text-gray-400"}`}>
-                    default {SHIFT_PREVIEW[def].emoji} {def}
+                  <span className={`inline-flex items-center gap-1 text-[9px] truncate ${sel ? "text-white/60" : "text-gray-400"}`}>
+                    {(() => { const DefIcon = SHIFT_PREVIEW[def].emoji; return <DefIcon size={10} className="flex-shrink-0" />; })()} default {def}
                   </span>
                 </span>
               </button>
@@ -390,6 +391,7 @@ export function ShiftScheduleTab({
             {(["PAGI", "SORE"] as const).map(s => {
               const p = SHIFT_PREVIEW[s];
               const on = shift === s;
+              const PIcon = p.emoji;
               return (
                 <button
                   key={s}
@@ -401,7 +403,7 @@ export function ShiftScheduleTab({
                       : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                   }`}
                 >
-                  <span className="block text-xs font-black">{p.emoji} {p.label}</span>
+                  <span className="flex items-center justify-center gap-1 text-xs font-black"><PIcon size={14} className="flex-shrink-0" /> {p.label}</span>
                   <span className={`block text-[9px] font-mono font-bold mt-0.5 ${on ? "text-white/70" : "text-gray-400"}`}>
                     {p.open} – {p.close}
                   </span>
@@ -469,17 +471,20 @@ export function ShiftScheduleTab({
         <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200 rounded-2xl p-4">
           <p className="text-[10px] font-black text-violet-700 uppercase tracking-wide mb-2.5"> Preview</p>
           <div className="grid grid-cols-3 gap-2 mb-3">
-            {[
-              { label: "Karyawan", value: `${selectedUsers.length}`, sub: "orang" },
-              { label: "Hari Kena", value: `${affectedDates.length}`, sub: "tanggal" },
-              { label: "Shift", value: `${cfg.emoji} ${shift}`, sub: `${hours.open}–${hours.close}` },
-            ].map(c => (
+            {([
+              { label: "Karyawan", value: `${selectedUsers.length}`, sub: "orang", icon: undefined as LucideIcon | undefined },
+              { label: "Hari Kena", value: `${affectedDates.length}`, sub: "tanggal", icon: undefined as LucideIcon | undefined },
+              { label: "Shift", value: shift, sub: `${hours.open}–${hours.close}`, icon: cfg.emoji as LucideIcon },
+            ]).map(c => {
+              const Ico = c.icon;
+              return (
               <div key={c.label} className="bg-white border border-violet-100 rounded-xl px-3 py-2.5 text-center">
                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-wide">{c.label}</p>
-                <p className="text-sm font-black text-violet-700 mt-0.5">{c.value}</p>
+                <p className="flex items-center justify-center gap-1 text-sm font-black text-violet-700 mt-0.5">{Ico && <Ico size={13} className="flex-shrink-0" />}{c.value}</p>
                 <p className="text-[9px] text-gray-400 font-semibold">{c.sub}</p>
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="flex flex-wrap gap-1 mb-3 max-h-16 overflow-y-auto">
             {affectedDates.slice(0, 24).map(dk => (
@@ -514,7 +519,7 @@ export function ShiftScheduleTab({
 
         {schedules.length === 0 ? (
           <div className="py-10 text-center bg-gray-50 rounded-2xl border border-gray-100">
-            <span className="text-2xl opacity-30"></span>
+            <Clock size={24} className="opacity-30 mx-auto" />
             <p className="text-[11px] text-gray-400 font-semibold mt-2">Belum ada jadwal shift khusus</p>
             <p className="text-[10px] text-gray-300 mt-0.5">Semua karyawan pakai shift default</p>
           </div>
@@ -556,8 +561,8 @@ export function ShiftScheduleTab({
                           ? "bg-amber-50 text-amber-700 border-amber-200"
                           : "bg-indigo-50 text-indigo-700 border-indigo-200"
                       }`}>
-                        <p className="text-[10px] font-black leading-none">
-                          {SHIFT_PREVIEW[s.shift].emoji} {s.shift}
+                        <p className="inline-flex items-center gap-1 text-[10px] font-black leading-none">
+                          {(() => { const SIcon = SHIFT_PREVIEW[s.shift].emoji; return <SIcon size={11} className="flex-shrink-0" />; })()} {s.shift}
                         </p>
                         <p className="text-[9px] font-mono font-bold opacity-70 mt-0.5">
                           {pad2(openH)}:{pad2(openM)}–{pad2(closeH)}:{pad2(closeM)}

@@ -5,6 +5,11 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx-js-style";
+import {
+    HardDrive, MemoryStick, Plug, BatteryFull, Keyboard, Monitor,
+    Package, CircuitBoard, Cpu, Gamepad2, Fan, Droplet, Cable, Wrench,
+    type LucideIcon,
+} from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface Accessory {
@@ -40,11 +45,11 @@ const CATEGORIES = [
     "KABEL", "LAINNYA",
 ];
 
-const CATEGORY_EMOJI: Record<string, string> = {
-    HDD: "", SSD: "", RAM: "", CHARGER: "", BATERAI: "",
-    KEYBOARD: "⌨", LCD: "", CASING: "", MOTHERBOARD: "",
-    PROCESSOR: "", VGA: "", FAN: "", "THERMAL PASTE": "",
-    KABEL: "", LAINNYA: "",
+const CATEGORY_ICON: Record<string, LucideIcon> = {
+    HDD: HardDrive, SSD: HardDrive, RAM: MemoryStick, CHARGER: Plug, BATERAI: BatteryFull,
+    KEYBOARD: Keyboard, LCD: Monitor, CASING: Package, MOTHERBOARD: CircuitBoard,
+    PROCESSOR: Cpu, VGA: Gamepad2, FAN: Fan, "THERMAL PASTE": Droplet,
+    KABEL: Cable, LAINNYA: Wrench,
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -333,6 +338,7 @@ function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete }: {
     if (!accessory) return null;
     const stock = accessory.stock ?? 0;
     const margin = (accessory.sell_price || 0) - (accessory.buy_price || 0);
+    const CatIcon = CATEGORY_ICON[accessory.category] ?? Wrench;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
@@ -347,7 +353,7 @@ function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete }: {
                 </div>
                 <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
                     <div className="flex flex-col sm:flex-row gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100">
-                        <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0">{CATEGORY_EMOJI[accessory.category] ?? ""}</div>
+                        <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-3xl flex-shrink-0"><CatIcon size={30} className="text-gray-700" /></div>
                         <div className="flex-1 min-w-0">
                             <h3 className="font-black text-gray-900 text-lg tracking-tight leading-snug break-words">{accessory.name}</h3>
                             <p className="text-sm text-gray-400 mt-0.5 font-medium">{accessory.brand || "—"}{accessory.spec ? ` · ${accessory.spec}` : ""}</p>
@@ -719,7 +725,7 @@ function AccessoriesContent() {
                     {/* TABLE */}
                     {fetching ? <SkeletonTable /> : items.length === 0 ? (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-24 text-center animate-fadeIn">
-                            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl"></div>
+                            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl"><Wrench size={30} className="text-gray-400" /></div>
                             <p className="text-gray-700 font-bold text-base">Belum ada data aksesori</p>
                             <p className="text-gray-400 text-sm mt-1.5">{hasFilter ? "Coba ubah filter pencarian" : "Klik tombol Tambah Aksesori untuk mulai"}</p>
                         </div>

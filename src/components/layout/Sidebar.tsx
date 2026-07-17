@@ -54,7 +54,8 @@ function isItemActive(href: string, pathname: string): boolean {
         !pathname.startsWith("/dashboard/preparation/pengantaran") &&
         !pathname.startsWith("/dashboard/preparation/sedang-diantar") &&
         !pathname.startsWith("/dashboard/preparation/siap-kirim") &&
-        !pathname.startsWith("/dashboard/preparation/riwayat-penyedia"))
+        !pathname.startsWith("/dashboard/preparation/riwayat-penyedia") &&
+        !pathname.startsWith("/dashboard/preparation/statistik"))
     );
   }
   
@@ -440,6 +441,7 @@ const PREPARATION_SALES_MENU: MenuGroup = {
 const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
+    { name: "Dashboard Pengantaran", href: "/dashboard/preparation/statistik", icon: Icons.dashboard },
     { name: "Siap Dikirim ", href: "/dashboard/preparation/siap-kirim", icon: Icons.serviceQueue },
     { name: "Sedang Diantar", href: "/dashboard/preparation/sedang-diantar", icon: Icons.deliveryRoute },
     { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.serviceHistory },
@@ -449,6 +451,7 @@ const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
 const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
+    { name: "Dashboard Pengantaran", href: "/dashboard/preparation/statistik", icon: Icons.dashboard },
     ITEM_ANTRIAN_MASUK,
     { name: "Tugas Antar Saya", href: "/dashboard/preparation/pengantaran", icon: Icons.deliveryRoute },
     { name: "Sedang Diantar", href: "/dashboard/preparation/sedang-diantar", icon: Icons.pendingOrders },
@@ -469,6 +472,7 @@ const ADMIN_PENYEDIA_MENU: MenuGroup = {
 const ADMIN_PENGANTARAN_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
+    { name: "Dashboard Pengantaran", href: "/dashboard/preparation/statistik", icon: Icons.dashboard },
     { name: "Siap Dikirim", href: "/dashboard/preparation/siap-kirim", icon: Icons.serviceQueue },
     { name: "Sedang Diantar", href: "/dashboard/preparation/sedang-diantar", icon: Icons.deliveryRoute },
     { name: "Riwayat Pengantaran", href: "/dashboard/preparation/history", icon: Icons.serviceHistory },
@@ -526,6 +530,7 @@ const ADMIN_TRANSAKSI: MenuGroup = {
 const SERVICE_MENU: MenuGroup = {
   label: "Servis",
   items: [
+    { name: "Dashboard Servis", href: "/dashboard/service/statistik", icon: Icons.dashboard },
     { name: "Antrian", href: "/dashboard/service/antrian", icon: Icons.serviceQueue },
     { name: "Selesai (Done)", href: "/dashboard/service/done", icon: Icons.serviceDone },
     { name: "Riwayat Servis", href: "/dashboard/service/history", icon: Icons.serviceHistory },

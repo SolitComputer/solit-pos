@@ -3,6 +3,10 @@
 import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import {
+  RefreshCw, Pause, Ban, Skull, Search, CheckCircle2, FileText,
+  Package, Wrench, ClipboardList, Clock, AlertTriangle, type LucideIcon,
+} from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MinusUnit {
@@ -32,14 +36,14 @@ interface MinusUnit {
 }
 
 // ─── Repair Status Config ─────────────────────────────────────────────────────
-const REPAIR_STATUS: Record<string, { label: string; badge: string; dot: string; emoji: string }> = {
-  WAITING_PARTS: { label: "Menunggu Sparepart", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: "" },
-  NOT_STARTED: { label: "Belum Terpegang", badge: "bg-gray-100 text-gray-600 border-gray-200", dot: "bg-gray-400", emoji: "" },
-  GIVE_UP: { label: "Nyerah", badge: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500", emoji: "" },
-  DEAD: { label: "Mati Total", badge: "bg-rose-50 text-rose-700 border-rose-200", dot: "bg-rose-500", emoji: "" },
-  HARD_PARTS: { label: "Sparepart Susah", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", emoji: "" },
-  DONE: { label: "Selesai", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: "" },
-  OTHER: { label: "Lain-lain", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: "" },
+const REPAIR_STATUS: Record<string, { label: string; badge: string; dot: string; emoji: LucideIcon }> = {
+  WAITING_PARTS: { label: "Menunggu Sparepart", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: RefreshCw },
+  NOT_STARTED: { label: "Belum Terpegang", badge: "bg-gray-100 text-gray-600 border-gray-200", dot: "bg-gray-400", emoji: Pause },
+  GIVE_UP: { label: "Nyerah", badge: "bg-red-50 text-red-700 border-red-200", dot: "bg-red-500", emoji: Ban },
+  DEAD: { label: "Mati Total", badge: "bg-rose-50 text-rose-700 border-rose-200", dot: "bg-rose-500", emoji: Skull },
+  HARD_PARTS: { label: "Sparepart Susah", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", emoji: Search },
+  DONE: { label: "Selesai", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: CheckCircle2 },
+  OTHER: { label: "Lain-lain", badge: "bg-gray-100 text-gray-700 border-gray-200", dot: "bg-gray-500", emoji: FileText },
 };
 
 const UNIT_STATUS: Record<string, { label: string; badge: string }> = {
@@ -265,7 +269,7 @@ function EditRepairModal({
                     : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                     }`}
                 >
-                  <span className="text-base flex-shrink-0">{val.emoji}</span>
+                  <span className="flex-shrink-0"><val.emoji size={16} /></span>
                   <div>
                     <p className="text-xs font-semibold leading-tight">{val.label}</p>
                   </div>
@@ -487,10 +491,10 @@ function MinusContent() {
           {/* Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Total Unit", value: units.length, color: "text-gray-800", bar: "bg-gray-600", icon: "" },
-              { label: "Belum Terpegang", value: repairCounts["NOT_STARTED"] || 0, color: "text-gray-600", bar: "bg-gray-400", icon: "" },
-              { label: "Proses", value: (repairCounts["WAITING_PARTS"] || 0) + (repairCounts["HARD_PARTS"] || 0), color: "text-gray-700", bar: "bg-gray-500", icon: "" },
-              { label: "Selesai", value: repairCounts["DONE"] || 0, color: "text-gray-700", bar: "bg-gray-500", icon: "" },
+              { label: "Total Unit", value: units.length, color: "text-gray-800", bar: "bg-gray-600", icon: <Package size={20} /> },
+              { label: "Belum Terpegang", value: repairCounts["NOT_STARTED"] || 0, color: "text-gray-600", bar: "bg-gray-400", icon: <Pause size={20} /> },
+              { label: "Proses", value: (repairCounts["WAITING_PARTS"] || 0) + (repairCounts["HARD_PARTS"] || 0), color: "text-gray-700", bar: "bg-gray-500", icon: <RefreshCw size={20} /> },
+              { label: "Selesai", value: repairCounts["DONE"] || 0, color: "text-gray-700", bar: "bg-gray-500", icon: <CheckCircle2 size={20} /> },
             ].map((s) => (
               <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 relative overflow-hidden group hover:shadow-md transition-all duration-300">
                 <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${s.bar} opacity-60 group-hover:opacity-100 transition-opacity`} />
@@ -508,7 +512,7 @@ function MinusContent() {
           {/* Filter Panel */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-              <span></span> Status Perbaikan
+              <Wrench size={14} /> Status Perbaikan
             </p>
             <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
               <button onClick={() => setFilterRepair("ALL")}
@@ -522,7 +526,7 @@ function MinusContent() {
               {Object.entries(REPAIR_STATUS).map(([key, val]) => (
                 <button key={key} onClick={() => setFilterRepair(key)}
                   className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterRepair === key ? `${val.badge} shadow-sm` : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-                  {val.emoji} {val.label}
+                  <val.emoji size={14} /> {val.label}
                   {repairCounts[key] > 0 && (
                     <span className={`px-1.5 py-0.5 rounded text-[10px] ${filterRepair === key ? "bg-white/30" : "bg-gray-100 text-gray-500"}`}>
                       {repairCounts[key]}
@@ -534,9 +538,9 @@ function MinusContent() {
 
             <div className="flex gap-2 flex-wrap">
               {[
-                { value: "ALL", label: "Semua Status", count: statusCounts.ALL, icon: "" },
-                { value: "SERVICE", label: "Service", count: statusCounts.SERVICE, icon: "" },
-                { value: "BELUM_SIAP", label: "Belum Siap", count: statusCounts.BELUM_SIAP, icon: "" },
+                { value: "ALL", label: "Semua Status", count: statusCounts.ALL, icon: <ClipboardList size={14} /> },
+                { value: "SERVICE", label: "Service", count: statusCounts.SERVICE, icon: <Wrench size={14} /> },
+                { value: "BELUM_SIAP", label: "Belum Siap", count: statusCounts.BELUM_SIAP, icon: <Clock size={14} /> },
               ].map((opt) => (
                 <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border flex items-center gap-1 ${filterStatus === opt.value ? "bg-gray-700 text-white border-gray-700 shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
@@ -571,7 +575,7 @@ function MinusContent() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
-              <div className="text-5xl mb-3"></div>
+              <div className="text-5xl mb-3"><Wrench size={48} className="mx-auto text-gray-300" /></div>
               <p className="text-gray-500 font-semibold text-base">Tidak ada unit ditemukan</p>
               <p className="text-gray-400 text-sm mt-1">Coba ubah filter pencarian</p>
             </div>
@@ -623,14 +627,14 @@ function MinusContent() {
                               </span>
                             )}
                             {missingAnalisa && (
-                              <span className="block text-[10px] text-amber-600 mt-1 font-medium"> perlu analisa</span>
+                              <span className="flex items-center gap-1 text-[10px] text-amber-600 mt-1 font-medium"><AlertTriangle size={11} className="flex-shrink-0" /> perlu analisa</span>
                             )}
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             {rs ? (
                               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${rs.badge}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${rs.dot}`} />
-                                {rs.emoji} {rs.label}
+                                <rs.emoji size={14} /> {rs.label}
                               </span>
                             ) : (
                               <span className="text-xs text-gray-300 italic">Belum diset</span>
