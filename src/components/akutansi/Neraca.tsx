@@ -8,6 +8,7 @@ interface NeracaRow {
     name: string;
     debit: number;
     kredit: number;
+    is_abnormal: boolean;
 }
 
 interface NeracaData {
@@ -147,12 +148,21 @@ export default function Neraca({ period }: { period: string }) {
                             ) : (
                                 data.rows.map((r) => (
                                     <tr key={r.code} className="hover:bg-blue-50/30 transition border-b border-gray-50">
-                                        <td className="px-4 py-2.5 text-[11px] font-mono font-bold text-gray-500">{r.code}</td>
+                                        <td className="px-4 py-2.5 text-[11px] font-mono font-bold text-gray-500">
+                                            {r.code}
+                                            {r.is_abnormal && <span className="ml-1" title="Posisi saldo tidak wajar — cek Buku Besar akun ini">⚠️</span>}
+                                        </td>
                                         <td className="px-4 py-2.5 text-[12px] text-gray-800">{r.name}</td>
-                                        <td className="px-4 py-2.5 text-right text-[12px] font-bold text-blue-700 font-mono">
+                                        <td
+                                            className={`px-4 py-2.5 text-right text-[12px] font-bold font-mono ${r.is_abnormal ? "text-red-600" : "text-blue-700"}`}
+                                            title={r.is_abnormal ? "Posisi saldo tidak wajar untuk tipe akun ini" : undefined}
+                                        >
                                             {r.debit > 0 ? rp(r.debit) : ""}
                                         </td>
-                                        <td className="px-4 py-2.5 text-right text-[12px] font-bold text-emerald-700 font-mono">
+                                        <td
+                                            className={`px-4 py-2.5 text-right text-[12px] font-bold font-mono ${r.is_abnormal ? "text-red-600" : "text-emerald-700"}`}
+                                            title={r.is_abnormal ? "Posisi saldo tidak wajar untuk tipe akun ini" : undefined}
+                                        >
                                             {r.kredit > 0 ? rp(r.kredit) : ""}
                                         </td>
                                     </tr>

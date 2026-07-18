@@ -473,8 +473,7 @@ function OpeningBalanceModal({
         setError("");
         if (nominalInput.trim() === "") return setError("Nominal wajib diisi");
         const nominal = Number(nominalInput);
-        if (!Number.isFinite(nominal)) return setError("Nominal tidak valid");
-        if (!isEdit && nominal <= 0) return setError("Nominal harus lebih dari 0");
+        if (!Number.isFinite(nominal) || nominal <= 0) return setError("Nominal harus lebih dari 0");
 
         const ok = confirm(
             isEdit
@@ -556,12 +555,10 @@ function OpeningBalanceModal({
                     </div>
 
                     <div>
-                        <label className="text-xs font-semibold text-gray-500 mb-1.5 block">
-                            Nominal {isEdit && <span className="text-gray-400 font-normal">(boleh negatif untuk koreksi)</span>}
-                        </label>
+                        <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Nominal</label>
                         <input
                             type="number"
-                            {...(!isEdit ? { min: 0 } : {})}
+                            min={0}
                             value={nominalInput}
                             onChange={(e) => setNominalInput(e.target.value)}
                             placeholder="0"

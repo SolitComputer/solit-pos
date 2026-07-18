@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { ACCOUNTS, isValidPeriod } from "@/lib/accounting";
+import { ACCOUNTS, ACCOUNT_TYPE_NORMAL_SIDE, AccountType, JournalSide, isValidPeriod } from "@/lib/accounting";
 import { createClient as createClientForAccounts } from "@supabase/supabase-js";
 
 function getAdmin(): SupabaseClient {
@@ -87,18 +87,25 @@ export const GET = withAuth(async (req) => {
       return { code: staticAcc.code, name: staticAcc.name, type: staticAcc.type };
     });
 
+    const staticNormalMap = new Map<string, JournalSide>(
+      ACCOUNTS.map((a) => [a.code, a.normal])
+    );
+
     const rows = allAccountsForNeraca
       .map((a) => {
         const balance = balanceMap.get(a.code) ?? 0;
-        return {
-          code: a.code,
-          name: a.name,
-          debit: balance > 0 ? balance : 0,
-          kredit: balance < 0 ? Math.abs(balance) : 0,
-        };
+        const debit = balance > 0 ? balance : 0;
+        const kredit = balance < 0 ? Math.abs(balance) : 0;
+
+        const normalSide: JournalSide =
+          staticNormalMap.get(a.code) ?? ACCOUNT_TYPE_NORMAL_SIDE[a.type as AccountType] ?? "DEBIT";
+        const actualSide: JournalSide = balance >= 0 ? "DEBIT" : "KREDIT";
+        const isAbnormal = (debit !== 0 || kredit !== 0) && normalSide !== actualSide;
+
+        return { code: a.code, name: a.name, debit, kredit, is_abnormal: isAbnormal };
       })
       .filter((r) => r.debit !== 0 || r.kredit !== 0)
-    
+
       .sort((a, b) => {
         const numA = parseInt(a.code, 10);
         const numB = parseInt(b.code, 10);
