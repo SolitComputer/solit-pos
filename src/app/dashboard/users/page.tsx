@@ -384,7 +384,7 @@ function MultiRoleSelect({
         if (!alive) return;
         if (data.success) setCustomRoles(data.roles ?? []);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => {
         if (alive) setLoadingCustom(false);
       });
