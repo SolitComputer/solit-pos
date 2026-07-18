@@ -378,7 +378,7 @@ const ITEM_AKUNTANSI: MenuItem = {
   icon: Icons.accounting,
 };
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
-const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Riwayat Pekerjaan", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
+const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
 // ── Item gabungan Data Barang (laptop + aksesoris) ────────────────────────────
 const ITEM_DATA_BARANG: MenuItem = {
   name: "Data Barang",
@@ -460,10 +460,10 @@ const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
 const ADMIN_PENYEDIA_MENU: MenuGroup = {
   label: "Penyedia Barang",
   items: [
+   ITEM_RIWAYAT_PENYEDIA,
     { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
     { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
-    ITEM_RIWAYAT_PENYEDIA,
   ],
 };
 
