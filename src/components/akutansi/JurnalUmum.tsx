@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -218,7 +218,7 @@ export default function JurnalUmum({ period }: { period: string }) {
     return (
         <div className="space-y-4">
             {toast && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] bg-gray-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg toast-in">
                     {toast}
                 </div>
             )}
@@ -244,7 +244,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                 <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
                     <button
                         onClick={() => setShowPending((v) => !v)}
-                        className="w-full px-4 py-3 flex items-center justify-between bg-amber-50 hover:bg-amber-100/60 transition"
+                        className="w-full px-4 py-3 flex items-center justify-between bg-amber-50 hover:bg-amber-100/60 active:scale-[0.995] transition-all duration-150"
                     >
                         <div className="flex flex-col items-start gap-1">
                             <div className="flex items-center gap-2">
@@ -261,7 +261,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 </span>
                             )}
                         </div>
-                        <span className="text-amber-600 text-xs">{showPending ? "▲" : "▼"}</span>
+                        <span className={`text-amber-600 text-xs transition-transform duration-200 ${showPending ? "" : "-rotate-90"}`}>▲</span>
                     </button>
 
                     {showPending && (
@@ -274,7 +274,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                     return (
                                         <label
                                             key={k}
-                                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                                            className={`flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors ${checked ? "bg-blue-50/40" : ""}`}
                                         >
                                             <input
                                                 type="checkbox"
@@ -286,7 +286,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                         return next;
                                                     })
                                                 }
-                                                className="w-4 h-4 rounded border-gray-300"
+                                                className="w-4 h-4 rounded border-gray-300 accent-[#1a1545]"
                                             />
                                             <span className="text-[10px] text-gray-400 font-mono w-16 shrink-0">
                                                 {fmtTgl(d.tanggal)}
@@ -305,7 +305,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 <button
                                     onClick={() => confirmItems(pending.filter((d) => selected.has(key(d))))}
                                     disabled={busy || selected.size === 0}
-                                    className="w-full h-9 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-800 transition disabled:opacity-40"
+                                    className="w-full h-9 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-bold hover:opacity-90 active:scale-[0.98] transition-all duration-150 disabled:opacity-40 disabled:active:scale-100"
                                 >
                                     Konfirmasi Terpilih ({selected.size})
                                 </button>
@@ -317,15 +317,18 @@ export default function JurnalUmum({ period }: { period: string }) {
 
             {/* ── Toolbar ── */}
             <div className="bg-white rounded-xl border border-gray-200 p-3 flex gap-2">
-                <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Cari keterangan, akun, ref..."
-                    className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                />
+                <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Cari keterangan, akun, ref..."
+                        className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                    />
+                </div>
                 <button
                     onClick={() => setShowManual(true)}
-                    className="h-10 px-4 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-800 transition whitespace-nowrap"
+                    className="h-10 px-4 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-bold hover:opacity-90 active:scale-[0.96] transition-all duration-150 whitespace-nowrap"
                 >
                     + Jurnal Manual
                 </button>
@@ -333,7 +336,7 @@ export default function JurnalUmum({ period }: { period: string }) {
 
             {/* ── Total — di ATAS, di luar tabel (bar ringkasan) ── */}
             {!loading && filtered.length > 0 && (
-                <div className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-3 flex flex-wrap items-center justify-end gap-x-6 gap-y-1">
+                <div className="bg-gray-100 border border-gray-300 border-t-2 border-t-[#D9A94A]/50 rounded-xl px-4 py-3 flex flex-wrap items-center justify-end gap-x-6 gap-y-1">
                     <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total</span>
                     <span className="text-sm font-black text-gray-900 font-mono">
                         Debit&nbsp; {rp(totalDebit)}
@@ -357,7 +360,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                     {...provided.droppableProps}
                                 >
                                     <thead>
-                                        <tr className="border-b-2 border-gray-200 bg-gray-50">
+                                        <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
                                             <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[110px]">Tanggal</th>
                                             <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
                                             <th className="px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[80px]">Ref</th>
@@ -417,7 +420,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                             {first && (
                                                                                 <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap flex items-center gap-2">
                                                                                     <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
-                                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                                                                                        <GripVertical className="w-3 h-3" />
                                                                                     </div>
                                                                                     {fmtTgl(entry.tanggal)}
                                                                                 </span>
@@ -478,21 +481,21 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                 <div className="flex items-center justify-center gap-1">
                                                                                     <button
                                                                                         onClick={() => setEditEntry(entry)}
-                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition"
+                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
                                                                                         title="Edit jurnal"
                                                                                     >
                                                                                         <Pencil className="w-4 h-4" />
                                                                                     </button>
                                                                                     <button
                                                                                         onClick={() => setLogEntry(entry)}
-                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"
                                                                                         title="Riwayat perubahan"
                                                                                     >
                                                                                         <Clock className="w-4 h-4" />
                                                                                     </button>
                                                                                     <button
                                                                                         onClick={() => handleDelete(entry)}
-                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
                                                                                         title="Hapus"
                                                                                     >
                                                                                         <Trash2 className="w-4 h-4" />
@@ -534,6 +537,17 @@ export default function JurnalUmum({ period }: { period: string }) {
                 />
             )}
             {logEntry && <AuditLogModal entry={logEntry} onClose={() => setLogEntry(null)} />}
+
+            <style jsx global>{`
+                @keyframes toastIn {
+                    from { opacity: 0; transform: translate(-50%, 8px); }
+                    to { opacity: 1; transform: translate(-50%, 0); }
+                }
+                .toast-in { animation: toastIn 0.25s ease-out backwards; }
+                @media (prefers-reduced-motion: reduce) {
+                    .toast-in { animation: none !important; }
+                }
+            `}</style>
         </div>
     );
 }
@@ -541,13 +555,13 @@ export default function JurnalUmum({ period }: { period: string }) {
 // ─── Stat card ────────────────────────────────────────────────────────────────
 function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone: "gray" | "blue" | "emerald" | "red" }) {
     const map = {
-        gray: "border-gray-200 text-gray-900",
-        blue: "border-blue-200 text-blue-800",
-        emerald: "border-emerald-200 text-emerald-800",
-        red: "border-red-200 text-red-700",
+        gray: "border-gray-200 border-t-[#0f0c29]/70 text-gray-900",
+        blue: "border-gray-200 border-t-blue-400 text-blue-800",
+        emerald: "border-gray-200 border-t-emerald-400 text-emerald-800",
+        red: "border-gray-200 border-t-red-400 text-red-700",
     };
     return (
-        <div className={`bg-white rounded-xl border p-4 ${map[tone]}`}>
+        <div className={`bg-white rounded-xl border border-t-2 p-4 ${map[tone]}`}>
             <p className="text-[10px] font-semibold uppercase tracking-wide opacity-50 mb-1">{label}</p>
             <p className="text-base font-black font-mono truncate">{value}</p>
         </div>
@@ -633,8 +647,9 @@ function EntryFormModal({
     return (
         <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh]">
-                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="relative bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
+                <div className="h-1 bg-gradient-to-r from-[#0f0c29] to-[#1a1545] shrink-0" />
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
                     <div>
                         <h3 className="font-bold text-gray-900 text-sm">{isEdit ? "Edit Jurnal" : "Jurnal Manual"}</h3>
                         {isEdit && (
@@ -643,7 +658,7 @@ function EntryFormModal({
                             </p>
                         )}
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center"><X className="w-4 h-4" /></button>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 active:scale-90 transition-all duration-150 flex items-center justify-center"><X className="w-4 h-4" /></button>
                 </div>
 
                 <div className="overflow-y-auto flex-1 p-5 space-y-4">
@@ -655,8 +670,8 @@ function EntryFormModal({
                                     <button
                                         key={t.key}
                                         onClick={() => applyTemplate(t.key)}
-                                        className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${template === t.key
-                                            ? "bg-gray-900 text-white border-gray-900"
+                                        className={`h-8 px-3 rounded-lg text-xs font-semibold border active:scale-[0.96] transition-all duration-150 ${template === t.key
+                                            ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white border-transparent"
                                             : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                             }`}
                                     >
@@ -674,7 +689,7 @@ function EntryFormModal({
                                 type="date"
                                 value={tanggal}
                                 onChange={(e) => setTanggal(e.target.value)}
-                                className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm"
+                                className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                             />
                         </div>
                         <div>
@@ -683,7 +698,7 @@ function EntryFormModal({
                                 value={ref}
                                 onChange={(e) => setRef(e.target.value)}
                                 placeholder="No. bukti"
-                                className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm"
+                                className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                             />
                         </div>
                     </div>
@@ -694,7 +709,7 @@ function EntryFormModal({
                             value={keterangan}
                             onChange={(e) => setKeterangan(e.target.value)}
                             placeholder="Tipe laptop - SN - Nama customer"
-                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm"
+                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                         />
                     </div>
 
@@ -753,7 +768,7 @@ function EntryFormModal({
                                     <button
                                         onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
                                         disabled={lines.length <= 2}
-                                        className="w-8 h-9 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-30 flex items-center justify-center"
+                                        className="w-8 h-9 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all duration-150 disabled:opacity-30 flex items-center justify-center"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>
@@ -780,14 +795,14 @@ function EntryFormModal({
                     )}
                 </div>
 
-                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
-                    <button onClick={onClose} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50">
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50 shrink-0">
+                    <button onClick={onClose} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 active:scale-[0.97] transition-all duration-150">
                         Batal
                     </button>
                     <button
                         onClick={submit}
                         disabled={saving || !balanced}
-                        className="flex-1 h-10 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-40"
+                        className="flex-1 h-10 bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white rounded-xl text-sm font-bold hover:opacity-90 active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:active:scale-100"
                     >
                         {saving ? "Menyimpan..." : isEdit ? "Simpan Perubahan" : "Simpan Jurnal"}
                     </button>
@@ -819,13 +834,14 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl max-h-[80dvh] flex flex-col">
-                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl max-h-[80dvh] flex flex-col overflow-hidden">
+                <div className="h-1 bg-gradient-to-r from-[#0f0c29] to-[#1a1545] shrink-0" />
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
                     <div>
                         <h3 className="font-bold text-gray-900 text-sm">Riwayat Perubahan</h3>
                         <p className="text-[11px] text-gray-400 truncate max-w-[280px]">{entry.keterangan}</p>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center"><X className="w-4 h-4" /></button>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 active:scale-90 transition-all duration-150 flex items-center justify-center"><X className="w-4 h-4" /></button>
                 </div>
 
                 <div className="overflow-y-auto flex-1 p-5 space-y-2">

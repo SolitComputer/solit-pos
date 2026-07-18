@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Inbox, AlertTriangle } from "lucide-react";
+import { Inbox, AlertTriangle, Check } from "lucide-react";
 
 interface NeracaRow {
     code: string;
@@ -73,7 +73,7 @@ export default function Neraca({ period }: { period: string }) {
                     onClick={() => load()}
                     disabled={loading}
                     title="Muat ulang data terbaru"
-                    className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition disabled:opacity-40 shrink-0"
+                    className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-800 active:scale-90 transition-all duration-150 disabled:opacity-40 shrink-0"
                 >
                     <span className={loading ? "inline-block animate-spin" : "inline-block"}>⟳</span>
                 </button>
@@ -89,7 +89,9 @@ export default function Neraca({ period }: { period: string }) {
                     className={`rounded-xl border p-3.5 flex items-start gap-2.5 ${data.totals.balanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
                         }`}
                 >
-                    <span className="text-lg leading-none">{data.totals.balanced ? "" : ""}</span>
+                    <span className={`shrink-0 mt-0.5 ${data.totals.balanced ? "text-emerald-600" : "text-red-600"}`}>
+                        {data.totals.balanced ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                    </span>
                     <span className={`text-xs font-semibold leading-relaxed ${data.totals.balanced ? "text-emerald-700" : "text-red-700"}`}>
                         {data.totals.balanced ? (
                             "Neraca Balance — total Debit sama dengan total Kredit."
@@ -109,7 +111,7 @@ export default function Neraca({ period }: { period: string }) {
                 <div className="overflow-x-auto">
                     <table className="w-full border-collapse" style={{ minWidth: "640px" }}>
                         <thead>
-                            <tr className="border-b-2 border-gray-200 bg-gray-50">
+                            <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
                                 <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[90px]">
                                     Kode
                                 </th>

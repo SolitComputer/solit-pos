@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ACCOUNTS, ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER } from "@/lib/accounting";
-import { Lock, Pencil, BookOpen, Check, X, AlertTriangle, DollarSign } from "lucide-react";
+import { Lock, Pencil, BookOpen, Check, X, AlertTriangle, DollarSign, Search } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface LedgerLine {
@@ -157,16 +157,19 @@ export default function BukuBesar({ period }: { period: string }) {
         <div className="space-y-4">
             {/* ── Account picker ── */}
             <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col sm:flex-row gap-2">
-                <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Cari kode / nama akun..."
-                    className="sm:w-64 h-10 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                />
+                <div className="relative sm:w-64">
+                    <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Cari kode / nama akun..."
+                        className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                    />
+                </div>
                 <select
                     value={accountCode}
                     onChange={(e) => setAccountCode(e.target.value)}
-                    className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white"
+                    className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                 >
                     {ACCOUNT_TYPE_ORDER.map((type) => {
                         const accs = filteredAccounts.filter((a) => a.type === type);
@@ -186,7 +189,7 @@ export default function BukuBesar({ period }: { period: string }) {
                     onClick={() => load()}
                     disabled={loading}
                     title="Muat ulang data terbaru"
-                    className="h-10 w-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition disabled:opacity-40 shrink-0"
+                    className="h-10 w-10 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-800 active:scale-90 transition-all duration-150 disabled:opacity-40 shrink-0"
                 >
                     <span className={loading ? "inline-block animate-spin" : "inline-block"}>⟳</span>
                 </button>
@@ -199,7 +202,7 @@ export default function BukuBesar({ period }: { period: string }) {
             {/* ── Summary ── */}
             {data && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <div className="bg-white rounded-xl border border-gray-200 border-t-2 border-t-[#0f0c29]/70 p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-wide opacity-50 mb-1">Akun</p>
                         <p className="text-base font-black font-mono truncate text-gray-900">
                             {data.account.code} · {data.account.name}
@@ -215,7 +218,7 @@ export default function BukuBesar({ period }: { period: string }) {
                             </span>
                         )}
                     </div>
-                    <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <div className="bg-white rounded-xl border border-gray-200 border-t-2 border-t-[#D9A94A]/60 p-4">
                         <p className="text-[10px] font-semibold uppercase tracking-wide opacity-50 mb-1">Saldo Awal (Total)</p>
                         <div className="flex items-center gap-2">
                             <p className="text-base font-black font-mono truncate text-gray-900">
@@ -232,7 +235,7 @@ export default function BukuBesar({ period }: { period: string }) {
             {/* ── Saldo Awal Manual (one-time input) ── */}
             {data && (
                 <div
-                    className={`rounded-xl border p-3.5 flex items-center justify-between gap-3 ${data.opening_balance ? "bg-gray-50 border-gray-200" : "bg-amber-50 border-amber-200"
+                    className={`rounded-xl border p-3.5 flex items-center justify-between gap-3 flex-wrap ${data.opening_balance ? "bg-gray-50 border-gray-200" : "bg-amber-50 border-amber-200"
                         }`}
                 >
                     {data.opening_balance ? (
@@ -252,7 +255,7 @@ export default function BukuBesar({ period }: { period: string }) {
                             </div>
                             <button
                                 onClick={() => setShowOpeningModal(true)}
-                                className="h-8 px-3 rounded-lg bg-gray-700 text-white text-[11px] font-bold hover:bg-gray-800 transition whitespace-nowrap shrink-0 inline-flex items-center"
+                                className="h-8 px-3 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-[11px] font-bold hover:opacity-90 active:scale-[0.96] transition-all duration-150 whitespace-nowrap shrink-0 inline-flex items-center"
                             >
                                 <Pencil className="w-3.5 h-3.5 inline mr-1" /> Koreksi
                             </button>
@@ -264,7 +267,7 @@ export default function BukuBesar({ period }: { period: string }) {
                             </span>
                             <button
                                 onClick={() => setShowOpeningModal(true)}
-                                className="h-8 px-3 rounded-lg bg-amber-600 text-white text-[11px] font-bold hover:bg-amber-700 transition whitespace-nowrap"
+                                className="h-8 px-3 rounded-lg bg-amber-600 text-white text-[11px] font-bold hover:bg-amber-700 active:scale-[0.96] transition-all duration-150 whitespace-nowrap"
                             >
                                 + Set Saldo Awal
                             </button>
@@ -301,7 +304,7 @@ export default function BukuBesar({ period }: { period: string }) {
                                     Cek
                                 </th>
                             </tr>
-                            <tr className="border-b-2 border-gray-200 bg-gray-50">
+                            <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
                                 <th className="px-4 py-2 text-right text-[10px] font-bold text-blue-600 uppercase tracking-wider w-[140px] border-l-2 border-gray-200">
                                     Debit
                                 </th>
@@ -386,7 +389,7 @@ export default function BukuBesar({ period }: { period: string }) {
                                                                 ? `Sudah dicek${l.checked_at ? " · " + fmtTgl(l.checked_at.slice(0, 10)) : ""}`
                                                                 : "Tandai sudah dicek"
                                                         }
-                                                        className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black transition ${l.checked
+                                                        className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${l.checked
                                                             ? "bg-green-600 border-green-600 text-white"
                                                             : "bg-white border-gray-300 text-transparent hover:border-gray-400 hover:text-gray-300"
                                                             }`}
@@ -508,7 +511,8 @@ function OpeningBalanceModal({
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col">
+            <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                <div className={`h-1 ${isEdit ? "bg-gradient-to-r from-red-500 to-red-700" : "bg-gradient-to-r from-[#0f0c29] to-[#1a1545]"}`} />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div>
                         <h3 className="font-bold text-gray-900 text-sm">
@@ -516,7 +520,7 @@ function OpeningBalanceModal({
                         </h3>
                         <p className="text-[11px] text-gray-400 mt-0.5">{accountLabel}</p>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center"><X className="w-4 h-4" /></button>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 active:scale-90 transition-all duration-150 flex items-center justify-center"><X className="w-4 h-4" /></button>
                 </div>
 
                 <div className="p-5 space-y-4">
@@ -535,7 +539,7 @@ function OpeningBalanceModal({
                             <button
                                 type="button"
                                 onClick={() => setSide("DEBIT")}
-                                className={`h-10 rounded-lg text-sm font-bold border transition ${side === "DEBIT"
+                                className={`h-10 rounded-lg text-sm font-bold border active:scale-[0.97] transition-all duration-150 ${side === "DEBIT"
                                     ? "bg-blue-600 text-white border-blue-600"
                                     : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                     }`}
@@ -545,7 +549,7 @@ function OpeningBalanceModal({
                             <button
                                 type="button"
                                 onClick={() => setSide("KREDIT")}
-                                className={`h-10 rounded-lg text-sm font-bold border transition ${side === "KREDIT"
+                                className={`h-10 rounded-lg text-sm font-bold border active:scale-[0.97] transition-all duration-150 ${side === "KREDIT"
                                     ? "bg-emerald-600 text-white border-emerald-600"
                                     : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                     }`}
@@ -563,7 +567,7 @@ function OpeningBalanceModal({
                             value={nominalInput}
                             onChange={(e) => setNominalInput(e.target.value)}
                             placeholder="0"
-                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm font-mono"
+                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                         />
                     </div>
 
@@ -575,14 +579,14 @@ function OpeningBalanceModal({
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50">
                     <button
                         onClick={onClose}
-                        className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50"
+                        className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 active:scale-[0.97] transition-all duration-150"
                     >
                         Batal
                     </button>
                     <button
                         onClick={submit}
                         disabled={saving || nominalInput.trim() === ""}
-                        className={`flex-1 h-10 text-white rounded-xl text-sm font-bold disabled:opacity-40 ${isEdit ? "bg-red-600 hover:bg-red-700" : "bg-gray-900 hover:bg-gray-800"
+                        className={`flex-1 h-10 text-white rounded-xl text-sm font-bold active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:active:scale-100 ${isEdit ? "bg-red-600 hover:bg-red-700" : "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] hover:opacity-90"
                             }`}
                     >
                         {saving ? "Menyimpan..." : isEdit ? "Simpan Koreksi" : "Simpan Saldo Awal"}
@@ -634,11 +638,11 @@ function SaldoBadge({
 function Stat({ label, value, tone }: { label: string; value: string; tone: "gray" | "blue" | "emerald" }) {
     const map = {
         gray: "border-gray-200 text-gray-900",
-        blue: "border-blue-200 text-blue-800",
-        emerald: "border-emerald-200 text-emerald-800",
+        blue: "border-gray-200 border-t-blue-400 text-blue-800",
+        emerald: "border-gray-200 border-t-emerald-400 text-emerald-800",
     };
     return (
-        <div className={`bg-white rounded-xl border p-4 ${map[tone]}`}>
+        <div className={`bg-white rounded-xl border border-t-2 p-4 ${map[tone]}`}>
             <p className="text-[10px] font-semibold uppercase tracking-wide opacity-50 mb-1">{label}</p>
             <p className="text-base font-black font-mono truncate">{value}</p>
         </div>

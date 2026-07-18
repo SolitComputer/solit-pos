@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Trophy, Medal, Award, Clock, X, Inbox } from "lucide-react";
+import { Trophy, Medal, Award, Clock, X, Inbox, BarChart3, TrendingUp } from "lucide-react";
+import { BarRankingChart } from "@/components/ui/BarRankingChart";
+import { LineTrendChart } from "@/components/ui/LineTrendChart";
 
 interface ProviderJob {
   id: string;
@@ -44,6 +46,11 @@ const fmtHours = (h: number | null) => {
   const mins = Math.round((h - whole) * 60);
   return mins > 0 ? `${whole}j ${mins}m` : `${whole} jam`;
 };
+
+// helper baru: bucket tanggal berbasis WIB (server/DB umumnya simpan UTC)
+const wibDay = (iso: string) => new Date(new Date(iso).getTime() + 7 * 3600_000).toISOString().slice(0, 10);
+const fmtShortDate = (s: string) =>
+  new Date(`${s}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short" });
 
 const PRESETS: { key: PresetKey; label: string }[] = [
   { key: "today", label: "Hari Ini" },
@@ -195,6 +202,49 @@ export default function RiwayatPenyediaPage() {
     return { totalProviders: providers.length, totalPekerjaan, rataGlobal };
   }, [providers]);
 
+  // === data untuk Bar Ranking Chart (Top 10 · Total Pekerjaan vs Jam Terbang) ===
+  const rankingLabels = useMemo(() => filtered.slice(0, 10).map((p) => p.name), [filtered]);
+
+  const rankingSeries = useMemo(
+    () => [
+      {
+        key: "pekerjaan",
+        label: "Total Pekerjaan",
+        color: "#1a1a2e",
+        data: filtered.slice(0, 10).map((p) => p.total_pekerjaan),
+        formatValue: (v: number) => String(v),
+      },
+      {
+        key: "jam",
+        label: "Jam Terbang",
+        color: "#3b82f6",
+        data: filtered.slice(0, 10).map((p) => Number(p.jam_terbang.toFixed(1))),
+        formatValue: (v: number) => fmtHours(v),
+      },
+    ],
+    [filtered]
+  );
+
+  // === data untuk Line Trend Chart (pekerjaan selesai per hari, WIB) ===
+  const trendLabelsRaw = useMemo(() => {
+    const days = new Set<string>();
+    filtered.forEach((p) => p.jobs.forEach((j) => days.add(wibDay(j.done_at))));
+    return [...days].sort();
+  }, [filtered]);
+
+  const trendData = useMemo(() => {
+    const counts = new Map<string, number>();
+    filtered.forEach((p) =>
+      p.jobs.forEach((j) => {
+        const day = wibDay(j.done_at);
+        counts.set(day, (counts.get(day) ?? 0) + 1);
+      })
+    );
+    return trendLabelsRaw.map((d) => counts.get(d) ?? 0);
+  }, [filtered, trendLabelsRaw]);
+
+  const trendLabels = useMemo(() => trendLabelsRaw.map(fmtShortDate), [trendLabelsRaw]);
+
   const rangeLabel = allTime ? "Semua Waktu" : `${fmtRangeDate(fromDate)} — ${fmtRangeDate(toDate)}`;
 
   const inputCls =
@@ -293,6 +343,59 @@ export default function RiwayatPenyediaPage() {
                 {isLoading ? "…" : fmtHours(totals.rataGlobal)}
               </p>
               <p className="text-[11px] font-bold uppercase tracking-wide mt-1 text-emerald-600">Rata-rata Global</p>
+            </div>
+          </div>
+
+          {/* Diagram Statistik */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <BarChart3 className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-gray-800 leading-tight">Ranking Penyedia</h2>
+                  <p className="text-[11px] text-gray-400">Top 10 · Total Pekerjaan vs Jam Terbang</p>
+                </div>
+              </div>
+              {isLoading ? (
+                <div className="h-[280px] bg-gray-100 rounded-xl animate-pulse" />
+              ) : rankingLabels.length === 0 ? (
+                <div className="h-[280px] flex flex-col items-center justify-center text-center">
+                  <BarChart3 className="w-8 h-8 mb-2 text-gray-200" />
+                  <p className="text-sm text-gray-400">Belum ada data</p>
+                </div>
+              ) : (
+                <BarRankingChart labels={rankingLabels} series={rankingSeries} height={280} />
+              )}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <TrendingUp className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-gray-800 leading-tight">Tren Pekerjaan Selesai</h2>
+                  <p className="text-[11px] text-gray-400">Jumlah pekerjaan selesai per hari · {rangeLabel}</p>
+                </div>
+              </div>
+              {isLoading ? (
+                <div className="h-[280px] bg-gray-100 rounded-xl animate-pulse" />
+              ) : trendData.length === 0 ? (
+                <div className="h-[280px] flex flex-col items-center justify-center text-center">
+                  <TrendingUp className="w-8 h-8 mb-2 text-gray-200" />
+                  <p className="text-sm text-gray-400">Belum ada data pada periode ini</p>
+                </div>
+              ) : (
+                <LineTrendChart
+                  labels={trendLabels}
+                  data={trendData}
+                  color="#059669"
+                  height={280}
+                  formatValue={(v) => `${v} pekerjaan`}
+                />
+              )}
             </div>
           </div>
 
