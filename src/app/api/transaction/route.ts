@@ -10,6 +10,25 @@ function splitSerials(raw: any): string[] {
   return [];
 }
 
+// ── Whitelist kolom yang boleh dipakai buat ORDER BY ──────────────────
+// Key = nilai `sortBy` yang dikirim client, value = nama kolom asli di tabel `transactions`.
+// Pakai whitelist supaya tidak ada celah injection lewat query string.
+const SORTABLE_COLUMNS: Record<string, string> = {
+  invoice: "invoice_number",
+  date: "created_at",
+  status: "status",
+  customer: "customer_name",
+  phone: "customer_phone",
+  sales: "sales_name",
+  laptop: "laptop_name",
+  cpu: "cpu",
+  sn: "serial_number",
+  price: "deal_price",
+  method: "payment_method",
+  source: "source_platform",
+  company: "company_name",
+};
+
 // ── Filter "Toko/Perusahaan" — replikasi persis logic yang dulu dikerjakan di client ──
 function applyCompanyFilter(query: any, companyName: string) {
   const q = companyName.toLowerCase();
@@ -56,6 +75,15 @@ async function handler(req: NextRequest) {
     const companyName = url.searchParams.get("companyName") ?? "ALL";
     const sortOrder = url.searchParams.get("sortOrder") === "oldest" ? "oldest" : "newest";
 
+    // ── Sorting per kolom (klik header tabel) ──────────────────────────
+    // sortBy  : key dari SORTABLE_COLUMNS. Kalau kosong / tidak dikenal → fallback ke created_at.
+    // sortDir : "asc" | "desc". Kalau kosong → ikut sortOrder lama (biar tombol Terbaru/Terlama tetap jalan).
+    const rawSortBy = url.searchParams.get("sortBy") ?? "";
+    const rawSortDir = url.searchParams.get("sortDir");
+    const sortColumn = SORTABLE_COLUMNS[rawSortBy] ?? "created_at";
+    const ascending =
+      rawSortDir === "asc" ? true : rawSortDir === "desc" ? false : sortOrder === "oldest";
+
     let query = supabase.from("transactions").select("*", { count: isExport ? undefined : "exact" });
 
     if (invoiceExact.trim()) {
@@ -86,7 +114,19 @@ async function handler(req: NextRequest) {
       if (companyName !== "ALL") query = applyCompanyFilter(query, companyName);
     }
 
-    query = query.order("created_at", { ascending: sortOrder === "oldest" });
+    // Baris yang nilainya NULL selalu ditaruh paling belakang, biar mirip perilaku sort Excel.
+    query = query.order(sortColumn, { ascending, nullsFirst: false });
+
+    // Harga jual: sebagian transaksi lama menyimpan nilainya di `amount`, bukan `deal_price`.
+    // Jadi urutan kedua pakai `amount` supaya baris lama tidak menumpuk di ujung.
+    if (sortColumn === "deal_price") {
+      query = query.order("amount", { ascending, nullsFirst: false });
+    }
+
+    // Tie-breaker: kalau nilai kolom sama persis, urutannya tetap stabil antar halaman.
+    if (sortColumn !== "created_at") {
+      query = query.order("created_at", { ascending: false });
+    }
 
     // Export & deep-link (invoiceExact) → ambil semua baris yang match, tanpa batas halaman.
     // Mode normal (buka halaman Riwayat Transaksi) → cuma ambil 1 halaman sesuai page/limit.
