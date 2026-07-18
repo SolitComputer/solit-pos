@@ -98,8 +98,8 @@ export default function JurnalUmum({ period }: { period: string }) {
             // Sort ulang di sini cuma jaga-jaga kalau ada penggabungan data di masa depan —
             // pakai sort_ts, BUKAN source_id, supaya urutannya sesuai waktu asli, bukan alfabetis.
             const pendingSorted = (p.success ? p.data ?? [] : []).slice().sort((a: PendingDraft, b: PendingDraft) => {
-                if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
-                return (a.sort_ts ?? "").localeCompare(b.sort_ts ?? "");
+                if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
+                return (b.sort_ts ?? "").localeCompare(a.sort_ts ?? "");
             });
             setPending(pendingSorted);
             setPendingSummary(p.success ? p.summary ?? null : null);
