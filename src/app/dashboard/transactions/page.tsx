@@ -10,6 +10,29 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+// ─── SORTING TYPES ───────────────────────────────────────────────────
+// Key sort harus sama persis dengan whitelist SORTABLE_COLUMNS di /api/transaction/route.ts.
+// "margin" tidak ada di database (hasil hitungan server), jadi diurutkan di client — lihat catatan di bawah.
+export type SortKey =
+  | "invoice" | "date" | "customer" | "sales" | "laptop" | "cpu"
+  | "sn" | "price" | "margin" | "method" | "source" | "company";
+
+export type SortDir = "asc" | "desc";
+
+// Arah default saat sebuah kolom pertama kali diklik.
+// Angka & tanggal enak-nya mulai dari besar → kecil, teks mulai dari A → Z (persis kebiasaan Excel).
+const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
+  invoice: "asc", date: "desc", customer: "asc", sales: "asc", laptop: "asc",
+  cpu: "asc", sn: "asc", price: "desc", margin: "desc", method: "asc",
+  source: "asc", company: "asc",
+};
+
+// Kolom yang diurutkan di client (bukan lewat query database)
+const CLIENT_SIDE_SORT_KEYS: SortKey[] = ["margin"];
+
+// Urutan awal halaman — dipakai saat klik ketiga (reset sorting)
+const DEFAULT_SORT: { by: SortKey; dir: SortDir } = { by: "date", dir: "desc" };
+
 // ─── Photo Modal ────────────────────────────────────────────────────
 function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
   useEffect(() => {
@@ -353,6 +376,7 @@ function MobileCardSkeleton() {
 function TableRowSkeleton() {
   return (
     <tr className="border-b border-gray-50">
+      <td className="px-4 py-3 text-center"><SkeletonPulse className="h-3 w-5 mx-auto" /></td>
       <td className="px-4 py-3"><SkeletonPulse className="h-5 w-14 rounded-lg" /></td>
       <td className="px-4 py-3"><div className="space-y-1"><SkeletonPulse className="h-3 w-28" /><SkeletonPulse className="h-3 w-20" /></div></td>
       <td className="px-4 py-3"><SkeletonPulse className="h-3 w-24" /></td>
@@ -379,10 +403,10 @@ function DesktopSkeletonTable() {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ minWidth: "1900px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: "1960px" }}>
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              {["Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "CPU", "SN", "Harga", "Margin", "Metode", "Sumber", "Toko", "Aksi"].map((h) => (
+              {["No", "Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "CPU", "SN", "Harga", "Margin", "Metode", "Sumber", "Toko", "Aksi"].map((h) => (
                 <th key={h} className="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -426,7 +450,7 @@ function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm
 }
 
 // ─── TRANSACTION CARD (Mobile) ────────────────────────────────────────
-function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick }: any) {
+function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
@@ -472,9 +496,16 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
       {/* Header */}
       <div className="px-4 pt-3.5 pb-3 border-b border-gray-50">
         <div className="flex items-start justify-between gap-3 mb-2">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-gray-900 leading-snug break-words">{item.customer_name}</h3>
-            <p className="text-[11px] text-gray-400 font-mono mt-0.5">{item.invoice_number}</p>
+          <div className="flex items-start gap-2 flex-1 min-w-0">
+            {typeof rowNumber === "number" && (
+              <span className="mt-0.5 inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-bold tabular-nums flex-shrink-0">
+                {rowNumber}
+              </span>
+            )}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-gray-900 leading-snug break-words">{item.customer_name}</h3>
+              <p className="text-[11px] text-gray-400 font-mono mt-0.5">{item.invoice_number}</p>
+            </div>
           </div>
           <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-lg whitespace-nowrap flex-shrink-0 ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
@@ -693,37 +724,86 @@ function StatusBadge({ item }: { item: any }) {
   );
 }
 
+// ─── SORT ICON + SORTABLE HEADER ─────────────────────────────────────
+function SortIcon({ state }: { state: "none" | "asc" | "desc" }) {
+  if (state === "none") {
+    // Netral: dua panah samar, muncul lebih jelas saat header di-hover
+    return (
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+        className="text-gray-300 opacity-0 group-hover/sort:opacity-100 transition-opacity flex-shrink-0">
+        <polyline points="8 9 12 5 16 9" /><polyline points="16 15 12 19 8 15" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+      className="text-gray-900 flex-shrink-0">
+      {state === "asc" ? <polyline points="8 14 12 10 16 14" /> : <polyline points="8 10 12 14 16 10" />}
+    </svg>
+  );
+}
+
+function SortableTh({ label, sortKey, sortBy, sortDir, onSort, className = "", align = "left" }: {
+  label: string; sortKey: SortKey; sortBy: SortKey; sortDir: SortDir;
+  onSort: (key: SortKey) => void; className?: string; align?: "left" | "right" | "center";
+}) {
+  const active = sortBy === sortKey;
+  const justify = align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
+
+  return (
+    <th className={className} aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        title={
+          active
+            ? sortDir === SORT_DEFAULT_DIR[sortKey]
+              ? `${label} — klik lagi untuk balik arah`
+              : `${label} — klik lagi untuk reset ke urutan awal`
+            : `Urutkan berdasarkan ${label}`
+        }
+        className={`group/sort w-full inline-flex items-center gap-1 ${justify} text-[10px] font-bold uppercase tracking-widest transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 ${active ? "text-gray-900" : "text-gray-400 hover:text-gray-700"}`}
+      >
+        <span className="whitespace-nowrap">{label}</span>
+        <SortIcon state={active ? sortDir : "none"} />
+      </button>
+    </th>
+  );
+}
+
 // ─── TRANSACTION TABLE (Desktop) ─────────────────────────────────────
-function TransactionTable({ paginatedTransactions, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onPhotoClick, onRestored, onRowClick }: any) {
+function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortDir, onSort, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onPhotoClick, onRestored, onRowClick }: any) {
   const HEAD = "px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap sticky top-0 bg-gray-50/95 backdrop-blur-sm z-10 border-b border-gray-100";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto" style={{ maxHeight: "calc(100dvh - 200px)", overflowY: "auto" }}>
-        <table className="w-full border-collapse" style={{ minWidth: "1900px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: "1960px" }}>
           <thead>
             <tr>
+              <th className={`${HEAD} text-center w-[60px]`}>No</th>
               <th className={`${HEAD} w-[100px]`}>Status</th>
-              <th className={`${HEAD} w-[155px]`}>Nota & Waktu</th>
-              <th className={`${HEAD} w-[145px]`}>Customer</th>
+              <SortableTh label="Nota & Waktu" sortKey="invoice" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[155px]`} />
+              <SortableTh label="Customer" sortKey="customer" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[145px]`} />
               <th className={`${HEAD} w-[125px]`}>Kontak</th>
-              <th className={`${HEAD} w-[125px]`}>Sales</th>
-              <th className={`${HEAD} w-[195px]`}>Laptop</th>
-              <th className={`${HEAD} w-[155px]`}>CPU</th>
-              <th className={`${HEAD} w-[165px]`}>SN</th>
-              <th className={`${HEAD} text-right w-[135px]`}>Harga Jual</th>
-              <th className={`${HEAD} text-right w-[125px]`}>Margin</th>
-              <th className={`${HEAD} text-center w-[145px]`}>Metode</th>
-              <th className={`${HEAD} text-center w-[115px]`}>Sumber</th>
-              <th className={`${HEAD} text-center w-[115px]`}>Toko</th>
+              <SortableTh label="Sales" sortKey="sales" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[125px]`} />
+              <SortableTh label="Laptop" sortKey="laptop" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[195px]`} />
+              <SortableTh label="CPU" sortKey="cpu" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[155px]`} />
+              <SortableTh label="SN" sortKey="sn" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[165px]`} />
+              <SortableTh label="Harga Jual" sortKey="price" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="right" className={`${HEAD} text-right w-[135px]`} />
+              <SortableTh label="Margin" sortKey="margin" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="right" className={`${HEAD} text-right w-[125px]`} />
+              <SortableTh label="Metode" sortKey="method" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[145px]`} />
+              <SortableTh label="Sumber" sortKey="source" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[115px]`} />
+              <SortableTh label="Toko" sortKey="company" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[115px]`} />
               <th className={`${HEAD} text-center w-[130px]`}>Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {paginatedTransactions.map((item: any) => (
+            {paginatedTransactions.map((item: any, idx: number) => (
               <TransactionTableRow
                 key={item.id}
                 item={item}
+                rowNumber={startIndex + idx + 1}
                 onPhotoClick={onPhotoClick}
                 canEditTransaction={canEditTransaction}
                 canRestoreTransaction={canRestoreTransaction}
@@ -744,7 +824,7 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
 }
 
 // ─── TRANSACTION TABLE ROW (Desktop) ─────────────────────────────────
-function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick }: any) {
+function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
@@ -837,6 +917,9 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
   return (
     <>
       <tr className="hover:bg-blue-50/30 transition-colors duration-100 cursor-pointer align-top group" onClick={() => onRowClick?.(item)}>
+        <td className="px-4 py-3.5 text-center">
+          <span className="text-[11px] font-bold text-gray-400 tabular-nums">{rowNumber}</span>
+        </td>
         <td className="px-4 py-3.5"><StatusBadge item={item} /></td>
         <td className="px-4 py-3.5">
           <div className="text-xs font-bold text-gray-800 font-mono leading-tight mb-1">{item.invoice_number}</div>
@@ -1203,7 +1286,12 @@ export default function Page() {
   const [paymentMethod, setPaymentMethod] = useState("ALL");
   const [sourcePlatform, setSourcePlatform] = useState("ALL");
   const [customerType, setCustomerType] = useState("ALL");
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  // Sorting: satu sumber kebenaran buat tombol "Terbaru/Terlama" DAN klik header tabel.
+  // Digabung jadi satu object supaya perubahan kolom + arah selalu terjadi dalam SATU render
+  // (kalau dipisah dua useState, setSortDir di dalam updater setSortBy membaca nilai basi).
+  const [sort, setSort] = useState<{ by: SortKey; dir: SortDir }>(DEFAULT_SORT);
+  const sortBy = sort.by;
+  const sortDir = sort.dir;
   const [companyName, setCompanyName] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = isMobile ? 10 : 25;
@@ -1213,6 +1301,10 @@ export default function Page() {
   const [focusInvoice, setFocusInvoice] = useState<string | null>(null);
   const [paymentMethodOptions, setPaymentMethodOptions] = useState<string[]>([]);
   const [sourcePlatformOptions, setSourcePlatformOptions] = useState<string[]>([]);
+
+  // Dipertahankan buat kompatibilitas param lama di API (`sortOrder`)
+  const sortOrder: "newest" | "oldest" =
+    sortBy === "date" && sortDir === "asc" ? "oldest" : "newest";
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -1256,12 +1348,32 @@ export default function Page() {
     }).catch(() => {});
   }, []);
 
+  // ── Klik header tabel (siklus 3 langkah, seperti Excel) ────────────
+  // 1x  → urut pakai arah default kolom itu (teks A→Z, angka/tanggal besar→kecil)
+  // 2x  → arah dibalik
+  // 3x  → reset, balik ke urutan awal halaman (tanggal terbaru)
+  const handleSort = (key: SortKey) => {
+    setSort((prev) => {
+      if (prev.by !== key) return { by: key, dir: SORT_DEFAULT_DIR[key] };
+      if (prev.dir === SORT_DEFAULT_DIR[key]) {
+        return { by: key, dir: prev.dir === "asc" ? "desc" : "asc" };
+      }
+      return DEFAULT_SORT;
+    });
+  };
+
   const fetchTransactions = async () => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
       params.set("status", status);
       params.set("sortOrder", sortOrder);
+      // Margin dihitung server setelah query, jadi tidak bisa jadi ORDER BY.
+      // Untuk key client-side, biarkan server tetap urut created_at.
+      if (!CLIENT_SIDE_SORT_KEYS.includes(sortBy)) {
+        params.set("sortBy", sortBy);
+        params.set("sortDir", sortDir);
+      }
 
       if (focusInvoice) {
         params.set("invoiceExact", focusInvoice);
@@ -1289,17 +1401,26 @@ export default function Page() {
   // Reset ke halaman 1 tiap kali filter (atau jumlah item per halaman) berubah
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName, itemsPerPage]);
+  }, [debouncedSearch, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortBy, sortDir, companyName, itemsPerPage]);
 
   // Fetch tiap kali halaman atau filter berubah
   useEffect(() => {
     fetchTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage, status, sortOrder, debouncedSearch, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, companyName, focusInvoice]);
+  }, [currentPage, itemsPerPage, status, sortBy, sortDir, debouncedSearch, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, companyName, focusInvoice]);
 
-  // Server sudah filter + paginasi — tampilkan langsung
-  const paginatedTransactions = allTransactions;
+  // Server sudah filter + paginasi. Khusus kolom Margin, urutkan di client
+  // karena nilainya baru ada setelah server menggabungkan data unit (bukan kolom tabel).
+  const paginatedTransactions = useMemo(() => {
+    if (!CLIENT_SIDE_SORT_KEYS.includes(sortBy)) return allTransactions;
+    const factor = sortDir === "asc" ? 1 : -1;
+    return [...allTransactions].sort(
+      (a, b) => (Number(a.other ?? 0) - Number(b.other ?? 0)) * factor
+    );
+  }, [allTransactions, sortBy, sortDir]);
+
   const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
+  const startIndex = focusInvoice ? 0 : (currentPage - 1) * itemsPerPage;
 
   const uniquePaymentMethods = useMemo(() => ["ALL", ...paymentMethodOptions], [paymentMethodOptions]);
   const uniqueSourcePlatforms = useMemo(() => ["ALL", ...sourcePlatformOptions], [sourcePlatformOptions]);
@@ -1322,6 +1443,10 @@ export default function Page() {
 
       // Ambil SEMUA baris yang match filter aktif (bukan cuma 1 halaman yang lagi ditampilkan)
       const exportParams = new URLSearchParams({ export: "1", status, sortOrder });
+      if (!CLIENT_SIDE_SORT_KEYS.includes(sortBy)) {
+        exportParams.set("sortBy", sortBy);
+        exportParams.set("sortDir", sortDir);
+      }
       if (debouncedSearch.trim()) exportParams.set("search", debouncedSearch.trim());
       if (customerType !== "ALL") exportParams.set("customerType", customerType);
       if (dateFrom) exportParams.set("dateFrom", dateFrom);
@@ -1342,6 +1467,7 @@ export default function Page() {
       });
 
       const COL_DEFS = [
+        { header: "No", key: "no", width: 7 },
         { header: "Tanggal", key: "tanggal", width: 14 }, { header: "Status", key: "status", width: 14 },
         { header: "Jumlah Unit", key: "qty", width: 13 }, { header: "Laptop", key: "laptop", width: 34 },
         { header: "CPU", key: "cpu", width: 22 }, { header: "RAM", key: "ram", width: 10 },
@@ -1374,9 +1500,10 @@ export default function Page() {
 
       const LEFT_KEYS = new Set(["tanggal"]);
       const CURR_KEYS = new Set(["modal", "jual"]);
-      const NUM_KEYS = new Set(["qty"]);
+      const NUM_KEYS = new Set(["qty", "no"]);
       const tableRows: (string | number)[][] = [];
 
+      let rowNo = 0;
       for (const item of exportRows) {
         const grouped: any[] = item.grouped_items ?? [];
         const isMulti = grouped.length > 1;
@@ -1389,12 +1516,14 @@ export default function Page() {
           for (const g of grouped) {
             const sns: string[] = Array.isArray(g.serial_numbers) ? g.serial_numbers : [];
             const modal = canSeeFinancials ? (cachedGroupMap.get(g.laptop_name ?? "") ?? Number(g.purchase_price_total ?? 0)) : 0;
-            tableRows.push([tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", Number(g.unit_count ?? 1), g.laptop_name ?? "", g.cpu ?? "", g.ram ?? "", g.storage ?? "", item.payment_method ?? "", modal, Number(g.allocated_deal_price ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
+            rowNo += 1;
+            tableRows.push([rowNo, tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", Number(g.unit_count ?? 1), g.laptop_name ?? "", g.cpu ?? "", g.ram ?? "", g.storage ?? "", item.payment_method ?? "", modal, Number(g.allocated_deal_price ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
           }
         } else {
           const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
           const modal = canSeeFinancials ? (cached?.purchase_price_total ?? Number(item.inventory_price ?? 0)) : 0;
-          tableRows.push([tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", 1, item.laptop_name ?? "", item.cpu ?? "", item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal, Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
+          rowNo += 1;
+          tableRows.push([rowNo, tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", 1, item.laptop_name ?? "", item.cpu ?? "", item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal, Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
         }
       }
 
@@ -1515,10 +1644,11 @@ export default function Page() {
               )}
             </div>
 
-            {/* Sort */}
+            {/* Sort tanggal (tetap ada, sekarang satu state dengan sorting kolom) */}
             <button
-              onClick={() => setSortOrder(s => s === "newest" ? "oldest" : "newest")}
-              className="flex items-center gap-1.5 px-3 h-9 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 bg-white hover:bg-gray-50 transition whitespace-nowrap"
+              onClick={() => handleSort("date")}
+              title="Urutkan berdasarkan waktu transaksi"
+              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${sortBy === "date" ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 {sortOrder === "newest"
@@ -1654,9 +1784,9 @@ export default function Page() {
           </div>
         ) : isMobile ? (
           <div className="space-y-3">
-            {paginatedTransactions.map((item) => (
+            {paginatedTransactions.map((item, idx) => (
               <TransactionCard
-                key={item.id} item={item} onPhotoClick={setPhotoModal}
+                key={item.id} item={item} rowNumber={startIndex + idx + 1} onPhotoClick={setPhotoModal}
                 canEditTransaction={canEditTransaction} canSeeFinancials={canSeeFinancials}
                 canSeeModal={canSeeModal}
                 canRestoreTransaction={canRestoreTransaction}
@@ -1667,6 +1797,8 @@ export default function Page() {
         ) : (
           <TransactionTable
             paginatedTransactions={paginatedTransactions}
+            startIndex={startIndex}
+            sortBy={sortBy} sortDir={sortDir} onSort={handleSort}
             canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction}
             canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} onPhotoClick={setPhotoModal}
             onRestored={() => fetchTransactions()} onRowClick={setDetailItem}
