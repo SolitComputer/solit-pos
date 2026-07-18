@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { User, Laptop, Wallet, Package, FileText, RefreshCw, Handshake, Pencil, X, type LucideIcon } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Transaction {
@@ -694,7 +695,7 @@ export default function EditTransactionPage() {
         <div className="form-card">
 
           {/* ─ Section: Pembeli ─ */}
-          <SectionHeader icon="" title="Data Pembeli" color="#EEF2FF" />
+          <SectionHeader icon={User} title="Data Pembeli" color="#EEF2FF" />
 
           <div className="px-5 pt-1 pb-4">
             <label className="block text-xs font-medium text-gray-400 mb-2">
@@ -702,10 +703,12 @@ export default function EditTransactionPage() {
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { value: "UMUM", label: "Umum", icon: "" },
-                { value: "RESELLER", label: "Reseller", icon: "" },
-                { value: "MITRA", label: "Mitra", icon: "" },
-              ].map((opt) => (
+                { value: "UMUM", label: "Umum", icon: User },
+                { value: "RESELLER", label: "Reseller", icon: RefreshCw },
+                { value: "MITRA", label: "Mitra", icon: Handshake },
+              ].map((opt) => {
+                const Icon = opt.icon;
+                return (
                 <button
                   key={opt.value}
                   type="button"
@@ -721,10 +724,11 @@ export default function EditTransactionPage() {
                     : ""
                     }`}
                 >
-                  <span>{opt.icon}</span>
+                  <Icon className="w-4 h-4" />
                   {opt.label}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -785,7 +789,7 @@ export default function EditTransactionPage() {
           <div className="section-divider" />
 
           {/* ─ Section: Unit Laptop ─ */}
-          <SectionHeader icon="" title="Unit Laptop" color="#EEF2FF" />
+          <SectionHeader icon={Laptop} title="Unit Laptop" color="#EEF2FF" />
           <div className="px-5 pb-5 space-y-4">
 
             {/* Active units list */}
@@ -899,7 +903,7 @@ export default function EditTransactionPage() {
           <div className="section-divider" />
 
           {/* ─ Section: Harga ─ */}
-          <SectionHeader icon="" title="Harga & Pembayaran" color="#ECFDF5" />
+          <SectionHeader icon={Wallet} title="Harga & Pembayaran" color="#ECFDF5" />
           <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Total Harga Deal (Rp)">
               <input
@@ -960,8 +964,8 @@ export default function EditTransactionPage() {
                 </p>
                 {totalInventoryPrice > 0 &&
                   totalInventoryPrice !== transaction.inventory_price && (
-                    <p className="text-[9px] text-amber-500 font-semibold mt-0.5">
-                       Diubah dari {fmt(transaction.inventory_price)}
+                    <p className="text-[9px] text-amber-500 font-semibold mt-0.5 inline-flex items-center gap-1">
+                      <Pencil className="w-2.5 h-2.5" /> Diubah dari {fmt(transaction.inventory_price)}
                     </p>
                   )}
               </div>
@@ -983,7 +987,7 @@ export default function EditTransactionPage() {
           <div className="section-divider" />
 
           {/* ─ Section: Pengambilan ─ */}
-          <SectionHeader icon="" title="Info Pengambilan" color="#FFFBEB" />
+          <SectionHeader icon={Package} title="Info Pengambilan" color="#FFFBEB" />
           <div className="px-5 pb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Metode Pengambilan">
               <select
@@ -1030,7 +1034,7 @@ export default function EditTransactionPage() {
           <div className="section-divider" />
 
           {/* ─ Section: Catatan ─ */}
-          <SectionHeader icon="" title="Catatan" color="#F1F5F9" />
+          <SectionHeader icon={FileText} title="Catatan" color="#F1F5F9" />
           <div className="px-5 pb-5">
             <textarea
               name="notes"
@@ -1161,8 +1165,8 @@ export default function EditTransactionPage() {
                   className="rounded-xl px-4 py-3"
                   style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}
                 >
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2.5">
-                     Unit Aktif ({activeUnits.length})
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2.5 inline-flex items-center gap-1">
+                    <Laptop className="w-3 h-3" /> Unit Aktif ({activeUnits.length})
                   </p>
                   <div className="space-y-2">
                     {activeUnits.map((u, i) => {
@@ -1410,8 +1414,8 @@ function UnitEditRow({
         className="border-t border-gray-100 px-3.5 py-2.5"
         style={{ background: "#F8FAFC" }}
       >
-        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-           Harga Deal
+        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+          <Wallet className="w-2.5 h-2.5" /> Harga Deal
         </label>
         <input
           type="number"
@@ -1429,8 +1433,8 @@ function UnitEditRow({
           className="border-t border-gray-100 px-3.5 pb-3.5 pt-3"
           style={{ background: "#FAFBFF" }}
         >
-          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-2">
-             Pilih unit pengganti
+          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-2 inline-flex items-center gap-1">
+            <RefreshCw className="w-2.5 h-2.5" /> Pilih unit pengganti
           </p>
           <div className="relative">
             <input
@@ -1479,9 +1483,9 @@ function UnitEditRow({
               setShowReplace(false);
               setReplaceSearch("");
             }}
-            className="mt-2 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition"
+            className="mt-2 text-[10px] font-medium text-gray-400 hover:text-gray-600 transition inline-flex items-center gap-1"
           >
-             Batal
+            <X className="w-2.5 h-2.5" /> Batal
           </button>
         </div>
       )}
@@ -1491,11 +1495,11 @@ function UnitEditRow({
 
 // ── UI Helpers ────────────────────────────────────────────────────────────────
 function SectionHeader({
-  icon,
+  icon: Icon,
   title,
   color,
 }: {
-  icon: string;
+  icon: LucideIcon;
   title: string;
   color?: string;
 }) {
@@ -1505,7 +1509,7 @@ function SectionHeader({
         className="section-header-icon"
         style={color ? { background: color } : {}}
       >
-        {icon}
+        <Icon className="w-4 h-4 text-slate-600" />
       </div>
       <p className="section-header-title">{title}</p>
     </div>

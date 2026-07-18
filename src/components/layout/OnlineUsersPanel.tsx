@@ -5,7 +5,12 @@
   import { getCurrentUserClient } from "@/lib/auth-client";
   import { getSupabaseClient } from "@/services/supabaseClient";
   import { useChatContext } from "@/contexts/ChatContext";
-import { User } from "lucide-react";
+import {
+  User, type LucideIcon,
+  Moon, Home, Timer, ClipboardList, Plus, CheckCircle2, AlertTriangle,
+  Laptop, ShoppingCart, Users, BarChart3, Shield, Hourglass, Lock,
+  FileText, CreditCard, Camera, Smartphone,
+} from "lucide-react";
 
   const ONLINE_THRESHOLD_MS = 35 * 1000;
   const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
@@ -30,28 +35,28 @@ import { User } from "lucide-react";
     role: string;
   }
 
-  function getPageLabel(page: string | null): { label: string; emoji: string } {
-    if (!page) return { label: "Belum aktif", emoji: "" };
-    if (page === "/" || page === "") return { label: "Beranda", emoji: "" };
-    if (page.startsWith("/dashboard/attendance/overtime")) return { label: "Lembur", emoji: "" };
-    if (page.startsWith("/dashboard/attendance")) return { label: "Absensi", emoji: "" };
-    if (page.startsWith("/dashboard/laptops/create")) return { label: "Tambah Laptop", emoji: "" };
-    if (page.startsWith("/dashboard/laptops/ready")) return { label: "Laptop Siap", emoji: "" };
-    if (page.startsWith("/dashboard/laptops/minus")) return { label: "Laptop Minus", emoji: "" };
-    if (page.startsWith("/dashboard/laptops")) return { label: "Laptop", emoji: "" };
-    if (page.startsWith("/dashboard/transactions")) return { label: "Transaksi", emoji: "" };
-    if (page.startsWith("/dashboard/users")) return { label: "Manajemen User", emoji: "" };
-    if (page.startsWith("/dashboard/reports")) return { label: "Laporan", emoji: "" };
-    if (page.startsWith("/dashboard/warranty")) return { label: "Garansi", emoji: "" };
-    if (page.startsWith("/dashboard/pending-orders")) return { label: "Pending Order", emoji: "" };
-    if (page.startsWith("/dashboard/login-logs")) return { label: "Login Log", emoji: "" };
-    if (page.startsWith("/dashboard/activity-log")) return { label: "Activity Log", emoji: "" };
-    if (page.startsWith("/dashboard")) return { label: "Dashboard", emoji: "" };
-    if (page.startsWith("/payment/create")) return { label: "Buat Transaksi", emoji: "" };
-    if (page.startsWith("/payment")) return { label: "Pembayaran", emoji: "" };
-    if (page.startsWith("/face-verify")) return { label: "Absen Wajah", emoji: "" };
-    if (page.startsWith("/scan")) return { label: "Scan Barcode", emoji: "" };
-    return { label: page.replace(/^\//, ""), emoji: "" };
+  function getPageLabel(page: string | null): { label: string; icon: LucideIcon } {
+    if (!page) return { label: "Belum aktif", icon: Moon };
+    if (page === "/" || page === "") return { label: "Beranda", icon: Home };
+    if (page.startsWith("/dashboard/attendance/overtime")) return { label: "Lembur", icon: Timer };
+    if (page.startsWith("/dashboard/attendance")) return { label: "Absensi", icon: ClipboardList };
+    if (page.startsWith("/dashboard/laptops/create")) return { label: "Tambah Laptop", icon: Plus };
+    if (page.startsWith("/dashboard/laptops/ready")) return { label: "Laptop Siap", icon: CheckCircle2 };
+    if (page.startsWith("/dashboard/laptops/minus")) return { label: "Laptop Minus", icon: AlertTriangle };
+    if (page.startsWith("/dashboard/laptops")) return { label: "Laptop", icon: Laptop };
+    if (page.startsWith("/dashboard/transactions")) return { label: "Transaksi", icon: ShoppingCart };
+    if (page.startsWith("/dashboard/users")) return { label: "Manajemen User", icon: Users };
+    if (page.startsWith("/dashboard/reports")) return { label: "Laporan", icon: BarChart3 };
+    if (page.startsWith("/dashboard/warranty")) return { label: "Garansi", icon: Shield };
+    if (page.startsWith("/dashboard/pending-orders")) return { label: "Pending Order", icon: Hourglass };
+    if (page.startsWith("/dashboard/login-logs")) return { label: "Login Log", icon: Lock };
+    if (page.startsWith("/dashboard/activity-log")) return { label: "Activity Log", icon: FileText };
+    if (page.startsWith("/dashboard")) return { label: "Dashboard", icon: Home };
+    if (page.startsWith("/payment/create")) return { label: "Buat Transaksi", icon: CreditCard };
+    if (page.startsWith("/payment")) return { label: "Pembayaran", icon: CreditCard };
+    if (page.startsWith("/face-verify")) return { label: "Absen Wajah", icon: Camera };
+    if (page.startsWith("/scan")) return { label: "Scan Barcode", icon: Smartphone };
+    return { label: page.replace(/^\//, ""), icon: FileText };
   }
 
   function formatLastSeen(secondsAgo: number | null): string {
@@ -279,7 +284,7 @@ import { User } from "lucide-react";
                       {isSelf && <span className="text-[8px] text-gray-400 font-normal flex-shrink-0">(Kamu)</span>}
                     </div>
                     <div className="flex items-center gap-1 mt-0.5">
-                      <span className="text-xs leading-none">{pageInfo.emoji}</span>
+                      <pageInfo.icon size={12} className="text-gray-400 flex-shrink-0" />
                       <p className="text-[10px] text-gray-400 truncate">{pageInfo.label}</p>
                     </div>
                   </div>

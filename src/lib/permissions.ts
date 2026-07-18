@@ -210,6 +210,12 @@ export const PREPARATION_ANTRIAN_VIEW_ROLES: UserRole[] = Array.from(new Set<Use
   "PENGANTARAN",
 ]));
 
+export const PROVIDER_PERFORMANCE_ROLES: UserRole[] = [
+  "KEPALA_PENYEDIA_BARANG", "PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG",
+];
+
+export const PROVIDER_PERFORMANCE_VIEW_ROLES: UserRole[] = [...PREPARATION_ANTRIAN_VIEW_ROLES];
+
 export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS,
   ...PREPARATION_SALES_ROLES,
@@ -316,6 +322,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/done": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/history": [...SERVICE_VIEW_ROLES],
+  "/dashboard/service/statistik": [...SERVICE_VIEW_ROLES],
 
   "/payment": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
@@ -432,10 +439,14 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
   "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
   "/dashboard/preparation/history": [...PREPARATION_VIEW_ROLES],
+  "/dashboard/preparation/statistik": [...DELIVERY_LEADERBOARD_VIEW_ROLES],
 
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
   "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
   "/api/preparation/dispatch": [...PREPARATION_DISPATCH_ROLES],
+
+  "/dashboard/preparation/riwayat-penyedia": [...PROVIDER_PERFORMANCE_VIEW_ROLES],
+  "/api/preparation/provider-performance": [...PROVIDER_PERFORMANCE_VIEW_ROLES],
 
   // ── Cashflow ───────────────────────────────────────────────────────────────
   "/dashboard/cashflow": [...CASHFLOW_ROLES],
@@ -580,6 +591,8 @@ export const PERMISSIONS = {
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],
   CANCEL_PREPARATION: [...PREPARATION_CANCEL_ROLES] as UserRole[],
   FORCE_COMPLETE_PREPARATION: [...PREPARATION_FORCE_COMPLETE_ROLES] as UserRole[],
+
+  VIEW_PROVIDER_PERFORMANCE: [...PROVIDER_PERFORMANCE_VIEW_ROLES] as UserRole[],
 
   // ── Voice HT ────────────────────────────────────────────────────────────────
   DELIVERY_VOICE: [...DELIVERY_VOICE_ROLES] as UserRole[],

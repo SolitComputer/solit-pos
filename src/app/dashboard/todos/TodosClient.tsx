@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { Sparkles, Check, CircleDot, type LucideIcon } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -101,16 +102,16 @@ function getItemProgress(items: TodoItem[] | undefined): number | null {
 // ─── EmptyState ───────────────────────────────────────────────────────────────
 
 function EmptyState({ filter }: { filter: FilterType }) {
-    const messages: Record<FilterType, { icon: string; title: string; desc: string }> = {
-        all: { icon: "", title: "Belum ada tugas", desc: "Tambah tugas pertamamu sekarang" },
-        active: { icon: "", title: "Semua tugas selesai!", desc: "Tidak ada tugas yang tertunda" },
-        done: { icon: "◎", title: "Belum ada tugas selesai", desc: "Selesaikan tugas dan centang di sini" },
+    const messages: Record<FilterType, { icon: LucideIcon; title: string; desc: string }> = {
+        all: { icon: Sparkles, title: "Belum ada tugas", desc: "Tambah tugas pertamamu sekarang" },
+        active: { icon: Check, title: "Semua tugas selesai!", desc: "Tidak ada tugas yang tertunda" },
+        done: { icon: CircleDot, title: "Belum ada tugas selesai", desc: "Selesaikan tugas dan centang di sini" },
     };
-    const { icon, title, desc } = messages[filter];
+    const { icon: Icon, title, desc } = messages[filter];
     return (
         <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 rounded-2xl bg-[#1a1a2e]/5 flex items-center justify-center mb-4">
-                <span className="text-2xl text-[#1a1a2e]/40 font-light">{icon}</span>
+                <Icon className="w-7 h-7 text-[#1a1a2e]/40" strokeWidth={1.5} />
             </div>
             <p className="text-sm font-semibold text-gray-700 mt-1">{title}</p>
             <p className="text-xs text-gray-400 mt-1">{desc}</p>

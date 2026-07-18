@@ -6,7 +6,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
-import { AlertCircle, Clock, Inbox } from "lucide-react";
+import { AlertCircle, Clock, Inbox, Package, Bike, CheckCircle2, Smartphone, Ruler, Target, MapPin, Home, type LucideIcon } from "lucide-react";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null; is_checked: boolean }
 interface MyDelivery {
@@ -30,11 +30,11 @@ function getPhase(o: MyDelivery): Phase {
   return "SELESAI";
 }
 
-const PHASE_META: Record<Phase, { label: string; badge: string; dot: string; cta: string; pulse?: boolean }> = {
-  MENUNGGU_SETUJU: { label: "Perlu Disetujui", badge: "bg-yellow-50 text-yellow-700 border-yellow-200", dot: "bg-yellow-500", cta: " Setujui Tugas", pulse: true },
-  PERLU_ANTAR: { label: "Perlu Diantar", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", cta: " Mulai Antar", pulse: true },
-  SEDANG_ANTAR: { label: "Sedang Diantar", badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", cta: " Lanjutkan Antar", pulse: true },
-  PULANG: { label: "Perjalanan Pulang", badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", cta: " Lihat Perjalanan", pulse: true },
+const PHASE_META: Record<Phase, { label: string; badge: string; dot: string; cta: string; icon?: LucideIcon; pulse?: boolean }> = {
+  MENUNGGU_SETUJU: { label: "Perlu Disetujui", badge: "bg-yellow-50 text-yellow-700 border-yellow-200", dot: "bg-yellow-500", cta: "Setujui Tugas", icon: CheckCircle2, pulse: true },
+  PERLU_ANTAR: { label: "Perlu Diantar", badge: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500", cta: "Mulai Antar", icon: Target, pulse: true },
+  SEDANG_ANTAR: { label: "Sedang Diantar", badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", cta: "Lanjutkan Antar", icon: MapPin, pulse: true },
+  PULANG: { label: "Perjalanan Pulang", badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", cta: "Lihat Perjalanan", icon: Home, pulse: true },
   SELESAI: { label: "Selesai", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", cta: "Lihat Detail" },
 };
 
@@ -72,6 +72,7 @@ function DeliveryTimer({ start, end }: { start: string; end?: string | null }) {
 function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
   const phase = getPhase(o);
   const meta = PHASE_META[phase];
+  const CtaIcon = meta.icon;
   const [showAllSN, setShowAllSN] = useState(false);
   const items = o.preparation_items ?? [];
   const shown = showAllSN ? items : items.slice(0, 3);
@@ -92,7 +93,7 @@ function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
           {o.customer_phone && (
             <a href={`tel:${o.customer_phone}`} onClick={(e) => e.stopPropagation()}
               className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 mt-0.5">
-               {o.customer_phone}
+              <Smartphone className="w-3 h-3" /> {o.customer_phone}
             </a>
           )}
         </div>
@@ -132,7 +133,7 @@ function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
 
       {(o.delivery_distance_m || o.delivery_duration_s || o.delivery_accepted_at) && (
         <div className="flex flex-wrap gap-2 mb-2">
-          {o.delivery_distance_m != null && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded"> {(o.delivery_distance_m / 1000).toFixed(1)} km</span>}
+          {o.delivery_distance_m != null && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded inline-flex items-center gap-1"><Ruler className="w-2.5 h-2.5" /> {(o.delivery_distance_m / 1000).toFixed(1)} km</span>}
           {o.delivery_duration_s != null && <span className="text-[10px] font-bold bg-gray-50 text-gray-700 border border-gray-100 px-2 py-0.5 rounded flex items-center gap-1">Estimasi: <span className="font-mono tabular-nums">{Math.round(o.delivery_duration_s / 60)} mnt</span></span>}
           {o.delivery_accepted_at && (
             <DeliveryTimer start={o.delivery_accepted_at} end={o.delivered_at} />
@@ -140,7 +141,8 @@ function DeliveryCard({ o, isNew }: { o: MyDelivery; isNew?: boolean }) {
         </div>
       )}
 
-      <div className={`mt-2 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition ${phase === "SELESAI" ? "bg-gray-100 text-gray-600" : "bg-[#1a1a2e] text-white"}`}>
+      <div className={`mt-2 h-10 rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition ${phase === "SELESAI" ? "bg-gray-100 text-gray-600" : "bg-[#1a1a2e] text-white"}`}>
+        {CtaIcon && <CtaIcon className="w-4 h-4" />}
         {meta.cta} →
       </div>
     </Link>
@@ -256,9 +258,9 @@ export default function MyDeliveryPage() {
   }, [orders, filter, search]);
 
   const STAT = [
-    { label: "Perlu Diantar", value: counts.perlu, color: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700", icon: "" },
-    { label: "Sedang Jalan", value: counts.jalan, color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: "" },
-    { label: "Selesai", value: counts.selesai, color: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700", icon: "" },
+    { label: "Perlu Diantar", value: counts.perlu, color: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700", icon: Package },
+    { label: "Sedang Jalan", value: counts.jalan, color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: Bike },
+    { label: "Selesai", value: counts.selesai, color: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700", icon: CheckCircle2 },
   ];
 
   const TABS = [
@@ -320,15 +322,18 @@ export default function MyDeliveryPage() {
           </div>
 
           <div className="grid grid-cols-3 gap-2.5">
-            {STAT.map((s) => (
+            {STAT.map((s) => {
+              const Icon = s.icon;
+              return (
               <div key={s.label} className={`bg-gradient-to-br ${s.color} border rounded-2xl p-3`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-lg">{s.icon}</span>
+                  <Icon className="w-5 h-5" />
                   <span className="text-2xl font-black tabular-nums">{s.value}</span>
                 </div>
                 <p className="text-[11px] font-bold uppercase tracking-wide mt-1 opacity-80">{s.label}</p>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {counts.perlu > 0 && (

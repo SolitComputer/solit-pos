@@ -16,7 +16,7 @@ import { supabase } from "@/services/supabase";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import ReassignModal from "@/components/preparation/ReassignModal";
 import ManualStatusModal from "@/components/preparation/ManualStatusModal";
-import { CheckCircle2, FileText, Clock, Inbox, AlertCircle } from "lucide-react";
+import { CheckCircle2, FileText, Clock, Inbox, AlertCircle, User, Bike, Package } from "lucide-react";
 
 interface PrepItem {
     id: string; serial_number: string; laptop_name: string | null;
@@ -177,9 +177,9 @@ function DispatchModal({ order, onClose, onDispatched }: {
     const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition";
 
     const OPTIONS = [
-        { value: "DIAMBIL_CUSTOMER", icon: "", title: "Langsung Diambil Customer", desc: "Customer ambil ke toko, langsung selesai" },
-        { value: "PENGANTARAN", icon: "", title: "Diantar Role Pengantaran", desc: "Pengantar dapat notif tugas & harus menyetujui dulu" },
-        { value: "KURIR", icon: "", title: "Diantar Kurir", desc: "Jasa kurir pihak ketiga (JNE, J&T, dll)" },
+        { value: "DIAMBIL_CUSTOMER", icon: User, title: "Langsung Diambil Customer", desc: "Customer ambil ke toko, langsung selesai" },
+        { value: "PENGANTARAN", icon: Bike, title: "Diantar Role Pengantaran", desc: "Pengantar dapat notif tugas & harus menyetujui dulu" },
+        { value: "KURIR", icon: Package, title: "Diantar Kurir", desc: "Jasa kurir pihak ketiga (JNE, J&T, dll)" },
     ] as const;
 
     return (
@@ -191,16 +191,19 @@ function DispatchModal({ order, onClose, onDispatched }: {
                     <p className="text-xs text-orange-100 mt-0.5">Pilih cara barang sampai ke customer</p>
                 </div>
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2.5">
-                    {OPTIONS.map(opt => (
+                    {OPTIONS.map(opt => {
+                        const Icon = opt.icon;
+                        return (
                         <button key={opt.value} type="button" onClick={() => setMethod(opt.value)}
                             className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition ${method === opt.value ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
-                            <span className="text-2xl">{opt.icon}</span>
+                            <span className="flex-shrink-0"><Icon className="w-6 h-6 text-gray-500" /></span>
                             <div>
                                 <p className={`text-sm font-bold ${method === opt.value ? "text-orange-700" : "text-gray-700"}`}>{opt.title}</p>
                                 <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
                             </div>
                         </button>
-                    ))}
+                        );
+                    })}
 
                     {method === "PENGANTARAN" && (
                         <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-2.5">

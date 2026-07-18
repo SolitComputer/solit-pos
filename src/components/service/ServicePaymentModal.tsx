@@ -2,6 +2,7 @@
 // src/components/service/ServicePaymentModal.tsx
 
 import { useState, useEffect } from "react";
+import { Banknote, Landmark, QrCode, Check } from "lucide-react";
 import type { ServiceOrder } from "@/types/service";
 
 interface Props {
@@ -20,9 +21,9 @@ interface Props {
 type PickupType = "service" | "garansi";
 
 const METHOD_OPTIONS = [
-  { value: "CASH", label: "Cash / Tunai", icon: "" },
-  { value: "TRANSFER", label: "Transfer Bank", icon: "" },
-  { value: "QRIS", label: "QRIS", icon: "" },
+  { value: "CASH", label: "Cash / Tunai", icon: Banknote },
+  { value: "TRANSFER", label: "Transfer Bank", icon: Landmark },
+  { value: "QRIS", label: "QRIS", icon: QrCode },
 ] as const;
 
 function fmtRupiah(n: number) {
@@ -310,7 +311,9 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-2">Metode Pembayaran</label>
               <div className="grid grid-cols-3 gap-2">
-                {METHOD_OPTIONS.map(m => (
+                {METHOD_OPTIONS.map(m => {
+                  const Icon = m.icon;
+                  return (
                   <button
                     key={m.value}
                     onClick={() => setMethod(m.value)}
@@ -319,10 +322,11 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
                         : "border-gray-200 text-gray-500 hover:border-gray-300"
                       }`}
                   >
-                    <span className="text-lg">{m.icon}</span>
+                    <Icon className="w-5 h-5" />
                     {m.label}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -406,7 +410,11 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
               </svg>
-            ) : isGaransi ? " Konfirmasi Klaim Garansi" : " Konfirmasi Diambil"}
+            ) : isGaransi ? (
+              <><Check className="w-4 h-4" /> Konfirmasi Klaim Garansi</>
+            ) : (
+              <><Check className="w-4 h-4" /> Konfirmasi Diambil</>
+            )}
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { Cake, CalendarDays, PartyPopper, Gift, Phone, Receipt, MessageCircle } from "lucide-react";
 
 interface BirthdayCustomer {
     id: string;
@@ -100,7 +101,7 @@ export default function CustomerBirthdaysPage() {
                                         boxShadow: "0 4px 16px rgba(251,191,36,0.4)",
                                     }}
                                 >
-                                    
+                                    <Cake size={24} style={{ color: "#78350f" }} />
                                 </div>
                                 <div>
                                     <h1 className="text-lg sm:text-xl font-black text-white tracking-tight leading-tight">
@@ -120,8 +121,8 @@ export default function CustomerBirthdaysPage() {
                                     border: "1px solid rgba(251,191,36,0.3)",
                                 }}
                             >
-                                <span className="text-[10px] sm:text-[11px] font-bold" style={{ color: "#fde68a" }}>
-                                     {todayShort}
+                                <span className="text-[10px] sm:text-[11px] font-bold inline-flex items-center gap-1" style={{ color: "#fde68a" }}>
+                                    <CalendarDays size={12} /> {todayShort}
                                 </span>
                             </div>
                         </div>
@@ -149,7 +150,7 @@ export default function CustomerBirthdaysPage() {
                             }}
                         >
                             <div className="text-center py-16 px-6">
-                                <div className="text-5xl mb-4"></div>
+                                <div className="mb-4 flex justify-center"><Cake size={48} className="text-slate-300" /></div>
                                 <p className="text-sm font-black text-slate-700">
                                     Tidak ada customer yang ulang tahun hari ini
                                 </p>
@@ -169,7 +170,7 @@ export default function CustomerBirthdaysPage() {
                                     boxShadow: "0 2px 12px rgba(245,158,11,0.12)",
                                 }}
                             >
-                                <span className="text-2xl flex-shrink-0"></span>
+                                <PartyPopper size={26} className="flex-shrink-0 text-amber-600" />
                                 <div>
                                     <p className="text-sm font-black text-amber-900">
                                         {customers.length} Customer Ulang Tahun Hari Ini!
@@ -247,7 +248,7 @@ export default function CustomerBirthdaysPage() {
                                                                 boxShadow: `0 2px 6px ${color.shadow}`,
                                                             }}
                                                         >
-                                                             {c.age} tahun
+                                                            <Gift size={11} /> {c.age} tahun
                                                         </span>
                                                     </div>
 
@@ -255,20 +256,20 @@ export default function CustomerBirthdaysPage() {
                                                     <div className="mt-2 space-y-1">
                                                         {c.customer_phone && (
                                                             <div className="flex items-center gap-1.5">
-                                                                <span className="text-[10px]"></span>
+                                                                <Phone size={11} className="text-slate-400 flex-shrink-0" />
                                                                 <span className="text-[11px] font-semibold text-slate-500">
                                                                     {c.customer_phone}
                                                                 </span>
                                                             </div>
                                                         )}
                                                         <div className="flex items-center gap-1.5">
-                                                            <span className="text-[10px]"></span>
+                                                            <CalendarDays size={11} className="text-slate-400 flex-shrink-0" />
                                                             <span className="text-[11px] text-slate-400">
                                                                 {formatDate(c.customer_birth_date)}
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                                            <span className="text-[10px]"></span>
+                                                            <Receipt size={11} className="text-slate-400 flex-shrink-0" />
                                                             <span className="text-[11px] text-slate-400">
                                                                 {c.invoice_number}
                                                             </span>
@@ -294,8 +295,8 @@ export default function CustomerBirthdaysPage() {
                                                             }}
                                                         >
                                                             {/* Icon only on mobile, text+icon on desktop */}
-                                                            <span className="hidden sm:inline"> Kirim WA</span>
-                                                            <span className="sm:hidden text-base leading-none"></span>
+                                                            <MessageCircle size={14} className="flex-shrink-0" />
+                                                            <span className="hidden sm:inline">Kirim WA</span>
                                                         </a>
                                                     </div>
                                                 )}

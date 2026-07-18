@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Bike } from "lucide-react";
 import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 
@@ -78,7 +79,7 @@ export default function DeliveryAlertListener() {
   return (
     <div className="fixed top-4 right-4 z-[200] animate-in slide-in-from-top-2 fade-in duration-300">
       <div className="bg-white border-2 border-violet-300 rounded-2xl shadow-2xl shadow-violet-900/20 px-4 py-3.5 flex items-center gap-3 max-w-sm">
-        <div className="w-11 h-11 rounded-xl bg-violet-500 flex items-center justify-center flex-shrink-0 animate-bounce text-xl"></div>
+        <div className="w-11 h-11 rounded-xl bg-violet-500 flex items-center justify-center flex-shrink-0 animate-bounce"><Bike size={20} className="text-white" /></div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-black text-gray-900">Kamu ditugaskan mengantar!</p>
           <p className="text-xs text-gray-500 truncate mt-0.5">{alert.customer_name} · {alert.order_number}</p>

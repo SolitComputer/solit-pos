@@ -6,6 +6,7 @@ import {
 import { supabase } from "@/services/supabase";
 import { ICE_SERVERS } from "@/lib/htIce";
 import { DELIVERY_VOICE_ROLES } from "@/lib/permissions";
+import { Radio } from "lucide-react";
 
 export interface LobbyUser { userId: string; name: string; role: string; }
 type CallState = "idle" | "outgoing" | "incoming" | "connecting" | "in-call";
@@ -346,7 +347,7 @@ export function HTCallProvider({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
           <div className="relative w-full max-w-sm bg-[#1a1a2e] rounded-3xl p-6 text-white shadow-2xl text-center">
-            <div className="text-5xl mb-3 animate-bounce"></div>
+            <Radio size={48} className="mb-3 animate-bounce mx-auto text-white" />
             <p className="text-[11px] uppercase tracking-wide text-gray-400 font-bold">
               {state === "incoming" ? "Panggilan HT masuk" : state === "outgoing" ? "Memanggil…" : state === "connecting" ? "Menyambungkan…" : "Tersambung"}
             </p>

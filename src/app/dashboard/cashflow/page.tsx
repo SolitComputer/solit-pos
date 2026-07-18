@@ -20,6 +20,22 @@ import {
     applyFilters,
     CASHFLOW_START_DATE,
 } from "@/lib/cashflow";
+import {
+    ShoppingCart,
+    Wrench,
+    Wallet,
+    Pencil,
+    Ban,
+    AlertTriangle,
+    Lock,
+    Camera,
+    Image as ImageIcon,
+    Banknote,
+    Landmark,
+    Check,
+    Search,
+    Inbox,
+} from "lucide-react";
 
 const fmtRupiah = (n: number) => `Rp${Number(n || 0).toLocaleString("id-ID")}`;
 
@@ -363,16 +379,16 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
 // ── Source Badge ──────────────────────────────────────────────────────────────
 function SourceBadge({ sourceType }: { sourceType: Entry["source_type"] }) {
     if (sourceType === "TRANSACTION") return (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap"> TRX</span>
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap"><ShoppingCart size={11} /> TRX</span>
     );
     if (sourceType === "SERVICE") return (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 whitespace-nowrap"> SVC</span>
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100 whitespace-nowrap"><Wrench size={11} /> SVC</span>
     );
     if (sourceType === "MODAL_AWAL") return (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-100 whitespace-nowrap"> MODAL</span>
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-100 whitespace-nowrap"><Wallet size={11} /> MODAL</span>
     );
     return (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap"> MANUAL</span>
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap"><Pencil size={11} /> MANUAL</span>
     );
 }
 
@@ -381,7 +397,7 @@ function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void
     if (entry.is_voided) return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
             title="Transaksi sumber sudah di-restore/dibatalkan — tidak bisa diaudit">
-             Dibatalkan
+            <Ban size={12} /> Dibatalkan
         </span>
     );
     if (entry.is_audited) return (
@@ -394,7 +410,7 @@ function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void
     if (Number(entry.nominal ?? 0) <= 0) return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
             title="Nominal 0 — edit nominal terlebih dahulu sebelum audit">
-             Nominal 0
+            <AlertTriangle size={12} /> Nominal 0
         </span>
     );
     return (
@@ -446,17 +462,17 @@ function ModalAwalModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                 <div className="h-1 bg-gradient-to-r from-violet-500 to-violet-700" />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-base"></div>
+                        <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-base"><Wallet size={16} className="text-violet-600" /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Atur Modal Awal</p>
-                            <p className="text-[11px] text-amber-600 font-semibold"> Hanya bisa diisi satu kali</p>
+                            <p className="text-[11px] text-amber-600 font-semibold inline-flex items-center gap-1"><AlertTriangle size={12} /> Hanya bisa diisi satu kali</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5">
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-700 space-y-1.5">
-                        <p className="font-bold text-amber-800"> Baca sebelum mengisi:</p>
+                        <p className="font-bold text-amber-800 inline-flex items-center gap-1"><AlertTriangle size={14} /> Baca sebelum mengisi:</p>
                         <ul className="space-y-1">
                             <li className="flex items-start gap-1.5"><span className="shrink-0 mt-0.5">•</span>Modal awal <strong>tidak dapat diubah atau dihapus</strong> setelah disimpan</li>
                             <li className="flex items-start gap-1.5"><span className="shrink-0 mt-0.5">•</span>Akun Anda akan tercatat sebagai yang mengisi</li>
@@ -500,7 +516,7 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
             <div className="h-0.5 bg-gradient-to-r from-violet-400 to-purple-500" />
             <div className="px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-violet-100 border border-violet-200 flex items-center justify-center shrink-0 text-xl"></div>
+                    <div className="w-10 h-10 rounded-xl bg-violet-100 border border-violet-200 flex items-center justify-center shrink-0 text-xl"><Wallet size={20} className="text-violet-600" /></div>
                     <div>
                         <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest mb-0.5">Modal Awal Cashflow</p>
                         <p className="text-xl font-black tabular-nums text-violet-800">{fmtRupiah(entry.nominal)}</p>
@@ -510,7 +526,7 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
                         </p>
                     </div>
                 </div>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 text-[11px] font-bold border border-violet-200 shrink-0"> Terkunci</span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 text-[11px] font-bold border border-violet-200 shrink-0"><Lock size={12} /> Terkunci</span>
             </div>
         </div>
     );
@@ -525,7 +541,7 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
             <div className="h-0.5 bg-gradient-to-r from-violet-400 to-violet-600" />
             <div className="px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center shrink-0 text-xl mt-0.5"></div>
+                    <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center shrink-0 text-xl mt-0.5"><Wallet size={20} className="text-violet-600" /></div>
                     <div>
                         <p className="text-sm font-bold text-gray-900">Modal Awal Cashflow</p>
                         <p className="text-xs text-gray-500 mt-0.5">Uang yang sudah ada sebelum cashflow dimulai. <span className="font-semibold text-amber-600">Hanya bisa diisi sekali.</span></p>
@@ -582,16 +598,16 @@ function FilterPanel({ filter, onChange, onReset, direction }: {
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Audit</label>
                     <select value={filter.audit} onChange={(e) => onChange({ ...filter, audit: e.target.value as AuditFilter })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Status</option>
-                        <option value="AUDITED"> Sudah Audit</option>
-                        <option value="NOT_AUDITED"> Belum Audit</option>
+                        <option value="AUDITED">Sudah Audit</option>
+                        <option value="NOT_AUDITED">Belum Audit</option>
                     </select>
                 </div>
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sumber</label>
                     <select value={filter.source} onChange={(e) => onChange({ ...filter, source: e.target.value as SourceFilter })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Sumber</option>
-                        <option value="MANUAL"> Manual</option>
-                        <option value="AUTO"> Otomatis</option>
+                        <option value="MANUAL">Manual</option>
+                        <option value="AUTO">Otomatis</option>
                     </select>
                 </div>
             </div>
@@ -643,7 +659,7 @@ function PhotoPicker({ value, onChange }: { value: File | null; onChange: (f: Fi
                 </div>
             ) : (
                 <div className="grid grid-cols-2 gap-2">
-                    {[{ ref: cameraRef, icon: "", label: "Kamera" }, { ref: fileRef, icon: "", label: "Galeri" }].map(({ ref, icon, label }) => (
+                    {[{ ref: cameraRef, icon: <Camera size={24} />, label: "Kamera" }, { ref: fileRef, icon: <ImageIcon size={24} />, label: "Galeri" }].map(({ ref, icon, label }) => (
                         <button key={label} type="button" onClick={() => (ref as React.RefObject<HTMLInputElement>).current?.click()} className="flex flex-col items-center justify-center gap-1.5 h-20 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300 hover:bg-gray-100 hover:text-gray-600 transition">
                             <span className="text-2xl">{icon}</span>
                             <span className="text-[11px] font-semibold">{label}</span>
@@ -691,7 +707,7 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                 <div className={`h-1 bg-gradient-to-r ${gradient}`} />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${isOut ? "bg-red-50" : "bg-emerald-50"}`}>{isOut ? "" : ""}</div>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${isOut ? "bg-red-50" : "bg-emerald-50"}`}>{isOut ? <Banknote size={16} className="text-red-600" /> : <Wallet size={16} className="text-emerald-600" />}</div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Detail {isOut ? "Uang Keluar" : "Uang Masuk"}</p>
                             <p className="text-[11px] text-gray-400">{fmtTanggal(entry.tanggal)}</p>
@@ -709,8 +725,8 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                     {isOut && entry.source_type === "MANUAL" && (
                         <DetailRow label="Metode">
                             {entry.payment_method === "SALDO"
-                                ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"> Saldo</span>
-                                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100"> Cash</span>}
+                                ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={12} /> Saldo</span>
+                                : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={12} /> Cash</span>}
                         </DetailRow>
                     )}
                     <DetailRow label="Diinput oleh">{pengisi}</DetailRow>
@@ -720,7 +736,7 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                             : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200"><IconClock /> Belum Audit</span>}
                     </DetailRow>
                     {entry.is_audited && entry.audited_by_user?.name && (
-                        <DetailRow label="Diaudit oleh"><span className="text-emerald-600 font-semibold"> {entry.audited_by_user.name}</span></DetailRow>
+                        <DetailRow label="Diaudit oleh"><span className="text-emerald-600 font-semibold inline-flex items-center gap-1"><Check size={14} /> {entry.audited_by_user.name}</span></DetailRow>
                     )}
                     <div className="pt-3">
                         <p className="text-xs font-semibold text-gray-400 mb-1.5">Keterangan</p>
@@ -818,7 +834,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                 <div className="h-1 bg-gradient-to-r from-red-400 to-rose-500" />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center text-base"></div>
+                        <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center text-base"><Banknote size={16} /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Tambah Uang Keluar</p>
                             <p className="text-[11px] text-gray-400">Nama pengisi tercatat otomatis</p>
@@ -832,7 +848,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                         <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
                             {(["CASH", "SALDO"] as const).map((m) => (
                                 <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === m ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
-                                    <span>{m === "CASH" ? "" : ""}</span> {m === "CASH" ? "Cash" : "Saldo"}
+                                    <span>{m === "CASH" ? <Banknote size={16} /> : <Landmark size={16} />}</span> {m === "CASH" ? "Cash" : "Saldo"}
                                 </button>
                             ))}
                         </div>
@@ -929,7 +945,7 @@ function EditExpenseModal({ entry, onClose, onSaved }: { entry: Entry; onClose: 
                 <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-base"></div>
+                        <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-base"><Pencil size={16} /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Edit Uang Keluar</p>
                             <p className="text-[11px] text-gray-400">{fmtTanggal(entry.tanggal)}</p>
@@ -943,7 +959,7 @@ function EditExpenseModal({ entry, onClose, onSaved }: { entry: Entry; onClose: 
                         <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
                             {(["CASH", "SALDO"] as const).map((m) => (
                                 <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === m ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
-                                    <span>{m === "CASH" ? "" : ""}</span> {m === "CASH" ? "Cash" : "Saldo"}
+                                    <span>{m === "CASH" ? <Banknote size={16} /> : <Landmark size={16} />}</span> {m === "CASH" ? "Cash" : "Saldo"}
                                 </button>
                             ))}
                         </div>
@@ -1044,7 +1060,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                 <div className="h-1 bg-gradient-to-r from-emerald-400 to-green-500" />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-base"></div>
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-base"><Wallet size={16} /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Tambah Uang Masuk</p>
                             <p className="text-[11px] text-gray-400">Nama pengisi tercatat otomatis</p>
@@ -1295,7 +1311,7 @@ export default function CashflowPage() {
     if (allowed === false) return (
         <DashboardLayout>
             <div className="max-w-md mx-auto mt-24 text-center">
-                <div className="text-5xl mb-3"></div>
+                <div className="text-5xl mb-3"><Lock size={48} className="mx-auto text-gray-300" /></div>
                 <p className="text-gray-600 font-semibold">Halaman ini hanya untuk Admin & Programmer.</p>
             </div>
         </DashboardLayout>
@@ -1384,7 +1400,7 @@ export default function CashflowPage() {
                                 {loading ? <div className="h-10 w-48 bg-gray-100 rounded-xl animate-pulse" /> : <p className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight tabular-nums">{fmtRupiah(summary.saldo)}</p>}
                                 <p className="text-[11px] text-gray-400 mt-1.5">Total masuk dikurangi keluar · akumulasi semua waktu</p>
                                 {!loading && summary.modal_awal_entry && (
-                                    <p className="text-[11px] text-violet-500 mt-1 font-medium"> Termasuk modal awal <span className="font-bold">{fmtRupiah(summary.modal_awal_entry.nominal)}</span></p>
+                                    <p className="text-[11px] text-violet-500 mt-1 font-medium inline-flex items-center gap-1"><Wallet size={12} /> Termasuk modal awal <span className="font-bold">{fmtRupiah(summary.modal_awal_entry.nominal)}</span></p>
                                 )}
                                 {!loading && summary.belum_audit > 0 && (
                                     <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200">
@@ -1493,7 +1509,7 @@ export default function CashflowPage() {
                                 ) : rows.length === 0 ? (
                                     <tr>
                                         <td colSpan={10} className="px-3.5 py-16 text-center">
-                                            <div className="text-4xl mb-2.5 opacity-25">{filterCount > 0 ? "" : ""}</div>
+                                            <div className="text-4xl mb-2.5 opacity-25 flex justify-center">{filterCount > 0 ? <Search size={40} /> : <Inbox size={40} />}</div>
                                             <p className="text-sm text-gray-400 font-medium">
                                                 {filterCount > 0 ? `Tidak ada data yang cocok (${allRows.length} entry tersembunyi).` : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`}
                                             </p>
@@ -1518,8 +1534,8 @@ export default function CashflowPage() {
                                                 <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
                                                     {e.direction === "OUT" && e.source_type === "MANUAL" ? (
                                                         e.payment_method === "SALDO"
-                                                            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"> Saldo</span>
-                                                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100"> Cash</span>
+                                                            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={11} /> Saldo</span>
+                                                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={11} /> Cash</span>
                                                     ) : <span className="text-gray-300 text-[11px]">—</span>}
                                                 </td>
                                                 <td className="px-3 py-3 max-w-[140px]">
@@ -1532,7 +1548,7 @@ export default function CashflowPage() {
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap">
                                                     {e.source_type === "MODAL_AWAL" ? (
-                                                        <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-md bg-violet-50 text-violet-600 border border-violet-100"> Modal Awal</span>
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-violet-50 text-violet-600 border border-violet-100"><Wallet size={11} /> Modal Awal</span>
                                                     ) : (
                                                         <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-md bg-gray-100 text-gray-600">{categoryLabel(e.direction, e.category)}</span>
                                                     )}
@@ -1542,7 +1558,7 @@ export default function CashflowPage() {
                                                     {e.is_stale && e.source_nominal != null && (
                                                         <p className="text-[9px] font-sans font-bold text-amber-600 mt-0.5"
                                                             title={`Harga deal di transaksi sudah berubah jadi ${fmtRupiah(e.source_nominal)}, tapi entry ini sudah diaudit sehingga nominalnya dikunci.`}>
-                                                             Kini {fmtRupiah(e.source_nominal)}
+                                                            <AlertTriangle size={11} className="inline align-[-1px]" /> Kini {fmtRupiah(e.source_nominal)}
                                                         </p>
                                                     )}
                                                 </td>
@@ -1550,7 +1566,7 @@ export default function CashflowPage() {
                                                     <span className="truncate block text-[11px] text-gray-500">{e.keterangan || "—"}</span>
                                                     {e.photo_url && (
                                                         <button type="button" onClick={(ev) => { ev.stopPropagation(); setDetailEntry(e); }} className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-blue-600 hover:underline">
-                                                             Foto
+                                                            <Camera size={11} /> Foto
                                                         </button>
                                                     )}
                                                 </td>

@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
-import { Trash2 } from "lucide-react";
+import { Trash2, Package, CheckCircle2, Wrench, Wallet } from "lucide-react";
 import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
 import UnitFormModal from "@/components/inventory/UnitFormModal";
 import EditablePriceCell from "@/components/inventory/EditablePriceCell";
@@ -405,11 +405,11 @@ export default function UnitsPage() {
                     {/* Stats Cards */}
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                         {[
-                            { label: "Total Unit", value: counts.total, color: "text-gray-800", icon: "" },
-                            { label: "Siap Jual", value: counts.siap, color: "text-emerald-600", icon: "" },
-                            { label: "Belum Siap", value: counts.belum, color: "text-amber-600", icon: "" },
-                            { label: "Service", value: counts.service, color: "text-blue-600", icon: "" },
-                            { label: "Terjual", value: counts.sold, color: "text-gray-500", icon: "" },
+                            { label: "Total Unit", value: counts.total, color: "text-gray-800", icon: <Package size={16} /> },
+                            { label: "Siap Jual", value: counts.siap, color: "text-emerald-600", icon: <CheckCircle2 size={16} /> },
+                            { label: "Belum Siap", value: counts.belum, color: "text-amber-600", icon: null },
+                            { label: "Service", value: counts.service, color: "text-blue-600", icon: <Wrench size={16} /> },
+                            { label: "Terjual", value: counts.sold, color: "text-gray-500", icon: <Wallet size={16} /> },
                         ].map(stat => (
                             <div key={stat.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                                 <div className="flex items-center justify-between">
@@ -548,7 +548,7 @@ export default function UnitsPage() {
                         <SkeletonUnits />
                     ) : filteredUnits.length === 0 ? (
                         <div className="bg-white rounded-xl border border-gray-100 shadow-sm py-12 text-center">
-                            <div className="text-3xl mb-2 opacity-50"></div>
+                            <div className="mb-2 opacity-50"><Package size={30} className="mx-auto text-gray-400" /></div>
                             <p className="text-gray-500 text-sm font-medium">Tidak ada unit ditemukan</p>
                             <p className="text-gray-400 text-xs mt-1">
                                 {hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL"

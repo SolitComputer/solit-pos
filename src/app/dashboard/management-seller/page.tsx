@@ -1,11 +1,27 @@
 "use client";
 // src/app/dashboard/management-seller/page.tsx
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
 import { toast } from "sonner";
+import {
+  Hand,
+  Archive,
+  Search,
+  CheckCircle2,
+  Phone,
+  User,
+  Users,
+  ImageIcon,
+  ShoppingCart,
+  Tag,
+  Lock,
+  AlertTriangle,
+  AlertCircle,
+} from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Followup {
@@ -381,7 +397,9 @@ function PicAccessDropdown({
             : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
         )}
       >
-        <span aria-hidden="true">{error ? "" : ""}</span>
+        <span aria-hidden="true" className="inline-flex">
+          {error ? <AlertTriangle size={14} /> : <Lock size={14} />}
+        </span>
         <span>Akses PIC</span>
         {!error && (
           <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-900 text-white text-[10px] font-black tabular-nums">
@@ -569,7 +587,7 @@ function TandaiFuButton({
       )}
     >
       <span className="flex-shrink-0 inline-flex">
-        {processing ? <Spinner /> : isUnowned ? <span aria-hidden="true"></span> : <PhoneIcon />}
+        {processing ? <Spinner /> : isUnowned ? <Hand size={16} /> : <PhoneIcon />}
       </span>
       <span className="truncate">{isUnowned ? "Klaim & FU" : "Follow-up"}</span>
     </button>
@@ -644,7 +662,9 @@ function BuktiFuUploader({
             <TrashIcon />
           </button>
           <div className="px-3 py-2 bg-white/80 backdrop-blur-sm border-t border-blue-100">
-            <p className="text-[10px] font-bold text-blue-600 truncate"> {value?.name}</p>
+            <p className="text-[10px] font-bold text-blue-600 truncate inline-flex items-center gap-1">
+              <ImageIcon size={11} className="flex-shrink-0" /> {value?.name}
+            </p>
             <p className="text-[9px] text-gray-400 mt-0.5 tabular-nums">
               {value ? (value.size / 1024).toFixed(0) + " KB" : ""}
             </p>
@@ -880,7 +900,15 @@ function ConfirmFollowupModal({
               <div className="space-y-2 mb-4">
                 <SummaryRow label="Customer">{followup.customer_name}</SummaryRow>
                 <SummaryRow label="Tipe">
-                  {followup.seller_type === "PEDAGANG" ? " Pedagang" : " User"}
+                  {followup.seller_type === "PEDAGANG" ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Tag size={11} /> Pedagang
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">
+                      <Hand size={11} /> User
+                    </span>
+                  )}
                 </SummaryRow>
                 <SummaryRow label="Jadwal baru">
                   <span className="text-blue-600">+{intervalDays} hari dari sekarang</span>
@@ -896,8 +924,9 @@ function ConfirmFollowupModal({
               </div>
 
               <div className="rounded-xl bg-amber-50 border border-amber-200 px-3.5 py-3">
-                <p className="text-xs font-black text-amber-800 leading-relaxed">
-                  Apakah Anda yakin sudah Follow-Up (FU) ke customer ini?
+                <p className="text-xs font-black text-amber-800 leading-relaxed inline-flex items-center gap-1.5">
+                  <AlertTriangle size={14} className="flex-shrink-0" /> Apakah Anda yakin sudah
+                  Follow-Up (FU) ke customer ini?
                 </p>
                 <p className="text-[11px] text-amber-600 mt-1 leading-relaxed">
                   Data ini akan tersimpan permanen dan tidak bisa dibatalkan. Jadwal follow-up
@@ -1010,7 +1039,7 @@ function PicBlock({ f }: { f: Followup }) {
   return (
     <div className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 border-dashed px-3 py-2.5">
       <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-base flex-shrink-0">
-
+        <Hand size={16} />
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider leading-none mb-1">
@@ -1087,7 +1116,15 @@ function FollowupCard({
                 : "bg-blue-50 text-blue-700 border-blue-200"
             )}
           >
-            {isPedagang ? " Pedagang" : " User"}
+            {isPedagang ? (
+              <>
+                <Tag size={11} /> Pedagang
+              </>
+            ) : (
+              <>
+                <Hand size={11} /> User
+              </>
+            )}
           </span>
           <span className="text-[9px] text-gray-300">·</span>
           <span className="text-[9px] text-gray-400 font-medium">
@@ -1111,13 +1148,16 @@ function FollowupCard({
 
         <div className="flex items-center gap-1.5 flex-wrap">
           <StatPill>
-            <span className="tabular-nums"> {f.purchase_count}× beli</span>
+            <ShoppingCart size={12} className="flex-shrink-0" />
+            <span className="tabular-nums">{f.purchase_count}× beli</span>
           </StatPill>
           <StatPill>
-            <span className="tabular-nums"> {f.followup_count}× FU</span>
+            <Phone size={12} className="flex-shrink-0" />
+            <span className="tabular-nums">{f.followup_count}× FU</span>
           </StatPill>
           {f.last_followup_by && (
             <StatPill>
+              <User size={12} className="flex-shrink-0" />
               <span className="truncate max-w-[120px] sm:max-w-[140px]">
                 FU terakhir: {f.last_followup_by}
               </span>
@@ -1132,6 +1172,7 @@ function FollowupCard({
                 FOCUS_RING
               )}
             >
+              <ImageIcon size={12} className="flex-shrink-0" />
               Lihat bukti
             </ExternalLink>
           )}
@@ -1224,9 +1265,9 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
   const cards =
     scope === "ARCHIVED"
       ? [
-        { emoji: "", label: "Total Arsip", short: "Arsip", value: total, danger: false },
+        { icon: Archive, label: "Total Arsip", short: "Arsip", value: total, danger: false },
         {
-          emoji: "",
+          icon: Phone,
           label: "Total Follow-up",
           short: "Total FU",
           value: totalFU,
@@ -1234,16 +1275,16 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
         },
       ]
       : [
-        { emoji: "", label: "Customer", short: "Customer", value: total, danger: false },
+        { icon: Users, label: "Customer", short: "Customer", value: total, danger: false },
         {
-          emoji: "",
+          icon: AlertCircle,
           label: "Perlu Follow-up",
           short: "Perlu FU",
           value: totalDue,
           danger: totalDue > 0,
         },
         {
-          emoji: "",
+          icon: Phone,
           label: "Total Follow-up",
           short: "Total FU",
           value: totalFU,
@@ -1268,10 +1309,10 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
             <div
               className={cx(
                 "w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-base flex-shrink-0",
-                c.danger ? "bg-red-100" : "bg-gray-100"
+                c.danger ? "bg-red-100 text-red-500" : "bg-gray-100 text-gray-500"
               )}
             >
-              {c.emoji}
+              <c.icon size={16} />
             </div>
 
             <div className="min-w-0 sm:w-full">
@@ -1675,14 +1716,14 @@ export default function ManagementSellerPage() {
                 {
                   key: "USER" as Tab,
                   label: "User",
-                  icon: "",
+                  icon: Hand,
                   count: userItems.length,
                   due: userDue,
                 },
                 {
                   key: "PEDAGANG" as Tab,
                   label: "Pedagang",
-                  icon: "",
+                  icon: Tag,
                   count: pedagangItems.length,
                   due: pedagangDue,
                 },
@@ -1705,10 +1746,10 @@ export default function ManagementSellerPage() {
                   <span
                     className={cx(
                       "w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center text-base sm:text-xl flex-shrink-0",
-                      isActive ? "bg-white/10" : "bg-gray-100"
+                      isActive ? "bg-white/10 text-white" : "bg-gray-100 text-gray-600"
                     )}
                   >
-                    {t.icon}
+                    <t.icon size={18} />
                   </span>
 
                   <span className="min-w-0 flex-1">
@@ -1834,8 +1875,14 @@ export default function ManagementSellerPage() {
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-200 py-14 sm:py-20 px-6 text-center">
-            <div className="text-4xl sm:text-5xl mb-4 opacity-25">
-              {scope === "ARCHIVED" ? "" : search.trim() ? "" : ""}
+            <div className="mb-4 opacity-25 flex justify-center text-gray-700">
+              {scope === "ARCHIVED" ? (
+                <Archive size={48} />
+              ) : search.trim() ? (
+                <Search size={48} />
+              ) : (
+                <CheckCircle2 size={48} />
+              )}
             </div>
             <p className="text-sm font-bold text-gray-700">
               {search.trim()

@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import * as XLSX from "xlsx";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { Laptop, CheckCircle2, Lock, Package, Trophy, ThumbsUp, AlertTriangle, Camera } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────── ──
 interface LaptopUnit {
@@ -118,7 +119,7 @@ function SkeletonRows() {
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, icon, color, bg, bar }: {
-    label: string; value: number; icon: string;
+    label: string; value: number; icon: React.ReactNode;
     color: string; bg: string; bar: string;
 }) {
     return (
@@ -386,10 +387,10 @@ function ReadyContent() {
 
                     {/* ── Stat Cards ─────────────────────────────────────── */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fadeUp">
-                        <StatCard label="Total Unit" value={counts.all} icon="" color="text-gray-900" bg="bg-white" bar="bg-gray-800" />
-                        <StatCard label="Siap Jual" value={counts.siap} icon="" color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
-                        <StatCard label="Dipesan" value={counts.reserved} icon="" color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
-                        <StatCard label="Diambil" value={counts.held} icon="" color="text-orange-600" bg="bg-orange-50" bar="bg-orange-500" />
+                        <StatCard label="Total Unit" value={counts.all} icon={<Laptop size={18} className="text-white" />} color="text-gray-900" bg="bg-white" bar="bg-gray-800" />
+                        <StatCard label="Siap Jual" value={counts.siap} icon={<CheckCircle2 size={18} className="text-white" />} color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
+                        <StatCard label="Dipesan" value={counts.reserved} icon={<Lock size={18} className="text-white" />} color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
+                        <StatCard label="Diambil" value={counts.held} icon={<Package size={18} className="text-white" />} color="text-orange-600" bg="bg-orange-50" bar="bg-orange-500" />
                     </div>
 
                     {/* ── Filter ─────────────────────────────────────────── */}
@@ -445,9 +446,9 @@ function ReadyContent() {
                                 className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer font-medium"
                             >
                                 <option value="ALL">Semua Grade</option>
-                                <option value="A"> Grade A</option>
-                                <option value="B"> Grade B</option>
-                                <option value="C"> Grade C</option>
+                                <option value="A">Grade A</option>
+                                <option value="B">Grade B</option>
+                                <option value="C">Grade C</option>
                             </select>
                             {hasActiveFilter && (
                                 <button
@@ -466,7 +467,7 @@ function ReadyContent() {
                         <SkeletonRows />
                     ) : filtered.length === 0 ? (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-20 gap-3">
-                            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-3xl"></div>
+                            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center"><Laptop size={30} className="text-gray-300" /></div>
                             <div className="text-center">
                                 <p className="text-gray-600 font-bold text-sm">Tidak ada unit ditemukan</p>
                                 <p className="text-gray-400 text-xs mt-1">
@@ -529,7 +530,7 @@ function ReadyContent() {
 
                                                     <td className="px-4 py-3.5 whitespace-nowrap">
                                                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${GRADE_BADGE[unit.grade] || ""}`}>
-                                                            {unit.grade === "A" ? "" : unit.grade === "B" ? "" : ""} Grade {unit.grade}
+                                                            {unit.grade === "A" ? <Trophy size={12} /> : unit.grade === "B" ? <ThumbsUp size={12} /> : <AlertTriangle size={12} />} Grade {unit.grade}
                                                         </span>
                                                     </td>
 
@@ -565,24 +566,24 @@ function ReadyContent() {
                                                                 <>
                                                                     <button
                                                                         onClick={() => setReserveTarget({ unit, type: "RESERVED" })}
-                                                                        className="px-2.5 py-1.5 text-[11px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition active:scale-95"
+                                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition active:scale-95"
                                                                     >
-                                                                         DP
+                                                                        <Lock size={12} /> DP
                                                                     </button>
                                                                     <button
                                                                         onClick={() => setReserveTarget({ unit, type: "HELD" })}
-                                                                        className="px-2.5 py-1.5 text-[11px] font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition active:scale-95"
+                                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition active:scale-95"
                                                                     >
-                                                                         Ambil
+                                                                        <Package size={12} /> Ambil
                                                                     </button>
                                                                 </>
                                                             )}
                                                             {isPending && canConfirmTx && !confirmedUnitIds.has(unit.id) && (
                                                                 <button
                                                                     onClick={() => setConfirmTarget(unit)}
-                                                                    className="px-2.5 py-1.5 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition active:scale-95"
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition active:scale-95"
                                                                 >
-                                                                     Lunas
+                                                                    <CheckCircle2 size={12} /> Lunas
                                                                 </button>
                                                             )}
                                                             {isPending && confirmedUnitIds.has(unit.id) && (
@@ -634,7 +635,7 @@ function ReadyContent() {
                     type={reserveTarget.type}
                     salesName={salesName}
                     onClose={() => setReserveTarget(null)}
-                    onSuccess={() => { setAlertMsg("Berhasil disimpan "); fetchUnits(); }}
+                    onSuccess={() => { setAlertMsg("Berhasil disimpan"); fetchUnits(); }}
                 />
             )}
 
@@ -644,7 +645,7 @@ function ReadyContent() {
                     onClose={() => setConfirmTarget(null)}
                     onSuccess={() => {
                         setConfirmedUnitIds(prev => new Set([...prev, confirmTarget.id]));
-                        setAlertMsg("Pembayaran dikonfirmasi, transaksi PAID ");
+                        setAlertMsg("Pembayaran dikonfirmasi, transaksi PAID");
                         fetchUnits();
                     }}
                 />
@@ -738,7 +739,7 @@ function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
                 <div className={`px-5 py-4 flex-shrink-0 ${isDP ? "bg-gray-800" : "bg-gray-700"} text-white`}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">{isDP ? "" : ""}</div>
+                            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">{isDP ? <Lock size={20} /> : <Package size={20} />}</div>
                             <div>
                                 <h2 className="font-bold text-base">{isDP ? "Pesanan DP" : "Ambil Dulu"}</h2>
                                 <p className="text-xs text-white/70 mt-0.5">{isDP ? "Unit dikunci, pembayaran sebagian" : "Barang dibawa, pembayaran menyusul"}</p>
@@ -960,7 +961,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                         >
                             {uploadingProof
                                 ? <><div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />Mengupload...</>
-                                : paymentProof ? " Foto terupload — klik untuk ganti" : " Upload foto bukti bayar"
+                                : paymentProof ? <><CheckCircle2 size={14} /> Foto terupload — klik untuk ganti</> : <><Camera size={14} /> Upload foto bukti bayar</>
                             }
                         </button>
                     </div>
@@ -987,7 +988,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                     >
                         {loading
                             ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
-                            : <> Konfirmasi Lunas</>
+                            : <><CheckCircle2 size={16} /> Konfirmasi Lunas</>
                         }
                     </button>
                 </div>

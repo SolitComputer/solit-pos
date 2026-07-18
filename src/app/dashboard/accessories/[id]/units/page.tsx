@@ -6,6 +6,12 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import {
+    HardDrive, MemoryStick, Plug, BatteryFull, Keyboard, Monitor,
+    Package, CircuitBoard, Cpu, Gamepad2, Fan, Droplet, Cable, Wrench,
+    Hash, Pencil, BarChart3, Download, CheckCircle2, Sparkles, RefreshCw, Lock, Wallet,
+    type LucideIcon,
+} from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface AccessoryUnit {
@@ -52,11 +58,11 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
     TERJUAL: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
 };
 
-const CATEGORY_EMOJI: Record<string, string> = {
-    HDD: "", SSD: "", RAM: "", CHARGER: "", BATERAI: "",
-    KEYBOARD: "⌨", LCD: "", CASING: "", MOTHERBOARD: "",
-    PROCESSOR: "", VGA: "", FAN: "", "THERMAL PASTE": "",
-    KABEL: "", LAINNYA: "",
+const CATEGORY_ICON: Record<string, LucideIcon> = {
+    HDD: HardDrive, SSD: HardDrive, RAM: MemoryStick, CHARGER: Plug, BATERAI: BatteryFull,
+    KEYBOARD: Keyboard, LCD: Monitor, CASING: Package, MOTHERBOARD: CircuitBoard,
+    PROCESSOR: Cpu, VGA: Gamepad2, FAN: Fan, "THERMAL PASTE": Droplet,
+    KABEL: Cable, LAINNYA: Wrench,
 };
 
 const EMPTY_UNIT_FORM = {
@@ -340,9 +346,9 @@ function BulkAddModal({
     };
 
     const TABS = [
-        { id: "range", label: "Range SN", icon: "" },
-        { id: "manual", label: "Manual", icon: "" },
-        { id: "excel", label: "Import Excel", icon: "" },
+        { id: "range", label: "Range SN", icon: <Hash size={14} /> },
+        { id: "manual", label: "Manual", icon: <Pencil size={14} /> },
+        { id: "excel", label: "Import Excel", icon: <BarChart3 size={14} /> },
     ] as const;
 
     return (
@@ -443,18 +449,18 @@ function BulkAddModal({
                                 <p className="text-xs text-blue-700 mb-2">
                                     Upload file Excel (.xlsx/.xls). Kolom yang dikenali: <code className="bg-blue-100 px-1 rounded font-mono">serial_number</code>, <code className="bg-blue-100 px-1 rounded font-mono">condition</code>, <code className="bg-blue-100 px-1 rounded font-mono">buy_price</code>, <code className="bg-blue-100 px-1 rounded font-mono">selling_price</code>, <code className="bg-blue-100 px-1 rounded font-mono">notes</code>.
                                 </p>
-                                <button onClick={downloadTemplate} className="text-xs text-blue-600 font-semibold underline underline-offset-2">Download Template Excel</button>
+                                <button onClick={downloadTemplate} className="inline-flex items-center gap-1 text-xs text-blue-600 font-semibold underline underline-offset-2"><Download size={13} /> Download Template Excel</button>
                             </div>
                             <div onClick={() => fileInputRef.current?.click()}
                                 className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer active:bg-gray-50 transition">
-                                <div className="text-3xl mb-2"></div>
+                                <div className="mb-2 flex justify-center"><BarChart3 size={30} className="text-gray-400" /></div>
                                 <p className="text-sm font-medium text-gray-600">Klik untuk pilih file</p>
                                 <p className="text-xs text-gray-400 mt-1">.xlsx atau .xls</p>
                                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
                             </div>
                             {excelRows.length > 0 && (
                                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-                                    <p className="text-xs font-semibold text-emerald-700 mb-2"> {excelRows.length} baris berhasil dibaca</p>
+                                    <p className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 mb-2"><CheckCircle2 size={14} /> {excelRows.length} baris berhasil dibaca</p>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-[10px]">
                                             <thead>
@@ -499,14 +505,14 @@ function BulkAddModal({
                                             key={c}
                                             type="button"
                                             onClick={() => setCondition(c)}
-                                            className={`h-9 rounded-lg text-xs font-bold border transition ${condition === c
+                                            className={`inline-flex items-center justify-center gap-1 h-9 rounded-lg text-xs font-bold border transition ${condition === c
                                                 ? c === "BARU"
                                                     ? "bg-emerald-600 text-white border-emerald-600"
                                                     : "bg-amber-500 text-white border-amber-500"
                                                 : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                                 }`}
                                         >
-                                            {c === "BARU" ? " Baru" : " Bekas"}
+                                            {c === "BARU" ? <><Sparkles size={13} /> Baru</> : <><RefreshCw size={13} /> Bekas</>}
                                         </button>
                                     ))}
                                 </div>
@@ -521,14 +527,14 @@ function BulkAddModal({
                                             key={s}
                                             type="button"
                                             onClick={() => setStatus(s)}
-                                            className={`h-9 rounded-lg text-xs font-semibold border transition ${status === s
+                                            className={`inline-flex items-center justify-center gap-1 h-9 rounded-lg text-xs font-semibold border transition ${status === s
                                                 ? s === "TERSEDIA"
                                                     ? "bg-emerald-600 text-white border-emerald-600"
                                                     : "bg-amber-500 text-white border-amber-500"
                                                 : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
                                                 }`}
                                         >
-                                            {s === "TERSEDIA" ? " Tersedia" : " Reserved"}
+                                            {s === "TERSEDIA" ? <><CheckCircle2 size={13} /> Tersedia</> : <><Lock size={13} /> Reserved</>}
                                         </button>
                                     ))}
                                 </div>
@@ -823,6 +829,7 @@ export default function AccessoryUnitsPage() {
     const buyVal = parseRupiah(buyInput);
     const sellVal = parseRupiah(sellInput);
     const marginPreview = sellVal - buyVal;
+    const CatIcon = (accessory && CATEGORY_ICON[accessory.category]) || Wrench;
 
     return (
         <DashboardLayout>
@@ -847,7 +854,7 @@ export default function AccessoryUnitsPage() {
                         <div>
                             <div className="flex items-center gap-2.5 mb-1">
                                 <div className="w-8 h-8 bg-gray-800 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
-                                    {accessory ? (CATEGORY_EMOJI[accessory.category] ?? "") : ""}
+                                    <CatIcon size={18} className="text-white" />
                                 </div>
                                 <h1 className="text-xl font-bold text-gray-900 tracking-tight">{accessory?.name || "—"}</h1>
                             </div>
@@ -882,10 +889,10 @@ export default function AccessoryUnitsPage() {
                     {/* Stats Cards */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {[
-                            { label: "Total Unit", value: counts.total, color: "text-gray-800", icon: "" },
-                            { label: "Tersedia", value: counts.tersedia, color: "text-emerald-600", icon: "" },
-                            { label: "Reserved", value: counts.reserved, color: "text-amber-600", icon: "" },
-                            { label: "Terjual", value: counts.terjual, color: "text-gray-500", icon: "" },
+                            { label: "Total Unit", value: counts.total, color: "text-gray-800", icon: <Package size={16} /> },
+                            { label: "Tersedia", value: counts.tersedia, color: "text-emerald-600", icon: <CheckCircle2 size={16} /> },
+                            { label: "Reserved", value: counts.reserved, color: "text-amber-600", icon: <Lock size={16} /> },
+                            { label: "Terjual", value: counts.terjual, color: "text-gray-500", icon: <Wallet size={16} /> },
                         ].map(stat => (
                             <div key={stat.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                                 <div className="flex items-center justify-between">
@@ -1022,7 +1029,7 @@ export default function AccessoryUnitsPage() {
                         <SkeletonUnits />
                     ) : filteredUnits.length === 0 ? (
                         <div className="bg-white rounded-xl border border-gray-100 shadow-sm py-12 text-center">
-                            <div className="text-3xl mb-2 opacity-50"></div>
+                            <div className="mb-2 opacity-50 flex justify-center"><Package size={30} className="text-gray-400" /></div>
                             <p className="text-gray-500 text-sm font-medium">Tidak ada unit ditemukan</p>
                             <p className="text-gray-400 text-xs mt-1">
                                 {hasActiveFilter || filterStatus !== "ALL" || filterCondition !== "ALL"
@@ -1193,8 +1200,8 @@ export default function AccessoryUnitsPage() {
                                         {(["BARU", "BEKAS"] as const).map(c => (
                                             <button key={c} type="button"
                                                 onClick={() => setFormData(p => ({ ...p, condition: c }))}
-                                                className={`h-10 rounded-xl text-xs font-bold border transition ${formData.condition === c ? (c === "BARU" ? "bg-emerald-600 text-white border-emerald-600" : "bg-amber-500 text-white border-amber-500") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
-                                                {c === "BARU" ? " Baru" : " Bekas"}
+                                                className={`inline-flex items-center justify-center gap-1 h-10 rounded-xl text-xs font-bold border transition ${formData.condition === c ? (c === "BARU" ? "bg-emerald-600 text-white border-emerald-600" : "bg-amber-500 text-white border-amber-500") : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                                                {c === "BARU" ? <><Sparkles size={13} /> Baru</> : <><RefreshCw size={13} /> Bekas</>}
                                             </button>
                                         ))}
                                     </div>

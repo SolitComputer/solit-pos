@@ -10,29 +10,99 @@ function splitSerials(raw: any): string[] {
   return [];
 }
 
+// ── Filter "Toko/Perusahaan" — replikasi persis logic yang dulu dikerjakan di client ──
+function applyCompanyFilter(query: any, companyName: string) {
+  const q = companyName.toLowerCase();
+  if (q === "sotech") return query.ilike("company_name", "%sotech%");
+  if (q === "solit") {
+    return query
+      .ilike("company_name", "%solit%")
+      .not("company_name", "ilike", "%sotech%")
+      .not("company_name", "ilike", "%onpoint%")
+      .not("company_name", "ilike", "%on point%");
+  }
+  if (q === "onpoint") return query.or("company_name.ilike.%onpoint%,company_name.ilike.%on point%");
+  if (q === "zenit.id") return query.ilike("company_name", "%zenit.id%");
+  if (q === "zenit") return query.ilike("company_name", "%zenit%").not("company_name", "ilike", "%zenit.id%");
+  return query.eq("company_name", companyName);
+}
+
 async function handler(req: NextRequest) {
   try {
     const url = new URL(req.url);
-    const search = url.searchParams.get("search") ?? "";
-    const status = url.searchParams.get("status") ?? "ALL";
 
-    let query = supabase
-      .from("transactions")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (status !== "ALL") query = query.eq("status", status);
-    if (search.trim()) {
-      query = query.or(
-        `invoice_number.ilike.%${search}%,customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%,laptop_name.ilike.%${search}%`
-      );
+    // ── Mode "meta": cuma buat isi dropdown filter (payment method / platform), dipanggil sekali saat mount ──
+    if (url.searchParams.get("meta") === "1") {
+      const [{ data: pm }, { data: sp }] = await Promise.all([
+        supabase.from("transactions").select("payment_method"),
+        supabase.from("transactions").select("source_platform"),
+      ]);
+      const paymentMethods = Array.from(new Set((pm ?? []).map((r: any) => r.payment_method).filter(Boolean)));
+      const sourcePlatforms = Array.from(new Set((sp ?? []).map((r: any) => r.source_platform).filter(Boolean)));
+      return NextResponse.json({ success: true, paymentMethods, sourcePlatforms });
     }
 
-    const { data: transactions, error } = await query;
-    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
-    if (!transactions || transactions.length === 0) return NextResponse.json({ success: true, data: [] });
+    const search = url.searchParams.get("search") ?? "";
+    const status = url.searchParams.get("status") ?? "ALL";
+    const invoiceExact = url.searchParams.get("invoiceExact") ?? "";
+    const isExport = url.searchParams.get("export") === "1";
+    const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") ?? "25", 10) || 25));
+    const dateFrom = url.searchParams.get("dateFrom") ?? "";
+    const dateTo = url.searchParams.get("dateTo") ?? "";
+    const paymentMethod = url.searchParams.get("paymentMethod") ?? "ALL";
+    const sourcePlatform = url.searchParams.get("sourcePlatform") ?? "ALL";
+    const customerType = url.searchParams.get("customerType") ?? "ALL";
+    const companyName = url.searchParams.get("companyName") ?? "ALL";
+    const sortOrder = url.searchParams.get("sortOrder") === "oldest" ? "oldest" : "newest";
 
-    // ── Kumpulkan semua invoice numbers & unit IDs ────────────────────────────
+    let query = supabase.from("transactions").select("*", { count: isExport ? undefined : "exact" });
+
+    if (invoiceExact.trim()) {
+      // Deep-link (mis. dari Cashflow) → cocokkan invoice persis, abaikan filter lain
+      query = query.eq("invoice_number", invoiceExact.trim());
+    } else {
+      if (status !== "ALL") query = query.eq("status", status);
+      if (search.trim()) {
+        query = query.or(
+          `invoice_number.ilike.%${search}%,customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%,laptop_name.ilike.%${search}%`
+        );
+      }
+      if (customerType !== "ALL") {
+        query = customerType === "UMUM"
+          ? query.or("customer_type.eq.UMUM,customer_type.is.null")
+          : query.eq("customer_type", customerType);
+      }
+      if (dateFrom) {
+        const from = new Date(dateFrom); from.setHours(0, 0, 0, 0);
+        query = query.gte("created_at", from.toISOString());
+      }
+      if (dateTo) {
+        const to = new Date(dateTo); to.setHours(23, 59, 59, 999);
+        query = query.lte("created_at", to.toISOString());
+      }
+      if (paymentMethod !== "ALL") query = query.eq("payment_method", paymentMethod);
+      if (sourcePlatform !== "ALL") query = query.eq("source_platform", sourcePlatform);
+      if (companyName !== "ALL") query = applyCompanyFilter(query, companyName);
+    }
+
+    query = query.order("created_at", { ascending: sortOrder === "oldest" });
+
+    // Export & deep-link (invoiceExact) → ambil semua baris yang match, tanpa batas halaman.
+    // Mode normal (buka halaman Riwayat Transaksi) → cuma ambil 1 halaman sesuai page/limit.
+    if (!isExport && !invoiceExact.trim()) {
+      const fromIdx = (page - 1) * limit;
+      const toIdx = fromIdx + limit - 1;
+      query = query.range(fromIdx, toIdx);
+    }
+
+    const { data: transactions, count, error } = await query;
+    if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+    if (!transactions || transactions.length === 0) {
+      return NextResponse.json({ success: true, data: [], total: count ?? 0, page, limit });
+    }
+
+    // ── Kumpulkan semua invoice numbers & unit IDs (dari baris yang match saja) ──────
     const allInvoiceNumbers = transactions.map((t: any) => t.invoice_number);
     const allUnitIds = new Set<string>();
     const allLaptopIds = new Set<string>();
@@ -45,7 +115,7 @@ async function handler(req: NextRequest) {
       if (trx.laptop_id) allLaptopIds.add(trx.laptop_id);
     }
 
-    // ── ✅ Fetch transaction_items — sumber deal_price aktual per unit ─────────
+    // ── Fetch transaction_items — sumber deal_price aktual per unit ─────────
     const { data: txItems } = await supabase
       .from("transaction_items")
       .select("invoice_number, unit_id, laptop_id, laptop_name, deal_price, selling_price, serial_number")
@@ -97,7 +167,6 @@ async function handler(req: NextRequest) {
         }
       }
     }
-
 
     if (allUnitIds.size > 0) {
       const { data: units } = await supabase
@@ -175,7 +244,7 @@ async function handler(req: NextRequest) {
         allocated_deal_price: number;
         unit_count: number;
       }>();
-      // ── SESUDAH ──
+
       let totalPurchasePrice = 0;
       let matchedAnyUnit = false;
       const allSerialNumbers: string[] = [];
@@ -213,7 +282,7 @@ async function handler(req: NextRequest) {
         if (unitData.serial_number) group.serial_numbers.push(unitData.serial_number);
         group.purchase_price_total += unitData.purchase_price;
         group.selling_price_total += unitData.selling_price ?? 0;
-        // ✅ Akumulasi deal price dari transaction_items per unit
+        // Akumulasi deal price dari transaction_items per unit
         group.allocated_deal_price += unitDealPrice;
         group.unit_count += 1;
       }
@@ -232,7 +301,7 @@ async function handler(req: NextRequest) {
           serial_numbers: trx.serial_number ? [trx.serial_number] : [],
           purchase_price_total: 0,
           selling_price_total: Number(trx.deal_price ?? trx.amount ?? 0),
-          allocated_deal_price: dealPrice, // ✅ full deal price untuk legacy
+          allocated_deal_price: dealPrice, // full deal price untuk legacy
           unit_count: 1,
         });
       }
@@ -242,10 +311,8 @@ async function handler(req: NextRequest) {
       const hasTxItems = items.length > 0;
       const totalAllocated = grouped_items.reduce((s, g) => s + g.allocated_deal_price, 0);
 
-      // ── SESUDAH ──
       const grouped_items_with_margin = grouped_items.map(g => {
         let finalDealPrice = g.allocated_deal_price;
-
 
         if (!hasTxItems || totalAllocated === 0) {
           const totalSelling = grouped_items.reduce((s, gi) => s + gi.selling_price_total, 0);
@@ -273,13 +340,9 @@ async function handler(req: NextRequest) {
       const laptopSpecs = trx.laptop_id ? laptopMap.get(trx.laptop_id) : undefined;
 
       const storedInventoryPrice = Number(trx.inventory_price ?? 0);
-
       const finalInventoryPrice = matchedAnyUnit ? totalPurchasePrice : storedInventoryPrice;
-
       const hasModal = finalInventoryPrice > 0;
-      const totalMargin = hasModal
-        ? dealPrice - finalInventoryPrice
-        : 0;
+      const totalMargin = hasModal ? dealPrice - finalInventoryPrice : 0;
 
       return {
         ...trx,
@@ -300,7 +363,7 @@ async function handler(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ success: true, data: enriched });
+    return NextResponse.json({ success: true, data: enriched, total: count ?? enriched.length, page, limit });
   } catch (err) {
     console.error("[GET /api/transaction]", err);
     return NextResponse.json({ success: false }, { status: 500 });

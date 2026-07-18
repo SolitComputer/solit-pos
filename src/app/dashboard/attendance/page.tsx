@@ -9,7 +9,7 @@ import { MonthlyOffModal } from "@/components/attendance/onthlyOffModal";
 import { canManageAttendance, DIVISION_MAP, isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
 import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
-import { Check, Clock, Frown, FileText, X, Umbrella, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Wrench, Inbox, CalendarDays, GraduationCap, Briefcase } from "lucide-react";
+import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Wrench, Inbox, CalendarDays, GraduationCap, Briefcase } from "lucide-react";
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
 
 function isPKLRole(role?: string): boolean {
@@ -1432,7 +1432,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
     switch (state) {
         case "EXEMPT":
             cfg = {
-                icon: "", gradient: "from-slate-50 to-gray-100", iconBg: "bg-slate-100",
+                icon: <Shield className="w-6 h-6 text-slate-600" />, gradient: "from-slate-50 to-gray-100", iconBg: "bg-slate-100",
                 badge: "bg-slate-100 text-slate-600 border-slate-200", dot: "bg-slate-400",
                 badgeText: "Bebas Absen", title: "Tidak Wajib Absen",
                 sub: `Role kamu dikecualikan dari absensi · Shift ${status.shift}`, showBtn: false,
@@ -1451,7 +1451,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                 || { label: "Tercatat", color: "text-gray-700" };
             const adminName = status.manualCreatedByName;
             cfg = {
-                icon: "",
+                icon: <Pencil className="w-6 h-6 text-blue-600" />,
                 gradient: "from-blue-50 to-indigo-50",
                 iconBg: "bg-blue-100",
                 badge: "bg-blue-100 text-blue-700 border-blue-200",
@@ -1472,7 +1472,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
             break;
         case "DAY_OFF":
             cfg = {
-                icon: "", gradient: "from-orange-50 to-amber-50", iconBg: "bg-orange-100",
+                icon: <Umbrella className="w-6 h-6 text-orange-600" />, gradient: "from-orange-50 to-amber-50", iconBg: "bg-orange-100",
                 badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-400",
                 badgeText: "Hari Libur", title: "Kamu Libur Hari Ini",
                 sub: "Tidak perlu absen", showBtn: false,
