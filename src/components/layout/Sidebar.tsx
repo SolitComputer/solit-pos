@@ -54,11 +54,10 @@ function isItemActive(href: string, pathname: string): boolean {
         !pathname.startsWith("/dashboard/preparation/pengantaran") &&
         !pathname.startsWith("/dashboard/preparation/sedang-diantar") &&
         !pathname.startsWith("/dashboard/preparation/siap-kirim") &&
-        !pathname.startsWith("/dashboard/preparation/riwayat-penyedia") &&
         !pathname.startsWith("/dashboard/preparation/statistik"))
     );
   }
-  
+
   if (href === "/dashboard/laptops") {
     return (
       pathname === "/dashboard/laptops" ||
@@ -379,8 +378,7 @@ const ITEM_AKUNTANSI: MenuItem = {
   icon: Icons.accounting,
 };
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
-const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Riwayat Pekerjaan", href: "/dashboard/preparation/riwayat-penyedia", icon: Icons.leaderboard };
-
+const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Riwayat Pekerjaan", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
 // ── Item gabungan Data Barang (laptop + aksesoris) ────────────────────────────
 const ITEM_DATA_BARANG: MenuItem = {
   name: "Data Barang",
