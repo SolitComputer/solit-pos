@@ -4,7 +4,11 @@ import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
 import { createPortal } from "react-dom";
-import { ImageIcon, Pencil, CheckCircle2, Receipt, Inbox } from "lucide-react";
+import {
+  ImageIcon, Pencil, CheckCircle2, Receipt, Inbox,
+  Store, Building2, User, Landmark, Banknote, QrCode, CreditCard,
+  type LucideIcon,
+} from "lucide-react";
 
 // ─── Photo Modal ────────────────────────────────────────────────────
 function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
