@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
 import { createPortal } from "react-dom";
-import ExcelJS from "exceljs";
 import { ImageIcon, Pencil, CheckCircle2, Receipt, Inbox } from "lucide-react";
 
 // ─── Photo Modal ────────────────────────────────────────────────────
@@ -551,7 +550,6 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
             <p className="text-[10px] text-blue-500 font-semibold mb-0.5">Harga Jual</p>
             <p className="text-sm font-bold text-blue-900 tabular-nums truncate">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</p>
           </div>
-          {/* ── SESUDAH ── */}
           {!canSeeModal ? (
             <div className="rounded-xl p-2.5 ring-1 bg-gray-50 ring-gray-100">
               <p className="text-[10px] font-semibold mb-0.5 text-gray-400">🔒 Margin</p>
@@ -693,7 +691,6 @@ function TransactionTable({ paginatedTransactions, canEditTransaction, canRestor
   const HEAD = "px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap sticky top-0 bg-gray-50/95 backdrop-blur-sm z-10 border-b border-gray-100";
 
   return (
-    //  max-h diperpanjang — hampir full viewport tingginya
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto" style={{ maxHeight: "calc(100dvh - 200px)", overflowY: "auto" }}>
         <table className="w-full border-collapse" style={{ minWidth: "1900px" }}>
@@ -1057,7 +1054,6 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                       </div>
                     </div>
                   )}
-                  {/* ── SESUDAH ── */}
                   {canSeeFinancials && (
                     <div className="px-3.5 py-2.5 grid grid-cols-4 gap-2">
                       <div>
@@ -1098,7 +1094,6 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
           <div>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5"> Pembayaran</p>
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2.5">
-              {/* ── SESUDAH ── */}
               {canSeeFinancials && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Total Harga Modal</span>
@@ -1187,12 +1182,14 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
 // ─── MAIN PAGE ────────────────────────────────────────────────────────
 export default function Page() {
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [photoModal, setPhotoModal] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -1207,6 +1204,8 @@ export default function Page() {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [detailItem, setDetailItem] = useState<any | null>(null);
   const [focusInvoice, setFocusInvoice] = useState<string | null>(null);
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState<string[]>([]);
+  const [sourcePlatformOptions, setSourcePlatformOptions] = useState<string[]>([]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -1234,90 +1233,75 @@ export default function Page() {
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
   const canSeeModal = userRoles.some((r) => MODAL_VISIBLE_ROLES.includes(r));
 
-  useEffect(() => { fetchTransactions(); }, []);
+  // ── Debounce search — hindari fetch tiap ketikan huruf ──
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // ── Isi dropdown filter (payment method / platform) — sekali di awal, bukan dari data yang lagi ditampilkan ──
+  useEffect(() => {
+    fetch("/api/transaction?meta=1").then(r => r.json()).then(r => {
+      if (r.success) {
+        setPaymentMethodOptions(r.paymentMethods ?? []);
+        setSourcePlatformOptions(r.sourcePlatforms ?? []);
+      }
+    }).catch(() => {});
+  }, []);
 
   const fetchTransactions = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/transaction?search=&status=ALL`);
+      const params = new URLSearchParams();
+      params.set("status", status);
+      params.set("sortOrder", sortOrder);
+
+      if (focusInvoice) {
+        params.set("invoiceExact", focusInvoice);
+      } else {
+        params.set("page", String(currentPage));
+        params.set("limit", String(itemsPerPage));
+        if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+        if (customerType !== "ALL") params.set("customerType", customerType);
+        if (dateFrom) params.set("dateFrom", dateFrom);
+        if (dateTo) params.set("dateTo", dateTo);
+        if (paymentMethod !== "ALL") params.set("paymentMethod", paymentMethod);
+        if (sourcePlatform !== "ALL") params.set("sourcePlatform", sourcePlatform);
+        if (companyName !== "ALL") params.set("companyName", companyName);
+      }
+
+      const response = await fetch(`/api/transaction?${params.toString()}`);
       const result = await response.json();
       setAllTransactions(result.data || []);
-    } catch { setAllTransactions([]); } finally { setIsLoading(false); }
+      setTotalCount(result.total ?? (result.data || []).length);
+    } catch {
+      setAllTransactions([]); setTotalCount(0);
+    } finally { setIsLoading(false); }
   };
 
-  const filteredTransactions = useMemo(() => {
-    if (focusInvoice) return allTransactions.filter((item) => item.invoice_number === focusInvoice);
+  // Reset ke halaman 1 tiap kali filter (atau jumlah item per halaman) berubah
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName, itemsPerPage]);
 
-    let filtered = [...allTransactions];
-    if (search.trim()) {
-      const term = search.toLowerCase();
-      filtered = filtered.filter((item) => {
-        if (item.invoice_number?.toLowerCase().includes(term)) return true;
-        if (item.customer_name?.toLowerCase().includes(term)) return true;
-        if (item.customer_phone?.toLowerCase().includes(term)) return true;
-        if (item.laptop_name?.toLowerCase().includes(term)) return true;
-        if (item.cpu?.toLowerCase().includes(term)) return true;
-        if (item.serial_number?.toLowerCase().includes(term)) return true;
-        if (Array.isArray(item.serial_numbers) && item.serial_numbers.some((sn: string) => sn?.toLowerCase().includes(term))) return true;
-        if (Array.isArray(item.grouped_items)) {
-          for (const g of item.grouped_items) {
-            if (g.cpu?.toLowerCase().includes(term)) return true;
-            if (Array.isArray(g.serial_numbers) && g.serial_numbers.some((sn: string) => sn?.toLowerCase().includes(term))) return true;
-          }
-        }
-        return false;
-      });
-    }
+  // Fetch tiap kali halaman atau filter berubah
+  useEffect(() => {
+    fetchTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, itemsPerPage, status, sortOrder, debouncedSearch, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, companyName, focusInvoice]);
 
-    if (status !== "ALL") filtered = filtered.filter((item) => item.status === status);
-    if (customerType !== "ALL") filtered = filtered.filter((item) => (item.customer_type ?? "UMUM") === customerType);
-    if (dateFrom) { const from = new Date(dateFrom); from.setHours(0, 0, 0, 0); filtered = filtered.filter((item) => new Date(item.created_at) >= from); }
-    if (dateTo) { const to = new Date(dateTo); to.setHours(23, 59, 59, 999); filtered = filtered.filter((item) => new Date(item.created_at) <= to); }
-    if (paymentMethod !== "ALL") filtered = filtered.filter((item) => item.payment_method === paymentMethod);
-    if (sourcePlatform !== "ALL") filtered = filtered.filter((item) => item.source_platform === sourcePlatform);
-    if (companyName !== "ALL") {
-      const q = companyName.toLowerCase();
-      filtered = filtered.filter((item) => {
-        const cn = (item.company_name ?? "").toLowerCase();
-        if (q === "sotech") return cn.includes("sotech");
-        if (q === "solit") return cn.includes("solit") && !cn.includes("sotech") && !cn.includes("onpoint") && !cn.includes("on point");
-        if (q === "onpoint") return cn.includes("onpoint") || cn.includes("on point");
-        if (q === "zenit.id") return cn.includes("zenit.id");
-        if (q === "zenit") return cn.includes("zenit") && !cn.includes("zenit.id");
-        return cn === q;
-      });
-    }
+  // Server sudah filter + paginasi — tampilkan langsung
+  const paginatedTransactions = allTransactions;
+  const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
 
-    filtered.sort((a, b) => {
-      const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      return sortOrder === "newest" ? diff : -diff;
-    });
-    return filtered;
-  }, [allTransactions, focusInvoice, search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
-
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-  const paginatedTransactions = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredTransactions.slice(start, start + itemsPerPage);
-  }, [filteredTransactions, currentPage, itemsPerPage]);
-
-  useEffect(() => { setCurrentPage(1); }, [search, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortOrder, companyName]);
-
-  const uniquePaymentMethods = useMemo(() => {
-    const methods = new Set(allTransactions.map((t) => t.payment_method).filter(Boolean));
-    return ["ALL", ...Array.from(methods)];
-  }, [allTransactions]);
-
-  const uniqueSourcePlatforms = useMemo(() => {
-    const platforms = new Set(allTransactions.map((t) => t.source_platform).filter(Boolean));
-    return ["ALL", ...Array.from(platforms)];
-  }, [allTransactions]);
+  const uniquePaymentMethods = useMemo(() => ["ALL", ...paymentMethodOptions], [paymentMethodOptions]);
+  const uniqueSourcePlatforms = useMemo(() => ["ALL", ...sourcePlatformOptions], [sourcePlatformOptions]);
 
   const hasActiveFilter = status !== "ALL" || customerType !== "ALL" || !!dateFrom || !!dateTo || paymentMethod !== "ALL" || sourcePlatform !== "ALL" || companyName !== "ALL";
   const activeFilterCount = [status !== "ALL", customerType !== "ALL", !!dateFrom, !!dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL", companyName !== "ALL"].filter(Boolean).length;
 
   const resetFilters = () => {
-    setSearch(""); setStatus("ALL"); setCustomerType("ALL"); setDateFrom(""); setDateTo("");
+    setSearch(""); setDebouncedSearch(""); setStatus("ALL"); setCustomerType("ALL"); setDateFrom(""); setDateTo("");
     setPaymentMethod("ALL"); setSourcePlatform("ALL"); setCompanyName("ALL");
   };
 
@@ -1326,6 +1310,23 @@ export default function Page() {
     if (isExporting) return;
     setIsExporting(true);
     try {
+      // Lazy-load ExcelJS hanya saat export ditekan — jangan bebani bundle halaman
+      const { default: ExcelJS } = await import("exceljs");
+
+      // Ambil SEMUA baris yang match filter aktif (bukan cuma 1 halaman yang lagi ditampilkan)
+      const exportParams = new URLSearchParams({ export: "1", status, sortOrder });
+      if (debouncedSearch.trim()) exportParams.set("search", debouncedSearch.trim());
+      if (customerType !== "ALL") exportParams.set("customerType", customerType);
+      if (dateFrom) exportParams.set("dateFrom", dateFrom);
+      if (dateTo) exportParams.set("dateTo", dateTo);
+      if (paymentMethod !== "ALL") exportParams.set("paymentMethod", paymentMethod);
+      if (sourcePlatform !== "ALL") exportParams.set("sourcePlatform", sourcePlatform);
+      if (companyName !== "ALL") exportParams.set("companyName", companyName);
+
+      const exportRes = await fetch(`/api/transaction?${exportParams.toString()}`);
+      const exportResult = await exportRes.json();
+      const exportRows: any[] = exportResult.data || [];
+
       const wb = new ExcelJS.Workbook();
       wb.creator = "Solit POS"; wb.created = new Date();
       const ws = wb.addWorksheet("Transaksi", {
@@ -1349,7 +1350,7 @@ export default function Page() {
       const detailCache = new Map<string, DetailCache>();
 
       if (canSeeFinancials) {
-        await Promise.allSettled(filteredTransactions.map(async (item) => {
+        await Promise.allSettled(exportRows.map(async (item) => {
           try {
             const res = await fetch(`/api/transaction/${item.invoice_number}`);
             if (!res.ok) return;
@@ -1369,7 +1370,7 @@ export default function Page() {
       const NUM_KEYS = new Set(["qty"]);
       const tableRows: (string | number)[][] = [];
 
-      for (const item of filteredTransactions) {
+      for (const item of exportRows) {
         const grouped: any[] = item.grouped_items ?? [];
         const isMulti = grouped.length > 1;
         const cached = detailCache.get(item.invoice_number);
@@ -1437,7 +1438,7 @@ export default function Page() {
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
       {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} />}
 
-      {/* ── Page wrapper — padding lebih kecil di desktop agar table lebih tinggi ── */}
+      {/* ── Page wrapper ── */}
       <div className={`${isMobile ? "px-4 py-4" : "max-w-[1920px] mx-auto px-6 py-4"} space-y-3`}>
 
         {/* ── Header ── */}
@@ -1453,11 +1454,11 @@ export default function Page() {
           <div className="flex items-center gap-2 flex-shrink-0">
             {!isLoading && (
               <div className="flex items-center gap-1.5 bg-gray-100 px-3 h-9 rounded-xl">
-                <span className="text-xs font-bold text-gray-900 tabular-nums">{filteredTransactions.length}</span>
+                <span className="text-xs font-bold text-gray-900 tabular-nums">{totalCount}</span>
                 <span className="text-xs text-gray-400">transaksi</span>
               </div>
             )}
-            {!isLoading && filteredTransactions.length > 0 && (
+            {!isLoading && totalCount > 0 && (
               <button
                 onClick={handleExportExcel} disabled={isExporting}
                 className="inline-flex items-center gap-1.5 px-3 h-9 bg-white border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
@@ -1477,8 +1478,8 @@ export default function Page() {
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
             <p className="text-xs text-amber-800">
                Dari Cashflow · <span className="font-mono text-amber-600">{focusInvoice}</span>
-              {filteredTransactions[0]?.customer_name && <> · <b>{filteredTransactions[0].customer_name}</b></>}
-              {filteredTransactions.length === 0 && <span className="text-amber-500"> — tidak ditemukan</span>}
+              {allTransactions[0]?.customer_name && <> · <b>{allTransactions[0].customer_name}</b></>}
+              {allTransactions.length === 0 && !isLoading && <span className="text-amber-500"> — tidak ditemukan</span>}
             </p>
             <button onClick={() => { setFocusInvoice(null); window.history.replaceState({}, "", "/dashboard/transactions"); }}
               className="text-[11px] text-amber-600 hover:text-amber-900 font-semibold whitespace-nowrap flex-shrink-0"> Semua</button>
@@ -1501,7 +1502,7 @@ export default function Page() {
                 onChange={(e) => setSearch(e.target.value)}
               />
               {search && (
-                <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 transition">
+                <button onClick={() => { setSearch(""); setDebouncedSearch(""); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 transition">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 </button>
               )}
@@ -1666,7 +1667,7 @@ export default function Page() {
         )}
 
         {/* ── Pagination ── */}
-        {!isLoading && filteredTransactions.length > itemsPerPage && (
+        {!isLoading && totalCount > itemsPerPage && (
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
