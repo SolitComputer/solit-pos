@@ -7,7 +7,7 @@ import {
 import { getSupabaseClient } from "@/services/supabaseClient";
 import { useChatContext } from "@/contexts/ChatContext";
 import { VoicePlayer, VoiceRecorder } from "@/components/ui/VoiceNote";
-import { Inbox, Clock, FileText, MessageCircle, ChevronUp } from "lucide-react";
+import { Inbox, FileText, ChevronUp } from "lucide-react";
 import { CreateGroupModal } from "@/components/ui/CreateGroupModal";
 import { GroupInfoModal } from "@/components/ui/GroupInfoModal";
 import { DEFAULT_GROUP_ID } from "@/lib/chatGroupsShared";
@@ -1919,59 +1919,47 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     {/* ── Header ── */}
                     <div
                         className="flex-shrink-0 flex items-center gap-3.5 px-4 md:px-6 py-4 relative overflow-hidden"
-                        style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 50%, #0f0c29 100%)" }}>
+                        style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
 
-                        {/* Background mesh pattern */}
+                        {/* Ambient glow — satu radial lembut, ganti 2 layer lama yang numpuk */}
                         <div className="absolute inset-0 pointer-events-none" style={{
-                            backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.15) 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(139,92,246,0.1) 0%, transparent 50%)",
-                        }} />
-                        {/* Subtle grid */}
-                        <div className="absolute inset-0 pointer-events-none" style={{
-                            backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
-                            backgroundSize: "32px 32px",
+                            backgroundImage: "radial-gradient(ellipse 420px 200px at 10% -20%, rgba(99,102,241,0.25) 0%, transparent 70%)",
                         }} />
 
                         {/* Logo */}
                         <div className="relative flex-shrink-0 z-10">
-                            <div style={{ border: "2px solid rgba(255,255,255,0.15)", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}>
+                            <div style={{
+                                borderRadius: 14,
+                                overflow: "hidden",
+                                boxShadow: "0 4px 14px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08)",
+                            }}>
                                 <SolitLogo size={48} radius={14} />
-                            </div>
-                            {/* Online indicator */}
-                            <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center"
-                                style={{ width: 14, height: 14, borderRadius: "50%", border: "2.5px solid #0f0c29", background: "#10b981" }}>
                             </div>
                         </div>
 
                         <div
                             className={`flex-1 min-w-0 z-10 ${activeGroupId !== DEFAULT_GROUP_ID ? "cursor-pointer" : ""}`}
                             onClick={() => { if (activeGroupId !== DEFAULT_GROUP_ID) setShowGroupInfo(true); }}>
-                            <div className="flex items-center gap-2">
-                                <h2 className="text-sm font-black text-white tracking-tight">
+                            <div className="flex items-center gap-1.5">
+                                <h2 className="text-sm font-black text-white tracking-tight truncate">
                                     {activeGroupId === DEFAULT_GROUP_ID ? "All Team Solit" : customGroups.find(g => g.id === activeGroupId)?.name ?? "Grup"}
                                 </h2>
-                                {activeGroupId === DEFAULT_GROUP_ID ? (
-                                    <Clock className="w-4 h-4 inline" />
-                                ) : (
-                                    <MessageCircle className="w-3.5 h-3.5 inline" />
-                                )}
                                 {activeGroupId !== DEFAULT_GROUP_ID && (
-                                    <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-3.5 h-3.5 text-white/30 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
                                 )}
                             </div>
-                            <div className="flex items-center gap-2 mt-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mt-1 min-w-0">
                                 <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
                                 </span>
-                                <span className="text-[10px] truncate" style={{ color: "rgba(255,255,255,0.4)" }}>Grup chat seluruh tim Solit 03</span>
-                                {onlineCount > 0 && (
-                                    <span className="text-[9px] font-bold text-emerald-400 px-2 py-0.5"
-                                        style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 100 }}>
-                                        {onlineCount} online
-                                    </span>
-                                )}
+                                <span className="text-[10.5px] font-medium truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
+                                    {activeGroupId === DEFAULT_GROUP_ID
+                                        ? (onlineCount > 0 ? `${onlineCount} anggota online` : "Grup chat seluruh tim Solit 03")
+                                        : (customGroups.find(g => g.id === activeGroupId)?.my_role === "owner" ? "Kamu pembuat grup" : "Grup")}
+                                </span>
                             </div>
                         </div>
 
@@ -1981,9 +1969,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             className="md:hidden w-9 h-9 flex items-center justify-center transition-all active:scale-95 flex-shrink-0 z-10 mr-1 relative"
                             style={{
                                 borderRadius: 12,
-                                background: "rgba(255,255,255,0.07)",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                color: "rgba(255,255,255,0.7)",
+                                background: "rgba(255,255,255,0.06)",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                color: "rgba(255,255,255,0.65)",
                             }}
                             title="Anggota tim">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1998,21 +1986,21 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         </button>
                         <button
                             onClick={onClose}
-                            className="w-9 h-9 flex items-center justify-center transition-all hover:scale-105 flex-shrink-0 z-10"
+                            className="w-9 h-9 flex items-center justify-center transition-all hover:bg-white/10 flex-shrink-0 z-10"
                             style={{
                                 borderRadius: 12,
-                                background: "rgba(255,255,255,0.07)",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                color: "rgba(255,255,255,0.5)",
+                                background: "rgba(255,255,255,0.06)",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                color: "rgba(255,255,255,0.55)",
                             }}>
-                            <svg className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
 
                     {/* Accent line */}
-                    <div style={{ height: 2, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 40%, #ec4899 80%, transparent 100%)", opacity: 0.7, flexShrink: 0 }} />
+                    <div style={{ height: 2, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 45%, transparent 90%)", opacity: 0.6, flexShrink: 0 }} />
 
                     {/* ── Messages ── */}
                     <div
@@ -2230,4 +2218,4 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             `}</style>
         </div>
     );
-}   
+}
