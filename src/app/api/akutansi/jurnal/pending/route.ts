@@ -20,10 +20,19 @@ export const GET = withAuth(async (req) => {
 
   const supabase = getAdmin();
 
-  const [drafts, posted] = await Promise.all([
-    buildDraftsForPeriod(supabase, period),
-    getPostedKeys(supabase),
-  ]);
+  let drafts, posted;
+  try {
+    [drafts, posted] = await Promise.all([
+      buildDraftsForPeriod(supabase, period),
+      getPostedKeys(supabase),
+    ]);
+  } catch (e: any) {
+    console.error("[akuntansi pending]", e);
+    return NextResponse.json(
+      { success: false, message: e?.message ?? "Gagal memuat data pending" },
+      { status: 500 }
+    );
+  }
 
   const pending = drafts.filter((d) => !posted.has(draftKey(d)));
 

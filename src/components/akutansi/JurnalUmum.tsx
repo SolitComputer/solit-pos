@@ -11,7 +11,6 @@ import {
     DraftLine,
     JournalSide,
     MANUAL_TEMPLATES,
-    accountName,
     isBalanced,
     sumSide,
 } from "@/lib/accounting";
@@ -72,7 +71,9 @@ const key = (d: { source_type: string; source_id: string }) => `${d.source_type}
 export default function JurnalUmum({ period }: { period: string }) {
     const [entries, setEntries] = useState<JournalEntry[]>([]);
     const [pending, setPending] = useState<PendingDraft[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [pendingSummary, setPendingSummary] = useState<{
+        transaction: number; service: number; cashflow: number;
+    } | null>(null); const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [search, setSearch] = useState("");
     const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -101,6 +102,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                 return (a.sort_ts ?? "").localeCompare(b.sort_ts ?? "");
             });
             setPending(pendingSorted);
+            setPendingSummary(p.success ? p.summary ?? null : null);
 
             setSelected(new Set());
         } finally {
@@ -240,13 +242,20 @@ export default function JurnalUmum({ period }: { period: string }) {
                         onClick={() => setShowPending((v) => !v)}
                         className="w-full px-4 py-3 flex items-center justify-between bg-amber-50 hover:bg-amber-100/60 transition"
                     >
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-amber-900">
-                                ⏳ {pending.length} data menunggu konfirmasi
-                            </span>
-                            <span className="text-[10px] text-amber-600 font-semibold">
-                                (belum masuk jurnal umum)
-                            </span>
+                        <div className="flex flex-col items-start gap-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-amber-900">
+                                    ⏳ {pending.length} data menunggu konfirmasi
+                                </span>
+                                <span className="text-[10px] text-amber-600 font-semibold">
+                                    (belum masuk jurnal umum)
+                                </span>
+                            </div>
+                            {pendingSummary && (
+                                <span className="text-[10px] text-amber-700/70 font-semibold">
+                                    Transaksi: {pendingSummary.transaction} · Service: {pendingSummary.service} · Cashflow: {pendingSummary.cashflow}
+                                </span>
+                            )}
                         </div>
                         <span className="text-amber-600 text-xs">{showPending ? "▲" : "▼"}</span>
                     </button>
@@ -411,7 +420,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                             )}
                                                                         </td>
 
-                                                                        {/* Keterangan — kredit di-indent (posisinya "lebih ke bawah & masuk") */}
+                                                                        {/* Keterangan — kredit di-indent */}
                                                                         <td className="px-4 py-2 align-top">
                                                                             {first && (
                                                                                 <div className="flex items-center gap-1.5 mb-1 flex-wrap">

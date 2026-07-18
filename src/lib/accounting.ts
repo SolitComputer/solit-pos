@@ -113,6 +113,14 @@ export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
   BEBAN: "Beban (Pengeluaran)",
 };
 
+export const ACCOUNT_TYPE_NORMAL_SIDE: Record<AccountType, JournalSide> = {
+  ASET: "DEBIT",
+  HUTANG: "KREDIT",
+  MODAL: "KREDIT",
+  PEMASUKAN: "KREDIT",
+  BEBAN: "DEBIT",
+};
+
 // ─── Periode ──────────────────────────────────────────────────────────────────
 export const MONTH_LABELS = [
   "Januari", "Februari", "Maret", "April", "Mei", "Juni",

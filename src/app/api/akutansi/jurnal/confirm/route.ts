@@ -32,11 +32,19 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
 
   const supabase = getAdmin();
 
-  // ✅ Draft dibangun ULANG di server — client tidak bisa kirim nominal karangan.
-  const [drafts, posted] = await Promise.all([
-    buildDraftsForPeriod(supabase, period),
-    getPostedKeys(supabase),
-  ]);
+  let drafts, posted;
+  try {
+    [drafts, posted] = await Promise.all([
+      buildDraftsForPeriod(supabase, period),
+      getPostedKeys(supabase),
+    ]);
+  } catch (e: any) {
+    console.error("[akuntansi confirm]", e);
+    return NextResponse.json(
+      { success: false, message: e?.message ?? "Gagal memuat data untuk konfirmasi" },
+      { status: 500 }
+    );
+  }
 
   const wanted =
     items && items.length > 0
