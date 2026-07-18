@@ -134,6 +134,26 @@ export const GET = withAuth(async (req) => {
         return new Date(ea.created_at).getTime() - new Date(eb.created_at).getTime();
       });
 
+    // ── 3.5) Ambil status "sudah dicek" untuk baris-baris akun ini ──
+    // (baru) — tanpa ini, field checked/checked_at tidak pernah dikirim ke frontend,
+    // jadi checkbox selalu terlihat "kosong" tiap kali halaman di-refresh/dibuka lagi,
+    // padahal data cek-nya sudah tersimpan di tabel journal_line_checks.
+    const ownLineIds = ownLines.map((l) => l.id);
+
+    const checkedMap = new Map<string, string>(); // line_id -> checked_at
+    if (ownLineIds.length > 0) {
+      const { data: checksData, error: checksErr } = await supabase
+        .from("journal_line_checks")
+        .select("line_id, checked_at")
+        .in("line_id", ownLineIds);
+
+      if (checksErr) throw checksErr;
+
+      for (const c of (checksData ?? []) as { line_id: string; checked_at: string }[]) {
+        checkedMap.set(c.line_id, c.checked_at);
+      }
+    }
+
     let running = saldoAwal;
     const lines = ownLines.map((l) => {
       const entry = entryMap.get(l.entry_id)!;
@@ -141,6 +161,7 @@ export const GET = withAuth(async (req) => {
       const kredit = l.side === "KREDIT" ? Number(l.nominal) : 0;
       running += debit - kredit;
       const ref = (counterMap.get(l.entry_id) ?? []).join(", ");
+      const checkedAt = checkedMap.get(l.id) ?? null; // (baru)
       return {
         id: l.id,
         tanggal: entry.tanggal,
@@ -150,6 +171,8 @@ export const GET = withAuth(async (req) => {
         kredit,
         saldo_debit: running >= 0 ? running : 0,
         saldo_kredit: running < 0 ? Math.abs(running) : 0,
+        checked: !!checkedAt, // (baru)
+        checked_at: checkedAt, // (baru)
       };
     });
 
