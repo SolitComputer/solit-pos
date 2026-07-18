@@ -11,7 +11,6 @@ import {
     DraftLine,
     JournalSide,
     MANUAL_TEMPLATES,
-    accountName,
     isBalanced,
     sumSide,
 } from "@/lib/accounting";
@@ -421,7 +420,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                             )}
                                                                         </td>
 
-                                                                        {/* Keterangan — kredit di-indent (posisinya "lebih ke bawah & masuk") */}
+                                                                        {/* Keterangan — kredit di-indent */}
                                                                         <td className="px-4 py-2 align-top">
                                                                             {first && (
                                                                                 <div className="flex items-center gap-1.5 mb-1 flex-wrap">

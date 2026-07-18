@@ -1,5 +1,5 @@
 "use client";
-// src/components/akuntansi/AkuntansiTabs.tsx
+// src/components/akutansi/AkuntansiTabs.tsx
 
 import { useState } from "react";
 import Link from "next/link";
