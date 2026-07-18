@@ -446,7 +446,6 @@ export default function BukuBesar({ period }: { period: string }) {
     );
 }
 
-// ─── Modal: Set Saldo Awal (hanya bisa sekali input) ──────────────────────────
 // ─── Modal: Set/Edit Saldo Awal ────────────────────────────────────────────
 function OpeningBalanceModal({
     accountCode,
