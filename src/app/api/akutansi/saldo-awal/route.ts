@@ -68,8 +68,8 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     return NextResponse.json({ success: false, message: "Akun tidak dikenal" }, { status: 400 });
   if (side !== "DEBIT" && side !== "KREDIT")
     return NextResponse.json({ success: false, message: "Sisi saldo harus DEBIT/KREDIT" }, { status: 400 });
-  if (!Number.isFinite(Number(nominal)) || Number(nominal) <= 0)
-    return NextResponse.json({ success: false, message: "Nominal harus lebih dari 0" }, { status: 400 });
+  if (!Number.isFinite(Number(nominal)))
+    return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
 
   const { data: existing, error: checkErr } = await supabase
     .from("journal_opening_balances")

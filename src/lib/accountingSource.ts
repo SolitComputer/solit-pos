@@ -157,7 +157,7 @@ async function buildTransactionDrafts(
   return drafts;
 }
 
-// ── SERVICE ──────────────────────────────────────────────────────────────────
+// SESUDAH
 async function buildServiceDrafts(
   supabase: SupabaseClient,
   period: string
@@ -165,7 +165,7 @@ async function buildServiceDrafts(
   const { data: svcs, error } = await supabase
     .from("service_orders")
     .select(
-      "id, nama, type_laptop, payment_amount, payment_method, biaya_sparepart, status, tanggal_masuk, tanggal_selesai, tanggal_diambil, created_at"
+      "id, nama, type_laptop, payment_amount, payment_method, biaya_sparepart, status, tanggal_masuk, tanggal_selesai, tanggal_diambil"
     )
     .in("status", ["DONE", "SUDAH_DIAMBIL"])
     .not("payment_amount", "is", null)
@@ -173,7 +173,7 @@ async function buildServiceDrafts(
 
   if (error) {
     console.error("[akuntansi] fetch service:", error.message);
-    return [];
+    throw new Error(`Gagal ambil data service: ${error.message}`);
   }
 
   const drafts: JournalDraft[] = [];
@@ -204,7 +204,7 @@ async function buildServiceDrafts(
 
     // Timestamp presisi untuk sorting: pakai created_at kalau ada, fallback ke
     // tanggal jam 00:00 supaya tetap konsisten kalau kolomnya null di baris tertentu.
-    const sortTs = (s.created_at as string) || `${tanggal}T00:00:00+07:00`;
+    const sortTs = refDate || `${tanggal}T00:00:00+07:00`;
 
     drafts.push({
       source_type: "SERVICE",

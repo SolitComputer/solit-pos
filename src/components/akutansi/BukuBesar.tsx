@@ -460,15 +460,21 @@ function OpeningBalanceModal({
     onClose: () => void;
     onSaved: () => void;
 }) {
+    // SESUDAH
     const isEdit = !!existing;
     const [side, setSide] = useState<"DEBIT" | "KREDIT">(existing?.side ?? "DEBIT");
-    const [nominal, setNominal] = useState<number>(existing?.nominal ?? 0);
+    const [nominalInput, setNominalInput] = useState<string>(
+        existing ? String(existing.nominal) : ""
+    );
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
     const submit = async () => {
         setError("");
-        if (!nominal || nominal <= 0) return setError("Nominal harus lebih dari 0");
+        if (nominalInput.trim() === "") return setError("Nominal wajib diisi");
+        const nominal = Number(nominalInput);
+        if (!Number.isFinite(nominal)) return setError("Nominal tidak valid");
+        if (!isEdit && nominal <= 0) return setError("Nominal harus lebih dari 0");
 
         const ok = confirm(
             isEdit
@@ -550,12 +556,14 @@ function OpeningBalanceModal({
                     </div>
 
                     <div>
-                        <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Nominal</label>
+                        <label className="text-xs font-semibold text-gray-500 mb-1.5 block">
+                            Nominal {isEdit && <span className="text-gray-400 font-normal">(boleh negatif untuk koreksi)</span>}
+                        </label>
                         <input
                             type="number"
-                            min={0}
-                            value={nominal || ""}
-                            onChange={(e) => setNominal(Math.max(0, Number(e.target.value)))}
+                            {...(!isEdit ? { min: 0 } : {})}
+                            value={nominalInput}
+                            onChange={(e) => setNominalInput(e.target.value)}
                             placeholder="0"
                             className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm font-mono"
                         />
@@ -575,7 +583,7 @@ function OpeningBalanceModal({
                     </button>
                     <button
                         onClick={submit}
-                        disabled={saving || !nominal}
+                        disabled={saving || nominalInput.trim() === ""}
                         className={`flex-1 h-10 text-white rounded-xl text-sm font-bold disabled:opacity-40 ${isEdit ? "bg-red-600 hover:bg-red-700" : "bg-gray-900 hover:bg-gray-800"
                             }`}
                     >

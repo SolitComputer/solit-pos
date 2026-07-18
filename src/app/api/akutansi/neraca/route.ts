@@ -4,7 +4,7 @@ import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { ACCOUNTS, isValidPeriod } from "@/lib/accounting";
-import { createClient as createClientForAccounts } from "@supabase/supabase-js"; 
+import { createClient as createClientForAccounts } from "@supabase/supabase-js";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -65,27 +65,48 @@ export const GET = withAuth(async (req) => {
       balanceMap.set(o.account_code, (balanceMap.get(o.account_code) ?? 0) + signed);
     }
 
-    const { data: customAccounts, error: customErr } = await supabase
+    const { data: dbAccounts, error: dbErr } = await supabase
       .from("chart_of_accounts")
       .select("code, name, type");
 
-    if (customErr) throw customErr;
+    if (dbErr) throw dbErr;
 
-    const staticCodes = new Set(ACCOUNTS.map((a) => a.code));
-    const allAccountsForNeraca = [
-      ...ACCOUNTS,
-      ...(customAccounts ?? []).filter((a: any) => !staticCodes.has(a.code)),
-    ];
+    const dbAccountMap = new Map<string, { code: string; name: string; type: string }>(
+      (dbAccounts ?? []).map((a: any) => [a.code as string, a])
+    );
 
-    const rows = allAccountsForNeraca.map((a) => {
-      const balance = balanceMap.get(a.code) ?? 0;
-      return {
-        code: a.code,
-        name: a.name,
-        debit: balance > 0 ? balance : 0,
-        kredit: balance < 0 ? Math.abs(balance) : 0,
-      };
-    }).filter((r) => r.debit !== 0 || r.kredit !== 0);
+    const allCodes = new Set<string>([
+      ...ACCOUNTS.map((a) => a.code),
+      ...dbAccountMap.keys(),
+    ]);
+
+    const allAccountsForNeraca = Array.from(allCodes).map((code) => {
+      const dbAcc = dbAccountMap.get(code);
+      if (dbAcc) return dbAcc;
+      const staticAcc = ACCOUNTS.find((a) => a.code === code)!;
+      return { code: staticAcc.code, name: staticAcc.name, type: staticAcc.type };
+    });
+
+    const rows = allAccountsForNeraca
+      .map((a) => {
+        const balance = balanceMap.get(a.code) ?? 0;
+        return {
+          code: a.code,
+          name: a.name,
+          debit: balance > 0 ? balance : 0,
+          kredit: balance < 0 ? Math.abs(balance) : 0,
+        };
+      })
+      .filter((r) => r.debit !== 0 || r.kredit !== 0)
+    
+      .sort((a, b) => {
+        const numA = parseInt(a.code, 10);
+        const numB = parseInt(b.code, 10);
+        if (Number.isFinite(numA) && Number.isFinite(numB) && numA !== numB) {
+          return numA - numB;
+        }
+        return a.code.localeCompare(b.code);
+      });
 
     const totalDebit = rows.reduce((s, r) => s + r.debit, 0);
     const totalKredit = rows.reduce((s, r) => s + r.kredit, 0);
