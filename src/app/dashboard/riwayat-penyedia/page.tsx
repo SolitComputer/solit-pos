@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Trophy, Clock, X, Inbox } from "lucide-react";
+import { Trophy, Medal, Award, Clock, X, Inbox } from "lucide-react";
 
 interface ProviderJob {
   id: string;
@@ -54,7 +54,16 @@ const PRESETS: { key: PresetKey; label: string }[] = [
   { key: "all", label: "Semua Waktu" },
 ];
 
-const medal = (i: number) => (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`);
+const medal = (i: number): ReactNode =>
+  i === 0 ? (
+    <Trophy className="w-4 h-4 text-yellow-500 inline-block" />
+  ) : i === 1 ? (
+    <Medal className="w-4 h-4 text-gray-400 inline-block" />
+  ) : i === 2 ? (
+    <Award className="w-4 h-4 text-amber-700 inline-block" />
+  ) : (
+    `${i + 1}`
+  );
 
 function ProviderJobsModal({ provider, onClose }: { provider: ProviderPerformance; onClose: () => void }) {
   return (

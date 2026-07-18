@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Bike, CheckCircle2, Undo2, Home, Wrench } from "lucide-react";
 
 interface Props {
   orderId: string;
@@ -10,12 +11,12 @@ interface Props {
   onChanged: () => void;
 }
 
-const OPTIONS: { target: string; label: string; desc: string; icon: string; showWhen: (s: string, r: boolean) => boolean }[] = [
+const OPTIONS: { target: string; label: string; desc: string; icon: React.ReactNode; showWhen: (s: string, r: boolean) => boolean }[] = [
   { target: "MENUNGGU_PENGANTAR", label: "Menunggu Pengantar", desc: "Reset ke belum disetujui pengantar", icon: "⏳", showWhen: () => true },
-  { target: "DIKIRIM", label: "Sedang Diantar", desc: "Set langsung ke fase sedang jalan", icon: "🛵", showWhen: () => true },
-  { target: "SELESAI", label: "Selesai (Terkirim)", desc: "Tandai barang sudah sampai ke customer", icon: "✅", showWhen: () => true },
-  { target: "RETURN_IN_PROGRESS", label: "Mulai Perjalanan Pulang", desc: "Hanya bisa jika status sudah Selesai", icon: "🔙", showWhen: (s) => s === "SELESAI" },
-  { target: "RETURN_DONE", label: "Sudah Sampai Toko", desc: "Tandai pengantar sudah kembali", icon: "🏠", showWhen: (s, r) => s === "SELESAI" && r },
+  { target: "DIKIRIM", label: "Sedang Diantar", desc: "Set langsung ke fase sedang jalan", icon: <Bike className="w-4 h-4" />, showWhen: () => true },
+  { target: "SELESAI", label: "Selesai (Terkirim)", desc: "Tandai barang sudah sampai ke customer", icon: <CheckCircle2 className="w-4 h-4" />, showWhen: () => true },
+  { target: "RETURN_IN_PROGRESS", label: "Mulai Perjalanan Pulang", desc: "Hanya bisa jika status sudah Selesai", icon: <Undo2 className="w-4 h-4" />, showWhen: (s) => s === "SELESAI" },
+  { target: "RETURN_DONE", label: "Sudah Sampai Toko", desc: "Tandai pengantar sudah kembali", icon: <Home className="w-4 h-4" />, showWhen: (s, r) => s === "SELESAI" && r },
 ];
 
 export default function ManualStatusModal({ orderId, currentStatus, hasReturnStarted, onClose, onChanged }: Props) {
@@ -46,7 +47,7 @@ export default function ManualStatusModal({ orderId, currentStatus, hasReturnSta
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
         <div className="bg-[#1a1a2e] px-5 py-4">
-          <p className="font-bold text-white text-sm">🛠️ Override Status Manual</p>
+          <p className="font-bold text-white text-sm"><Wrench className="inline w-4 h-4 mr-1" /> Override Status Manual</p>
           <p className="text-xs text-gray-300 mt-0.5">Status saat ini: {currentStatus}</p>
         </div>
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2.5">

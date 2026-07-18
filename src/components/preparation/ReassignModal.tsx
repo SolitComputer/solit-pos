@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { RefreshCw, Check, Lightbulb } from "lucide-react";
 
 interface DriverOption { id: string; name: string; role: string }
 interface Props {
@@ -52,7 +53,7 @@ export default function ReassignModal({ orderId, currentDriverId, currentDriverN
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
         <div className="bg-indigo-600 px-5 py-4">
-          <p className="font-bold text-white text-sm">🔄 Pindah Pengantar</p>
+          <p className="font-bold text-white text-sm"><RefreshCw className="inline w-4 h-4 mr-1" /> Pindah Pengantar</p>
           <p className="text-xs text-indigo-100 mt-0.5">
             Saat ini: <span className="font-bold">{currentDriverName || "—"}</span>
           </p>
@@ -84,13 +85,13 @@ export default function ReassignModal({ orderId, currentDriverId, currentDriverN
                     <p className={`text-sm font-bold truncate ${selectedId === d.id ? "text-indigo-800" : "text-gray-700"}`}>{d.name}</p>
                     <p className="text-[10px] text-gray-400">{d.role}</p>
                   </div>
-                  {selectedId === d.id && <span className="text-indigo-600 flex-shrink-0">✓</span>}
+                  {selectedId === d.id && <span className="text-indigo-600 flex-shrink-0"><Check className="w-4 h-4" /></span>}
                 </button>
               ))}
             </div>
           )}
           <p className="text-[11px] text-gray-400">
-            💡 Kalau pengantar belum mulai jalan, tugas akan diset ulang ke "Menunggu Persetujuan" —
+<Lightbulb className="inline w-4 h-4 mr-1" /> Kalau pengantar belum mulai jalan, tugas akan diset ulang ke "Menunggu Persetujuan" —
             pengantar baru harus klik setuju dulu. Kalau sudah di jalan, tugas langsung dipindah tanpa reset tracking.
           </p>
           {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}

@@ -7,7 +7,7 @@ import {
 import { getSupabaseClient } from "@/services/supabaseClient";
 import { useChatContext } from "@/contexts/ChatContext";
 import { VoicePlayer, VoiceRecorder } from "@/components/ui/VoiceNote";
-import { Inbox, Clock, FileText } from "lucide-react";
+import { Inbox, Clock, FileText, MessageCircle, ChevronUp } from "lucide-react";
 import { CreateGroupModal } from "@/components/ui/CreateGroupModal";
 import { GroupInfoModal } from "@/components/ui/GroupInfoModal";
 import { DEFAULT_GROUP_ID } from "@/lib/chatGroupsShared";
@@ -1952,7 +1952,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 {activeGroupId === DEFAULT_GROUP_ID ? (
                                     <Clock className="w-4 h-4 inline" />
                                 ) : (
-                                    <span style={{ fontSize: 14 }}>💬</span>
+                                    <MessageCircle className="w-3.5 h-3.5 inline" />
                                 )}
                                 {activeGroupId !== DEFAULT_GROUP_ID && (
                                     <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2033,7 +2033,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 <button onClick={loadMore}
                                     className="text-[11px] text-indigo-600 hover:text-indigo-700 transition-all px-5 py-2 font-semibold hover:scale-105"
                                     style={{ background: "#fff", border: "1px solid #e0e4f5", borderRadius: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-                                    ↑ Muat pesan lebih lama
+                                    <ChevronUp className="inline w-3.5 h-3.5 mr-1" />Muat pesan lebih lama
                                 </button>
                             </div>
                         )}

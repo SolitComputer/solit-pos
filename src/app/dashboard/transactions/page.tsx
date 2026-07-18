@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import {
   ImageIcon, Pencil, CheckCircle2, Receipt, Inbox,
   Store, Building2, User, Landmark, Banknote, QrCode, CreditCard,
+  Lock, AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -559,12 +560,12 @@ function TransactionCard({ item, onPhotoClick, canEditTransaction, canRestoreTra
           </div>
           {!canSeeModal ? (
             <div className="rounded-xl p-2.5 ring-1 bg-gray-50 ring-gray-100">
-              <p className="text-[10px] font-semibold mb-0.5 text-gray-400">🔒 Margin</p>
+              <p className="text-[10px] font-semibold mb-0.5 text-gray-400"><Lock className="inline w-3 h-3 mr-1" />Margin</p>
               <p className="text-xs font-bold text-gray-400 leading-snug">Dibatasi</p>
             </div>
           ) : item.has_modal === false ? (
             <div className="rounded-xl p-2.5 ring-1 bg-amber-50 ring-amber-100">
-              <p className="text-[10px] font-semibold mb-0.5 text-amber-600">⚠️ Modal</p>
+              <p className="text-[10px] font-semibold mb-0.5 text-amber-600"><AlertTriangle className="inline w-3 h-3 mr-1" />Modal</p>
               <p className="text-xs font-bold text-amber-700 leading-snug">Belum di-set</p>
             </div>
           ) : item.other !== undefined && item.other !== null && (
@@ -891,11 +892,11 @@ function TransactionTableRow({ item, onPhotoClick, canEditTransaction, canRestor
         <td className="px-4 py-3.5 text-right">
           {!canSeeModal ? (
             <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-lg bg-gray-100 text-gray-400 ring-1 ring-gray-200 whitespace-nowrap">
-              🔒 Dibatasi
+              <Lock className="inline w-3.5 h-3.5 mr-1" /> Dibatasi
             </span>
           ) : item.has_modal === false ? (
             <span className="inline-flex text-[9px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-200 whitespace-nowrap">
-              ⚠️ Belum di-set modal
+              <AlertTriangle className="inline w-3.5 h-3.5 mr-1" /> Belum di-set modal
             </span>
           ) : item.other !== undefined && item.other !== null ? (
             <span className={`text-sm font-bold font-mono tabular-nums whitespace-nowrap ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-500" : "text-gray-300"}`}>
@@ -1066,9 +1067,9 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                       <div>
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Modal</p>
                         {!canSeeModal ? (
-                          <p className="text-[10px] font-bold text-gray-400">🔒 Dibatasi</p>
+                          <p className="text-[10px] font-bold text-gray-400"><Lock className="inline w-3.5 h-3.5 mr-1" />Dibatasi</p>
                         ) : g.has_modal === false ? (
-                          <p className="text-[10px] font-bold text-amber-600">⚠️ Belum di-set</p>
+                          <p className="text-[10px] font-bold text-amber-600"><AlertTriangle className="inline w-3.5 h-3.5 mr-1" />Belum di-set</p>
                         ) : (
                           <p className="text-xs font-bold text-gray-700 font-mono tabular-nums">Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}</p>
                         )}
@@ -1078,7 +1079,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                       <div>
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Margin</p>
                         {!canSeeModal ? (
-                          <p className="text-[10px] font-bold text-gray-400">🔒</p>
+                          <p className="text-[10px] font-bold text-gray-400"><Lock className="w-3.5 h-3.5" /></p>
                         ) : g.has_modal === false ? (
                           <p className="text-[10px] font-bold text-amber-600">—</p>
                         ) : (
@@ -1105,9 +1106,9 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Total Harga Modal</span>
                   {!canSeeModal ? (
-                    <span className="text-xs font-bold text-gray-400">🔒 Dibatasi</span>
+                    <span className="text-xs font-bold text-gray-400"><Lock className="inline w-3.5 h-3.5 mr-1" />Dibatasi</span>
                   ) : item.has_modal === false ? (
-                    <span className="text-xs font-bold text-amber-600">⚠️ Belum di-set harga modal</span>
+                    <span className="text-xs font-bold text-amber-600"><AlertTriangle className="inline w-3.5 h-3.5 mr-1" />Belum di-set harga modal</span>
                   ) : (
                     <span className="text-sm font-bold text-gray-700 font-mono tabular-nums">Rp{totalModal.toLocaleString("id-ID")}</span>
                   )}
@@ -1132,13 +1133,13 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
               {canSeeFinancials && !canSeeModal && (
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                   <span className="text-xs font-semibold text-gray-700">Total Margin</span>
-                  <span className="text-xs font-bold text-gray-400">🔒 Dibatasi</span>
+                  <span className="text-xs font-bold text-gray-400"><Lock className="inline w-3.5 h-3.5 mr-1" />Dibatasi</span>
                 </div>
               )}
               {canSeeFinancials && canSeeModal && item.has_modal === false && (
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                   <span className="text-xs font-semibold text-gray-700">Total Margin</span>
-                  <span className="text-xs font-bold text-amber-600">⚠️ Belum di-set harga modal</span>
+                  <span className="text-xs font-bold text-amber-600"><AlertTriangle className="inline w-3.5 h-3.5 mr-1" />Belum di-set harga modal</span>
                 </div>
               )}
               {canSeeFinancials && canSeeModal && item.has_modal !== false && totalMargin !== 0 && (
