@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Inbox } from "lucide-react";
+import { Inbox, AlertTriangle } from "lucide-react";
 
 interface NeracaRow {
     code: string;
@@ -150,7 +150,7 @@ export default function Neraca({ period }: { period: string }) {
                                     <tr key={r.code} className="hover:bg-blue-50/30 transition border-b border-gray-50">
                                         <td className="px-4 py-2.5 text-[11px] font-mono font-bold text-gray-500">
                                             {r.code}
-                                            {r.is_abnormal && <span className="ml-1" title="Posisi saldo tidak wajar — cek Buku Besar akun ini">⚠️</span>}
+                                            {r.is_abnormal && <span className="ml-1 inline-flex text-amber-500" title="Posisi saldo tidak wajar — cek Buku Besar akun ini"><AlertTriangle className="w-3 h-3" /></span>}
                                         </td>
                                         <td className="px-4 py-2.5 text-[12px] text-gray-800">{r.name}</td>
                                         <td

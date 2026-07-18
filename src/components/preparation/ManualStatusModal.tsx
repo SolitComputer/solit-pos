@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bike, CheckCircle2, Undo2, Home, Wrench } from "lucide-react";
+import { Bike, CheckCircle2, Undo2, Home, Wrench, Clock } from "lucide-react";
 
 interface Props {
   orderId: string;
@@ -12,7 +12,7 @@ interface Props {
 }
 
 const OPTIONS: { target: string; label: string; desc: string; icon: React.ReactNode; showWhen: (s: string, r: boolean) => boolean }[] = [
-  { target: "MENUNGGU_PENGANTAR", label: "Menunggu Pengantar", desc: "Reset ke belum disetujui pengantar", icon: "⏳", showWhen: () => true },
+  { target: "MENUNGGU_PENGANTAR", label: "Menunggu Pengantar", desc: "Reset ke belum disetujui pengantar", icon: <Clock className="w-4 h-4" />, showWhen: () => true },
   { target: "DIKIRIM", label: "Sedang Diantar", desc: "Set langsung ke fase sedang jalan", icon: <Bike className="w-4 h-4" />, showWhen: () => true },
   { target: "SELESAI", label: "Selesai (Terkirim)", desc: "Tandai barang sudah sampai ke customer", icon: <CheckCircle2 className="w-4 h-4" />, showWhen: () => true },
   { target: "RETURN_IN_PROGRESS", label: "Mulai Perjalanan Pulang", desc: "Hanya bisa jika status sudah Selesai", icon: <Undo2 className="w-4 h-4" />, showWhen: (s) => s === "SELESAI" },

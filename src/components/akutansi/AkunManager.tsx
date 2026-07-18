@@ -40,7 +40,7 @@ export default function AkunManager() {
 
     const handleDelete = async (acc: AccountRow) => {
         const warning = acc.is_builtin
-            ? `⚠️ "${acc.code} · ${acc.name}" adalah akun BAWAAN sistem. Kalau akun ini masih dipakai untuk pencatatan otomatis (transaksi/service/cashflow), transaksi baru akan GAGAL tercatat setelah dihapus. Yakin tetap hapus?`
+            ? `PERINGATAN: "${acc.code} · ${acc.name}" adalah akun BAWAAN sistem. Kalau akun ini masih dipakai untuk pencatatan otomatis (transaksi/service/cashflow), transaksi baru akan GAGAL tercatat setelah dihapus. Yakin tetap hapus?`
             : `Hapus akun "${acc.code} · ${acc.name}"?\n\nTidak bisa dihapus kalau sudah pernah dipakai di jurnal.`;
 
         if (!confirm(warning)) return;
@@ -182,7 +182,7 @@ function AccountFormModal({
 
         if (isEdit && code.trim() !== account!.code) {
             const ok = confirm(
-                `⚠️ Kamu mengubah kode akun dari "${account!.code}" menjadi "${code.trim()}".\n\nSemua mutasi jurnal yang sudah tercatat pakai kode "${account!.code}" akan ikut dipindah ke kode baru. Yakin lanjut?`
+                `PERINGATAN: Kamu mengubah kode akun dari "${account!.code}" menjadi "${code.trim()}".\n\nSemua mutasi jurnal yang sudah tercatat pakai kode "${account!.code}" akan ikut dipindah ke kode baru. Yakin lanjut?`
             );
             if (!ok) return;
         }

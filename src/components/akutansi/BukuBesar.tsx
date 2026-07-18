@@ -479,7 +479,7 @@ function OpeningBalanceModal({
         const ok = confirm(
             isEdit
                 ? `Yakin KOREKSI saldo awal "${accountLabel}" menjadi ${rp(nominal)} di sisi ${side === "DEBIT" ? "Debit" : "Kredit"
-                }?\n\n⚠️ Ini akan mengubah saldo berjalan di seluruh periode setelahnya. Pastikan sudah benar.`
+                }?\n\nPERINGATAN: Ini akan mengubah saldo berjalan di seluruh periode setelahnya. Pastikan sudah benar.`
                 : `Yakin input saldo awal "${accountLabel}" sebesar ${rp(nominal)} di sisi ${side === "DEBIT" ? "Debit" : "Kredit"
                 }?`
         );

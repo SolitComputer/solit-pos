@@ -1,7 +1,7 @@
 "use client";
 // src/components/akutansi/JurnalUmum.tsx
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Inbox, Pencil, Clock, Trash2, X, Check } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
@@ -230,7 +230,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                 <Stat label="Total Kredit" value={rp(totalKredit)} tone="emerald" />
                 <Stat
                     label="Status"
-                    value={totalDebit === totalKredit ? "Balance ✓" : "Tidak Balance"}
+                    value={
+                        totalDebit === totalKredit
+                            ? <span className="inline-flex items-center gap-1">Balance <Check className="w-3.5 h-3.5" /></span>
+                            : "Tidak Balance"
+                    }
                     tone={totalDebit === totalKredit ? "emerald" : "red"}
                 />
             </div>
@@ -244,8 +248,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                     >
                         <div className="flex flex-col items-start gap-1">
                             <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-amber-900">
-                                    ⏳ {pending.length} data menunggu konfirmasi
+                                <span className="text-sm font-bold text-amber-900 inline-flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5" /> {pending.length} data menunggu konfirmasi
                                 </span>
                                 <span className="text-[10px] text-amber-600 font-semibold">
                                     (belum masuk jurnal umum)
@@ -535,7 +539,7 @@ export default function JurnalUmum({ period }: { period: string }) {
 }
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
-function Stat({ label, value, tone }: { label: string; value: string; tone: "gray" | "blue" | "emerald" | "red" }) {
+function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone: "gray" | "blue" | "emerald" | "red" }) {
     const map = {
         gray: "border-gray-200 text-gray-900",
         blue: "border-blue-200 text-blue-800",
