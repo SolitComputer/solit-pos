@@ -14,14 +14,12 @@ export function isModalAwalActive(): boolean {
   return new Date() <= new Date(MODAL_AWAL_DEADLINE_ISO);
 }
 
-// ── Kategori Uang Masuk ──────────────────────────────────────────────────────
-// PENJUALAN_LAPTOP & SERVICE → auto-sync dari sistem, tidak bisa diinput manual
-// UTANG & AKSESORIS          → bisa diinput manual
 export const INCOME_CATEGORIES = {
   PENJUALAN_LAPTOP: "Penjualan Laptop",
   SERVICE: "Service",
-  UTANG: "Utang",
+  PIUTANG: "Piutang",
   AKSESORIS: "Aksesoris",
+  BIAYA_LAIN: "Biaya Lain-lain",
 } as const;
 
 // ── Kategori yang OTOMATIS dari sistem — tidak boleh diinput manual ───────────
@@ -47,7 +45,7 @@ export const EXPENSE_CATEGORIES = {
   BELANJA_LAPTOP: "Belanja Laptop",
   AKSESORIS: "Aksesoris",
   MODAL_SERVICE: "Modal Service",
-  PIUTANG: "Piutang",
+  UTANG: "Utang",
   KEUNTUNGAN_MITRA: "Keuntungan Mitra Reseller",
   BIAYA_LAIN: "Biaya Lain-lain",
 } as const;
