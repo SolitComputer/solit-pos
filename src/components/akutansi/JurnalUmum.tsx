@@ -1,8 +1,8 @@
 "use client";
 // src/components/akutansi/JurnalUmum.tsx
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Inbox } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Inbox, Pencil, Clock, Trash2, X, Check } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -98,8 +98,8 @@ export default function JurnalUmum({ period }: { period: string }) {
             // Sort ulang di sini cuma jaga-jaga kalau ada penggabungan data di masa depan —
             // pakai sort_ts, BUKAN source_id, supaya urutannya sesuai waktu asli, bukan alfabetis.
             const pendingSorted = (p.success ? p.data ?? [] : []).slice().sort((a: PendingDraft, b: PendingDraft) => {
-                if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
-                return (a.sort_ts ?? "").localeCompare(b.sort_ts ?? "");
+                if (a.tanggal !== b.tanggal) return b.tanggal.localeCompare(a.tanggal);
+                return (b.sort_ts ?? "").localeCompare(a.sort_ts ?? "");
             });
             setPending(pendingSorted);
             setPendingSummary(p.success ? p.summary ?? null : null);
@@ -230,7 +230,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                 <Stat label="Total Kredit" value={rp(totalKredit)} tone="emerald" />
                 <Stat
                     label="Status"
-                    value={totalDebit === totalKredit ? "Balance ✓" : "Tidak Balance"}
+                    value={
+                        totalDebit === totalKredit
+                            ? <span className="inline-flex items-center gap-1">Balance <Check className="w-3.5 h-3.5" /></span>
+                            : "Tidak Balance"
+                    }
                     tone={totalDebit === totalKredit ? "emerald" : "red"}
                 />
             </div>
@@ -244,8 +248,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                     >
                         <div className="flex flex-col items-start gap-1">
                             <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-amber-900">
-                                    ⏳ {pending.length} data menunggu konfirmasi
+                                <span className="text-sm font-bold text-amber-900 inline-flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5" /> {pending.length} data menunggu konfirmasi
                                 </span>
                                 <span className="text-[10px] text-amber-600 font-semibold">
                                     (belum masuk jurnal umum)
@@ -477,21 +481,21 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                         className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition"
                                                                                         title="Edit jurnal"
                                                                                     >
-                                                                                        ✏️
+                                                                                        <Pencil className="w-4 h-4" />
                                                                                     </button>
                                                                                     <button
                                                                                         onClick={() => setLogEntry(entry)}
                                                                                         className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"
                                                                                         title="Riwayat perubahan"
                                                                                     >
-                                                                                        🕐
+                                                                                        <Clock className="w-4 h-4" />
                                                                                     </button>
                                                                                     <button
                                                                                         onClick={() => handleDelete(entry)}
                                                                                         className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
                                                                                         title="Hapus"
                                                                                     >
-                                                                                        🗑️
+                                                                                        <Trash2 className="w-4 h-4" />
                                                                                     </button>
                                                                                 </div>
                                                                             )}
@@ -535,7 +539,7 @@ export default function JurnalUmum({ period }: { period: string }) {
 }
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
-function Stat({ label, value, tone }: { label: string; value: string; tone: "gray" | "blue" | "emerald" | "red" }) {
+function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone: "gray" | "blue" | "emerald" | "red" }) {
     const map = {
         gray: "border-gray-200 text-gray-900",
         blue: "border-blue-200 text-blue-800",
@@ -639,7 +643,7 @@ function EntryFormModal({
                             </p>
                         )}
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100">✕</button>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center"><X className="w-4 h-4" /></button>
                 </div>
 
                 <div className="overflow-y-auto flex-1 p-5 space-y-4">
@@ -749,9 +753,9 @@ function EntryFormModal({
                                     <button
                                         onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
                                         disabled={lines.length <= 2}
-                                        className="w-8 h-9 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-30"
+                                        className="w-8 h-9 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-30 flex items-center justify-center"
                                     >
-                                        ✕
+                                        <X className="w-4 h-4" />
                                     </button>
                                 </div>
                             ))}
@@ -763,8 +767,8 @@ function EntryFormModal({
                         className={`rounded-xl border p-3 flex items-center justify-between ${balanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
                             }`}
                     >
-                        <span className={`text-xs font-bold ${balanced ? "text-emerald-700" : "text-red-700"}`}>
-                            {balanced ? "✓ Balance" : "✕ Tidak balance"}
+                        <span className={`text-xs font-bold inline-flex items-center gap-1 ${balanced ? "text-emerald-700" : "text-red-700"}`}>
+                            {balanced ? <><Check className="w-3.5 h-3.5" /> Balance</> : <><X className="w-3.5 h-3.5" /> Tidak balance</>}
                         </span>
                         <span className="text-xs font-mono font-bold text-gray-700">
                             D {rp(debit)} &nbsp;·&nbsp; K {rp(kredit)}
@@ -821,7 +825,7 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
                         <h3 className="font-bold text-gray-900 text-sm">Riwayat Perubahan</h3>
                         <p className="text-[11px] text-gray-400 truncate max-w-[280px]">{entry.keterangan}</p>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100">✕</button>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center"><X className="w-4 h-4" /></button>
                 </div>
 
                 <div className="overflow-y-auto flex-1 p-5 space-y-2">

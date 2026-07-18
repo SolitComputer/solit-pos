@@ -8,7 +8,7 @@ import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
 import { isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
-import { Clock, AlertCircle, Inbox, Camera, X, CheckCircle2, CalendarDays, Package, Wrench, Truck, FileText, Bike, Medal, List, Trophy, Lightbulb } from "lucide-react";
+import { Clock, AlertCircle, Inbox, Camera, X, CheckCircle2, CalendarDays, Package, Wrench, Truck, FileText, Bike, List } from "lucide-react";
 
 function BarcodeScanModal({
   onScan,
@@ -617,8 +617,6 @@ function fmtMinShort(min: number | null): string {
 
 export default function PreparationPage() {
   // ── View & data ──
-  const [viewMode, setViewMode] = useState<"list" | "board">("list");
-
   const [orders, setOrders] = useState<PrepOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -954,41 +952,6 @@ export default function PreparationPage() {
     emerald: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700",
   };
 
-  // Letakkan tepat setelah penutup boardGroups array
-  const boardGroups = [
-    {
-      key: "formats",
-      title: "Paling Banyak Buat Format",
-      sub: "Sales input penyiapan",
-      icon: <FileText size={24} />,
-      rows: stats?.formats ?? [],
-      type: "count" as const,
-    },
-    {
-      key: "prepared",
-      title: "Paling Banyak Menyiapkan",
-      sub: "Penyedia cek → siap kirim",
-      icon: <Package size={24} />,
-      rows: stats?.prepared ?? [],
-      type: "count" as const,
-    },
-    {
-      key: "delivered",
-      title: "Paling Banyak Mengantar",
-      sub: "Pengantar selesai antar",
-      icon: <Bike size={24} />,
-      rows: stats?.delivered ?? [],
-      type: "count" as const,
-    },
-  ];
-
-  const speedRows: SpeedRow[] = stats?.speed ?? [];
-
-  const medal = (i: number) =>
-    i === 0 ? <Medal size={16} className="inline text-amber-500" />
-      : i === 1 ? <Medal size={16} className="inline text-gray-400" />
-        : i === 2 ? <Medal size={16} className="inline text-orange-500" />
-          : `${i + 1}`;
 
   const TABS = [
     { value: "ALL", label: "Semua" },
@@ -1114,24 +1077,6 @@ export default function PreparationPage() {
             </div>
           </div>
 
-          {/* View toggle */}
-          <div className="inline-flex bg-white border border-gray-200 rounded-xl p-1 gap-1 shadow-sm">
-            {[
-              { v: "list", label: "Daftar", icon: <List size={16} /> },
-              { v: "board", label: "Papan Peringkat", icon: <Trophy size={16} /> },
-            ].map((t) => (
-              <button
-                key={t.v}
-                onClick={() => setViewMode(t.v as "list" | "board")}
-                className={`px-4 h-9 rounded-lg text-sm font-bold transition ${viewMode === t.v
-                  ? "bg-[#1a1a2e] text-white shadow-sm"
-                  : "text-gray-500 hover:bg-gray-50"
-                  }`}
-              >
-                <span className="inline-flex items-center gap-1.5">{t.icon}{t.label}</span>
-              </button>
-            ))}
-          </div>
 
           {/* Periode / kalender */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
@@ -1210,7 +1155,6 @@ export default function PreparationPage() {
               <button
                 key={s.key}
                 onClick={() => {
-                  setViewMode("list");
                   setStatusFilter(s.key);
                 }}
                 className={`bg-gradient-to-br ${statColor[s.color]} border rounded-2xl p-4 text-left transition hover:scale-[1.02] active:scale-95 shadow-sm hover:shadow-md`}
@@ -1228,349 +1172,6 @@ export default function PreparationPage() {
             ))}
           </div>
 
-          {/* ── BOARD ── */}
-          {viewMode === "board" ? (
-            <>
-              {/* Header banner */}
-              <div className="bg-gradient-to-r from-indigo-50 to-indigo-100/50 border border-indigo-200 rounded-2xl px-5 py-4 flex items-center gap-4">
-                <AlertCircle className="w-8 h-8 inline text-gray-500" />
-                <div>
-                  <p className="text-sm font-bold text-indigo-800">
-                    Papan Peringkat · {rangeLabel}
-                  </p>
-                  <p className="text-xs text-indigo-600 mt-0.5">
-                    Default bulan berjalan (reset otomatis tiap bulan). Ganti periode/pilih bulan
-                    untuk lihat bulan sebelumnya.
-                  </p>
-                </div>
-              </div>
-
-              {/* ── Avg Stats Cards ─────────────────────────────────────────────────── */}
-              {!statsLoading && (
-                (stats?.global_avg_minutes != null || stats?.avg_wait_minutes != null) && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {stats?.avg_wait_minutes != null && (
-                      <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <Clock size={20} className="text-amber-600" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-amber-600 font-bold uppercase tracking-wide">
-                              Rata-rata Tunggu Diterima
-                            </p>
-                            <p className="text-xl font-black text-amber-800 mt-0.5 tabular-nums">
-                              {stats.avg_wait_minutes < 60
-                                ? `${stats.avg_wait_minutes} mnt`
-                                : `${Math.floor(stats.avg_wait_minutes / 60)}j ${stats.avg_wait_minutes % 60}m`}
-                            </p>
-                            <p className="text-[11px] text-amber-600 mt-0.5">Dibuat → diterima penyedia</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {stats?.global_avg_minutes != null && (
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200 rounded-2xl p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <Package size={20} className="text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wide">
-                              Rata-rata Durasi Penyiapan
-                            </p>
-                            <p className="text-xl font-black text-blue-800 mt-0.5 tabular-nums">
-                              {stats.global_avg_minutes < 60
-                                ? `${stats.global_avg_minutes} mnt`
-                                : `${Math.floor(stats.global_avg_minutes / 60)}j ${stats.global_avg_minutes % 60}m`}
-                            </p>
-                            <p className="text-[11px] text-blue-600 mt-0.5">Diterima → siap kirim</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              )}
-
-              {/* ── Speed Leaderboards (3 kolom) ──────────────────────── */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* 1. Menyiapkan */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Clock className="w-6 h-6 inline text-gray-500" />
-                    <div>
-                      <h3 className="text-sm font-black text-gray-800 leading-tight">Paling Cepat Menyiapkan</h3>
-                      <p className="text-[11px] text-gray-400">Diterima → siap kirim</p>
-                    </div>
-                  </div>
-                  {statsLoading ? (
-                    <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-11 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-                  ) : speedRows.length === 0 ? (
-                    <div className="py-10 text-center text-xs text-gray-400">Belum ada data</div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {speedRows.slice(0, 10).map((r, i) => (
-                        <div key={r.name + i} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition ${i === 0 ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-100"}`}>
-                          <span className={`w-7 text-center text-sm font-black flex-shrink-0 ${i > 2 ? "text-gray-400" : ""}`}>{medal(i)}</span>
-                          <span className="flex-1 min-w-0 text-sm font-bold text-gray-700 truncate">{r.name}</span>
-                          <div className="text-right flex-shrink-0">
-                            <p className={`text-sm font-black tabular-nums ${i === 0 ? "text-emerald-700" : "text-gray-900"}`}>{r.label}</p>
-                            <p className="text-[10px] text-gray-400">{r.total}× order</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. Respon Pengantar */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Clock className="w-6 h-6 inline text-gray-500" />
-                    <div>
-                      <h3 className="text-sm font-black text-gray-800 leading-tight">Respon Tercepat</h3>
-                      <p className="text-[11px] text-gray-400">Ditugaskan → terima tugas</p>
-                    </div>
-                  </div>
-                  {statsLoading ? (
-                    <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-11 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-                  ) : !delivLb || delivLb.respon.length === 0 ? (
-                    <div className="py-10 text-center text-xs text-gray-400">Belum ada data</div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {delivLb.respon.slice(0, 10).map((r, i) => (
-                        <div key={r.id} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition ${i === 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100"}`}>
-                          <span className={`w-7 text-center text-sm font-black flex-shrink-0 ${i > 2 ? "text-gray-400" : ""}`}>{medal(i)}</span>
-                          <span className="flex-1 min-w-0 text-sm font-bold text-gray-700 truncate">{r.name}</span>
-                          <div className="text-right flex-shrink-0">
-                            <p className={`text-sm font-black tabular-nums ${i === 0 ? "text-amber-700" : "text-gray-900"}`}>{fmtDur(r.avgMs)}</p>
-                            <p className="text-[10px] text-gray-400">{r.count}× order</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Selesai Pengantar */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Clock className="w-6 h-6 inline text-gray-500" />
-                    <div>
-                      <h3 className="text-sm font-black text-gray-800 leading-tight">Selesai Tercepat</h3>
-                      <p className="text-[11px] text-gray-400">Mulai jalan → sampai tujuan</p>
-                    </div>
-                  </div>
-                  {statsLoading ? (
-                    <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-11 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-                  ) : !delivLb || delivLb.selesai.length === 0 ? (
-                    <div className="py-10 text-center text-xs text-gray-400">Belum ada data</div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {delivLb.selesai.slice(0, 10).map((r, i) => (
-                        <div key={r.id} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition ${i === 0 ? "bg-blue-50 border-blue-200" : "bg-gray-50 border-gray-100"}`}>
-                          <span className={`w-7 text-center text-sm font-black flex-shrink-0 ${i > 2 ? "text-gray-400" : ""}`}>{medal(i)}</span>
-                          <span className="flex-1 min-w-0 text-sm font-bold text-gray-700 truncate">{r.name}</span>
-                          <div className="text-right flex-shrink-0">
-                            <p className={`text-sm font-black tabular-nums ${i === 0 ? "text-blue-700" : "text-gray-900"}`}>{fmtDur(r.avgMs)}</p>
-                            <p className="text-[10px] text-gray-400">{r.count}× order</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* ── Count Leaderboards (3 kolom) ────────────────────────────────────── */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {boardGroups.map((g) => (
-                  <div
-                    key={g.key}
-                    className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition"
-                  >
-                    <div className="flex items-center gap-3 mb-4">
-                      <span className="text-2xl">{g.icon}</span>
-                      <div>
-                        <h3 className="text-sm font-black text-gray-800 leading-tight">
-                          {g.title}
-                        </h3>
-                        <p className="text-[11px] text-gray-400">{g.sub}</p>
-                      </div>
-                    </div>
-                    {statsLoading ? (
-                      <div className="space-y-2">
-                        {[1, 2, 3].map((i) => (
-                          <div key={i} className="h-11 bg-gray-100 rounded-xl animate-pulse" />
-                        ))}
-                      </div>
-                    ) : g.rows.length === 0 ? (
-                      <div className="py-10 text-center text-xs text-gray-400">
-                        Belum ada data di periode ini
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {g.rows.slice(0, 10).map((r, i) => (
-                          <div
-                            key={r.name + i}
-                            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border ${i === 0
-                              ? "bg-amber-50 border-amber-200"
-                              : "bg-gray-50 border-gray-100"
-                              }`}
-                          >
-                            <span
-                              className={`w-7 text-center text-sm font-black flex-shrink-0 ${i > 2 ? "text-gray-400" : ""
-                                }`}
-                            >
-                              {medal(i)}
-                            </span>
-                            <span className="flex-1 min-w-0 text-sm font-bold text-gray-700 truncate">
-                              {r.name}
-                            </span>
-                            <span className="text-sm font-black text-gray-900 tabular-nums">
-                              {r.total}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {/* ── Ringkasan Per Orang ─────────────────────────────────────────── */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
-                <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <Clock className="w-6 h-6 inline text-gray-500" />
-                    <div>
-                      <h3 className="text-sm font-black text-gray-800 leading-tight">
-                        Ringkasan Per Orang
-                      </h3>
-                      <p className="text-[11px] text-gray-400">
-                        Jam mulai · selesai · rata-rata order/minggu
-                      </p>
-                    </div>
-                  </div>
-                  {/* Tab toggle */}
-                  <div className="inline-flex bg-gray-100 rounded-xl p-1 gap-1">
-                    {(["sales", "penyedia"] as const).map(tab => (
-                      <button
-                        key={tab}
-                        onClick={() => setPersonTab(tab)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${personTab === tab
-                          ? "bg-white text-gray-800 shadow-sm"
-                          : "text-gray-500 hover:text-gray-700"
-                          }`}
-                      >
-                        {tab === "sales" ? <span className="inline-flex items-center gap-1"><FileText size={12} />Sales</span> : <span className="inline-flex items-center gap-1"><Package size={12} />Penyedia</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {personStatsLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />
-                    ))}
-                  </div>
-                ) : (personStats?.[personTab] ?? []).length === 0 ? (
-                  <div className="py-10 text-center text-xs text-gray-400">
-                    Belum ada data di periode ini
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {/* Header */}
-                    <div className="grid grid-cols-12 gap-2 px-3 py-1.5">
-                      <span className="col-span-3 text-[10px] font-bold text-gray-400 uppercase">Nama</span>
-                      <span className="col-span-2 text-[10px] font-bold text-gray-400 uppercase text-center">Mulai</span>
-                      <span className="col-span-2 text-[10px] font-bold text-gray-400 uppercase text-center">Selesai</span>
-                      <span className="col-span-2 text-[10px] font-bold text-gray-400 uppercase text-center">Avg/Minggu</span>
-                      <span className="col-span-2 text-[10px] font-bold text-gray-400 uppercase text-center">
-                        {personTab === "penyedia" ? "Avg Durasi" : "Total"}
-                      </span>
-                      <span className="col-span-1 text-[10px] font-bold text-gray-400 uppercase text-center">Total</span>
-                    </div>
-                    {(personStats?.[personTab] ?? []).slice(0, 15).map((r, i) => (
-                      <div
-                        key={r.name + i}
-                        className={`grid grid-cols-12 gap-2 items-center rounded-xl px-3 py-3 border ${i === 0 ? "bg-indigo-50 border-indigo-200" : "bg-gray-50 border-gray-100"
-                          }`}
-                      >
-                        {/* Nama */}
-                        <div className="col-span-3 flex items-center gap-2 min-w-0">
-                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 ${i === 0 ? "bg-indigo-500 text-white" : "bg-gray-200 text-gray-600"
-                            }`}>
-                            {r.name.charAt(0).toUpperCase()}
-                          </span>
-                          <span className="text-xs font-bold text-gray-700 truncate">{r.name}</span>
-                        </div>
-
-                        {/* Jam mulai */}
-                        <div className="col-span-2 text-center">
-                          <span className="text-xs font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg tabular-nums">
-                            {r.earliest_time}
-                          </span>
-                        </div>
-
-                        {/* Jam selesai */}
-                        <div className="col-span-2 text-center">
-                          <span className="text-xs font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg tabular-nums">
-                            {r.latest_time}
-                          </span>
-                        </div>
-
-                        {/* Avg per minggu */}
-                        <div className="col-span-2 text-center">
-                          <span className="text-xs font-black text-gray-700 tabular-nums">
-                            {r.avg_per_week}×
-                          </span>
-                          <p className="text-[9px] text-gray-400">{r.week_count} minggu</p>
-                        </div>
-
-                        {/* Avg durasi (penyedia) atau kosong (sales) */}
-                        <div className="col-span-2 text-center">
-                          {personTab === "penyedia" ? (
-                            <span className={`text-xs font-black tabular-nums ${r.avg_prep_min !== null && r.avg_prep_min < 30
-                              ? "text-emerald-700"
-                              : r.avg_prep_min !== null && r.avg_prep_min < 60
-                                ? "text-blue-700"
-                                : "text-orange-700"
-                              }`}>
-                              {fmtMinShort(r.avg_prep_min)}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </div>
-
-                        {/* Total order */}
-                        <div className="col-span-1 text-center">
-                          <span className="text-xs font-black text-gray-900 tabular-nums">{r.total_orders}</span>
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Legend */}
-                    <div className="flex flex-wrap gap-3 pt-2 px-1">
-                      <span className="text-[10px] text-gray-400 inline-flex items-start gap-1">
-                        <Lightbulb size={11} className="mt-0.5 flex-shrink-0" /> Jam mulai/selesai = persentil 10%/90% dari semua order di periode ini (WIB)
-                      </span>
-                      {personTab === "penyedia" && (
-                        <span className="text-[10px] text-gray-400">
-                          · Avg Durasi = rata-rata waktu diterima → siap kirim
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-
-            /* ── LIST ── */
-            <>
               {canDone && (sc?.menunggu ?? 0) > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center gap-4">
                   <AlertCircle className="w-8 h-8 inline text-gray-500" />
@@ -1679,8 +1280,6 @@ export default function PreparationPage() {
                   )}
                 </>
               )}
-            </>
-          )}
         </div>
       </main>
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER } from "@/lib/accounting";
+import { Pencil, Trash2, X, AlertTriangle } from "lucide-react";
 
 interface AccountRow {
     code: string;
@@ -39,7 +40,7 @@ export default function AkunManager() {
 
     const handleDelete = async (acc: AccountRow) => {
         const warning = acc.is_builtin
-            ? `⚠️ "${acc.code} · ${acc.name}" adalah akun BAWAAN sistem. Kalau akun ini masih dipakai untuk pencatatan otomatis (transaksi/service/cashflow), transaksi baru akan GAGAL tercatat setelah dihapus. Yakin tetap hapus?`
+            ? `PERINGATAN: "${acc.code} · ${acc.name}" adalah akun BAWAAN sistem. Kalau akun ini masih dipakai untuk pencatatan otomatis (transaksi/service/cashflow), transaksi baru akan GAGAL tercatat setelah dihapus. Yakin tetap hapus?`
             : `Hapus akun "${acc.code} · ${acc.name}"?\n\nTidak bisa dihapus kalau sudah pernah dipakai di jurnal.`;
 
         if (!confirm(warning)) return;
@@ -69,7 +70,7 @@ export default function AkunManager() {
             )}
 
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800 leading-relaxed">
-                ⚠️ Semua akun (termasuk bawaan) sekarang bisa diedit — nama, tipe, <b>maupun kode</b> — dan dihapus. Mengubah/menghapus akun yang dipakai sistem untuk pencatatan otomatis (110, 410, dst) bisa membuat transaksi baru gagal tercatat. Berhati-hatilah.
+                <AlertTriangle className="inline w-4 h-4 mr-1 -mt-0.5" /> Semua akun (termasuk bawaan) sekarang bisa diedit — nama, tipe, <b>maupun kode</b> — dan dihapus. Mengubah/menghapus akun yang dipakai sistem untuk pencatatan otomatis (110, 410, dst) bisa membuat transaksi baru gagal tercatat. Berhati-hatilah.
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 p-3 flex gap-2">
@@ -128,14 +129,14 @@ export default function AkunManager() {
                                                     title="Edit akun"
                                                     className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition"
                                                 >
-                                                    ✏️
+                                                    <Pencil className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(a)}
                                                     title="Hapus akun"
                                                     className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
                                                 >
-                                                    🗑️
+                                                    <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         </td>
@@ -181,7 +182,7 @@ function AccountFormModal({
 
         if (isEdit && code.trim() !== account!.code) {
             const ok = confirm(
-                `⚠️ Kamu mengubah kode akun dari "${account!.code}" menjadi "${code.trim()}".\n\nSemua mutasi jurnal yang sudah tercatat pakai kode "${account!.code}" akan ikut dipindah ke kode baru. Yakin lanjut?`
+                `PERINGATAN: Kamu mengubah kode akun dari "${account!.code}" menjadi "${code.trim()}".\n\nSemua mutasi jurnal yang sudah tercatat pakai kode "${account!.code}" akan ikut dipindah ke kode baru. Yakin lanjut?`
             );
             if (!ok) return;
         }
@@ -214,7 +215,7 @@ function AccountFormModal({
             <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col">
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="font-bold text-gray-900 text-sm">{isEdit ? "Edit Akun" : "Akun Baru"}</h3>
-                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100">✕</button>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center"><X className="w-4 h-4" /></button>
                 </div>
 
                 <div className="p-5 space-y-4">
@@ -228,7 +229,7 @@ function AccountFormModal({
                         />
                         {isEdit && (
                             <p className="text-[10px] text-amber-600 mt-1">
-                                ⚠️ Mengubah kode akan memindahkan semua mutasi jurnal terkait ke kode baru.
+                                <AlertTriangle className="inline w-3.5 h-3.5 mr-1 -mt-0.5" /> Mengubah kode akan memindahkan semua mutasi jurnal terkait ke kode baru.
                             </p>
                         )}
                     </div>

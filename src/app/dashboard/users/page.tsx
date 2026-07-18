@@ -7,6 +7,13 @@ import { getCurrentUserClient } from "@/lib/auth-client";
 import { useChatContext } from "@/contexts/ChatContext";
 import { NotificationToggle } from "@/components/ui/NotificationToggle";
 import RoleAccessManager from "@/components/users/RoleAccessManager";
+import {
+  Crown, Code2, Handshake, BarChart3, Target, Wrench, Briefcase, DollarSign,
+  Package, Truck, Smartphone, Sparkles, Factory, Building2, FileText, MapPin,
+  Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
+  Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
+  ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock,
+} from "lucide-react";
 
 interface User {
   id: string;
@@ -69,19 +76,20 @@ const ROLE_LABEL: Record<string, string> = {
   PURCHASING: "Purchasing",
 };
 
-const ROLE_ICON: Record<string, string> = {
-  ADMIN: "👑", PROGRAMMER: "💻", ASISTEN_CEO: "🤝",
-  KEPALA_SALES: "📊", KEPALA_MARKETING: "🎯", KEPALA_TEKNISI: "🔩",
-  CREW_SALES: "💼", SOTECH: "🛠️", ACCOUNTING: "💰",
-  PENGELOLA_BARANG: "📦", KEPALA_PENGELOLA_BARANG: "📦", TEKNISI: "🔧", PENGANTARAN: "🚚",
-  MARKETING: "📱", KEBERSIHAN: "🧹",
-  PENYEDIA_BARANG: "🏭", KEPALA_PENYEDIA_BARANG: "🏢", KONTEN: "📝",
-  KEPALA_ONPOINT: "🎯", ONPOINT: "📍", KEPALA_SOTECH: "⚙️",
-  PKL: "🎓", PKL_MARKETING: "🎓", PKL_SALES: "🎓",
-  PKL_PENYEDIA_BARANG: "🎓", PKL_SOTECH: "🎓",
-  PKL_ONPOINT: "🎓", PKL_TEKNISI: "🎓", PKL_KONTEN: "🎓", PKL_PENGANTARAN: "🎓",
-  CUSTOMER_SERVICE: "🎧", PKL_CUSTOMER_SERVICE: "🎓",
-  PKL_PENGELOLA_BARANG: "🎓", PURCHASING: "🛒", KEPALA_ZENITH: "⚡",
+const RI = "w-3.5 h-3.5";
+const ROLE_ICON: Record<string, React.ReactNode> = {
+  ADMIN: <Crown className={RI} />, PROGRAMMER: <Code2 className={RI} />, ASISTEN_CEO: <Handshake className={RI} />,
+  KEPALA_SALES: <BarChart3 className={RI} />, KEPALA_MARKETING: <Target className={RI} />, KEPALA_TEKNISI: <Wrench className={RI} />,
+  CREW_SALES: <Briefcase className={RI} />, SOTECH: <Wrench className={RI} />, ACCOUNTING: <DollarSign className={RI} />,
+  PENGELOLA_BARANG: <Package className={RI} />, KEPALA_PENGELOLA_BARANG: <Package className={RI} />, TEKNISI: <Wrench className={RI} />, PENGANTARAN: <Truck className={RI} />,
+  MARKETING: <Smartphone className={RI} />, KEBERSIHAN: <Sparkles className={RI} />,
+  PENYEDIA_BARANG: <Factory className={RI} />, KEPALA_PENYEDIA_BARANG: <Building2 className={RI} />, KONTEN: <FileText className={RI} />,
+  KEPALA_ONPOINT: <Target className={RI} />, ONPOINT: <MapPin className={RI} />, KEPALA_SOTECH: <Settings className={RI} />,
+  PKL: <GraduationCap className={RI} />, PKL_MARKETING: <GraduationCap className={RI} />, PKL_SALES: <GraduationCap className={RI} />,
+  PKL_PENYEDIA_BARANG: <GraduationCap className={RI} />, PKL_SOTECH: <GraduationCap className={RI} />,
+  PKL_ONPOINT: <GraduationCap className={RI} />, PKL_TEKNISI: <GraduationCap className={RI} />, PKL_KONTEN: <GraduationCap className={RI} />, PKL_PENGANTARAN: <GraduationCap className={RI} />,
+  CUSTOMER_SERVICE: <Headset className={RI} />, PKL_CUSTOMER_SERVICE: <GraduationCap className={RI} />,
+  PKL_PENGELOLA_BARANG: <GraduationCap className={RI} />, PURCHASING: <ShoppingCart className={RI} />, KEPALA_ZENITH: <Zap className={RI} />,
 };
 
 const PKL_BADGE = { bg: "#fefce8", text: "#854d0e", border: "#fde68a" };
@@ -316,7 +324,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
         {error && (
           <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
             style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
-            ⚠️ {error}
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
           </div>
         )}
         <Field label="Nama Lengkap">
@@ -340,7 +348,9 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
                 style={shift === s
                   ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
                   : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                {s === "PAGI" ? "🌅 Pagi" : "🌆 Sore"}
+                {s === "PAGI"
+                  ? <span className="inline-flex items-center gap-1.5"><Sunrise className="w-3.5 h-3.5" /> Pagi</span>
+                  : <span className="inline-flex items-center gap-1.5"><Sunset className="w-3.5 h-3.5" /> Sore</span>}
               </button>
             ))}
           </div>
@@ -357,7 +367,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
           {saving
             ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Membuat...</>
-            : "✅ Buat Akun"}
+            : <><CheckCircle2 className="w-4 h-4" /> Buat Akun</>}
         </button>
       </div>
     </ModalShell>
@@ -400,7 +410,7 @@ function MultiRoleSelect({
   }, [customRoles]);
 
   const getLabel = (role: string) => customLookup.get(role)?.label ?? ROLE_LABEL[role] ?? role;
-  const getIcon = (role: string) => customLookup.get(role)?.icon ?? ROLE_ICON[role] ?? "👤";
+  const getIcon = (role: string) => customLookup.get(role)?.icon ?? ROLE_ICON[role] ?? <User className={RI} />;
   const getBadge = (role: string) => {
     const custom = customLookup.get(role);
     if (custom) return { bg: custom.badge_bg, text: custom.badge_text, border: custom.badge_border };
@@ -475,7 +485,7 @@ function MultiRoleSelect({
                     title="Jadikan role utama"
                     className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity text-[9px] font-black"
                   >
-                    ↑
+                    <ChevronUp className="w-2.5 h-2.5" />
                   </button>
                 )}
                 <button
@@ -515,7 +525,7 @@ function MultiRoleSelect({
                       : { background: "#f8fafc", color: "#94a3b8", borderColor: "#e2e8f0" }
                     }
                   >
-                    {isSelected && "✓ "}
+                    {isSelected && <Check className="w-2.5 h-2.5 inline mr-0.5" />}
                     {getIcon(role)} {getLabel(role)}
                   </button>
                 );
@@ -531,7 +541,7 @@ function MultiRoleSelect({
       {values.some(r => FULL_ACCESS_ROLES.has(r)) && (
         <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
           style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#6d28d9" }}>
-          ⚠️ Salah satu role memiliki akses penuh ke semua fitur
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> Salah satu role memiliki akses penuh ke semua fitur
         </div>
       )}
     </div>
@@ -583,7 +593,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
         {error && (
           <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
             style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
-            ⚠️ {error}
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
           </div>
         )}
         <Field label="Nama"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
@@ -602,7 +612,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
                 style={shift === s
                   ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
                   : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                {s === "PAGI" ? "🌅" : "🌆"} {s}
+                {s === "PAGI" ? <Sunrise className="w-3.5 h-3.5 inline" /> : <Sunset className="w-3.5 h-3.5 inline" />} {s}
               </button>
             ))}
           </div>
@@ -619,7 +629,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
           style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
           {saving
             ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Menyimpan...</>
-            : "💾 Simpan"}
+            : <><Save className="w-4 h-4" /> Simpan</>}
         </button>
       </div>
     </ModalShell>
@@ -635,8 +645,8 @@ function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
       <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
         style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl"
-          style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>🚪</div>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}><DoorOpen className="w-8 h-8" style={{ color: "#ea580c" }} /></div>
         <h3 className="font-black text-slate-800 text-center text-base mb-1">Paksa Logout {user.name}?</h3>
         <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">Session aktif user ini akan diakhiri segera.</p>
         <div className="flex gap-2.5">
@@ -650,7 +660,7 @@ function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
             style={{ background: "linear-gradient(135deg, #ea580c, #dc2626)", boxShadow: "0 4px 14px rgba(234,88,12,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-              : "🚪 Ya, Logout"}
+              : <><DoorOpen className="w-4 h-4" /> Ya, Logout</>}
           </button>
         </div>
       </div>
@@ -667,15 +677,15 @@ function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
       <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
         style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl"
-          style={{ background: "#fff1f2", border: "1px solid #fecaca" }}>🗑️</div>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><Trash2 className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
         <h3 className="font-black text-slate-800 text-center text-base mb-1">Hapus Akun {user.name}?</h3>
         <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
           Akun ini akan dihapus permanen dari sistem.
         </p>
-        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold"
+        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
           style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}>
-          ⚠️ Tindakan ini tidak bisa dibatalkan!
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> Tindakan ini tidak bisa dibatalkan!
         </div>
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
@@ -688,7 +698,7 @@ function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
             style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-              : "🗑️ Ya, Hapus"}
+              : <><Trash2 className="w-4 h-4" /> Ya, Hapus</>}
           </button>
         </div>
       </div>
@@ -705,15 +715,15 @@ function ConfirmResetPasswordModal({ user, onClose, onConfirm, loading }: {
       <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
         style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl"
-          style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>🔑</div>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "#fffbeb", border: "1px solid #fde68a" }}><KeyRound className="w-8 h-8" style={{ color: "#d97706" }} /></div>
         <h3 className="font-black text-slate-800 text-center text-base mb-1">Reset Password {user.name}?</h3>
         <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
           Password akan direset. User harus membuat password baru saat login berikutnya.
         </p>
-        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold"
+        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
           style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
-          💡 Status "Belum PW" akan aktif kembali
+          <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" /> Status "Belum PW" akan aktif kembali
         </div>
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
@@ -726,7 +736,7 @@ function ConfirmResetPasswordModal({ user, onClose, onConfirm, loading }: {
             style={{ background: "linear-gradient(135deg, #d97706, #b45309)", boxShadow: "0 4px 14px rgba(217,119,6,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-              : "🔑 Ya, Reset"}
+              : <><KeyRound className="w-4 h-4" /> Ya, Reset</>}
           </button>
         </div>
       </div>
@@ -749,7 +759,7 @@ function ActionBtn({ onClick, title, bg, color, children }: {
 
 // ── StatCard ──────────────────────────────────────────────────────────────────
 function StatCard({ icon, value, label, sub, accent }: {
-  icon: string; value: number; label: string; sub: string; accent: string;
+  icon: React.ReactNode; value: number; label: string; sub: string; accent: string;
 }) {
   return (
     <div className="bg-white rounded-2xl p-4 relative overflow-hidden group transition-all hover:shadow-md"
@@ -757,7 +767,7 @@ function StatCard({ icon, value, label, sub, accent }: {
       <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: accent }} />
       <div className="pl-3">
         <div className="flex items-start justify-between mb-3">
-          <span className="text-xl">{icon}</span>
+          <span className="text-slate-700">{icon}</span>
           <span className="text-3xl font-black tabular-nums" style={{ color: "#0f172a" }}>{value}</span>
         </div>
         <p className="text-[11px] font-bold" style={{ color: "#64748b" }}>{label}</p>
@@ -833,7 +843,7 @@ export default function UsersPage() {
   }, [customRoles]);
 
   const getRoleLabel = (role: string) => customRoleLookup.get(role)?.label ?? ROLE_LABEL[role] ?? role;
-  const getRoleIcon = (role: string) => customRoleLookup.get(role)?.icon ?? ROLE_ICON[role] ?? "👤";
+  const getRoleIcon = (role: string) => customRoleLookup.get(role)?.icon ?? ROLE_ICON[role] ?? <User className={RI} />;
   const getRoleBadge = (role: string) => {
     const custom = customRoleLookup.get(role);
     if (custom) return { bg: custom.badge_bg, text: custom.badge_text, border: custom.badge_border };
@@ -875,7 +885,7 @@ export default function UsersPage() {
         body: JSON.stringify({ id: confirmLogoutUser.id, _forceLogout: true }),
       });
       const data = await res.json();
-      if (data.success) { showToast(`✅ ${confirmLogoutUser.name} berhasil di-logout`, "ok"); fetchUsers(); }
+      if (data.success) { showToast(`${confirmLogoutUser.name} berhasil di-logout`, "ok"); fetchUsers(); }
       else showToast(data.message ?? "Gagal logout user", "err");
     } catch { showToast("Terjadi kesalahan", "err"); }
     finally { setLoggingOut(false); setConfirmLogoutUser(null); }
@@ -890,7 +900,7 @@ export default function UsersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`✅ Akun ${confirmDeleteUser.name} berhasil dihapus`, "ok");
+        showToast(`Akun ${confirmDeleteUser.name} berhasil dihapus`, "ok");
         fetchUsers();
       } else {
         showToast(data.message ?? "Gagal menghapus user", "err");
@@ -914,7 +924,7 @@ export default function UsersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`✅ Password ${confirmResetPwUser.name} berhasil direset`, "ok");
+        showToast(`Password ${confirmResetPwUser.name} berhasil direset`, "ok");
         fetchUsers();
       } else {
         showToast(data.message ?? "Gagal reset password", "err");
@@ -976,8 +986,8 @@ export default function UsersPage() {
           <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => setConfirmReset(null)} />
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
             style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl"
-              style={{ background: "#fff1f2", border: "1px solid #fecaca" }}>😶</div>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><ScanFace className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
             <h3 className="font-black text-slate-800 text-center text-base mb-1">Reset Wajah {confirmReset.name}?</h3>
             <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">User harus scan ulang wajah saat login berikutnya.</p>
             <div className="flex gap-2.5">
@@ -991,7 +1001,7 @@ export default function UsersPage() {
                 style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
                 {resetting === confirmReset.id
                   ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-                  : "😶 Ya, Reset"}
+                  : <><ScanFace className="w-4 h-4" /> Ya, Reset</>}
               </button>
             </div>
           </div>
@@ -1065,10 +1075,10 @@ export default function UsersPage() {
 
           {!loading && isAdmin && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard icon="👥" value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
-              <StatCard icon="👑" value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
-              <StatCard icon="😊" value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
-              <StatCard icon="⚠️" value={pwNotSet} label="Belum Set PW" sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
+              <StatCard icon={<Users className="w-5 h-5" />} value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
+              <StatCard icon={<Crown className="w-5 h-5" />} value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
+              <StatCard icon={<ScanFace className="w-5 h-5" />} value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
+              <StatCard icon={<AlertTriangle className="w-5 h-5" />} value={pwNotSet} label="Belum Set PW" sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
                 accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"} />
             </div>
           )}
@@ -1077,8 +1087,8 @@ export default function UsersPage() {
             <div className="bg-white rounded-2xl p-1.5 border border-slate-100">
               <div className="flex gap-1.5">
                 {([
-                  { key: "users", label: "Daftar User", emoji: "👥" },
-                  { key: "roles", label: "Role & Hak Akses", emoji: "🔐" },
+                  { key: "users", label: "Daftar User", icon: <Users className="w-3.5 h-3.5" /> },
+                  { key: "roles", label: "Role & Hak Akses", icon: <Lock className="w-3.5 h-3.5" /> },
                 ] as const).map((t) => (
                   <button
                     key={t.key}
@@ -1093,7 +1103,7 @@ export default function UsersPage() {
                         : { background: "#f5f7ff", color: "#64748b" }
                     }
                   >
-                    <span>{t.emoji}</span>
+                    <span>{t.icon}</span>
                     <span>{t.label}</span>
                   </button>
                 ))}
@@ -1110,8 +1120,8 @@ export default function UsersPage() {
                   style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                   <div className="flex gap-1.5">
                     {([
-                      { key: "karyawan", label: "Karyawan", emoji: "👥", count: totalKaryawan },
-                      { key: "pkl", label: "PKL", emoji: "🎓", count: totalPKL },
+                      { key: "karyawan", label: "Karyawan", icon: <Users className="w-3.5 h-3.5" />, count: totalKaryawan },
+                      { key: "pkl", label: "PKL", icon: <GraduationCap className="w-3.5 h-3.5" />, count: totalPKL },
                     ] as const).map(t => (
                       <button key={t.key}
                         onClick={() => { setActiveTab(t.key); setFilterRole("Semua"); }}
@@ -1119,7 +1129,7 @@ export default function UsersPage() {
                         style={activeTab === t.key
                           ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
                           : { background: "#f5f7ff", color: "#64748b" }}>
-                        <span>{t.emoji}</span>
+                        <span>{t.icon}</span>
                         <span>{t.label}</span>
                         <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black"
                           style={activeTab === t.key
@@ -1178,7 +1188,7 @@ export default function UsersPage() {
                             style={filterRole === r
                               ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
                               : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
-                            {r === "Semua" ? `Semua (${totalInTab})` : `${getRoleIcon(r)} ${getRoleLabel(r)}`}
+                            {r === "Semua" ? `Semua (${totalInTab})` : <>{getRoleIcon(r)} {getRoleLabel(r)}</>}
                           </button>
                         ))}
                       </div>
@@ -1227,7 +1237,7 @@ export default function UsersPage() {
 
                     ) : filtered.length === 0 ? (
                       <div className="text-center py-20">
-                        <div className="text-4xl mb-3">📭</div>
+                        <div className="flex justify-center mb-3"><Inbox className="w-9 h-9" style={{ color: "#cbd5e1" }} /></div>
                         <p className="text-sm font-bold" style={{ color: "#475569" }}>Tidak ada user ditemukan</p>
                         <p className="text-xs mt-1" style={{ color: "#94a3b8" }}>Coba ubah filter atau kata kunci pencarian</p>
                         {(search || filterRole !== "Semua") && (
@@ -1289,21 +1299,21 @@ export default function UsersPage() {
                                       );
                                     })}
                                     {isAdmin && !user.password_set && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                                         style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>
-                                        🔑 Belum PW
+                                        <KeyRound className="w-2.5 h-2.5" /> Belum PW
                                       </span>
                                     )}
                                     {isAdmin && user.force_logout_at && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                                         style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}>
-                                        🚪 Forced Out
+                                        <DoorOpen className="w-2.5 h-2.5" /> Forced Out
                                       </span>
                                     )}
                                     {isBirthdayToday(user.birth_date) && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 animate-pulse"
+                                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 animate-pulse"
                                         style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>
-                                        🎂 Ultah!
+                                        <Cake className="w-2.5 h-2.5" /> Ultah!
                                       </span>
                                     )}
                                   </div>
@@ -1311,10 +1321,10 @@ export default function UsersPage() {
                                     <p className="text-[11px] text-gray-400 font-medium mt-0.5">{user.phone_number}</p>
                                   )}
                                   {user.birth_date && (
-                                    <p className="text-[10px] text-gray-400 mt-0.5">
-                                      🎂 {formatBirthDate(user.birth_date)}
+                                    <p className="text-[10px] text-gray-400 mt-0.5 inline-flex items-center gap-1">
+                                      <Cake className="w-3 h-3" /> {formatBirthDate(user.birth_date)}
                                       {isBirthdayToday(user.birth_date) && (
-                                        <span className="ml-1 text-amber-600 font-bold">— Hari ini! 🎉</span>
+                                        <span className="ml-1 text-amber-600 font-bold inline-flex items-center gap-1">— Hari ini! <PartyPopper className="w-3 h-3" /></span>
                                       )}
                                     </p>
                                   )}
@@ -1451,7 +1461,7 @@ export default function UsersPage() {
                         <div>
                           <p className="text-xs font-bold" style={{ color: "#1d4ed8" }}>Auto-logout 03:00 WIB</p>
                           <p className="text-[10.5px] mt-0.5 leading-relaxed" style={{ color: "#3b82f6" }}>
-                            Session diakhiri otomatis. Gunakan 🚪 untuk paksa logout manual.
+                            Session diakhiri otomatis. Gunakan <DoorOpen className="w-2.5 h-2.5 inline" /> untuk paksa logout manual.
                           </p>
                         </div>
                       </div>

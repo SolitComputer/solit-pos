@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Ban, X, RefreshCw } from "lucide-react";
 import {
   type CCReport, type CCPosting, type CCBrand,
   CC_STATUS_META, CC_PLATFORMS, PLATFORM_COLOR, CC_BRANDS, BRAND_META, DEFAULT_BRAND,
@@ -249,7 +250,7 @@ export default function CCReportModal({ report, canManage, onClose, onChanged }:
           {/*  Banner terkunci — tampil di semua tab kalau konten sudah di-cancel */}
           {locked && (
             <div className="rounded-xl border border-gray-200 bg-gray-100 p-3 text-xs font-medium text-gray-600">
-              🚫 Konten ini sudah <b>dibatalkan (Cancel)</b> dan tidak bisa diubah lagi.
+              <Ban className="inline w-4 h-4 mr-1 text-red-600" /> Konten ini sudah <b>dibatalkan (Cancel)</b> dan tidak bisa diubah lagi.
             </div>
           )}
 
@@ -523,7 +524,7 @@ function PostingSection({
           onClick={onCancel}
           className="w-full rounded-2xl border border-red-200 bg-red-50 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-100"
         >
-          ✕ Cancel Konten
+          <X className="inline w-4 h-4 mr-1" /> Cancel Konten
         </button>
       )}
 
@@ -608,7 +609,7 @@ function PostingSection({
                     disabled={busy}
                     className="rounded-lg bg-gray-100 px-2.5 py-1 text-[11px] font-bold text-gray-700 transition hover:bg-gray-200 disabled:opacity-40"
                   >
-                    {busy ? "Sync…" : "↻ Sync"}
+                    {busy ? "Sync…" : <><RefreshCw className="inline w-4 h-4 mr-1" /> Sync</>}
                   </button>
                 )}
               </div>
