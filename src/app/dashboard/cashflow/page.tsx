@@ -64,7 +64,7 @@ type Entry = {
     nominal: number;
     modal: number | null;
     keterangan: string | null;
-    source_type: "MANUAL" | "TRANSACTION" | "SERVICE" | "MODAL_AWAL";
+    source_type: "MANUAL" | "TRANSACTION" | "TRANSACTION_PAYMENT" | "TRANSACTION_DP" | "SERVICE" | "MODAL_AWAL";
     source_id: string | null;
     tanggal: string;
     payment_method: "CASH" | "SALDO" | null;
@@ -206,7 +206,7 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
     const fmtDateExcel = (d?: string) =>
         d ? new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
     const sourceLabel = (s: Entry["source_type"]) =>
-        ({ TRANSACTION: "Transaksi", SERVICE: "Service", MODAL_AWAL: "Modal Awal", MANUAL: "Manual" }[s] ?? s);
+        ({ TRANSACTION: "Transaksi", TRANSACTION_PAYMENT: "Pembayaran", TRANSACTION_DP: "DP Transaksi", SERVICE: "Service", MODAL_AWAL: "Modal Awal", MANUAL: "Manual" }[s] ?? s);
     const methodLabel = (m: Entry["payment_method"]) =>
         m === "CASH" ? "Cash" : m === "SALDO" ? "Saldo" : "—";
     const auditLabel = (e: Entry) =>
@@ -378,7 +378,7 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
 
 // ── Source Badge ──────────────────────────────────────────────────────────────
 function SourceBadge({ sourceType }: { sourceType: Entry["source_type"] }) {
-    if (sourceType === "TRANSACTION") return (
+    if (sourceType === "TRANSACTION" || sourceType === "TRANSACTION_PAYMENT" || sourceType === "TRANSACTION_DP") return (
         <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 whitespace-nowrap"><ShoppingCart size={11} /> TRX</span>
     );
     if (sourceType === "SERVICE") return (
@@ -1152,7 +1152,7 @@ function InlineDateRange({ from, to, onChange }: { from: string, to: string, onC
 
     const prevMonth = () => setCurrMonth(m => m === 0 ? (setCurrYear(y => y - 1), 11) : m - 1);
     const nextMonth = () => setCurrMonth(m => m === 11 ? (setCurrYear(y => y + 1), 0) : m + 1);
-    
+
     const daysInMonth = new Date(currYear, currMonth + 1, 0).getDate();
     const firstDay = new Date(currYear, currMonth, 1).getDay();
     const blanks = Array.from({ length: firstDay });
@@ -1186,7 +1186,7 @@ function InlineDateRange({ from, to, onChange }: { from: string, to: string, onC
                     const isToday = dateStr === todayStr;
                     const isSelected = dateStr === from || dateStr === to;
                     const inRange = from && to && dateStr > from && dateStr < to;
-                    
+
                     let cls = "h-5 w-5 mx-auto rounded flex items-center justify-center cursor-pointer transition text-[9px] font-semibold ";
                     if (isSelected) cls += "bg-gray-900 text-white shadow-sm ring-1 ring-gray-900";
                     else if (inRange) cls += "bg-gray-100 text-gray-900";
@@ -1416,10 +1416,10 @@ export default function CashflowPage() {
                                 )}
                             </div>
                             <div className="flex flex-col items-end gap-2 shrink-0">
-                                <InlineDateRange 
-                                    from={customFrom} 
-                                    to={customTo} 
-                                    onChange={(f, t) => { setCustomFrom(f); setCustomTo(t); }} 
+                                <InlineDateRange
+                                    from={customFrom}
+                                    to={customTo}
+                                    onChange={(f, t) => { setCustomFrom(f); setCustomTo(t); }}
                                 />
                             </div>
                         </div>

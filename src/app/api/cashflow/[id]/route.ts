@@ -62,6 +62,21 @@ async function isEntryVoided(
         return !!tx && tx.status === "CANCELLED";
     }
 
+    if (entry.source_type === "TRANSACTION_DP") {
+        const { data: tx, error } = await supabase
+            .from("transactions")
+            .select("status")
+            .eq("invoice_number", entry.source_id)
+            .maybeSingle();
+
+        if (error) {
+            console.error("[cashflow] cek void gagal:", error.message);
+            return false;
+        }
+
+        return !!tx && tx.status === "CANCELLED";
+    }
+
     return false;
 }
 

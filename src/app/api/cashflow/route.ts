@@ -128,7 +128,9 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
     }
 
     if (toInsert.length > 0) {
-        const { error: insErr } = await supabase.from("cashflow_entries").insert(toInsert);
+        const { error: insErr } = await supabase
+            .from("cashflow_entries")
+            .upsert(toInsert, { onConflict: "source_type,source_id", ignoreDuplicates: true });
         if (insErr) console.error("[cashflow sync] insert transactions error:", insErr.message);
         else console.log(`[cashflow sync] inserted ${toInsert.length} transaction entries`);
     }
@@ -224,11 +226,35 @@ function buildPaymentPayload(p: any, customerName: string, salesName: string) {
     };
 }
 
-async function syncLegacyDpPayments(supabase: SupabaseClient) {
+function buildDpPayload(t: any) {
+    const refDate = t.created_at as string;
+    return {
+        direction: "IN",
+        category: "PENJUALAN_LAPTOP",
+        nama: (t.sales_name as string) || "Sales",
+        nominal: Math.round(Number(t.dp_amount ?? 0)),
+        modal: null,
+        keterangan: `DP · ${t.invoice_number} · ${(t.customer_name as string) || "—"}`,
+        tanggal: jakartaDate(refDate),
+        source_type: "TRANSACTION_DP",
+        source_id: t.invoice_number as string,
+        payment_method: null,
+    };
+}
+
+// ── Backfill LANGSUNG dari tabel transactions (bukan dari transaction_payments) —
+// menangkap semua transaksi lama berstatus DP/Ambil-Dulu/Packing yang dp_amount-nya
+// belum pernah tercatat di manapun. Sama seperti syncTransactionEntries yang baca
+// langsung dari transactions PAID → cashflow_entries, tanpa tabel perantara.
+// HANYA insert sekali per invoice, tidak pernah direkonsiliasi ulang — supaya kalau
+// nanti transaksi itu dapat cicilan baru (menambah dp_amount di transactions),
+// tidak dobel-hitung dengan cicilan baru yang tercatat terpisah lewat transaction_payments.
+async function syncLegacyDpEntries(supabase: SupabaseClient) {
     const { data: pendingTx, error } = await supabase
         .from("transactions")
-        .select("id, invoice_number, dp_amount, status, created_at")
-        .in("status", ["RESERVED", "HELD", "PACKING"]);
+        .select("id, invoice_number, customer_name, sales_name, dp_amount, status, created_at")
+        .in("status", ["RESERVED", "HELD", "PACKING"])
+        .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
 
     if (error) {
         console.error("[cashflow sync] fetch legacy DP transactions error:", error.message);
@@ -240,28 +266,32 @@ async function syncLegacyDpPayments(supabase: SupabaseClient) {
     if (withDp.length === 0) return;
 
     const invoices = withDp.map((t: any) => t.invoice_number as string);
-    const { data: existingPayments } = await supabase
+
+    const { data: paymentRows } = await supabase
         .from("transaction_payments")
         .select("invoice_number")
         .in("invoice_number", invoices);
+    const hasPaymentRow = new Set((paymentRows ?? []).map((p: any) => p.invoice_number as string));
 
-    const covered = new Set((existingPayments ?? []).map((p: any) => p.invoice_number as string));
-    const missing = withDp.filter((t: any) => !covered.has(t.invoice_number as string));
-    if (missing.length === 0) return;
+    const { data: existingDpEntries } = await supabase
+        .from("cashflow_entries")
+        .select("source_id")
+        .eq("source_type", "TRANSACTION_DP")
+        .in("source_id", invoices);
+    const hasDpEntry = new Set((existingDpEntries ?? []).map((e: any) => e.source_id as string));
 
-    const toInsert = missing.map((t: any) => ({
-        transaction_id: t.id,
-        invoice_number: t.invoice_number,
-        amount: Math.round(Number(t.dp_amount)),
-        payment_type: "DP",
-        created_by_name: "System (backfill)",
-        notes: "Backfill otomatis dari status DP transaksi (data lama)",
-        created_at: t.created_at,
-    }));
+    const toInsert = withDp
+        .filter((t: any) => !hasPaymentRow.has(t.invoice_number as string) && !hasDpEntry.has(t.invoice_number as string))
+        .map((t: any) => ({ ...buildDpPayload(t), is_audited: false }))
+        .filter((e) => e.nominal > 0 && e.tanggal >= CASHFLOW_START_DATE);
 
-    const { error: insErr } = await supabase.from("transaction_payments").insert(toInsert);
-    if (insErr) console.error("[cashflow sync] backfill DP insert error:", insErr.message);
-    else console.log(`[cashflow sync] backfilled ${toInsert.length} legacy DP payments`);
+    if (toInsert.length > 0) {
+        const { error: insErr } = await supabase
+            .from("cashflow_entries")
+            .upsert(toInsert, { onConflict: "source_type,source_id", ignoreDuplicates: true });
+        if (insErr) console.error("[cashflow sync] insert legacy DP entries error:", insErr.message);
+        else console.log(`[cashflow sync] backfilled ${toInsert.length} legacy DP entries`);
+    }
 }
 
 async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
@@ -276,7 +306,17 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
     }
     if (!payments || payments.length === 0) return;
 
-    const paymentIds = payments.map((p: any) => p.id as string);
+    const seenDpInvoices = new Set<string>();
+    const dedupedPayments = [...payments]
+        .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
+        .filter((p: any) => {
+            if (p.payment_type !== "DP") return true;
+            if (seenDpInvoices.has(p.invoice_number as string)) return false;
+            seenDpInvoices.add(p.invoice_number as string);
+            return true;
+        });
+
+    const paymentIds = dedupedPayments.map((p: any) => p.id as string);
     const { data: existing } = await supabase
         .from("cashflow_entries")
         .select("id, source_id")
@@ -284,7 +324,7 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
         .in("source_id", paymentIds);
 
     const existingIds = new Set((existing ?? []).map((e: any) => e.source_id as string));
-    const missing = payments.filter((p: any) => !existingIds.has(p.id as string));
+    const missing = dedupedPayments.filter((p: any) => !existingIds.has(p.id as string));
     if (missing.length === 0) return;
 
     const invoiceNumbers = [...new Set(missing.map((p: any) => p.invoice_number as string))];
@@ -305,14 +345,16 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
         .map((e) => ({ ...e, is_audited: false }));
 
     if (toInsert.length > 0) {
-        const { error: insErr } = await supabase.from("cashflow_entries").insert(toInsert);
+        const { error: insErr } = await supabase
+            .from("cashflow_entries")
+            .upsert(toInsert, { onConflict: "source_type,source_id", ignoreDuplicates: true });
         if (insErr) console.error("[cashflow sync] insert payment entries error:", insErr.message);
         else console.log(`[cashflow sync] inserted ${toInsert.length} payment entries`);
     }
 }
 
 async function syncDerivedEntries(supabase: SupabaseClient) {
-    await syncLegacyDpPayments(supabase);
+    await syncLegacyDpEntries(supabase);
     await syncTransactionEntries(supabase);
     await syncTransactionPaymentEntries(supabase);
 
@@ -398,7 +440,7 @@ export const GET = withAuth(async () => {
     const txSourceIds = Array.from(
         new Set(
             rawAll
-                .filter((e: any) => e.source_type === "TRANSACTION" && e.source_id)
+                .filter((e: any) => (e.source_type === "TRANSACTION" || e.source_type === "TRANSACTION_DP") && e.source_id)
                 .map((e: any) => e.source_id as string)
         )
     );
@@ -459,6 +501,12 @@ export const GET = withAuth(async () => {
         if (e.source_type === "TRANSACTION_PAYMENT" && e.source_id) {
             const invoiceNumber = paymentInvoiceMap.get(e.source_id as string);
             const tx = invoiceNumber ? txMap.get(invoiceNumber) : undefined;
+            const isVoided = !!tx && tx.status === "CANCELLED";
+            return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null };
+        }
+
+        if (e.source_type === "TRANSACTION_DP" && e.source_id) {
+            const tx = txMap.get(e.source_id as string);
             const isVoided = !!tx && tx.status === "CANCELLED";
             return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null };
         }
