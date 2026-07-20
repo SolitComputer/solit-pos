@@ -1,3 +1,4 @@
+// src/app/api/dashboard/revenue-detail/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, PERMISSIONS } from "@/lib/auth";
@@ -8,7 +9,7 @@ function wibDateToUTCRange(dateWIB: string): { start: string; end: string } {
     const [y, m, d] = dateWIB.split("-").map(Number);
     const WIB = getWIBOffset();
     const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - WIB);
-    const end   = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - WIB);
+    const end = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - WIB);
     return { start: start.toISOString(), end: end.toISOString() };
 }
 
@@ -20,8 +21,21 @@ function getDealPrice(item: any): number {
     return Number(item.deal_price || item.amount || 0);
 }
 
-function calcGrossProfit(item: any): number {
-    return getDealPrice(item) - Number(item.inventory_price || 0);
+// GROSS PROFIT = deal_price - live purchase_price dari laptop_units
+// (disamakan dengan calcMarginFromMap di stats/route.ts, BUKAN kolom inventory_price)
+function calcGrossProfit(item: any, unitMap: Map<string, number>): number {
+    const dealPrice = getDealPrice(item);
+    let totalPurchasePrice = 0;
+
+    if (Array.isArray(item.unit_ids) && item.unit_ids.length > 0) {
+        for (const uid of item.unit_ids) {
+            totalPurchasePrice += unitMap.get(uid) ?? 0;
+        }
+    } else if (item.unit_id) {
+        totalPurchasePrice = unitMap.get(item.unit_id) ?? 0;
+    }
+
+    return totalPurchasePrice > 0 ? dealPrice - totalPurchasePrice : 0;
 }
 
 async function handler(req: NextRequest) {
@@ -32,7 +46,7 @@ async function handler(req: NextRequest) {
 
         // ── Range bulan ini ──────────────────────────────────────────────────
         const monthStart = new Date(Date.UTC(ty, tm - 1, 1, 0, 0, 0) - WIB);
-        const monthEnd   = new Date(Date.UTC(ty, tm, 1, 0, 0, 0) - WIB);
+        const monthEnd = new Date(Date.UTC(ty, tm, 1, 0, 0, 0) - WIB);
 
         // ── Range 30 hari terakhir untuk data harian ─────────────────────────
         const day30Start = new Date(Date.now() + WIB);
@@ -43,7 +57,7 @@ async function handler(req: NextRequest) {
         // ── Fetch semua transaksi bulan ini ──────────────────────────────────
         const { data: monthlyTx, error } = await supabase
             .from("transactions")
-            .select("paid_at, deal_price, amount, inventory_price, sales_name")
+            .select("paid_at, deal_price, amount, unit_id, unit_ids, sales_name")
             .eq("status", "PAID")
             .gte("paid_at", monthStart.toISOString())
             .lt("paid_at", monthEnd.toISOString())
@@ -53,17 +67,38 @@ async function handler(req: NextRequest) {
 
         const txList = monthlyTx || [];
 
+        // ── BATCH FETCH purchase_price dari laptop_units ──────────────────────
+        const allUnitIds = new Set<string>();
+        for (const trx of txList) {
+            if (trx.unit_id) allUnitIds.add(trx.unit_id);
+            if (Array.isArray(trx.unit_ids)) {
+                for (const uid of trx.unit_ids) { if (uid) allUnitIds.add(uid); }
+            }
+        }
+
+        const unitMap = new Map<string, number>();
+        if (allUnitIds.size > 0) {
+            const { data: units } = await supabase
+                .from("laptop_units")
+                .select("id, purchase_price")
+                .in("id", Array.from(allUnitIds));
+            for (const unit of units ?? []) {
+                unitMap.set(unit.id, Number(unit.purchase_price ?? 0));
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         // ── Today stats ──────────────────────────────────────────────────────
         const todayRange = wibDateToUTCRange(todayWIB);
         const todayTx = txList.filter(t =>
             t.paid_at >= todayRange.start && t.paid_at < todayRange.end
         );
         const todayRevenue = todayTx.reduce((s, t) => s + getDealPrice(t), 0);
-        const todayProfit  = todayTx.reduce((s, t) => s + calcGrossProfit(t), 0);
+        const todayProfit = todayTx.reduce((s, t) => s + calcGrossProfit(t, unitMap), 0);
 
         // ── Monthly stats ────────────────────────────────────────────────────
         const monthlyRevenue = txList.reduce((s, t) => s + getDealPrice(t), 0);
-        const monthlyProfit  = txList.reduce((s, t) => s + calcGrossProfit(t), 0);
+        const monthlyProfit = txList.reduce((s, t) => s + calcGrossProfit(t, unitMap), 0);
 
         // ── Daily breakdown (30 hari) ────────────────────────────────────────
         const dailyMap: Record<string, { revenue: number; profit: number; count: number }> = {};
@@ -82,8 +117,8 @@ async function handler(req: NextRequest) {
                 .toISOString().split("T")[0];
             if (dailyMap[wibDate]) {
                 dailyMap[wibDate].revenue += getDealPrice(t);
-                dailyMap[wibDate].profit  += calcGrossProfit(t);
-                dailyMap[wibDate].count   += 1;
+                dailyMap[wibDate].profit += calcGrossProfit(t, unitMap);
+                dailyMap[wibDate].count += 1;
             }
         });
 
@@ -115,15 +150,15 @@ async function handler(req: NextRequest) {
                 weeklyMap[weekKey] = { revenue: 0, profit: 0, count: 0, weekStart: weekKey };
             }
             weeklyMap[weekKey].revenue += getDealPrice(t);
-            weeklyMap[weekKey].profit  += calcGrossProfit(t);
-            weeklyMap[weekKey].count   += 1;
+            weeklyMap[weekKey].profit += calcGrossProfit(t, unitMap);
+            weeklyMap[weekKey].count += 1;
         });
 
         const weekly = Object.entries(weeklyMap)
             .map(([weekStart, data]) => {
                 const [y, m, d] = weekStart.split("-").map(Number);
                 const startDate = new Date(y, m - 1, d);
-                const endDate   = new Date(y, m - 1, d + 6);
+                const endDate = new Date(y, m - 1, d + 6);
                 const label = `${startDate.toLocaleDateString("id-ID", { day: "numeric", month: "short" })} – ${endDate.toLocaleDateString("id-ID", { day: "numeric", month: "short" })}`;
                 return { weekStart, label, revenue: data.revenue, profit: data.profit, count: data.count };
             })
