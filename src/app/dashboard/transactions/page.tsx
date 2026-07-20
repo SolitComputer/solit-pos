@@ -1829,7 +1829,7 @@ export default function Page() {
               disabled={currentPage === totalPages}
               className="flex items-center gap-1.5 px-3 h-9 rounded-xl border border-gray-200 text-xs bg-white text-gray-500 disabled:opacity-30 hover:bg-gray-50 transition font-semibold"
             >
-              <span className="hidden sm:inline">Selanjutnya</span>
+              <span className="hidden sm:inline">selanjutnya</span>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
           </div>
