@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, type ReactNode } from "react";
-import { User, RefreshCw, Handshake, Hand, Tag, Repeat, Gift, Store, Package, Banknote, Landmark, QrCode, Shuffle, Check, Shield, Smartphone, Cake, Wallet, Laptop } from "lucide-react";
+import { User, RefreshCw, Handshake, Hand, Tag, Repeat, Gift, Store, Package, Banknote, Landmark, QrCode, Shuffle, Check, Shield, Smartphone, Cake, Wallet, Laptop, X, AlertTriangle, CheckCircle2, History, ScanLine, MapPin, Search, Minus, Plus, ChevronLeft, ChevronRight, Save, Loader2, Receipt, CalendarDays, Camera } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createPaymentSchema, CreatePaymentType, UnitItem } from "@/lib/validation";
@@ -99,11 +99,9 @@ function SelectedUnitCard({ unit, index, onRemove }: {
             <button
                 type="button"
                 onClick={onRemove}
-                className="ml-2 text-red-400 hover:text-red-600 transition flex-shrink-0"
+                className="ml-2 w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0"
             >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X size={15} />
             </button>
         </div>
     );
@@ -595,6 +593,7 @@ export default function CreatePaymentPage() {
     const btnPrimary = "flex-1 bg-gray-700 text-white rounded-xl h-11 font-medium hover:bg-gray-800 active:scale-[0.98] transition-all duration-200 text-sm shadow-sm";
 
     const stepLabels = ["Data Pembeli", "Pilih Unit", "Pengambilan", "Pembayaran"];
+    const stepIcons = [User, Laptop, CalendarDays, Wallet];
     const goBack3 = () => fromScan ? setStep(1) : setStep(2);
 
     return (
@@ -602,29 +601,49 @@ export default function CreatePaymentPage() {
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-all duration-300">
 
                 {/* Header */}
-                <div className="mb-5">
-                    <div className="flex items-center gap-2 mb-1">
-                        <div className="w-1 h-7 bg-gradient-to-b from-gray-600 to-gray-800 rounded-full" />
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <Receipt size={18} className="text-white" />
+                    </div>
+                    <div className="min-w-0">
+                        <h1 className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent leading-tight">
                             Buat Payment
                         </h1>
+                        <p className="text-xs text-gray-400">{stepLabels[step - 1]}</p>
                     </div>
-                    <p className="text-xs text-gray-400 ml-3">{stepLabels[step - 1]}</p>
                 </div>
 
                 {/* Step indicator */}
-                <div className="flex gap-1.5 mb-6">
-                    {[1, 2, 3, 4].map(i => (
-                        <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${step > i ? "bg-gray-600" : step === i ? "bg-gray-400" : "bg-gray-200"
-                            }`} />
-                    ))}
+                <div className="flex items-center mb-6">
+                    {stepIcons.map((StepIcon, idx) => {
+                        const i = idx + 1;
+                        const isDone = step > i;
+                        const isActive = step === i;
+                        return (
+                            <div key={i} className={`flex items-center ${i < stepIcons.length ? "flex-1" : ""}`}>
+                                <div
+                                    className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 flex-shrink-0 ${isDone
+                                        ? "bg-gray-700 border-gray-700 text-white"
+                                        : isActive
+                                            ? "bg-white border-gray-600 text-gray-700 ring-4 ring-gray-100"
+                                            : "bg-white border-gray-200 text-gray-300"
+                                        }`}
+                                >
+                                    {isDone ? <Check size={14} /> : <StepIcon size={14} />}
+                                </div>
+                                {i < stepIcons.length && (
+                                    <div className={`flex-1 h-0.5 mx-1.5 rounded-full transition-all duration-300 ${step > i ? "bg-gray-700" : "bg-gray-200"}`} />
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
 
                 {fromPrep && (
-                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 mb-4">
-                        <svg className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                    <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 mb-4">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                            <CheckCircle2 size={16} className="text-emerald-600" />
+                        </div>
                         <div>
                             <p className="text-xs font-semibold text-emerald-700">
                                 {prepLoading ? "Memuat data penyiapan..." : "Data dari penyiapan barang"}
@@ -636,10 +655,10 @@ export default function CreatePaymentPage() {
 
                 {/* Scan banner */}
                 {fromScan && (
-                    <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 mb-4">
-                        <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                    <div className="flex items-center gap-3 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 mb-4">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                            <ScanLine size={16} className="text-gray-600" />
+                        </div>
                         <div>
                             <p className="text-xs font-semibold text-gray-700">Unit dari scan barcode</p>
                             <p className="text-xs text-gray-500 font-mono">{urlSn}</p>
@@ -649,10 +668,10 @@ export default function CreatePaymentPage() {
 
                 {draftRestored && !fromScan && (
                     <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 mb-4">
-                        <div className="flex items-center gap-2">
-                            <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <History size={16} className="text-gray-600" />
+                            </div>
                             <p className="text-xs font-semibold text-gray-700">Draft tersimpan dipulihkan</p>
                         </div>
                         <button type="button" onClick={() => { clearDraft(); window.location.reload(); }}
@@ -752,8 +771,8 @@ export default function CreatePaymentPage() {
                                 if (!watch("customer_name")) { alert("Isi nama customer dulu"); return; }
                                 if (!watch("customer_phone")) { alert("Isi nomor WhatsApp dulu"); return; }
                                 fromScan ? setStep(3) : setStep(2);
-                            }} className={`w-full ${btnPrimary}`}>
-                                Lanjut →
+                            }} className={`w-full ${btnPrimary} inline-flex items-center justify-center gap-1.5`}>
+                                Lanjut <ChevronRight size={16} />
                             </button>
                         </>
                     )}
@@ -763,23 +782,24 @@ export default function CreatePaymentPage() {
                         <>
                             {/* Search SN */}
                             <div>
-                                <label className="text-xs text-gray-500 mb-1.5 block">
-                                    Cari & Tambah Serial Number
+                                <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
+                                    <Laptop size={13} /> Cari & Tambah Serial Number
                                     {selectedUnits.length > 0 && (
-                                        <span className="ml-1.5 text-gray-700 font-semibold">({selectedUnits.length} unit terpilih)</span>
+                                        <span className="text-gray-700 font-semibold">({selectedUnits.length} unit terpilih)</span>
                                     )}
                                 </label>
                                 <div className="relative">
+                                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                                     <input
                                         type="text"
                                         placeholder="Ketik SN unit..."
-                                        className={inputClass}
+                                        className={`${inputClass} pl-10`}
                                         value={snSearch}
                                         onChange={e => { setSnSearch(e.target.value); handleSnSearch(e.target.value); }}
                                     />
                                     {isLoadingUnits && (
                                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                            <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+                                            <Loader2 size={16} className="text-gray-400 animate-spin" />
                                         </div>
                                     )}
                                 </div>
@@ -963,19 +983,20 @@ export default function CreatePaymentPage() {
 
                             {/* ── Aksesori (opsional, tanpa SN) ── */}
                             <div>
-                                <label className="text-xs text-gray-500 mb-1.5 block">
-                                    Aksesori (opsional)
+                                <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
+                                    <Gift size={13} /> Aksesori (opsional)
                                     {selectedAccessories.length > 0 && (
-                                        <span className="ml-1.5 text-gray-700 font-semibold">({selectedAccessories.length} item)</span>
+                                        <span className="text-gray-700 font-semibold">({selectedAccessories.length} item)</span>
                                     )}
                                 </label>
                                 <div className="relative">
-                                    <input type="text" placeholder="Cari aksesori (nama/kategori)..." className={inputClass}
+                                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                    <input type="text" placeholder="Cari aksesori (nama/kategori)..." className={`${inputClass} pl-10`}
                                         value={accSearch}
                                         onChange={e => { setAccSearch(e.target.value); handleAccSearch(e.target.value); }} />
                                     {accLoading && (
                                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                            <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
+                                            <Loader2 size={16} className="text-gray-400 animate-spin" />
                                         </div>
                                     )}
                                 </div>
@@ -1010,8 +1031,8 @@ export default function CreatePaymentPage() {
                                                     <p className="text-xs font-semibold text-gray-800 truncate">{a.name}</p>
                                                     <p className="text-[10px] text-gray-400">Stok tersedia: {a.stock}</p>
                                                 </div>
-                                                <button type="button" onClick={() => removeAccessory(i)} className="text-red-400 hover:text-red-600 flex-shrink-0">
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                <button type="button" onClick={() => removeAccessory(i)} className="w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0">
+                                                    <X size={15} />
                                                 </button>
                                             </div>
 
@@ -1019,10 +1040,10 @@ export default function CreatePaymentPage() {
                                                 {/* Qty */}
                                                 <div className="flex items-center border border-gray-200 rounded-lg bg-white">
                                                     <button type="button" onClick={() => updateAccessory(i, { quantity: Math.max(1, a.quantity - 1) })}
-                                                        className="w-8 h-9 text-gray-500 hover:bg-gray-50">−</button>
+                                                        className="w-8 h-9 flex items-center justify-center text-gray-500 hover:bg-gray-50 rounded-l-lg"><Minus size={13} /></button>
                                                     <span className="w-8 text-center text-sm font-semibold text-gray-800">{a.quantity}</span>
                                                     <button type="button" onClick={() => updateAccessory(i, { quantity: Math.min(a.stock, a.quantity + 1) })}
-                                                        className="w-8 h-9 text-gray-500 hover:bg-gray-50">+</button>
+                                                        className="w-8 h-9 flex items-center justify-center text-gray-500 hover:bg-gray-50 rounded-r-lg"><Plus size={13} /></button>
                                                 </div>
 
                                                 {/* Toggle Bonus */}
@@ -1058,15 +1079,15 @@ export default function CreatePaymentPage() {
                             <input type="text" placeholder="Request Software (opsional)" className={inputClass} {...register("software_request")} />
 
                             <div className="flex gap-2 pt-1">
-                                <button type="button" onClick={() => setStep(1)} className={btnSecondary}>← Kembali</button>
+                                <button type="button" onClick={() => setStep(1)} className={`${btnSecondary} inline-flex items-center justify-center gap-1.5`}><ChevronLeft size={16} /> Kembali</button>
                                 <button type="button" onClick={() => {
                                     if (!selectedUnits.length) { alert("Cari dan pilih minimal 1 unit dulu"); return; }
                                     if (!rawDealPrice) { alert("Masukkan harga deal"); return; }
                                     if (isTradeIn && !tradeInItem) { alert("Isi nama barang tukar"); return; }
                                     if (isTradeIn && !tradeInValue) { alert("Isi nilai barang tukar"); return; }
                                     setStep(3);
-                                }} className={btnPrimary}>
-                                    Lanjut →
+                                }} className={`${btnPrimary} inline-flex items-center justify-center gap-1.5`}>
+                                    Lanjut <ChevronRight size={16} />
                                 </button>
                             </div>
                         </>
@@ -1138,12 +1159,12 @@ export default function CreatePaymentPage() {
                                 <input type="text" placeholder="Alamat pengiriman" className={inputClass} {...register("pickup_location")} />
                             )}
                             <div className="flex gap-2 pt-1">
-                                <button type="button" onClick={goBack3} className={btnSecondary}>← Kembali</button>
+                                <button type="button" onClick={goBack3} className={`${btnSecondary} inline-flex items-center justify-center gap-1.5`}><ChevronLeft size={16} /> Kembali</button>
                                 <button type="button" onClick={() => {
                                     if (fromScan && !rawDealPrice) { alert("Masukkan harga deal dulu"); return; }
                                     setStep(4);
-                                }} className={btnPrimary}>
-                                    Lanjut →
+                                }} className={`${btnPrimary} inline-flex items-center justify-center gap-1.5`}>
+                                    Lanjut <ChevronRight size={16} />
                                 </button>
                             </div>
                         </>
@@ -1298,7 +1319,7 @@ export default function CreatePaymentPage() {
 
                             {/* Foto */}
                             <div>
-                                <label className="text-xs text-gray-500 mb-1.5 block">Foto Bukti Pembayaran *</label>
+                                <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5"><Camera size={14} /> Foto Bukti Pembayaran *</label>
                                 <input type="file" accept="image/*" capture="environment"
                                     className="border border-gray-200 rounded-xl p-3 text-sm w-full bg-white file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 transition"
                                     onChange={handlePhotoChange}
@@ -1307,24 +1328,30 @@ export default function CreatePaymentPage() {
                             </div>
 
                             {/* GPS */}
-                            <div className="border border-gray-200 rounded-xl p-4 flex justify-between items-center">
-                                <div>
-                                    <p className="text-sm font-medium text-gray-800">GPS Lokasi</p>
-                                    <p className="text-xs text-gray-400 mt-0.5">
-                                        {latitude ? <span className="inline-flex items-center gap-1"><Check size={12} /> Koordinat berhasil diambil</span> : "Wajib diambil sebelum simpan"}
-                                    </p>
+                            <div className="border border-gray-200 rounded-xl p-4 flex justify-between items-center gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                        <MapPin size={16} className="text-gray-600" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-gray-800">GPS Lokasi</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">
+                                            {latitude ? <span className="inline-flex items-center gap-1"><Check size={12} /> Koordinat berhasil diambil</span> : "Wajib diambil sebelum simpan"}
+                                        </p>
+                                    </div>
                                 </div>
                                 <button type="button" onClick={getLocation}
-                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition active:scale-95 ${latitude ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-gray-700 text-white hover:bg-gray-800"
+                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition active:scale-95 flex-shrink-0 inline-flex items-center gap-1.5 ${latitude ? "bg-gray-100 text-gray-700 border border-gray-200" : "bg-gray-700 text-white hover:bg-gray-800"
                                         }`}>
-                                    {gpsLoading ? "..." : latitude ? <span className="inline-flex items-center gap-1"><Check size={14} /> Diambil</span> : "Ambil GPS"}
+                                    {gpsLoading ? <Loader2 size={14} className="animate-spin" /> : latitude ? <Check size={14} /> : <MapPin size={14} />}
+                                    {gpsLoading ? "Mencari..." : latitude ? "Diambil" : "Ambil GPS"}
                                 </button>
                             </div>
 
                             <input type="text" placeholder="Catatan (opsional)" className={inputClass} {...register("notes")} />
 
                             <div className="flex gap-2 pt-1">
-                                <button type="button" onClick={() => setStep(3)} className={btnSecondary}>← Kembali</button>
+                                <button type="button" onClick={() => setStep(3)} className={`${btnSecondary} inline-flex items-center justify-center gap-1.5`}><ChevronLeft size={16} /> Kembali</button>
                                 <button
                                     type="button"
                                     disabled={submitting}
@@ -1333,9 +1360,9 @@ export default function CreatePaymentPage() {
                                         setValue("amount", rawDealPrice);
                                         handleSubmit(onSubmit)();
                                     }}
-                                    className={`${btnPrimary} disabled:opacity-50`}
+                                    className={`${btnPrimary} disabled:opacity-50 inline-flex items-center justify-center gap-1.5`}
                                 >
-                                    {submitting ? "Menyimpan..." : "Simpan Transaksi"}
+                                    {submitting ? <><Loader2 size={16} className="animate-spin" /> Menyimpan...</> : <><Save size={16} /> Simpan Transaksi</>}
                                 </button>
                             </div>
                         </>
@@ -1351,9 +1378,7 @@ export default function CreatePaymentPage() {
                             <div className="bg-gray-700 px-5 py-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-9 h-9 bg-gray-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
+                                        <CheckCircle2 size={20} className="text-white" />
                                     </div>
                                     <div>
                                         <p className="font-bold text-white text-sm">Konfirmasi Transaksi</p>
@@ -1419,9 +1444,7 @@ export default function CreatePaymentPage() {
                                 </div>
 
                                 <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
-                                    <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
+                                    <AlertTriangle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
                                     <p className="text-xs text-amber-700">
                                         Transaksi yang sudah disimpan <span className="font-semibold">tidak dapat dibatalkan</span>.
                                     </p>
@@ -1436,9 +1459,9 @@ export default function CreatePaymentPage() {
                                 <button type="button" onClick={handleConfirmedSubmit} disabled={submitting}
                                     className="flex-1 h-11 bg-gray-700 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm">
                                     {submitting ? (
-                                        <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
+                                        <><Loader2 size={16} className="animate-spin" />Menyimpan...</>
                                     ) : (
-                                        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Ya, Simpan</>
+                                        <><Check size={16} />Ya, Simpan</>
                                     )}
                                 </button>
                             </div>
