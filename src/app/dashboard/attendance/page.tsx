@@ -9,11 +9,7 @@ import { MonthlyOffModal } from "@/components/attendance/onthlyOffModal";
 import { canManageAttendance, DIVISION_MAP, isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
 import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
-import {
-    Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Minus, Pencil, Trash2,
-    ArrowRightLeft, ChevronRight, ChevronLeft, CheckCircle2, Wrench, Inbox, CalendarDays, GraduationCap, Briefcase,
-    RefreshCw, Users, Info, AlertTriangle, MapPin, Send, Save, Wallet, History as HistoryIcon,
-} from "lucide-react";
+import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Wrench, Inbox, CalendarDays, GraduationCap, Briefcase, Trophy } from "lucide-react";
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
 
 function isPKLRole(role?: string): boolean {
@@ -390,7 +386,7 @@ function computeMonthlySalary(
 
 // ─── Modal Shell ──────────────────────────────────────────────────────────────
 function ModalShell({ onClose, headerColor, title, subtitle, children, footer, wide }: {
-    onClose: () => void; headerColor: string; title: React.ReactNode; subtitle?: string;
+    onClose: () => void; headerColor: string; title: string; subtitle?: string;
     children: React.ReactNode; footer: React.ReactNode; wide?: boolean;
 }) {
     return (
@@ -399,11 +395,11 @@ function ModalShell({ onClose, headerColor, title, subtitle, children, footer, w
             <div className={`relative bg-white w-full ${wide ? "sm:max-w-3xl" : "sm:max-w-2xl"} rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-scaleIn`}>
                 <div className={`${headerColor} px-6 py-5 flex items-start justify-between flex-shrink-0`}>
                     <div>
-                        <p className="font-bold text-white text-base tracking-tight flex items-center gap-2">{title}</p>
+                        <p className="font-bold text-white text-base tracking-tight">{title}</p>
                         {subtitle && <p className="text-xs text-white/70 mt-1">{subtitle}</p>}
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all duration-200">
-                        <X className="w-4 h-4" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
                 {children}
@@ -552,20 +548,20 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
     return (
         <ModalShell onClose={onClose}
             headerColor={isEdit ? "bg-gradient-to-r from-blue-600 to-blue-700" : "bg-gradient-to-r from-[#1a1a2e] to-[#16213e]"}
-            title={isEdit ? (<><Pencil className="w-4 h-4" />Edit Absen Manual</>) : (<><Plus className="w-4 h-4" />Tambah Absen Manual</>)}
+            title={isEdit ? "Edit Absen Manual" : " Tambah Absen Manual"}
             subtitle={isEdit ? `${editData?.users?.name ?? "—"} · ${editData?.attendance_date}` : "Input data kehadiran yang belum tercatat atau koreksi absen"}
             footer={
                 <div className="flex gap-3">
                     {isEdit && (
                         <button onClick={deleteRecord} disabled={deleting}
                             className="h-11 px-5 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-semibold hover:bg-red-100 transition-all duration-200 disabled:opacity-50 flex items-center gap-2">
-                            {deleting ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" /> : <><Trash2 className="w-4 h-4" />Hapus</>}
+                            {deleting ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" /> : "Hapus"}
                         </button>
                     )}
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all duration-200">Batal</button>
                     <button onClick={save} disabled={saving}
                         className={`flex-1 h-11 ${isEdit ? "bg-gradient-to-r from-blue-600 to-blue-700" : "bg-gradient-to-r from-[#1a1a2e] to-[#16213e]"} text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2`}>
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : <><Save className="w-4 h-4" />Simpan</>}
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : " Simpan"}
                     </button>
                 </div>
             }>
@@ -631,7 +627,7 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                             return (
                                 <button key={s} type="button" onClick={() => setForm(f => ({ ...f, status: s as any }))}
                                     className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-bold border transition-all duration-200 ${sel ? `${cfg.bg} ${cfg.color} ${cfg.border} shadow-md scale-[1.04]` : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50 hover:scale-[1.02]"}`}>
-                                    <span className="text-base">{renderStatusEmoji(cfg.emoji)}</span>
+                                    <span className="text-base">{cfg.emoji}</span>
                                     <span>{cfg.label}</span>
                                 </button>
                             );
@@ -666,7 +662,7 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                                 </p>
                             </div>
                             <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-full border ${MANUAL_STATUS_LABELS[form.status].bg} ${MANUAL_STATUS_LABELS[form.status].color} ${MANUAL_STATUS_LABELS[form.status].border}`}>
-                                {renderStatusEmoji(MANUAL_STATUS_LABELS[form.status].emoji)} {MANUAL_STATUS_LABELS[form.status].label}
+                                {MANUAL_STATUS_LABELS[form.status].emoji} {MANUAL_STATUS_LABELS[form.status].label}
                             </span>
                         </div>
                     </div>
@@ -718,21 +714,20 @@ function SalaryModal({ users, salaries, onClose, onSaved }: {
 
     return (
         <ModalShell onClose={onClose} headerColor="bg-gradient-to-r from-emerald-600 to-green-700"
-            title={<><Wallet className="w-4 h-4" />Kelola Gaji Karyawan</>} subtitle="Atur tipe dan nominal gaji per karyawan"
+            title=" Kelola Gaji Karyawan" subtitle="Atur tipe dan nominal gaji per karyawan"
             footer={
                 <div className="flex gap-3">
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
                     <button onClick={save} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : <><Save className="w-4 h-4" />Simpan Semua</>}
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : " Simpan Semua"}
                     </button>
                 </div>
             }>
             <div className="overflow-y-auto flex-1 px-6 py-4">
                 {error && <div className="mb-3 bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-2.5 rounded-xl">{error}</div>}
-                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 text-xs text-amber-700 flex items-start gap-2">
-                    <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                    <span>Gaji <strong>Tetap</strong> = nominal penuh, tidak tergantung absensi.
-                        Gaji <strong>Persentase Absen</strong> = % kehadiran × gaji pokok.</span>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 text-xs text-amber-700">
+                    <strong>ℹ</strong> Gaji <strong>Tetap</strong> = nominal penuh, tidak tergantung absensi.
+                    Gaji <strong>Persentase Absen</strong> = % kehadiran × gaji pokok.
                 </div>
                 <div className="space-y-3">
                     {users.map(u => (
@@ -741,7 +736,7 @@ function SalaryModal({ users, salaries, onClose, onSaved }: {
                                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[11px] font-black shadow-md flex-shrink-0">{initials(u.name)}</div>
                                 <div><p className="text-sm font-bold text-gray-800">{u.name}</p><p className="text-[10px] text-gray-400">{u.role.replace(/_/g, " ")}</p></div>
                                 {local[u.id]?.salary_type === "FIXED" && (
-                                    <span className="ml-auto text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />Tetap</span>
+                                    <span className="ml-auto text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full"> Tetap</span>
                                 )}
                                 {local[u.id]?.salary_type === "PERCENTAGE" && (
                                     <span className="ml-auto text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-full">% Absen</span>
@@ -752,7 +747,7 @@ function SalaryModal({ users, salaries, onClose, onSaved }: {
                                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1 block">Tipe Gaji</label>
                                     <select value={local[u.id]?.salary_type ?? "FIXED"} onChange={e => setLocal(p => ({ ...p, [u.id]: { ...p[u.id], salary_type: e.target.value as any } }))}
                                         className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none transition-all">
-                                        <option value="FIXED">Tetap</option>
+                                        <option value="FIXED"> Tetap</option>
                                         <option value="PERCENTAGE">Persentase Absen</option>
                                     </select>
                                 </div>
@@ -834,25 +829,27 @@ function EditAllowanceModal({
             <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
                 <div className="bg-gradient-to-r from-purple-600 to-violet-700 px-6 py-5 flex items-start justify-between">
                     <div>
-                        <p className="font-bold text-white text-base flex items-center gap-2"><Wallet className="w-4 h-4" />Tunjangan & Potongan</p>
+                        <p className="font-bold text-white text-base">Tunjangan & Potongan</p>
                         <p className="text-xs text-white/70 mt-1">{userName}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition">
-                        <X className="w-4 h-4" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                     </button>
                 </div>
 
                 <div className="px-6 py-5 space-y-6 overflow-y-auto max-h-[70vh]">
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2">
-                            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />{error}
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">
+                            {error}
                         </div>
                     )}
 
                     {/* TUNJANGAN SECTION */}
                     <div>
-                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-4 flex items-center gap-1.5">
-                            <Plus className="w-3.5 h-3.5" />Tunjangan (Disesuaikan % Kehadiran)
+                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-4">
+                            Tunjangan (Disesuaikan % Kehadiran)
                         </p>
                         <div className="space-y-3">
                             {/* Tunjangan Istri */}
@@ -907,8 +904,8 @@ function EditAllowanceModal({
 
                     {/* POTONGAN SECTION */}
                     <div>
-                        <p className="text-xs font-bold text-red-600 uppercase tracking-wide mb-4 flex items-center gap-1.5">
-                            <Minus className="w-3.5 h-3.5" />Potongan (Langsung Potong, Tidak Disesuaikan %)
+                        <p className="text-xs font-bold text-red-600 uppercase tracking-wide mb-4">
+                            Potongan (Langsung Potong, Tidak Disesuaikan %)
                         </p>
                         <div className="space-y-3">
                             {/* Cicilan Kasbon */}
@@ -961,7 +958,7 @@ function EditAllowanceModal({
 
                     {/* SUMMARY */}
                     <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-2xl p-4">
-                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-3 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" />Ringkasan</p>
+                        <p className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-3"> Ringkasan</p>
                         <div className="space-y-1.5 text-sm">
                             <div className="flex justify-between text-gray-600">
                                 <span>Tunjangan Istri (×%)</span>
@@ -995,7 +992,7 @@ function EditAllowanceModal({
                                 Menyimpan...
                             </>
                         ) : (
-                            <><Save className="w-4 h-4" />Simpan</>
+                            " Simpan"
                         )}
                     </button>
                 </div>
@@ -1086,7 +1083,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
         <ModalShell
             onClose={onClose}
             headerColor="bg-gradient-to-r from-cyan-600 to-teal-700"
-            title={<><Umbrella className="w-4 h-4" />Kelola Cuti Karyawan</>}
+            title="Kelola Cuti Karyawan"
             subtitle={`${MONTH_NAMES[calMonth]} ${calYear} · ${users.length} karyawan`}
             wide
             footer={
@@ -1099,8 +1096,8 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                 {/* ── Info banner ── */}
                 <div className="px-6 pt-4 pb-2">
                     <div className="bg-cyan-50 border border-cyan-200 rounded-xl px-4 py-2.5 text-[11px] text-cyan-700 flex items-center gap-2">
-                        <Info className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span>Admin bisa tambah/kurangi cuti meski saldo habis. Klik <Plus className="w-3 h-3 inline align-text-bottom" /> untuk tambah, <Minus className="w-3 h-3 inline align-text-bottom" /> untuk kurangi/hapus.</span>
+                        <span>ℹ</span>
+                        <span>Admin bisa tambah/kurangi cuti meski saldo habis. Klik <strong></strong> untuk tambah, <strong></strong> untuk kurangi/hapus.</span>
                     </div>
                 </div>
 
@@ -1160,12 +1157,12 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                                                             disabled={settingQuota || manualQuota === ""}
                                                             className="w-8 h-8 flex items-center justify-center bg-violet-600 text-white rounded-lg text-[10px] font-bold hover:bg-violet-700 disabled:opacity-50 transition-all"
                                                         >
-                                                            {settingQuota ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                                            {settingQuota ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : ""}
                                                         </button>
                                                         <button
                                                             onClick={() => { setQuotaUid(null); setManualQuota(""); }}
                                                             className="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-500 rounded-lg text-sm font-bold hover:bg-gray-200 transition-all"
-                                                        ><X className="w-3.5 h-3.5" /></button>
+                                                        >×</button>
                                                     </div>
                                                 ) : (
                                                     <button
@@ -1205,7 +1202,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                                                                     className="ml-0.5 w-3.5 h-3.5 flex items-center justify-center rounded text-cyan-500 hover:text-red-600 hover:bg-red-100 transition-all"
                                                                     title="Hapus cuti ini"
                                                                 >
-                                                                    {deleting === r.id ? <div className="w-2.5 h-2.5 border border-red-300 border-t-red-500 rounded-full animate-spin" /> : <X className="w-2.5 h-2.5" />}
+                                                                    {deleting === r.id ? <div className="w-2.5 h-2.5 border border-red-300 border-t-red-500 rounded-full animate-spin" /> : "×"}
                                                                 </button>
                                                             </span>
                                                         ))}
@@ -1227,7 +1224,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                                                         className={`w-8 h-8 flex items-center justify-center rounded-xl text-sm font-black border transition-all ${isExpanded ? "bg-cyan-600 text-white border-cyan-600" : "bg-cyan-100 text-cyan-700 border-cyan-200 hover:bg-cyan-200 hover:scale-105"}`}
                                                         title="Tambah cuti"
                                                     >
-                                                        {isExpanded ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                                        {isExpanded ? "−" : "＋"}
                                                     </button>
                                                 </div>
                                             </td>
@@ -1266,7 +1263,7 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                                                                 disabled={saving || !addDate}
                                                                 className="h-9 px-4 bg-gradient-to-r from-cyan-600 to-teal-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
                                                             >
-                                                                {saving ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : <><Save className="w-3.5 h-3.5" />Simpan Cuti</>}
+                                                                {saving ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "Simpan Cuti"}
                                                             </button>
                                                             <button
                                                                 onClick={() => { setExpandedUid(null); setAddDate(""); setAddReason(""); setError(""); }}
@@ -1276,11 +1273,11 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                                                             </button>
                                                         </div>
                                                         {error && (
-                                                            <p className="w-full text-[11px] text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{error}</p>
+                                                            <p className="w-full text-[11px] text-red-500 flex items-center gap-1"> {error}</p>
                                                         )}
                                                         {available <= 0 && (
                                                             <p className="w-full text-[11px] text-amber-500 flex items-center gap-1">
-                                                                <Info className="w-3 h-3" />Saldo habis — admin tetap bisa tambah cuti
+                                                                Saldo habis — admin tetap bisa tambah cuti
                                                             </p>
                                                         )}
                                                     </div>
@@ -1303,8 +1300,8 @@ function LeaveModal({ users, leaveData, calYear, calMonth, onClose, onSaved }: {
                 {/* ── Footer legend ── */}
                 <div className="px-6 pb-4 flex items-center gap-4 flex-wrap text-[10px] text-gray-400">
                     <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center text-violet-700 font-black text-[9px]">1</span>Kuota — klik untuk edit</span>
-                    <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-lg bg-cyan-100 border border-cyan-200 flex items-center justify-center text-cyan-700"><Plus className="w-3 h-3" /></span>Tambah cuti</span>
-                    <span className="flex items-center gap-1.5"><X className="w-3 h-3" />tanggal → hover untuk hapus</span>
+                    <span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-lg bg-cyan-100 border border-cyan-200 flex items-center justify-center text-cyan-700 font-black text-[10px]">＋</span>Tambah cuti</span>
+                    <span className="flex items-center gap-1.5">tanggal → hover × untuk hapus</span>
                 </div>
             </div>
         </ModalShell>
@@ -1346,12 +1343,12 @@ function DayOffModal({ users, dayOffs, onClose, onSaved }: {
     };
     const shown = filter ? users.filter(u => u.id === filter) : users;
     return (
-        <ModalShell onClose={onClose} headerColor="bg-gradient-to-r from-[#1a1a2e] to-[#16213e]" title={<><Umbrella className="w-4 h-4" />Libur Mingguan Berulang</>} subtitle="Pilih hari libur tetap per karyawan"
+        <ModalShell onClose={onClose} headerColor="bg-gradient-to-r from-[#1a1a2e] to-[#16213e]" title=" Libur Mingguan Berulang" subtitle="Pilih hari libur tetap per karyawan"
             footer={
                 <div className="flex gap-3">
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
                     <button onClick={save} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : <><Save className="w-4 h-4" />Simpan</>}
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : " Simpan"}
                     </button>
                 </div>
             }>
@@ -1516,7 +1513,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
     return (
         <div className={`bg-gradient-to-br ${cfg.gradient} rounded-2xl border border-gray-100 shadow-sm p-5`}>
             <div className="flex items-center gap-4">
-                <div className={`w-14 h-14 rounded-2xl ${cfg.iconBg} flex items-center justify-center flex-shrink-0 shadow-sm`}>{cfg.icon}</div>
+                <div className={`w-14 h-14 rounded-2xl ${cfg.iconBg} flex items-center justify-center flex-shrink-0 shadow-sm`}><span className="text-2xl">{cfg.icon}</span></div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1"><span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border ${cfg.badge}`}><span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.badgeText}</span></div>
                     <p className="font-bold text-gray-800 text-sm">{cfg.title}</p>
@@ -1524,7 +1521,7 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <button onClick={onRefresh} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:text-gray-600 transition-all shadow-sm" title="Refresh">
-                        <RefreshCw className="w-3.5 h-3.5" />
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     </button>
                     {cfg.showBtn && <button onClick={cfg.btnAction} className={`${cfg.btnColor} text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all whitespace-nowrap`}>{cfg.btnLabel}</button>}
                 </div>
@@ -1547,13 +1544,13 @@ function MonthSelector({ onSelect }: { onSelect: (year: number, month: number) =
             </div>
             <div className="flex items-center justify-center gap-2.5 mb-8">
                 <button onClick={() => setYear(y => y - 1)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all shadow-sm active:scale-95">
-                    <ChevronLeft className="w-4 h-4" />
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <div className="flex gap-2 flex-wrap justify-center">{years.map(y => (
                     <button key={y} onClick={() => setYear(y)} className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 border ${year === y ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white border-[#1a1a2e] shadow-md scale-105" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:scale-105"}`}>{y}</button>
                 ))}</div>
                 <button onClick={() => setYear(y => y + 1)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all shadow-sm active:scale-95">
-                    <ChevronRight className="w-4 h-4" />
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </button>
             </div>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
@@ -1619,16 +1616,18 @@ function InlineSalaryEditModal({ userId, userName, currentSalary, onClose, onSav
             <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
                 <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
                     <div>
-                        <p className="font-bold text-white text-base flex items-center gap-2"><Wallet className="w-4 h-4" />Edit Gaji</p>
+                        <p className="font-bold text-white text-base"> Edit Gaji</p>
                         <p className="text-xs text-white/70 mt-1">{userName}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
-                        <X className="w-4 h-4" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                     </button>
                 </div>
                 <div className="px-6 py-5 space-y-4">
                     {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />{error}</div>
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl"> {error}</div>
                     )}
                     <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 block">Tipe Gaji</label>
@@ -1672,7 +1671,7 @@ function InlineSalaryEditModal({ userId, userName, currentSalary, onClose, onSav
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
                     <button onClick={save} disabled={saving || !baseSalary}
                         className="flex-1 h-11 bg-gradient-to-r from-emerald-600 to-green-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : <><Save className="w-4 h-4" />Simpan</>}
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : " Simpan"}
                     </button>
                 </div>
             </div>
@@ -1690,18 +1689,18 @@ function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
             <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
                 <div className="bg-gradient-to-r from-red-600 to-rose-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
                     <div>
-                        <p className="font-bold text-white text-base flex items-center gap-2"><AlertTriangle className="w-4 h-4" />Detail Ketidakhadiran</p>
+                        <p className="font-bold text-white text-base"> Detail Ketidakhadiran</p>
                         <p className="text-xs text-white/70 mt-1">{name} · {monthLabel}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-                        <X className="w-4 h-4" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
                 <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
                     <div>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Hari tidak hadir ({absences.length})</p>
                         {absences.length === 0 ? (
-                            <p className="text-sm text-gray-400">Tidak ada ketidakhadiran</p>
+                            <p className="text-sm text-gray-400">Tidak ada ketidakhadiran </p>
                         ) : (
                             <div className="space-y-2">
                                 {absences.map(a => {
@@ -1713,7 +1712,7 @@ function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
                                                 {a.note && <p className="text-[11px] text-gray-400 truncate">{a.note}</p>}
                                             </div>
                                             <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0 ${cfg.bg} ${cfg.color} ${cfg.border}`}>
-                                                {renderStatusEmoji(cfg.emoji)} {cfg.label}
+                                                {cfg.emoji} {cfg.label}
                                             </span>
                                         </div>
                                     );
@@ -1728,7 +1727,7 @@ function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
                             <div className="flex flex-wrap gap-1.5">
                                 {offDates.map(d => (
                                     <span key={d} className="inline-flex items-center gap-1 text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-200 px-2 py-1 rounded-lg">
-                                        <Umbrella className="w-3 h-3" />{new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                        {new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
                                     </span>
                                 ))}
                             </div>
@@ -1752,9 +1751,7 @@ function AttendanceSummaryDetailModal({ detail, onClose }: {
     const headerColor = isPresent
         ? "bg-gradient-to-r from-emerald-600 to-green-700"
         : "bg-gradient-to-r from-amber-500 to-orange-600";
-    const title = isPresent
-        ? (<><CheckCircle2 className="w-4 h-4" />Detail Hari Tepat Waktu</>)
-        : (<><Clock className="w-4 h-4" />Detail Hari Terlambat</>);
+    const title = isPresent ? "Detail Hari Tepat Waktu" : " Detail Hari Terlambat";
 
     const fmt = (d: string) =>
         new Date(d + "T12:00:00").toLocaleDateString("id-ID", {
@@ -1767,11 +1764,13 @@ function AttendanceSummaryDetailModal({ detail, onClose }: {
             <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
                 <div className={`${headerColor} px-6 py-5 flex items-start justify-between flex-shrink-0`}>
                     <div>
-                        <p className="font-bold text-white text-base flex items-center gap-2">{title}</p>
+                        <p className="font-bold text-white text-base">{title}</p>
                         <p className="text-xs text-white/70 mt-1">{detail.name} · {detail.monthLabel}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-                        <X className="w-4 h-4" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                     </button>
                 </div>
 
@@ -1793,11 +1792,11 @@ function AttendanceSummaryDetailModal({ detail, onClose }: {
                                 <div className="min-w-0">
                                     <p className="text-sm font-bold text-gray-800">{fmt(item.date)}</p>
                                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                        <span className="font-mono text-[11px] font-bold text-gray-600 inline-flex items-center gap-1">
-                                            <Clock className="w-3 h-3 text-gray-400" />{item.checkInTime}
+                                        <span className="font-mono text-[11px] font-bold text-gray-600">
+                                            {item.checkInTime}
                                         </span>
                                         {item.method === "MANUAL" && (
-                                            <span className="text-[10px] text-blue-600 font-bold inline-flex items-center gap-0.5"><Pencil className="w-3 h-3" />Manual</span>
+                                            <span className="text-[10px] text-blue-600 font-bold"> Manual</span>
                                         )}
                                         {item.manualCreatedBy && (
                                             <span className="text-[10px] text-violet-500 font-semibold">
@@ -1924,7 +1923,7 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                             className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-blue-100 text-blue-700 border-blue-200"
                             title={`Dikirim: ${sentDate}`}
                         >
-                            <Send className="w-3 h-3" />Terkirim {sentDate}
+                            Terkirim {sentDate}
                         </span>
                     )}
                 </div>
@@ -1937,16 +1936,16 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                         rel="noopener noreferrer"
                         className="px-3 py-1.5 bg-gray-800 text-white text-[10px] font-bold rounded-lg hover:bg-gray-700 transition flex items-center gap-1"
                     >
-                        <FileText className="w-3 h-3" />PDF
+                        PDF
                     </a>
 
                     {slip.status === "DRAFT" && (
                         <button
                             onClick={handleFinalize}
                             disabled={finalizing}
-                            className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50 flex items-center gap-1"
+                            className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50"
                         >
-                            {finalizing ? "..." : <><CheckCircle2 className="w-3 h-3" />Finalisasi</>}
+                            {finalizing ? "..." : "Finalisasi"}
                         </button>
                     )}
 
@@ -1962,7 +1961,7 @@ function SalarySlipCard({ slip, onFinalize, onRefresh }: {
                     >
                         {sending
                             ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengirim...</>
-                            : alreadySent ? <><CheckCircle2 className="w-3 h-3" />Terkirim</> : <><Send className="w-3 h-3" />Kirim</>
+                            : alreadySent ? "Terkirim" : "Kirim"
                         }
                     </button>
                 </div>
@@ -2131,7 +2130,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
         <ModalShell
             onClose={onClose}
             headerColor="bg-gradient-to-r from-violet-600 to-purple-700"
-            title={<><ArrowRightLeft className="w-4 h-4" />Tukar Libur</>}
+            title="Tukar Libur"
             subtitle="Ganti hari libur dengan hari kerja lain dalam bulan ini"
             footer={
                 <div className="flex gap-3">
@@ -2145,7 +2144,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                     >
                         {saving
                             ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
-                            : <><Save className="w-4 h-4" />Simpan Tukar Libur</>
+                            : "Simpan Tukar Libur"
                         }
                     </button>
                 </div>
@@ -2160,7 +2159,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
 
                 {/* Info box */}
                 <div className="bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 text-xs text-violet-700">
-                    <p className="font-bold mb-1 flex items-center gap-1.5"><Info className="w-4 h-4 flex-shrink-0" />Cara kerja Tukar Libur:</p>
+                    <p className="font-bold mb-1"><span className="inline-flex mr-1 items-center justify-center w-4 h-4 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold">i</span> Cara kerja Tukar Libur:</p>
                     <ul className="space-y-1 text-violet-600">
                         <li>• <strong>Tanggal Diganti Libur</strong>: hari yang harusnya masuk, tapi karyawan izin/libur</li>
                         <li>• <strong>Tanggal Masuk Pengganti</strong>: hari libur mingguan yang akan dipakai sebagai ganti masuk</li>
@@ -2212,7 +2211,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                             {offDate && (
                                 <p className={`text-[10px] mt-1 font-semibold ${isDayOff(offDate) ? "text-red-500" : "text-emerald-600"}`}>
                                     {new Date(offDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long" })}
-                                    {isDayOff(offDate) ? " Ini hari libur!" : " Hari kerja"}
+                                    {isDayOff(offDate) ? " Ini hari libur!" : "Hari kerja"}
                                 </p>
                             )}
                             <p className="text-[9px] text-gray-400 mt-0.5">Hari yang harusnya masuk → jadi libur</p>
@@ -2234,7 +2233,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                             {workDate && (
                                 <p className={`text-[10px] mt-1 font-semibold ${isDayOff(workDate) ? "text-emerald-600" : "text-amber-500"}`}>
                                     {new Date(workDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long" })}
-                                    {isDayOff(workDate) ? " Hari libur (bisa dipakai)" : " Ini bukan hari libur!"}
+                                    {isDayOff(workDate) ? "Hari libur (bisa dipakai)" : " Ini bukan hari libur!"}
                                 </p>
                             )}
                             <p className="text-[9px] text-gray-400 mt-0.5">Hari libur mingguan → jadi masuk</p>
@@ -2255,7 +2254,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                                         {new Date(offDate + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long" })}
                                     </p>
                                 </div>
-                                <ArrowRightLeft className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                                <span className="text-gray-400 font-bold text-lg">⇄</span>
                                 <div className="flex-1 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-center">
                                     <p className="text-[10px] text-emerald-600 font-bold">MASUK</p>
                                     <p className="font-bold text-gray-800 text-xs mt-0.5">
@@ -2303,7 +2302,7 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                                                 <span className="bg-red-100 text-red-600 border border-red-200 px-2.5 py-1 rounded-lg font-bold">
                                                     {new Date(off.off_date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}
                                                 </span>
-                                                <ArrowRightLeft className="w-3.5 h-3.5 text-gray-400" />
+                                                <span className="text-gray-400 font-bold">→</span>
                                                 <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
                                                     {new Date(work.work_date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" })}
                                                 </span>
@@ -2315,11 +2314,11 @@ function SwapDayOffModal({ users, dayOffs, allDateOffs, allDateWorks, calYear, c
                                         <button
                                             onClick={() => deleteSwap(off, work)}
                                             disabled={deleting === key}
-                                            className="w-8 h-8 flex items-center justify-center rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all flex-shrink-0"
+                                            className="w-8 h-8 flex items-center justify-center rounded-xl text-red-400 hover:bg-red-50 hover:text-red-600 transition-all font-bold text-lg flex-shrink-0"
                                         >
                                             {deleting === key
                                                 ? <div className="w-4 h-4 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
-                                                : <X className="w-4 h-4" />
+                                                : "×"
                                             }
                                         </button>
                                     </div>
@@ -2357,7 +2356,6 @@ function AbsentUsersModal({
     const headerGradient = isPKL ? "from-amber-500 to-yellow-600" : "from-orange-500 to-amber-600";
     const avatarGradient = isPKL ? "from-amber-400 to-yellow-500" : "from-orange-400 to-amber-500";
     const modeLabel = isPKL ? "PKL" : "karyawan";
-    const HeaderIcon = isPKL ? GraduationCap : AlertTriangle;
     const STATUS_CONFIG = {
         WITHIN_TIME: {
             label: "Belum Buka Absen",
@@ -2421,11 +2419,13 @@ function AbsentUsersModal({
                 {/* Header */}
                 <div className={`bg-gradient-to-r ${headerGradient} px-6 py-5 flex items-start justify-between flex-shrink-0`}>
                     <div>
-                        <p className="font-bold text-white text-base flex items-center gap-2"><HeaderIcon className="w-4 h-4" />{isPKL ? "PKL Belum Absen" : "Karyawan Belum Absen"}</p>
+                        <p className="font-bold text-white text-base">{isPKL ? "PKL Belum Absen" : "Karyawan Belum Absen"}</p>
                         <p className="text-xs text-white/70 mt-1">{dateLabel} · {absentUsers.length} {modeLabel}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
-                        <X className="w-4 h-4" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                     </button>
                 </div>
 
@@ -2466,9 +2466,9 @@ function AbsentUsersModal({
                                             {isAdmin && (
                                                 <button
                                                     onClick={() => { onAbsenManual(u.userId); onClose(); }}
-                                                    className="flex-shrink-0 text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all flex items-center gap-1"
+                                                    className="flex-shrink-0 text-[10px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all"
                                                 >
-                                                    <Pencil className="w-3 h-3" />Absen
+                                                    Absen
                                                 </button>
                                             )}
                                         </div>
@@ -2505,7 +2505,7 @@ function AbsentSummaryBanner({ list, mode, onClick }: {
     const subColor = isPKL ? "text-amber-500" : "text-orange-500";
     const avatarGrad = isPKL ? "from-amber-400 to-yellow-500" : "from-orange-400 to-amber-500";
     const arrowColor = isPKL ? "text-amber-400 group-hover:text-amber-600" : "text-orange-400 group-hover:text-orange-600";
-    const IconComp = isPKL ? GraduationCap : AlertTriangle;
+    const icon = isPKL ? "graduation-cap" : "alert";
     const label = isPKL ? "PKL" : "Karyawan";
 
     const confirmed = list.filter(u => u.attendanceStatus === "ABSENT_CONFIRMED").length;
@@ -2524,7 +2524,7 @@ function AbsentSummaryBanner({ list, mode, onClick }: {
                 className={`w-full flex items-center justify-between gap-3 px-4 py-3 border rounded-xl transition-all group ${btnBg}`}
             >
                 <div className="flex items-center gap-3">
-                    <IconComp className={`w-5 h-5 flex-shrink-0 ${titleColor}`} />
+                    <span className="text-lg">{icon}</span>
                     <div className="text-left">
                         <p className={`text-xs font-bold ${titleColor}`}>
                             {list.length} {label} Belum Absen
@@ -2549,7 +2549,9 @@ function AbsentSummaryBanner({ list, mode, onClick }: {
                             </div>
                         )}
                     </div>
-                    <ChevronRight className={`w-4 h-4 transition-colors ${arrowColor}`} />
+                    <svg className={`w-4 h-4 transition-colors ${arrowColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                 </div>
             </button>
         </div>
@@ -2566,7 +2568,7 @@ function ShiftScheduleModal({ users, schedules, calYear, calMonth, onClose, onSa
         <ModalShell
             onClose={onClose}
             headerColor="bg-gradient-to-r from-violet-600 to-purple-700"
-            title={<><Clock className="w-4 h-4" />Jadwal Shift per Tanggal</>}
+            title="Jadwal Shift per Tanggal"
             subtitle={`${MONTH_NAMES[calMonth]} ${calYear} · ${users.length} karyawan · ${schedules.length} jadwal aktif`}
             wide
             footer={
@@ -3636,7 +3638,7 @@ export default function AttendanceDashboardPage() {
                             }}
                             className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all shadow-sm active:scale-95"
                         >
-                            <ChevronLeft className="w-4 h-4" />
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                         </button>
                         <div>
                             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 flex-wrap">
@@ -3648,13 +3650,19 @@ export default function AttendanceDashboardPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                            onClick={() => router.push("/dashboard/attendance/leaderboard")}
+                            className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all active:scale-95"
+                        >
+                            <Trophy className="w-3.5 h-3.5" /> Leaderboard
+                        </button>
                         {isAdmin && (
                             <button
                                 onClick={() => openAddManual()}
                                 disabled={usersLoading}
                                 className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
                             >
-                                {usersLoading ? "Loading..." : <><Pencil className="w-3.5 h-3.5" />Absen Manual</>}
+                                {usersLoading ? "Loading..." : "Absen Manual"}
                             </button>
                         )}
                         {canManage && (
@@ -3666,7 +3674,7 @@ export default function AttendanceDashboardPage() {
                                     }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl hover:bg-orange-100 transition-all active:scale-95"
                                 >
-                                    <Umbrella className="w-3.5 h-3.5" />Atur Libur
+                                    Atur Libur
                                 </button>
                                 {/* NEW */}
                                 <button
@@ -3676,12 +3684,12 @@ export default function AttendanceDashboardPage() {
                                     }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all active:scale-95"
                                 >
-                                    <Clock className="w-3.5 h-3.5" />Jadwal Shift
+                                    Jadwal Shift
                                 </button>
                             </>
                         )}
                         <button onClick={refreshAll} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2 rounded-xl bg-white hover:shadow-md transition-all active:scale-95">
-                            <RefreshCw className="w-3.5 h-3.5" />Refresh
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Refresh
                         </button>
                     </div>
                 </div>
@@ -3691,10 +3699,10 @@ export default function AttendanceDashboardPage() {
                 {/* ── Stat Cards ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {[
-                        { label: "Hari Hadir", value: thisMonthDays, icon: <CalendarDays className="w-4 h-4 text-gray-500" />, gradient: "from-gray-50 to-gray-100", iconBg: "bg-gray-100" },
-                        { label: "Tepat Waktu", value: thisMonthPresent, icon: <CheckCircle2 className="w-4 h-4 text-emerald-600" />, gradient: "from-emerald-50 to-green-100", iconBg: "bg-emerald-100" },
-                        { label: "Terlambat", value: thisMonthLate, icon: <Clock className="w-4 h-4 text-amber-600" />, gradient: "from-amber-50 to-yellow-100", iconBg: "bg-amber-100" },
-                        { label: "Karyawan", value: uniqueUsers.length, icon: <Users className="w-4 h-4 text-blue-600" />, gradient: "from-blue-50 to-indigo-100", iconBg: "bg-blue-100" },
+                        { label: "Hari Hadir", value: thisMonthDays, icon: <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>, gradient: "from-gray-50 to-gray-100", iconBg: "bg-gray-100" },
+                        { label: "Tepat Waktu", value: thisMonthPresent, icon: <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>, gradient: "from-emerald-50 to-green-100", iconBg: "bg-emerald-100" },
+                        { label: "Terlambat", value: thisMonthLate, icon: <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, gradient: "from-amber-50 to-yellow-100", iconBg: "bg-amber-100" },
+                        { label: "Karyawan", value: uniqueUsers.length, icon: <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>, gradient: "from-blue-50 to-indigo-100", iconBg: "bg-blue-100" },
                     ].map(c => (
                         <div key={c.label} className={`bg-gradient-to-br ${c.gradient} rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 p-5 hover:scale-[1.02]`}>
                             <div className="flex items-start justify-between mb-3">
@@ -3712,28 +3720,28 @@ export default function AttendanceDashboardPage() {
                 {/* Tab bar — computed di luar JSX */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1 flex-wrap">
                     {(() => {
-                        const tabs: { id: typeof activeTab; label: string; icon: React.ReactNode }[] = [
-                            { id: "calendar", label: "Kalender", icon: <CalendarDays className="w-3.5 h-3.5" /> },
+                        const tabs: { id: typeof activeTab; label: string }[] = [
+                            { id: "calendar", label: "Kalender" },
                         ];
-                        if (canManage) tabs.push({ id: "summary", label: "Ringkasan", icon: <CheckCircle2 className="w-3.5 h-3.5" /> });
+                        if (canManage) tabs.push({ id: "summary", label: "Ringkasan" });
                         if (canSalary) {
-                            tabs.push({ id: "salary", label: "Rekap Gaji", icon: <Wallet className="w-3.5 h-3.5" /> });
-                            tabs.push({ id: "salary-pkl", label: "Gaji PKL", icon: <GraduationCap className="w-3.5 h-3.5" /> });
-                            tabs.push({ id: "salary-slip", label: "Slip Gaji", icon: <FileText className="w-3.5 h-3.5" /> });
-                            tabs.push({ id: "salary-history", label: "Riwayat Gaji", icon: <HistoryIcon className="w-3.5 h-3.5" /> });
+                            tabs.push({ id: "salary", label: "Rekap Gaji" });
+                            tabs.push({ id: "salary-pkl", label: "Gaji PKL" });
+                            tabs.push({ id: "salary-slip", label: "Slip Gaji" });
+                            tabs.push({ id: "salary-history", label: "Riwayat Gaji" });
                         }
                         if (!isAdmin && !canSalary && !userIsPKL(currentUser)) {
-                            tabs.push({ id: "my-salary" as typeof activeTab, label: "Gaji Saya", icon: <Wallet className="w-3.5 h-3.5" /> });
-                            tabs.push({ id: "my-slip" as typeof activeTab, label: "Slip Gaji", icon: <FileText className="w-3.5 h-3.5" /> });
+                            tabs.push({ id: "my-salary" as typeof activeTab, label: "Gaji Saya" });
+                            tabs.push({ id: "my-slip" as typeof activeTab, label: "Slip Gaji" });
                         }
-                        if (isAdmin) tabs.push({ id: "leave", label: "Cuti", icon: <Umbrella className="w-3.5 h-3.5" /> });
+                        if (isAdmin) tabs.push({ id: "leave", label: "Cuti" });
                         return tabs.map(t => (
                             <button key={t.id} onClick={() => handleSetActiveTab(t.id)}
-                                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit flex items-center justify-center gap-1.5 ${activeTab === t.id
+                                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all duration-200 flex-1 min-w-fit ${activeTab === t.id
                                     ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md"
                                     : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                                     }`}>
-                                {t.icon}{t.label}
+                                {t.label}
                             </button>
                         ));
                     })()}
@@ -3886,118 +3894,117 @@ export default function AttendanceDashboardPage() {
                                             );
                                         })}
                                     </div>
-                                  )}
-                             </div>
-                         </div>
- 
-                         {/* Detail tanggal */}
-                         {selectedDate && (
-                             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeIn">
-                                 <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white flex-wrap gap-3">
-                                     <div>
-                                         <p className="text-lg font-bold text-gray-800">
-                                             {new Date(selectedDate + "T12:00:00+07:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                                         </p>
-                                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                             {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full"><Check className="w-3 h-3" /> {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length} tepat</span>}
-                                             {selectedAttendances.filter(a => a.displayStatus === "LATE").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full"><Clock className="w-3 h-3" /> {selectedAttendances.filter(a => a.displayStatus === "LATE").length} terlambat</span>}
-                                             {selectedAttendances.filter(a => a.source === "MANUAL").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full"><Pencil className="w-3 h-3" /> {selectedAttendances.filter(a => a.source === "MANUAL").length} manual</span>}
-                                             {selectedOffDetail.length > 0 && <span title={selectedOffDetail.map(o => o.name).join(", ")} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-3 py-1 rounded-full"><Info className="w-3 h-3" /> {selectedOffDetail.length} libur</span>}
-                                             {selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
-                                                 <button
-                                                     onClick={() => setAbsentPopupMode("karyawan")}
-                                                     className="inline-flex items-center gap-1.5 text-[10px] font-bold text-orange-700 bg-orange-100 border border-orange-200 px-3 py-1 rounded-full hover:bg-orange-200 transition-all"
-                                                 >
-                                                     <AlertTriangle className="w-3 h-3" /> {selectedAbsentKaryawan.length} karyawan tidak masuk
-                                                 </button>
-                                             )}
-                                             {selectedAbsentPKL.length > 0 && calendarPklFilter !== "karyawan" && (
-                                                 <button
-                                                     onClick={() => setAbsentPopupMode("pkl")}
-                                                     className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full hover:bg-amber-200 transition-all"
-                                                 >
-                                                     <GraduationCap className="w-3 h-3" /> {selectedAbsentPKL.length} PKL tidak masuk
-                                                 </button>
-                                             )}
-                                         </div>
-                                     </div>
-                                     <div className="flex items-center gap-2">
-                                         {isAdminRole(currentUser?.role)
-                                             && (
-                                                 <button onClick={() => openAddManual(selectedDate)} className="flex items-center gap-1.5 text-[11px] font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-200 transition-all">
-                                                     <Plus className="w-3.5 h-3.5" />Tambah Manual
-                                                 </button>
-                                             )}
-                                         <button onClick={() => { setSelectedDate(null); setAbsentPopupMode(null); }} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all">
-                                             <X className="w-4 h-4" />
-                                         </button>
-                                     </div>
-                                 </div>
- 
-                                 {canManage && selectedOffDetail.length > 0 && calendarPklFilter !== "pkl" && (
-                                     <div className="px-6 pt-4 pb-3 border-b border-gray-50 bg-red-50/20">
-                                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">
-                                             Libur / Tidak Masuk ({selectedOffDetail.length})
-                                         </p>
-                                         <div className="flex flex-wrap gap-2">
-                                             {selectedOffDetail.map(o => (
-                                                 <div key={o.name} className="inline-flex items-center gap-2 bg-white border border-red-200 rounded-xl pl-1.5 pr-3 py-1.5 shadow-sm">
-                                                     <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center text-white text-[9px] font-black flex-shrink-0">
-                                                         {initials(o.name)}
-                                                     </div>
-                                                     <div className="leading-tight">
-                                                         <p className="text-[11px] font-bold text-gray-700">{o.name}</p>
-                                                         <p className="text-[9px] text-red-500 font-semibold">
-                                                             {o.reason}{o.role ? ` · ${o.role.replace(/_/g, " ")}` : ""}
-                                                         </p>
-                                                     </div>
-                                                 </div>
-                                             ))}
-                                         </div>
-                                     </div>
-                                 )}
- 
-                                 {canManage && selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
-                                     <AbsentSummaryBanner
-                                         list={selectedAbsentKaryawan}
-                                         mode="karyawan"
-                                         onClick={() => setAbsentPopupMode("karyawan")}
-                                     />
-                                 )}
-                                 {canManage && selectedAbsentPKL.length > 0 && calendarPklFilter !== "karyawan" && (
-                                     <AbsentSummaryBanner
-                                         list={selectedAbsentPKL}
-                                         mode="pkl"
-                                         onClick={() => setAbsentPopupMode("pkl")}
-                                     />
-                                 )}
+                                )}
+                            </div>
+                        </div>
 
-                                 {selectedAttendances.length === 0 ? (
-                                     <div className="flex flex-col items-center justify-center py-12 px-6">
-                                         <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-                                             {!isAdminRole(currentUser?.role) && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "")
-                                                 ? <Umbrella className="w-8 h-8 text-orange-400 animate-pulse" />
-                                                 : <CalendarDays className="w-8 h-8 text-gray-400 opacity-40" />
-                                             }
-                                         </div>
-                                         {!canManage && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "") ? (
-                                             <div className="text-center">
-                                                 <p className="text-sm font-bold text-orange-600 mb-1">Hari Libur</p>
-                                                 <p className="text-xs text-gray-400">Kamu tidak masuk kerja di tanggal ini</p>
-                                             </div>
-                                         ) : !isAdminRole(currentUser?.role) ? (
-                                             <div className="text-center">
-                                                 <p className="text-sm font-bold text-gray-500 mb-1">Tidak Ada Catatan</p>
-                                                 <p className="text-xs text-gray-400">
-                                                     Ini bukan hari liburmu — tapi tidak ada data absensi di tanggal ini
-                                                 </p>
-                                                 <span className="inline-flex items-center gap-1.5 mt-3 text-[10px] font-bold px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
-                                                     Hari Kerja
-                                                 </span>
-                                             </div>
-                                         ) : (
-                                             <p className="text-sm text-gray-400 font-medium">Tidak ada data absensi di tanggal ini</p>
-                                         )}
+                        {/* Detail tanggal */}
+                        {selectedDate && (
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-fadeIn">
+                                <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white flex-wrap gap-3">
+                                    <div>
+                                        <p className="text-lg font-bold text-gray-800">
+                                            {new Date(selectedDate + "T12:00:00+07:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                                        </p>
+                                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                            {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg> {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length} tepat</span>}
+                                            {selectedAttendances.filter(a => a.displayStatus === "LATE").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> {selectedAttendances.filter(a => a.displayStatus === "LATE").length} terlambat</span>}
+                                            {selectedAttendances.filter(a => a.source === "MANUAL").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg> {selectedAttendances.filter(a => a.source === "MANUAL").length} manual</span>}
+                                            {selectedOffDetail.length > 0 && <span title={selectedOffDetail.map(o => o.name).join(", ")} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg> {selectedOffDetail.length} libur</span>}
+                                            {selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
+                                                <button
+                                                    onClick={() => setAbsentPopupMode("karyawan")}
+                                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-orange-700 bg-orange-100 border border-orange-200 px-3 py-1 rounded-full hover:bg-orange-200 transition-all"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> {selectedAbsentKaryawan.length} karyawan tidak masuk
+                                                </button>
+                                            )}
+                                            {selectedAbsentPKL.length > 0 && calendarPklFilter !== "karyawan" && (
+                                                <button
+                                                    onClick={() => setAbsentPopupMode("pkl")}
+                                                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full hover:bg-amber-200 transition-all"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z" /><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M22 10v6M2 10l10 5 10-5" /></svg> {selectedAbsentPKL.length} PKL tidak masuk
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {isAdminRole(currentUser?.role)
+                                            && (
+                                                <button onClick={() => openAddManual(selectedDate)} className="flex items-center gap-1.5 text-[11px] font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-200 transition-all">
+                                                    Tambah Manual
+                                                </button>
+                                            )}
+                                        <button onClick={() => { setSelectedDate(null); setAbsentPopupMode(null); }} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all">                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {canManage && selectedOffDetail.length > 0 && calendarPklFilter !== "pkl" && (
+                                    <div className="px-6 pt-4 pb-3 border-b border-gray-50 bg-red-50/20">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">
+                                            Libur / Tidak Masuk ({selectedOffDetail.length})
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedOffDetail.map(o => (
+                                                <div key={o.name} className="inline-flex items-center gap-2 bg-white border border-red-200 rounded-xl pl-1.5 pr-3 py-1.5 shadow-sm">
+                                                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center text-white text-[9px] font-black flex-shrink-0">
+                                                        {initials(o.name)}
+                                                    </div>
+                                                    <div className="leading-tight">
+                                                        <p className="text-[11px] font-bold text-gray-700">{o.name}</p>
+                                                        <p className="text-[9px] text-red-500 font-semibold">
+                                                            {o.reason}{o.role ? ` · ${o.role.replace(/_/g, " ")}` : ""}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {canManage && selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
+                                    <AbsentSummaryBanner
+                                        list={selectedAbsentKaryawan}
+                                        mode="karyawan"
+                                        onClick={() => setAbsentPopupMode("karyawan")}
+                                    />
+                                )}
+                                {canManage && selectedAbsentPKL.length > 0 && calendarPklFilter !== "karyawan" && (
+                                    <AbsentSummaryBanner
+                                        list={selectedAbsentPKL}
+                                        mode="pkl"
+                                        onClick={() => setAbsentPopupMode("pkl")}
+                                    />
+                                )}
+
+                                {selectedAttendances.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-12 px-6">
+                                        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                                            {!isAdminRole(currentUser?.role) && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "")
+                                                ? <svg className="w-8 h-8 text-orange-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m11.314 11.314l.707-.707M12 5a7 7 0 100 14 7 7 0 000-14z" /></svg>
+                                                : <svg className="w-8 h-8 text-gray-400 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                            }
+                                        </div>
+                                        {!canManage && currentUser?.name && isDayOffForUser(currentUser.name, selectedDate ?? "") ? (
+                                            <div className="text-center">
+                                                <p className="text-sm font-bold text-orange-600 mb-1">Hari Libur</p>
+                                                <p className="text-xs text-gray-400">Kamu tidak masuk kerja di tanggal ini</p>
+                                            </div>
+                                        ) : !isAdminRole(currentUser?.role) ? (
+                                            <div className="text-center">
+                                                <p className="text-sm font-bold text-gray-500 mb-1">Tidak Ada Catatan</p>
+                                                <p className="text-xs text-gray-400">
+                                                    Ini bukan hari liburmu — tapi tidak ada data absensi di tanggal ini
+                                                </p>
+                                                <span className="inline-flex items-center gap-1.5 mt-3 text-[10px] font-bold px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                                                    Hari Kerja
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-gray-400 font-medium">Tidak ada data absensi di tanggal ini</p>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className="overflow-x-auto">
@@ -4060,7 +4067,7 @@ export default function AttendanceDashboardPage() {
                                                                 {a.latitude && a.longitude ? (
                                                                     <a href={`https://maps.google.com/?q=${a.latitude},${a.longitude}`} target="_blank" rel="noopener noreferrer"
                                                                         className={`inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-full border no-underline transition-all hover:shadow-md ${Math.round(haversine(a.latitude, a.longitude, OFFICE_LAT, OFFICE_LNG)) <= 80 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-red-100 text-red-600 border-red-200"}`}>
-                                                                        <MapPin className="w-3 h-3" />{Math.round(haversine(a.latitude, a.longitude, OFFICE_LAT, OFFICE_LNG))}m
+                                                                        {Math.round(haversine(a.latitude, a.longitude, OFFICE_LAT, OFFICE_LNG))}m
                                                                     </a>
                                                                 ) : <span className="text-[10px] text-gray-200 font-bold">—</span>}
                                                             </td>
@@ -4091,7 +4098,7 @@ export default function AttendanceDashboardPage() {
                                                                                     }}
                                                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-200 transition-all duration-200"
                                                                                     title="Edit manual attendance">
-                                                                                    <Pencil className="w-3 h-3" />Edit
+                                                                                    Edit
                                                                                 </button>
                                                                             ) : (
                                                                                 <>
@@ -4115,7 +4122,7 @@ export default function AttendanceDashboardPage() {
                                                                                         }}
                                                                                         className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 hover:text-red-700 transition-all duration-200"
                                                                                         title="Hapus absen wajah ini">
-                                                                                        <Trash2 className="w-3 h-3" />Hapus
+                                                                                        Hapus
                                                                                     </button>
 
                                                                                     <button
@@ -4137,7 +4144,7 @@ export default function AttendanceDashboardPage() {
                                                                                         }}
                                                                                         className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-100 hover:text-blue-700 hover:border-blue-200 transition-all duration-200"
                                                                                         title="Convert ke manual entry">
-                                                                                        <Pencil className="w-3 h-3" />Edit
+                                                                                        Edit
                                                                                     </button>
                                                                                 </>
                                                                             )}
@@ -4207,7 +4214,7 @@ export default function AttendanceDashboardPage() {
                                 )}
                                 <button onClick={() => openAddManual()} disabled={usersLoading}
                                     className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60">
-                                    {usersLoading ? "Loading..." : <><Pencil className="w-3.5 h-3.5" />Absen Manual</>}
+                                    {usersLoading ? "Loading..." : "Absen Manual"}
                                 </button>
                             </div>
                         </div>
@@ -4339,12 +4346,12 @@ export default function AttendanceDashboardPage() {
                                                                     }}
                                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
                                                                     title={`Generate slip gaji ${u.name}`}>
-                                                                    <FileText className="w-3 h-3" />Slip
+                                                                    Slip
                                                                 </button>
                                                                 <button onClick={() => openAddManual(undefined, u.userId)}
                                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 hover:bg-[#1a1a2e] hover:text-white hover:border-[#1a1a2e] transition-all duration-200 whitespace-nowrap"
                                                                     title={`Tambah absen manual untuk ${u.name}`}>
-                                                                    <Pencil className="w-3 h-3" />Absen
+                                                                    Absen
                                                                 </button>
                                                             </div>
                                                         </td>
@@ -4410,7 +4417,7 @@ export default function AttendanceDashboardPage() {
                                 </p>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setSalaryModalPklOnly(false); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all"><Wallet className="w-3.5 h-3.5" />Atur Gaji</button>
+                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setSalaryModalPklOnly(false); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all">Atur Gaji</button>
                             </div>
                         </div>
 
@@ -4663,7 +4670,7 @@ export default function AttendanceDashboardPage() {
                                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
                                                                     title={`Generate slip gaji ${u.name} dari rekapan bulan ini`}
                                                                 >
-                                                                    <FileText className="w-3 h-3" />Slip
+                                                                    Slip
                                                                 </button>
                                                                 {/* Tombol Edit Tunjangan */}
                                                                 <button
@@ -4675,7 +4682,7 @@ export default function AttendanceDashboardPage() {
                                                                     className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-purple-50 text-purple-600 border border-purple-200 hover:bg-purple-100 transition-all whitespace-nowrap"
                                                                     title="Edit tunjangan & potongan"
                                                                 >
-                                                                    <Wallet className="w-3 h-3" />Tunjangan
+                                                                    Tunjangan
                                                                 </button>
                                                             </div>
                                                         </td>
@@ -4816,7 +4823,7 @@ export default function AttendanceDashboardPage() {
                                     onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setSalaryModalPklOnly(true); setShowSalaryModal(true); }}
                                     className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl hover:bg-amber-100 transition-all"
                                 >
-                                    <Wallet className="w-3.5 h-3.5" /> Atur Gaji PKL
+                                    Atur Gaji PKL
                                 </button>
                             </div>
                         </div>
@@ -5067,7 +5074,7 @@ export default function AttendanceDashboardPage() {
                                                                         }}
                                                                         className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-all whitespace-nowrap"
                                                                     >
-                                                                        <FileText className="w-3 h-3" /> Slip
+                                                                        Slip
                                                                     </button>
                                                                     <button
                                                                         onClick={() => setEditSalaryUser({
@@ -5077,7 +5084,7 @@ export default function AttendanceDashboardPage() {
                                                                         })}
                                                                         className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 transition-all whitespace-nowrap"
                                                                     >
-                                                                        <Wallet className="w-3 h-3" /> Edit Gaji
+                                                                        Edit Gaji
                                                                     </button>
                                                                 </div>
                                                             </td>
@@ -5138,7 +5145,7 @@ export default function AttendanceDashboardPage() {
                                     <p className="text-base font-bold text-gray-800">Saldo & Pengajuan Cuti — {MONTH_NAMES[calMonth]} {calYear}</p>
                                     <p className="text-[10px] text-gray-400 mt-1">1 hari cuti per bulan · Sisa carry-over ke bulan berikutnya</p>
                                 </div>
-                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all"><Umbrella className="w-3.5 h-3.5" /> Kelola Cuti</button>
+                                <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); fetchLeaveData(calYear, calMonth); setShowLeaveModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-cyan-600 bg-cyan-50 border border-cyan-200 px-4 py-2 rounded-xl hover:bg-cyan-100 transition-all">Kelola Cuti</button>
                             </div>
                             {loading ? (
                                 <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-16 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
@@ -5206,7 +5213,7 @@ export default function AttendanceDashboardPage() {
                                 onClick={fetchSalaryHistory}
                                 className="flex items-center gap-1.5 text-xs font-bold text-gray-500 bg-white border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition"
                             >
-                                <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                                Refresh
                             </button>
                         </div>
                     </div>
@@ -5232,7 +5239,7 @@ export default function AttendanceDashboardPage() {
                                     <tr className="border-b border-gray-100 bg-gray-50/60">
                                         <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
                                         <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Lama</th>
-                                        <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest w-8"><ChevronRight className="w-3.5 h-3.5 inline" /></th>
+                                        <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest w-8">→</th>
                                         <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Gaji Baru</th>
                                         <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipe</th>
                                         <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Diubah Oleh</th>
@@ -5272,7 +5279,7 @@ export default function AttendanceDashboardPage() {
                                                         <span className="text-[10px] text-gray-400">{hist.old_salary_type || "—"}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-4 text-center text-gray-300"><ChevronRight className="w-4 h-4 inline" /></td>
+                                                <td className="px-4 py-4 text-center text-gray-300 font-bold">→</td>
                                                 <td className="px-4 py-4">
                                                     <div className="flex flex-col">
                                                         <span className="font-mono font-bold text-emerald-600 text-xs">
@@ -5343,7 +5350,7 @@ export default function AttendanceDashboardPage() {
                                 {/* Card Gaji Pokok */}
                                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                                     <div className="bg-gradient-to-r from-emerald-600 to-green-700 px-6 py-5">
-                                        <p className="font-bold text-white text-base flex items-center gap-2"><Wallet className="w-4 h-4" /> Informasi Gaji</p>
+                                        <p className="font-bold text-white text-base">Informasi Gaji</p>
                                         <p className="text-xs text-white/70 mt-1">
                                             {MONTH_NAMES[calMonth]} {calYear}
                                         </p>
@@ -5393,19 +5400,19 @@ export default function AttendanceDashboardPage() {
                                                         <div className="grid grid-cols-3 gap-3 mb-4">
                                                             <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
                                                                 <p className="text-2xl font-black text-emerald-600">{myStat.present}</p>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-1 flex items-center justify-center gap-1"><Check className="w-3 h-3 text-emerald-500" /> Tepat</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">Tepat</p>
                                                             </div>
                                                             <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
                                                                 <p className="text-2xl font-black text-amber-600">{myStat.late}</p>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-1 flex items-center justify-center gap-1"><Clock className="w-3 h-3 text-amber-500" /> Terlambat</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1"> Terlambat</p>
                                                             </div>
                                                             <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
                                                                 <p className="text-2xl font-black text-red-500">{myStat.absences.length}</p>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-1 flex items-center justify-center gap-1"><X className="w-3 h-3 text-red-500" /> Tidak Hadir</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1"> Tidak Hadir</p>
                                                             </div>
                                                             <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
                                                                 <p className="text-2xl font-black text-cyan-600">{myStat.leave}</p>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-1 flex items-center justify-center gap-1"><Umbrella className="w-3 h-3 text-cyan-500" /> Cuti</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">Cuti</p>
                                                             </div>
                                                         </div>
 
@@ -5503,10 +5510,9 @@ export default function AttendanceDashboardPage() {
                                                 {/* Info tambahan untuk FIXED — tetap tampilkan persentase */}
                                                 {mySalary.salary_type === "FIXED" && myStat && (
                                                     <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-                                                        <p className="text-[11px] text-blue-700 font-medium flex items-start gap-1.5">
-                                                            <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                                                            <span>Kamu memiliki gaji tetap — nominal gaji tidak berubah meskipun kehadiran kurang dari 100%.
-                                                            Namun persentase kehadiran kamu tetap dicatat: <strong>{formatPct(myStat.pct)}%</strong></span>
+                                                        <p className="text-[11px] text-blue-700 font-medium">
+                                                            ℹ Kamu memiliki gaji tetap — nominal gaji tidak berubah meskipun kehadiran kurang dari 100%.
+                                                            Namun persentase kehadiran kamu tetap dicatat: <strong>{formatPct(myStat.pct)}%</strong>
                                                         </p>
                                                     </div>
                                                 )}
@@ -5525,8 +5531,8 @@ export default function AttendanceDashboardPage() {
                 <div className="space-y-4 px-4 pb-8 max-w-3xl mx-auto">
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                         <div className="flex items-center gap-3 mb-5">
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
-                                <FileText className="w-5 h-5" />
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl shadow-lg">
+
                             </div>
                             <div>
                                 <p className="font-bold text-gray-800">Slip Gaji Saya</p>
@@ -5543,7 +5549,7 @@ export default function AttendanceDashboardPage() {
                         ) : mySlips.length === 0 ? (
                             <div className="text-center py-12">
                                 <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                                    <FileText className="w-7 h-7 text-gray-400 opacity-60" />
+                                    <span className="text-2xl opacity-40"><FileText className="w-5 h-5" /> </span>
                                 </div>
                                 <p className="text-sm text-gray-400 font-medium">Belum ada slip gaji yang dikirim</p>
                                 <p className="text-xs text-gray-300 mt-1">Slip akan muncul setelah admin mengirimkannya</p>
@@ -5565,8 +5571,8 @@ export default function AttendanceDashboardPage() {
                                             <div key={slip.id} className="bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-2xl p-4 hover:shadow-md transition">
                                                 <div className="flex items-center justify-between gap-3 flex-wrap">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-md flex-shrink-0">
-                                                            <FileText className="w-4.5 h-4.5" />
+                                                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-lg shadow-md flex-shrink-0">
+
                                                         </div>
                                                         <div>
                                                             <p className="font-bold text-gray-800 text-sm">
@@ -5579,7 +5585,7 @@ export default function AttendanceDashboardPage() {
                                                             )}
                                                         </div>
                                                         <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-emerald-100 text-emerald-700 border-emerald-200">
-                                                            <CheckCircle2 className="w-3 h-3" /> Final
+                                                            Final
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-3">
@@ -5595,7 +5601,7 @@ export default function AttendanceDashboardPage() {
                                                             rel="noopener noreferrer"
                                                             className="flex items-center gap-1.5 text-xs font-bold bg-gray-900 text-white px-4 py-2 rounded-xl hover:bg-gray-800 transition"
                                                         >
-                                                            <FileText className="w-3.5 h-3.5" /> Lihat & Cetak
+                                                            Lihat & Cetak
                                                         </a>
                                                     </div>
                                                 </div>
@@ -5628,7 +5634,7 @@ export default function AttendanceDashboardPage() {
                                         year: s.month === 0 ? s.year - 1 : s.year,
                                     }))}
                                     className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition text-sm"
-                                ><ChevronLeft className="w-4 h-4" /></button>
+                                >◀</button>
                                 <div className="px-5 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl font-bold text-xs min-w-[130px] text-center">
                                     {MONTH_NAMES[selectedSlipMonth.month]} {selectedSlipMonth.year}
                                 </div>
@@ -5638,7 +5644,7 @@ export default function AttendanceDashboardPage() {
                                         year: s.month === 11 ? s.year + 1 : s.year,
                                     }))}
                                     className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 transition text-sm"
-                                ><ChevronRight className="w-4 h-4" /></button>
+                                ></button>
                             </div>
                         </div>
 
@@ -5736,7 +5742,7 @@ export default function AttendanceDashboardPage() {
                                     fetchSalarySlips(selectedSlipMonth.year, selectedSlipMonth.month);
                                 }}
                                 className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition"
-                            ><FileText className="w-3.5 h-3.5" /> Generate Slip Sekarang</button>
+                            >Generate Slip Sekarang</button>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -5778,7 +5784,7 @@ export default function AttendanceDashboardPage() {
                             ? allUsers
                             : allUsers.filter(u => (getEffectiveSubordinates(userRoles) as string[]).includes(u.role))
                     }
-                    schedules={shiftSchedules}                  
+                    schedules={shiftSchedules}
                     calYear={calYear}
                     calMonth={calMonth}
                     onClose={() => setShowShiftScheduleModal(false)}

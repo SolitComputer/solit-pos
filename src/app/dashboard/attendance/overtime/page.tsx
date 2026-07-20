@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation"; //  ADD
+import { useRouter, useSearchParams } from "next/navigation";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2, AlertTriangle, Camera, Inbox, Pencil, Play, Check, X, Ban, ClipboardList, Circle, HelpCircle, type LucideIcon } from "lucide-react";
+import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2, AlertTriangle, Camera, Inbox, Pencil, Play, Check, X, Ban, ClipboardList, Circle, HelpCircle, Trophy, type LucideIcon } from "lucide-react";
 
 type OvertimeRequest = {
   id: string; user_id: string; request_date: string;
@@ -14,7 +14,7 @@ type OvertimeRequest = {
   status: "PENDING" | "APPROVED" | "ONGOING" | "COMPLETED" | "REJECTED" | "CANCELLED" | "NEED_PROOF";
   rate_per_hour: number | null; total_pay: number | null; auto_completed: boolean;
   created_at: string; reason?: string; requested_start?: string;
-  completed_at?: string; rejection_note?: string;
+  completed_at?: string; rejection_note?: string; approved_at?: string;
   is_holiday?: boolean;
   is_late?: boolean;
   users?: { id: string; name: string; role: string };
@@ -253,7 +253,7 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
             )}
             {o.is_holiday && (
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-purple-50 text-purple-700 border-purple-200">
-                 Hari Libur
+                Hari Libur
               </span>
             )}
           </div>
@@ -309,8 +309,21 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
         )}
         {o.approver && (
           <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5">
-            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Disetujui oleh</p>
-            <p className="text-xs text-gray-800 font-semibold">{o.approver.name}</p>
+            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+              {o.status === "REJECTED" ? "Ditolak oleh" : "Disetujui oleh"}
+            </p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs text-gray-800 font-semibold truncate">{o.approver.name}</p>
+                <p className="text-[9px] text-gray-400 mt-0.5">{o.approver.role.replace(/_/g, " ")}</p>
+              </div>
+              {o.approved_at && (
+                <p className="text-[9px] text-gray-400 font-mono flex-shrink-0 text-right">
+                  {new Date(o.approved_at).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                  <br />{formatTime(o.approved_at)}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -384,7 +397,7 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
         <div className="rounded-xl bg-red-50 border border-red-200 p-5 text-center space-y-3">
           <p className="text-sm font-bold text-red-700">{error}</p>
           <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-all shadow-sm">
-             Pilih dari Galeri
+            Pilih dari Galeri
             <input type="file" accept="image/*" className="hidden" onChange={e => {
               const file = e.target.files?.[0]; if (!file) return;
               const reader = new FileReader();
@@ -1338,6 +1351,11 @@ function EmployeeDetailView({ userId, name, role, overtimes, userCanViewPay, cur
                     )}
                     {isMyUrgent && <span className="text-[8px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md">{o.status === "NEED_PROOF" ? "Upload foto" : "Selesaikan"}</span>}
                     {canApproveTarget(currentUser?.role, o.users?.role ?? userId) && o.status === "PENDING" && <span className="text-[8px] font-semibold text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded-md">Perlu acc</span>}
+                    {o.approver && (
+                      <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded-md border ${o.status === "REJECTED" ? "text-red-600 bg-red-50 border-red-100" : "text-emerald-600 bg-emerald-50 border-emerald-100"}`}>
+                        {o.status === "REJECTED" ? "Ditolak" : "Diacc"}: {o.approver.name}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
                     <span className="font-mono">{formatTime(o.scheduled_start)} – {formatTime(o.scheduled_end)}</span>
@@ -1645,6 +1663,10 @@ export default function OvertimePage() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={() => router.push("/dashboard/attendance/overtime/leaderboard")}
+                className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow">
+                <Trophy size={16} /><span className="hidden sm:inline">Leaderboard</span>
+              </button>
               {canInputManual(currentUser?.roles ?? (currentUser?.role ? [currentUser.role] : [])) && (
                 <button onClick={() => setShowManualModal(true)}
                   className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow">
@@ -1744,8 +1766,8 @@ export default function OvertimePage() {
                     key={tab}
                     onClick={() => { setActiveTab(tab); setSearchQuery(""); setFilterStatus("Semua"); }}
                     className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${active
-                        ? "bg-[#0f0c29] text-white shadow-md"
-                        : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                      ? "bg-[#0f0c29] text-white shadow-md"
+                      : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
                       }`}
                   >
                     <span className="text-sm">{tab === "KARYAWAN" ? "" : ""}</span>
@@ -1800,14 +1822,16 @@ export default function OvertimePage() {
       {proofPhotoData && <ProofPhotoModal overtime={proofPhotoData} onClose={() => setProofPhotoData(null)} canViewPay={userCanViewPay} />}
       {editData && <EditOvertimeModal overtime={editData} onClose={() => setEditData(null)} onSaved={() => { refetch(); setEditData(null); }} />}
       {deleteData && <DeleteConfirmModal overtime={deleteData} onClose={() => setDeleteData(null)} onDeleted={() => { refetch(); setDeleteData(null); }} canViewPay={userCanViewPay} />}
-      {detailData && (
-        <OvertimeDetailModal
-          overtime={detailData} onClose={() => setDetailData(null)} userCanViewPay={userCanViewPay} currentUser={currentUser}
-          onApprove={() => setApproveData(detailData)} onComplete={() => setCompleteData(detailData)}
-          onSetPay={() => setSetPayData(detailData)} onProofPhoto={() => setProofPhotoData(detailData)}
-          onEdit={() => setEditData(detailData)} onDelete={() => setDeleteData(detailData)}
-        />
-      )}
+      {
+        detailData && (
+          <OvertimeDetailModal
+            overtime={detailData} onClose={() => setDetailData(null)} userCanViewPay={userCanViewPay} currentUser={currentUser}
+            onApprove={() => setApproveData(detailData)} onComplete={() => setCompleteData(detailData)}
+            onSetPay={() => setSetPayData(detailData)} onProofPhoto={() => setProofPhotoData(detailData)}
+            onEdit={() => setEditData(detailData)} onDelete={() => setDeleteData(detailData)}
+          />
+        )
+      }
 
       <style jsx global>{`
           @keyframes modalUp {
@@ -1817,6 +1841,6 @@ export default function OvertimePage() {
           .scrollbar-hide::-webkit-scrollbar { display: none; }
           .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
-    </DashboardLayout>
+    </DashboardLayout >
   );
 }
