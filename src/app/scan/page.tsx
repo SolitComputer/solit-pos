@@ -175,21 +175,6 @@ export default function ScanPage() {
 
                                 {/* Info footer */}
                                 <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-                                    <div className="flex items-center gap-2 text-[11px] text-gray-400">
-                                        <svg className="w-3.5 h-3.5 flex-shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <circle cx="12" cy="12" r="10" strokeWidth={2} />
-                                            <path strokeWidth={2} d="M12 8v4l3 3" />
-                                        </svg>
-                                        <span>Hasil scan muncul otomatis</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-[11px] text-gray-400">
-                                        <svg className="w-3.5 h-3.5 flex-shrink-0 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeWidth={2} d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" />
-                                            <polyline points="10 17 15 12 10 7" strokeWidth={2} />
-                                            <line x1="15" y1="12" x2="3" y2="12" strokeWidth={2} />
-                                        </svg>
-                                        <span>Support barcode dan QR Code</span>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -216,51 +201,6 @@ export default function ScanPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                                 </svg>
                             </Link>
-
-                            {/* Tips card */}
-                            <div
-                                className="rounded-3xl bg-white border border-gray-100 shadow-sm p-4 sm:p-5 animate-fadeUp"
-                                style={{ animationDelay: "0.2s" }}
-                            >
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
-                                    Tips Cepat
-                                </p>
-                                <ul className="space-y-3">
-                                    <li className="flex items-start gap-2.5">
-                                        <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4" />
-                                                <circle cx="12" cy="12" r="9" strokeWidth={2} />
-                                            </svg>
-                                        </span>
-                                        <p className="text-xs text-gray-600 leading-relaxed">
-                                            Pastikan pencahayaan cukup terang agar barcode terbaca jelas.
-                                        </p>
-                                    </li>
-                                    <li className="flex items-start gap-2.5">
-                                        <span className="w-6 h-6 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4" />
-                                                <circle cx="12" cy="12" r="9" strokeWidth={2} />
-                                            </svg>
-                                        </span>
-                                        <p className="text-xs text-gray-600 leading-relaxed">
-                                            Jaga jarak 10–20 cm antara kamera dan barcode.
-                                        </p>
-                                    </li>
-                                    <li className="flex items-start gap-2.5">
-                                        <span className="w-6 h-6 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4" />
-                                                <circle cx="12" cy="12" r="9" strokeWidth={2} />
-                                            </svg>
-                                        </span>
-                                        <p className="text-xs text-gray-600 leading-relaxed">
-                                            Barcode buram atau rusak? Ketik nomor serial secara manual.
-                                        </p>
-                                    </li>
-                                </ul>
-                            </div>
                         </div>
                     </div>
                 </div>

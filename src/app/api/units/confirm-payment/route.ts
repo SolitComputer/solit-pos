@@ -58,6 +58,32 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       const newPaidTotal = paidSoFar + cicilan;
       const now = new Date().toISOString();
 
+      const { data: updatedTx, error: updateErr } = await supabaseAdmin
+        .from("transactions")
+        .update({
+          dp_amount: newPaidTotal,
+          last_edited_by: user.name,
+          last_edited_at: now,
+          notes: transaction.notes
+            ? `${transaction.notes} | [CICILAN ${now.split("T")[0]}: Rp${cicilan.toLocaleString("id-ID")} oleh ${user.name}]`
+            : `[CICILAN ${now.split("T")[0]}: Rp${cicilan.toLocaleString("id-ID")} oleh ${user.name}]`,
+        })
+        .eq("invoice_number", invoice_number)
+        .eq("dp_amount", paidSoFar)
+        .select()
+        .maybeSingle();
+
+      if (updateErr) {
+        console.error("[confirm-payment] gagal update dp_amount cicilan:", updateErr.message);
+        return NextResponse.json({ success: false, message: "Gagal menyimpan cicilan: " + updateErr.message }, { status: 500 });
+      }
+      if (!updatedTx) {
+        return NextResponse.json(
+          { success: false, message: "Data transaksi sudah berubah (mungkin diproses bersamaan). Silakan refresh dan coba lagi." },
+          { status: 409 }
+        );
+      }
+
       const { error: payErr } = await supabaseAdmin.from("transaction_payments").insert({
         transaction_id: transaction.id,
         invoice_number,
@@ -69,20 +95,6 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         console.error("[confirm-payment] gagal catat cicilan:", payErr.message);
         return NextResponse.json({ success: false, message: "Gagal mencatat cicilan: " + payErr.message }, { status: 500 });
       }
-
-      const { data: updatedTx } = await supabaseAdmin
-        .from("transactions")
-        .update({
-          dp_amount: newPaidTotal,
-          last_edited_by: user.name,
-          last_edited_at: now,
-          notes: transaction.notes
-            ? `${transaction.notes} | [CICILAN ${now.split("T")[0]}: Rp${cicilan.toLocaleString("id-ID")} oleh ${user.name}]`
-            : `[CICILAN ${now.split("T")[0]}: Rp${cicilan.toLocaleString("id-ID")} oleh ${user.name}]`,
-        })
-        .eq("invoice_number", invoice_number)
-        .select()
-        .single();
 
       await logActivity({
         userId: user.id, userName: user.name, userRole: user.role,
@@ -124,7 +136,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         );
       }
 
-      const { data: updatedTx } = await supabaseAdmin
+      const { data: updatedTx, error: updateErr } = await supabaseAdmin
         .from("transactions")
         .update({
           status: "PAID",
@@ -135,8 +147,20 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
           last_edited_at: now,
         })
         .eq("invoice_number", invoice_number)
+        .eq("status", transaction.status)
         .select()
-        .single();
+        .maybeSingle();
+
+      if (updateErr) {
+        console.error("[confirm-payment] gagal update status PAID (multi-unit):", updateErr.message);
+        return NextResponse.json({ success: false, message: "Gagal konfirmasi pembayaran: " + updateErr.message }, { status: 500 });
+      }
+      if (!updatedTx) {
+        return NextResponse.json(
+          { success: false, message: "Transaksi ini sudah diproses (mungkin bersamaan dengan permintaan lain). Silakan refresh." },
+          { status: 409 }
+        );
+      }
 
       if (finalPayment > 0) {
         const { error: payErr } = await supabaseAdmin.from("transaction_payments").insert({
@@ -220,7 +244,8 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         );
       }
 
-      const { data: updatedTx } = await supabaseAdmin
+      // Optimistic lock — sama seperti jalur multi-unit di atas.
+      const { data: updatedTx, error: updateErr } = await supabaseAdmin
         .from("transactions")
         .update({
           status: "PAID",
@@ -233,8 +258,20 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
           last_edited_at: now,
         })
         .eq("invoice_number", invoice_number)
+        .eq("status", transaction.status)
         .select()
-        .single();
+        .maybeSingle();
+
+      if (updateErr) {
+        console.error("[confirm-payment] gagal update status PAID:", updateErr.message);
+        return NextResponse.json({ success: false, message: "Gagal konfirmasi pembayaran: " + updateErr.message }, { status: 500 });
+      }
+      if (!updatedTx) {
+        return NextResponse.json(
+          { success: false, message: "Transaksi ini sudah diproses (mungkin bersamaan dengan permintaan lain). Silakan refresh." },
+          { status: 409 }
+        );
+      }
 
       if (finalPayment > 0) {
         const { error: payErr } = await supabaseAdmin.from("transaction_payments").insert({
@@ -305,5 +342,9 @@ export const POST = withAuth(postHandler, [
   "PROGRAMMER",
   "ASISTEN_CEO",
   "KEPALA_SALES",
-  "KEPALA_SOTECH"
+  "KEPALA_ZENITH",
+  "CREW_SALES",
+  "KEPALA_SOTECH",
+  "KEPALA_ONPOINT",
+  "ONPOINT",
 ]);
