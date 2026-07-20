@@ -85,12 +85,12 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
   if (!isOpen) return null;
 
   const tabs = [
-    { key: "daily",   label: "Harian"   },
-    { key: "weekly",  label: "Mingguan" },
-    { key: "monthly", label: "Bulanan"  },
+    { key: "daily", label: "Harian" },
+    { key: "weekly", label: "Mingguan" },
+    { key: "monthly", label: "Bulanan" },
   ] as const;
 
-  const maxDaily  = data ? Math.max(...data.daily.map((d) => d.revenue),  1) : 1;
+  const maxDaily = data ? Math.max(...data.daily.map((d) => d.revenue), 1) : 1;
   const maxWeekly = data ? Math.max(...data.weekly.map((w) => w.revenue), 1) : 1;
 
   return (
@@ -290,7 +290,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Omzet Hari Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtShort(data.today.revenue)}</p>
+                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtRupiah(data.today.revenue)}</p>
                       <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#10B981" }}>{data.today.count} transaksi</p>
                     </div>
                   </div>
@@ -305,7 +305,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Bulan Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtShort(data.monthly.revenue)}</p>
+                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtRupiah(data.monthly.revenue)}</p>
                       <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#F59E0B" }}>{data.monthly.count} transaksi</p>
                     </div>
                   </div>
@@ -320,7 +320,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Profit Hari Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtShort(data.today.profit)}</p>
+                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtRupiah(data.today.profit)}</p>
                       <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#8B5CF6" }}>hari ini</p>
                     </div>
                   </div>

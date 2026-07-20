@@ -402,8 +402,7 @@ export function GrossProfitDetailModal({ isOpen, onClose }: { isOpen: boolean; o
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Profit Hari Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtShort(data.today.gross_profit)}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#10B981" }}>{data.today.margin_pct}% margin</p>
+                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtRupiah(data.today.gross_profit)}</p>                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#10B981" }}>{data.today.margin_pct}% margin</p>
                     </div>
                   </div>
 
@@ -417,7 +416,7 @@ export function GrossProfitDetailModal({ isOpen, onClose }: { isOpen: boolean; o
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Bulan Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtShort(data.monthly.gross_profit)}</p>
+                     <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtRupiah(data.monthly.gross_profit)}</p>
                       <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#F59E0B" }}>{data.monthly.margin_pct}% margin</p>
                     </div>
                   </div>
@@ -432,7 +431,7 @@ export function GrossProfitDetailModal({ isOpen, onClose }: { isOpen: boolean; o
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Omzet</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtShort(data.today.revenue)}</p>
+                     <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0F172A" }}>{fmtRupiah(data.today.revenue)}</p>
                       <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#6366F1" }}>{data.today.count} transaksi</p>
                     </div>
                   </div>
@@ -461,7 +460,7 @@ export function GrossProfitDetailModal({ isOpen, onClose }: { isOpen: boolean; o
                       <div className="text-center py-14">
                         <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "#F1F5F9" }}>
                           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.8">
-                            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                            <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                           </svg>
                         </div>
                         <p className="text-sm font-semibold" style={{ color: "#94A3B8" }}>Belum ada data harian</p>
@@ -525,7 +524,7 @@ export function GrossProfitDetailModal({ isOpen, onClose }: { isOpen: boolean; o
                                 style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}
                               >
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5">
-                                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+                                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
                                 </svg>
                               </div>
                               <div className="min-w-0">
@@ -589,7 +588,7 @@ export function GrossProfitDetailModal({ isOpen, onClose }: { isOpen: boolean; o
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#FFFBEB" }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.2" strokeLinecap="round">
-                            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>
+                            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><line x1="9" y1="12" x2="15" y2="12" /><line x1="9" y1="16" x2="13" y2="16" />
                           </svg>
                         </div>
                         <div>
@@ -635,7 +634,7 @@ export function GrossProfitDetailModal({ isOpen, onClose }: { isOpen: boolean; o
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "#FEF2F2" }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
                 <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
