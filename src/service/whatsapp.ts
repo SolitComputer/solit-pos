@@ -159,6 +159,11 @@ export function buildPaymentMessage(data: {
     `🔗 https://solit03.com/cek-garansi`,
     data.serial_number ? `Masukkan SN: *${data.serial_number}*` : null,
     ``,
+    `📋 *Ketentuan Garansi*`,
+    `1. Garansi hanya berlaku untuk kerusakan yang BUKAN akibat human error.`,
+    `2. Kerusakan LCD seperti pecah, kena air, terbakar, bergaris, berkedip, gelap/redup, blank putih, dead pixel, berbayang/shadow, warna pudar/tidak akurat, serta bercak hitam/putih TIDAK termasuk garansi.`,
+    `3. Wajib membawa nota pembelian ini saat melakukan klaim garansi.`,
+    ``,
     `Terima kasih sudah berbelanja di *Solit 03* 🙏`,
     `_Sawangan, Depok_`,
   ]
