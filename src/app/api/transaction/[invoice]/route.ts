@@ -202,6 +202,139 @@ async function syncUnitStatusesByIds(
   await syncLaptopParentStats(affectedLaptopIds);
 }
 
+// ── Resolusi unit BARU — SN adalah sumber kebenaran, TIDAK di-union dengan
+// unit_ids lama supaya unit yang sudah ditukar tidak "nyangkut" dianggap tetap ada.
+async function resolveNewUnitIds(
+  ids: (string | null | undefined)[],
+  sns: (string | null | undefined)[]
+): Promise<string[]> {
+  const cleanSNs = [
+    ...new Set(sns.map((s) => (s ?? "").toString().trim()).filter((s) => s.length > 0)),
+  ];
+
+  if (cleanSNs.length > 0) {
+    const { data: unitsBySN, error } = await supabase
+      .from("laptop_units")
+      .select("id, serial_number")
+      .in("serial_number", cleanSNs);
+
+    if (error) console.error("[resolveNewUnitIds] gagal lookup SN → id:", error.message);
+
+    const resolved = new Set<string>();
+    for (const u of unitsBySN ?? []) if (u.id) resolved.add(u.id);
+    return [...resolved];
+  }
+
+  // Tidak ada SN dikirim → fallback pakai unit_ids langsung.
+  const resolved = new Set<string>();
+  for (const id of ids) {
+    const clean = (id ?? "").toString().trim();
+    if (clean) resolved.add(clean);
+  }
+  return [...resolved];
+}
+
+async function syncUnitStatusesByFinalIds(toRelease: string[], toMark: string[]) {
+  if (toRelease.length === 0 && toMark.length === 0) return;
+
+  const results = await Promise.all([
+    ...toRelease.map((id) => setUnitStatusById(id, "SIAP_JUAL")),
+    ...toMark.map((id) => setUnitStatusById(id, "TERJUAL")),
+  ]);
+
+  const failed = results.filter((ok) => !ok).length;
+  if (failed > 0) {
+    console.error(`[syncUnitStatusesByFinalIds] ${failed} update status unit GAGAL — cek RLS/constraint.`);
+  }
+
+  const affectedUnitIds = [...toRelease, ...toMark];
+  const { data: affectedUnits } = await supabase
+    .from("laptop_units")
+    .select("laptop_id")
+    .in("id", affectedUnitIds);
+
+  const affectedLaptopIds = [
+    ...new Set((affectedUnits ?? []).map((u: { laptop_id: string }) => u.laptop_id).filter(Boolean)),
+  ];
+
+  await syncLaptopParentStats(affectedLaptopIds);
+}
+
+// ── Rekonsiliasi penuh transaction_items terhadap komposisi unit FINAL ───
+// Beda dari versi diff-based: ini menghapus SEMUA baris unit yang tidak ada
+// di komposisi final (termasuk sisa data lama yang sudah nyangkut dari
+// sebelum fix ini), dan membuat baris untuk unit final yang belum punya
+// baris — jadi otomatis "menyembuhkan" data yang sudah kadung tidak sinkron,
+// tidak cuma yang berubah di sesi edit ini saja.
+async function reconcileTransactionItems(
+  invoice: string,
+  transactionId: string,
+  finalUnitIds: string[],
+  dealPricesPerUnit: Array<{ unit_id?: string; serial_number?: string; deal_price: number }>
+) {
+  if (!transactionId) {
+    console.error("[reconcileTransactionItems] transactionId kosong, skip — cek pemanggilan before?.id");
+    return;
+  }
+
+  const { data: currentItems, error: fetchErr } = await supabase
+    .from("transaction_items")
+    .select("unit_id")
+    .eq("invoice_number", invoice)
+    .not("unit_id", "is", null);
+  if (fetchErr) console.error("[reconcileTransactionItems] gagal ambil item existing:", fetchErr.message);
+
+  const currentIds = new Set((currentItems ?? []).map((it: any) => it.unit_id));
+  const finalSet = new Set(finalUnitIds);
+
+  // Hapus baris unit yang sudah tidak jadi bagian transaksi (termasuk sisa data lama/stale)
+  const staleIds = [...currentIds].filter((id) => !finalSet.has(id));
+  if (staleIds.length > 0) {
+    const { error } = await supabase
+      .from("transaction_items")
+      .delete()
+      .eq("invoice_number", invoice)
+      .in("unit_id", staleIds);
+    if (error) console.error("[reconcileTransactionItems] gagal hapus item stale:", error.message);
+  }
+
+  // Buat baris untuk unit final yang belum punya baris transaction_items
+  const missingIds = finalUnitIds.filter((id) => !currentIds.has(id));
+  if (missingIds.length > 0) {
+    const { data: newUnits, error: unitErr } = await supabase
+      .from("laptop_units")
+      .select("id, serial_number, laptop_id, selling_price, laptop:laptops(laptop_name)")
+      .in("id", missingIds);
+    if (unitErr) console.error("[reconcileTransactionItems] gagal ambil data unit:", unitErr.message);
+
+    const rows = (newUnits ?? []).map((u: any) => {
+      const matched = dealPricesPerUnit.find(
+        (p) => p.unit_id === u.id || (p.serial_number && p.serial_number === u.serial_number)
+      );
+      const dealPrice =
+        matched && Number.isFinite(Number(matched.deal_price))
+          ? Math.round(Number(matched.deal_price))
+          : Math.round(Number(u.selling_price ?? 0));
+
+      return {
+        transaction_id: transactionId,
+        invoice_number: invoice,
+        unit_id: u.id,
+        laptop_id: u.laptop_id,
+        laptop_name: u.laptop?.laptop_name ?? null,
+        serial_number: u.serial_number,
+        deal_price: dealPrice,
+        selling_price: u.selling_price ?? 0,
+      };
+    });
+
+    if (rows.length > 0) {
+      const { error } = await supabase.from("transaction_items").insert(rows);
+      if (error) console.error("[reconcileTransactionItems] gagal insert item baru:", error.message);
+    }
+  }
+}
+
 // ── Sync by serial_numbers (legacy fallback) ──────────────────────────────────
 // Dipanggil hanya untuk transaksi lama yang tidak punya unit_ids
 async function syncUnitStatuses(oldSNs: string[], newSNs: string[]) {
@@ -359,14 +492,56 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { invoice } = await props.params;
     const body = await req.json();
 
-    // ── Ambil data sebelum diubah ────────────────────────────────────
     const { data: before } = await supabase
       .from("transactions")
       .select("*")
       .eq("invoice_number", invoice)
       .single();
 
-    // ── Whitelist field yang boleh diupdate ──────────────────────────
+    // ── Deteksi cancel & resolusi komposisi unit final ─────────────────
+    // Dihitung di awal karena transaction_items harus sudah sinkron SEBELUM
+    // deal_prices_per_unit diproses di bawah.
+    const isCancelling =
+      body.status === "CANCELLED" && before?.status !== "CANCELLED";
+
+    const unitFieldsProvided =
+      body.unit_ids !== undefined || body.unit_id !== undefined ||
+      body.serial_numbers !== undefined || body.serial_number !== undefined;
+
+    let finalNewUnitIds: string[] = [];
+    let finalToRelease: string[] = [];
+    let finalToMark: string[] = [];
+
+    if (unitFieldsProvided && !isCancelling) {
+      const oldIds: string[] = Array.isArray(before?.unit_ids)
+        ? before.unit_ids.filter(Boolean)
+        : before?.unit_id ? [before.unit_id] : [];
+      const oldSNs: string[] = Array.isArray(before?.serial_numbers)
+        ? before.serial_numbers.filter(Boolean)
+        : before?.serial_number ? [before.serial_number] : [];
+      const newIds: string[] = Array.isArray(body.unit_ids)
+        ? body.unit_ids.filter(Boolean)
+        : body.unit_id ? [body.unit_id] : [];
+      const newSNs: string[] = Array.isArray(body.serial_numbers)
+        ? body.serial_numbers.filter(Boolean)
+        : body.serial_number ? [body.serial_number] : [];
+
+      const finalOldUnitIds = await resolveUnitIds(oldIds, oldSNs);
+      finalNewUnitIds = await resolveNewUnitIds(newIds, newSNs);
+
+      const oldSet = new Set(finalOldUnitIds);
+      const newSet = new Set(finalNewUnitIds);
+      finalToRelease = finalOldUnitIds.filter((id) => !newSet.has(id));
+      finalToMark = finalNewUnitIds.filter((id) => !oldSet.has(id));
+
+      await reconcileTransactionItems(
+        invoice,
+        before?.id,
+        finalNewUnitIds,
+        Array.isArray(body.deal_prices_per_unit) ? body.deal_prices_per_unit : []
+      );
+    }
+
     const allowedFields: Record<string, any> = {};
     if (body.amount !== undefined) allowedFields.amount = Number(body.amount);
     if (body.deal_price !== undefined) allowedFields.deal_price = Number(body.deal_price);
@@ -437,15 +612,15 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 
       // Recompute inventory_price dari SELURUH unit transaksi (bukan cuma yang
       // dikirim), supaya edit sebagian unit tidak menghapus modal unit lain.
-      const txUnitIds: string[] = (
-        Array.isArray(body.unit_ids)
-          ? body.unit_ids
-          : Array.isArray(before?.unit_ids)
+      const txUnitIds: string[] = unitFieldsProvided
+        ? finalNewUnitIds
+        : (
+          Array.isArray(before?.unit_ids)
             ? before.unit_ids
             : before?.unit_id
               ? [before.unit_id]
               : []
-      ).filter(Boolean);
+        ).filter(Boolean);
 
       if (txUnitIds.length > 0) {
         const { data: allUnits } = await supabase
@@ -548,58 +723,12 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     // ── Sync status unit ─────────────────────────────────────────────
-    // PRIORITAS 0: pembatalan transaksi (status → CANCELLED). Lepas SEMUA unit
-    // kembali ke stok, kalau tidak stok hilang permanen (dulu tidak di-handle).
-    const isCancelling =
-      body.status === "CANCELLED" && before?.status !== "CANCELLED";
+    // PRIORITAS 0: pembatalan transaksi → lepas SEMUA unit ke stok.
     if (isCancelling) {
       await releaseTransactionUnits(before, invoice);
     }
-    // PRIORITAS 1: by unit_ids (modern, reliable, selalu ada dari form edit)
-    else if (body.unit_ids !== undefined) {
-      const oldIds: string[] = Array.isArray(before?.unit_ids)
-        ? before.unit_ids.filter(Boolean)
-        : before?.unit_id
-          ? [before.unit_id]
-          : [];
-
-      const newIds: string[] = Array.isArray(body.unit_ids)
-        ? body.unit_ids.filter(Boolean)
-        : body.unit_id
-          ? [body.unit_id]
-          : [];
-
-      // FIX: sertakan serial_numbers sebagai fallback resolusi unit_id.
-      // Ini yang bikin "Tukar SN" benar walau unit_id unit baru sempat kosong.
-      const oldSNs: string[] = Array.isArray(before?.serial_numbers)
-        ? before.serial_numbers.filter(Boolean)
-        : before?.serial_number
-          ? [before.serial_number]
-          : [];
-
-      const newSNs: string[] = Array.isArray(body.serial_numbers)
-        ? body.serial_numbers.filter(Boolean)
-        : body.serial_number
-          ? [body.serial_number]
-          : [];
-
-      await syncUnitStatusesByIds(oldIds, newIds, oldSNs, newSNs);
-    }
-    // PRIORITAS 2: fallback by serial_numbers (untuk transaksi legacy lama)
-    else if (body.serial_numbers !== undefined) {
-      const oldSNs: string[] = Array.isArray(before?.serial_numbers)
-        ? before.serial_numbers.filter(Boolean)
-        : before?.serial_number
-          ? [before.serial_number]
-          : [];
-
-      const newSNs: string[] = Array.isArray(body.serial_numbers)
-        ? body.serial_numbers.filter(Boolean)
-        : body.serial_number
-          ? [body.serial_number]
-          : [];
-
-      await syncUnitStatuses(oldSNs, newSNs);
+    else if (finalToRelease.length > 0 || finalToMark.length > 0) {
+      await syncUnitStatusesByFinalIds(finalToRelease, finalToMark);
     }
 
     // ── Activity log ─────────────────────────────────────────────────

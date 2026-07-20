@@ -188,6 +188,19 @@ function getCustomerTypeBadge(type: string): { text: string; icon: LucideIcon } 
   return { text: "Umum", icon: User };
 }
 
+function getPrimaryPriceDisplay(item: any) {
+  const dealPrice = Number(item.deal_price || item.amount || 0);
+  if (item.status === "RESERVED") {
+    return {
+      label: "DP Diterima",
+      value: Number(item.dp_amount || 0),
+      isDP: true,
+      totalDeal: dealPrice,
+    };
+  }
+  return { label: "Harga Jual", value: dealPrice, isDP: false, totalDeal: dealPrice };
+}
+
 // ─── RESTORE MODAL ────────────────────────────────────────────────────
 function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
   item: any; isPending: boolean; restoring: boolean; onConfirm: () => void; onClose: () => void;
@@ -585,10 +598,18 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
 
         {/* Price + Margin */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-xl p-2.5 bg-blue-50 ring-1 ring-blue-100">
-            <p className="text-[10px] text-blue-500 font-semibold mb-0.5">Harga Jual</p>
-            <p className="text-sm font-bold text-blue-900 tabular-nums truncate">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</p>
-          </div>
+          {(() => {
+            const priceDisplay = getPrimaryPriceDisplay(item);
+            return (
+              <div className="rounded-xl p-2.5 bg-blue-50 ring-1 ring-blue-100">
+                <p className="text-[10px] text-blue-500 font-semibold mb-0.5">{priceDisplay.label}</p>
+                <p className="text-sm font-bold text-blue-900 tabular-nums truncate">Rp{priceDisplay.value.toLocaleString("id-ID")}</p>
+                {priceDisplay.isDP && (
+                  <p className="text-[9px] text-blue-400 mt-0.5 truncate">dari Rp{priceDisplay.totalDeal.toLocaleString("id-ID")}</p>
+                )}
+              </div>
+            );
+          })()}
           {!canSeeModal ? (
             <div className="rounded-xl p-2.5 ring-1 bg-gray-50 ring-gray-100">
               <p className="text-[10px] font-semibold mb-0.5 text-gray-400"><Lock className="inline w-3 h-3 mr-1" />Margin</p>
@@ -650,7 +671,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
             {showDetails ? "Sembunyikan" : "Detail"}
           </button>
           <button onClick={() => onRowClick?.(item)} className="h-9 rounded-xl bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800 transition">
-             Lihat Laptop
+            Lihat Laptop
           </button>
         </div>
 
@@ -970,7 +991,21 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
           })()}
         </td>
         <td className="px-4 py-3.5 text-right">
-          <span className="text-sm font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">Rp{(item.deal_price || item.amount || 0).toLocaleString("id-ID")}</span>
+          {(() => {
+            const priceDisplay = getPrimaryPriceDisplay(item);
+            return (
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="text-sm font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">
+                  Rp{priceDisplay.value.toLocaleString("id-ID")}
+                </span>
+                {priceDisplay.isDP && (
+                  <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                    DP dari Rp{priceDisplay.totalDeal.toLocaleString("id-ID")}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </td>
         <td className="px-4 py-3.5 text-right">
           {!canSeeModal ? (
@@ -1203,14 +1238,21 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                   <span className="text-sm font-bold text-violet-700 font-mono tabular-nums">Rp{totalJual.toLocaleString("id-ID")}</span>
                 </div>
               )}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Total Harga Deal</span>
-                <span className="text-sm font-bold text-gray-900 font-mono tabular-nums">Rp{totalDeal.toLocaleString("id-ID")}</span>
-              </div>
-              {Number(item.dp_amount) > 0 && (
+              {item.status === "RESERVED" && Number(item.dp_amount) > 0 ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">DP Diterima</span>
+                    <span className="text-sm font-bold text-blue-700 font-mono tabular-nums">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Total Harga Deal</span>
+                    <span className="text-sm font-bold text-gray-900 font-mono tabular-nums">Rp{totalDeal.toLocaleString("id-ID")}</span>
+                  </div>
+                </>
+              ) : (
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">DP</span>
-                  <span className="text-sm font-bold text-blue-700 font-mono tabular-nums">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span>
+                  <span className="text-xs text-gray-500">Total Harga Deal</span>
+                  <span className="text-sm font-bold text-gray-900 font-mono tabular-nums">Rp{totalDeal.toLocaleString("id-ID")}</span>
                 </div>
               )}
               {canSeeFinancials && !canSeeModal && (
@@ -1346,7 +1388,7 @@ export default function Page() {
         setPaymentMethodOptions(r.paymentMethods ?? []);
         setSourcePlatformOptions(r.sourcePlatforms ?? []);
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   // ── Klik header tabel (siklus 3 langkah, seperti Excel) ────────────
@@ -1614,7 +1656,7 @@ export default function Page() {
         {focusInvoice && (
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
             <p className="text-xs text-amber-800">
-               Dari Cashflow · <span className="font-mono text-amber-600">{focusInvoice}</span>
+              Dari Cashflow · <span className="font-mono text-amber-600">{focusInvoice}</span>
               {allTransactions[0]?.customer_name && <> · <b>{allTransactions[0].customer_name}</b></>}
               {allTransactions.length === 0 && !isLoading && <span className="text-amber-500"> — tidak ditemukan</span>}
             </p>
@@ -1765,7 +1807,7 @@ export default function Page() {
 
               {hasActiveFilter && (
                 <button onClick={resetFilters} className="w-full h-8 text-xs text-gray-400 border border-gray-200 rounded-xl hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition font-semibold">
-                   Reset semua filter
+                  Reset semua filter
                 </button>
               )}
             </div>
