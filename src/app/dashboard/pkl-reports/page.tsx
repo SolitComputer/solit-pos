@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { PartyPopper, AlertTriangle, CheckCircle2, RefreshCw, Ban, ClipboardList, MessageCircle, Megaphone, ShoppingCart, Package, Wrench, Target, Laptop, Upload } from "lucide-react";
+import { PartyPopper, AlertTriangle, CheckCircle2, RefreshCw, Ban, ClipboardList, MessageCircle, Megaphone, ShoppingCart, Package, Wrench, Target, Laptop, Upload, type LucideIcon } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type UserRole = string;
@@ -136,8 +136,8 @@ function SectionHeader({ title, subtitle, right }: {
 }
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
-function StatCard({ icon, value, label, gradient, tint, loading }: {
-    icon: string; value: number; label: string; gradient: string; tint: string; loading: boolean;
+function StatCard({ icon: Icon, iconColor, value, label, gradient, tint, loading }: {
+    icon: LucideIcon; iconColor: string; value: number; label: string; gradient: string; tint: string; loading: boolean;
 }) {
     return (
         <div className="group relative bg-white rounded-2xl p-4 overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
@@ -146,9 +146,9 @@ function StatCard({ icon, value, label, gradient, tint, loading }: {
             <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-[0.10] transition-opacity duration-300 group-hover:opacity-25"
                 style={{ background: gradient }} />
             <div className="relative flex items-start justify-between mb-3.5">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] leading-none ring-1 ring-inset ring-white/60"
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center ring-1 ring-inset ring-white/60"
                     style={{ background: tint }}>
-                    {icon}
+                    <Icon size={17} strokeWidth={2.4} color={iconColor} />
                 </div>
             </div>
             <p className="relative text-[27px] font-black text-[#0f172a] tabular-nums leading-none tracking-tight">
@@ -1247,10 +1247,10 @@ export default function PKLReportsPage() {
 
                     {/* ── Stat Cards ── */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <StatCard icon="" value={stats.total} label="Total Laporan" loading={loading} gradient="linear-gradient(135deg, #94a3b8, #475569)" tint="#f1f5f9" />
-                        <StatCard icon="" value={stats.submitted} label="Terkirim" loading={loading} gradient="linear-gradient(135deg, #60a5fa, #2563eb)" tint="#eff6ff" />
-                        <StatCard icon="" value={stats.reviewed} label="Disetujui" loading={loading} gradient="linear-gradient(135deg, #34d399, #059669)" tint="#ecfdf5" />
-                        <StatCard icon="" value={stats.revision} label="Perlu Revisi" loading={loading} gradient="linear-gradient(135deg, #fbbf24, #d97706)" tint="#fffbeb" />
+                        <StatCard icon={ClipboardList} iconColor="#475569" value={stats.total} label="Total Laporan" loading={loading} gradient="linear-gradient(135deg, #94a3b8, #475569)" tint="#f1f5f9" />
+                        <StatCard icon={Upload} iconColor="#2563eb" value={stats.submitted} label="Terkirim" loading={loading} gradient="linear-gradient(135deg, #60a5fa, #2563eb)" tint="#eff6ff" />
+                        <StatCard icon={CheckCircle2} iconColor="#059669" value={stats.reviewed} label="Disetujui" loading={loading} gradient="linear-gradient(135deg, #34d399, #059669)" tint="#ecfdf5" />
+                        <StatCard icon={RefreshCw} iconColor="#d97706" value={stats.revision} label="Perlu Revisi" loading={loading} gradient="linear-gradient(135deg, #fbbf24, #d97706)" tint="#fffbeb" />
                     </div>
 
                     {/* ── Kalender + Insight ── */}
