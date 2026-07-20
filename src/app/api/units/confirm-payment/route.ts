@@ -220,5 +220,9 @@ export const POST = withAuth(postHandler, [
   "PROGRAMMER",
   "ASISTEN_CEO",
   "KEPALA_SALES",
-  "KEPALA_SOTECH"
+  "KEPALA_ZENITH",
+  "CREW_SALES",
+  "KEPALA_SOTECH",
+  "KEPALA_ONPOINT",
+  "ONPOINT",
 ]);
