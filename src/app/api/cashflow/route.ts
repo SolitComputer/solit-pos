@@ -88,7 +88,15 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
     }
     if (!transactions || transactions.length === 0) return;
 
-    const invoices = transactions.map((t: any) => t.invoice_number as string);
+    const { data: paidInvoicesWithPayments } = await supabase
+        .from("transaction_payments")
+        .select("invoice_number")
+        .in("invoice_number", transactions.map((t: any) => t.invoice_number as string));
+    const invoicesWithPayments = new Set((paidInvoicesWithPayments ?? []).map((p: any) => p.invoice_number as string));
+    const transactionsToSync = (transactions as any[]).filter((t) => !invoicesWithPayments.has(t.invoice_number as string));
+    if (transactionsToSync.length === 0) return;
+
+    const invoices = transactionsToSync.map((t: any) => t.invoice_number as string);
 
     const { data: existing } = await supabase
         .from("cashflow_entries")
@@ -103,7 +111,7 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
     const toInsert: any[] = [];
     const updates: { id: string; patch: Record<string, any> }[] = [];
 
-    for (const t of transactions as any[]) {
+    for (const t of transactionsToSync) {
         const desired = buildTxPayload(t);
         if (desired.nominal <= 0 || desired.tanggal < CASHFLOW_START_DATE) continue;
 
@@ -201,8 +209,112 @@ async function syncServiceEntries(
     }
 }
 
+function buildPaymentPayload(p: any, customerName: string, salesName: string) {
+    return {
+        direction: "IN",
+        category: "PENJUALAN_LAPTOP",
+        nama: salesName || "Sales",
+        nominal: Math.round(Number(p.amount ?? 0)),
+        modal: null,
+        keterangan: `${p.payment_type === "DP" ? "DP" : p.payment_type === "CICILAN" ? "Cicilan" : "Pelunasan"} · ${p.invoice_number} · ${customerName || "—"}`,
+        tanggal: jakartaDate(p.created_at),
+        source_type: "TRANSACTION_PAYMENT",
+        source_id: p.id as string,
+        payment_method: null,
+    };
+}
+
+async function syncLegacyDpPayments(supabase: SupabaseClient) {
+    const { data: pendingTx, error } = await supabase
+        .from("transactions")
+        .select("id, invoice_number, dp_amount, status, created_at")
+        .in("status", ["RESERVED", "HELD", "PACKING"]);
+
+    if (error) {
+        console.error("[cashflow sync] fetch legacy DP transactions error:", error.message);
+        return;
+    }
+    if (!pendingTx || pendingTx.length === 0) return;
+
+    const withDp = pendingTx.filter((t: any) => Number(t.dp_amount) > 0);
+    if (withDp.length === 0) return;
+
+    const invoices = withDp.map((t: any) => t.invoice_number as string);
+    const { data: existingPayments } = await supabase
+        .from("transaction_payments")
+        .select("invoice_number")
+        .in("invoice_number", invoices);
+
+    const covered = new Set((existingPayments ?? []).map((p: any) => p.invoice_number as string));
+    const missing = withDp.filter((t: any) => !covered.has(t.invoice_number as string));
+    if (missing.length === 0) return;
+
+    const toInsert = missing.map((t: any) => ({
+        transaction_id: t.id,
+        invoice_number: t.invoice_number,
+        amount: Math.round(Number(t.dp_amount)),
+        payment_type: "DP",
+        created_by_name: "System (backfill)",
+        notes: "Backfill otomatis dari status DP transaksi (data lama)",
+        created_at: t.created_at,
+    }));
+
+    const { error: insErr } = await supabase.from("transaction_payments").insert(toInsert);
+    if (insErr) console.error("[cashflow sync] backfill DP insert error:", insErr.message);
+    else console.log(`[cashflow sync] backfilled ${toInsert.length} legacy DP payments`);
+}
+
+async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
+    const { data: payments, error } = await supabase
+        .from("transaction_payments")
+        .select("id, invoice_number, amount, payment_type, created_at")
+        .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
+
+    if (error) {
+        console.error("[cashflow sync] fetch transaction_payments error:", error.message);
+        return;
+    }
+    if (!payments || payments.length === 0) return;
+
+    const paymentIds = payments.map((p: any) => p.id as string);
+    const { data: existing } = await supabase
+        .from("cashflow_entries")
+        .select("id, source_id")
+        .eq("source_type", "TRANSACTION_PAYMENT")
+        .in("source_id", paymentIds);
+
+    const existingIds = new Set((existing ?? []).map((e: any) => e.source_id as string));
+    const missing = payments.filter((p: any) => !existingIds.has(p.id as string));
+    if (missing.length === 0) return;
+
+    const invoiceNumbers = [...new Set(missing.map((p: any) => p.invoice_number as string))];
+    const { data: txRows } = await supabase
+        .from("transactions")
+        .select("invoice_number, customer_name, sales_name")
+        .in("invoice_number", invoiceNumbers);
+    const txInfoMap = new Map<string, { customer_name: string; sales_name: string }>(
+        (txRows ?? []).map((t: any) => [t.invoice_number as string, t])
+    );
+
+    const toInsert = missing
+        .map((p: any) => {
+            const info = txInfoMap.get(p.invoice_number as string);
+            return buildPaymentPayload(p, info?.customer_name ?? "—", info?.sales_name ?? "Sales");
+        })
+        .filter((e) => e.nominal > 0 && e.tanggal >= CASHFLOW_START_DATE)
+        .map((e) => ({ ...e, is_audited: false }));
+
+    if (toInsert.length > 0) {
+        const { error: insErr } = await supabase.from("cashflow_entries").insert(toInsert);
+        if (insErr) console.error("[cashflow sync] insert payment entries error:", insErr.message);
+        else console.log(`[cashflow sync] inserted ${toInsert.length} payment entries`);
+    }
+}
+
 async function syncDerivedEntries(supabase: SupabaseClient) {
+    await syncLegacyDpPayments(supabase);
     await syncTransactionEntries(supabase);
+    await syncTransactionPaymentEntries(supabase);
 
     const { data: services, error: svcError } = await supabase
         .from("service_orders")
@@ -291,12 +403,37 @@ export const GET = withAuth(async () => {
         )
     );
 
+    const paymentSourceIds = Array.from(
+        new Set(
+            rawAll
+                .filter((e: any) => e.source_type === "TRANSACTION_PAYMENT" && e.source_id)
+                .map((e: any) => e.source_id as string)
+        )
+    );
+
+    // Entry pembayaran (source_id = id baris transaction_payments) perlu di-lookup dulu
+    // ke invoice_number-nya sebelum bisa cek status transaksi induk.
+    const paymentInvoiceMap = new Map<string, string>();
+    if (paymentSourceIds.length > 0) {
+        const { data: paymentRows } = await supabase
+            .from("transaction_payments")
+            .select("id, invoice_number")
+            .in("id", paymentSourceIds);
+        for (const p of paymentRows ?? []) {
+            paymentInvoiceMap.set(p.id as string, p.invoice_number as string);
+        }
+    }
+
+    const allInvoiceNumbers = Array.from(
+        new Set([...txSourceIds, ...Array.from(paymentInvoiceMap.values())])
+    );
+
     const txMap = new Map<string, { status: string; nominal: number }>();
-    if (txSourceIds.length > 0) {
+    if (allInvoiceNumbers.length > 0) {
         const { data: linkedTx } = await supabase
             .from("transactions")
             .select("invoice_number, status, deal_price, amount")
-            .in("invoice_number", txSourceIds);
+            .in("invoice_number", allInvoiceNumbers);
 
         for (const t of linkedTx ?? []) {
             txMap.set(t.invoice_number as string, {
@@ -307,23 +444,26 @@ export const GET = withAuth(async () => {
     }
 
     const all = rawAll.map((e: any) => {
-        if (e.source_type !== "TRANSACTION" || !e.source_id) {
-            return { ...e, is_voided: false, is_stale: false };
-        }
-        const tx = txMap.get(e.source_id as string);
-        const isVoided = !!tx && tx.status !== "PAID";
-        const isStale =
-            !!tx &&
-            !isVoided &&
-            e.is_audited &&
-            Number(e.nominal ?? 0) !== tx.nominal;
+        if (e.source_type === "TRANSACTION" && e.source_id) {
+            const tx = txMap.get(e.source_id as string);
+            const isVoided = !!tx && tx.status !== "PAID";
+            const isStale =
+                !!tx &&
+                !isVoided &&
+                e.is_audited &&
+                Number(e.nominal ?? 0) !== tx.nominal;
 
-        return {
-            ...e,
-            is_voided: isVoided,
-            is_stale: isStale,
-            source_nominal: tx?.nominal ?? null,
-        };
+            return { ...e, is_voided: isVoided, is_stale: isStale, source_nominal: tx?.nominal ?? null };
+        }
+
+        if (e.source_type === "TRANSACTION_PAYMENT" && e.source_id) {
+            const invoiceNumber = paymentInvoiceMap.get(e.source_id as string);
+            const tx = invoiceNumber ? txMap.get(invoiceNumber) : undefined;
+            const isVoided = !!tx && tx.status === "CANCELLED";
+            return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null };
+        }
+
+        return { ...e, is_voided: false, is_stale: false };
     });
 
     const masuk = all.filter((e: any) => e.direction === "IN");

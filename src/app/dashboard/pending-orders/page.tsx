@@ -162,6 +162,13 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
+    const [cicilanAmount, setCicilanAmount] = useState("");
+
+    const dealTotal = Number(tx.deal_price || tx.amount || 0);
+    const paidSoFar = Number(tx.dp_amount || 0);
+    const remaining = Math.max(0, dealTotal - paidSoFar);
+    const showCicilanForm = payMode === "CICILAN";
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -172,7 +179,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        setUploadingPhoto(true); setError("");
+        setUploadingPhoto(true);
         try {
             const fd = new FormData();
             fd.append("file", file);
@@ -186,6 +193,28 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     };
 
     const handleConfirm = async () => {
+        if (showCicilanForm) {
+            const amt = Number(cicilanAmount);
+            if (!amt || amt <= 0) { setError("Nominal cicilan wajib diisi"); return; }
+            setLoading(true); setError("");
+            try {
+                const res = await fetch("/api/units/confirm-payment", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        invoice_number: tx.invoice_number,
+                        amount: amt,
+                        is_partial: true,
+                    }),
+                });
+                const r = await res.json();
+                if (!r.success) { setError(r.message || "Gagal"); return; }
+                onSuccess(); onClose();
+            } catch { setError("Terjadi kesalahan koneksi"); }
+            finally { setLoading(false); }
+            return;
+        }
+
         setLoading(true); setError("");
         try {
             const res = await fetch("/api/units/confirm-payment", {
@@ -217,7 +246,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="font-bold text-white text-sm">Konfirmasi Lunas</h2>
+                                <h2 className="font-bold text-white text-sm">Pembayaran</h2>
                                 <p className="text-xs text-gray-400 font-mono mt-0.5">{tx.invoice_number}</p>
                             </div>
                         </div>
@@ -236,8 +265,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                             { label: "Status", value: <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${tx.status === "RESERVED" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-orange-50 text-orange-700 border-orange-200"}`}>{tx.status === "RESERVED" ? <><CreditCard size={12} /> DP</> : <><Package size={12} /> Ambil Dulu</>}</span> },
                             { label: "Customer", value: <span className="text-xs font-semibold text-gray-800">{tx.customer_name}</span> },
                             { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800 truncate max-w-[180px] block">{tx.laptop_name}</span> },
-                            { label: "SN", value: tx.serial_number ? <code className="text-xs font-mono bg-white px-1.5 py-0.5 rounded border border-gray-200 text-gray-700">{tx.serial_number}</code> : <span className="inline-flex items-center gap-1 text-xs text-amber-500 font-medium"><AlertTriangle size={12} /> Tidak ada SN</span> },
-                            { label: "Harga Deal", value: <span className="text-sm font-bold text-gray-800">{fmt(tx.deal_price || tx.amount)}</span> },
+                            { label: "Harga Deal", value: <span className="text-sm font-bold text-gray-800">{fmt(dealTotal)}</span> },
                         ].map((row, i) => (
                             <div key={i} className="flex items-center justify-between px-4 py-2.5">
                                 <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wide">{row.label}</span>
@@ -246,41 +274,88 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                         ))}
                     </div>
 
-                    {/* Upload bukti */}
-                    <div>
-                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-                            Bukti Transfer <span className="text-gray-400 normal-case font-normal">(opsional)</span>
-                        </label>
-                        {paymentPhoto ? (
-                            <div className="relative rounded-xl overflow-hidden border border-gray-200">
-                                <img src={paymentPhoto} alt="Bukti bayar" className="w-full max-h-40 object-cover" />
-                                <button onClick={() => { setPaymentPhoto(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                                    className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-lg flex items-center justify-center hover:bg-red-600 transition shadow">
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                                <div className="bg-gray-50 border-t border-gray-100 px-3 py-1.5">
-                                    <p className="inline-flex items-center gap-1 text-xs font-medium text-gray-600"><CheckCircle2 size={12} className="text-emerald-600" /> Foto berhasil diupload</p>
-                                </div>
+                    {paidSoFar > 0 && (
+                        <div className="bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-3 px-4 py-3">
+                            <div>
+                                <p className="text-[10px] text-gray-400 font-semibold uppercase">Sudah Dibayar</p>
+                                <p className="text-sm font-bold text-blue-700">{fmt(paidSoFar)}</p>
                             </div>
-                        ) : (
-                            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingPhoto}
-                                className="w-full border-2 border-dashed border-gray-200 rounded-xl py-5 flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:border-gray-300 hover:bg-gray-50 transition">
-                                {uploadingPhoto ? (
-                                    <><div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" /><span className="text-xs">Mengupload...</span></>
-                                ) : (
-                                    <><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg><span className="text-xs font-medium">Upload Foto Bukti</span></>
-                                )}
-                            </button>
-                        )}
-                        <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} className="hidden" />
+                            <div>
+                                <p className="text-[10px] text-gray-400 font-semibold uppercase">Sisa Tagihan</p>
+                                <p className="text-sm font-bold text-red-600">{fmt(remaining)}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={() => setPayMode("CICILAN")}
+                            className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "CICILAN" ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                            Cicilan
+                        </button>
+                        <button type="button" onClick={() => setPayMode("LUNAS")}
+                            className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "LUNAS" ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                            Lunas Sekarang
+                        </button>
                     </div>
 
-                    <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
-                        <svg className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                        </svg>
-                        <p className="text-xs text-amber-700">Konfirmasi akan mengubah status menjadi <strong>PAID</strong> dan unit menjadi <strong>SOLD</strong>. Tidak dapat dibatalkan.</p>
-                    </div>
+                    {showCicilanForm ? (
+                        <div className="space-y-1.5">
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">Nominal Cicilan</label>
+                            <input
+                                type="number" value={cicilanAmount}
+                                onChange={(e) => { setCicilanAmount(e.target.value); setError(""); }}
+                                placeholder={`Kurang dari ${fmt(remaining)}`}
+                                className="w-full h-11 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:bg-white transition"
+                                autoFocus
+                            />
+                            <p className="text-[11px] text-gray-400">Sisa setelah cicilan ini: {fmt(Math.max(0, remaining - (Number(cicilanAmount) || 0)))}</p>
+                        </div>
+                    ) : (
+                        <>
+                            {/* SN — hanya relevan buat status RESERVED tanpa SN */}
+                            {tx.status === "RESERVED" && !tx.serial_number && (
+                                <div className="flex items-center gap-1 text-xs text-amber-500 font-medium px-1">
+                                    <AlertTriangle size={12} /> Unit belum ada SN — pastikan sudah diisi sebelum lunas
+                                </div>
+                            )}
+
+                            {/* Upload bukti */}
+                            <div>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                                    Bukti Transfer <span className="text-gray-400 normal-case font-normal">(opsional)</span>
+                                </label>
+                                {paymentPhoto ? (
+                                    <div className="relative rounded-xl overflow-hidden border border-gray-200">
+                                        <img src={paymentPhoto} alt="Bukti bayar" className="w-full max-h-40 object-cover" />
+                                        <button onClick={() => { setPaymentPhoto(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                                            className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-lg flex items-center justify-center hover:bg-red-600 transition shadow">
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                        <div className="bg-gray-50 border-t border-gray-100 px-3 py-1.5">
+                                            <p className="inline-flex items-center gap-1 text-xs font-medium text-gray-600"><CheckCircle2 size={12} className="text-emerald-600" /> Foto berhasil diupload</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingPhoto}
+                                        className="w-full border-2 border-dashed border-gray-200 rounded-xl py-5 flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:border-gray-300 hover:bg-gray-50 transition">
+                                        {uploadingPhoto ? (
+                                            <><div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" /><span className="text-xs">Mengupload...</span></>
+                                        ) : (
+                                            <><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg><span className="text-xs font-medium">Upload Foto Bukti</span></>
+                                        )}
+                                    </button>
+                                )}
+                                <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} className="hidden" />
+                            </div>
+
+                            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
+                                <svg className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                                </svg>
+                                <p className="text-xs text-amber-700">Konfirmasi akan mengubah status menjadi <strong>PAID</strong> dan unit menjadi <strong>SOLD</strong>. Tidak dapat dibatalkan.</p>
+                            </div>
+                        </>
+                    )}
 
                     {error && (
                         <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-xs text-red-700 anim-shake">{error}</div>
@@ -291,7 +366,12 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                     <button onClick={onClose} disabled={loading} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
                     <button onClick={handleConfirm} disabled={loading || uploadingPhoto}
                         className="flex-1 h-10 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-md">
-                        {loading ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</> : <><CheckCircle2 size={16} /> Konfirmasi Lunas</>}
+                        {loading
+                            ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
+                            : showCicilanForm
+                                ? "Simpan Cicilan"
+                                : <><CheckCircle2 size={16} /> Konfirmasi Lunas</>
+                        }
                     </button>
                 </div>
             </div>

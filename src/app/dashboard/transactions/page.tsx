@@ -191,14 +191,16 @@ function getCustomerTypeBadge(type: string): { text: string; icon: LucideIcon } 
 function getPrimaryPriceDisplay(item: any) {
   const dealPrice = Number(item.deal_price || item.amount || 0);
   if (item.status === "RESERVED") {
+    const paid = Number(item.dp_amount || 0);
     return {
-      label: "DP Diterima",
-      value: Number(item.dp_amount || 0),
+      label: "Terbayar",
+      value: paid,
       isDP: true,
       totalDeal: dealPrice,
+      remaining: Math.max(0, dealPrice - paid),
     };
   }
-  return { label: "Harga Jual", value: dealPrice, isDP: false, totalDeal: dealPrice };
+  return { label: "Harga Jual", value: dealPrice, isDP: false, totalDeal: dealPrice, remaining: 0 };
 }
 
 // ─── RESTORE MODAL ────────────────────────────────────────────────────
@@ -244,20 +246,71 @@ function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
 }
 
 // ─── CONFIRM PAYMENT MODAL ────────────────────────────────────────────
-function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setConfirmError, confirming, onConfirm, onClose }: {
+function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setConfirmError, confirming, payMode, setPayMode, cicilanAmount, setCicilanAmount, onConfirm, onClose }: {
   item: any; confirmSN: string; setConfirmSN: (v: string) => void; confirmError: string;
-  setConfirmError: (v: string) => void; confirming: boolean; onConfirm: () => void; onClose: () => void;
+  setConfirmError: (v: string) => void; confirming: boolean;
+  payMode: "LUNAS" | "CICILAN"; setPayMode: (v: "LUNAS" | "CICILAN") => void;
+  cicilanAmount: string; setCicilanAmount: (v: string) => void;
+  onConfirm: () => void; onClose: () => void;
 }) {
+  const fmt = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
+  const dealTotal = Number(item.deal_price || item.amount || 0);
+  const paidSoFar = Number(item.dp_amount || 0);
+  const remaining = Math.max(0, dealTotal - paidSoFar);
+  const isReserved = item.status === "RESERVED";
+  const showCicilanForm = isReserved && payMode === "CICILAN";
+  const showSNForm = isReserved && payMode === "LUNAS";
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden ring-1 ring-black/5">
         <div className="bg-emerald-700 px-5 py-4">
-          <p className="font-semibold text-white text-sm">Konfirmasi Pelunasan</p>
+          <p className="font-semibold text-white text-sm">Pembayaran</p>
           <p className="text-xs text-white/60 mt-0.5 font-mono">{item.invoice_number}</p>
         </div>
         <div className="p-5 space-y-4">
-          {item.status === "RESERVED" && (
+          {isReserved && (
+            <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-200 grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-gray-400 font-semibold uppercase">Sudah Dibayar</p>
+                <p className="text-sm font-bold text-blue-700">{fmt(paidSoFar)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-gray-400 font-semibold uppercase">Sisa Tagihan</p>
+                <p className="text-sm font-bold text-red-600">{fmt(remaining)}</p>
+              </div>
+            </div>
+          )}
+
+          {isReserved && (
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setPayMode("CICILAN")}
+                className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "CICILAN" ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                Cicilan
+              </button>
+              <button type="button" onClick={() => setPayMode("LUNAS")}
+                className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "LUNAS" ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                Lunas Sekarang
+              </button>
+            </div>
+          )}
+
+          {showCicilanForm && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nominal Cicilan</label>
+              <input
+                type="number" value={cicilanAmount}
+                onChange={(e) => { setCicilanAmount(e.target.value); setConfirmError(""); }}
+                placeholder={`Kurang dari ${fmt(remaining)}`}
+                className="w-full h-11 sm:h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
+                autoFocus
+              />
+              <p className="text-[11px] text-gray-400">Sisa setelah cicilan ini: {fmt(Math.max(0, remaining - (Number(cicilanAmount) || 0)))}</p>
+            </div>
+          )}
+
+          {showSNForm && (
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Serial Number</label>
               <input
@@ -265,16 +318,16 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
                 onChange={(e) => { setConfirmSN(e.target.value); setConfirmError(""); }}
                 placeholder="Masukkan SN..."
                 className="w-full h-11 sm:h-10 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-                autoFocus
               />
             </div>
           )}
+
           {confirmError && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-xs text-red-700 font-medium">{confirmError}</div>}
         </div>
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-3 bg-gray-50">
           <button onClick={() => { onClose(); setConfirmError(""); }} className="flex-1 h-11 sm:h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-          <button onClick={onConfirm} disabled={confirming} className="flex-1 h-11 sm:h-10 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-60">
-            {confirming ? "Memproses..." : "Konfirmasi"}
+          <button onClick={onConfirm} disabled={confirming} className={`flex-1 h-11 sm:h-10 text-white rounded-xl text-sm font-semibold transition disabled:opacity-60 ${showCicilanForm ? "bg-gray-900 hover:bg-gray-800" : "bg-emerald-600 hover:bg-emerald-700"}`}>
+            {confirming ? "Memproses..." : showCicilanForm ? "Simpan Cicilan" : "Konfirmasi Lunas"}
           </button>
         </div>
       </div>
@@ -473,11 +526,28 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
+  const [cicilanAmount, setCicilanAmount] = useState("");
 
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
+    const isCicilan = item.status === "RESERVED" && payMode === "CICILAN";
+
+    if (isCicilan) {
+      const amt = Number(cicilanAmount);
+      if (!amt || amt <= 0) { setConfirmError("Nominal cicilan wajib diisi"); return; }
+      setConfirming(true); setConfirmError("");
+      try {
+        const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, amount: amt, is_partial: true }) });
+        const result = await res.json();
+        if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
+        setShowConfirmModal(false); onRestored(item.invoice_number);
+      } catch { setConfirmError("Terjadi kesalahan koneksi"); } finally { setConfirming(false); }
+      return;
+    }
+
     if (item.status === "RESERVED" && !confirmSN.trim()) { setConfirmError("Serial number wajib diisi"); return; }
     setConfirming(true); setConfirmError("");
     try {
@@ -605,7 +675,10 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
                 <p className="text-[10px] text-blue-500 font-semibold mb-0.5">{priceDisplay.label}</p>
                 <p className="text-sm font-bold text-blue-900 tabular-nums truncate">Rp{priceDisplay.value.toLocaleString("id-ID")}</p>
                 {priceDisplay.isDP && (
-                  <p className="text-[9px] text-blue-400 mt-0.5 truncate">dari Rp{priceDisplay.totalDeal.toLocaleString("id-ID")}</p>
+                  <>
+                    <p className="text-[9px] text-blue-400 mt-0.5 truncate">dari Rp{priceDisplay.totalDeal.toLocaleString("id-ID")}</p>
+                    <p className="text-[9px] text-red-500 font-semibold mt-0.5 truncate">Sisa Rp{priceDisplay.remaining.toLocaleString("id-ID")}</p>
+                  </>
                 )}
               </div>
             );
@@ -687,8 +760,8 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
             </a>
           )}
           {isPending && canEditTransaction && (
-            <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition text-[10px] font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5" />Lunas
+            <button onClick={() => { setConfirmSN(item.serial_number || ""); setPayMode("LUNAS"); setCicilanAmount(""); setShowConfirmModal(true); }} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition text-[10px] font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5" />Bayar
             </button>
           )}
           {canRestore && (
@@ -704,8 +777,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
       {showRestoreModal && <RestoreModal item={item} isPending={isPending} restoring={restoring} onConfirm={handleRestore} onClose={() => setShowRestoreModal(false)} />}
-      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
-    </div>
+      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}    </div>
   );
 }
 
@@ -854,11 +926,28 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
   const [confirmSN, setConfirmSN] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState("");
+  const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
+  const [cicilanAmount, setCicilanAmount] = useState("");
 
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
+    const isCicilan = item.status === "RESERVED" && payMode === "CICILAN";
+
+    if (isCicilan) {
+      const amt = Number(cicilanAmount);
+      if (!amt || amt <= 0) { setConfirmError("Nominal cicilan wajib diisi"); return; }
+      setConfirming(true); setConfirmError("");
+      try {
+        const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, amount: amt, is_partial: true }) });
+        const result = await res.json();
+        if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
+        setShowConfirmModal(false); onRestored(item.invoice_number);
+      } catch { setConfirmError("Terjadi kesalahan koneksi"); } finally { setConfirming(false); }
+      return;
+    }
+
     if (item.status === "RESERVED" && !confirmSN.trim()) { setConfirmError("Serial number wajib diisi"); return; }
     setConfirming(true); setConfirmError("");
     try {
@@ -1054,7 +1143,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
               </a>
             )}
             {isPending && canEditTransaction && (
-              <button onClick={() => { setConfirmSN(item.serial_number || ""); setShowConfirmModal(true); }} className="p-1.5 text-gray-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition group-hover:text-gray-400" title="Lunas">
+              <button onClick={() => { setConfirmSN(item.serial_number || ""); setPayMode("LUNAS"); setCicilanAmount(""); setShowConfirmModal(true); }} className="p-1.5 text-gray-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition group-hover:text-gray-400" title="Bayar">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </button>
             )}
@@ -1072,7 +1161,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
       {showRestoreModal && <RestoreModal item={item} isPending={isPending} restoring={restoring} onConfirm={handleRestore} onClose={() => setShowRestoreModal(false)} />}
-      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
+      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
     </>
   );
 }

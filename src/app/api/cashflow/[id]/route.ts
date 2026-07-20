@@ -13,30 +13,56 @@ function getAdmin(): SupabaseClient {
     );
 }
 
-/**
- * `is_voided` BUKAN kolom di tabel `cashflow_entries`.
- * Itu field turunan (derived) yang dihitung di GET /api/cashflow dengan
- * mencocokkan source_id ke tabel `transactions` lalu cek status !== "PAID".
- * Helper ini menghitung ulang status tersebut untuk satu entry.
- */
 async function isEntryVoided(
     supabase: SupabaseClient,
     entry: { source_type: string | null; source_id: string | null }
 ): Promise<boolean> {
-    if (entry.source_type !== "TRANSACTION" || !entry.source_id) return false;
+    if (!entry.source_id) return false;
 
-    const { data: tx, error } = await supabase
-        .from("transactions")
-        .select("status")
-        .eq("invoice_number", entry.source_id)
-        .maybeSingle();
+    if (entry.source_type === "TRANSACTION") {
+        const { data: tx, error } = await supabase
+            .from("transactions")
+            .select("status")
+            .eq("invoice_number", entry.source_id)
+            .maybeSingle();
 
-    if (error) {
-        console.error("[cashflow] cek void gagal:", error.message);
-        return false; // fail-open: jangan blokir aksi hanya karena lookup gagal
+        if (error) {
+            console.error("[cashflow] cek void gagal:", error.message);
+            return false;
+        }
+
+        return !!tx && tx.status !== "PAID";
     }
 
-    return !!tx && tx.status !== "PAID";
+    if (entry.source_type === "TRANSACTION_PAYMENT") {
+        // source_id di sini adalah id baris transaction_payments — resolve dulu
+        // ke invoice_number-nya sebelum cek status transaksi induk.
+        const { data: payment, error: payErr } = await supabase
+            .from("transaction_payments")
+            .select("invoice_number")
+            .eq("id", entry.source_id)
+            .maybeSingle();
+
+        if (payErr || !payment) {
+            if (payErr) console.error("[cashflow] cek void (payment) gagal:", payErr.message);
+            return false;
+        }
+
+        const { data: tx, error } = await supabase
+            .from("transactions")
+            .select("status")
+            .eq("invoice_number", payment.invoice_number)
+            .maybeSingle();
+
+        if (error) {
+            console.error("[cashflow] cek void gagal:", error.message);
+            return false;
+        }
+
+        return !!tx && tx.status === "CANCELLED";
+    }
+
+    return false;
 }
 
 // ── PATCH /api/cashflow/[id] — toggle audit ───────────────────────────────────

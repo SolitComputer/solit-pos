@@ -155,6 +155,19 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
+    // ── 5b. Catat pembayaran DP awal — sumber sync per-pembayaran ke cashflow ──
+    if (type === "RESERVED" && Number(dp_amount) > 0) {
+      const { error: payErr } = await supabaseAdmin.from("transaction_payments").insert({
+        transaction_id: tx.id,
+        invoice_number,
+        amount: Number(dp_amount),
+        payment_type: "DP",
+        payment_method: payment_method || "TRANSFER",
+        created_by_name: user.name,
+      });
+      if (payErr) console.error("[reserve] gagal catat transaction_payments (DP):", payErr.message);
+    }
+
     // ── 6. Update qty laptop (RESERVED/HELD tidak dikurangi qty) ──────────
     if (unit.laptop?.id) {
       const { data: remaining } = await supabaseAdmin

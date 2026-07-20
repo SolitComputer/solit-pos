@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
-import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 
 async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     const body = await req.json();
-    const { invoice_number, payment_photo, serial_number } = body;
+    const { invoice_number, payment_photo, serial_number, amount, is_partial } = body;
 
     if (!invoice_number) {
       return NextResponse.json(
@@ -15,7 +15,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    const { data: transaction } = await supabase
+    const { data: transaction } = await supabaseAdmin
       .from("transactions")
       .select("*")
       .eq("invoice_number", invoice_number)
@@ -35,19 +35,84 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
+    const dealTotal = Number(transaction.deal_price ?? transaction.amount ?? 0);
+    const paidSoFar = Number(transaction.dp_amount ?? 0);
+    const remaining = Math.max(0, dealTotal - paidSoFar);
+
+    // ── Jalur CICILAN: bayar sebagian, transaksi TETAP di status semula ──
+    if (is_partial) {
+      const cicilan = Math.round(Number(amount));
+      if (!Number.isFinite(cicilan) || cicilan <= 0) {
+        return NextResponse.json({ success: false, message: "Nominal cicilan tidak valid" }, { status: 400 });
+      }
+      if (cicilan >= remaining) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Nominal cicilan (Rp${cicilan.toLocaleString("id-ID")}) melebihi atau sama dengan sisa tagihan (Rp${remaining.toLocaleString("id-ID")}). Gunakan opsi "Lunas Sekarang".`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const newPaidTotal = paidSoFar + cicilan;
+      const now = new Date().toISOString();
+
+      const { error: payErr } = await supabaseAdmin.from("transaction_payments").insert({
+        transaction_id: transaction.id,
+        invoice_number,
+        amount: cicilan,
+        payment_type: "CICILAN",
+        created_by_name: user.name,
+      });
+      if (payErr) {
+        console.error("[confirm-payment] gagal catat cicilan:", payErr.message);
+        return NextResponse.json({ success: false, message: "Gagal mencatat cicilan: " + payErr.message }, { status: 500 });
+      }
+
+      const { data: updatedTx } = await supabaseAdmin
+        .from("transactions")
+        .update({
+          dp_amount: newPaidTotal,
+          last_edited_by: user.name,
+          last_edited_at: now,
+          notes: transaction.notes
+            ? `${transaction.notes} | [CICILAN ${now.split("T")[0]}: Rp${cicilan.toLocaleString("id-ID")} oleh ${user.name}]`
+            : `[CICILAN ${now.split("T")[0]}: Rp${cicilan.toLocaleString("id-ID")} oleh ${user.name}]`,
+        })
+        .eq("invoice_number", invoice_number)
+        .select()
+        .single();
+
+      await logActivity({
+        userId: user.id, userName: user.name, userRole: user.role,
+        action: "EDIT", entity: "transaction", entityId: transaction.id,
+        entityLabel: `${invoice_number} — CICILAN Rp${cicilan.toLocaleString("id-ID")} (sisa Rp${(dealTotal - newPaidTotal).toLocaleString("id-ID")})`,
+        beforeData: transaction, afterData: updatedTx,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Cicilan Rp${cicilan.toLocaleString("id-ID")} tercatat. Sisa tagihan: Rp${(dealTotal - newPaidTotal).toLocaleString("id-ID")}`,
+        invoice_number,
+        paid_amount: newPaidTotal,
+        remaining: dealTotal - newPaidTotal,
+      });
+    }
+
+    // ── Jalur LUNAS (melunasi sisa, sekaligus proses SOLD & warranty) ────
+    const finalPayment = remaining;
     const now = new Date().toISOString();
     const warrantyDuration = 30;
     const warrantyEnd = new Date();
     warrantyEnd.setDate(warrantyEnd.getDate() + warrantyDuration);
 
-    // ── Deteksi multi-unit vs single unit ────────────────────────────────────
     const isMultiUnit = Array.isArray(transaction.unit_ids) && transaction.unit_ids.length > 1;
 
     if (isMultiUnit) {
-      // ── Multi-unit: konfirmasi semua unit sekaligus ─────────────────────
       const unitIds: string[] = transaction.unit_ids;
 
-      const { data: units } = await supabase
+      const { data: units } = await supabaseAdmin
         .from("laptop_units")
         .select("id, laptop_id, serial_number, status")
         .in("id", unitIds);
@@ -59,11 +124,11 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         );
       }
 
-      // Update transaction
-      const { data: updatedTx } = await supabase
+      const { data: updatedTx } = await supabaseAdmin
         .from("transactions")
         .update({
           status: "PAID",
+          dp_amount: dealTotal,
           paid_at: now,
           payment_photo: payment_photo || transaction.payment_photo,
           last_edited_by: user.name,
@@ -73,28 +138,36 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         .select()
         .single();
 
-      // Update semua unit → SOLD
-      await supabase
+      if (finalPayment > 0) {
+        const { error: payErr } = await supabaseAdmin.from("transaction_payments").insert({
+          transaction_id: transaction.id,
+          invoice_number,
+          amount: finalPayment,
+          payment_type: "PELUNASAN",
+          created_by_name: user.name,
+        });
+        if (payErr) console.error("[confirm-payment] gagal catat pelunasan (multi-unit):", payErr.message);
+      }
+
+      await supabaseAdmin
         .from("laptop_units")
         .update({ status: "SOLD", reserved_by: null, reserved_invoice: null })
         .in("id", unitIds);
 
-      // Update qty tiap laptop
       const uniqueLaptopIds = [...new Set(units.map(u => u.laptop_id))];
       await Promise.all(uniqueLaptopIds.map(async (lid) => {
-        const { data: remaining } = await supabase
+        const { data: remainingUnits } = await supabaseAdmin
           .from("laptop_units")
           .select("id")
           .eq("laptop_id", lid)
           .eq("status", "SIAP_JUAL");
-        const newQty = remaining?.length ?? 0;
-        await supabase
+        const newQty = remainingUnits?.length ?? 0;
+        await supabaseAdmin
           .from("laptops")
           .update({ qty: newQty, status: newQty <= 0 ? "SOLD" : "SIAP_JUAL" })
           .eq("id", lid);
       }));
 
-      // Buat warranty untuk setiap unit
       const warrantiesToInsert = units.map(u => ({
         invoice_number,
         serial_number: u.serial_number.toUpperCase(),
@@ -110,7 +183,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         created_by: user.name,
       }));
 
-      await supabase.from("warranties").insert(warrantiesToInsert);
+      await supabaseAdmin.from("warranties").insert(warrantiesToInsert);
 
       await logActivity({
         userId: user.id, userName: user.name, userRole: user.role,
@@ -134,7 +207,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         );
       }
 
-      const { data: unit } = await supabase
+      const { data: unit } = await supabaseAdmin
         .from("laptop_units")
         .select("id, laptop_id, status")
         .eq("serial_number", finalSN)
@@ -147,12 +220,13 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         );
       }
 
-      const { data: updatedTx } = await supabase
+      const { data: updatedTx } = await supabaseAdmin
         .from("transactions")
         .update({
           status: "PAID",
           serial_number: finalSN,
           unit_id: unit.id,
+          dp_amount: dealTotal,
           paid_at: now,
           payment_photo: payment_photo || transaction.payment_photo,
           last_edited_by: user.name,
@@ -162,24 +236,35 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         .select()
         .single();
 
-      await supabase
+      if (finalPayment > 0) {
+        const { error: payErr } = await supabaseAdmin.from("transaction_payments").insert({
+          transaction_id: transaction.id,
+          invoice_number,
+          amount: finalPayment,
+          payment_type: "PELUNASAN",
+          created_by_name: user.name,
+        });
+        if (payErr) console.error("[confirm-payment] gagal catat pelunasan:", payErr.message);
+      }
+
+      await supabaseAdmin
         .from("laptop_units")
         .update({ status: "SOLD", reserved_by: null, reserved_invoice: null })
         .eq("id", unit.id);
 
-      const { data: remainingUnits } = await supabase
+      const { data: remainingUnits } = await supabaseAdmin
         .from("laptop_units")
         .select("id")
         .eq("laptop_id", unit.laptop_id)
         .eq("status", "SIAP_JUAL");
 
       const newQty = remainingUnits?.length ?? 0;
-      await supabase
+      await supabaseAdmin
         .from("laptops")
         .update({ qty: newQty, status: newQty <= 0 ? "SOLD" : "SIAP_JUAL" })
         .eq("id", unit.laptop_id);
 
-      await supabase.from("warranties").insert({
+      await supabaseAdmin.from("warranties").insert({
         invoice_number,
         serial_number: finalSN.toUpperCase(),
         customer_name: transaction.customer_name,
