@@ -13,11 +13,21 @@ function getDealPrice(item: any): number {
   return Number(item.deal_price || item.amount || 0);
 }
 
-// GROSS PROFIT = deal_price - inventory_price (BUKAN other field)
-function calcGrossProfit(item: any): number {
+// GROSS PROFIT = deal_price - live purchase_price dari laptop_units
+// (disamakan dengan calcMarginFromMap di stats/route.ts, BUKAN kolom inventory_price)
+function calcGrossProfit(item: any, unitMap: Map<string, number>): number {
   const dealPrice = getDealPrice(item);
-  const inventoryPrice = Number(item.inventory_price || 0);
-  return dealPrice - inventoryPrice;
+  let totalPurchasePrice = 0;
+
+  if (Array.isArray(item.unit_ids) && item.unit_ids.length > 0) {
+    for (const uid of item.unit_ids) {
+      totalPurchasePrice += unitMap.get(uid) ?? 0;
+    }
+  } else if (item.unit_id) {
+    totalPurchasePrice = unitMap.get(item.unit_id) ?? 0;
+  }
+
+  return totalPurchasePrice > 0 ? dealPrice - totalPurchasePrice : 0;
 }
 
 // WIB day → rentang UTC (sama persis dengan stats/route.ts)
@@ -64,13 +74,40 @@ async function handler(req: NextRequest) {
         .gte("paid_at", dailyRange.start).lt("paid_at", dailyRange.end),
     ]);
 
+    // ── BATCH FETCH purchase_price dari laptop_units (sama seperti stats/route.ts) ──
+    const allTrxForUnits = [
+      ...(todayTrx ?? []),
+      ...(monthTrx ?? []),
+      ...(dailyTrx ?? []),
+    ];
+
+    const allUnitIds = new Set<string>();
+    for (const trx of allTrxForUnits) {
+      if (trx.unit_id) allUnitIds.add(trx.unit_id);
+      if (Array.isArray(trx.unit_ids)) {
+        for (const uid of trx.unit_ids) { if (uid) allUnitIds.add(uid); }
+      }
+    }
+
+    const unitMap = new Map<string, number>();
+    if (allUnitIds.size > 0) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, purchase_price")
+        .in("id", Array.from(allUnitIds));
+      for (const unit of units ?? []) {
+        unitMap.set(unit.id, Number(unit.purchase_price ?? 0));
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     // ── Daily Breakdown ────────────────────────────────────────────────────
     const dailyMap: Record<string, { gross_profit: number; revenue: number; count: number; margin_pct: number }> = {};
     dailyTrx?.forEach((item) => {
       if (!item.paid_at) return;
       const date = paidAtToWIBDate(item.paid_at);
       const dealPrice = getDealPrice(item);
-      const grossProfit = calcGrossProfit(item);
+      const grossProfit = calcGrossProfit(item, unitMap);
 
       if (!dailyMap[date]) dailyMap[date] = { gross_profit: 0, revenue: 0, count: 0, margin_pct: 0 };
       dailyMap[date].gross_profit += grossProfit;
@@ -112,7 +149,7 @@ async function handler(req: NextRequest) {
       const weekKey = weekStart.toISOString().split("T")[0];
 
       const dealPrice = getDealPrice(item);
-      const grossProfit = calcGrossProfit(item);
+      const grossProfit = calcGrossProfit(item, unitMap);
 
       if (!weeklyMap[weekKey]) {
         weeklyMap[weekKey] = { gross_profit: 0, revenue: 0, count: 0, margin_pct: 0 };
@@ -144,19 +181,21 @@ async function handler(req: NextRequest) {
 
     // ── Monthly Summary ────────────────────────────────────────────────────
     const monthRevenue = monthTrx?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0;
-    const monthGrossProfit = monthTrx?.reduce((acc, item) => acc + calcGrossProfit(item), 0) || 0;
+    const monthGrossProfit = monthTrx?.reduce((acc, item) => acc + calcGrossProfit(item, unitMap), 0) || 0;
     const monthMarginPct = monthRevenue > 0 ? Math.round((monthGrossProfit / monthRevenue) * 100) : 0;
+
+    // ── Today Summary ────────────────────────────────────────────────────
+    const todayGrossProfit = todayTrx?.reduce((acc, item) => acc + calcGrossProfit(item, unitMap), 0) || 0;
+    const todayRevenue = todayTrx?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0;
 
     return NextResponse.json({
       success: true,
       data: {
         today: {
-          gross_profit: todayTrx?.reduce((acc, item) => acc + calcGrossProfit(item), 0) || 0,
-          revenue: todayTrx?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0,
+          gross_profit: todayGrossProfit,
+          revenue: todayRevenue,
           count: todayTrx?.length || 0,
-          margin_pct: todayTrx && todayTrx.length > 0
-            ? Math.round((todayTrx.reduce((acc, item) => acc + calcGrossProfit(item), 0) / todayTrx.reduce((acc, item) => acc + getDealPrice(item), 0)) * 100)
-            : 0,
+          margin_pct: todayRevenue > 0 ? Math.round((todayGrossProfit / todayRevenue) * 100) : 0,
         },
         daily: dailyBreakdown,
         weekly: weeklyBreakdown,
