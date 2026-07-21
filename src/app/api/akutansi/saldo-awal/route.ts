@@ -48,12 +48,6 @@ export const GET = withAuth(async (req) => {
   return NextResponse.json({ success: true, data: data ?? null });
 }, AKUNTANSI_MANAGE_ROLES);
 
-// ── POST /api/akutansi/saldo-awal — input saldo awal PERTAMA KALI ───────────
-// Rumus normal balance:
-//   sisi DEBIT ketemu baris DEBIT  -> +   |  sisi DEBIT ketemu baris KREDIT -> -
-//   sisi KREDIT ketemu baris DEBIT -> -   |  sisi KREDIT ketemu baris KREDIT -> +
-// Diwujudkan sebagai nilai bertanda: DEBIT = +nominal, KREDIT = -nominal,
-// lalu dipakai sebagai basis running balance di Buku Besar.
 export const POST = withAuth(async (req, _ctx, user: any) => {
   const body = await req.json();
   const { account_code, side, nominal } = body as {

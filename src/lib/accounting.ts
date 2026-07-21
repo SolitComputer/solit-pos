@@ -240,46 +240,53 @@ export function mergeLines(lines: DraftLine[]): DraftLine[] {
   return Array.from(map.values());
 }
 
+/** Bersihkan baris jurnal MANUAL tanpa menggabungkan akun+side yang sama.
+ *  Beda dengan mergeLines(): di jurnal manual, 2 baris dengan akun & side yang
+ *  sama tetap 2 transaksi terpisah — tidak boleh dijumlahkan jadi satu baris. */
+export function cleanManualLines(lines: DraftLine[]): DraftLine[] {
+  return lines.filter((l) => Number(l.nominal) > 0).map((l) => ({ ...l }));
+}
+
 // ─── Template jurnal manual ───────────────────────────────────────────────────
 export const MANUAL_TEMPLATES: {
   key: string;
   label: string;
   lines: { account_code: string; side: JournalSide }[];
 }[] = [
-  {
-    key: "PENJUALAN_LAPTOP",
-    label: "Penjualan Laptop",
-    lines: [
-      { account_code: AKUN.KAS_SALDO, side: "DEBIT" },
-      { account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT" },
-    ],
-  },
-  {
-    key: "SERVICE",
-    label: "Service Laptop",
-    lines: [
-      { account_code: AKUN.KAS_CASH, side: "DEBIT" },
-      { account_code: AKUN.JASA_SERVICE, side: "KREDIT" },
-    ],
-  },
-  {
-    key: "PENJUALAN_AKSESORIS",
-    label: "Penjualan Aksesoris",
-    lines: [
-      { account_code: AKUN.KAS_CASH, side: "DEBIT" },
-      { account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT" },
-    ],
-  },
-  {
-    key: "BEBAN",
-    label: "Beban / Pengeluaran",
-    lines: [
-      { account_code: AKUN.BIAYA_LAIN, side: "DEBIT" },
-      { account_code: AKUN.KAS_CASH, side: "KREDIT" },
-    ],
-  },
-  { key: "CUSTOM", label: "Kosong (custom)", lines: [] },
-];
+    {
+      key: "PENJUALAN_LAPTOP",
+      label: "Penjualan Laptop",
+      lines: [
+        { account_code: AKUN.KAS_SALDO, side: "DEBIT" },
+        { account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT" },
+      ],
+    },
+    {
+      key: "SERVICE",
+      label: "Service Laptop",
+      lines: [
+        { account_code: AKUN.KAS_CASH, side: "DEBIT" },
+        { account_code: AKUN.JASA_SERVICE, side: "KREDIT" },
+      ],
+    },
+    {
+      key: "PENJUALAN_AKSESORIS",
+      label: "Penjualan Aksesoris",
+      lines: [
+        { account_code: AKUN.KAS_CASH, side: "DEBIT" },
+        { account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT" },
+      ],
+    },
+    {
+      key: "BEBAN",
+      label: "Beban / Pengeluaran",
+      lines: [
+        { account_code: AKUN.BIAYA_LAIN, side: "DEBIT" },
+        { account_code: AKUN.KAS_CASH, side: "KREDIT" },
+      ],
+    },
+    { key: "CUSTOM", label: "Kosong (custom)", lines: [] },
+  ];
 
 export const PROTECTED_ACCOUNT_CODES: string[] = [
   ...Object.values(AKUN),
