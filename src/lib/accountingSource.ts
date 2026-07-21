@@ -157,7 +157,6 @@ async function buildTransactionDrafts(
   return drafts;
 }
 
-// SESUDAH
 async function buildServiceDrafts(
   supabase: SupabaseClient,
   period: string
@@ -165,7 +164,7 @@ async function buildServiceDrafts(
   const { data: svcs, error } = await supabase
     .from("service_orders")
     .select(
-      "id, nama, type_laptop, payment_amount, payment_method, biaya_sparepart, status, tanggal_masuk, tanggal_selesai, tanggal_diambil"
+      "id, nama, type_laptop, payment_amount, payment_method, status, tanggal_masuk, tanggal_selesai, tanggal_diambil"
     )
     .in("status", ["DONE", "SUDAH_DIAMBIL"])
     .not("payment_amount", "is", null)
@@ -176,25 +175,74 @@ async function buildServiceDrafts(
     throw new Error(`Gagal ambil data service: ${error.message}`);
   }
 
+  // Saring dulu service yang tanggalnya masuk periode ini, supaya query
+  // accessory_outflows di bawah tidak perlu ambil semua service sepanjang masa.
+  const relevantServices = ((svcs ?? []) as any[]).filter((s) => {
+    const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.tanggal_masuk) as string;
+    if (!refDate) return false;
+    return periodFromDate(jakartaDate(refDate)) === period;
+  });
+
+  if (relevantServices.length === 0) return [];
+
+  // ── Modal sparepart SESUNGGUHNYA per service ──
+  // Dihitung dari accessory_outflows (qty aksesoris yang benar-benar dipakai teknisi)
+  // dikali accessories.buy_price (harga MODAL/beli) — BUKAN dari
+  // service_orders.biaya_sparepart, karena kolom itu menyimpan biaya yang
+  // ditagihkan ke customer (harga jual), bukan harga modal.
+  const serviceIds = relevantServices.map((s) => String(s.id));
+
+  const { data: outflows, error: outflowErr } = await supabase
+    .from("accessory_outflows")
+    .select("service_id, accessory_id, qty")
+    .eq("source_type", "service")
+    .eq("status", "active")
+    .in("service_id", serviceIds);
+
+  if (outflowErr) {
+    console.error("[akuntansi] fetch accessory_outflows:", outflowErr.message);
+  }
+
+  const accessoryIds = new Set<string>();
+  for (const o of (outflows ?? []) as any[]) {
+    if (o.accessory_id) accessoryIds.add(o.accessory_id);
+  }
+
+  const buyPriceMap = new Map<string, number>();
+  if (accessoryIds.size > 0) {
+    const { data: accs } = await supabase
+      .from("accessories")
+      .select("id, buy_price")
+      .in("id", Array.from(accessoryIds));
+    for (const a of accs ?? []) {
+      buyPriceMap.set(a.id as string, Math.round(Number(a.buy_price ?? 0)));
+    }
+  }
+
+  const modalByService = new Map<string, number>();
+  for (const o of (outflows ?? []) as any[]) {
+    const buyPrice = buyPriceMap.get(o.accessory_id) ?? 0;
+    const qty = Math.round(Number(o.qty ?? 0));
+    const cur = modalByService.get(o.service_id) ?? 0;
+    modalByService.set(o.service_id, cur + buyPrice * qty);
+  }
+
   const drafts: JournalDraft[] = [];
 
-  for (const s of (svcs ?? []) as any[]) {
+  for (const s of relevantServices) {
     const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.tanggal_masuk) as string;
-    if (!refDate) continue;
-
     const tanggal = jakartaDate(refDate);
-    if (periodFromDate(tanggal) !== period) continue;
 
     const bayar = Math.round(Number(s.payment_amount ?? 0));
     if (bayar <= 0) continue;
 
-    const sparepart = Math.round(Number(s.biaya_sparepart ?? 0));
+    const sparepart = modalByService.get(String(s.id)) ?? 0;
     const lines: DraftLine[] = [
       { account_code: kasAccountFromPaymentMethod(s.payment_method), side: "DEBIT", nominal: bayar },
       { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: bayar },
     ];
 
-    // Modal sparepart keluar dari stok aksesoris service
+    // Modal sparepart keluar dari stok aksesoris service — nilai MODAL, bukan harga jual
     if (sparepart > 0) {
       lines.push({ account_code: AKUN.MODAL_SERVICE_KELUAR, side: "DEBIT", nominal: sparepart });
       lines.push({ account_code: AKUN.AKSESORIS_SERVICE, side: "KREDIT", nominal: sparepart });
