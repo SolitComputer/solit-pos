@@ -7,7 +7,7 @@ import {
   DraftLine,
   isBalanced,
   isValidAccount,
-  mergeLines,
+  cleanManualLines,
   periodFromDate,
   totalOf,
 } from "@/lib/accounting";
@@ -69,8 +69,8 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
       return NextResponse.json({ success: false, message: "Nominal harus > 0" }, { status: 400 });
   }
 
-  const merged = mergeLines(lines);
-  if (!isBalanced(merged))
+  const merged = cleanManualLines(lines);
+   if (!isBalanced(merged))
     return NextResponse.json(
       { success: false, message: "Jurnal tidak balance — total debit harus sama dengan total kredit" },
       { status: 400 }
