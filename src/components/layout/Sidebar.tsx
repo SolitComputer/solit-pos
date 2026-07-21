@@ -102,114 +102,123 @@ interface MenuGroup {
   items: MenuItem[];
 }
 
+// ── Icon set: konsisten 24x24 viewBox, stroke rounded, ukuran 16px ───────────
 const Icons = {
   dashboard: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="2" />
+      <rect x="14" y="3" width="7" height="7" rx="2" />
+      <rect x="3" y="14" width="7" height="7" rx="2" />
+      <rect x="14" y="14" width="7" height="7" rx="2" />
     </svg>
   ),
   attendance: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="17" rx="3" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <path d="M8.5 15l2 2 4-4" />
     </svg>
   ),
   overtime: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="12 7 12 12 15.5 14" />
     </svg>
   ),
   riwayat: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
       <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
+      <line x1="8" y1="13" x2="16" y2="13" />
+      <line x1="8" y1="17" x2="16" y2="17" />
     </svg>
   ),
   laptop: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-      <line x1="12" y1="17" x2="12" y2="21" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="13" rx="2" />
+      <line x1="7" y1="21" x2="17" y2="21" />
+      <line x1="12" y1="16" x2="12" y2="21" />
     </svg>
   ),
   garansi: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21c4.5-2 8-5.5 8-11V5.5L12 3 4 5.5V10c0 5.5 3.5 9 8 11z" />
+      <path d="M9.25 12l1.75 1.75L15 10" />
     </svg>
   ),
   payment: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="1" y="4" width="22" height="16" rx="2" />
-      <line x1="1" y1="10" x2="23" y2="10" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="3" />
+      <line x1="2" y1="10" x2="22" y2="10" />
+      <line x1="6" y1="15" x2="10" y2="15" />
     </svg>
   ),
   scanner: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M4 7V5a1 1 0 011-1h2" />
-      <path d="M20 7V5a1 1 0 00-1-1h-2" />
-      <path d="M4 17v2a1 1 0 001 1h2" />
-      <path d="M20 17v2a1 1 0 01-1 1h-2" />
-      <path d="M7 12h10" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 8V6a3 3 0 013-3h2" />
+      <path d="M16 3h2a3 3 0 013 3v2" />
+      <path d="M21 16v2a3 3 0 01-3 3h-2" />
+      <path d="M8 21H6a3 3 0 01-3-3v-2" />
+      <line x1="6" y1="12" x2="18" y2="12" />
     </svg>
   ),
   logout: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   ),
   log: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 11l3 3L22 4" />
       <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </svg>
   ),
   loginLog: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" />
       <polyline points="10 17 15 12 10 7" />
       <line x1="15" y1="12" x2="3" y2="12" />
     </svg>
   ),
   reports: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
-      <line x1="2" y1="20" x2="22" y2="20" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="21" x2="21" y2="21" />
+      <rect x="6" y="13" width="3.2" height="7" rx="1" fill="currentColor" stroke="none" />
+      <rect x="12" y="8" width="3.2" height="12" rx="1" fill="currentColor" stroke="none" />
+      <rect x="18" y="4" width="3.2" height="16" rx="1" fill="currentColor" stroke="none" />
     </svg>
   ),
   laptopReady: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 12l2 2 4-4" />
-      <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-      <line x1="12" y1="17" x2="12" y2="21" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="13" rx="2" />
+      <path d="M8 9.5l2 2 4-4" />
+      <line x1="7" y1="21" x2="17" y2="21" />
+      <line x1="12" y1="16" x2="12" y2="21" />
     </svg>
   ),
   laptopMinus: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M12 9v4m0 4h.01" />
-      <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-      <line x1="12" y1="17" x2="12" y2="21" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="13" rx="2" />
+      <line x1="12" y1="7" x2="12" y2="11" />
+      <circle cx="12" cy="13.3" r="0.6" fill="currentColor" stroke="none" />
+      <line x1="7" y1="21" x2="17" y2="21" />
+      <line x1="12" y1="16" x2="12" y2="21" />
     </svg>
   ),
   pendingOrders: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-      <rect x="9" y="3" width="6" height="4" rx="1" ry="1" />
-      <path d="M9 12h6M9 16h4" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 4H6a2 2 0 00-2 2v13a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2" />
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+      <line x1="8" y1="16" x2="13" y2="16" />
     </svg>
   ),
   users: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 00-3-3.87" />
@@ -217,148 +226,166 @@ const Icons = {
     </svg>
   ),
   leaderboard: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M8 21h8" />
       <path d="M12 17v4" />
-      <path d="M7 4h10l1 7H6l1-7z" />
-      <path d="M6 11v6a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-6" />
+      <path d="M7 4h10l1 7a5.5 5.5 0 01-11 0z" />
+      <path d="M7 5H4a2 2 0 002 4" />
+      <path d="M17 5h3a2 2 0 01-2 4" />
     </svg>
   ),
   code: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="16 18 22 12 16 6" />
       <polyline points="8 6 2 12 8 18" />
     </svg>
   ),
   serviceQueue: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
     </svg>
   ),
   serviceDone: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <polyline points="20 6 9 17 4 12" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="8 12.5 11 15.5 16 9.5" />
     </svg>
   ),
   serviceHistory: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 3v5h5" />
       <path d="M3.05 13A9 9 0 1021 12a9 9 0 00-8.83 7.5" />
+      <polyline points="12 8 12 12 14.5 13.5" />
     </svg>
   ),
   pklReport: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
       <polyline points="14 2 14 8 20 8" />
-      <path d="M9 13h6M9 17h4M9 9h1" />
+      <line x1="8" y1="13" x2="13" y2="13" />
+      <line x1="8" y1="17" x2="11" y2="17" />
     </svg>
   ),
   accessories: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
-      <path d="M8 12h.01M12 12h.01M16 12h.01" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="7" width="18" height="12" rx="2" />
+      <circle cx="8" cy="13" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="13" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="13" r="0.6" fill="currentColor" stroke="none" />
     </svg>
   ),
   barang: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
       <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
       <line x1="12" y1="22.08" x2="12" y2="12" />
     </svg>
   ),
   allUnits: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2 2 7l10 5 10-5-10-5z" />
       <path d="M2 17l10 5 10-5" />
       <path d="M2 12l10 5 10-5" />
     </svg>
   ),
   monitorChat: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.38 8.38 0 01-4.8 7.6 8.5 8.5 0 01-9.4-1.2L3 19l1.1-3.8a8.38 8.38 0 01-1.2-4.4 8.5 8.5 0 017.6-8.3 8.38 8.38 0 019.5 8v.5z" />
+      <circle cx="8.5" cy="11.5" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="11.5" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="11.5" r="0.6" fill="currentColor" stroke="none" />
     </svg>
   ),
   cashflow: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <line x1="12" y1="1" x2="12" y2="23" />
       <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
     </svg>
   ),
   managementSeller: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3z" />
-      <path d="M8 11c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3z" />
-      <path d="M8 13c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-      <path d="M16 13c-.29 0-.62.02-.97.05C16.19 13.89 17 15.02 17 16.35V19h7v-2c0-2.66-5.33-4-8-4z" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="16" cy="8" r="3" />
+      <circle cx="8" cy="8" r="3" />
+      <path d="M2 20v-1c0-2.5 3-4.5 6-4.5s6 2 6 4.5v1" />
+      <path d="M14 15c2.5.3 6 2 6 4.5V20" />
     </svg>
   ),
   deliveryRoute: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="6" cy="19" r="2" />
       <circle cx="18" cy="5" r="2" />
       <path d="M8 19h7a3 3 0 003-3v-6M16 5H9a3 3 0 00-3 3v6" />
     </svg>
   ),
   missions: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 11l3 3L22 4" />
       <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
     </svg>
   ),
   ccReport: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M23 7l-7 5 7 5V7z" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+      <path d="M23 7l-7 5 7 5V7z" />
     </svg>
   ),
   missionDashboard: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="4" />
+      <circle cx="12" cy="12" r="4.5" />
       <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
     </svg>
   ),
   missionProgress: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
     </svg>
   ),
   missionHistory: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 3v5h5" />
       <path d="M3.05 13A9 9 0 1 0 21 12a9 9 0 0 0-8.83 7.5" />
       <polyline points="12 8 12 12 15 14" />
     </svg>
   ),
   customerBirthday: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M20 21v-2a4 4 0 00-3-3.87M4 21v-2a4 4 0 013-3.87" />
-      <path d="M16 3.13a4 4 0 010 7.75M8 3.13a4 4 0 000 7.75" />
-      <path d="M12 17v4M10 21h4" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-7a2 2 0 00-2-2H6a2 2 0 00-2 2v7" />
+      <path d="M4 17c1.2-1 2-1 3.5-.3 1.5.7 2.3.7 3.8 0 1.5-.7 2.3-.7 3.8 0 1.5.7 2.3.7 3.5-.3" />
+      <path d="M2 21h20" />
+      <path d="M7 12V9" />
+      <path d="M12 12V9" />
+      <path d="M17 12V9" />
+      <circle cx="7" cy="6.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="6.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="6.5" r="1" fill="currentColor" stroke="none" />
     </svg>
   ),
   missionAll: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9l9-6 9 6-9 6-9-6z" />
       <path d="M3 15l9 6 9-6" />
       <path d="M3 12l9 6 9-6" />
     </svg>
   ),
   todo: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 11l3 3L22 4" />
-      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3.5 6l1.2 1.2L7 4.7" />
+      <path d="M3.5 12l1.2 1.2L7 10.7" />
+      <path d="M3.5 18l1.2 1.2L7 16.7" />
+      <line x1="10.5" y1="6" x2="21" y2="6" />
+      <line x1="10.5" y1="12" x2="21" y2="12" />
+      <line x1="10.5" y1="18" x2="21" y2="18" />
     </svg>
   ),
   accounting: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" />
       <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
     </svg>
   ),
   monitoringCeo: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
       <circle cx="12" cy="12" r="3" />
     </svg>
@@ -388,9 +415,14 @@ const ITEM_MONITORING_CEO_ABSENSI: MenuItem = {
   href: "/dashboard/monitoring-ceo/absensi",
   icon: Icons.monitoringCeo,
 };
+const ITEM_MONITORING_CEO_PENGANTARAN: MenuItem = {
+  name: "Pengantaran",
+  href: "/dashboard/monitoring-ceo/pengantaran",
+  icon: Icons.deliveryRoute,
+};
 const MONITORING_CEO_MENU: MenuGroup = {
   label: "Monitoring CEO",
-  items: [ITEM_MONITORING_CEO_ABSENSI],
+  items: [ITEM_MONITORING_CEO_ABSENSI, ITEM_MONITORING_CEO_PENGANTARAN],
 };
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
@@ -1272,13 +1304,13 @@ function RoleBadges({ user }: { user: any }) {
     user?.roles?.length > 0 ? user.roles : [user?.role].filter(Boolean);
   if (roles.length === 0) return null;
   return (
-    <div className="flex flex-col gap-0.5 mt-0.5">
+    <div className="flex flex-col gap-1 mt-1">
       {roles.map((role) => {
         const meta = ROLE_META[role as UserRole];
         return (
           <span
             key={role}
-            className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-gray-50 text-gray-700"
+            className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full w-fit ring-1 ring-black/5 tracking-wide ${meta?.className ?? "bg-gray-50 text-gray-700"
               }`}
           >
             {meta?.label ?? role}
@@ -1307,40 +1339,39 @@ function NavItem({
       href={item.href}
       onClick={onClick}
       title={rail ? item.name : undefined}
-      className={`group relative flex items-center rounded-xl text-sm font-medium outline-none
-        transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30
-        ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2 hover:translate-x-0.5"}
+      className={`group relative flex items-center rounded-[14px] text-[13.5px] font-medium outline-none
+        transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/25 focus-visible:ring-offset-1
+        ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2.5 hover:translate-x-[2px]"}
         ${isActive
-          ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20"
-          : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+          ? "bg-gradient-to-r from-[#1a1a2e] via-[#232342] to-[#2d2d4a] text-white shadow-[0_4px_14px_-4px_rgba(26,26,46,0.55)]"
+          : "text-gray-500 hover:bg-gray-100/80 hover:text-gray-800"
         }`}
     >
       {!rail && (
         <span
-          className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-white
+          className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-white
             transition-all duration-300 ease-out ${isActive ? "h-5 opacity-90" : "h-0 opacity-0"
             }`}
         />
       )}
       <span
-        className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110
+        className={`flex items-center justify-center flex-shrink-0 rounded-lg transition-all duration-200 group-hover:scale-105
+          ${rail ? "w-6 h-6" : "w-5 h-5"}
           ${isActive
-            ? rail
-              ? "text-white"
-              : "text-white/80"
+            ? "text-white"
             : "text-gray-400 group-hover:text-gray-600"
           }`}
       >
         {item.icon}
       </span>
-      {!rail && <span className="flex-1 truncate">{item.name}</span>}
+      {!rail && <span className="flex-1 truncate tracking-[-0.01em]">{item.name}</span>}
       {badge && badge > 0 ? (
         <span
           style={{ animation: "solitBadgePop 0.3s ease-out both" }}
-          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums
-            ${rail ? "absolute top-0.5 right-1" : "ml-auto"}
+          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ring-2
+            ${rail ? "absolute -top-0.5 -right-0.5 ring-white" : "ml-auto ring-transparent"}
             ${isActive
-              ? "bg-white text-[#1a1a2e]"
+              ? "bg-white text-[#1a1a2e] ring-[#1a1a2e]/10"
               : "bg-red-500 text-white shadow-sm shadow-red-500/40"
             }`}
         >
@@ -1402,7 +1433,7 @@ function SidebarContent({
       <div className={`pt-5 pb-4 flex-shrink-0 ${rail ? "px-2" : "px-4"}`}>
         <div className={`flex items-center mb-5 ${rail ? "justify-center" : "justify-between"}`}>
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-[#1a1a2e]">
+            <div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-[#1a1a2e] to-[#2d2d4a] ring-1 ring-black/5 shadow-sm">
               <img
                 src="/assets/solit03.jpeg"
                 alt="Solit"
@@ -1413,13 +1444,15 @@ function SidebarContent({
               />
             </div>
             {!rail && (
-              <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>
+              <span className="text-[15px] font-bold bg-gradient-to-r from-[#1a1a2e] to-[#3d3d63] bg-clip-text text-transparent tracking-tight">
+                Solit POS
+              </span>
             )}
           </div>
           {onToggleRail && (
             <button
               onClick={onToggleRail}
-              className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition ${rail ? "mx-auto mt-2" : ""}`}
+              className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-95 transition-all ${rail ? "mx-auto mt-2" : ""}`}
               title={rail ? "Perbesar sidebar" : "Perkecil sidebar"}
               aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}
             >
@@ -1440,7 +1473,7 @@ function SidebarContent({
           {onClose && (
             <button
               onClick={onClose}
-              className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+              className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-95 transition-all"
               aria-label="Tutup sidebar"
             >
               <svg
@@ -1471,15 +1504,15 @@ function SidebarContent({
         ) : rail ? (
           <div className="flex justify-center">
             <div
-              className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold"
+              className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#2d2d4a] flex items-center justify-center text-white text-xs font-bold ring-2 ring-white shadow-md shadow-[#1a1a2e]/20"
               title={user?.name || ""}
             >
               {initials}
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+          <div className="flex items-center gap-3 rounded-xl px-2 py-1.5 -mx-2 hover:bg-gray-50/80 transition-colors">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#2d2d4a] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ring-2 ring-white shadow-md shadow-[#1a1a2e]/20">
               {initials}
             </div>
             <div className="min-w-0 flex-1">
@@ -1492,13 +1525,13 @@ function SidebarContent({
 
 
 
-      <div className={`h-px bg-gray-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
+      <div className={`h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
 
       {/* ── Nav ── */}
       <nav
         ref={navRef}
         onScroll={handleNavScroll}
-        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${rail ? "px-2 space-y-1" : "px-3 space-y-2"
+        className={`solit-scroll flex-1 overflow-y-auto overflow-x-hidden py-3 ${rail ? "px-2 space-y-1" : "px-3 space-y-2"
           }`}
         style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}
       >
@@ -1507,7 +1540,7 @@ function SidebarContent({
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1"
+                className="h-9 rounded-[14px] bg-gray-100 animate-pulse mb-1"
                 style={{ animationDelay: `${i * 40}ms` }}
               />
             ))}
@@ -1525,7 +1558,9 @@ function SidebarContent({
                   rail
                 />
               ))}
-              {gi < groups.length - 1 && <div className="mx-2 my-1.5 h-px bg-gray-100" />}
+              {gi < groups.length - 1 && (
+                <div className="mx-2 my-1.5 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+              )}
             </div>
           ))
         ) : (
@@ -1542,10 +1577,10 @@ function SidebarContent({
               >
                 <button
                   onClick={() => onToggleGroup(group.label)}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition group/cat"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-gray-50/80 transition-colors group/cat"
                 >
                   <span
-                    className={`text-[10px] font-bold uppercase tracking-[0.07em] flex-1 text-left truncate
+                    className={`text-[10px] font-bold uppercase tracking-[0.08em] flex-1 text-left truncate
                     ${hasActive
                         ? "text-[#1a1a2e]"
                         : "text-gray-400 group-hover/cat:text-gray-600"
@@ -1554,7 +1589,10 @@ function SidebarContent({
                     {group.label}
                   </span>
                   {hasActive && !isOpen && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse" />
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#1a1a2e]/40" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#1a1a2e]" />
+                    </span>
                   )}
                   <svg
                     width="12"
@@ -1603,10 +1641,10 @@ function SidebarContent({
         <button
           onClick={onLogout}
           title={rail ? "Keluar" : undefined}
-          className={`w-full group flex items-center rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all
-            ${rail ? "justify-center py-2.5" : "gap-3 px-3 py-2"}`}
+          className={`w-full group flex items-center rounded-[14px] text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 active:scale-[0.98] transition-all
+            ${rail ? "justify-center py-2.5" : "gap-3 px-3 py-2.5"}`}
         >
-          <span className="flex-shrink-0 group-hover:text-red-500">{Icons.logout}</span>
+          <span className="flex-shrink-0 group-hover:text-red-500 transition-colors">{Icons.logout}</span>
           {!rail && <span>Keluar</span>}
         </button>
       </div>
@@ -1875,20 +1913,43 @@ export default function Sidebar() {
           60%  { transform: scale(1.15); }
           100% { transform: scale(1); opacity: 1; }
         }
+        @keyframes solitBannerIn {
+          from { opacity: 0; transform: translate(-50%, -12px); }
+          to   { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .solit-scroll::-webkit-scrollbar {
+          width: 5px;
+        }
+        .solit-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .solit-scroll::-webkit-scrollbar-thumb {
+          background: #e2e4e9;
+          border-radius: 9999px;
+        }
+        .solit-scroll::-webkit-scrollbar-thumb:hover {
+          background: #cbd0d9;
+        }
       `}</style>
 
       {/* ── Alarm banners ── */}
       {!onAntrian && prep.menungguUnacked.length > 0 && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
+        <div
+          className="fixed top-3 left-1/2 z-[60] w-full max-w-sm px-2"
+          style={{ animation: "solitBannerIn 0.3s ease-out both", transform: "translateX(-50%)" }}
+        >
           <button
             onClick={() => {
               prep.ackMenunggu(prep.menungguUnacked);
               router.push("/dashboard/preparation/antrian");
             }}
-            className="w-full bg-red-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+            className="w-full bg-gradient-to-r from-red-600 to-rose-600 text-white px-4 py-2.5 rounded-2xl shadow-xl shadow-red-900/30 ring-1 ring-black/5 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
           >
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+            </span>
+            <span className="text-sm font-bold tracking-tight">
               {prep.menungguUnacked.length} penyiapan baru — buka antrian
             </span>
           </button>
@@ -1896,18 +1957,25 @@ export default function Sidebar() {
       )}
       {!onSiapKirim && prep.siapKirimUnacked.length > 0 && (
         <div
-          className="fixed left-1/2 -translate-x-1/2 z-[59] w-full max-w-sm px-2"
-          style={{ top: !onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12 }}
+          className="fixed left-1/2 z-[59] w-full max-w-sm px-2"
+          style={{
+            top: !onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12,
+            animation: "solitBannerIn 0.3s ease-out both",
+            transform: "translateX(-50%)",
+          }}
         >
           <button
             onClick={() => {
               prep.ackSiapKirim(prep.siapKirimUnacked);
               router.push("/dashboard/preparation/siap-kirim");
             }}
-            className="w-full bg-orange-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-orange-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+            className="w-full bg-gradient-to-r from-orange-600 to-amber-600 text-white px-4 py-2.5 rounded-2xl shadow-xl shadow-orange-900/30 ring-1 ring-black/5 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
           >
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+            </span>
+            <span className="text-sm font-bold tracking-tight">
               {prep.siapKirimUnacked.length} barang siap — pilih pengiriman
             </span>
           </button>
@@ -1917,7 +1985,7 @@ export default function Sidebar() {
       {/* ── Mobile toggle ── */}
       <button
         onClick={() => setOpen(true)}
-        className="lg:hidden fixed top-0 left-0 z-50 w-12 h-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition"
+        className="lg:hidden fixed top-3 left-3 z-50 w-11 h-11 flex items-center justify-center rounded-2xl bg-white/90 backdrop-blur-md text-gray-600 shadow-lg shadow-black/5 ring-1 ring-black/5 active:scale-95 transition-transform"
         aria-label="Buka menu"
       >
         <svg
@@ -1936,7 +2004,7 @@ export default function Sidebar() {
 
       {/* ── Mobile overlay ── */}
       <div
-        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        className={`lg:hidden fixed inset-0 z-40 bg-black/45 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
@@ -1944,8 +2012,9 @@ export default function Sidebar() {
 
       {/* ── Mobile sidebar ── */}
       <aside
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-[280px] bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform rounded-r-3xl overflow-hidden ${open ? "translate-x-0" : "-translate-x-full"
           }`}
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <SidebarContent {...sharedContentProps} onClose={() => setOpen(false)} />
       </aside>
@@ -1956,7 +2025,7 @@ export default function Sidebar() {
           width: rail ? RAIL_W : width,
           transition: dragging || !hydrated ? "none" : "width 0.2s ease-out",
         }}
-        className="relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start"
+        className="relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 shadow-[2px_0_24px_-16px_rgba(0,0,0,0.12)] flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start"
       >
         <SidebarContent {...sharedContentProps} rail={rail} onToggleRail={toggleRail} />
         {!rail && (
