@@ -1,7 +1,15 @@
-// src/app/api/accessories/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { withAuth, PERMISSIONS } from "@/lib/auth";
+import { withAuth } from "@/lib/auth";
+import { UserRole } from "@/lib/permissions";
+
+const VIEW_ROLES: UserRole[] = [
+    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+    "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "CREW_SALES",
+    "ACCOUNTING",
+];
 
 export const GET = withAuth(async (req: NextRequest) => {
     const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
@@ -16,6 +24,9 @@ export const GET = withAuth(async (req: NextRequest) => {
     if (q) query = query.or(`name.ilike.%${q}%,brand.ilike.%${q}%,category.ilike.%${q}%`);
 
     const { data, error } = await query;
-    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    if (error) {
+        console.error("[GET /api/accessories/search]", error);
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
     return NextResponse.json({ success: true, data: data ?? [] });
-}, PERMISSIONS.CREATE_TRANSACTION);
+}, VIEW_ROLES);
