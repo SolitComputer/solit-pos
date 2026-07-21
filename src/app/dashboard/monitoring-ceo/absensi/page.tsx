@@ -39,6 +39,7 @@ type RosterEntry = {
     shift: "PAGI" | "SORE";
     shiftLabel: string;
     shiftFromSchedule: boolean;
+    shiftIsCustom: boolean;
 };
 
 type MonthStat = {
@@ -138,12 +139,13 @@ function RosterRow({ entry }: { entry: RosterEntry }) {
                     {entry.isPkl ? "PKL" : entry.role.replace(/_/g, " ")}
                 </span>
             </div>
-            <div className={`hidden sm:flex flex-col items-end text-right flex-shrink-0 px-2 py-1 rounded-lg border ${entry.shift === "PAGI" ? "bg-amber-50 border-amber-200" : "bg-indigo-50 border-indigo-200"}`}>
-                <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${entry.shift === "PAGI" ? "text-amber-700" : "text-indigo-700"}`}>
+            <div className={`hidden sm:flex flex-col items-end text-right flex-shrink-0 px-2 py-1 rounded-lg border ${entry.shiftIsCustom ? "bg-rose-50 border-rose-200" : entry.shift === "PAGI" ? "bg-amber-50 border-amber-200" : "bg-indigo-50 border-indigo-200"}`}>
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${entry.shiftIsCustom ? "text-rose-700" : entry.shift === "PAGI" ? "text-amber-700" : "text-indigo-700"}`}>
                     <ShiftIcon className="w-3 h-3" /> {entry.shift}
-                    {entry.shiftFromSchedule && <span className="text-[8px] font-semibold text-violet-500 normal-case">·jadwal</span>}
+                    {entry.shiftFromSchedule && !entry.shiftIsCustom && <span className="text-[8px] font-semibold text-violet-500 normal-case">·jadwal</span>}
+                    {entry.shiftIsCustom && <span className="text-[8px] font-black text-rose-600 normal-case">·custom</span>}
                 </span>
-                <span className="text-[9px] font-mono text-gray-400">{entry.shiftLabel}</span>
+                <span className={`text-[9px] font-mono ${entry.shiftIsCustom ? "text-rose-500 font-bold" : "text-gray-400"}`}>{entry.shiftLabel}</span>
             </div>
             {entry.checkInTime && (
                 <span className="font-mono font-bold text-gray-700 text-xs flex-shrink-0">{entry.checkInTime}</span>
@@ -238,6 +240,7 @@ export default function MonitoringCeoAbsensiPage() {
             return {
                 shift: sched.shift,
                 fromSchedule: true,
+                isCustom: custom, // true kalau jadwal ini pakai jam sendiri, bukan jam default shift
                 openMin: custom ? sched.open_hour! * 60 + (sched.open_minute ?? 0) : base.open_hour * 60 + base.open_minute,
                 closeMin: custom ? sched.close_hour! * 60 + (sched.close_minute ?? 0) : base.close_hour * 60 + base.close_minute,
             };
@@ -247,6 +250,7 @@ export default function MonitoringCeoAbsensiPage() {
         return {
             shift,
             fromSchedule: false,
+            isCustom: false,
             openMin: base.open_hour * 60 + base.open_minute,
             closeMin: base.close_hour * 60 + base.close_minute,
         };
@@ -338,6 +342,7 @@ export default function MonitoringCeoAbsensiPage() {
             return {
                 userId: u.id, name: u.name, role: u.role, isPkl: isPKLRole(u.role), checkInTime, kind,
                 shift: eff.shift, shiftLabel: `${minToHHMM(eff.openMin)}–${minToHHMM(eff.closeMin)}`, shiftFromSchedule: eff.fromSchedule,
+                shiftIsCustom: eff.isCustom,
             };
         }).sort((a, b) => {
             const rank = (k: RosterEntry["kind"]) =>
@@ -500,8 +505,8 @@ export default function MonitoringCeoAbsensiPage() {
                         {(["semua", "karyawan", "pkl"] as GroupFilter[]).map(f => (
                             <button key={f} onClick={() => setGroupFilter(f)}
                                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${groupFilter === f
-                                        ? f === "pkl" ? "bg-amber-500 text-white shadow-sm" : "bg-[#1a1a2e] text-white shadow-sm"
-                                        : "text-gray-400 hover:text-gray-600 bg-gray-50"
+                                    ? f === "pkl" ? "bg-amber-500 text-white shadow-sm" : "bg-[#1a1a2e] text-white shadow-sm"
+                                    : "text-gray-400 hover:text-gray-600 bg-gray-50"
                                     }`}>
                                 {f === "semua" ? "Semua" : f === "karyawan" ? "Karyawan" : "PKL"}
                             </button>
@@ -631,9 +636,14 @@ export default function MonitoringCeoAbsensiPage() {
                                                         const eff = effectiveShiftFor(s.userId, todayKey);
                                                         const ShiftIcon = eff.shift === "PAGI" ? Sun : Moon;
                                                         return (
-                                                            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg border whitespace-nowrap ${eff.shift === "PAGI" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-indigo-50 text-indigo-700 border-indigo-200"}`}>
-                                                                <ShiftIcon className="w-3 h-3" /> {minToHHMM(eff.openMin)}–{minToHHMM(eff.closeMin)}
-                                                            </span>
+                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg border whitespace-nowrap ${eff.isCustom ? "bg-rose-50 text-rose-700 border-rose-200" : eff.shift === "PAGI" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-indigo-50 text-indigo-700 border-indigo-200"}`}>
+                                                                    <ShiftIcon className="w-3 h-3" /> {minToHHMM(eff.openMin)}–{minToHHMM(eff.closeMin)}
+                                                                </span>
+                                                                {eff.isCustom && (
+                                                                    <span className="text-[8px] font-black text-rose-600">Custom</span>
+                                                                )}
+                                                            </div>
                                                         );
                                                     })()}
                                                 </td>
