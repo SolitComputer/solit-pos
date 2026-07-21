@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -77,17 +77,23 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [busy, setBusy] = useState(false);
     const [search, setSearch] = useState("");
     const [selected, setSelected] = useState<Set<string>>(new Set());
-    const [showPending, setShowPending] = useState(true);
+    const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // default: terbaru dulu
     const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
     const [showManual, setShowManual] = useState(false);
     const [logEntry, setLogEntry] = useState<JournalEntry | null>(null);
     const [toast, setToast] = useState<string | null>(null);
+    // Default TERTUTUP supaya tidak mengganggu tabel jurnal utama.
+    // Pilihan buka/tutup user diingat per browser lewat localStorage.
+    const [showPending, setShowPending] = useState(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem("jurnal-show-pending") === "true";
+    });
 
     const load = useCallback(async () => {
         setLoading(true);
         try {
             const [jRes, pRes] = await Promise.all([
-                fetch(`/api/akutansi/jurnal?period=${period}`),
+                fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}`),
                 fetch(`/api/akutansi/jurnal/pending?period=${period}`),
             ]);
             const j = await jRes.json();
@@ -108,9 +114,14 @@ export default function JurnalUmum({ period }: { period: string }) {
         } finally {
             setLoading(false);
         }
-    }, [period]);
+    }, [period, sortOrder]);
 
     useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem("jurnal-show-pending", String(showPending));
+        }
+    }, [showPending]);
 
     const confirmItems = async (items: PendingDraft[]) => {
         if (items.length === 0 || busy) return;
@@ -326,6 +337,30 @@ export default function JurnalUmum({ period }: { period: string }) {
                         className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                     />
                 </div>
+
+                <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg p-1 shrink-0">
+                    <button
+                        onClick={() => setSortOrder("desc")}
+                        title="Terbaru ke terlama"
+                        className={`h-8 px-2.5 rounded-md text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all duration-150 ${sortOrder === "desc"
+                            ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white"
+                            : "text-gray-400 hover:bg-gray-50"
+                            }`}
+                    >
+                        <ArrowUpDown className="w-3 h-3" /> Terbaru
+                    </button>
+                    <button
+                        onClick={() => setSortOrder("asc")}
+                        title="Terlama ke terbaru"
+                        className={`h-8 px-2.5 rounded-md text-[11px] font-bold active:scale-95 transition-all duration-150 ${sortOrder === "asc"
+                            ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white"
+                            : "text-gray-400 hover:bg-gray-50"
+                            }`}
+                    >
+                        Terlama
+                    </button>
+                </div>
+
                 <button
                     onClick={() => setShowManual(true)}
                     className="h-10 px-4 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-bold hover:opacity-90 active:scale-[0.96] transition-all duration-150 whitespace-nowrap"
