@@ -268,6 +268,7 @@ export const CC_REPORT_MANAGE_ROLES: UserRole[] = [
 
 // ─── To-Do List — hanya ADMIN & PROGRAMMER ────────────────────────────────────
 export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
+export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
@@ -468,6 +469,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/todos": [...TODO_ROLES],
 
   "/dashboard/akutansi": [...AKUNTANSI_ROLES],
+  "/dashboard/monitoring-ceo": [...MONITORING_CEO_ROLES],
   "/api/akutansi": [...AKUNTANSI_ROLES],
 };
 
