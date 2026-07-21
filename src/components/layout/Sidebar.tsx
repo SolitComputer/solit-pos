@@ -357,6 +357,12 @@ const Icons = {
       <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
     </svg>
   ),
+  monitoringCeo: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -376,6 +382,15 @@ const ITEM_AKUNTANSI: MenuItem = {
   name: "Akuntansi",
   href: "/dashboard/akutansi",
   icon: Icons.accounting,
+};
+const ITEM_MONITORING_CEO_ABSENSI: MenuItem = {
+  name: "Absensi",
+  href: "/dashboard/monitoring-ceo/absensi",
+  icon: Icons.monitoringCeo,
+};
+const MONITORING_CEO_MENU: MenuGroup = {
+  label: "Monitoring CEO",
+  items: [ITEM_MONITORING_CEO_ABSENSI],
 };
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
@@ -460,7 +475,7 @@ const PREPARATION_PENGANTARAN_MENU: MenuGroup = {
 const ADMIN_PENYEDIA_MENU: MenuGroup = {
   label: "Penyedia Barang",
   items: [
-   ITEM_RIWAYAT_PENYEDIA,
+    ITEM_RIWAYAT_PENYEDIA,
     { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
     { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue },
     { name: "Selesai Disiapkan", href: "/dashboard/preparation/done", icon: Icons.serviceDone },
@@ -648,10 +663,9 @@ const PKL_PENYEDIA_MENU: MenuGroup[] = [
   },
 ];
 
-// ── Role → Menu mapping ───────────────────────────────────────────────────────
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
-  // ── ADMIN & setara ──────────────────────────────────────────────────────────
   ADMIN: [
+    MONITORING_CEO_MENU,        // ← dipindah ke paling atas
     ADMIN_OVERVIEW,
     ADMIN_INVENTARIS,
     ADMIN_TRANSAKSI,
@@ -661,6 +675,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   PROGRAMMER: [
+    MONITORING_CEO_MENU,        // ← dipindah ke paling atas
     {
       label: "Overview",
       items: [
@@ -673,7 +688,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         ITEM_CASHFLOW,
-        ITEM_AKUNTANSI, //  NEW
+        ITEM_AKUNTANSI,
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
         ITEM_CC_REPORT,
@@ -696,7 +711,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     PREPARATION_SALES_DELIVERY_MENU,
   ],
 
-  // PERUBAHAN: tambah ITEM_CC_REPORT di Overview inline ASISTEN_CEO
   ASISTEN_CEO: [
     {
       label: "Overview",
@@ -710,7 +724,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
-        ITEM_CC_REPORT, // ← dipindah ke Overview
+        ITEM_CC_REPORT, 
       ],
     },
     ADMIN_INVENTARIS,

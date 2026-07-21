@@ -71,6 +71,7 @@ export function isAutoIncomeCategory(category: string): boolean {
 // ── Filter Types ──────────────────────────────────────────────────────────────
 export type AuditFilter = "ALL" | "AUDITED" | "NOT_AUDITED";
 export type SourceFilter = "ALL" | "MANUAL" | "AUTO";
+export type PaymentMethodFilter = "ALL" | "CASH" | "SALDO"; // ⬅️ BARU
 
 export interface CashflowFilter {
   dateFrom: string;
@@ -78,6 +79,7 @@ export interface CashflowFilter {
   category: string;
   audit: AuditFilter;
   source: SourceFilter;
+  paymentMethod: PaymentMethodFilter; // ⬅️ BARU
   search: string;
 }
 
@@ -88,6 +90,7 @@ export function defaultCashflowFilter(): CashflowFilter {
     category: "ALL",
     audit: "ALL",
     source: "ALL",
+    paymentMethod: "ALL", // ⬅️ BARU
     search: "",
   };
 }
@@ -100,6 +103,7 @@ export function isFilterActive(f: CashflowFilter): boolean {
     f.category !== d.category ||
     f.audit !== d.audit ||
     f.source !== d.source ||
+    f.paymentMethod !== d.paymentMethod || // ⬅️ BARU
     f.search !== d.search
   );
 }
@@ -110,6 +114,7 @@ export function activeFilterCount(f: CashflowFilter): number {
   if (f.category !== "ALL") c++;
   if (f.audit !== "ALL") c++;
   if (f.source !== "ALL") c++;
+  if (f.paymentMethod !== "ALL") c++; // ⬅️ BARU
   if (f.search.trim()) c++;
   return c;
 }
@@ -119,6 +124,7 @@ export function applyFilters<T extends {
   category?: string;
   is_audited?: boolean;
   source_type?: string;
+  payment_method?: string | null; // ⬅️ BARU
   nama?: string;
   keterangan?: string | null;
 }>(entries: T[], filter: CashflowFilter): T[] {
@@ -132,6 +138,7 @@ export function applyFilters<T extends {
     if (filter.audit === "NOT_AUDITED" && e.is_audited) return false;
     if (filter.source === "MANUAL" && e.source_type !== "MANUAL") return false;
     if (filter.source === "AUTO" && e.source_type === "MANUAL") return false;
+    if (filter.paymentMethod !== "ALL" && e.payment_method !== filter.paymentMethod) return false; // ⬅️ BARU
     if (q) {
       const haystack = `${e.nama || ""} ${e.keterangan || ""}`.toLowerCase();
       if (!haystack.includes(q)) return false;
