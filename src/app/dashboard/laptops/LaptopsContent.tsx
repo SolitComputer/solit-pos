@@ -307,6 +307,8 @@ export function LaptopsContent() {
     const [filterPriceRange, setFilterPriceRange] = useState("ALL");
     const [sortBy, setSortBy] = useState("DEFAULT");
     const [filterSN, setFilterSN] = useState("");
+    // ── Filter stok: default TERSEDIA supaya laptop stok 0 otomatis "hilang" ──
+    const [filterStock, setFilterStock] = useState<"ALL" | "TERSEDIA" | "HABIS">("TERSEDIA");
 
     const handleSort = (asc: string, desc: string) => {
         setSortBy(prev => prev === asc ? desc : asc);
@@ -433,6 +435,16 @@ export function LaptopsContent() {
             const snQ = filterSN.trim().toLowerCase();
             list = list.filter(x => x.laptop_units?.some(u => u.serial_number.toLowerCase().includes(snQ)));
         }
+
+        // ── Filter stok tersisa ──────────────────────────────────────────────
+        // Default "TERSEDIA" → laptop dgn stok 0 otomatis tersembunyi ("hilang").
+        // User bisa pilih "ALL" untuk lihat semua, atau "HABIS" untuk lihat yg kosong saja.
+        if (filterStock === "TERSEDIA") {
+            list = list.filter(x => (x.stok_tersedia ?? 0) > 0);
+        } else if (filterStock === "HABIS") {
+            list = list.filter(x => (x.stok_tersedia ?? 0) === 0);
+        }
+
         switch (sortBy) {
             case "AZ": list.sort((a, b) => (a.laptop_name || "").localeCompare(b.laptop_name || "")); break;
             case "ZA": list.sort((a, b) => (b.laptop_name || "").localeCompare(a.laptop_name || "")); break;
@@ -458,7 +470,7 @@ export function LaptopsContent() {
             case "SN": list.sort((a, b) => a.id.localeCompare(b.id)); break;
         }
         return list;
-    }, [laptops, search, filterSN, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, sortBy]);
+    }, [laptops, search, filterSN, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, filterStock, sortBy]);
 
     const uniqueProcessors = useMemo(() => {
         const types = new Set<string>();
@@ -587,7 +599,6 @@ export function LaptopsContent() {
         wb.creator = "Solit Inventory";
         wb.created = new Date();
 
-        // Tentukan konteks berdasarkan filter status aktif
         // Tentukan konteks berdasarkan filter status aktif
         const isSiapJualOnly = filterStatus === "SIAP_JUAL";
         const isMinusOnly = filterStatus === "BELUM_SIAP";
@@ -891,7 +902,7 @@ export function LaptopsContent() {
                                         {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
                                     </FilterSelect>
                                     <button
-                                        onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setSortBy("DEFAULT"); }}
+                                        onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setFilterStock("TERSEDIA"); setSortBy("DEFAULT"); }}
                                         className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all duration-150 flex items-center justify-center gap-1.5"
                                     >
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -901,7 +912,7 @@ export function LaptopsContent() {
                                     </button>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
                                     <FilterSelect value={filterRam} onChange={e => setFilterRam(e.target.value)}>
                                         {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
                                     </FilterSelect>
@@ -911,6 +922,12 @@ export function LaptopsContent() {
                                         <option value="2-3">Rp 2 jt – 3 jt</option>
                                         <option value="3-4">Rp 3 jt – 4 jt</option>
                                         <option value="4+">Rp 4 jt ke atas</option>
+                                    </FilterSelect>
+                                    {/* ── Filter Stok Tersisa ── */}
+                                    <FilterSelect value={filterStock} onChange={e => setFilterStock(e.target.value as "ALL" | "TERSEDIA" | "HABIS")}>
+                                        <option value="TERSEDIA">📦 Stok Tersedia</option>
+                                        <option value="ALL">Semua Stok</option>
+                                        <option value="HABIS">🚫 Stok Habis</option>
                                     </FilterSelect>
                                     <FilterSelect value={sortBy} onChange={e => setSortBy(e.target.value)}>
                                         <option value="DEFAULT">Urutan Default</option>
@@ -922,11 +939,12 @@ export function LaptopsContent() {
                                     </FilterSelect>
                                 </div>
 
-                                {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || sortBy !== "DEFAULT") && (
+                                {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || filterStock !== "TERSEDIA" || sortBy !== "DEFAULT") && (
                                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                                         {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
                                         {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
                                         {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
+                                        {filterStock !== "TERSEDIA" && <FilterChip label={filterStock === "ALL" ? "Semua Stok" : "Stok Habis"} onRemove={() => setFilterStock("TERSEDIA")} />}
                                         {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${SORT_LABELS[sortBy] ?? sortBy}`} onRemove={() => setSortBy("DEFAULT")} />}
                                     </div>
                                 )}

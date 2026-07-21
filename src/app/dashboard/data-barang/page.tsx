@@ -1,5 +1,4 @@
 "use client";
-// src/app/dashboard/data-barang/page.tsx
 
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -37,13 +36,13 @@ const TABS: TabDef[] = [
   {
     key: "outflows",
     label: "Pengambilan Barang",
-    roles: ITEM_OUTFLOW_ROLES, // ← tab hanya tampil utk role yg diizinkan
+    roles: ITEM_OUTFLOW_ROLES,
     icon: "ti-history",
   },
   {
     key: "pedagang",
     label: "Price List Pedagang",
-    roles: PRICELIST_PEDAGANG_ROLES, // ← tab hanya tampil utk role yg diizinkan
+    roles: PRICELIST_PEDAGANG_ROLES,
     icon: "ti-tag",
   },
 ];
@@ -147,12 +146,10 @@ export default function DataBarangPage() {
 
   return (
     <DashboardLayout>
-      {/* ── STICKY HEADER ─────────────────────────────────────── */}
-      <div className="sticky top-4 z-30 bg-white/90 backdrop-blur-md border border-gray-200 rounded-2xl shadow-sm mb-6 overflow-hidden">
-        {/* Top row: identity + badge */}
+      {/* ── PAGE HEADER — scrolls away normally ───────────────── */}
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden mb-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 gap-3 sm:gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            {/* Icon */}
             <div className="w-10 h-10 sm:w-9 sm:h-9 bg-gray-900 rounded-[10px] flex items-center justify-center flex-shrink-0 shadow-md">
               <svg
                 className="w-[18px] h-[18px] sm:w-[17px] sm:h-[17px]"
@@ -168,8 +165,6 @@ export default function DataBarangPage() {
                 <line x1="12" y1="22.08" x2="12" y2="12" />
               </svg>
             </div>
-
-            {/* Title + subtitle */}
             <div className="min-w-0 flex-1">
               <h1 className="text-[15px] sm:text-[14.5px] font-bold text-gray-900 tracking-tight leading-none truncate">
                 Data Barang
@@ -179,41 +174,47 @@ export default function DataBarangPage() {
               </p>
             </div>
           </div>
-
-          {/* Kategori badge */}
           <span className="inline-flex self-start sm:self-auto text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-3 py-1 font-medium tabular-nums">
             {visibleTabs.length} kategori
           </span>
         </div>
+      </div>
 
-        {/* ── Tab strip — underline style ─────────────────────── */}
-        <div className="flex overflow-x-auto scrollbar-hide px-4 sm:px-6 border-t border-gray-100 bg-gray-50/30">
-          {visibleTabs.map((tab) => {
-            const isActive = tab.key === activeTab;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => changeTab(tab.key)}
-                className={[
-                  "flex-shrink-0 flex items-center gap-2 h-11 px-1 mr-6",
-                  "text-[13px] border-b-2 -mb-px transition-all duration-150 select-none",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 rounded-sm",
-                  isActive
-                    ? "border-gray-900 text-gray-900 font-medium"
-                    : "border-transparent text-gray-500 font-normal hover:text-gray-800 hover:border-gray-300",
-                ]
-                  .join(" ")}
-              >
-                {getTabIcon(tab.icon, `w-4 h-4 ${isActive ? "opacity-80" : "opacity-40"}`)}
-                {tab.label}
-              </button>
-            );
-          })}
+      {/* ── STICKY TAB STRIP — nempel di atas saat scroll ─────── */}
+      {/*
+        Mobile  : top-12 (di bawah topbar 48px dari DashboardLayout)
+        Desktop : top-0  (gak ada topbar)
+        Negative margin + padding trick supaya sticky full-width
+      */}
+      <div className="sticky top-12 lg:top-0 z-30 -mx-4 lg:-mx-5 px-4 lg:px-5">
+        <div className="bg-white/95 backdrop-blur-md border border-gray-200 border-t-0 rounded-b-2xl shadow-sm overflow-hidden">
+          <div className="flex overflow-x-auto scrollbar-hide px-4 sm:px-6">
+            {visibleTabs.map((tab) => {
+              const isActive = tab.key === activeTab;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => changeTab(tab.key)}
+                  className={[
+                    "flex-shrink-0 flex items-center gap-2 h-11 px-1 mr-6",
+                    "text-[13px] border-b-2 -mb-px transition-all duration-150 select-none",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 rounded-sm",
+                    isActive
+                      ? "border-gray-900 text-gray-900 font-medium"
+                      : "border-transparent text-gray-500 font-normal hover:text-gray-800 hover:border-gray-300",
+                  ].join(" ")}
+                >
+                  {getTabIcon(tab.icon, `w-4 h-4 ${isActive ? "opacity-80" : "opacity-40"}`)}
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* ── KONTEN TAB ────────────────────────────────────────── */}
-      <div>
+      <div className="mt-5">
         {activeTab === "laptops" && <LaptopsContent />}
         {activeTab === "accessories" && <AccessoriesContent />}
         {activeTab === "outflows" && <OutflowsContent />}
