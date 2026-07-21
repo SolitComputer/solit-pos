@@ -154,17 +154,26 @@ function PriceListPedagangContent() {
         pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
       });
 
+      const COLOR = {
+          headerBg: "FF4B5563",
+          headerFg: "FFFFFFFF",
+          rowEven: "FFF8FAFC",
+          rowOdd: "FFFFFFFF",
+          borderColor: "FFE2E8F0",
+          subTextFg: "FF64748B",
+      };
+
       const COLS = [
-        { key: "no", width: 6 },
-        { key: "product", width: 34 },
-        { key: "brand", width: 14 },
-        { key: "cpu", width: 26 },
-        { key: "ram", width: 10 },
-        { key: "storage", width: 14 },
-        { key: "grade", width: 10 },
-        { key: "sn", width: 20 },
-        { key: "condition", width: 26 },
-        { key: "price", width: 18 },
+        { header: "No", key: "no", width: 6 },
+        { header: "Nama Laptop", key: "product", width: 34 },
+        { header: "Brand", key: "brand", width: 14 },
+        { header: "CPU", key: "cpu", width: 26 },
+        { header: "RAM", key: "ram", width: 10 },
+        { header: "Storage", key: "storage", width: 14 },
+        { header: "Grade", key: "grade", width: 10 },
+        { header: "Serial Number", key: "sn", width: 20 },
+        { header: "Kondisi", key: "condition", width: 26 },
+        { header: "Harga Pedagang", key: "price", width: 18 },
       ];
       ws.columns = COLS;
 
@@ -177,6 +186,7 @@ function PriceListPedagangContent() {
       titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
       ws.getRow(1).height = 28;
 
+      // Subjudul
       ws.mergeCells(2, 1, 2, COLS.length);
       const subtitleCell = ws.getCell(2, 1);
       subtitleCell.value = `Diperbarui: ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })} — Harga dapat berubah sewaktu-waktu tanpa pemberitahuan.`;
@@ -184,58 +194,68 @@ function PriceListPedagangContent() {
       subtitleCell.alignment = { horizontal: "center", vertical: "middle" };
       ws.getRow(2).height = 18;
 
-      // Header (row 4, row 3 dikosongkan sebagai spacer)
+      // Header row styling (row 4)
       const headerRowNum = 4;
-      const headers = ["No", "Nama Laptop", "Brand", "CPU", "RAM", "Storage", "Grade", "Serial Number", "Kondisi", "Harga"];
-      headers.forEach((h, i) => {
-        const cell = ws.getCell(headerRowNum, i + 1);
-        cell.value = h;
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4B5563" } };
-        cell.font = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.border = {
-          top: { style: "thin", color: { argb: "FFE2E8F0" } },
-          left: { style: "thin", color: { argb: "FFE2E8F0" } },
-          bottom: { style: "medium", color: { argb: "FF94A3B8" } },
-          right: { style: "thin", color: { argb: "FFE2E8F0" } },
-        };
+      const headerRow = ws.getRow(headerRowNum);
+      headerRow.height = 32;
+      headerRow.eachCell(cell => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
+          cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
+          cell.border = {
+              top: { style: "thin", color: { argb: COLOR.borderColor } },
+              left: { style: "thin", color: { argb: COLOR.borderColor } },
+              bottom: { style: "medium", color: { argb: "FF94A3B8" } },
+              right: { style: "thin", color: { argb: COLOR.borderColor } },
+          };
+          cell.alignment = { horizontal: "center", vertical: "middle" };
       });
-      ws.getRow(headerRowNum).height = 30;
 
       filtered.forEach((u, idx) => {
-        const rowNum = headerRowNum + 1 + idx;
-        const rowBg = idx % 2 === 0 ? "FFF8FAFC" : "FFFFFFFF";
-        const rowValues: (string | number)[] = [
-          idx + 1,
-          u.laptop?.laptop_name || "-",
-          u.laptop?.brand || "-",
-          u.laptop?.cpu || "-",
-          u.laptop?.ram || "-",
-          u.laptop?.storage || "-",
-          `Grade ${u.grade}`,
-          u.serial_number,
-          u.condition_note || "-",
-          u.pedagang_price,
-        ];
-        rowValues.forEach((val, colIdx) => {
-          const cell = ws.getCell(rowNum, colIdx + 1);
-          cell.value = val;
+        const rowBg = idx % 2 === 0 ? COLOR.rowEven : COLOR.rowOdd;
+        const rowData = {
+          no: idx + 1,
+          product: u.laptop?.laptop_name || "-",
+          brand: u.laptop?.brand || "-",
+          cpu: u.laptop?.cpu || "-",
+          ram: u.laptop?.ram || "-",
+          storage: u.laptop?.storage || "-",
+          grade: `Grade ${u.grade}`,
+          sn: u.serial_number,
+          condition: u.condition_note || "-",
+          price: u.pedagang_price,
+        };
+
+        const row = ws.addRow(rowData);
+        row.height = 22;
+
+        row.eachCell((cell, colNum) => {
+          const key = ws.getColumn(colNum).key as string;
+
+          // ── Base styling ──────────────────────────────────────────────
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
-          cell.font = { size: 10, name: "Arial" };
           cell.border = {
-            top: { style: "hair", color: { argb: "FFE2E8F0" } },
-            left: { style: "hair", color: { argb: "FFE2E8F0" } },
-            bottom: { style: "hair", color: { argb: "FFE2E8F0" } },
-            right: { style: "hair", color: { argb: "FFE2E8F0" } },
+              top: { style: "hair", color: { argb: COLOR.borderColor } },
+              left: { style: "hair", color: { argb: COLOR.borderColor } },
+              bottom: { style: "hair", color: { argb: COLOR.borderColor } },
+              right: { style: "hair", color: { argb: COLOR.borderColor } },
           };
-          if (colIdx === 0) cell.alignment = { horizontal: "center" };
-          if (colIdx === 9) {
-            cell.numFmt = '"Rp "#,##0';
-            cell.font = { size: 10, bold: true, color: { argb: "FF065F46" } };
-            cell.alignment = { horizontal: "right" };
+          cell.font = { size: 10, name: "Arial" };
+          cell.alignment = { vertical: "middle" };
+
+          // ── Per-column overrides ──────────────────────────────────────
+          if (key === "no") {
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+              cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
+          } else if (key === "product") {
+              cell.font = { size: 10, name: "Arial", bold: true };
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+          } else if (["brand", "cpu", "ram", "storage", "grade", "sn"].includes(key)) {
+              cell.alignment = { horizontal: "center", vertical: "middle" };
+          } else if (key === "price") {
+              cell.numFmt = '"Rp "#,##0';
+              cell.alignment = { horizontal: "center", vertical: "middle" };
           }
         });
-        ws.getRow(rowNum).height = 22;
       });
 
       const buffer = await wb.xlsx.writeBuffer();
