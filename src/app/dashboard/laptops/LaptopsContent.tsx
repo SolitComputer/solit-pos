@@ -307,6 +307,8 @@ export function LaptopsContent() {
     const [filterPriceRange, setFilterPriceRange] = useState("ALL");
     const [sortBy, setSortBy] = useState("DEFAULT");
     const [filterSN, setFilterSN] = useState("");
+    // ── Filter stok: default TERSEDIA supaya laptop stok 0 otomatis "hilang" ──
+    const [filterStock, setFilterStock] = useState<"ALL" | "TERSEDIA" | "HABIS">("TERSEDIA");
 
     const handleSort = (asc: string, desc: string) => {
         setSortBy(prev => prev === asc ? desc : asc);
@@ -434,8 +436,14 @@ export function LaptopsContent() {
             list = list.filter(x => x.laptop_units?.some(u => u.serial_number.toLowerCase().includes(snQ)));
         }
 
-        // ── Selalu sembunyikan laptop dengan stok habis ────────────────────
-        list = list.filter(x => (x.stok_tersedia ?? 0) > 0);
+        // ── Filter stok tersisa ──────────────────────────────────────────────
+        // Default "TERSEDIA" → laptop dgn stok 0 otomatis tersembunyi ("hilang").
+        // User bisa pilih "ALL" untuk lihat semua, atau "HABIS" untuk lihat yg kosong saja.
+        if (filterStock === "TERSEDIA") {
+            list = list.filter(x => (x.stok_tersedia ?? 0) > 0);
+        } else if (filterStock === "HABIS") {
+            list = list.filter(x => (x.stok_tersedia ?? 0) === 0);
+        }
 
         switch (sortBy) {
             case "AZ": list.sort((a, b) => (a.laptop_name || "").localeCompare(b.laptop_name || "")); break;
@@ -462,7 +470,7 @@ export function LaptopsContent() {
             case "SN": list.sort((a, b) => a.id.localeCompare(b.id)); break;
         }
         return list;
-    }, [laptops, search, filterSN, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, sortBy]);
+    }, [laptops, search, filterSN, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, filterStock, sortBy]);
 
     const uniqueProcessors = useMemo(() => {
         const types = new Set<string>();
@@ -863,205 +871,211 @@ export function LaptopsContent() {
                             )}
                         </div>
                     </div>
-                            {/* ── STAT CARDS ───────────────────────────────────── */}
-                            <div className={`grid gap-3 animate-slideDown ${canViewTotalStok ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"}`}>
-                                {canViewTotalStok && (
-                                    <StatCard label="Stok Tersisa" value={`${totalSisa} unit`} accent="bg-gray-700"
-                                        icon={<svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
-                                    />
-                                )}
-                                <StatCard label="Siap Jual" value={`${totalSiapJual} unit`} accent="bg-green-500"
-                                    icon={<svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                                />
-                                {canViewTotalStok && (
-                                    <StatCard label="Minus" value={`${totalMinus} unit`} accent="bg-red-500"
-                                        icon={<svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>}
-                                    />
-                                )}
+                    {/* ── STAT CARDS ───────────────────────────────────── */}
+                    <div className={`grid gap-3 animate-slideDown ${canViewTotalStok ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"}`}>
+                        {canViewTotalStok && (
+                            <StatCard label="Stok Tersisa" value={`${totalSisa} unit`} accent="bg-gray-700"
+                                icon={<svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
+                            />
+                        )}
+                        <StatCard label="Siap Jual" value={`${totalSiapJual} unit`} accent="bg-green-500"
+                            icon={<svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                        />
+                        {canViewTotalStok && (
+                            <StatCard label="Minus" value={`${totalMinus} unit`} accent="bg-red-500"
+                                icon={<svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>}
+                            />
+                        )}
+                    </div>
+
+                    {/* ── FILTER PANEL ─────────────────────────────────── */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                            <SearchInput placeholder="Cari nama, brand, CPU..." value={search} onChange={e => setSearch(e.target.value)} icon="search" />
+                            <SearchInput placeholder="Cari Serial Number..." value={filterSN} onChange={e => setFilterSN(e.target.value)} icon="sn" />
+                            <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                                <option value="ALL">Semua Status</option>
+                                <option value="SIAP_JUAL">✅ Siap Jual</option>
+                                <option value="BELUM_SIAP">⚠️ Minus</option>
+                            </FilterSelect>
+                            <FilterSelect value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
+                                {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
+                            </FilterSelect>
+                            <button
+                                onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setFilterStock("TERSEDIA"); setSortBy("DEFAULT"); }}
+                                className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all duration-150 flex items-center justify-center gap-1.5"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Reset
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                            <FilterSelect value={filterRam} onChange={e => setFilterRam(e.target.value)}>
+                                {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
+                            </FilterSelect>
+                            <FilterSelect value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)}>
+                                <option value="ALL">Semua Harga</option>
+                                <option value="1-2">Rp 1 jt – 2 jt</option>
+                                <option value="2-3">Rp 2 jt – 3 jt</option>
+                                <option value="3-4">Rp 3 jt – 4 jt</option>
+                                <option value="4+">Rp 4 jt ke atas</option>
+                            </FilterSelect>
+                            {/* ── Filter Stok Tersisa ── */}
+                            <FilterSelect value={filterStock} onChange={e => setFilterStock(e.target.value as "ALL" | "TERSEDIA" | "HABIS")}>
+                                <option value="TERSEDIA">📦 Stok Tersedia</option>
+                                <option value="ALL">Semua Stok</option>
+                                <option value="HABIS">🚫 Stok Habis</option>
+                            </FilterSelect>
+                            <FilterSelect value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                                <option value="DEFAULT">Urutan Default</option>
+                                <option value="AZ">Nama: A → Z</option>
+                                <option value="ZA">Nama: Z → A</option>
+                                <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
+                                <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
+                                <option value="SN">Urut SN</option>
+                            </FilterSelect>
+                        </div>
+
+                        {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || filterStock !== "TERSEDIA" || sortBy !== "DEFAULT") && (
+                            <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
+                                {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
+                                {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
+                                {filterStock !== "TERSEDIA" && <FilterChip label={filterStock === "ALL" ? "Semua Stok" : "Stok Habis"} onRemove={() => setFilterStock("TERSEDIA")} />}
+                                {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${SORT_LABELS[sortBy] ?? sortBy}`} onRemove={() => setSortBy("DEFAULT")} />}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── TABLE ────────────────────────────────────────── */}
+                    {isLoading ? (
+                        <SkeletonTable />
+                    ) : filteredLaptops.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-24 text-center animate-fadeIn">
+                            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <p className="text-gray-700 font-bold text-base">Tidak ada laptop ditemukan</p>
+                            <p className="text-gray-400 text-sm mt-1.5">Coba ubah filter atau tambah laptop baru</p>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
+                            <div className="overflow-x-auto table-scroll">
+                                <table className="w-full text-sm border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 border-b-2 border-gray-100">
+                                            <Th center sortKey="NO" activeSort={sortBy} onSort={handleSort}>No</Th>
+                                            <Th sortKey="NAMA" activeSort={sortBy} onSort={handleSort}>Nama Laptop</Th>
+                                            <Th sortKey="CPU" activeSort={sortBy} onSort={handleSort}>CPU</Th>
+                                            <Th sortKey="RAM" activeSort={sortBy} onSort={handleSort}>RAM</Th>
+                                            <Th sortKey="STORAGE" activeSort={sortBy} onSort={handleSort}>Storage</Th>
+                                            <Th right sortKey="PRICE" activeSort={sortBy} onSort={handleSort}>Harga Jual</Th>
+                                            {canViewTotalStok && <Th right sortKey="STOK" activeSort={sortBy} onSort={handleSort}>Stok Tersisa</Th>}
+                                            <Th right sortKey="SIAP" activeSort={sortBy} onSort={handleSort}>Siap Jual</Th>
+                                            {canViewTotalStok && <Th right sortKey="MINUS" activeSort={sortBy} onSort={handleSort}>Minus</Th>}
+                                            <Th right>Aksi</Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredLaptops.map((item, idx) => (
+                                            <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0" onClick={() => openDetail(item)}>
+                                                <td className="px-4 py-3.5 text-center w-10">
+                                                    <span className="text-xs font-semibold text-gray-300 tabular-nums">{String(idx + 1).padStart(2, "0")}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 max-w-[200px]">
+                                                    <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.laptop_name}>{item.laptop_name}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 max-w-[160px]">
+                                                    <span className="block text-xs text-gray-600 truncate" title={item.cpu}>{item.cpu || <span className="text-gray-200">—</span>}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 whitespace-nowrap">
+                                                    <span className="text-xs font-medium text-gray-600">{item.ram || <span className="text-gray-200">—</span>}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 whitespace-nowrap">
+                                                    <span className="text-xs font-medium text-gray-600">{item.storage || <span className="text-gray-200">—</span>}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                    <span className="text-[13px] font-bold text-gray-800 tabular-nums">{fmt(item.selling_price)}</span>
+                                                </td>
+                                                {canViewTotalStok && (
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className={`text-sm font-semibold tabular-nums ${(item.stok_tersedia ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
+                                                            {item.stok_tersedia ?? 0}
+                                                        </span>
+                                                    </td>
+                                                )}
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                    <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.siap_jual ?? 0) === 0 ? "bg-red-50 text-red-500 ring-1 ring-red-200" : "bg-green-50 text-green-700 ring-1 ring-green-200"}`}>
+                                                        {item.siap_jual ?? 0}
+                                                    </span>
+                                                </td>
+                                                {canViewTotalStok && (
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                                        <span className={`text-sm font-semibold tabular-nums ${(item.stok_minus ?? 0) > 0 ? "text-red-500" : "text-gray-200"}`}>
+                                                            {(item.stok_minus ?? 0) > 0 ? `-${item.stok_minus}` : "—"}
+                                                        </span>
+                                                    </td>
+                                                )}
+                                                <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {canViewBarcode && (
+                                                            <button onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
+                                                                className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150"
+                                                                title="Lihat Barcode">
+                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                        {canViewUnits && (
+                                                            <Link href={`/dashboard/laptops/${item.id}/units`} onClick={e => e.stopPropagation()}
+                                                                className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150 flex items-center">
+                                                                Units
+                                                            </Link>
+                                                        )}
+                                                        {canEditLaptop && (
+                                                            <>
+                                                                <button onClick={() => openEdit(item)}
+                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150">
+                                                                    Edit
+                                                                </button>
+                                                                <button onClick={() => handleDelete(item.id)}
+                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-all duration-150">
+                                                                    Hapus
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
 
-                            {/* ── FILTER PANEL ─────────────────────────────────── */}
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3.5">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                                    <SearchInput placeholder="Cari nama, brand, CPU..." value={search} onChange={e => setSearch(e.target.value)} icon="search" />
-                                    <SearchInput placeholder="Cari Serial Number..." value={filterSN} onChange={e => setFilterSN(e.target.value)} icon="sn" />
-                                    <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                                        <option value="ALL">Semua Status</option>
-                                        <option value="SIAP_JUAL">✅ Siap Jual</option>
-                                        <option value="BELUM_SIAP">⚠️ Minus</option>
-                                    </FilterSelect>
-                                    <FilterSelect value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
-                                        {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
-                                    </FilterSelect>
-                                    <button
-                                        onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setSortBy("DEFAULT"); }}
-                                        className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all duration-150 flex items-center justify-center gap-1.5"
-                                    >
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                        Reset
-                                    </button>
+                            {/* Table Footer */}
+                            <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
+                                <p className="text-xs text-gray-400 font-medium">
+                                    <span className="text-gray-700 font-bold">{filteredLaptops.length}</span> laptop
+                                    {laptops.length !== filteredLaptops.length && (
+                                        <span className="text-gray-400 ml-1">dari {laptops.length}</span>
+                                    )}
+                                </p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {canViewTotalStok && <FooterStat label="Stok Tersisa" value={totalSisa} dot="bg-gray-400" color="text-gray-800" />}
+                                    <FooterStat label="Siap Jual" value={totalSiapJual} dot="bg-green-500" color="text-green-700" />
+                                    {canViewTotalStok && (
+                                        <FooterStat label="Minus" value={totalMinus} dot="bg-red-500" color="text-red-500" />
+                                    )}
                                 </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                                    <FilterSelect value={filterRam} onChange={e => setFilterRam(e.target.value)}>
-                                        {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
-                                    </FilterSelect>
-                                    <FilterSelect value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)}>
-                                        <option value="ALL">Semua Harga</option>
-                                        <option value="1-2">Rp 1 jt – 2 jt</option>
-                                        <option value="2-3">Rp 2 jt – 3 jt</option>
-                                        <option value="3-4">Rp 3 jt – 4 jt</option>
-                                        <option value="4+">Rp 4 jt ke atas</option>
-                                    </FilterSelect>
-
-                                    <FilterSelect value={sortBy} onChange={e => setSortBy(e.target.value)}>
-                                        <option value="DEFAULT">Urutan Default</option>
-                                        <option value="AZ">Nama: A → Z</option>
-                                        <option value="ZA">Nama: Z → A</option>
-                                        <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
-                                        <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
-                                        <option value="SN">Urut SN</option>
-                                    </FilterSelect>
-                                </div>
-
-                                {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || sortBy !== "DEFAULT") && (
-                                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                                        {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
-                                        {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
-                                        {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
-                                        {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${SORT_LABELS[sortBy] ?? sortBy}`} onRemove={() => setSortBy("DEFAULT")} />}
-                                    </div>
-                                )}
                             </div>
-
-                            {/* ── TABLE ────────────────────────────────────────── */}
-                            {isLoading ? (
-                                <SkeletonTable />
-                            ) : filteredLaptops.length === 0 ? (
-                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-24 text-center animate-fadeIn">
-                                    <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </div>
-                                    <p className="text-gray-700 font-bold text-base">Tidak ada laptop ditemukan</p>
-                                    <p className="text-gray-400 text-sm mt-1.5">Coba ubah filter atau tambah laptop baru</p>
-                                </div>
-                            ) : (
-                                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
-                                    <div className="overflow-x-auto table-scroll">
-                                        <table className="w-full text-sm border-collapse">
-                                            <thead>
-                                                <tr className="bg-gray-50 border-b-2 border-gray-100">
-                                                    <Th center sortKey="NO" activeSort={sortBy} onSort={handleSort}>No</Th>
-                                                    <Th sortKey="NAMA" activeSort={sortBy} onSort={handleSort}>Nama Laptop</Th>
-                                                    <Th sortKey="CPU" activeSort={sortBy} onSort={handleSort}>CPU</Th>
-                                                    <Th sortKey="RAM" activeSort={sortBy} onSort={handleSort}>RAM</Th>
-                                                    <Th sortKey="STORAGE" activeSort={sortBy} onSort={handleSort}>Storage</Th>
-                                                    <Th right sortKey="PRICE" activeSort={sortBy} onSort={handleSort}>Harga Jual</Th>
-                                                    {canViewTotalStok && <Th right sortKey="STOK" activeSort={sortBy} onSort={handleSort}>Stok Tersisa</Th>}
-                                                    <Th right sortKey="SIAP" activeSort={sortBy} onSort={handleSort}>Siap Jual</Th>
-                                                    {canViewTotalStok && <Th right sortKey="MINUS" activeSort={sortBy} onSort={handleSort}>Minus</Th>}
-                                                    <Th right>Aksi</Th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {filteredLaptops.map((item, idx) => (
-                                                    <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0" onClick={() => openDetail(item)}>
-                                                        <td className="px-4 py-3.5 text-center w-10">
-                                                            <span className="text-xs font-semibold text-gray-300 tabular-nums">{String(idx + 1).padStart(2, "0")}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 max-w-[200px]">
-                                                            <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.laptop_name}>{item.laptop_name}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 max-w-[160px]">
-                                                            <span className="block text-xs text-gray-600 truncate" title={item.cpu}>{item.cpu || <span className="text-gray-200">—</span>}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 whitespace-nowrap">
-                                                            <span className="text-xs font-medium text-gray-600">{item.ram || <span className="text-gray-200">—</span>}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 whitespace-nowrap">
-                                                            <span className="text-xs font-medium text-gray-600">{item.storage || <span className="text-gray-200">—</span>}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className="text-[13px] font-bold text-gray-800 tabular-nums">{fmt(item.selling_price)}</span>
-                                                        </td>
-                                                        {canViewTotalStok && (
-                                                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                                <span className={`text-sm font-semibold tabular-nums ${(item.stok_tersedia ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
-                                                                    {item.stok_tersedia ?? 0}
-                                                                </span>
-                                                            </td>
-                                                        )}
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                            <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.siap_jual ?? 0) === 0 ? "bg-red-50 text-red-500 ring-1 ring-red-200" : "bg-green-50 text-green-700 ring-1 ring-green-200"}`}>
-                                                                {item.siap_jual ?? 0}
-                                                            </span>
-                                                        </td>
-                                                        {canViewTotalStok && (
-                                                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                                <span className={`text-sm font-semibold tabular-nums ${(item.stok_minus ?? 0) > 0 ? "text-red-500" : "text-gray-200"}`}>
-                                                                    {(item.stok_minus ?? 0) > 0 ? `-${item.stok_minus}` : "—"}
-                                                                </span>
-                                                            </td>
-                                                        )}
-                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                {canViewBarcode && (
-                                                                    <button onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
-                                                                        className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150"
-                                                                        title="Lihat Barcode">
-                                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
-                                                                        </svg>
-                                                                    </button>
-                                                                )}
-                                                                {canViewUnits && (
-                                                                    <Link href={`/dashboard/laptops/${item.id}/units`} onClick={e => e.stopPropagation()}
-                                                                        className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150 flex items-center">
-                                                                        Units
-                                                                    </Link>
-                                                                )}
-                                                                {canEditLaptop && (
-                                                                    <>
-                                                                        <button onClick={() => openEdit(item)}
-                                                                            className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150">
-                                                                            Edit
-                                                                        </button>
-                                                                        <button onClick={() => handleDelete(item.id)}
-                                                                            className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-all duration-150">
-                                                                            Hapus
-                                                                        </button>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* Table Footer */}
-                                    <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
-                                        <p className="text-xs text-gray-400 font-medium">
-                                            <span className="text-gray-700 font-bold">{filteredLaptops.length}</span> laptop
-                                            {laptops.length !== filteredLaptops.length && (
-                                                <span className="text-gray-400 ml-1">dari {laptops.length}</span>
-                                            )}
-                                        </p>
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            {canViewTotalStok && <FooterStat label="Stok Tersisa" value={totalSisa} dot="bg-gray-400" color="text-gray-800" />}
-                                            <FooterStat label="Siap Jual" value={totalSiapJual} dot="bg-green-500" color="text-green-700" />
-                                            {canViewTotalStok && (
-                                                <FooterStat label="Minus" value={totalMinus} dot="bg-red-500" color="text-red-500" />
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                        </div>
+                    )}
                 </div>
             </main>
 
