@@ -393,11 +393,15 @@ const ITEM_MONITORING_CEO_PENYEDIA: MenuItem = {
   href: "/dashboard/riwayat-penyedia",
   icon: Icons.barang,
 };
-
+const ITEM_MONITORING_CEO_SERVIS: MenuItem = {
+  name: "Service",
+  href: "/dashboard/service/statistik",
+  icon: Icons.serviceQueue,
+};
 
 const MONITORING_CEO_MENU: MenuGroup = {
   label: "Monitoring CEO",
-  items: [ITEM_MONITORING_CEO_ABSENSI, ITEM_MONITORING_CEO_PENYEDIA],
+  items: [ITEM_MONITORING_CEO_ABSENSI, ITEM_MONITORING_CEO_PENYEDIA, ITEM_MONITORING_CEO_SERVIS],
 };
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
