@@ -435,7 +435,7 @@ export function LaptopsContent() {
         }
 
         // ── Selalu sembunyikan laptop dengan stok habis ────────────────────
-        list = list.filter(x => (x.stok_tersedia ?? 0) > 0);
+                list = list.filter(x => (x.laptop_units?.length ?? 0) === 0 || (x.stok_tersedia ?? 0) > 0);
 
         switch (sortBy) {
             case "AZ": list.sort((a, b) => (a.laptop_name || "").localeCompare(b.laptop_name || "")); break;

@@ -391,10 +391,17 @@ export default function CreatePaymentPage() {
         try {
             const res = await fetch(`/api/accessories/search?q=${encodeURIComponent(q)}`);
             const result = await res.json();
+            if (!res.ok || !result.success) {
+                console.error("[handleAccSearch] gagal ambil data aksesori:", result.error || res.statusText);
+                setAccResults([]);
+                return;
+            }
             const selectedIds = new Set(selectedAccessories.map(a => a.accessory_id));
             setAccResults((result.data || []).filter((a: AccessoryOption) => !selectedIds.has(a.id)));
-        } catch { setAccResults([]); }
-        finally { setAccLoading(false); }
+        } catch (err) {
+            console.error("[handleAccSearch] error:", err);
+            setAccResults([]);
+        } finally { setAccLoading(false); }
     }, [selectedAccessories]);
 
     const handleAddAccessory = (a: AccessoryOption) => {
