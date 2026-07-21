@@ -35,16 +35,22 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
       );
     }
 
-    await logActivity({
-      userId: user.id,
-      userName: user.name,
-      userRole: user.role,
-      action: "CREATE",
-      entity: "laptop",
-      entityId: laptop.id,
-      entityLabel: laptop.laptop_name,
-      afterData: laptop,
-    });
+   try {
+      await logActivity({
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        action: "CREATE",
+        entity: "laptop",
+        entityId: laptop.id,
+        entityLabel: laptop.laptop_name,
+        afterData: laptop,
+      });
+    } catch (logErr) {
+      // Laptop SUDAH tersimpan di titik ini — kegagalan logging
+      // tidak boleh membuat response ke user jadi "gagal".
+      console.error("logActivity gagal (laptop tetap tersimpan):", logErr);
+    }
 
     return NextResponse.json({ success: true, data: laptop });
   } catch (err) {
