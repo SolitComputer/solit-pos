@@ -8,9 +8,11 @@ import { LaptopsContent } from "../laptops/LaptopsContent";
 import AccessoriesContent from "../accessories/AccessoriesContent";
 import OutflowsContent from "./OutflowsContent";
 import { ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
+import PriceListPedagangTab from "@/components/inventory/price-list-pedagang/page";
+import { PRICELIST_PEDAGANG_ROLES } from "@/lib/pricelistPedagang";
 
 
-type TabKey = "laptops" | "accessories" | "outflows";
+type TabKey = "laptops" | "accessories" | "outflows" | "pedagang";
 
 interface TabDef {
   key: TabKey;
@@ -38,6 +40,12 @@ const TABS: TabDef[] = [
     roles: ITEM_OUTFLOW_ROLES, // ← tab hanya tampil utk role yg diizinkan
     icon: "ti-history",
   },
+  {
+    key: "pedagang",
+    label: "Price List Pedagang",
+    roles: PRICELIST_PEDAGANG_ROLES, // ← tab hanya tampil utk role yg diizinkan
+    icon: "ti-tag",
+  },
 ];
 
 function getTabIcon(icon: string, className: string) {
@@ -64,6 +72,13 @@ function getTabIcon(icon: string, className: string) {
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" />
           <polyline points="12 6 12 12 16 14" />
+        </svg>
+      );
+    case "ti-tag":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.17L4 3a1 1 0 0 0-1 1l.17 5.59a2 2 0 0 0 .66 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83Z" />
+          <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
         </svg>
       );
     default:
@@ -202,6 +217,7 @@ export default function DataBarangPage() {
         {activeTab === "laptops" && <LaptopsContent />}
         {activeTab === "accessories" && <AccessoriesContent />}
         {activeTab === "outflows" && <OutflowsContent />}
+        {activeTab === "pedagang" && <PriceListPedagangTab />}
       </div>
 
       <style jsx global>{`

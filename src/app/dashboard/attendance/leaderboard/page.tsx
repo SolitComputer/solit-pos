@@ -27,7 +27,7 @@ type UserLeaveData = { user: { id: string; name: string; role: string }; request
 type RankingEntry = {
   userId: string; name: string; role: string;
   present: number; late: number; leave: number; absentRecorded: number;
-  score: number; onTimeRate: number;
+  score: number; onTimeRate: number; attendanceRate: number;
 };
 type StatusCount = { status: string; count: number };
 type TrendPoint = { key: string; count: number };
@@ -153,15 +153,25 @@ function computeLeaderboard(
       const score = v.present * 1 + v.late * 0.5 + v.leave * 1;
       const totalRecorded = v.present + v.late;
       const onTimeRate = totalRecorded > 0 ? Math.round((v.present / totalRecorded) * 1000) / 10 : 0;
+      // Basis peringkat: RATA-RATA kualitas kehadiran per hari tercatat
+      // (present+late+leave+absentRecorded), bukan total poin mentah.
+      // Ini mencegah karyawan yang sering telat tapi jumlah hadirnya lebih
+      // banyak mengalahkan karyawan yang jarang/tidak pernah telat.
+      const totalCounted = v.present + v.late + v.leave + v.absentRecorded;
+      const attendanceRate = totalCounted > 0 ? Math.round((score / totalCounted) * 1000) / 10 : 0;
       return {
         userId: uid,
         name: userMap[uid]?.name ?? "—",
         role: userMap[uid]?.role ?? "—",
         present: v.present, late: v.late, leave: v.leave, absentRecorded: v.absentRecorded,
-        score, onTimeRate,
+        score, onTimeRate, attendanceRate,
       };
     })
-    .sort((a, b) => b.score - a.score || b.onTimeRate - a.onTimeRate);
+    .sort((a, b) =>
+      b.attendanceRate - a.attendanceRate ||
+      b.onTimeRate - a.onTimeRate ||
+      b.score - a.score
+    );
 
   const totalPresent = ranking.reduce((s, r) => s + r.present, 0);
   const totalLate = ranking.reduce((s, r) => s + r.late, 0);
@@ -215,9 +225,9 @@ function PodiumCard({ entry, rank }: { entry: RankingEntry; rank: number }) {
         <div className={`w-12 h-12 mx-auto rounded-xl flex items-center justify-center text-sm font-bold mb-2 ${bg}`}>{initials(entry.name)}</div>
         <p className="font-bold text-gray-900 text-xs leading-tight truncate">{entry.name}</p>
         <p className="text-[9px] text-gray-400 mt-0.5 mb-2 truncate">{entry.role.replace(/_/g, " ")}</p>
-        <p className="text-lg font-black text-violet-600 leading-none">{entry.score.toFixed(1)}<span className="text-[10px] font-semibold text-gray-400 ml-1">poin</span></p>
+        <p className="text-lg font-black text-violet-600 leading-none">{entry.attendanceRate.toFixed(1)}<span className="text-[10px] font-semibold text-gray-400 ml-1">%</span></p>
         <p className="text-[9px] text-gray-400 mt-1">{entry.present} tepat · {entry.late} telat{entry.leave > 0 ? ` · ${entry.leave} cuti` : ""}</p>
-        <p className="text-[10px] font-semibold text-emerald-600 mt-1.5">{entry.onTimeRate}% ketepatan</p>
+        <p className="text-[10px] font-semibold text-emerald-600 mt-1.5">{entry.score.toFixed(1)} poin · {entry.onTimeRate}% ketepatan</p>
       </div>
     </div>
   );
@@ -230,7 +240,7 @@ function BarTooltip({ active, payload }: any) {
   return (
     <div className="bg-gray-900 text-white text-[10px] rounded-lg px-3 py-2 shadow-lg">
       <p className="font-bold mb-0.5">{d.fullName}</p>
-      <p className="text-gray-300">{d.present} tepat · {d.late} telat · skor {d.score.toFixed(1)}</p>
+      <p className="text-gray-300">{d.attendanceRate.toFixed(1)}% kehadiran · {d.present} tepat · {d.late} telat</p>
     </div>
   );
 }
@@ -306,7 +316,8 @@ export default function AttendanceLeaderboardPage() {
 
   const barData = useMemo(
     () => data.ranking.slice(0, 10).map(r => ({
-      name: r.name.split(" ")[0], fullName: r.name, score: r.score, present: r.present, late: r.late,
+      name: r.name.split(" ")[0], fullName: r.name, score: r.score,
+      attendanceRate: r.attendanceRate, present: r.present, late: r.late,
     })),
     [data.ranking]
   );
@@ -432,14 +443,14 @@ export default function AttendanceLeaderboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Bar ranking */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Ranking Skor Kehadiran (Top 10)</p>
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Ranking Tingkat Kehadiran (Top 10)</p>
                 <ResponsiveContainer width="100%" height={Math.max(220, barData.length * 34)}>
                   <BarChart data={barData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f1f3" />
                     <XAxis type="number" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#4b5563" }} axisLine={false} tickLine={false} width={70} />
                     <Tooltip content={<BarTooltip />} cursor={{ fill: "#f5f3ff" }} />
-                    <Bar dataKey="score" fill="#7c3aed" radius={[0, 6, 6, 0]} barSize={16} />
+                    <Bar dataKey="attendanceRate" fill="#7c3aed" radius={[0, 6, 6, 0]} barSize={16} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -521,8 +532,8 @@ export default function AttendanceLeaderboardPage() {
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-xs font-bold text-gray-800 font-mono">{r.score.toFixed(1)} poin</p>
-                        <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">{r.onTimeRate}% ketepatan</p>
+                        <p className="text-xs font-bold text-gray-800 font-mono">{r.attendanceRate.toFixed(1)}% kehadiran</p>
+                        <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">{r.score.toFixed(1)} poin · {r.onTimeRate}% ketepatan</p>
                       </div>
                     </div>
                   );
