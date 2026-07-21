@@ -33,9 +33,12 @@ async function isValidAccountAnywhere(supabase: SupabaseClient, code: string) {
   return !!data;
 }
 
-// ── GET /api/akuntansi/jurnal?period=2026-07 ─────────────────────────────────
 export const GET = withAuth(async (req) => {
-  const period = new URL(req.url).searchParams.get("period") ?? "";
+  const url = new URL(req.url);
+  const period = url.searchParams.get("period") ?? "";
+  // default "desc" = terbaru dulu. Kirim ?sort=asc untuk terlama ke terbaru.
+  const sort = url.searchParams.get("sort") === "asc" ? "asc" : "desc";
+
   if (!isValidPeriod(period))
     return NextResponse.json({ success: false, message: "Periode tidak valid" }, { status: 400 });
 
@@ -45,8 +48,8 @@ export const GET = withAuth(async (req) => {
     .from("journal_entries")
     .select(ENTRY_SELECT)
     .eq("period", period)
-    .order("tanggal", { ascending: true })
-    .order("created_at", { ascending: true });
+    .order("tanggal", { ascending: sort === "asc" })
+    .order("created_at", { ascending: true }); // urutan dalam tanggal yang sama tetap konsisten (dipakai drag-and-drop reorder)
 
   if (error) {
     console.error("[akuntansi GET jurnal]", error);
