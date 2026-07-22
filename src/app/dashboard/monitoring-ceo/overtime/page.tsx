@@ -94,8 +94,7 @@ function formatDuration(mins: number | null): string {
   return m > 0 ? `${h}j ${m}m` : `${h} jam`;
 }
 function initials(name: string) { return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase(); }
-const AV_COLORS = ["bg-violet-100 text-violet-700", "bg-blue-100 text-blue-700", "bg-emerald-100 text-emerald-700", "bg-rose-100 text-rose-700", "bg-amber-100 text-amber-700", "bg-cyan-100 text-cyan-700", "bg-purple-100 text-purple-700"];
-function avBg(name: string) { let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff; return AV_COLORS[Math.abs(h) % AV_COLORS.length]; }
+function avBg(_name: string) { return "bg-white text-gray-600 border border-gray-200"; }
 function csvEscape(v: string | number | null | undefined): string {
   const s = v === null || v === undefined ? "" : String(v);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -177,13 +176,13 @@ function DateRangeCalendar({
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-black text-gray-900">{MONTH_NAMES[viewMonth]} {viewYear}</p>
         <div className="flex items-center gap-1">
-          <button type="button" onClick={goPrevMonth} className="w-8 h-8 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 hover:text-violet-600 transition-all border border-transparent hover:border-gray-200 hover:shadow-sm">
+          <button type="button" onClick={goPrevMonth} className="w-8 h-8 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 hover:text-gray-900 transition-all border border-transparent hover:border-gray-200 hover:shadow-sm">
             <ChevronLeft size={14} />
           </button>
-          <button type="button" onClick={goToday} className="h-8 px-2.5 rounded-lg hover:bg-white text-[10px] font-bold text-gray-500 hover:text-violet-600 transition-all border border-transparent hover:border-gray-200">
+          <button type="button" onClick={goToday} className="h-8 px-2.5 rounded-lg hover:bg-white text-[10px] font-bold text-gray-500 hover:text-gray-900 transition-all border border-transparent hover:border-gray-200">
             Hari ini
           </button>
-          <button type="button" onClick={goNextMonth} className="w-8 h-8 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 hover:text-violet-600 transition-all border border-transparent hover:border-gray-200 hover:shadow-sm">
+          <button type="button" onClick={goNextMonth} className="w-8 h-8 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 hover:text-gray-900 transition-all border border-transparent hover:border-gray-200 hover:shadow-sm">
             <ChevronRight size={14} />
           </button>
         </div>
@@ -212,9 +211,9 @@ function DateRangeCalendar({
               onMouseLeave={() => setHoverDate(null)}
               className={`relative h-9 rounded-lg flex items-center justify-center text-xs font-bold transition-all
                 ${isStart || isEnd
-                  ? "bg-gradient-to-br from-violet-500 to-violet-700 text-white shadow-md shadow-violet-500/30"
+                  ? "bg-gray-900 text-white shadow-md shadow-gray-900/20"
                   : isInRange
-                    ? "bg-violet-100 text-violet-700"
+                    ? "bg-gray-100 text-gray-800"
                     : isFuture
                       ? "text-gray-300 hover:bg-gray-50"
                       : isSun
@@ -222,7 +221,7 @@ function DateRangeCalendar({
                         : "text-gray-700 hover:bg-white hover:shadow-sm"}`}
             >
               {day}
-              {isToday && !isStart && !isEnd && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-violet-500" />}
+              {isToday && !isStart && !isEnd && <span className="absolute bottom-1 w-1 h-1 rounded-full bg-gray-900" />}
             </button>
           );
         })}
@@ -242,17 +241,16 @@ function MonitorDetailModal({ overtime: o, onClose }: { overtime: OvertimeRow; o
       <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden border border-gray-100/80" onClick={e => e.stopPropagation()}>
         <div className="flex justify-center pt-3 pb-0 sm:hidden"><div className="w-10 h-1 rounded-full bg-gray-200" /></div>
 
-        {/* Header — gradient */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-[#4c1d95] to-violet-700 px-5 pt-4 pb-4 flex items-start gap-3">
-          <div className="absolute -top-8 -right-8 w-32 h-32 bg-violet-500/30 rounded-full blur-2xl" />
-          <div className="relative w-11 h-11 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 bg-white/15 backdrop-blur-sm border border-white/20 text-white">
+        {/* Header — white */}
+        <div className="relative bg-white border-b border-gray-100 px-5 pt-4 pb-4 flex items-start gap-3">
+          <div className="relative w-11 h-11 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 bg-white border border-gray-200 text-gray-700">
             {initials(o.users?.name ?? "?")}
           </div>
           <div className="relative flex-1 min-w-0 pt-0.5">
-            <h2 className="text-sm font-black text-white leading-tight truncate">{o.users?.name ?? "—"}</h2>
-            <p className="text-[10px] text-white/70 mt-0.5 truncate">{o.users?.role?.replace(/_/g, " ") ?? "—"} · {formatDateLabel(o.request_date)}</p>
+            <h2 className="text-sm font-black text-gray-900 leading-tight truncate">{o.users?.name ?? "—"}</h2>
+            <p className="text-[10px] text-gray-400 mt-0.5 truncate">{o.users?.role?.replace(/_/g, " ") ?? "—"} · {formatDateLabel(o.request_date)}</p>
           </div>
-          <button onClick={onClose} className="relative w-8 h-8 rounded-xl flex items-center justify-center text-white/80 hover:text-white hover:bg-white/20 transition-all shrink-0 mt-0.5">
+          <button onClick={onClose} className="relative w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all shrink-0 mt-0.5">
             <X size={16} />
           </button>
         </div>
@@ -269,22 +267,22 @@ function MonitorDetailModal({ overtime: o, onClose }: { overtime: OvertimeRow; o
               ["Selesai", formatTime(o.actual_end ?? o.scheduled_end)],
               ["Durasi", formatDuration(o.duration_minutes)],
             ].map(([k, v]) => (
-              <div key={k} className="bg-gradient-to-br from-gray-50 to-gray-100/50 border border-gray-100 rounded-xl p-3 text-center">
+              <div key={k} className="bg-white border border-gray-100 rounded-xl p-3 text-center">
                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5">{k}</p>
                 <p className="font-black text-gray-800 text-xs font-mono">{v}</p>
               </div>
             ))}
           </div>
-          <div className="bg-gray-50/70 border border-gray-100 rounded-xl p-3.5">
+          <div className="bg-white border border-gray-100 rounded-xl p-3.5">
             <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Alasan</p>
             <p className="text-xs text-gray-800">{o.reason || "—"}</p>
           </div>
-          <div className="bg-gray-50/70 border border-gray-100 rounded-xl p-3.5">
+          <div className="bg-white border border-gray-100 rounded-xl p-3.5">
             <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5">Rincian Pekerjaan</p>
             <p className="text-xs text-gray-700 leading-relaxed">{o.work_description || "—"}</p>
           </div>
           {o.approver && (
-            <div className="bg-gray-50/70 border border-gray-100 rounded-xl p-3.5">
+            <div className="bg-white border border-gray-100 rounded-xl p-3.5">
               <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-1.5">
                 {o.status === "REJECTED" ? "Ditolak oleh" : "Disetujui oleh"}
               </p>
@@ -292,14 +290,13 @@ function MonitorDetailModal({ overtime: o, onClose }: { overtime: OvertimeRow; o
               <p className="text-[9px] text-gray-400 mt-0.5">{o.approver.role.replace(/_/g, " ")}</p>
             </div>
           )}
-          <div className="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-violet-900 rounded-2xl p-4">
-            <div className="absolute -top-4 -right-4 w-24 h-24 bg-violet-500/20 rounded-full blur-2xl" />
+          <div className="relative bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
             <div className="relative flex items-end justify-between">
               <div>
-                <p className="text-[9px] text-white/60 font-black uppercase tracking-wider mb-1">Total Bayaran</p>
-                <p className="text-xl font-black text-white">{o.total_pay != null ? formatRupiah(o.total_pay) : "—"}</p>
+                <p className="text-[9px] text-gray-400 font-black uppercase tracking-wider mb-1">Total Bayaran</p>
+                <p className="text-xl font-black text-gray-900">{o.total_pay != null ? formatRupiah(o.total_pay) : "—"}</p>
               </div>
-              {o.rate_per_hour != null && <p className="text-[10px] text-white/50 font-mono">{formatRupiah(o.rate_per_hour)}/jam</p>}
+              {o.rate_per_hour != null && <p className="text-[10px] text-gray-400 font-mono">{formatRupiah(o.rate_per_hour)}/jam</p>}
             </div>
           </div>
           {o.proof_photo_url && (
@@ -311,8 +308,8 @@ function MonitorDetailModal({ overtime: o, onClose }: { overtime: OvertimeRow; o
             </div>
           )}
         </div>
-        <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/60">
-          <button onClick={onClose} className="w-full h-10 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all">
+        <div className="px-5 py-4 border-t border-gray-100 bg-white">
+          <button onClick={onClose} className="w-full h-10 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all">
             Tutup
           </button>
         </div>
@@ -359,31 +356,30 @@ function EmployeeOvertimeDetailView({
 
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* Header — gradient */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-[#4c1d95] to-violet-700 px-5 py-4 flex items-center gap-3">
-        <div className="absolute -top-8 -right-8 w-32 h-32 bg-violet-500/30 rounded-full blur-2xl" />
-        <button onClick={onBack} className="relative w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all flex-shrink-0 active:scale-95">
+      {/* Header — white */}
+      <div className="relative bg-white border-b border-gray-100 px-5 py-4 flex items-center gap-3">
+        <button onClick={onBack} className="relative w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-all flex-shrink-0 active:scale-95">
           <ChevronLeft size={18} />
         </button>
-        <div className="relative w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0 bg-white/15 backdrop-blur-sm border border-white/20 text-white">
+        <div className="relative w-11 h-11 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0 bg-white border border-gray-200 text-gray-700">
           {initials(employee.name)}
         </div>
         <div className="relative flex-1 min-w-0">
-          <p className="font-black text-white text-sm leading-tight truncate">{employee.name}</p>
-          <p className="text-[10px] text-white/70 mt-0.5">{employee.role.replace(/_/g, " ")} · {rows.length} lemburan</p>
+          <p className="font-black text-gray-900 text-sm leading-tight truncate">{employee.name}</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">{employee.role.replace(/_/g, " ")} · {rows.length} lemburan</p>
         </div>
       </div>
 
       {/* Quick stats */}
-      <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-br from-gray-50/60 to-white">
+      <div className="px-5 py-4 border-b border-gray-100 bg-white">
         <div className="grid grid-cols-4 gap-2">
           {[
-            { label: "Total", value: counts.total, color: "text-gray-800", bg: "bg-gray-100" },
-            { label: "Pending", value: counts.pending, color: "text-amber-600", bg: "bg-amber-50" },
-            { label: "Berjalan", value: counts.ongoing, color: "text-emerald-600", bg: "bg-emerald-50" },
-            { label: "Selesai", value: counts.selesai, color: "text-blue-600", bg: "bg-blue-50" },
+            { label: "Total", value: counts.total, color: "text-gray-800" },
+            { label: "Pending", value: counts.pending, color: "text-amber-600" },
+            { label: "Berjalan", value: counts.ongoing, color: "text-emerald-600" },
+            { label: "Selesai", value: counts.selesai, color: "text-blue-600" },
           ].map(s => (
-            <div key={s.label} className={`${s.bg} rounded-xl px-2 py-2.5 text-center border border-white`}>
+            <div key={s.label} className="bg-white rounded-xl px-2 py-2.5 text-center border border-gray-100">
               <p className={`text-xl sm:text-2xl font-black ${s.color} tabular-nums leading-none`}>{s.value}</p>
               <p className="text-[9px] text-gray-400 font-black uppercase tracking-wider mt-1">{s.label}</p>
             </div>
@@ -438,8 +434,8 @@ function EmployeeOvertimeDetailView({
             const dateObj = new Date(o.request_date + "T12:00:00");
             return (
               <button key={o.id} onClick={() => onOpenDetail(o)}
-                className="w-full px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4 text-left hover:bg-violet-50/40 transition-colors">
-                <div className="w-10 flex-shrink-0 text-center bg-gray-50 border border-gray-100 rounded-xl py-1.5">
+                className="w-full px-4 sm:px-5 py-4 flex items-center gap-3 sm:gap-4 text-left hover:bg-gray-50/60 transition-colors">
+                <div className="w-10 flex-shrink-0 text-center bg-white border border-gray-200 rounded-xl py-1.5">
                   <p className="text-base font-black text-gray-800 leading-none">{dateObj.getDate()}</p>
                   <p className="text-[9px] text-gray-400 font-black uppercase mt-0.5">{MONTH_NAMES[dateObj.getMonth()].substring(0, 3)}</p>
                 </div>
@@ -593,7 +589,7 @@ export default function CeoOvertimeMonitoringPage() {
 
   const renderSortIcon = (field: SortBy) => {
     if (sortBy !== field) return <ArrowUpDown size={12} className="text-gray-300" />;
-    return sortOrder === "asc" ? <ArrowUp size={12} className="text-violet-600" /> : <ArrowDown size={12} className="text-violet-600" />;
+    return sortOrder === "asc" ? <ArrowUp size={12} className="text-white" /> : <ArrowDown size={12} className="text-white" />;
   };
 
   const exportCsv = () => {
@@ -644,26 +640,23 @@ export default function CeoOvertimeMonitoringPage() {
         <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-5">
 
           {/* ─── HERO HEADER ─── */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1e1b4b] via-[#4c1d95] to-violet-700 p-5 sm:p-7 shadow-xl shadow-violet-900/20">
-            <div className="absolute -top-16 -right-16 w-48 h-48 bg-violet-400/25 rounded-full blur-3xl" />
-            <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-fuchsia-500/15 rounded-full blur-3xl" />
-
+          <div className="relative rounded-3xl bg-white border border-gray-100 p-5 sm:p-7 shadow-sm">
             <div className="relative flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
               <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                  <Timer className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white border border-gray-200 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Timer className="w-6 h-6 sm:w-7 sm:h-7 text-gray-700" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-none">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-gray-900 tracking-tight leading-none">
                       Monitor Lemburan
                     </h1>
-                    <span className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-emerald-300 bg-emerald-500/20 backdrop-blur-sm border border-emerald-400/30 px-2 py-0.5 rounded-full flex-shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex-shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       LIVE
                     </span>
                   </div>
-                  <p className="text-[11px] sm:text-sm text-white/60 font-medium leading-snug truncate">
+                  <p className="text-[11px] sm:text-sm text-gray-400 font-medium leading-snug truncate">
                     {selectedEmployee
                       ? (employeeLoading ? "Memuat data..." : `${selectedEmployee.name} · ${employeeRows.length} lemburan`)
                       : (loading
@@ -677,14 +670,14 @@ export default function CeoOvertimeMonitoringPage() {
                 <button
                   onClick={() => fetchData()}
                   disabled={loading}
-                  className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white flex items-center justify-center transition disabled:opacity-50 flex-shrink-0"
+                  className="w-10 h-10 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 flex items-center justify-center transition disabled:opacity-50 flex-shrink-0"
                   title="Refresh"
                 >
                   <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
                 </button>
                 <button
                   onClick={() => router.push("/dashboard/attendance/overtime/leaderboard")}
-                  className="h-10 px-3 sm:px-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
+                  className="h-10 px-3 sm:px-4 bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
                 >
                   <Trophy size={14} />
                   <span className="hidden sm:inline">Leaderboard</span>
@@ -692,7 +685,7 @@ export default function CeoOvertimeMonitoringPage() {
                 <button
                   onClick={exportCsv}
                   disabled={(selectedEmployee ? employeeRows : rows).length === 0}
-                  className="flex-1 sm:flex-none h-10 px-3 sm:px-4 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed text-violet-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-md"
+                  className="flex-1 sm:flex-none h-10 px-3 sm:px-4 bg-gray-900 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm"
                 >
                   <Download size={14} />
                   <span>Export CSV</span>
@@ -732,16 +725,16 @@ export default function CeoOvertimeMonitoringPage() {
 
               {/* ─── FILTER PANEL ─── */}
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2 bg-gradient-to-r from-gray-50/60 to-white">
+                <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2 bg-white">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-gray-200 text-gray-700 flex items-center justify-center flex-shrink-0 shadow-sm">
                       <CalendarDays className="w-4 h-4" />
                     </div>
                     <p className="text-sm font-black text-gray-900">Filter Rentang</p>
                   </div>
-                  <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 rounded-xl px-3 py-1.5">
-                    <Activity size={10} className="text-violet-600" />
-                    <span className="text-[10px] font-black text-violet-700 tabular-nums">
+                  <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5">
+                    <Activity size={10} className="text-gray-500" />
+                    <span className="text-[10px] font-black text-gray-700 tabular-nums">
                       {startDate === endDate ? formatDateLabelShort(startDate) : `${formatDateLabelShort(startDate)} – ${formatDateLabelShort(endDate)}`}
                     </span>
                   </div>
@@ -757,7 +750,7 @@ export default function CeoOvertimeMonitoringPage() {
                     ))}
                   </div>
 
-                  <div className="border border-gray-100 rounded-2xl p-4 bg-gradient-to-br from-gray-50/40 to-white">
+                  <div className="border border-gray-100 rounded-2xl p-4 bg-white">
                     <DateRangeCalendar
                       startDate={startDate}
                       endDate={endDate}
@@ -776,7 +769,7 @@ export default function CeoOvertimeMonitoringPage() {
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
                       <input type="text" placeholder="Cari nama karyawan..." value={searchInput} onChange={e => setSearchInput(e.target.value)}
-                        className="w-full h-10 pl-9 pr-8 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 focus:bg-white transition-all placeholder:text-gray-300" />
+                        className="w-full h-10 pl-9 pr-8 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition-all placeholder:text-gray-300" />
                       {searchInput && (
                         <button onClick={() => setSearchInput("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 p-1 hover:bg-gray-100 rounded-lg transition">
                           <X size={13} />
@@ -802,33 +795,29 @@ export default function CeoOvertimeMonitoringPage() {
               {/* ─── TOP EMPLOYEES ─── */}
               {summary && summary.topEmployees.length > 0 && (
                 <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-center gap-2.5 bg-gradient-to-r from-amber-50/60 to-white">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-center gap-2.5 bg-white">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-gray-200 text-gray-700 flex items-center justify-center flex-shrink-0 shadow-sm">
                       <Trophy className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-black text-gray-900">Top 5 Jam Lembur</p>
                       <p className="text-[10px] text-gray-400 font-medium">Di rentang tanggal ini</p>
                     </div>
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 tabular-nums flex-shrink-0">
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 tabular-nums flex-shrink-0">
                       {summary.topEmployees.length}
                     </span>
                   </div>
                   <div className="divide-y divide-gray-50">
                     {summary.topEmployees.map((e, i) => (
                       <button key={e.id + i} onClick={() => openEmployee({ id: e.id, name: e.name, role: e.role })}
-                        className="w-full flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-amber-50/30 transition-all text-left group">
+                        className="w-full flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-gray-50/60 transition-all text-left group">
                         {/* Rank / Medal */}
                         {i < 3 ? (
-                          <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-white flex-shrink-0 shadow-md bg-gradient-to-br ${
-                            i === 0 ? "from-amber-400 to-yellow-500 shadow-amber-500/40" :
-                            i === 1 ? "from-slate-300 to-slate-400 shadow-slate-400/40" :
-                                       "from-orange-400 to-amber-600 shadow-orange-500/40"
-                          }`}>
+                          <span className="w-8 h-8 rounded-xl bg-gray-900 flex items-center justify-center text-white flex-shrink-0 shadow-sm">
                             <Medal className="w-4 h-4" />
                           </span>
                         ) : (
-                          <span className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-[11px] font-black text-gray-500 flex-shrink-0">
+                          <span className="w-8 h-8 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-[11px] font-black text-gray-500 flex-shrink-0">
                             {i + 1}
                           </span>
                         )}
@@ -836,14 +825,14 @@ export default function CeoOvertimeMonitoringPage() {
                           {initials(e.name)}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-gray-800 truncate group-hover:text-violet-700 transition">{e.name}</p>
+                          <p className="text-xs font-bold text-gray-800 truncate group-hover:text-gray-900 transition">{e.name}</p>
                           <p className="text-[10px] text-gray-400 truncate">{e.role.replace(/_/g, " ")} · {e.sessions} sesi</p>
                         </div>
                         <div className="text-right flex-shrink-0">
                           <p className="text-xs font-black text-gray-800 font-mono tabular-nums">{Math.round((e.minutes / 60) * 10) / 10}j</p>
                           <p className="text-[10px] text-gray-400 font-mono hidden sm:block">{formatRupiah(e.pay)}</p>
                         </div>
-                        <ChevronRight size={14} className="text-gray-300 group-hover:text-violet-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                        <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                       </button>
                     ))}
                   </div>
@@ -852,21 +841,21 @@ export default function CeoOvertimeMonitoringPage() {
 
               {/* ─── DETAIL TABLE ─── */}
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2 bg-gradient-to-r from-gray-50/60 to-white">
+                <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2 bg-white">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-gray-700 to-gray-900 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-gray-200 text-gray-700 flex items-center justify-center flex-shrink-0 shadow-sm">
                       <FileText className="w-4 h-4" />
                     </div>
                     <p className="text-sm font-black text-gray-900">Detail Lemburan</p>
                     {!loading && rows.length > 0 && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 tabular-nums">{rows.length}</span>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 tabular-nums">{rows.length}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[9px] text-gray-400 font-black uppercase tracking-wider mr-1 hidden sm:inline">Urutkan:</span>
                     {(["duration", "pay", "date"] as SortBy[]).map(f => (
                       <button key={f} onClick={() => handleSortClick(f)}
-                        className={`h-7 px-2.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 transition-all ${sortBy === f ? "bg-violet-50 border-violet-300 text-violet-700 shadow-sm" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"}`}>
+                        className={`h-7 px-2.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 transition-all ${sortBy === f ? "bg-gray-900 border-gray-900 text-white shadow-sm" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"}`}>
                         {f === "duration" ? "Durasi" : f === "pay" ? "Nominal" : "Tanggal"}
                         {renderSortIcon(f)}
                       </button>
@@ -886,7 +875,7 @@ export default function CeoOvertimeMonitoringPage() {
                   </div>
                 ) : rows.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 gap-2.5 px-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-full flex items-center justify-center mb-1">
+                    <div className="w-16 h-16 bg-white border border-gray-100 rounded-full flex items-center justify-center mb-1">
                       <FileText size={26} className="text-gray-300" />
                     </div>
                     <p className="text-sm font-black text-gray-500">Tidak Ada Data</p>
@@ -910,7 +899,7 @@ export default function CeoOvertimeMonitoringPage() {
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                           {rows.map(o => (
-                            <tr key={o.id} onClick={() => setDetailRow(o)} className="hover:bg-violet-50/40 cursor-pointer transition-colors group">
+                            <tr key={o.id} onClick={() => setDetailRow(o)} className="hover:bg-gray-50/60 cursor-pointer transition-colors group">
                               <td className="px-5 py-3.5">
                                 <button
                                   onClick={(e) => { e.stopPropagation(); if (o.users) openEmployee(o.users); }}
@@ -918,7 +907,7 @@ export default function CeoOvertimeMonitoringPage() {
                                 >
                                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black flex-shrink-0 ${avBg(o.users?.name ?? "?")}`}>{initials(o.users?.name ?? "?")}</div>
                                   <div className="min-w-0">
-                                    <p className="font-bold text-gray-800 truncate group-hover:text-violet-700 transition">{o.users?.name ?? "—"}</p>
+                                    <p className="font-bold text-gray-800 truncate group-hover:text-gray-900 transition">{o.users?.name ?? "—"}</p>
                                     <p className="text-[9px] text-gray-400">{o.users?.role?.replace(/_/g, " ") ?? "—"}</p>
                                   </div>
                                 </button>
@@ -938,7 +927,7 @@ export default function CeoOvertimeMonitoringPage() {
                     {/* Mobile cards */}
                     <div className="md:hidden divide-y divide-gray-50">
                       {rows.map(o => (
-                        <div key={o.id} onClick={() => setDetailRow(o)} className="px-4 py-3.5 hover:bg-violet-50/40 cursor-pointer transition-colors">
+                        <div key={o.id} onClick={() => setDetailRow(o)} className="px-4 py-3.5 hover:bg-gray-50/60 cursor-pointer transition-colors">
                           <div className="flex items-start gap-3">
                             <button
                               onClick={(e) => { e.stopPropagation(); if (o.users) openEmployee(o.users); }}
@@ -960,7 +949,7 @@ export default function CeoOvertimeMonitoringPage() {
                                 <p className="text-[10px] text-gray-400 truncate mt-1">{o.work_description}</p>
                               )}
                               {o.total_pay != null && (
-                                <p className="text-xs font-black text-violet-700 font-mono tabular-nums mt-1.5">{formatRupiah(o.total_pay)}</p>
+                                <p className="text-xs font-black text-gray-900 font-mono tabular-nums mt-1.5">{formatRupiah(o.total_pay)}</p>
                               )}
                             </div>
                             <ChevronRight size={14} className="text-gray-300 flex-shrink-0 mt-1" />
@@ -1002,19 +991,11 @@ function StatCard({
   small?: boolean;
   loading?: boolean;
 }) {
-  const tones = {
-    gray:    { text: "text-gray-800",    gradient: "from-gray-500 to-gray-700",       glow: "from-gray-500" },
-    violet:  { text: "text-violet-600",  gradient: "from-violet-500 to-violet-600",   glow: "from-violet-500" },
-    emerald: { text: "text-emerald-600", gradient: "from-emerald-500 to-emerald-600", glow: "from-emerald-500" },
-    blue:    { text: "text-blue-600",    gradient: "from-blue-500 to-blue-600",       glow: "from-blue-500" },
-  };
-  const t = tones[tone];
+  void tone;
   return (
     <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 overflow-hidden transition hover:shadow-md hover:-translate-y-0.5">
-      <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${t.glow} to-transparent opacity-[0.06] rounded-full blur-2xl`} />
-
       <div className="relative flex items-start justify-between gap-2 mb-2">
-        <span className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${t.gradient} text-white flex items-center justify-center shrink-0 shadow-sm`}>
+        <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white border border-gray-200 text-gray-700 flex items-center justify-center shrink-0 shadow-sm">
           {icon}
         </span>
       </div>
@@ -1026,7 +1007,7 @@ function StatCard({
         {loading ? (
           <div className="w-16 h-6 bg-gray-100 rounded-lg animate-pulse" />
         ) : (
-          <div className={`${small ? "text-sm sm:text-base" : "text-xl sm:text-2xl lg:text-3xl"} font-black tabular-nums ${t.text} leading-none truncate`}>
+          <div className={`${small ? "text-sm sm:text-base" : "text-xl sm:text-2xl lg:text-3xl"} font-black tabular-nums text-gray-900 leading-none truncate`}>
             {value}
           </div>
         )}
