@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ShiftConfigModal } from "@/components/attendance/ShiftConfigModal";
@@ -17,17 +17,17 @@ function isPKLRole(role?: string): boolean {
     return role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-");
 }
 
-function renderStatusEmoji(emojiName: string) {
-    if (emojiName === "check") return <Check className="w-3.5 h-3.5" />;
-    if (emojiName === "clock") return <Clock className="w-3.5 h-3.5" />;
-    if (emojiName === "frown") return <Frown className="w-3.5 h-3.5" />;
-    if (emojiName === "file-text") return <FileText className="w-3.5 h-3.5" />;
-    if (emojiName === "x") return <X className="w-3.5 h-3.5" />;
-    if (emojiName === "umbrella") return <Umbrella className="w-3.5 h-3.5" />;
-    if (emojiName === "slash") return <X className="w-3.5 h-3.5 opacity-50" />;
-    if (emojiName === "alert") return <ShieldAlert className="w-3.5 h-3.5" />;
-    if (emojiName === "sun") return <Sun className="w-3.5 h-3.5" />;
-    if (emojiName === "inbox") return <Inbox className="w-3.5 h-3.5" />;
+function renderStatusEmoji(emojiName: string, className = "w-3.5 h-3.5") {
+    if (emojiName === "check") return <Check className={className} />;
+    if (emojiName === "clock") return <Clock className={className} />;
+    if (emojiName === "frown") return <Frown className={className} />;
+    if (emojiName === "file-text") return <FileText className={className} />;
+    if (emojiName === "x") return <X className={className} />;
+    if (emojiName === "umbrella") return <Umbrella className={className} />;
+    if (emojiName === "slash") return <X className={`${className} opacity-50`} />;
+    if (emojiName === "alert") return <ShieldAlert className={className} />;
+    if (emojiName === "sun") return <Sun className={className} />;
+    if (emojiName === "inbox") return <Inbox className={className} />;
     return null;
 }
 
@@ -626,8 +626,8 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                             const sel = form.status === s;
                             return (
                                 <button key={s} type="button" onClick={() => setForm(f => ({ ...f, status: s as any }))}
-                                    className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-bold border transition-all duration-200 ${sel ? `${cfg.bg} ${cfg.color} ${cfg.border} shadow-md scale-[1.04]` : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50 hover:scale-[1.02]"}`}>
-                                    <span className="text-base">{cfg.emoji}</span>
+                                    className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-bold border transition-all duration-200 ${sel ? `${cfg.bg} ${cfg.color} ${cfg.border} shadow-md scale-[1.04]` : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50 hover:scale-[1.02]"}`}>
+                                    {renderStatusEmoji(cfg.emoji, "w-4 h-4")}
                                     <span>{cfg.label}</span>
                                 </button>
                             );
@@ -2929,10 +2929,11 @@ export default function AttendanceDashboardPage() {
         setShowManualModal(true);
     }, [allUsers, fetchAllUsers]);
 
-    const refreshAll = useCallback(async () => {
+    // silent = true -> refetch data tanpa toggle `loading`, jadi UI tidak "berkedip"
+    const refreshAll = useCallback(async (silent: boolean = false) => {
         if (!selectedMonth) return;
         const { year, month } = selectedMonth;
-        setLoading(true);
+        if (!silent) setLoading(true);
         const tasks: Promise<any>[] = [
             fetchAttendance(),
             fetchDayOffs(),
@@ -2946,7 +2947,7 @@ export default function AttendanceDashboardPage() {
             fetchLeaveData(year, month),
             fetchShiftSchedules(year, month),
         ];
-        Promise.all(tasks).finally(() => setLoading(false));
+        Promise.all(tasks).finally(() => { if (!silent) setLoading(false); });
         if (userCanViewSalary(currentUser)) {
             fetchSalarySlips(year, month);
         }
@@ -3591,16 +3592,24 @@ export default function AttendanceDashboardPage() {
         };
     }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser]);
 
+    const lastRefreshRef = useRef<number>(Date.now());
+
     useEffect(() => {
         const handleVisibilityChange = () => {
-            if (!document.hidden && selectedMonth) {
-                console.log("Refresh data...");
-                refreshAll();
-            }
+            if (document.hidden || !selectedMonth) return;
+
+            const now = Date.now();
+            // Hanya refetch kalau tab/app memang sudah tidak aktif > 60 detik.
+            // Kalau cuma switch tab sebentar (< 1 menit), tidak perlu fetch ulang sama sekali.
+            if (now - lastRefreshRef.current < 60_000) return;
+
+            lastRefreshRef.current = now;
+            refreshAll(true); // silent -> tidak ada skeleton loading yang muncul
+            fetchTodayStatus();
         };
         document.addEventListener("visibilitychange", handleVisibilityChange);
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    }, [selectedMonth, refreshAll]);
+    }, [selectedMonth, refreshAll, fetchTodayStatus]);
 
     const userRoles: string[] = getUserRoles(currentUser);
     const isAdmin = userIsAdmin(currentUser);
@@ -3688,7 +3697,7 @@ export default function AttendanceDashboardPage() {
                                 </button>
                             </>
                         )}
-                        <button onClick={refreshAll} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2 rounded-xl bg-white hover:shadow-md transition-all active:scale-95">
+                        <button onClick={() => refreshAll()} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2 rounded-xl bg-white hover:shadow-md transition-all active:scale-95">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Refresh
                         </button>
                     </div>

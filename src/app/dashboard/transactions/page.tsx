@@ -1523,9 +1523,13 @@ export default function Page() {
 
       const response = await fetch(`/api/transaction?${params.toString()}`);
       const result = await response.json();
+      if (!result.success) {
+        console.error("[fetchTransactions] API error:", result.message ?? result);
+      }
       setAllTransactions(result.data || []);
       setTotalCount(result.total ?? (result.data || []).length);
-    } catch {
+    } catch (err) {
+      console.error("[fetchTransactions] fetch failed:", err);
       setAllTransactions([]); setTotalCount(0);
     } finally { setIsLoading(false); }
   };
