@@ -42,6 +42,7 @@ type RosterEntry = {
   shift: "PAGI" | "SORE";
   shiftLabel: string;
   shiftFromSchedule: boolean;
+  shiftIsCustom?: boolean;
 };
 
 type MonthStat = {
@@ -56,15 +57,15 @@ const CEO_MONITORING_ROLES = ["ADMIN", "PROGRAMMER"] as const;
 const SHIFT_LATE: Record<"PAGI" | "SORE", number> = { PAGI: 8 * 60, SORE: 16 * 60 };
 
 const KIND_CONFIG: Record<RosterEntry["kind"], { label: string; bg: string; color: string; border: string }> = {
-  PRESENT:     { label: "Tepat Waktu", bg: "bg-emerald-50", color: "text-emerald-700", border: "border-emerald-200" },
-  LATE:        { label: "Terlambat",   bg: "bg-amber-50",   color: "text-amber-700",   border: "border-amber-200" },
-  SKIP:        { label: "Skip",        bg: "bg-gray-50",    color: "text-gray-500",    border: "border-gray-200" },
-  LEAVE:       { label: "Cuti",        bg: "bg-cyan-50",    color: "text-cyan-700",    border: "border-cyan-200" },
-  DAY_OFF:     { label: "Libur",       bg: "bg-orange-50",  color: "text-orange-600",  border: "border-orange-200" },
-  SICK:        { label: "Sakit",       bg: "bg-blue-50",    color: "text-blue-700",    border: "border-blue-200" },
-  PERMIT:      { label: "Izin",        bg: "bg-violet-50",  color: "text-violet-700",  border: "border-violet-200" },
-  ABSENT:      { label: "Tidak Hadir", bg: "bg-red-50",     color: "text-red-600",     border: "border-red-200" },
-  BELUM_ABSEN: { label: "Belum Absen", bg: "bg-gray-50",    color: "text-gray-400",    border: "border-gray-200" },
+  PRESENT: { label: "Tepat Waktu", bg: "bg-emerald-50", color: "text-emerald-700", border: "border-emerald-200" },
+  LATE: { label: "Terlambat", bg: "bg-amber-50", color: "text-amber-700", border: "border-amber-200" },
+  SKIP: { label: "Skip", bg: "bg-gray-50", color: "text-gray-500", border: "border-gray-200" },
+  LEAVE: { label: "Cuti", bg: "bg-cyan-50", color: "text-cyan-700", border: "border-cyan-200" },
+  DAY_OFF: { label: "Libur", bg: "bg-orange-50", color: "text-orange-600", border: "border-orange-200" },
+  SICK: { label: "Sakit", bg: "bg-blue-50", color: "text-blue-700", border: "border-blue-200" },
+  PERMIT: { label: "Izin", bg: "bg-violet-50", color: "text-violet-700", border: "border-violet-200" },
+  ABSENT: { label: "Tidak Hadir", bg: "bg-red-50", color: "text-red-600", border: "border-red-200" },
+  BELUM_ABSEN: { label: "Belum Absen", bg: "bg-gray-50", color: "text-gray-400", border: "border-gray-200" },
 };
 
 const AV_COLORS = [
@@ -144,18 +145,19 @@ function RosterRow({ entry }: { entry: RosterEntry }) {
             {entry.isPkl ? "PKL" : entry.role.replace(/_/g, " ")}
           </span>
           {/* Shift chip — mobile inline */}
-          <span className={`sm:hidden inline-flex items-center gap-0.5 text-[9px] font-bold ${entry.shift === "PAGI" ? "text-amber-700" : "text-indigo-700"}`}>
+          <span className={`sm:hidden inline-flex items-center gap-0.5 text-[9px] font-bold ${entry.shiftIsCustom ? "text-rose-700" : entry.shift === "PAGI" ? "text-amber-700" : "text-indigo-700"}`}>
             <ShiftIcon className="w-2.5 h-2.5" /> {entry.shift}
           </span>
         </div>
       </div>
       {/* Shift info — desktop */}
-      <div className={`hidden sm:flex flex-col items-end text-right flex-shrink-0 px-2.5 py-1 rounded-lg border ${entry.shift === "PAGI" ? "bg-amber-50 border-amber-200" : "bg-indigo-50 border-indigo-200"}`}>
-        <span className={`inline-flex items-center gap-1 text-[10px] font-black ${entry.shift === "PAGI" ? "text-amber-700" : "text-indigo-700"}`}>
+      <div className={`hidden sm:flex flex-col items-end text-right flex-shrink-0 px-2.5 py-1 rounded-lg border ${entry.shiftIsCustom ? "bg-rose-50 border-rose-200" : entry.shift === "PAGI" ? "bg-amber-50 border-amber-200" : "bg-indigo-50 border-indigo-200"}`}>
+        <span className={`inline-flex items-center gap-1 text-[10px] font-black ${entry.shiftIsCustom ? "text-rose-700" : entry.shift === "PAGI" ? "text-amber-700" : "text-indigo-700"}`}>
           <ShiftIcon className="w-3 h-3" /> {entry.shift}
-          {entry.shiftFromSchedule && <span className="text-[8px] font-bold text-violet-500 normal-case">·jadwal</span>}
+          {entry.shiftFromSchedule && !entry.shiftIsCustom && <span className="text-[8px] font-bold text-violet-500 normal-case">·jadwal</span>}
+          {entry.shiftIsCustom && <span className="text-[8px] font-black text-rose-600 normal-case">·custom</span>}
         </span>
-        <span className="text-[9px] font-mono text-gray-400">{entry.shiftLabel}</span>
+        <span className={`text-[9px] font-mono ${entry.shiftIsCustom ? "text-rose-500 font-bold" : "text-gray-400"}`}>{entry.shiftLabel}</span>
       </div>
       {entry.checkInTime && (
         <span className="font-mono font-black text-gray-700 text-xs flex-shrink-0 bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg">
@@ -201,7 +203,7 @@ export default function MonitoringCeoAbsensiPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  const now = new Date();
+  const now = useMemo(() => new Date(), []);
   const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [groupFilter, setGroupFilter] = useState<GroupFilter>("semua");
 
@@ -224,7 +226,8 @@ export default function MonitoringCeoAbsensiPage() {
       if (u && !userCanAccessCeoMonitoring(u)) router.replace("/dashboard");
     });
   }, [router]);
-const fetchAll = useCallback(async (year: number, month: number, silent = false) => {
+
+  const fetchAll = useCallback(async (year: number, month: number, silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
     try {
       const [usersRes, attRes, manualRes, dayOffRes, dateOffRes, monthlyOffRes, leaveRes, shiftRes] = await Promise.all([
@@ -279,6 +282,7 @@ const fetchAll = useCallback(async (year: number, month: number, silent = false)
       return {
         shift: sched.shift,
         fromSchedule: true,
+        isCustom: custom,
         openMin: custom ? sched.open_hour! * 60 + (sched.open_minute ?? 0) : base.open_hour * 60 + base.open_minute,
         closeMin: custom ? sched.close_hour! * 60 + (sched.close_minute ?? 0) : base.close_hour * 60 + base.close_minute,
       };
@@ -288,6 +292,7 @@ const fetchAll = useCallback(async (year: number, month: number, silent = false)
     return {
       shift,
       fromSchedule: false,
+      isCustom: false,
       openMin: base.open_hour * 60 + base.open_minute,
       closeMin: base.close_hour * 60 + base.close_minute,
     };
@@ -379,6 +384,7 @@ const fetchAll = useCallback(async (year: number, month: number, silent = false)
       return {
         userId: u.id, name: u.name, role: u.role, isPkl: isPKLRole(u.role), checkInTime, kind,
         shift: eff.shift, shiftLabel: `${minToHHMM(eff.openMin)}–${minToHHMM(eff.closeMin)}`, shiftFromSchedule: eff.fromSchedule,
+        shiftIsCustom: eff.isCustom,
       };
     }).sort((a, b) => {
       const rank = (k: RosterEntry["kind"]) =>
@@ -595,13 +601,12 @@ const fetchAll = useCallback(async (year: number, month: number, silent = false)
                   <button
                     key={f}
                     onClick={() => setGroupFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${
-                      groupFilter === f
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${groupFilter === f
                         ? f === "pkl"
                           ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-sm"
                           : "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] text-white shadow-sm"
                         : "text-gray-500 hover:text-gray-800 hover:bg-white"
-                    }`}
+                      }`}
                   >
                     {f === "semua" ? "Semua" : f === "karyawan" ? "Karyawan" : "PKL"}
                   </button>
@@ -622,16 +627,16 @@ const fetchAll = useCallback(async (year: number, month: number, silent = false)
             ) : (
               [
                 { label: "Hadir Hari Ini", value: todaySummary.hadir, icon: <CheckCircle2 className="w-5 h-5" />, tone: "emerald" },
-                { label: "Terlambat",      value: todaySummary.telat, icon: <Clock className="w-5 h-5" />,        tone: "amber" },
-                { label: "Libur / Cuti",   value: todaySummary.libur, icon: <Umbrella className="w-5 h-5" />,     tone: "orange" },
-                { label: "Belum Absen",    value: todaySummary.belumAbsen, icon: <Users className="w-5 h-5" />,   tone: todaySummary.belumAbsen > 0 ? "red" : "gray" },
+                { label: "Terlambat", value: todaySummary.telat, icon: <Clock className="w-5 h-5" />, tone: "amber" },
+                { label: "Libur / Cuti", value: todaySummary.libur, icon: <Umbrella className="w-5 h-5" />, tone: "orange" },
+                { label: "Belum Absen", value: todaySummary.belumAbsen, icon: <Users className="w-5 h-5" />, tone: todaySummary.belumAbsen > 0 ? "red" : "gray" },
               ].map(c => {
                 const tones: Record<string, { text: string; gradient: string; glow: string }> = {
                   emerald: { text: "text-emerald-600", gradient: "from-emerald-500 to-emerald-600", glow: "from-emerald-500" },
-                  amber:   { text: "text-amber-600",   gradient: "from-amber-500 to-amber-600",     glow: "from-amber-500" },
-                  orange:  { text: "text-orange-600",  gradient: "from-orange-500 to-orange-600",   glow: "from-orange-500" },
-                  red:     { text: "text-red-600",     gradient: "from-red-500 to-red-600",         glow: "from-red-500" },
-                  gray:    { text: "text-gray-700",    gradient: "from-gray-400 to-gray-500",       glow: "from-gray-400" },
+                  amber: { text: "text-amber-600", gradient: "from-amber-500 to-amber-600", glow: "from-amber-500" },
+                  orange: { text: "text-orange-600", gradient: "from-orange-500 to-orange-600", glow: "from-orange-500" },
+                  red: { text: "text-red-600", gradient: "from-red-500 to-red-600", glow: "from-red-500" },
+                  gray: { text: "text-gray-700", gradient: "from-gray-400 to-gray-500", glow: "from-gray-400" },
                 };
                 const t = tones[c.tone as string];
                 return (
@@ -726,11 +731,10 @@ const fetchAll = useCallback(async (year: number, month: number, silent = false)
                   <div key={s.userId} className="px-4 sm:px-6 py-3 flex items-center gap-2.5 sm:gap-3 hover:bg-amber-50/30 transition-colors">
                     {/* Medal / Rank */}
                     {i < 3 ? (
-                      <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-white flex-shrink-0 shadow-md bg-gradient-to-br ${
-                        i === 0 ? "from-amber-400 to-yellow-500 shadow-amber-500/40" :
-                        i === 1 ? "from-slate-300 to-slate-400 shadow-slate-400/40" :
-                                   "from-orange-400 to-amber-600 shadow-orange-500/40"
-                      }`}>
+                      <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-white flex-shrink-0 shadow-md bg-gradient-to-br ${i === 0 ? "from-amber-400 to-yellow-500 shadow-amber-500/40" :
+                          i === 1 ? "from-slate-300 to-slate-400 shadow-slate-400/40" :
+                            "from-orange-400 to-amber-600 shadow-orange-500/40"
+                        }`}>
                         <Medal className="w-4 h-4" />
                       </span>
                     ) : (
@@ -830,9 +834,12 @@ const fetchAll = useCallback(async (year: number, month: number, silent = false)
                             <td className="px-3 py-3 text-center font-black text-red-500 tabular-nums">{s.absent || "—"}</td>
                             <td className="px-3 py-3 text-center font-black text-cyan-600 tabular-nums">{s.leave || "—"}</td>
                             <td className="px-3 py-3 text-center">
-                              <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg border whitespace-nowrap ${eff.shift === "PAGI" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-indigo-50 text-indigo-700 border-indigo-200"}`}>
-                                <ShiftIcon className="w-3 h-3" /> {minToHHMM(eff.openMin)}–{minToHHMM(eff.closeMin)}
-                              </span>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg border whitespace-nowrap ${eff.isCustom ? "bg-rose-50 text-rose-700 border-rose-200" : eff.shift === "PAGI" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-indigo-50 text-indigo-700 border-indigo-200"}`}>
+                                  <ShiftIcon className="w-3 h-3" /> {minToHHMM(eff.openMin)}–{minToHHMM(eff.closeMin)}
+                                </span>
+                                {eff.isCustom && <span className="text-[8px] font-black text-rose-600">Custom</span>}
+                              </div>
                             </td>
                             <td className="px-6 py-3">
                               <div className="flex items-center gap-2">
@@ -866,7 +873,7 @@ const fetchAll = useCallback(async (year: number, month: number, silent = false)
                               <span className={`inline-block text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${s.isPkl ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
                                 {s.isPkl ? "PKL" : s.role.replace(/_/g, " ")}
                               </span>
-                              <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold ${eff.shift === "PAGI" ? "text-amber-700" : "text-indigo-700"}`}>
+                              <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold ${eff.isCustom ? "text-rose-700" : eff.shift === "PAGI" ? "text-amber-700" : "text-indigo-700"}`}>
                                 <ShiftIcon className="w-2.5 h-2.5" /> {minToHHMM(eff.openMin)}–{minToHHMM(eff.closeMin)}
                               </span>
                             </div>
