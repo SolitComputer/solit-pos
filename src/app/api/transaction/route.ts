@@ -91,9 +91,9 @@ async function handler(req: NextRequest) {
       query = query.eq("invoice_number", invoiceExact.trim());
     } else {
       if (status !== "ALL") query = query.eq("status", status);
-     if (search.trim()) {
+      if (search.trim()) {
         const term = search.trim();
-        
+
         const [{ data: snMatches }, { data: cpuLaptops }] = await Promise.all([
           supabase.from("transaction_items").select("invoice_number").ilike("serial_number", `%${term}%`),
           supabase.from("laptops").select("id").ilike("cpu", `%${term}%`),
@@ -301,7 +301,6 @@ async function handler(req: NextRequest) {
         if (item.unit_id) itemDealPriceMap.set(item.unit_id, Number(item.deal_price ?? 0));
       }
 
-      // ── Group laptop per laptop_id ──────────────────────────────────────────
       const laptopGroups = new Map<string, {
         laptop_id: string;
         laptop_name: string;
@@ -311,6 +310,7 @@ async function handler(req: NextRequest) {
         selling_price_total: number;
         allocated_deal_price: number;
         unit_count: number;
+        has_matched_unit: boolean;
       }>();
 
       let totalPurchasePrice = 0;
@@ -343,6 +343,7 @@ async function handler(req: NextRequest) {
             selling_price_total: 0,
             allocated_deal_price: 0,
             unit_count: 0,
+            has_matched_unit: false,
           });
         }
 
@@ -350,7 +351,7 @@ async function handler(req: NextRequest) {
         if (unitData.serial_number) group.serial_numbers.push(unitData.serial_number);
         group.purchase_price_total += unitData.purchase_price;
         group.selling_price_total += unitData.selling_price ?? 0;
-        // Akumulasi deal price dari transaction_items per unit
+        group.has_matched_unit = true;
         group.allocated_deal_price += unitDealPrice;
         group.unit_count += 1;
       }
@@ -367,10 +368,11 @@ async function handler(req: NextRequest) {
           storage: specs?.storage ?? trx.storage,
           vga: specs?.vga ?? trx.vga,
           serial_numbers: trx.serial_number ? [trx.serial_number] : [],
-          purchase_price_total: 0,
+          purchase_price_total: Number(trx.inventory_price ?? 0),
           selling_price_total: Number(trx.deal_price ?? trx.amount ?? 0),
           allocated_deal_price: dealPrice, // full deal price untuk legacy
           unit_count: 1,
+          has_matched_unit: trx.inventory_price !== null && trx.inventory_price !== undefined,
         });
       }
 
@@ -396,7 +398,7 @@ async function handler(req: NextRequest) {
           finalDealPrice = dealPrice;
         }
 
-        const hasModal = g.purchase_price_total > 0;
+        const hasModal = g.has_matched_unit;
         const margin = hasModal ? finalDealPrice - g.purchase_price_total : 0;
         return {
           ...g,
@@ -409,7 +411,7 @@ async function handler(req: NextRequest) {
 
       const storedInventoryPrice = Number(trx.inventory_price ?? 0);
       const finalInventoryPrice = matchedAnyUnit ? totalPurchasePrice : storedInventoryPrice;
-      const hasModal = finalInventoryPrice > 0;
+      const hasModal = matchedAnyUnit || (trx.inventory_price !== null && trx.inventory_price !== undefined);
       const totalMargin = hasModal ? dealPrice - finalInventoryPrice : 0;
 
       return {
