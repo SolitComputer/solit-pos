@@ -124,9 +124,9 @@ export default function DataBarangPage() {
   const visibleTabs = useMemo(
     () =>
       TABS.filter(
-        (t) => t.roles.length === 0 || hasAnyRole(userRoles, t.roles)
+        (t) => t.roles.length === 0 || !rolesLoaded || hasAnyRole(userRoles, t.roles)
       ),
-    [userRoles]
+    [userRoles, rolesLoaded]
   );
 
   // ── Fallback ke tab pertama kalau tab aktif tidak visible
@@ -166,7 +166,7 @@ export default function DataBarangPage() {
               </svg>
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-[15px] sm:text-[14.5px] font-bold text-gray-900 tracking-tight leading-none truncate">
+              <h1 className="text-[15px] sm:text-[14.5px] font-bold text-gray-900 tracking-tight leading-tight truncate">
                 Data Barang
               </h1>
               <p className="text-[11.5px] text-gray-400 mt-1 font-normal truncate">
