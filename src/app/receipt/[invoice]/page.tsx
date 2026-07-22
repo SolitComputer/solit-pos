@@ -212,6 +212,18 @@ export default async function Page(props: Props) {
                       SN: {data.serial_number || "—"}
                     </div>
                   </div>
+
+                  {/* Ketentuan Garansi */}
+                  <div className="mt-2.5 bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2 text-xs text-slate-600">
+                    <p className="font-semibold text-slate-800 flex items-center gap-1.5 text-xs">
+                      📋 Ketentuan Garansi
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1.5 text-[11px] leading-relaxed text-slate-500">
+                      <li>Garansi hanya berlaku untuk kerusakan yang <strong>BUKAN akibat human error</strong>.</li>
+                      <li>Kerusakan LCD seperti pecah, kena air, terbakar, bergaris, berkedip, gelap/redup, blank putih, dead pixel, berbayang/shadow, warna pudar/tidak akurat, serta bercak hitam/putih <strong>TIDAK termasuk garansi</strong>.</li>
+                      <li>Wajib membawa nota pembelian ini saat melakukan klaim garansi.</li>
+                    </ol>
+                  </div>
                 </Section>
               </>
             )}
