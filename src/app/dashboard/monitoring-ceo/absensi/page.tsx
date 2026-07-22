@@ -32,6 +32,11 @@ type DateOff = { id: string; user_id: string; off_date: string };
 type MonthlyOff = { id: string; user_id: string; off_date: string; year: number; month: number };
 type LeaveRequest = { id: string; leave_date: string; reason: string | null; status: string };
 type UserLeaveData = { user: { id: string; name: string; role: string }; requests: LeaveRequest[] };
+type ShiftConfigItem = {
+  user_id: string; shift: "PAGI" | "SORE"; has_custom: boolean;
+  open_hour: number; open_minute: number; late_hour: number; late_minute: number;
+  close_hour: number; close_minute: number;
+};
 
 type GroupFilter = "karyawan" | "pkl" | "semua";
 
@@ -215,6 +220,7 @@ export default function MonitoringCeoAbsensiPage() {
   const [monthlyOffs, setMonthlyOffs] = useState<MonthlyOff[]>([]);
   const [leaveData, setLeaveData] = useState<UserLeaveData[]>([]);
   const [shiftSchedules, setShiftSchedules] = useState<ShiftScheduleRow[]>([]);
+  const [shiftConfigs, setShiftConfigs] = useState<ShiftConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -230,7 +236,7 @@ export default function MonitoringCeoAbsensiPage() {
   const fetchAll = useCallback(async (year: number, month: number, silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
     try {
-      const [usersRes, attRes, manualRes, dayOffRes, dateOffRes, monthlyOffRes, leaveRes, shiftRes] = await Promise.all([
+      const [usersRes, attRes, manualRes, dayOffRes, dateOffRes, monthlyOffRes, leaveRes, shiftRes, configRes] = await Promise.all([
         fetch("/api/attendance/users").then(r => r.json()),
         fetch("/api/attendance").then(r => r.json()),
         fetch(`/api/attendance/manual?year=${year}&month=${month + 1}`).then(r => r.json()),
@@ -239,6 +245,7 @@ export default function MonitoringCeoAbsensiPage() {
         fetch(`/api/attendance/monthly-off?year=${year}&month=${month + 1}`).then(r => r.json()),
         fetch(`/api/attendance/leave?year=${year}&month=${month + 1}`).then(r => r.json()),
         fetch(`/api/attendance/shift-schedule?year=${year}&month=${month + 1}`).then(r => r.json()),
+        fetch("/api/attendance/shift-config").then(r => r.json()),
       ]);
       if (usersRes?.success) setAllUsers(usersRes.data || []);
       if (attRes?.success) setAttendances(attRes.data || []);
@@ -251,6 +258,7 @@ export default function MonitoringCeoAbsensiPage() {
         setLeaveData(Array.isArray(raw) ? raw : raw ? [raw] : []);
       }
       if (shiftRes?.success) setShiftSchedules(shiftRes.data || []);
+      if (configRes?.success) setShiftConfigs(configRes.data || []);
     } catch (err) {
       console.error("[monitoring-ceo/absensi] fetch error:", err);
     } finally {
@@ -274,29 +282,72 @@ export default function MonitoringCeoAbsensiPage() {
     return m;
   }, [shiftSchedules]);
 
+  const configsByUser = useMemo(() => {
+    const m: Record<string, ShiftConfigItem> = {};
+    shiftConfigs.forEach(c => { m[c.user_id] = c; });
+    return m;
+  }, [shiftConfigs]);
+
   const effectiveShiftFor = useCallback((userId: string, dateKey: string) => {
     const sched = pickSchedule(schedulesByUser[userId] ?? [], dateKey);
+    const cfg = configsByUser[userId];
+    const userBaseShift = (userById[userId]?.shift ?? "PAGI") as "PAGI" | "SORE";
+
+    let shift: "PAGI" | "SORE" = userBaseShift;
+    let fromSchedule = false;
+    let openMin: number | null = null;
+    let lateMin: number | null = null;
+    let closeMin: number | null = null;
+
     if (sched) {
-      const base = SHIFT_DEFAULTS[sched.shift];
-      const custom = sched.open_hour != null && sched.late_hour != null && sched.close_hour != null;
-      return {
-        shift: sched.shift,
-        fromSchedule: true,
-        isCustom: custom,
-        openMin: custom ? sched.open_hour! * 60 + (sched.open_minute ?? 0) : base.open_hour * 60 + base.open_minute,
-        closeMin: custom ? sched.close_hour! * 60 + (sched.close_minute ?? 0) : base.close_hour * 60 + base.close_minute,
-      };
+      fromSchedule = true;
+      shift = sched.shift;
+      if (sched.open_hour != null) {
+        openMin = sched.open_hour * 60 + (sched.open_minute ?? 0);
+      }
+      if (sched.late_hour != null) {
+        lateMin = sched.late_hour * 60 + (sched.late_minute ?? 0);
+      }
+      if (sched.close_hour != null) {
+        closeMin = sched.close_hour * 60 + (sched.close_minute ?? 0);
+      }
     }
-    const shift = (userById[userId]?.shift ?? "PAGI") as "PAGI" | "SORE";
-    const base = SHIFT_DEFAULTS[shift];
+
+    if (cfg) {
+      if (!sched) {
+        shift = (cfg.shift ?? userBaseShift) as "PAGI" | "SORE";
+      }
+      if (openMin == null && cfg.open_hour != null) {
+        openMin = cfg.open_hour * 60 + (cfg.open_minute ?? 0);
+      }
+      if (lateMin == null && cfg.late_hour != null) {
+        lateMin = cfg.late_hour * 60 + (cfg.late_minute ?? 0);
+      }
+      if (closeMin == null && cfg.close_hour != null) {
+        closeMin = cfg.close_hour * 60 + (cfg.close_minute ?? 0);
+      }
+    }
+
+    const base = SHIFT_DEFAULTS[shift] ?? SHIFT_DEFAULTS.PAGI;
+    if (openMin == null) openMin = base.open_hour * 60 + base.open_minute;
+    if (lateMin == null) lateMin = base.late_hour * 60 + base.late_minute;
+    if (closeMin == null) closeMin = base.close_hour * 60 + base.close_minute;
+
+    const defOpenMin = base.open_hour * 60 + base.open_minute;
+    const defLateMin = base.late_hour * 60 + base.late_minute;
+    const defCloseMin = base.close_hour * 60 + base.close_minute;
+
+    const isCustom = openMin !== defOpenMin || lateMin !== defLateMin || closeMin !== defCloseMin;
+
     return {
       shift,
-      fromSchedule: false,
-      isCustom: false,
-      openMin: base.open_hour * 60 + base.open_minute,
-      closeMin: base.close_hour * 60 + base.close_minute,
+      fromSchedule,
+      isCustom,
+      openMin,
+      lateMin,
+      closeMin,
     };
-  }, [schedulesByUser, userById]);
+  }, [schedulesByUser, configsByUser, userById]);
 
   const dayOffByUser = useMemo(() => {
     const m: Record<string, Set<number>> = {};

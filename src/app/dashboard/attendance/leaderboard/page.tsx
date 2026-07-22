@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   ArrowLeft, Trophy, Medal, Award, Users, TrendingUp, Clock, CheckCircle2,
-  Inbox, CalendarDays, type LucideIcon,
+  Inbox, AlertCircle, ChevronDown, ChevronUp, type LucideIcon,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -14,6 +14,7 @@ import {
 
 // ─── TYPES ──────────────────────────────────────────────────────────────
 type Scope = "day" | "month" | "all";
+type Tab = "karyawan" | "pkl";
 
 type UserInfo = { id: string; name: string; role: string };
 type AttendanceRecord = {
@@ -24,23 +25,41 @@ type ManualRecord = { id: string; user_id: string; attendance_date: string; chec
 type LeaveRequest = { id: string; leave_date: string; reason: string | null; status: string };
 type UserLeaveData = { user: { id: string; name: string; role: string }; requests: LeaveRequest[] };
 
+/** Minimum hadir agar masuk ranking. Untuk scope "day", gate di-skip. */
+const MIN_SESI = 5;
+
+/** Prior weight untuk Bayesian smoothing */
+const BAYESIAN_M = 5;
+
 type RankingEntry = {
-  userId: string; name: string; role: string;
-  present: number; late: number; leave: number; absentRecorded: number;
-  score: number; onTimeRate: number; attendanceRate: number;
+  userId: string; name: string; role: string; isPkl: boolean;
+  hadir: number; tepat: number; telat: number; leave: number;
+  expected: number;
+  disiplin: number;   // Bayesian on-time rate [0,1]
+  kehadiran: number;  // hadir/expected [0,1]
+  volume: number;     // hadir/targetSesi [0,1]
+  lateRatio: number;  // telat/hadir, penalty proxy
+  bayesianScore: number; // final composite score
 };
+
+type InsufficientEntry = {
+  userId: string; name: string; role: string; isPkl: boolean;
+  hadir: number; tepat: number;
+};
+
 type StatusCount = { status: string; count: number };
 type TrendPoint = { key: string; count: number };
 
 // ─── CONSTANTS ──────────────────────────────────────────────────────────
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-
-const STATUS_COLORS: Record<string, string> = { PRESENT: "#10b981", LATE: "#f59e0b", LEAVE: "#06b6d4", ABSENT: "#ef4444" };
-const STATUS_LABELS: Record<string, string> = { PRESENT: "Tepat Waktu", LATE: "Terlambat", LEAVE: "Cuti", ABSENT: "Tidak Hadir" };
+const STATUS_COLORS: Record<string, string> = { PRESENT: "#10b981", LATE: "#f59e0b", LEAVE: "#06b6d4" };
+const STATUS_LABELS: Record<string, string> = { PRESENT: "Tepat Waktu", LATE: "Terlambat", LEAVE: "Cuti" };
 
 // ─── HELPERS ────────────────────────────────────────────────────────────
 function pad2(n: number) { return String(n).padStart(2, "0"); }
 function initials(name: string) { return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase(); }
+function isPKLRole(role: string): boolean { return /pkl|magang/i.test(role); }
+
 const AV_COLORS = [
   "bg-violet-100 text-violet-700", "bg-blue-100 text-blue-700",
   "bg-emerald-100 text-emerald-700", "bg-rose-100 text-rose-700",
@@ -64,8 +83,6 @@ function addDaysToDateStr(dateStr: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-// Versi simpel dari getDisplayStatus di halaman utama absensi — tanpa
-// hitung ulang shift, karena late_weight sudah dihitung server-side saat absen.
 function getAutoStatus(a: { method: string; status: string; late_weight: number | null }): "PRESENT" | "LATE" | "SKIP" {
   if (a.method === "FORCE") return "PRESENT";
   if (a.method === "SKIP" || a.status === "SKIPPED_MANUAL") return "SKIP";
@@ -74,7 +91,18 @@ function getAutoStatus(a: { method: string; status: string; late_weight: number 
     if (a.late_weight > 0) return "LATE";
     return "SKIP";
   }
-  return "PRESENT"; // fallback data lama tanpa late_weight
+  return "PRESENT";
+}
+
+/** Hitung jumlah hari kerja (Senin–Jumat) dalam bulan tertentu */
+function workdaysInMonth(year: number, month: number): number {
+  const dim = new Date(year, month + 1, 0).getDate();
+  let count = 0;
+  for (let d = 1; d <= dim; d++) {
+    const dow = new Date(year, month, d).getDay();
+    if (dow !== 0 && dow !== 6) count++;
+  }
+  return count;
 }
 
 // ─── CORE COMPUTATION ───────────────────────────────────────────────────
@@ -93,8 +121,8 @@ function computeLeaderboard(
     return true;
   };
 
+  // ── Tahap 1: Kumpulkan attendance per user-date ──────────────────────
   const effByUserDate: Record<string, "PRESENT" | "LATE"> = {};
-  const absentByUserDate: Record<string, "SICK" | "PERMIT" | "ABSENT"> = {};
   const trendEvents: { dateKey: string; hour: number }[] = [];
 
   autoRecords.forEach(a => {
@@ -112,12 +140,10 @@ function computeLeaderboard(
     const dateKey = mr.attendance_date;
     if (!inScope(dateKey)) return;
     const key = `${mr.user_id}_${dateKey}`;
-    if (effByUserDate[key]) return; // absen wajah lebih diutamakan
+    if (effByUserDate[key]) return;
     if (mr.status === "PRESENT" || mr.status === "LATE") {
       effByUserDate[key] = mr.status;
       trendEvents.push({ dateKey, hour: wibHour(mr.check_in_time) });
-    } else if (mr.status === "SICK" || mr.status === "PERMIT" || mr.status === "ABSENT") {
-      absentByUserDate[key] = mr.status as "SICK" | "PERMIT" | "ABSENT";
     }
   });
 
@@ -129,67 +155,145 @@ function computeLeaderboard(
       const dateKey = r.leave_date;
       if (!inScope(dateKey)) return;
       const key = `${uid}_${dateKey}`;
-      if (effByUserDate[key]) return; // sudah hadir/telat di tanggal itu, jangan dobel
+      if (effByUserDate[key]) return;
       leaveByUserDate.add(key);
     });
   });
 
-  const agg: Record<string, { present: number; late: number; leave: number; absentRecorded: number }> = {};
-  const ensure = (uid: string) => (agg[uid] ??= { present: 0, late: 0, leave: 0, absentRecorded: 0 });
+  // ── Tahap 2: Agregasi per user ───────────────────────────────────────
+  const agg: Record<string, { hadir: number; tepat: number; telat: number; leave: number }> = {};
+  const ensure = (uid: string) => (agg[uid] ??= { hadir: 0, tepat: 0, telat: 0, leave: 0 });
 
   Object.entries(effByUserDate).forEach(([key, status]) => {
     const uid = key.split("_")[0];
     ensure(uid);
-    if (status === "PRESENT") agg[uid].present++; else agg[uid].late++;
+    agg[uid].hadir++;
+    if (status === "PRESENT") agg[uid].tepat++;
+    else agg[uid].telat++;
   });
-  leaveByUserDate.forEach(key => { const uid = key.split("_")[0]; ensure(uid); agg[uid].leave++; });
-  Object.keys(absentByUserDate).forEach(key => { const uid = key.split("_")[0]; ensure(uid); agg[uid].absentRecorded++; });
+  leaveByUserDate.forEach(key => {
+    const uid = key.split("_")[0];
+    ensure(uid);
+    agg[uid].leave++;
+  });
 
-  const userMap: Record<string, { name: string; role: string }> = {};
-  users.forEach(u => { userMap[u.id] = { name: u.name, role: u.role }; });
+  const userMap: Record<string, UserInfo> = {};
+  users.forEach(u => { userMap[u.id] = u; });
 
-  const ranking: RankingEntry[] = Object.entries(agg)
-    .map(([uid, v]) => {
-      const score = v.present * 1 + v.late * 0.5 + v.leave * 1;
-      const totalRecorded = v.present + v.late;
-      const onTimeRate = totalRecorded > 0 ? Math.round((v.present / totalRecorded) * 1000) / 10 : 0;
-      // Basis peringkat: RATA-RATA kualitas kehadiran per hari tercatat
-      // (present+late+leave+absentRecorded), bukan total poin mentah.
-      // Ini mencegah karyawan yang sering telat tapi jumlah hadirnya lebih
-      // banyak mengalahkan karyawan yang jarang/tidak pernah telat.
-      const totalCounted = v.present + v.late + v.leave + v.absentRecorded;
-      const attendanceRate = totalCounted > 0 ? Math.round((score / totalCounted) * 1000) / 10 : 0;
-      return {
+  // ── Tahap 3: Expected & target sesi ─────────────────────────────────
+  // expected = hari kerja kalender bulan ini (untuk scope month)
+  // Untuk scope lain: expected = hadir sendiri (kehadiran netral)
+  const expectedDays = scope === "month"
+    ? workdaysInMonth(period.year, period.month)
+    : 22; // fallback untuk scope "all"
+
+  // targetSesi untuk volume: pakai expectedDays agar fair lintas role
+  const targetSesi = expectedDays;
+
+  // ── Tahap 4: Global on-time rate C (Bayesian prior) ─────────────────
+  // Hitung dari user yang sudah cukup data (atau semua kalau tidak ada)
+  const skipGateForScope = scope === "day";
+  const aggValues = Object.values(agg);
+  const eligibleForC = skipGateForScope
+    ? aggValues
+    : aggValues.filter(v => v.hadir >= MIN_SESI);
+  const srcForC = eligibleForC.length > 0 ? eligibleForC : aggValues;
+  const globalTepat = srcForC.reduce((s, v) => s + v.tepat, 0);
+  const globalHadir = srcForC.reduce((s, v) => s + v.hadir, 0);
+  const C = globalHadir > 0 ? globalTepat / globalHadir : 0.75;
+
+  // ── Tahap 5: Hitung skor per user + gate ────────────────────────────
+  const validEntries: RankingEntry[] = [];
+  const insufficientEntries: InsufficientEntry[] = [];
+
+  Object.entries(agg).forEach(([uid, v]) => {
+    const uInfo = userMap[uid];
+    const isPkl = uInfo ? isPKLRole(uInfo.role) : false;
+
+    if (!skipGateForScope && v.hadir < MIN_SESI) {
+      insufficientEntries.push({
         userId: uid,
-        name: userMap[uid]?.name ?? "—",
-        role: userMap[uid]?.role ?? "—",
-        present: v.present, late: v.late, leave: v.leave, absentRecorded: v.absentRecorded,
-        score, onTimeRate, attendanceRate,
-      };
-    })
-    .sort((a, b) =>
-      b.attendanceRate - a.attendanceRate ||
-      b.onTimeRate - a.onTimeRate ||
-      b.score - a.score
+        name: uInfo?.name ?? "—",
+        role: uInfo?.role ?? "—",
+        isPkl,
+        hadir: v.hadir,
+        tepat: v.tepat,
+      });
+      return;
+    }
+
+    const hadir = v.hadir;
+    const tepat = v.tepat;
+    const telat = v.telat;
+
+    // a. Disiplin: Bayesian smoothing anti small-sample
+    const disiplin = hadir > 0
+      ? (tepat + BAYESIAN_M * C) / (hadir + BAYESIAN_M)
+      : C;
+
+    // b. Kehadiran: hadir vs hari kerja terjadwal
+    const expected = scope === "month" ? expectedDays : hadir;
+    const kehadiran = expected > 0 ? Math.min(hadir / expected, 1.0) : 1.0;
+
+    // c. Volume: reward konsistensi hadir
+    const volume = targetSesi > 0 ? Math.min(hadir / targetSesi, 1.0) : 1.0;
+
+    // Penalty: proporsi hari telat
+    const lateRatio = hadir > 0 ? telat / hadir : 0;
+
+    // d. Skor gabungan
+    // 0.45×disiplin + 0.35×kehadiran + 0.20×volume → [0,1] range
+    // Penalti: 15 × lateRatio (max -15 poin, bila 100% telat)
+    const bayesianScore = Math.max(
+      0,
+      100 * (0.45 * disiplin + 0.35 * kehadiran + 0.20 * volume) - 15 * lateRatio
     );
 
-  const totalPresent = ranking.reduce((s, r) => s + r.present, 0);
-  const totalLate = ranking.reduce((s, r) => s + r.late, 0);
-  const totalLeave = ranking.reduce((s, r) => s + r.leave, 0);
-  const totalAbsent = ranking.reduce((s, r) => s + r.absentRecorded, 0);
-  const totalRecordedAll = totalPresent + totalLate;
+    validEntries.push({
+      userId: uid,
+      name: uInfo?.name ?? "—",
+      role: uInfo?.role ?? "—",
+      isPkl,
+      hadir, tepat, telat,
+      leave: v.leave,
+      expected,
+      disiplin,
+      kehadiran,
+      volume,
+      lateRatio,
+      bayesianScore,
+    });
+  });
+
+  // ── Tahap 6: Sort + tie-breaker ─────────────────────────────────────
+  const sortRanking = (arr: RankingEntry[]) =>
+    [...arr].sort((a, b) =>
+      b.bayesianScore - a.bayesianScore ||
+      b.tepat - a.tepat ||
+      a.lateRatio - b.lateRatio ||
+      b.hadir - a.hadir
+    );
+
+  const karyawanRanking = sortRanking(validEntries.filter(e => !e.isPkl));
+  const pklRanking = sortRanking(validEntries.filter(e => e.isPkl));
+  const allRanking = sortRanking(validEntries);
+
+  // ── Summary ──────────────────────────────────────────────────────────
+  const totalPresent = allRanking.reduce((s, r) => s + r.tepat, 0);
+  const totalLate = allRanking.reduce((s, r) => s + r.telat, 0);
+  const totalLeave = allRanking.reduce((s, r) => s + r.leave, 0);
+  const totalHadir = allRanking.reduce((s, r) => s + r.hadir, 0);
 
   const summary = {
     totalPresent, totalLate, totalLeave,
-    activeEmployees: ranking.length,
-    avgOnTimeRate: totalRecordedAll > 0 ? Math.round((totalPresent / totalRecordedAll) * 1000) / 10 : 0,
+    activeEmployees: allRanking.length,
+    avgOnTimeRate: totalHadir > 0 ? Math.round((totalPresent / totalHadir) * 1000) / 10 : 0,
   };
 
   const statusDistribution: StatusCount[] = [
     { status: "PRESENT", count: totalPresent },
     { status: "LATE", count: totalLate },
     { status: "LEAVE", count: totalLeave },
-    { status: "ABSENT", count: totalAbsent },
   ].filter(s => s.count > 0);
 
   const trendMap: Record<string, number> = {};
@@ -201,7 +305,12 @@ function computeLeaderboard(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, count]) => ({ key, count }));
 
-  return { ranking, summary, statusDistribution, trend };
+  return {
+    karyawanRanking, pklRanking, allRanking,
+    summary, statusDistribution, trend,
+    insufficientEntries,
+    globalOnTimeRate: Math.round(C * 1000) / 10,
+  };
 }
 
 // ─── PODIUM CARD ───────────────────────────────────────────────────────
@@ -215,6 +324,7 @@ function PodiumCard({ entry, rank }: { entry: RankingEntry; rank: number }) {
   const style = PODIUM_STYLE[rank];
   const Icon = style.icon;
   const bg = avBg(entry.name);
+  const disiplinPct = (entry.disiplin * 100).toFixed(1);
   return (
     <div className={`flex-1 ${style.order} ${style.height}`}>
       <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 text-center ring-2 ${style.ring} relative`}>
@@ -225,10 +335,80 @@ function PodiumCard({ entry, rank }: { entry: RankingEntry; rank: number }) {
         <div className={`w-12 h-12 mx-auto rounded-xl flex items-center justify-center text-sm font-bold mb-2 ${bg}`}>{initials(entry.name)}</div>
         <p className="font-bold text-gray-900 text-xs leading-tight truncate">{entry.name}</p>
         <p className="text-[9px] text-gray-400 mt-0.5 mb-2 truncate">{entry.role.replace(/_/g, " ")}</p>
-        <p className="text-lg font-black text-violet-600 leading-none">{entry.attendanceRate.toFixed(1)}<span className="text-[10px] font-semibold text-gray-400 ml-1">%</span></p>
-        <p className="text-[9px] text-gray-400 mt-1">{entry.present} tepat · {entry.late} telat{entry.leave > 0 ? ` · ${entry.leave} cuti` : ""}</p>
-        <p className="text-[10px] font-semibold text-emerald-600 mt-1.5">{entry.score.toFixed(1)} poin · {entry.onTimeRate}% ketepatan</p>
+        <p className="text-lg font-black text-violet-600 leading-none">
+          {entry.bayesianScore.toFixed(1)}<span className="text-[10px] font-semibold text-gray-400 ml-1">poin</span>
+        </p>
+        <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
+          <span className="text-[9px] font-bold text-emerald-600">{disiplinPct}% disiplin</span>
+          <span className="text-[9px] text-gray-300">·</span>
+          <span className="text-[9px] text-gray-400">{entry.tepat} tepat · {entry.telat} telat</span>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// ─── RANKING ROW ────────────────────────────────────────────────────────
+function RankingRow({ entry, idx }: { entry: RankingEntry; idx: number }) {
+  const bg = avBg(entry.name);
+  const disiplinPct = (entry.disiplin * 100).toFixed(1);
+  const kehadiranPct = (entry.kehadiran * 100).toFixed(0);
+  return (
+    <div className="px-5 py-3.5 flex items-center gap-3.5 hover:bg-gray-50/60 transition-colors">
+      <span className={`w-6 text-center text-xs font-black flex-shrink-0 ${idx < 3 ? "text-violet-600" : "text-gray-300"}`}>{idx + 1}</span>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${bg}`}>{initials(entry.name)}</div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-gray-900 text-sm leading-tight truncate">{entry.name}</p>
+        <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wide">
+          {entry.role.replace(/_/g, " ")} · {entry.hadir} hadir · {entry.tepat} tepat · {entry.telat} telat
+          {entry.leave > 0 ? ` · ${entry.leave} cuti` : ""}
+        </p>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <p className="text-sm font-black text-violet-700">{entry.bayesianScore.toFixed(1)} <span className="text-[10px] font-semibold text-gray-400">poin</span></p>
+        <p className="text-[10px] text-gray-400 mt-0.5">
+          <span className="text-emerald-600 font-bold">{disiplinPct}%</span> disiplin · <span className="font-semibold text-gray-500">{kehadiranPct}%</span> hadir
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── RANKING TABLE ───────────────────────────────────────────────────────
+function RankingTable({ title, ranking, loading }: { title: string; ranking: RankingEntry[]; loading: boolean }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <p className="font-bold text-gray-900 text-sm">{title}</p>
+        {!loading && ranking.length > 0 && (
+          <span className="text-[10px] font-bold text-gray-400">{ranking.length} orang</span>
+        )}
+      </div>
+      {loading ? (
+        <div className="divide-y divide-gray-50">
+          {Array(4).fill(0).map((_, i) => (
+            <div key={i} className="px-5 py-4 flex items-center gap-3.5">
+              <div className="w-6 h-4 bg-gray-100 rounded animate-pulse" />
+              <div className="w-10 h-10 rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-gray-100 rounded-lg animate-pulse w-36" />
+                <div className="h-2.5 bg-gray-100 rounded-lg animate-pulse w-24" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : ranking.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-2">
+          <Inbox size={28} className="text-gray-300" />
+          <p className="text-xs text-gray-400 font-medium">Belum ada data absensi pada periode ini</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-50">
+          {ranking.map((r, idx) => (
+            <RankingRow key={r.userId} entry={r} idx={idx} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -240,7 +420,7 @@ function BarTooltip({ active, payload }: any) {
   return (
     <div className="bg-gray-900 text-white text-[10px] rounded-lg px-3 py-2 shadow-lg">
       <p className="font-bold mb-0.5">{d.fullName}</p>
-      <p className="text-gray-300">{d.attendanceRate.toFixed(1)}% kehadiran · {d.present} tepat · {d.late} telat</p>
+      <p className="text-gray-300">{d.bayesianScore.toFixed(1)} poin · {d.tepat} tepat · {d.telat} telat</p>
     </div>
   );
 }
@@ -265,6 +445,8 @@ export default function AttendanceLeaderboardPage() {
   const [scope, setScope] = useState<Scope>("month");
   const [period, setPeriod] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() });
   const [selectedDate, setSelectedDate] = useState(() => todayWIB());
+  const [showInsufficient, setShowInsufficient] = useState(false);
+
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [autoRecords, setAutoRecords] = useState<AttendanceRecord[]>([]);
   const [manualRecords, setManualRecords] = useState<ManualRecord[]>([]);
@@ -311,15 +493,19 @@ export default function AttendanceLeaderboardPage() {
     [scope, period, selectedDate, users, autoRecords, manualRecords, leaveData]
   );
 
-  const top3 = data.ranking.slice(0, 3).map((entry, rank) => ({ entry, rank }));
+  const hasBothSections = data.pklRanking.length > 0 && data.karyawanRanking.length > 0;
+
+  // Podium selalu dari karyawan (atau all jika tidak ada pemisah)
+  const podiumSource = data.karyawanRanking.length > 0 ? data.karyawanRanking : data.allRanking;
+  const top3 = podiumSource.slice(0, 3).map((entry, rank) => ({ entry, rank }));
   const podiumOrder = top3.length === 3 ? [top3[1], top3[0], top3[2]] : top3;
 
   const barData = useMemo(
-    () => data.ranking.slice(0, 10).map(r => ({
-      name: r.name.split(" ")[0], fullName: r.name, score: r.score,
-      attendanceRate: r.attendanceRate, present: r.present, late: r.late,
+    () => data.allRanking.slice(0, 10).map(r => ({
+      name: r.name.split(" ")[0], fullName: r.name,
+      bayesianScore: r.bayesianScore, tepat: r.tepat, telat: r.telat,
     })),
-    [data.ranking]
+    [data.allRanking]
   );
 
   const pieData = useMemo(
@@ -396,12 +582,18 @@ export default function AttendanceLeaderboardPage() {
             </div>
           </div>
 
+          {/* ── Info banners ── */}
           {scope === "all" && (
             <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 text-blue-700 text-[11px] px-3.5 py-2.5 rounded-xl">
               Mode Semua Waktu hanya menghitung absen otomatis (wajah) — absen manual & cuti tidak disertakan.
             </div>
           )}
-
+          {!loading && scope !== "day" && (
+            <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 text-[11px] px-3.5 py-2.5 rounded-xl">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              Skor menggunakan <strong className="mx-1">Bayesian smoothing</strong> untuk menghindari bias data kecil. Prior global = {data.globalOnTimeRate}% · Min sesi ranking = {MIN_SESI} hari.
+            </div>
+          )}
           {error && (
             <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-3 rounded-xl">{error}</div>
           )}
@@ -426,10 +618,10 @@ export default function AttendanceLeaderboardPage() {
             ))}
           </div>
 
-          {/* ── Podium ── */}
+          {/* ── Podium Karyawan ── */}
           {!loading && top3.length > 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
-              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Top Performer</p>
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Top Performer{hasBothSections ? " · Karyawan" : ""}</p>
               <div className="flex items-end gap-3">
                 {podiumOrder.map(({ entry, rank }) => (
                   <PodiumCard key={entry.userId} entry={entry} rank={rank} />
@@ -439,18 +631,18 @@ export default function AttendanceLeaderboardPage() {
           )}
 
           {/* ── Charts ── */}
-          {!loading && data.ranking.length > 0 && (
+          {!loading && data.allRanking.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Bar ranking */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Ranking Tingkat Kehadiran (Top 10)</p>
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Skor Bayesian Top 10</p>
                 <ResponsiveContainer width="100%" height={Math.max(220, barData.length * 34)}>
                   <BarChart data={barData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f1f3" />
-                    <XAxis type="number" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#4b5563" }} axisLine={false} tickLine={false} width={70} />
                     <Tooltip content={<BarTooltip />} cursor={{ fill: "#f5f3ff" }} />
-                    <Bar dataKey="attendanceRate" fill="#7c3aed" radius={[0, 6, 6, 0]} barSize={16} />
+                    <Bar dataKey="bayesianScore" fill="#7c3aed" radius={[0, 6, 6, 0]} barSize={16} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -494,53 +686,59 @@ export default function AttendanceLeaderboardPage() {
             </div>
           )}
 
-          {/* ── Full Ranking Table ── */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <p className="font-bold text-gray-900 text-sm">Papan Peringkat Lengkap</p>
+          {/* ── Ranking Table: Karyawan ── */}
+          <RankingTable
+            title="Papan Peringkat Karyawan"
+            ranking={data.karyawanRanking.length > 0 ? data.karyawanRanking : (!hasBothSections ? data.allRanking : [])}
+            loading={loading}
+          />
+
+          {/* ── Ranking Table: PKL ── */}
+          {!loading && data.pklRanking.length > 0 && (
+            <RankingTable title="Papan Peringkat PKL / Magang" ranking={data.pklRanking} loading={false} />
+          )}
+
+          {/* ── Data Belum Cukup ── */}
+          {!loading && data.insufficientEntries.length > 0 && (
+            <div className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden">
+              <button
+                className="w-full px-5 py-4 border-b border-amber-100 flex items-center justify-between text-left"
+                onClick={() => setShowInsufficient(v => !v)}
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                  <p className="font-bold text-gray-700 text-sm">Data Belum Cukup</p>
+                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                    {data.insufficientEntries.length} orang
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-gray-400">
+                  <span className="text-[10px]">Min. {MIN_SESI} hari hadir untuk masuk ranking</span>
+                  {showInsufficient ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </div>
+              </button>
+              {showInsufficient && (
+                <div className="divide-y divide-amber-50">
+                  {data.insufficientEntries.map(e => {
+                    const bg = avBg(e.name);
+                    return (
+                      <div key={e.userId} className="px-5 py-3 flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${bg}`}>{initials(e.name)}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-800 text-xs truncate">{e.name}</p>
+                          <p className="text-[9px] text-gray-400">{e.role.replace(/_/g, " ")} {e.isPkl ? "· PKL" : ""}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-[10px] font-bold text-amber-600">{e.hadir} / {MIN_SESI} hari</p>
+                          <p className="text-[9px] text-gray-400">{e.tepat} tepat waktu</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            {loading ? (
-              <div className="divide-y divide-gray-50">
-                {Array(5).fill(0).map((_, i) => (
-                  <div key={i} className="px-5 py-4 flex items-center gap-3.5">
-                    <div className="w-6 h-4 bg-gray-100 rounded animate-pulse" />
-                    <div className="w-10 h-10 rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-3 bg-gray-100 rounded-lg animate-pulse w-36" />
-                      <div className="h-2.5 bg-gray-100 rounded-lg animate-pulse w-24" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : data.ranking.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 gap-2">
-                <Inbox size={30} className="text-gray-300" />
-                <p className="text-xs text-gray-400 font-medium">Belum ada data absensi pada periode ini</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-50">
-                {data.ranking.map((r, idx) => {
-                  const bg = avBg(r.name);
-                  return (
-                    <div key={r.userId} className="px-5 py-3.5 flex items-center gap-3.5">
-                      <span className={`w-6 text-center text-xs font-black flex-shrink-0 ${idx < 3 ? "text-violet-600" : "text-gray-300"}`}>{idx + 1}</span>
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${bg}`}>{initials(r.name)}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 text-xs leading-tight truncate">{r.name}</p>
-                        <p className="text-[9px] text-gray-400 mt-0.5">
-                          {r.role.replace(/_/g, " ")} · {r.present} tepat · {r.late} telat{r.leave > 0 ? ` · ${r.leave} cuti` : ""}{r.absentRecorded > 0 ? ` · ${r.absentRecorded} tidak hadir` : ""}
-                        </p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs font-bold text-gray-800 font-mono">{r.attendanceRate.toFixed(1)}% kehadiran</p>
-                        <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">{r.score.toFixed(1)} poin · {r.onTimeRate}% ketepatan</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          )}
 
         </div>
       </div>
