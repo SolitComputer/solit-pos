@@ -9,7 +9,7 @@ import { MonthlyOffModal } from "@/components/attendance/onthlyOffModal";
 import { canManageAttendance, DIVISION_MAP, isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
 import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
-import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Wrench, Inbox, CalendarDays, GraduationCap, Briefcase, Trophy } from "lucide-react";
+import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Inbox, CalendarDays, GraduationCap, Briefcase, Trophy } from "lucide-react";
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
 
 function isPKLRole(role?: string): boolean {
@@ -3875,7 +3875,9 @@ export default function AttendanceDashboardPage() {
                                                     return dk >= startDate;
                                                 }).length > 0
                                                 : false;
+                                 // AFTER
                                             const hasManual = mc > 0;
+                                            const showLiburLine = !tot && (isUserDayOff || hasAnyDayOff);
                                             return (
                                                 <button key={day} onClick={() => {
                                                     setAbsentPopupMode(null);
@@ -3886,19 +3888,32 @@ export default function AttendanceDashboardPage() {
                                                     <span className={`text-[11px] sm:text-xs font-semibold ${isSel ? "text-white/90" : isTod ? "text-blue-700" : isUserDayOff ? "text-red-500" : "text-gray-700"}`}>
                                                         {day}
                                                     </span>
-                                                    {tot > 0 && (
-                                                        <div className="mt-auto pt-1 w-full flex items-center gap-1">
-                                                            <div className={`flex items-center justify-center w-3 h-3 sm:w-4 sm:h-4 rounded-full ${isSel ? "bg-white/20" : "bg-[#1a1a2e]/10"} ${hasManual ? "ring-1 ring-yellow-400" : ""}`}>
-                                                                <span className={`flex items-center justify-center ${isSel ? "text-white" : "text-[#1a1a2e]"}`}>
-                                                                    {hasManual ? <Wrench className="w-2 h-2 sm:w-2.5 sm:h-2.5" /> : <CheckCircle2 className="w-2 h-2 sm:w-2.5 sm:h-2.5" />}
+                                                    {tot > 0 ? (
+                                                        <div className="mt-auto pt-1 w-full space-y-1">
+                                                            {/* Garis progress: proporsi Tepat/Terlambat/Skip hari ini */}
+                                                            <div className={`w-full h-1 sm:h-1.5 rounded-full overflow-hidden flex ${isSel ? "bg-white/20" : "bg-gray-200/70"}`}>
+                                                                {pc > 0 && <div className="h-full bg-emerald-400" style={{ width: `${(pc / tot) * 100}%` }} />}
+                                                                {lc > 0 && <div className="h-full bg-amber-400" style={{ width: `${(lc / tot) * 100}%` }} />}
+                                                                {sc > 0 && <div className="h-full bg-gray-400" style={{ width: `${(sc / tot) * 100}%` }} />}
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <div className={`flex items-center justify-center w-3 h-3 sm:w-4 sm:h-4 rounded-full ${isSel ? "bg-white/20" : "bg-[#1a1a2e]/10"} ${hasManual ? "ring-1 ring-blue-400" : ""}`}>
+                                                                    <span className={`flex items-center justify-center ${isSel ? "text-white" : "text-[#1a1a2e]"}`}>
+                                                                        {hasManual ? <Pencil className="w-2 h-2 sm:w-2.5 sm:h-2.5" /> : <CheckCircle2 className="w-2 h-2 sm:w-2.5 sm:h-2.5" />}
+                                                                    </span>
+                                                                </div>
+                                                                <span className={`text-[9px] sm:text-[10px] font-bold leading-tight ${isSel ? "text-white/70" : "text-gray-400"}`}>
+                                                                    <span className="hidden sm:inline">{tot} hadir{mc > 0 ? ` · ${mc} manual` : ""}</span>
+                                                                    <span className="sm:hidden">{tot}{mc > 0 ? " (m)" : ""}</span>
                                                                 </span>
                                                             </div>
-                                                            <span className={`text-[9px] sm:text-[10px] font-bold leading-tight ${isSel ? "text-white/70" : "text-gray-400"}`}>
-                                                                <span className="hidden sm:inline">{tot} hadir{mc > 0 ? ` · ${mc} manual` : ""}</span>
-                                                                <span className="sm:hidden">{tot}{mc > 0 ? " (m)" : ""}</span>
-                                                            </span>
                                                         </div>
-                                                    )}
+                                                    ) : showLiburLine ? (
+                                                        /* Garis Libur: merah penuh kalau nggak ada absensi & hari ini hari libur */
+                                                        <div className="mt-auto pt-1 w-full">
+                                                            <div className="w-full h-1 sm:h-1.5 rounded-full bg-red-300" />
+                                                        </div>
+                                                    ) : null}
                                                 </button>
                                             );
                                         })}
