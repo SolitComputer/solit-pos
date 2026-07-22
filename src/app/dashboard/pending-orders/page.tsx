@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { UserRole } from "@/lib/permissions";
-import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw } from "lucide-react";
+import { UserRole, hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PendingTransaction {
@@ -379,6 +379,61 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     );
 }
 
+// ─── CancelModal (Tidak Jadi) ─────────────────────────────────────────────────
+function CancelModal({ tx, cancelling, onConfirm, onClose }: {
+    tx: PendingTransaction; cancelling: boolean; onConfirm: () => void; onClose: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center anim-fade">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden anim-slide-up">
+                <div className="bg-red-600 px-5 py-4 shrink-0">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="font-bold text-white text-sm">Batalkan Pesanan (Tidak Jadi)</h2>
+                            <p className="text-xs text-white/70 mt-0.5 font-mono">{tx.invoice_number}</p>
+                        </div>
+                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-800">
+                        <p className="font-bold mb-1 leading-relaxed text-sm">
+                            Batalkan pesanan untuk <span className="underline">{tx.customer_name}</span>?
+                        </p>
+                    </div>
+                    <div className="space-y-1.5 text-xs text-gray-600 bg-gray-50 rounded-xl p-3.5 border border-gray-200">
+                        <p className="font-semibold text-gray-700 mb-2">Yang akan terjadi:</p>
+                        <p>• Status → <span className="font-bold text-red-600">BATAL (Tidak Jadi)</span></p>
+                        <p>• Unit <span className="font-semibold">{tx.laptop_name}</span> kembali ke stok <span className="font-bold text-emerald-700">Siap Jual</span> di Data Barang</p>
+                        <p>• Otomatis hilang dari daftar DP &amp; Ambil Dulu</p>
+                        <p>• Tercatat di Riwayat Transaksi dengan status <span className="font-bold text-red-600">Batal</span></p>
+                        {tx.status === "RESERVED" && (
+                            <p className="text-amber-700 font-semibold pt-1"> DP yang sudah dibayar diurus manual (tidak otomatis dikembalikan sistem)</p>
+                        )}
+                    </div>
+                </div>
+                <div className="px-5 py-3 border-t border-gray-100 flex gap-2.5 shrink-0">
+                    <button onClick={onClose} disabled={cancelling} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
+                    <button onClick={onConfirm} disabled={cancelling} className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60">
+                        {cancelling ? "Memproses..." : "Ya, Tidak Jadi"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Row badges ───────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: "RESERVED" | "HELD" }) {
     if (status === "RESERVED") {
@@ -396,10 +451,12 @@ function StatusBadge({ status }: { status: "RESERVED" | "HELD" }) {
 }
 
 // ─── Table row for PENDING ────────────────────────────────────────────────────
-function PendingRow({ tx, canConfirm, onConfirm, onDetail, onWhatsApp, idx }: {
+function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, onWhatsApp, idx }: {
     tx: PendingTransaction;
     canConfirm: boolean;
+    canCancel: boolean;
     onConfirm: (tx: PendingTransaction) => void;
+    onCancel: (tx: PendingTransaction) => void;
     onDetail: (tx: PendingTransaction) => void;
     onWhatsApp: (tx: PendingTransaction) => void;
     idx: number;
@@ -483,6 +540,14 @@ function PendingRow({ tx, canConfirm, onConfirm, onDetail, onWhatsApp, idx }: {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                             </svg>
                             Lunas
+                        </button>
+                    )}
+                    {canCancel && (
+                        <button onClick={() => onCancel(tx)}
+                            title="Tidak Jadi — batalkan pesanan"
+                            className="h-7 px-2.5 flex items-center gap-1 rounded-lg text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all">
+                            <Ban size={12} />
+                            Tidak Jadi
                         </button>
                     )}
                 </div>
@@ -668,6 +733,8 @@ export default function PendingOrdersPage() {
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmPaymentTx, setConfirmPaymentTx] = useState<PendingTransaction | null>(null);
     const [detailTx, setDetailTx] = useState<PendingTransaction | null>(null);
+    const [cancelTx, setCancelTx] = useState<PendingTransaction | null>(null);
+    const [cancelling, setCancelling] = useState(false);
 
     const CAN_CONFIRM_PAYMENT_ROLES: UserRole[] = [
         "ADMIN",
@@ -675,10 +742,12 @@ export default function PendingOrdersPage() {
         "PROGRAMMER",
         "KEPALA_SALES",
         "KEPALA_SOTECH",
-        "SOTECH",       
+        "SOTECH",
     ];
 
     const canConfirm = userRole ? CAN_CONFIRM_PAYMENT_ROLES.includes(userRole) : false;
+    // Reuse permission yang sama dengan tombol "Restore/Batal" di halaman Riwayat Transaksi
+    const canCancel = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
 
     useEffect(() => {
         fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
@@ -721,6 +790,27 @@ export default function PendingOrdersPage() {
             fetchHistory();
         }
     }, [activeTab]);
+
+    const handleCancelConfirm = async () => {
+        if (!cancelTx) return;
+        setCancelling(true);
+        try {
+            // Endpoint sama persis dengan tombol "Restore/Batal" di halaman Riwayat Transaksi
+            const res = await fetch(`/api/transaction/${cancelTx.invoice_number}/restore`, { method: "POST" });
+            const result = await res.json();
+            if (!result.success) {
+                setAlertModal("Gagal membatalkan: " + (result.message || "Terjadi kesalahan"));
+                return;
+            }
+            setAlertModal(`Pesanan ${cancelTx.invoice_number} berhasil ditandai Tidak Jadi. Unit sudah kembali ke stok Siap Jual.`);
+            setCancelTx(null);
+            fetchData();
+        } catch {
+            setAlertModal("Terjadi kesalahan koneksi saat membatalkan pesanan");
+        } finally {
+            setCancelling(false);
+        }
+    };
 
     const handleWhatsApp = (tx: PendingTransaction) => {
         if (!tx.customer_phone) return;
@@ -908,8 +998,9 @@ export default function PendingOrdersPage() {
                                             </tr>
                                         ) : (
                                             filtered.map((tx, idx) => (
-                                                <PendingRow key={tx.id} tx={tx} idx={idx} canConfirm={canConfirm}
+                                                <PendingRow key={tx.id} tx={tx} idx={idx} canConfirm={canConfirm} canCancel={canCancel}
                                                     onConfirm={setConfirmPaymentTx}
+                                                    onCancel={setCancelTx}
                                                     onDetail={setDetailTx}
                                                     onWhatsApp={handleWhatsApp} />
                                             ))
@@ -986,6 +1077,14 @@ export default function PendingOrdersPage() {
                 />
             )}
             {detailTx && <DetailModal tx={detailTx} onClose={() => setDetailTx(null)} />}
+            {cancelTx && (
+                <CancelModal
+                    tx={cancelTx}
+                    cancelling={cancelling}
+                    onConfirm={handleCancelConfirm}
+                    onClose={() => setCancelTx(null)}
+                />
+            )}
         </DashboardLayout>
     );
 }
