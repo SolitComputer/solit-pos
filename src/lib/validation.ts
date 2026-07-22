@@ -27,7 +27,7 @@ export const unitItemSchema = z.object({
 });
 
 export const createPaymentSchema = z.object({
-  customer_name: z.string().min(3, "Nama customer wajib diisi"),
+  customer_name: z.string().min(1, "Nama customer wajib diisi"),
   customer_type: z.enum(["UMUM", "RESELLER", "MITRA"]),
   seller_type: z.enum(["USER", "PEDAGANG"]).default("USER"),
   company_name: z.string().optional(),
