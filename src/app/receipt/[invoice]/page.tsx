@@ -223,6 +223,9 @@ export default async function Page(props: Props) {
                       <li>Kerusakan LCD seperti pecah, kena air, terbakar, bergaris, berkedip, gelap/redup, blank putih, dead pixel, berbayang/shadow, warna pudar/tidak akurat, serta bercak hitam/putih <strong>TIDAK termasuk garansi</strong>.</li>
                       <li>Wajib membawa nota pembelian ini saat melakukan klaim garansi.</li>
                     </ol>
+                    <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/80 rounded-lg px-2.5 py-1.5 mt-2">
+                      ⚠️ <strong>Note:</strong> Barang yang sudah dibeli tidak bisa dikembalikan.
+                    </p>
                   </div>
                 </Section>
               </>

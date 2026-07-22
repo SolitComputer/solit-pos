@@ -163,6 +163,7 @@ export function buildPaymentMessage(data: {
     `1. Garansi hanya berlaku untuk kerusakan yang BUKAN akibat human error.`,
     `2. Kerusakan LCD seperti pecah, kena air, terbakar, bergaris, berkedip, gelap/redup, blank putih, dead pixel, berbayang/shadow, warna pudar/tidak akurat, serta bercak hitam/putih TIDAK termasuk garansi.`,
     `3. Wajib membawa nota pembelian ini saat melakukan klaim garansi.`,
+    `⚠️ *Note:* Barang yang sudah dibeli tidak bisa dikembalikan.`,
     ``,
     `Terima kasih sudah berbelanja di *Solit 03* 🙏`,
     `_Sawangan, Depok_`,
