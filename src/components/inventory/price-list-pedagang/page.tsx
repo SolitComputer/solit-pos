@@ -150,7 +150,7 @@ function PriceListPedagangContent() {
       wb.created = new Date();
 
       const ws = wb.addWorksheet("Price List Pedagang", {
-        views: [{ state: "frozen", ySplit: 4 }],
+        views: [{ state: "frozen", ySplit: 1 }],
         pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
       });
 
@@ -177,38 +177,22 @@ function PriceListPedagangContent() {
       ];
       ws.columns = COLS;
 
-      // Judul
-      ws.mergeCells(1, 1, 1, COLS.length);
-      const titleCell = ws.getCell(1, 1);
-      titleCell.value = "PRICE LIST PEDAGANG — SOLIT 03";
-      titleCell.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
-      titleCell.alignment = { horizontal: "center", vertical: "middle" };
-      titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-      ws.getRow(1).height = 28;
-
-      // Subjudul
-      ws.mergeCells(2, 1, 2, COLS.length);
-      const subtitleCell = ws.getCell(2, 1);
-      subtitleCell.value = `Diperbarui: ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })} — Harga dapat berubah sewaktu-waktu tanpa pemberitahuan.`;
-      subtitleCell.font = { italic: true, size: 9, color: { argb: "FF6B7280" } };
-      subtitleCell.alignment = { horizontal: "center", vertical: "middle" };
-      ws.getRow(2).height = 18;
-
-      // Header row styling (row 4)
-      const headerRowNum = 4;
-      const headerRow = ws.getRow(headerRowNum);
-      headerRow.height = 32;
-      headerRow.eachCell(cell => {
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
-          cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
-          cell.border = {
-              top: { style: "thin", color: { argb: COLOR.borderColor } },
-              left: { style: "thin", color: { argb: COLOR.borderColor } },
-              bottom: { style: "medium", color: { argb: "FF94A3B8" } },
-              right: { style: "thin", color: { argb: COLOR.borderColor } },
-          };
-          cell.alignment = { horizontal: "center", vertical: "middle" };
+      // Header row styling (row 1)
+      const headerRowNum = 1;
+      COLS.forEach((col, i) => {
+        const cell = ws.getCell(headerRowNum, i + 1);
+        cell.value = col.header;
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
+        cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
+        cell.border = {
+          top: { style: "thin", color: { argb: COLOR.borderColor } },
+          left: { style: "thin", color: { argb: COLOR.borderColor } },
+          bottom: { style: "medium", color: { argb: "FF94A3B8" } },
+          right: { style: "thin", color: { argb: COLOR.borderColor } },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
       });
+      ws.getRow(headerRowNum).height = 32;
 
       filtered.forEach((u, idx) => {
         const rowBg = idx % 2 === 0 ? COLOR.rowEven : COLOR.rowOdd;
@@ -246,14 +230,15 @@ function PriceListPedagangContent() {
           if (key === "no") {
               cell.alignment = { horizontal: "center", vertical: "middle" };
               cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-          } else if (key === "product") {
-              cell.font = { size: 10, name: "Arial", bold: true };
-              cell.alignment = { horizontal: "center", vertical: "middle" };
+          } else if (key === "product" || key === "condition") {
+              cell.font = { size: 10, name: "Arial", bold: key === "product" };
+              cell.alignment = { horizontal: "left", vertical: "middle" };
           } else if (["brand", "cpu", "ram", "storage", "grade", "sn"].includes(key)) {
               cell.alignment = { horizontal: "center", vertical: "middle" };
           } else if (key === "price") {
               cell.numFmt = '"Rp "#,##0';
-              cell.alignment = { horizontal: "center", vertical: "middle" };
+              cell.font = { size: 10, name: "Arial", bold: true };
+              cell.alignment = { horizontal: "right", vertical: "middle" };
           }
         });
       });
