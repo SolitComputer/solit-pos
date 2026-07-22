@@ -15,6 +15,7 @@ import {
     type AuditFilter,
     type SourceFilter,
     type PaymentMethodFilter,
+    type StatusFilter,
     defaultCashflowFilter,
     isFilterActive,
     activeFilterCount,
@@ -603,7 +604,7 @@ function FilterPanel({ filter, onChange, onReset, direction }: {
                         <option value="NOT_AUDITED">Belum Audit</option>
                     </select>
                 </div>
-               <div>
+                <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sumber</label>
                     <select value={filter.source} onChange={(e) => onChange({ ...filter, source: e.target.value as SourceFilter })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Sumber</option>
@@ -611,6 +612,20 @@ function FilterPanel({ filter, onChange, onReset, direction }: {
                         <option value="AUTO">Otomatis</option>
                     </select>
                 </div>
+                {direction === "IN" && (
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Status</label>
+                        <select
+                            value={filter.status}
+                            onChange={(e) => onChange({ ...filter, status: e.target.value as StatusFilter })}
+                            className={`${selectCls} w-full`}
+                        >
+                            <option value="ALL">Semua Status</option>
+                            <option value="ACTIVE">Aktif</option>
+                            <option value="VOIDED">Dibatalkan</option>
+                        </select>
+                    </div>
+                )}
                 {direction === "OUT" && (
                     <div>
                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Metode Bayar</label>
@@ -626,7 +641,7 @@ function FilterPanel({ filter, onChange, onReset, direction }: {
                     </div>
                 )}
             </div>
-            
+
             <div className="px-4 pb-4 -mt-1 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Dari Tanggal</label>
