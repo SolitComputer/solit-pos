@@ -92,9 +92,33 @@ async function handler(req: NextRequest) {
     } else {
       if (status !== "ALL") query = query.eq("status", status);
       if (search.trim()) {
-        query = query.or(
-          `invoice_number.ilike.%${search}%,customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%,laptop_name.ilike.%${search}%`
+        const term = search.trim();
+
+        // SN untuk transaksi multi-laptop tersimpan per-unit di transaction_items,
+        // bukan di kolom `transactions` — jadi dicari terpisah dulu, invoice_number
+        // yang match lalu digabung ke filter utama.
+        const { data: snMatches } = await supabase
+          .from("transaction_items")
+          .select("invoice_number")
+          .ilike("serial_number", `%${term}%`);
+
+        const invoiceNumbersFromSN = Array.from(
+          new Set((snMatches ?? []).map((r: any) => r.invoice_number).filter(Boolean))
         );
+
+        const orParts = [
+          `invoice_number.ilike.%${term}%`,
+          `customer_name.ilike.%${term}%`,
+          `customer_phone.ilike.%${term}%`,
+          `laptop_name.ilike.%${term}%`,
+          `serial_number.ilike.%${term}%`,
+          `cpu.ilike.%${term}%`,
+        ];
+        if (invoiceNumbersFromSN.length > 0) {
+          orParts.push(`invoice_number.in.(${invoiceNumbersFromSN.join(",")})`);
+        }
+
+        query = query.or(orParts.join(","));
       }
       if (customerType !== "ALL") {
         query = customerType === "UMUM"
