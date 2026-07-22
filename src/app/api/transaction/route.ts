@@ -227,8 +227,7 @@ async function handler(req: NextRequest) {
         if (u.laptop_id) allLaptopIds.add(u.laptop_id);
         if (!unitMap.has(u.id)) {
           unitMap.set(u.id, {
-            purchase_price: Number(u.purchase_price ?? 0),
-            serial_number: u.serial_number,
+            purchase_price: Number(u.purchase_price ?? 0), serial_number: u.serial_number,
             laptop_id: u.laptop_id ?? undefined,
             selling_price: Number(u.selling_price ?? 0),
           });
@@ -310,7 +309,7 @@ async function handler(req: NextRequest) {
         selling_price_total: number;
         allocated_deal_price: number;
         unit_count: number;
-        has_matched_unit: boolean;
+        has_matched_unit: boolean; // unit ketemu di laptop_units, dipakai buat itung margin
       }>();
 
       let totalPurchasePrice = 0;
@@ -400,11 +399,13 @@ async function handler(req: NextRequest) {
 
         const hasModal = g.has_matched_unit;
         const margin = hasModal ? finalDealPrice - g.purchase_price_total : 0;
+        const modalMissing = g.purchase_price_total === 0; // modal 0 = belum di-set, apapun sumbernya
         return {
           ...g,
           allocated_deal_price: finalDealPrice,
           margin,
           has_modal: hasModal,
+          modal_missing: modalMissing,
         };
       });
       const laptopSpecs = trx.laptop_id ? laptopMap.get(trx.laptop_id) : undefined;
@@ -413,7 +414,8 @@ async function handler(req: NextRequest) {
       const finalInventoryPrice = matchedAnyUnit ? totalPurchasePrice : storedInventoryPrice;
       const hasModal = matchedAnyUnit || (trx.inventory_price !== null && trx.inventory_price !== undefined);
       const totalMargin = hasModal ? dealPrice - finalInventoryPrice : 0;
-
+      const modalMissing = finalInventoryPrice === 0; // modal 0 = belum di-set, apapun sumbernya
+      
       return {
         ...trx,
         cpu: trx.cpu || laptopSpecs?.cpu || undefined,
@@ -427,6 +429,7 @@ async function handler(req: NextRequest) {
           : trx.serial_numbers ?? (trx.serial_number ? [trx.serial_number] : []),
         other: totalMargin,
         has_modal: hasModal,
+        modal_missing: modalMissing,
         purchase_price_current: finalInventoryPrice,
         grouped_items: grouped_items_with_margin,
         is_multi_laptop: grouped_items.length > 1,
