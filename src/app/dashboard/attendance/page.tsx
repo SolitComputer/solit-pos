@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ShiftConfigModal } from "@/components/attendance/ShiftConfigModal";
@@ -2929,10 +2929,11 @@ export default function AttendanceDashboardPage() {
         setShowManualModal(true);
     }, [allUsers, fetchAllUsers]);
 
-    const refreshAll = useCallback(async () => {
+    // silent = true -> refetch data tanpa toggle `loading`, jadi UI tidak "berkedip"
+    const refreshAll = useCallback(async (silent: boolean = false) => {
         if (!selectedMonth) return;
         const { year, month } = selectedMonth;
-        setLoading(true);
+        if (!silent) setLoading(true);
         const tasks: Promise<any>[] = [
             fetchAttendance(),
             fetchDayOffs(),
@@ -2946,7 +2947,7 @@ export default function AttendanceDashboardPage() {
             fetchLeaveData(year, month),
             fetchShiftSchedules(year, month),
         ];
-        Promise.all(tasks).finally(() => setLoading(false));
+        Promise.all(tasks).finally(() => { if (!silent) setLoading(false); });
         if (userCanViewSalary(currentUser)) {
             fetchSalarySlips(year, month);
         }
@@ -3591,16 +3592,24 @@ export default function AttendanceDashboardPage() {
         };
     }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser]);
 
+    const lastRefreshRef = useRef<number>(Date.now());
+
     useEffect(() => {
         const handleVisibilityChange = () => {
-            if (!document.hidden && selectedMonth) {
-                console.log("Refresh data...");
-                refreshAll();
-            }
+            if (document.hidden || !selectedMonth) return;
+
+            const now = Date.now();
+            // Hanya refetch kalau tab/app memang sudah tidak aktif > 60 detik.
+            // Kalau cuma switch tab sebentar (< 1 menit), tidak perlu fetch ulang sama sekali.
+            if (now - lastRefreshRef.current < 60_000) return;
+
+            lastRefreshRef.current = now;
+            refreshAll(true); // silent -> tidak ada skeleton loading yang muncul
+            fetchTodayStatus();
         };
         document.addEventListener("visibilitychange", handleVisibilityChange);
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    }, [selectedMonth, refreshAll]);
+    }, [selectedMonth, refreshAll, fetchTodayStatus]);
 
     const userRoles: string[] = getUserRoles(currentUser);
     const isAdmin = userIsAdmin(currentUser);
@@ -3688,7 +3697,7 @@ export default function AttendanceDashboardPage() {
                                 </button>
                             </>
                         )}
-                        <button onClick={refreshAll} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2 rounded-xl bg-white hover:shadow-md transition-all active:scale-95">
+                        <button onClick={() => refreshAll()} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2 rounded-xl bg-white hover:shadow-md transition-all active:scale-95">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Refresh
                         </button>
                     </div>
