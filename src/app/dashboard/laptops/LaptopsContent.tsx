@@ -896,8 +896,8 @@ export function LaptopsContent() {
                             <SearchInput placeholder="Cari Serial Number..." value={filterSN} onChange={e => setFilterSN(e.target.value)} icon="sn" />
                             <FilterSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                                 <option value="ALL">Semua Status</option>
-                                <option value="SIAP_JUAL">✅ Siap Jual</option>
-                                <option value="BELUM_SIAP">⚠️ Minus</option>
+                                <option value="SIAP_JUAL">Siap Jual</option>
+                                <option value="BELUM_SIAP">Minus</option>
                             </FilterSelect>
                             <FilterSelect value={filterBrand} onChange={e => setFilterBrand(e.target.value)}>
                                 {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
@@ -924,12 +924,7 @@ export function LaptopsContent() {
                                 <option value="3-4">Rp 3 jt – 4 jt</option>
                                 <option value="4+">Rp 4 jt ke atas</option>
                             </FilterSelect>
-                            {/* ── Filter Stok Tersisa ── */}
-                            <FilterSelect value={filterStock} onChange={e => setFilterStock(e.target.value as "ALL" | "TERSEDIA" | "HABIS")}>
-                                <option value="TERSEDIA">📦 Stok Tersedia</option>
-                                <option value="ALL">Semua Stok</option>
-                                <option value="HABIS">🚫 Stok Habis</option>
-                            </FilterSelect>
+
                             <FilterSelect value={sortBy} onChange={e => setSortBy(e.target.value)}>
                                 <option value="DEFAULT">Urutan Default</option>
                                 <option value="AZ">Nama: A → Z</option>

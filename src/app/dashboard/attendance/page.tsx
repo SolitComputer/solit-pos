@@ -17,17 +17,17 @@ function isPKLRole(role?: string): boolean {
     return role === "PKL" || role.startsWith("PKL_") || role.startsWith("PKL-");
 }
 
-function renderStatusEmoji(emojiName: string) {
-    if (emojiName === "check") return <Check className="w-3.5 h-3.5" />;
-    if (emojiName === "clock") return <Clock className="w-3.5 h-3.5" />;
-    if (emojiName === "frown") return <Frown className="w-3.5 h-3.5" />;
-    if (emojiName === "file-text") return <FileText className="w-3.5 h-3.5" />;
-    if (emojiName === "x") return <X className="w-3.5 h-3.5" />;
-    if (emojiName === "umbrella") return <Umbrella className="w-3.5 h-3.5" />;
-    if (emojiName === "slash") return <X className="w-3.5 h-3.5 opacity-50" />;
-    if (emojiName === "alert") return <ShieldAlert className="w-3.5 h-3.5" />;
-    if (emojiName === "sun") return <Sun className="w-3.5 h-3.5" />;
-    if (emojiName === "inbox") return <Inbox className="w-3.5 h-3.5" />;
+function renderStatusEmoji(emojiName: string, className = "w-3.5 h-3.5") {
+    if (emojiName === "check") return <Check className={className} />;
+    if (emojiName === "clock") return <Clock className={className} />;
+    if (emojiName === "frown") return <Frown className={className} />;
+    if (emojiName === "file-text") return <FileText className={className} />;
+    if (emojiName === "x") return <X className={className} />;
+    if (emojiName === "umbrella") return <Umbrella className={className} />;
+    if (emojiName === "slash") return <X className={`${className} opacity-50`} />;
+    if (emojiName === "alert") return <ShieldAlert className={className} />;
+    if (emojiName === "sun") return <Sun className={className} />;
+    if (emojiName === "inbox") return <Inbox className={className} />;
     return null;
 }
 
@@ -626,8 +626,8 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                             const sel = form.status === s;
                             return (
                                 <button key={s} type="button" onClick={() => setForm(f => ({ ...f, status: s as any }))}
-                                    className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-[11px] font-bold border transition-all duration-200 ${sel ? `${cfg.bg} ${cfg.color} ${cfg.border} shadow-md scale-[1.04]` : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50 hover:scale-[1.02]"}`}>
-                                    <span className="text-base">{cfg.emoji}</span>
+                                    className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[11px] font-bold border transition-all duration-200 ${sel ? `${cfg.bg} ${cfg.color} ${cfg.border} shadow-md scale-[1.04]` : "bg-white text-gray-400 border-gray-200 hover:bg-gray-50 hover:scale-[1.02]"}`}>
+                                    {renderStatusEmoji(cfg.emoji, "w-4 h-4")}
                                     <span>{cfg.label}</span>
                                 </button>
                             );
