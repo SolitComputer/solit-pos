@@ -72,7 +72,8 @@ export function isAutoIncomeCategory(category: string): boolean {
 // ── Filter Types ──────────────────────────────────────────────────────────────
 export type AuditFilter = "ALL" | "AUDITED" | "NOT_AUDITED";
 export type SourceFilter = "ALL" | "MANUAL" | "AUTO";
-export type PaymentMethodFilter = "ALL" | "CASH" | "SALDO"; // ⬅️ BARU
+export type PaymentMethodFilter = "ALL" | "CASH" | "SALDO";
+export type StatusFilter = "ALL" | "ACTIVE" | "VOIDED";
 
 export interface CashflowFilter {
   dateFrom: string;
@@ -80,7 +81,8 @@ export interface CashflowFilter {
   category: string;
   audit: AuditFilter;
   source: SourceFilter;
-  paymentMethod: PaymentMethodFilter; // ⬅️ BARU
+  paymentMethod: PaymentMethodFilter;
+  status: StatusFilter;
   search: string;
 }
 
@@ -92,6 +94,7 @@ export function defaultCashflowFilter(): CashflowFilter {
     audit: "ALL",
     source: "ALL",
     paymentMethod: "ALL", // ⬅️ BARU
+    status: "ALL", // ⬅️ BARU: filter Batal
     search: "",
   };
 }
@@ -105,6 +108,7 @@ export function isFilterActive(f: CashflowFilter): boolean {
     f.audit !== d.audit ||
     f.source !== d.source ||
     f.paymentMethod !== d.paymentMethod || // ⬅️ BARU
+    f.status !== d.status || // ⬅️ BARU
     f.search !== d.search
   );
 }
@@ -116,6 +120,7 @@ export function activeFilterCount(f: CashflowFilter): number {
   if (f.audit !== "ALL") c++;
   if (f.source !== "ALL") c++;
   if (f.paymentMethod !== "ALL") c++; // ⬅️ BARU
+  if (f.status !== "ALL") c++; // ⬅️ BARU
   if (f.search.trim()) c++;
   return c;
 }
@@ -126,6 +131,7 @@ export function applyFilters<T extends {
   is_audited?: boolean;
   source_type?: string;
   payment_method?: string | null; // ⬅️ BARU
+  is_voided?: boolean; // ⬅️ BARU
   nama?: string;
   keterangan?: string | null;
 }>(entries: T[], filter: CashflowFilter): T[] {
@@ -140,6 +146,8 @@ export function applyFilters<T extends {
     if (filter.source === "MANUAL" && e.source_type !== "MANUAL") return false;
     if (filter.source === "AUTO" && e.source_type === "MANUAL") return false;
     if (filter.paymentMethod !== "ALL" && e.payment_method !== filter.paymentMethod) return false; // ⬅️ BARU
+    if (filter.status === "ACTIVE" && e.is_voided) return false; // ⬅️ BARU
+    if (filter.status === "VOIDED" && !e.is_voided) return false; // ⬅️ BARU
     if (q) {
       const haystack = `${e.nama || ""} ${e.keterangan || ""}`.toLowerCase();
       if (!haystack.includes(q)) return false;
