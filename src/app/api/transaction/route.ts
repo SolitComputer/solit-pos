@@ -91,20 +91,25 @@ async function handler(req: NextRequest) {
       query = query.eq("invoice_number", invoiceExact.trim());
     } else {
       if (status !== "ALL") query = query.eq("status", status);
-      if (search.trim()) {
+     if (search.trim()) {
         const term = search.trim();
+        
+        const [{ data: snMatches }, { data: cpuLaptops }] = await Promise.all([
+          supabase.from("transaction_items").select("invoice_number").ilike("serial_number", `%${term}%`),
+          supabase.from("laptops").select("id").ilike("cpu", `%${term}%`),
+        ]);
 
-        // SN untuk transaksi multi-laptop tersimpan per-unit di transaction_items,
-        // bukan di kolom `transactions` — jadi dicari terpisah dulu, invoice_number
-        // yang match lalu digabung ke filter utama.
-        const { data: snMatches } = await supabase
-          .from("transaction_items")
-          .select("invoice_number")
-          .ilike("serial_number", `%${term}%`);
-
-        const invoiceNumbersFromSN = Array.from(
-          new Set((snMatches ?? []).map((r: any) => r.invoice_number).filter(Boolean))
+        const extraInvoiceNumbers = new Set<string>(
+          (snMatches ?? []).map((r: any) => r.invoice_number).filter(Boolean)
         );
+
+        if (cpuLaptops && cpuLaptops.length > 0) {
+          const { data: itemsByLaptop } = await supabase
+            .from("transaction_items")
+            .select("invoice_number")
+            .in("laptop_id", cpuLaptops.map((l: any) => l.id));
+          (itemsByLaptop ?? []).forEach((r: any) => { if (r.invoice_number) extraInvoiceNumbers.add(r.invoice_number); });
+        }
 
         const orParts = [
           `invoice_number.ilike.%${term}%`,
@@ -112,10 +117,9 @@ async function handler(req: NextRequest) {
           `customer_phone.ilike.%${term}%`,
           `laptop_name.ilike.%${term}%`,
           `serial_number.ilike.%${term}%`,
-          `cpu.ilike.%${term}%`,
         ];
-        if (invoiceNumbersFromSN.length > 0) {
-          orParts.push(`invoice_number.in.(${invoiceNumbersFromSN.join(",")})`);
+        if (extraInvoiceNumbers.size > 0) {
+          orParts.push(`invoice_number.in.(${Array.from(extraInvoiceNumbers).join(",")})`);
         }
 
         query = query.or(orParts.join(","));
