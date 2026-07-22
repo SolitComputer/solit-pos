@@ -63,7 +63,7 @@ export function calculatePedagangPrice(modalPrice: number): PedagangPriceResult 
 export const PRICELIST_PEDAGANG_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES", "ACCOUNTING",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
-  "MARKETING", "KEPALA_MARKETING",
+  "MARKETING", "KEPALA_MARKETING", "KEPALA_SOTECH", "KEPALA_ONPOINT", "KEPALA_ZENITH"
 ];
 
 // Role yang boleh lihat harga MODAL di tabel dashboard (bukan di Excel —
@@ -71,5 +71,5 @@ export const PRICELIST_PEDAGANG_ROLES: UserRole[] = [
 // `canSeePriceInfo` di halaman Units.
 export const PRICELIST_MODAL_VIEW_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
-  "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
+  "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING", "KEPALA_SOTECH", "KEPALA_ONPOINT", "KEPALA_ZENITH"
 ];
