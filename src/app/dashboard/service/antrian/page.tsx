@@ -558,7 +558,7 @@ export default function AntrianPage() {
   const queue = [...orders].sort(
     (a, b) => new Date(a.tanggal_masuk).getTime() - new Date(b.tanggal_masuk).getTime()
   );
-  const COLUMNS = ["#", "Pelanggan", "Laptop", "Keluhan", "Masuk", "Durasi", "Teknisi", "Estimasi", "Status", "Aksi"];
+  const COLUMNS = ["No", "Pelanggan", "Laptop", "Keluhan", "Masuk", "Durasi", "Teknisi", "Estimasi", "Status", "Aksi"];
 
   return (
     <DashboardLayout>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
-  Clock, CalendarDays, FileText, TrendingUp, Users, Download,
+  Clock, CalendarDays, FileText, TrendingUp, Users,
   ArrowUpDown, ArrowUp, ArrowDown, Search, X, Trophy, ChevronLeft, ChevronRight,
   Medal, Activity, RefreshCw, Timer, DollarSign,
 } from "lucide-react";
@@ -95,10 +95,6 @@ function formatDuration(mins: number | null): string {
 }
 function initials(name: string) { return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase(); }
 function avBg(_name: string) { return "bg-white text-gray-600 border border-gray-200"; }
-function csvEscape(v: string | number | null | undefined): string {
-  const s = v === null || v === undefined ? "" : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string; dot: string }> = {
   PENDING: { label: "Pending", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", dot: "bg-amber-400" },
@@ -209,7 +205,7 @@ function DateRangeCalendar({
               onClick={() => onDayClick(dk)}
               onMouseEnter={() => setHoverDate(dk)}
               onMouseLeave={() => setHoverDate(null)}
-              className={`relative h-9 rounded-lg flex items-center justify-center text-xs font-bold transition-all
+              className={`relative h-9 rounded-lg flex items-center justify-center text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/30
                 ${isStart || isEnd
                   ? "bg-gray-900 text-white shadow-md shadow-gray-900/20"
                   : isInRange
@@ -372,7 +368,7 @@ function EmployeeOvertimeDetailView({
 
       {/* Quick stats */}
       <div className="px-5 py-4 border-b border-gray-100 bg-white">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { label: "Total", value: counts.total, color: "text-gray-800" },
             { label: "Pending", value: counts.pending, color: "text-amber-600" },
@@ -397,7 +393,7 @@ function EmployeeOvertimeDetailView({
       </div>
 
       {statuses.length > 1 && (
-        <div className="px-5 py-2.5 border-b border-gray-100 flex gap-1.5 overflow-x-auto scrollbar-hide">
+        <div className="px-5 py-2.5 border-b border-gray-100 flex gap-1.5 overflow-x-auto scrollbar-hide sm:flex-wrap sm:overflow-visible">
           {["Semua", ...statuses].map(s => {
             const c = s !== "Semua" ? STATUS_CONFIG[s] : null;
             const active = statusFilter === s;
@@ -592,31 +588,6 @@ export default function CeoOvertimeMonitoringPage() {
     return sortOrder === "asc" ? <ArrowUp size={12} className="text-white" /> : <ArrowDown size={12} className="text-white" />;
   };
 
-  const exportCsv = () => {
-    const sourceRows = selectedEmployee ? employeeRows : rows;
-    const header = ["Nama", "Role", "Tanggal", "Jam Mulai", "Jam Selesai", "Durasi (menit)", "Status", "Keterangan Pekerjaan", "Total Nominal"];
-    const lines = sourceRows.map(o => [
-      csvEscape(o.users?.name ?? selectedEmployee?.name ?? "—"),
-      csvEscape((o.users?.role ?? selectedEmployee?.role)?.replace(/_/g, " ") ?? "—"),
-      csvEscape(o.request_date),
-      csvEscape(formatTime(o.actual_start ?? o.scheduled_start)),
-      csvEscape(formatTime(o.actual_end ?? o.scheduled_end)),
-      csvEscape(o.duration_minutes ?? 0),
-      csvEscape(o.status),
-      csvEscape(o.work_description ?? ""),
-      csvEscape(o.total_pay ?? 0),
-    ].join(","));
-    const csv = "\uFEFF" + [header.join(","), ...lines].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = selectedEmployee
-      ? `lembur_${selectedEmployee.name.replace(/\s+/g, "-")}_${startDate}_${endDate}.csv`
-      : `monitoring-lembur_${startDate}_${endDate}.csv`;
-    a.click(); URL.revokeObjectURL(url);
-  };
-
   const statusChips = useMemo(() => ["Semua", ...(summary ? Object.keys(summary.statusCounts) : [])], [summary]);
 
   if (authChecked && !isAllowed) {
@@ -682,14 +653,6 @@ export default function CeoOvertimeMonitoringPage() {
                   <Trophy size={14} />
                   <span className="hidden sm:inline">Leaderboard</span>
                 </button>
-                <button
-                  onClick={exportCsv}
-                  disabled={(selectedEmployee ? employeeRows : rows).length === 0}
-                  className="flex-1 sm:flex-none h-10 px-3 sm:px-4 bg-gray-900 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm"
-                >
-                  <Download size={14} />
-                  <span>Export CSV</span>
-                </button>
               </div>
             </div>
           </div>
@@ -712,7 +675,7 @@ export default function CeoOvertimeMonitoringPage() {
           ) : (
             <>
               {/* ─── SUMMARY CARDS ─── */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
                 {[
                   { label: "Total Lemburan", value: summary?.totalSessions ?? 0, icon: <FileText className="w-5 h-5" />, tone: "gray" as const },
                   { label: "Total Jam", value: `${summary?.totalHours ?? 0} j`, icon: <Clock className="w-5 h-5" />, tone: "violet" as const },
@@ -744,7 +707,7 @@ export default function CeoOvertimeMonitoringPage() {
                   <div className="flex flex-wrap gap-1.5">
                     {PRESETS.map(p => (
                       <button key={p.key} onClick={() => applyPreset(p.key)}
-                        className={`h-8 px-3.5 rounded-lg text-[11px] font-bold border transition-all ${activePreset === p.key ? "bg-gray-900 text-white border-gray-900 shadow-sm" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-800"}`}>
+                        className={`h-8 px-3.5 rounded-lg text-[11px] font-bold border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 ${activePreset === p.key ? "bg-gray-900 text-white border-gray-900 shadow-sm" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-800"}`}>
                         {p.label}
                       </button>
                     ))}
@@ -776,7 +739,7 @@ export default function CeoOvertimeMonitoringPage() {
                         </button>
                       )}
                     </div>
-                    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+                    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide sm:flex-wrap sm:overflow-visible">
                       {statusChips.map(s => {
                         const c = s !== "Semua" ? STATUS_CONFIG[s] : null;
                         const active = statusFilter === s;
@@ -855,7 +818,7 @@ export default function CeoOvertimeMonitoringPage() {
                     <span className="text-[9px] text-gray-400 font-black uppercase tracking-wider mr-1 hidden sm:inline">Urutkan:</span>
                     {(["duration", "pay", "date"] as SortBy[]).map(f => (
                       <button key={f} onClick={() => handleSortClick(f)}
-                        className={`h-7 px-2.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 transition-all ${sortBy === f ? "bg-gray-900 border-gray-900 text-white shadow-sm" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"}`}>
+                        className={`h-7 px-2.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 ${sortBy === f ? "bg-gray-900 border-gray-900 text-white shadow-sm" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"}`}>
                         {f === "duration" ? "Durasi" : f === "pay" ? "Nominal" : "Tanggal"}
                         {renderSortIcon(f)}
                       </button>
@@ -884,7 +847,7 @@ export default function CeoOvertimeMonitoringPage() {
                 ) : (
                   <>
                     {/* Desktop table */}
-                    <div className="hidden md:block overflow-x-auto">
+                    <div className="hidden lg:block overflow-x-auto">
                       <table className="w-full min-w-[820px] text-xs">
                         <thead>
                           <tr className="bg-gray-50/70 border-b border-gray-100">
@@ -925,7 +888,7 @@ export default function CeoOvertimeMonitoringPage() {
                     </div>
 
                     {/* Mobile cards */}
-                    <div className="md:hidden divide-y divide-gray-50">
+                    <div className="lg:hidden divide-y divide-gray-50">
                       {rows.map(o => (
                         <div key={o.id} onClick={() => setDetailRow(o)} className="px-4 py-3.5 hover:bg-gray-50/60 cursor-pointer transition-colors">
                           <div className="flex items-start gap-3">
@@ -976,6 +939,13 @@ export default function CeoOvertimeMonitoringPage() {
 }
 
 // ─── Sub-component: StatCard ─────────────────────────────────────────────
+const STAT_TONES: Record<"gray" | "violet" | "emerald" | "blue", { bg: string; text: string; border: string }> = {
+  gray: { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200" },
+  violet: { bg: "bg-violet-50", text: "text-violet-600", border: "border-violet-200" },
+  emerald: { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200" },
+  blue: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200" },
+};
+
 function StatCard({
   label,
   value,
@@ -991,11 +961,11 @@ function StatCard({
   small?: boolean;
   loading?: boolean;
 }) {
-  void tone;
+  const toneClasses = STAT_TONES[tone];
   return (
     <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 overflow-hidden transition hover:shadow-md hover:-translate-y-0.5">
       <div className="relative flex items-start justify-between gap-2 mb-2">
-        <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white border border-gray-200 text-gray-700 flex items-center justify-center shrink-0 shadow-sm">
+        <span className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${toneClasses.bg} border ${toneClasses.border} ${toneClasses.text} flex items-center justify-center shrink-0 shadow-sm`}>
           {icon}
         </span>
       </div>
