@@ -17,6 +17,21 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import {
+  Wrench,
+  Users,
+  Clock,
+  Trophy,
+  Medal,
+  CheckCircle2,
+  Activity,
+  RefreshCw,
+  X,
+  Inbox,
+  TrendingUp,
+  PieChart as PieChartIcon,
+  BarChart3,
+} from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 interface ServiceDetail {
@@ -250,7 +265,6 @@ export default function ServiceStatistikPage() {
 
   const topTech = rows[0];
 
-  // ── Data grafik (dihitung dari respons yang sama) ──
   const workloadData = useMemo(
     () =>
       rows
@@ -289,82 +303,100 @@ export default function ServiceStatistikPage() {
   return (
     <DashboardLayout>
       <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5 p-3 sm:p-6 pb-16">
-        {/* Header */}
-        <div className="flex flex-col gap-3">
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-              <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085" />
-                </svg>
-              </span>
-              Statistik Servis
-            </h1>
-            <p className="text-gray-500 text-xs mt-1">
-              Peringkat teknisi (termasuk PKL Teknisi aktif) berdasarkan waktu
-              pengerjaan &amp; penyelesaian. Realtime.
-            </p>
+        {/* ─── HERO HEADER ─── */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-indigo-800 p-5 sm:p-7 shadow-xl shadow-indigo-900/20">
+          {/* Decorative blobs */}
+          <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl" />
+          <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-violet-500/15 rounded-full blur-3xl" />
+
+          <div className="relative flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                <Wrench className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-none">
+                    Statistik Servis
+                  </h1>
+                  <span className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-emerald-300 bg-emerald-500/20 backdrop-blur-sm border border-emerald-400/30 px-2 py-0.5 rounded-full flex-shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    LIVE
+                  </span>
+                </div>
+                <p className="text-[11px] sm:text-sm text-white/60 font-medium leading-snug">
+                  Peringkat teknisi (termasuk PKL) berdasarkan waktu pengerjaan &amp; penyelesaian
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => { setLoading(true); fetchData(period); }}
+              disabled={loading}
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white flex items-center justify-center transition disabled:opacity-50 flex-shrink-0 self-end sm:self-auto"
+              title="Refresh manual"
+            >
+              <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${loading ? "animate-spin" : ""}`} />
+            </button>
           </div>
 
-          {/* Period filter */}
-          <div className="grid grid-cols-5 sm:flex bg-white rounded-lg shadow-sm border border-gray-200/60 p-0.5 w-full sm:w-auto">
-            {PERIODS.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => setPeriod(p.key)}
-                className={`px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-medium rounded-md transition-all whitespace-nowrap ${
-                  period === p.key
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+          {/* Period filter — glassmorphism */}
+          <div className="relative mt-5 sm:mt-6">
+            <div className="grid grid-cols-5 gap-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-1">
+              {PERIODS.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => setPeriod(p.key)}
+                  className={`px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+                    period === p.key
+                      ? "bg-white text-indigo-700 shadow-md"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {error && (
-          <div className="p-3 bg-red-50 text-red-600 rounded-lg border border-red-100 text-sm">
-            {error}
+          <div className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-100 text-sm flex items-center gap-2">
+            <X className="w-4 h-4 flex-shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
         {/* Ringkasan */}
         {hasData && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
             <StatCard
               label="Total Servis Selesai"
               value={totalServis.toString()}
+              subtitle="Periode aktif"
+              icon={<CheckCircle2 className="w-5 h-5" />}
               tone="indigo"
-              icon={
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              }
             />
             <StatCard
               label="Teknisi Aktif"
               value={rows.length.toString()}
+              subtitle="Termasuk PKL"
+              icon={<Users className="w-5 h-5" />}
               tone="sky"
-              icon={
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z" />
-              }
             />
             <StatCard
-              label="Rata-rata Waktu Pengerjaan"
+              label="Rata-rata Pengerjaan"
               value={formatDuration(avgPengerjaan)}
+              subtitle="Waktu kerja aktif"
+              icon={<Clock className="w-5 h-5" />}
               tone="amber"
-              icon={
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              }
             />
             <StatCard
               label="Teknisi Terbaik"
               value={topTech ? firstName(topTech.name) : "—"}
-              sub={topTech ? `${topTech.total} servis` : ""}
+              subtitle={topTech ? `${topTech.total} servis` : "Belum ada"}
+              icon={<Trophy className="w-5 h-5" />}
               tone="violet"
-              icon={
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 007.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 002.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 012.916.52 6.003 6.003 0 01-5.395 4.972m0 0a6.726 6.726 0 01-2.749 1.35m0 0a6.772 6.772 0 01-3.044 0" />
-              }
             />
           </div>
         )}
@@ -381,6 +413,7 @@ export default function ServiceStatistikPage() {
             <ChartCard
               title="Beban Kerja Teknisi"
               subtitle="Total servis per teknisi"
+              icon={<BarChart3 className="w-3.5 h-3.5" />}
               className="lg:col-span-2"
             >
               <ResponsiveContainer width="100%" height={260}>
@@ -389,7 +422,7 @@ export default function ServiceStatistikPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} tickLine={false} axisLine={false} interval={0} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} width={32} />
                   <Tooltip cursor={{ fill: "#eef2ff" }} content={<CountTooltip unit="servis" />} />
-                  <Bar dataKey="total" radius={[6, 6, 0, 0]} maxBarSize={46}>
+                  <Bar dataKey="total" radius={[8, 8, 0, 0]} maxBarSize={46}>
                     {workloadData.map((_, i) => (
                       <Cell key={i} fill={ACCENT} fillOpacity={1 - i * 0.07} />
                     ))}
@@ -399,7 +432,11 @@ export default function ServiceStatistikPage() {
             </ChartCard>
 
             {/* Distribusi status */}
-            <ChartCard title="Distribusi Status" subtitle="Semua servis periode ini">
+            <ChartCard
+              title="Distribusi Status"
+              subtitle="Semua servis periode ini"
+              icon={<PieChartIcon className="w-3.5 h-3.5" />}
+            >
               {statusData.length === 0 ? (
                 <div className="h-[260px] flex items-center justify-center text-sm text-gray-400">
                   Tidak ada data
@@ -429,7 +466,7 @@ export default function ServiceStatistikPage() {
                       <div key={s.status} className="flex items-center gap-2 text-xs">
                         <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
                         <span className="text-gray-600 flex-1 truncate">{s.label}</span>
-                        <span className="font-semibold text-gray-900">{s.value}</span>
+                        <span className="font-bold text-gray-900 tabular-nums">{s.value}</span>
                       </div>
                     ))}
                   </div>
@@ -441,6 +478,7 @@ export default function ServiceStatistikPage() {
             <ChartCard
               title="Tren Servis Selesai"
               subtitle="Jumlah servis terselesaikan dari waktu ke waktu"
+              icon={<TrendingUp className="w-3.5 h-3.5" />}
               className="lg:col-span-3"
             >
               <ResponsiveContainer width="100%" height={220}>
@@ -462,7 +500,7 @@ export default function ServiceStatistikPage() {
           </div>
         )}
 
-        {/* Tabel Leaderboard */}
+        {/* Leaderboard */}
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -473,16 +511,25 @@ export default function ServiceStatistikPage() {
           <EmptyState />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-900">Peringkat Teknisi</h3>
-              <p className="text-[11px] text-gray-400">Ketuk baris untuk melihat riwayat lengkap</p>
+            <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-3.5 h-3.5" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-black text-gray-900">Peringkat Teknisi</h3>
+                <p className="text-[11px] text-gray-400 font-medium">Ketuk baris untuk melihat riwayat lengkap</p>
+              </div>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 tabular-nums flex-shrink-0">
+                {rows.length}
+              </span>
             </div>
+
             {/* Desktop table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-[10px] font-black uppercase tracking-wider text-gray-400 border-b border-gray-100">
-                    <th className="text-left px-4 py-3 w-10">#</th>
+                  <tr className="text-[10px] font-black uppercase tracking-wider text-gray-400 border-b border-gray-100 bg-gray-50/40">
+                    <th className="text-left px-4 py-3 w-14">#</th>
                     <th className="text-left px-4 py-3">Nama</th>
                     <th className="text-center px-4 py-3">Total Pekerjaan</th>
                     <th className="text-center px-4 py-3">Waktu Pengerjaan</th>
@@ -495,20 +542,20 @@ export default function ServiceStatistikPage() {
                     <tr
                       key={r.id}
                       onClick={() => setSelected(r)}
-                      className="hover:bg-indigo-50/40 transition-colors cursor-pointer"
+                      className="hover:bg-indigo-50/40 transition-colors cursor-pointer group"
                     >
                       <td className="px-4 py-3">
                         <RankBadge idx={idx} />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[11px] shrink-0">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-white flex items-center justify-center font-black text-[11px] shrink-0 shadow-sm shadow-indigo-500/30">
                             {getInitials(r.name)}
                           </div>
-                          <span className="font-semibold text-gray-900">{r.name}</span>
+                          <span className="font-bold text-gray-900 group-hover:text-indigo-700 transition">{r.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center font-bold text-gray-900">
+                      <td className="px-4 py-3 text-center font-black text-gray-900 tabular-nums">
                         {r.total}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -517,7 +564,7 @@ export default function ServiceStatistikPage() {
                       <td className="px-4 py-3 text-center">
                         <DurCell avg={r.penyelesaianAvgMs} total={r.penyelesaianTotalMs} />
                       </td>
-                      <td className="px-4 py-3 text-center font-semibold text-indigo-700">
+                      <td className="px-4 py-3 text-center font-black text-indigo-700 tabular-nums">
                         {formatDuration(r.avgMs)}
                       </td>
                     </tr>
@@ -535,16 +582,20 @@ export default function ServiceStatistikPage() {
                   className="w-full text-left px-3 py-3 hover:bg-indigo-50/40 transition-colors flex items-center gap-3"
                 >
                   <RankBadge idx={idx} />
-                  <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm shadow-indigo-500/30">
                     {getInitials(r.name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-900 text-sm truncate">{r.name}</div>
-                    <div className="text-[11px] text-gray-500 mt-0.5 flex flex-wrap gap-x-2">
-                      <span>Total: <strong className="text-gray-700">{r.total}</strong></span>
+                    <div className="font-bold text-gray-900 text-sm truncate">{r.name}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+                      <span>Total: <strong className="text-gray-700 tabular-nums">{r.total}</strong></span>
                       <span>Kerja: <strong className="text-gray-700">{formatDuration(r.pengerjaanAvgMs)}</strong></span>
                       <span>Selesai: <strong className="text-gray-700">{formatDuration(r.penyelesaianAvgMs)}</strong></span>
                     </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-base font-black text-indigo-600 tabular-nums leading-none">{r.total}</div>
+                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mt-0.5">servis</div>
                   </div>
                 </button>
               ))}
@@ -562,40 +613,51 @@ export default function ServiceStatistikPage() {
 }
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
-const TONE: Record<string, { bg: string; text: string }> = {
-  indigo: { bg: "bg-indigo-50", text: "text-indigo-600" },
-  sky: { bg: "bg-sky-50", text: "text-sky-600" },
-  amber: { bg: "bg-amber-50", text: "text-amber-600" },
-  violet: { bg: "bg-violet-50", text: "text-violet-600" },
+const TONE: Record<string, { text: string; gradient: string; ring: string }> = {
+  indigo: { text: "text-indigo-600", gradient: "from-indigo-500 to-indigo-600", ring: "ring-indigo-500/20" },
+  sky:    { text: "text-sky-600",    gradient: "from-sky-500 to-sky-600",       ring: "ring-sky-500/20" },
+  amber:  { text: "text-amber-600",  gradient: "from-amber-500 to-amber-600",   ring: "ring-amber-500/20" },
+  violet: { text: "text-violet-600", gradient: "from-violet-500 to-violet-600", ring: "ring-violet-500/20" },
 };
 
 function StatCard({
   label,
   value,
-  sub,
+  subtitle,
   tone = "indigo",
   icon,
 }: {
   label: string;
   value: string;
-  sub?: string;
+  subtitle?: string;
   tone?: keyof typeof TONE;
   icon?: React.ReactNode;
 }) {
   const t = TONE[tone] ?? TONE.indigo;
   return (
-    <div className="bg-white rounded-xl border border-gray-200/60 shadow-sm px-4 py-3 flex items-start gap-3">
-      {icon && (
-        <span className={`w-8 h-8 rounded-lg ${t.bg} ${t.text} flex items-center justify-center shrink-0 mt-0.5`}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <div className="relative bg-white rounded-2xl border border-gray-200/60 shadow-sm p-3 sm:p-4 overflow-hidden transition hover:shadow-md hover:-translate-y-0.5">
+      <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${t.gradient} opacity-[0.07] rounded-full blur-2xl`} />
+
+      <div className="relative flex items-start justify-between gap-2 mb-2">
+        {icon && (
+          <span className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${t.gradient} text-white flex items-center justify-center shrink-0 shadow-sm`}>
             {icon}
-          </svg>
-        </span>
-      )}
-      <div className="min-w-0">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 truncate">{label}</div>
-        <div className="text-lg font-bold text-gray-900 mt-0.5 truncate">{value}</div>
-        {sub && <div className="text-[11px] text-gray-400 truncate">{sub}</div>}
+          </span>
+        )}
+      </div>
+
+      <div className="relative">
+        <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-500 mb-0.5 truncate">
+          {label}
+        </div>
+        <div className={`text-xl sm:text-2xl lg:text-3xl font-black tabular-nums ${t.text} leading-none truncate`}>
+          {value}
+        </div>
+        {subtitle && (
+          <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1 truncate font-medium">
+            {subtitle}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -604,19 +666,28 @@ function StatCard({
 function ChartCard({
   title,
   subtitle,
+  icon,
   className = "",
   children,
 }: {
   title: string;
   subtitle?: string;
+  icon?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className={`bg-white rounded-2xl border border-gray-200/60 shadow-sm p-4 ${className}`}>
-      <div className="mb-3">
-        <h3 className="text-sm font-bold text-gray-900">{title}</h3>
-        {subtitle && <p className="text-[11px] text-gray-400">{subtitle}</p>}
+      <div className="mb-3 flex items-start gap-2">
+        {icon && (
+          <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+            {icon}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-black text-gray-900 truncate">{title}</h3>
+          {subtitle && <p className="text-[11px] text-gray-400 font-medium truncate">{subtitle}</p>}
+        </div>
       </div>
       {children}
     </div>
@@ -629,26 +700,29 @@ function CountTooltip({ active, payload, label, unit }: any) {
   const name = item?.payload?.label ?? label;
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-lg px-3 py-2 text-xs">
-      <div className="font-semibold text-gray-900">{name}</div>
+      <div className="font-bold text-gray-900">{name}</div>
       <div className="text-gray-500">
-        <span className="font-bold text-gray-900">{item.value}</span> {unit}
+        <span className="font-black text-gray-900 tabular-nums">{item.value}</span> {unit}
       </div>
     </div>
   );
 }
 
 function RankBadge({ idx }: { idx: number }) {
-  const styles = [
-    "bg-amber-100 text-amber-700 border-amber-200",
-    "bg-slate-100 text-slate-600 border-slate-200",
-    "bg-orange-100 text-orange-600 border-orange-200",
+  const medalGradients = [
+    "from-amber-400 to-yellow-500 shadow-amber-500/40",  // gold
+    "from-slate-300 to-slate-400 shadow-slate-400/40",   // silver
+    "from-orange-400 to-amber-600 shadow-orange-500/40", // bronze
   ];
+  if (idx < 3) {
+    return (
+      <span className={`w-8 h-8 shrink-0 rounded-xl flex items-center justify-center bg-gradient-to-br ${medalGradients[idx]} text-white shadow-md`}>
+        <Medal className="w-4 h-4" />
+      </span>
+    );
+  }
   return (
-    <span
-      className={`w-6 h-6 shrink-0 rounded-lg flex items-center justify-center font-bold text-[11px] border ${
-        idx < 3 ? styles[idx] : "bg-gray-50 text-gray-400 border-gray-100"
-      }`}
-    >
+    <span className="w-8 h-8 shrink-0 rounded-xl flex items-center justify-center font-black text-[11px] bg-gray-100 text-gray-500">
       {idx + 1}
     </span>
   );
@@ -657,22 +731,20 @@ function RankBadge({ idx }: { idx: number }) {
 function DurCell({ avg, total }: { avg: number; total: number }) {
   return (
     <div className="leading-tight">
-      <div className="font-semibold text-gray-900">{formatDuration(avg)}</div>
-      <div className="text-[10px] text-gray-400">total {formatDuration(total)}</div>
+      <div className="font-bold text-gray-900 tabular-nums">{formatDuration(avg)}</div>
+      <div className="text-[10px] text-gray-400 tabular-nums">total {formatDuration(total)}</div>
     </div>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-200/60 p-8 sm:p-10 text-center shadow-sm">
-      <div className="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
-        <svg className="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877" />
-        </svg>
+    <div className="bg-white rounded-3xl border border-gray-200/60 p-8 sm:p-12 text-center shadow-sm">
+      <div className="w-16 h-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <Inbox className="w-8 h-8 text-gray-300" />
       </div>
-      <h3 className="text-base font-bold text-gray-900 mb-1">Belum Ada Servis</h3>
-      <p className="text-gray-500 text-sm">Belum ada data servis untuk periode ini.</p>
+      <h3 className="text-base font-black text-gray-900 mb-1">Belum Ada Servis</h3>
+      <p className="text-gray-500 text-sm font-medium">Belum ada data servis untuk periode ini.</p>
     </div>
   );
 }
@@ -686,50 +758,68 @@ function DetailModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
-        {/* Header */}
-        <div className="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
+        {/* Header — dengan gradient */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-indigo-700 px-4 sm:px-5 py-4 flex items-center gap-3">
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-indigo-500/30 rounded-full blur-2xl" />
+          <div className="relative w-11 h-11 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 text-white flex items-center justify-center font-black text-sm shrink-0">
             {getInitials(tech.name)}
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-gray-900 truncate">{tech.name}</h2>
-            <p className="text-xs text-gray-500">
-              {tech.total} servis selesai · rata-rata pengerjaan {formatDuration(tech.avgMs)}
+          <div className="relative flex-1 min-w-0">
+            <h2 className="font-black text-white text-base truncate">{tech.name}</h2>
+            <p className="text-xs text-white/70 font-medium">
+              {tech.total} servis selesai · avg {formatDuration(tech.avgMs)}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 shrink-0"
+            className="relative w-8 h-8 rounded-lg hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition shrink-0"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="w-5 h-5" />
           </button>
         </div>
 
+        {/* Quick stats bar */}
+        <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100 bg-gray-50/40">
+          <div className="px-3 py-2.5 text-center">
+            <div className="text-[9px] font-black uppercase tracking-wider text-gray-400">Total</div>
+            <div className="text-sm font-black text-gray-900 tabular-nums">{tech.total}</div>
+          </div>
+          <div className="px-3 py-2.5 text-center">
+            <div className="text-[9px] font-black uppercase tracking-wider text-gray-400">Pengerjaan</div>
+            <div className="text-sm font-black text-gray-900">{formatDuration(tech.pengerjaanAvgMs)}</div>
+          </div>
+          <div className="px-3 py-2.5 text-center">
+            <div className="text-[9px] font-black uppercase tracking-wider text-gray-400">Penyelesaian</div>
+            <div className="text-sm font-black text-gray-900">{formatDuration(tech.penyelesaianAvgMs)}</div>
+          </div>
+        </div>
+
         {/* List riwayat */}
-        <div className="overflow-y-auto p-3 sm:p-4 space-y-2">
+        <div className="overflow-y-auto p-3 sm:p-4 space-y-2 flex-1">
           {tech.orders.length === 0 ? (
-            <p className="text-center text-sm text-gray-400 py-6">Tidak ada riwayat.</p>
+            <div className="text-center py-10">
+              <Inbox className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+              <p className="text-sm text-gray-400 font-medium">Tidak ada riwayat.</p>
+            </div>
           ) : (
             tech.orders.map((o) => (
               <div
                 key={o.id}
-                className="rounded-xl border border-gray-200/60 p-3 hover:border-indigo-200 transition-colors"
+                className="rounded-xl border border-gray-200/60 p-3 hover:border-indigo-200 hover:shadow-sm transition-all"
               >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="min-w-0">
-                    <div className="font-semibold text-gray-900 text-sm truncate">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-gray-900 text-sm truncate">
                       {o.type_laptop || "—"}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">
+                    <div className="text-xs text-gray-500 truncate mt-0.5">
                       {o.keluhan || "—"}
                     </div>
                   </div>
                   <span
-                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${
+                    className={`text-[10px] font-black px-2 py-0.5 rounded-full border shrink-0 uppercase tracking-wider ${
                       STATUS_STYLE[o.status || ""] || "bg-gray-50 text-gray-600 border-gray-200"
                     }`}
                   >
@@ -741,11 +831,13 @@ function DetailModal({
                   <TimeCol label="Mulai" value={formatDateTime(o.mulai_dikerjakan)} />
                   <TimeCol label="Selesai" value={formatDateTime(o.tanggal_selesai)} />
                 </div>
-                <div className="flex gap-3 mt-2 pt-2 border-t border-gray-50 text-[11px]">
-                  <span className="text-gray-500">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 pt-2 border-t border-gray-50 text-[11px]">
+                  <span className="text-gray-500 inline-flex items-center gap-1">
+                    <Activity className="w-3 h-3 text-indigo-500" />
                     Pengerjaan: <strong className="text-gray-800">{formatDuration(o.pengerjaanMs)}</strong>
                   </span>
-                  <span className="text-gray-500">
+                  <span className="text-gray-500 inline-flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-emerald-500" />
                     Penyelesaian: <strong className="text-gray-800">{formatDuration(o.penyelesaianMs)}</strong>
                   </span>
                 </div>
@@ -760,9 +852,9 @@ function DetailModal({
 
 function TimeCol({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="text-[9px] uppercase tracking-wider text-gray-400 font-bold">{label}</div>
-      <div className="text-gray-700">{value}</div>
+    <div className="min-w-0">
+      <div className="text-[9px] uppercase tracking-wider text-gray-400 font-black">{label}</div>
+      <div className="text-gray-700 font-semibold truncate">{value}</div>
     </div>
   );
 }

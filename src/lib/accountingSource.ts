@@ -353,7 +353,6 @@ export async function getPostedKeys(supabase: SupabaseClient): Promise<Set<strin
   return new Set((data ?? []).map((e: any) => draftKey(e)));
 }
 
-/** Ubah draft → rows siap insert ke journal_lines */
 export function draftToLineRows(entryId: string, lines: DraftLine[]) {
   return lines.map((l, i) => ({
     entry_id: entryId,
@@ -361,6 +360,7 @@ export function draftToLineRows(entryId: string, lines: DraftLine[]) {
     account_name: accountName(l.account_code),
     side: l.side,
     nominal: Math.round(Number(l.nominal)),
+    keterangan: l.keterangan?.trim() ? l.keterangan.trim() : null,
     line_order: i,
   }));
 }

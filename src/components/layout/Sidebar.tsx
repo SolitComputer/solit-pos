@@ -26,7 +26,6 @@ function isItemActive(href: string, pathname: string): boolean {
   if (href === "/dashboard") return false;
   if (href === "/dashboard/attendance") return pathname === "/dashboard/attendance";
 
-  // Data Barang: cocokkan berdasarkan pathname saja (semua tab tetap highlight menu)
   if (href.startsWith("/dashboard/data-barang")) {
     return (
       pathname === "/dashboard/data-barang" ||
@@ -34,9 +33,6 @@ function isItemActive(href: string, pathname: string): boolean {
     );
   }
 
-  // ── Laptop Siap Jual & Minus sebagai route standalone ─────────────────────
-  // Harus di-cek SEBELUM fallback startsWith("/dashboard/laptops")
-  // supaya /dashboard/laptops/ready tidak ikut menghighlight item /dashboard/laptops
   if (href === "/dashboard/laptops/ready") {
     return pathname === "/dashboard/laptops/ready";
   }
@@ -103,266 +99,45 @@ interface MenuGroup {
 }
 
 const Icons = {
-  dashboard: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  ),
-  attendance: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2" />
-    </svg>
-  ),
-  overtime: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  ),
-  riwayat: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-    </svg>
-  ),
-  laptop: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-      <line x1="12" y1="17" x2="12" y2="21" />
-    </svg>
-  ),
-  garansi: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  ),
-  payment: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="1" y="4" width="22" height="16" rx="2" />
-      <line x1="1" y1="10" x2="23" y2="10" />
-    </svg>
-  ),
-  scanner: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M4 7V5a1 1 0 011-1h2" />
-      <path d="M20 7V5a1 1 0 00-1-1h-2" />
-      <path d="M4 17v2a1 1 0 001 1h2" />
-      <path d="M20 17v2a1 1 0 01-1 1h-2" />
-      <path d="M7 12h10" />
-    </svg>
-  ),
-  logout: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  ),
-  log: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 11l3 3L22 4" />
-      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-    </svg>
-  ),
-  loginLog: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" />
-      <polyline points="10 17 15 12 10 7" />
-      <line x1="15" y1="12" x2="3" y2="12" />
-    </svg>
-  ),
-  reports: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <line x1="18" y1="20" x2="18" y2="10" />
-      <line x1="12" y1="20" x2="12" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
-      <line x1="2" y1="20" x2="22" y2="20" />
-    </svg>
-  ),
-  laptopReady: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 12l2 2 4-4" />
-      <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-      <line x1="12" y1="17" x2="12" y2="21" />
-    </svg>
-  ),
-  laptopMinus: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M12 9v4m0 4h.01" />
-      <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-      <line x1="12" y1="17" x2="12" y2="21" />
-    </svg>
-  ),
-  pendingOrders: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-      <rect x="9" y="3" width="6" height="4" rx="1" ry="1" />
-      <path d="M9 12h6M9 16h4" />
-    </svg>
-  ),
-  users: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 00-3-3.87" />
-      <path d="M16 3.13a4 4 0 010 7.75" />
-    </svg>
-  ),
-  leaderboard: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 21h8" />
-      <path d="M12 17v4" />
-      <path d="M7 4h10l1 7H6l1-7z" />
-      <path d="M6 11v6a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-6" />
-    </svg>
-  ),
-  code: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <polyline points="16 18 22 12 16 6" />
-      <polyline points="8 6 2 12 8 18" />
-    </svg>
-  ),
-  serviceQueue: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
-    </svg>
-  ),
-  serviceDone: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  ),
-  serviceHistory: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M3 3v5h5" />
-      <path d="M3.05 13A9 9 0 1021 12a9 9 0 00-8.83 7.5" />
-    </svg>
-  ),
-  pklReport: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <path d="M9 13h6M9 17h4M9 9h1" />
-    </svg>
-  ),
-  accessories: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
-      <path d="M8 12h.01M12 12h.01M16 12h.01" />
-    </svg>
-  ),
-  barang: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-      <line x1="12" y1="22.08" x2="12" y2="12" />
-    </svg>
-  ),
-  allUnits: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M12 2 2 7l10 5 10-5-10-5z" />
-      <path d="M2 17l10 5 10-5" />
-      <path d="M2 12l10 5 10-5" />
-    </svg>
-  ),
-  monitorChat: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-    </svg>
-  ),
-  cashflow: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <line x1="12" y1="1" x2="12" y2="23" />
-      <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-    </svg>
-  ),
-  managementSeller: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3z" />
-      <path d="M8 11c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3z" />
-      <path d="M8 13c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-      <path d="M16 13c-.29 0-.62.02-.97.05C16.19 13.89 17 15.02 17 16.35V19h7v-2c0-2.66-5.33-4-8-4z" />
-    </svg>
-  ),
-  deliveryRoute: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <circle cx="6" cy="19" r="2" />
-      <circle cx="18" cy="5" r="2" />
-      <path d="M8 19h7a3 3 0 003-3v-6M16 5H9a3 3 0 00-3 3v6" />
-    </svg>
-  ),
-  missions: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 11l3 3L22 4" />
-      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-    </svg>
-  ),
-  ccReport: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M23 7l-7 5 7 5V7z" />
-      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-    </svg>
-  ),
-  missionDashboard: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  ),
-  missionProgress: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-    </svg>
-  ),
-  missionHistory: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M3 3v5h5" />
-      <path d="M3.05 13A9 9 0 1 0 21 12a9 9 0 0 0-8.83 7.5" />
-      <polyline points="12 8 12 12 15 14" />
-    </svg>
-  ),
-  customerBirthday: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M20 21v-2a4 4 0 00-3-3.87M4 21v-2a4 4 0 013-3.87" />
-      <path d="M16 3.13a4 4 0 010 7.75M8 3.13a4 4 0 000 7.75" />
-      <path d="M12 17v4M10 21h4" />
-    </svg>
-  ),
-  missionAll: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M3 9l9-6 9 6-9 6-9-6z" />
-      <path d="M3 15l9 6 9-6" />
-      <path d="M3 12l9 6 9-6" />
-    </svg>
-  ),
-  todo: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M9 11l3 3L22 4" />
-      <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-    </svg>
-  ),
-  accounting: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" />
-      <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
-    </svg>
-  ),
-  monitoringCeo: (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  ),
+  dashboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>),
+  attendance: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2" /></svg>),
+  overtime: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>),
+  riwayat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>),
+  laptop: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>),
+  garansi: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>),
+  payment: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>),
+  scanner: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M4 7V5a1 1 0 011-1h2" /><path d="M20 7V5a1 1 0 00-1-1h-2" /><path d="M4 17v2a1 1 0 001 1h2" /><path d="M20 17v2a1 1 0 01-1 1h-2" /><path d="M7 12h10" /></svg>),
+  logout: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>),
+  log: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>),
+  loginLog: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" /></svg>),
+  reports: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" /></svg>),
+  laptopReady: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 12l2 2 4-4" /><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>),
+  laptopMinus: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 9v4m0 4h.01" /><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>),
+  pendingOrders: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" ry="1" /><path d="M9 12h6M9 16h4" /></svg>),
+  users: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>),
+  leaderboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8" /><path d="M12 17v4" /><path d="M7 4h10l1 7H6l1-7z" /><path d="M6 11v6a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-6" /></svg>),
+  code: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></svg>),
+  serviceQueue: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" /></svg>),
+  serviceDone: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="20 6 9 17 4 12" /></svg>),
+  serviceHistory: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1021 12a9 9 0 00-8.83 7.5" /></svg>),
+  pklReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><path d="M9 13h6M9 17h4M9 9h1" /></svg>),
+  accessories: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" /><path d="M8 12h.01M12 12h.01M16 12h.01" /></svg>),
+  barang: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg>),
+  allUnits: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 2 2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg>),
+  monitorChat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>),
+  cashflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>),
+  managementSeller: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3z" /><path d="M8 11c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3z" /><path d="M8 13c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /><path d="M16 13c-.29 0-.62.02-.97.05C16.19 13.89 17 15.02 17 16.35V19h7v-2c0-2.66-5.33-4-8-4z" /></svg>),
+  deliveryRoute: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" /><path d="M8 19h7a3 3 0 003-3v-6M16 5H9a3 3 0 00-3 3v6" /></svg>),
+  missions: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>),
+  ccReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>),
+  missionDashboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></svg>),
+  missionProgress: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>),
+  missionHistory: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1 0 21 12a9 9 0 0 0-8.83 7.5" /><polyline points="12 8 12 12 15 14" /></svg>),
+  customerBirthday: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M20 21v-2a4 4 0 00-3-3.87M4 21v-2a4 4 0 013-3.87" /><path d="M16 3.13a4 4 0 010 7.75M8 3.13a4 4 0 000 7.75" /><path d="M12 17v4M10 21h4" /></svg>),
+  missionAll: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 9l9-6 9 6-9 6-9-6z" /><path d="M3 15l9 6 9-6" /><path d="M3 12l9 6 9-6" /></svg>),
+  todo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>),
+  accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" /><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" /></svg>),
+  monitoringCeo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -378,61 +153,24 @@ const ITEM_CASHFLOW: MenuItem = { name: "Cashflow", href: "/dashboard/cashflow",
 const ITEM_CC_REPORT: MenuItem = { name: "Laporan Konten (CC)", href: "/dashboard/cc-reports", icon: Icons.ccReport };
 const ITEM_CUSTOMER_BIRTHDAY: MenuItem = { name: "Ultah Customer", href: "/dashboard/customer-birthdays", icon: Icons.customerBirthday };
 const ITEM_TODOS: MenuItem = { name: "To-Do List", href: "/dashboard/todos", icon: Icons.todo };
-const ITEM_AKUNTANSI: MenuItem = {
-  name: "Akuntansi",
-  href: "/dashboard/akutansi",
-  icon: Icons.accounting,
-};
+const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 
-const ITEM_MONITORING_CEO_ABSENSI: MenuItem = {
-  name: "Absensi",
-  href: "/dashboard/monitoring-ceo/absensi",
-  icon: Icons.monitoringCeo,
-};
-
-const ITEM_MONITORING_CEO_OVERTIME: MenuItem = {
-  name: "Monitor Lembur",
-  href: "/dashboard/monitoring-ceo/overtime",
-  icon: Icons.overtime,
-};
-
-const ITEM_MONITORING_CEO_PENYEDIA: MenuItem = {
-  name: "Penyedia Barang",
-  href: "/dashboard/riwayat-penyedia",
-  icon: Icons.barang,
-};
-const ITEM_MONITORING_CEO_SERVIS: MenuItem = {
-  name: "Service",
-  href: "/dashboard/service/statistik",
-  icon: Icons.serviceQueue,
-};
+const ITEM_MONITORING_CEO_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/monitoring-ceo/absensi", icon: Icons.monitoringCeo };
+const ITEM_MONITORING_CEO_OVERTIME: MenuItem = { name: "Monitor Lembur", href: "/dashboard/monitoring-ceo/overtime", icon: Icons.overtime };
+const ITEM_MONITORING_CEO_PENYEDIA: MenuItem = { name: "Penyedia Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.barang };
+const ITEM_MONITORING_CEO_SERVIS: MenuItem = { name: "Service", href: "/dashboard/service/statistik", icon: Icons.serviceQueue };
+const ITEM_MONITORING_CEO_PENGANTARAN: MenuItem = { name: "Pengantaran", href: "/dashboard/monitoring-ceo/pengantaran", icon: Icons.deliveryRoute };
 
 const MONITORING_CEO_MENU: MenuGroup = {
   label: "Monitoring CEO",
-  items: [ITEM_MONITORING_CEO_ABSENSI, ITEM_MONITORING_CEO_OVERTIME, ITEM_MONITORING_CEO_PENYEDIA, ITEM_MONITORING_CEO_SERVIS],
+  items: [ITEM_MONITORING_CEO_ABSENSI, ITEM_MONITORING_CEO_OVERTIME, ITEM_MONITORING_CEO_PENYEDIA, ITEM_MONITORING_CEO_SERVIS, ITEM_MONITORING_CEO_PENGANTARAN],
 };
+
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
-// ── Item gabungan Data Barang (laptop + aksesoris) ────────────────────────────
-const ITEM_DATA_BARANG: MenuItem = {
-  name: "Data Barang",
-  href: "/dashboard/data-barang?tab=laptops",
-  icon: Icons.barang,
-};
-
-// ── Item Laptop Siap Jual & Minus sebagai sidebar item standalone ─────────────
-const ITEM_LAPTOP_SIAP_JUAL: MenuItem = {
-  name: "Laptop Siap Jual",
-  href: "/dashboard/laptops/ready",
-  icon: Icons.laptopReady,
-};
-
-const ITEM_LAPTOP_MINUS: MenuItem = {
-  name: "Laptop Minus",
-  href: "/dashboard/laptops/minus",
-  icon: Icons.laptopMinus,
-};
-
+const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang?tab=laptops", icon: Icons.barang };
+const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
+const ITEM_LAPTOP_MINUS: MenuItem = { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LEADERBOARD_PEKERJAAN: MenuItem = { name: "Leaderboard Pekerjaan", href: "/dashboard/missions/leaderboard", icon: Icons.leaderboard };
 
 const MISSIONS_MENU: MenuGroup = {
@@ -445,12 +183,7 @@ const MISSIONS_MENU: MenuGroup = {
 };
 
 const MISSION_FULL_ACCESS_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
-
-const ITEM_MISSION_ALL: MenuItem = {
-  name: "Semua Misi",
-  href: "/dashboard/missions/all",
-  icon: Icons.missionAll,
-};
+const ITEM_MISSION_ALL: MenuItem = { name: "Semua Misi", href: "/dashboard/missions/all", icon: Icons.missionAll };
 
 const PREPARATION_PENYEDIA_MENU: MenuGroup = {
   label: "Penyiapan Barang",
@@ -511,43 +244,30 @@ const ADMIN_PENGANTARAN_MENU: MenuGroup = {
   ],
 };
 
-// ── Shared group builders ─────────────────────────────────────────────────────
-
 const ADMIN_OVERVIEW: MenuGroup = {
   label: "Overview",
   items: [
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-    ITEM_ABSENSI,
-    ITEM_LEMBUR,
-    ITEM_PKL_REPORT,
-    ITEM_MISSIONS,
+    ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT, ITEM_MISSIONS,
     { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
     { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
     { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
     { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
-    ITEM_AKUNTANSI, //  NEW
+    ITEM_AKUNTANSI,
     { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
     { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
-    ITEM_CUSTOMER_BIRTHDAY,
-    ITEM_CC_REPORT,
-    ITEM_LEADERBOARD_PEKERJAAN,
-    ITEM_TODOS,
+    ITEM_CUSTOMER_BIRTHDAY, ITEM_CC_REPORT, ITEM_LEADERBOARD_PEKERJAAN, ITEM_TODOS,
   ],
 };
 
-// ── ADMIN_INVENTARIS: Data Barang (laptop+aksesoris) + Siap Jual + Minus + Garansi + Semua Unit
 const ADMIN_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
-    ITEM_DATA_BARANG,
-    ITEM_LAPTOP_SIAP_JUAL,
-    ITEM_LAPTOP_MINUS,
-    ITEM_ALL_UNITS,
+    ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_ALL_UNITS,
     { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
   ],
 };
 
-// PERUBAHAN: ITEM_CC_REPORT dihapus dari sini
 const ADMIN_TRANSAKSI: MenuGroup = {
   label: "Transaksi",
   items: [
@@ -573,22 +293,14 @@ const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
   label: "Overview",
   items: [
     { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-    ITEM_ABSENSI,
-    ITEM_LEMBUR,
-    ITEM_PKL_REPORT,
-    ITEM_MISSIONS,
-    ITEM_CUSTOMER_BIRTHDAY,
+    ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT, ITEM_MISSIONS, ITEM_CUSTOMER_BIRTHDAY,
     ...extra,
   ],
 });
 
 const SALES_INVENTARIS: MenuGroup = {
   label: "Inventaris",
-  items: [
-    ITEM_DATA_BARANG,
-    ITEM_LAPTOP_SIAP_JUAL,
-    { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
-  ],
+  items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi }],
 };
 
 const SALES_TRANSAKSI: MenuGroup = {
@@ -612,41 +324,20 @@ const PENGANTARAN_TRANSAKSI: MenuGroup = {
   ],
 };
 
-// ── PKL menus — TIDAK ada ITEM_MISSIONS ──────────────────────────────────────
 const PKL_INVENTARIS_BASIC: MenuGroup = {
   label: "Inventaris",
   items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
 };
 
 const PKL_MENU: MenuGroup[] = [
-  {
-    label: "Overview",
-    items: [
-      { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-      ITEM_ABSENSI,
-      ITEM_PKL_REPORT,
-    ],
-  },
+  { label: "Overview", items: [{ name: "Dashboard", href: "/dashboard", icon: Icons.dashboard }, ITEM_ABSENSI, ITEM_PKL_REPORT] },
   PKL_INVENTARIS_BASIC,
-  {
-    label: "Transaksi",
-    items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }],
-  },
-  {
-    label: "Tools",
-    items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }],
-  },
+  { label: "Transaksi", items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }] },
+  { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
 ];
 
 const PKL_SALES_MENU: MenuGroup[] = [
-  {
-    label: "Overview",
-    items: [
-      { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-      ITEM_ABSENSI,
-      ITEM_PKL_REPORT,
-    ],
-  },
+  { label: "Overview", items: [{ name: "Dashboard", href: "/dashboard", icon: Icons.dashboard }, ITEM_ABSENSI, ITEM_PKL_REPORT] },
   PKL_INVENTARIS_BASIC,
   {
     label: "Transaksi",
@@ -656,78 +347,42 @@ const PKL_SALES_MENU: MenuGroup[] = [
       { name: "Scanner", href: "/scan", icon: Icons.scanner },
     ],
   },
-  PREPARATION_SALES_MENU,
-  PREPARATION_PENYEDIA_MENU,
-  PREPARATION_SALES_DELIVERY_MENU,
+  PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
 ];
 
 const PKL_PENYEDIA_MENU: MenuGroup[] = [
-  {
-    label: "Overview",
-    items: [
-      { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-      ITEM_ABSENSI,
-      ITEM_PKL_REPORT,
-    ],
-  },
+  { label: "Overview", items: [{ name: "Dashboard", href: "/dashboard", icon: Icons.dashboard }, ITEM_ABSENSI, ITEM_PKL_REPORT] },
   PKL_INVENTARIS_BASIC,
   PREPARATION_PENYEDIA_MENU,
-  {
-    label: "Transaksi",
-    items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }],
-  },
-  {
-    label: "Tools",
-    items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }],
-  },
+  { label: "Transaksi", items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }] },
+  { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
 ];
 
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
-  ADMIN: [
-    MONITORING_CEO_MENU,        // ← dipindah ke paling atas
-    ADMIN_OVERVIEW,
-    ADMIN_INVENTARIS,
-    ADMIN_TRANSAKSI,
-    ADMIN_PENYEDIA_MENU,
-    ADMIN_PENGANTARAN_MENU,
-    SERVICE_MENU,
-  ],
+  ADMIN: [MONITORING_CEO_MENU, ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU],
 
   PROGRAMMER: [
-    MONITORING_CEO_MENU,        // ← dipindah ke paling atas
+    MONITORING_CEO_MENU,
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_PKL_REPORT,
-        ITEM_MISSIONS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT, ITEM_MISSIONS,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-        ITEM_CASHFLOW,
-        ITEM_AKUNTANSI,
+        ITEM_CASHFLOW, ITEM_AKUNTANSI,
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
-        ITEM_CC_REPORT,
-        ITEM_TODOS,
+        ITEM_CC_REPORT, ITEM_TODOS,
       ],
     },
-    ADMIN_INVENTARIS,
-    ADMIN_TRANSAKSI,
-    ADMIN_PENYEDIA_MENU,
-    ADMIN_PENGANTARAN_MENU,
-    SERVICE_MENU,
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
 
   KEPALA_ZENITH: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-    PREPARATION_PENYEDIA_MENU,
-    PREPARATION_SALES_DELIVERY_MENU,
+    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   ASISTEN_CEO: [
@@ -735,108 +390,64 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_PKL_REPORT,
-        ITEM_MISSIONS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT, ITEM_MISSIONS,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
-        ITEM_CC_REPORT, 
+        ITEM_CC_REPORT,
       ],
     },
-    ADMIN_INVENTARIS,
-    ADMIN_TRANSAKSI,
-    ADMIN_PENYEDIA_MENU,
-    ADMIN_PENGANTARAN_MENU,
-    SERVICE_MENU,
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
 
-  // ── SALES ──────────────────────────────────────────────────────────────────
   KEPALA_SALES: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-    PREPARATION_PENYEDIA_MENU,
-    PREPARATION_SALES_DELIVERY_MENU,
+    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   CREW_SALES: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-    PREPARATION_PENYEDIA_MENU,
-    PREPARATION_SALES_DELIVERY_MENU,
+    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   SOTECH: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-    PREPARATION_SALES_DELIVERY_MENU,
+    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   PENGANTARAN: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    PENGANTARAN_TRANSAKSI,
-    PREPARATION_PENGANTARAN_MENU,
+    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, PENGANTARAN_TRANSAKSI, PREPARATION_PENGANTARAN_MENU,
   ],
 
   KEPALA_ONPOINT: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-    PREPARATION_PENYEDIA_MENU,
-    PREPARATION_SALES_DELIVERY_MENU,
+    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   ONPOINT: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-    PREPARATION_SALES_DELIVERY_MENU,
+    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   KEPALA_SOTECH: [
-    SALES_OVERVIEW([ITEM_USERS]),
-    SALES_INVENTARIS,
-    SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU,
-    PREPARATION_PENYEDIA_MENU,
-    PREPARATION_SALES_DELIVERY_MENU,
+    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
-  // ── TEKNISI ────────────────────────────────────────────────────────────────
   TEKNISI: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
-        ITEM_MISSIONS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS,
       ],
     },
     {
       label: "Inventaris",
-      items: [
-        ITEM_DATA_BARANG,
-        { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
-        ITEM_LAPTOP_MINUS,
-      ],
+      items: [ITEM_DATA_BARANG, { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi }, ITEM_LAPTOP_MINUS],
     },
-    {
-      label: "Transaksi",
-      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
-    },
+    { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
     SERVICE_MENU,
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
@@ -846,20 +457,13 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
-        ITEM_PKL_REPORT,
-        ITEM_MISSIONS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT, ITEM_MISSIONS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        ITEM_DATA_BARANG,
-        ITEM_LAPTOP_SIAP_JUAL,
-        ITEM_LAPTOP_MINUS,
-        ITEM_ALL_UNITS,
+        ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_ALL_UNITS,
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
@@ -872,28 +476,20 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_PKL_REPORT,
-        ITEM_MISSIONS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT, ITEM_MISSIONS,
         { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
         { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
         { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
-        ITEM_AKUNTANSI, //  NEW
+        ITEM_AKUNTANSI,
         { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
         { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
         ITEM_CC_REPORT,
       ],
     },
-    ADMIN_INVENTARIS,
-    ADMIN_TRANSAKSI,
-    ADMIN_PENYEDIA_MENU,
-    ADMIN_PENGANTARAN_MENU,
-    SERVICE_MENU,
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
 
-  // ── PURCHASING ─────────────────────────────────────────────────────────────
   PURCHASING: [
     {
       label: "Overview",
@@ -901,9 +497,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         ITEM_ABSENSI, ITEM_LEMBUR,
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-        ITEM_CASHFLOW,
-        ITEM_USERS,
-        ITEM_MISSIONS,
+        ITEM_CASHFLOW, ITEM_USERS, ITEM_MISSIONS,
       ],
     },
     {
@@ -913,35 +507,20 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
-    {
-      label: "Transaksi",
-      items: [
-        { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
-      ],
-    },
+    { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
   ],
 
-  // ── PENGELOLA BARANG ───────────────────────────────────────────────────────
   PENGELOLA_BARANG: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
+        ITEM_ABSENSI, ITEM_LEMBUR,
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        ITEM_USERS,
-        ITEM_MISSIONS,
+        ITEM_USERS, ITEM_MISSIONS,
       ],
     },
-    {
-      label: "Inventaris",
-      items: [
-        ITEM_DATA_BARANG,
-        ITEM_LAPTOP_SIAP_JUAL,
-        ITEM_LAPTOP_MINUS,
-      ],
-    },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS] },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
@@ -950,56 +529,31 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
-        ITEM_PKL_REPORT,
-        ITEM_MISSIONS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT, ITEM_MISSIONS,
       ],
     },
     {
       label: "Inventaris",
       items: [
-        ITEM_DATA_BARANG,
-        ITEM_LAPTOP_SIAP_JUAL,
-        ITEM_LAPTOP_MINUS,
-        ITEM_ALL_UNITS,
+        ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_ALL_UNITS,
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
-    {
-      label: "Transaksi",
-      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
-    },
+    { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
-  // PERUBAHAN: hapus group "Konten" tersendiri, ITEM_CC_REPORT masuk Overview
   MARKETING: [
-    {
-      label: "Overview",
-      items: [
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
-        ITEM_MISSIONS,
-        ITEM_CC_REPORT, // ← dipindah ke Overview
-      ],
-    },
-    {
-      label: "Inventaris",
-      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
-    },
+    { label: "Overview", items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS, ITEM_CC_REPORT] },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
   ],
 
-  // PERUBAHAN: hapus group "Konten" tersendiri, ITEM_CC_REPORT masuk Overview via SALES_OVERVIEW
   KEPALA_MARKETING: [
-    SALES_OVERVIEW([ITEM_USERS, ITEM_CC_REPORT]), // ← ITEM_CC_REPORT masuk Overview
+    SALES_OVERVIEW([ITEM_USERS, ITEM_CC_REPORT]),
     {
       label: "Inventaris",
       items: [
-        ITEM_DATA_BARANG,
-        ITEM_LAPTOP_SIAP_JUAL,
+        ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL,
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
@@ -1011,51 +565,33 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
         { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
       ],
     },
-    PREPARATION_SALES_MENU,
-    PREPARATION_PENYEDIA_MENU,
-    PREPARATION_SALES_DELIVERY_MENU,
+    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
-  // ── KEBERSIHAN ─────────────────────────────────────────────────────────────
   KEBERSIHAN: [
     {
       label: "Overview",
       items: [
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
+        ITEM_ABSENSI, ITEM_LEMBUR,
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
         { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        ITEM_USERS,
-        ITEM_MISSIONS,
+        ITEM_USERS, ITEM_MISSIONS,
       ],
     },
-    {
-      label: "Inventaris",
-      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
-    },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
   ],
 
-  // ── PENYEDIA BARANG ────────────────────────────────────────────────────────
   PENYEDIA_BARANG: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
-        ITEM_MISSIONS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS,
       ],
     },
-    {
-      label: "Inventaris",
-      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
-    },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
     PREPARATION_PENYEDIA_MENU,
-    {
-      label: "Transaksi",
-      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
-    },
+    { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
   ],
 
   KEPALA_PENYEDIA_BARANG: [
@@ -1063,62 +599,29 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
-        ITEM_PKL_REPORT,
-        ITEM_MISSIONS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT, ITEM_MISSIONS,
       ],
     },
-    {
-      label: "Inventaris",
-      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
-    },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
     PREPARATION_PENYEDIA_MENU,
-    {
-      label: "Transaksi",
-      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
-    },
+    { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
   ],
 
-  // PERUBAHAN: hapus group "Konten" tersendiri, ITEM_CC_REPORT masuk Overview
   KONTEN: [
-    {
-      label: "Overview",
-      items: [
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
-        ITEM_MISSIONS,
-        ITEM_CC_REPORT, // ← dipindah ke Overview
-      ],
-    },
-    {
-      label: "Inventaris",
-      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
-    },
-    {
-      label: "Transaksi",
-      items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }],
-    },
+    { label: "Overview", items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS, ITEM_CC_REPORT] },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
+    { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
   ],
 
-  // ── CUSTOMER SERVICE ───────────────────────────────────────────────────────
   CUSTOMER_SERVICE: [
     {
       label: "Overview",
       items: [
         { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI,
-        ITEM_LEMBUR,
-        ITEM_USERS,
-        ITEM_MISSIONS,
+        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS,
       ],
     },
-    {
-      label: "Inventaris",
-      items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL],
-    },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
     {
       label: "Transaksi",
       items: [
@@ -1129,7 +632,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SERVICE_MENU,
   ],
 
-  // ── PKL — TIDAK ada ITEM_MISSIONS ─────────────────────────────────────────
   PKL: PKL_MENU,
   PKL_MARKETING: PKL_MENU,
   PKL_SALES: PKL_SALES_MENU,
@@ -1144,12 +646,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 };
 
 // ── Missions normalization pass ───────────────────────────────────────────────
-// Hapus semua item missions dari grup mana pun, lalu tambahkan grup Missions
-// tersendiri di akhir (kecuali role PKL).
-const MISSION_HREFS = new Set([
-  ...MISSIONS_MENU.items.map((i) => i.href),
-  ITEM_MISSION_ALL.href,
-]);
+const MISSION_HREFS = new Set([...MISSIONS_MENU.items.map((i) => i.href), ITEM_MISSION_ALL.href]);
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   ROLE_MENUS[role] = ROLE_MENUS[role]
@@ -1157,10 +654,7 @@ const MISSION_HREFS = new Set([
     .filter((g) => g.items.length > 0);
 
   if (!isPKLRole(role)) {
-    const missionsForRole: MenuGroup = {
-      label: MISSIONS_MENU.label,
-      items: [...MISSIONS_MENU.items],
-    };
+    const missionsForRole: MenuGroup = { label: MISSIONS_MENU.label, items: [...MISSIONS_MENU.items] };
     if (role !== "ADMIN") {
       missionsForRole.items = missionsForRole.items.filter((it) => it.href !== "/dashboard/missions/leaderboard");
     }
@@ -1191,10 +685,7 @@ const PKL_STRIP_HREFS = new Set<string>([
 ]);
 
 (Object.entries(PKL_MENU_INHERIT) as [UserRole, UserRole][]).forEach(([pklRole, parentRole]) => {
-  const inherited: MenuGroup[] = ROLE_MENUS[parentRole].map((g) => ({
-    label: g.label,
-    items: [...g.items],
-  }));
+  const inherited: MenuGroup[] = ROLE_MENUS[parentRole].map((g) => ({ label: g.label, items: [...g.items] }));
   const stripped = inherited
     .map((g) => ({ ...g, items: g.items.filter((it) => !PKL_STRIP_HREFS.has(it.href)) }))
     .filter((g) => g.items.length > 0);
@@ -1209,13 +700,7 @@ const PKL_STRIP_HREFS = new Set<string>([
 });
 
 // ── Konsolidasi item inventaris → satu "Data Barang" ─────────────────────────
-// Hanya meng-collapse /dashboard/laptops dan /dashboard/accessories.
-// /dashboard/laptops/ready dan /dashboard/laptops/minus TIDAK di-collapse
-// karena sudah menjadi ITEM_LAPTOP_SIAP_JUAL & ITEM_LAPTOP_MINUS yang terpisah.
-const DATA_BARANG_LEGACY_HREFS = new Set<string>([
-  "/dashboard/laptops",
-  "/dashboard/accessories",
-]);
+const DATA_BARANG_LEGACY_HREFS = new Set<string>(["/dashboard/laptops", "/dashboard/accessories"]);
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   ROLE_MENUS[role] = ROLE_MENUS[role]
@@ -1224,10 +709,7 @@ const DATA_BARANG_LEGACY_HREFS = new Set<string>([
       const items: MenuItem[] = [];
       for (const item of group.items) {
         if (DATA_BARANG_LEGACY_HREFS.has(item.href)) {
-          if (!inserted) {
-            items.push(ITEM_DATA_BARANG);
-            inserted = true;
-          }
+          if (!inserted) { items.push(ITEM_DATA_BARANG); inserted = true; }
           continue;
         }
         items.push(item);
@@ -1237,7 +719,6 @@ const DATA_BARANG_LEGACY_HREFS = new Set<string>([
     .filter((group) => group.items.length > 0);
 });
 
-// ── Role meta ─────────────────────────────────────────────────────────────────
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
   KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
@@ -1273,33 +754,22 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL_PENGANTARAN: { label: "PKL Pengantaran", className: "bg-amber-50 text-amber-700" },
   PKL_CUSTOMER_SERVICE: { label: "PKL Customer Service", className: "bg-amber-50 text-amber-700" },
   PKL_PENGELOLA_BARANG: { label: "PKL Pengelola Barang", className: "bg-amber-50 text-amber-700" },
-  KEPALA_ZENITH: { label: "Kepala Zenith", className: "bg-purple-50 text-purple-700" },   // ← NEW
-
+  KEPALA_ZENITH: { label: "Kepala Zenith", className: "bg-purple-50 text-purple-700" },
 };
 
 function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
+  return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 }
 
 function RoleBadges({ user }: { user: any }) {
-  const roles: string[] =
-    user?.roles?.length > 0 ? user.roles : [user?.role].filter(Boolean);
+  const roles: string[] = user?.roles?.length > 0 ? user.roles : [user?.role].filter(Boolean);
   if (roles.length === 0) return null;
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">
       {roles.map((role) => {
         const meta = ROLE_META[role as UserRole];
         return (
-          <span
-            key={role}
-            className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-gray-50 text-gray-700"
-              }`}
-          >
+          <span key={role} className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-gray-50 text-gray-700"}`}>
             {meta?.label ?? role}
           </span>
         );
@@ -1308,60 +778,25 @@ function RoleBadges({ user }: { user: any }) {
   );
 }
 
-function NavItem({
-  item,
-  isActive,
-  onClick,
-  badge,
-  rail,
-}: {
-  item: MenuItem;
-  isActive: boolean;
-  onClick?: () => void;
-  badge?: number;
-  rail?: boolean;
-}) {
+function NavItem({ item, isActive, onClick, badge, rail }: { item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number; rail?: boolean; }) {
   return (
     <Link
       href={item.href}
       onClick={onClick}
       title={rail ? item.name : undefined}
-      className={`group relative flex items-center rounded-xl text-sm font-medium outline-none
-        transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30
-        ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2 hover:translate-x-0.5"}
-        ${isActive
-          ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20"
-          : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-        }`}
+      className={`group relative flex items-center rounded-xl text-sm font-medium outline-none transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2 hover:translate-x-0.5"} ${isActive ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20" : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"}`}
     >
       {!rail && (
-        <span
-          className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-white
-            transition-all duration-300 ease-out ${isActive ? "h-5 opacity-90" : "h-0 opacity-0"
-            }`}
-        />
+        <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-white transition-all duration-300 ease-out ${isActive ? "h-5 opacity-90" : "h-0 opacity-0"}`} />
       )}
-      <span
-        className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110
-          ${isActive
-            ? rail
-              ? "text-white"
-              : "text-white/80"
-            : "text-gray-400 group-hover:text-gray-600"
-          }`}
-      >
+      <span className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? (rail ? "text-white" : "text-white/80") : "text-gray-400 group-hover:text-gray-600"}`}>
         {item.icon}
       </span>
       {!rail && <span className="flex-1 truncate">{item.name}</span>}
       {badge && badge > 0 ? (
         <span
           style={{ animation: "solitBadgePop 0.3s ease-out both" }}
-          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums
-            ${rail ? "absolute top-0.5 right-1" : "ml-auto"}
-            ${isActive
-              ? "bg-white text-[#1a1a2e]"
-              : "bg-red-500 text-white shadow-sm shadow-red-500/40"
-            }`}
+          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${rail ? "absolute top-0.5 right-1" : "ml-auto"} ${isActive ? "bg-white text-[#1a1a2e]" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
         >
           {badge > 99 ? "99+" : badge}
         </span>
@@ -1371,29 +806,12 @@ function NavItem({
 }
 
 function SidebarContent({
-  user,
-  loading,
-  groups,
-  pathname,
-  onClose,
-  onLogout,
-  badges,
-  rail,
-  onToggleRail,
-  openMap,
-  onToggleGroup,
+  user, loading, groups, pathname, onClose, onLogout, badges, rail, onToggleRail, openMap, onToggleGroup,
 }: {
-  user: any;
-  loading: boolean;
-  groups: MenuGroup[];
-  pathname: string;
-  onClose?: () => void;
-  onLogout: () => void;
-  badges?: Record<string, number>;
-  rail?: boolean;
-  onToggleRail?: () => void;
-  openMap: Record<string, boolean>;
-  onToggleGroup: (label: string) => void;
+  user: any; loading: boolean; groups: MenuGroup[]; pathname: string;
+  onClose?: () => void; onLogout: () => void; badges?: Record<string, number>;
+  rail?: boolean; onToggleRail?: () => void;
+  openMap: Record<string, boolean>; onToggleGroup: (label: string) => void;
 }) {
   const initials = user?.name ? getInitials(user.name) : "?";
   const navRef = useRef<HTMLElement>(null);
@@ -1404,10 +822,7 @@ function SidebarContent({
     const el = navRef.current;
     if (!el) return;
     const saved = sessionStorage.getItem(scrollKey);
-    if (saved)
-      requestAnimationFrame(() => {
-        el.scrollTop = parseInt(saved, 10);
-      });
+    if (saved) requestAnimationFrame(() => { el.scrollTop = parseInt(saved, 10); });
   }, [loading, scrollKey]);
 
   const handleNavScroll = useCallback(() => {
@@ -1417,59 +832,25 @@ function SidebarContent({
 
   return (
     <div className="flex flex-col h-full overflow-hidden select-none">
-      {/* ── Logo + User ── */}
       <div className={`pt-5 pb-4 flex-shrink-0 ${rail ? "px-2" : "px-4"}`}>
         <div className={`flex items-center mb-5 ${rail ? "justify-center" : "justify-between"}`}>
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-[#1a1a2e]">
-              <img
-                src="/assets/solit03.jpeg"
-                alt="Solit"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
+              <img src="/assets/solit03.jpeg" alt="Solit" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
-            {!rail && (
-              <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>
-            )}
+            {!rail && <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>}
           </div>
           {onToggleRail && (
-            <button
-              onClick={onToggleRail}
-              className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition ${rail ? "mx-auto mt-2" : ""}`}
-              title={rail ? "Perbesar sidebar" : "Perkecil sidebar"}
-              aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.4"
-                style={{ transform: rail ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}
-              >
+            <button onClick={onToggleRail} className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition ${rail ? "mx-auto mt-2" : ""}`} title={rail ? "Perbesar sidebar" : "Perkecil sidebar"} aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" style={{ transform: rail ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
                 <polyline points="11 17 6 12 11 7" />
                 <polyline points="18 17 13 12 18 7" />
               </svg>
             </button>
           )}
           {onClose && (
-            <button
-              onClick={onClose}
-              className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
-              aria-label="Tutup sidebar"
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
+            <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition" aria-label="Tutup sidebar">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -1489,18 +870,13 @@ function SidebarContent({
           </div>
         ) : rail ? (
           <div className="flex justify-center">
-            <div
-              className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold"
-              title={user?.name || ""}
-            >
+            <div className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold" title={user?.name || ""}>
               {initials}
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-              {initials}
-            </div>
+            <div className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{initials}</div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-800 truncate">{user?.name || "—"}</p>
               <RoleBadges user={user} />
@@ -1509,40 +885,20 @@ function SidebarContent({
         )}
       </div>
 
-
-
       <div className={`h-px bg-gray-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
 
-      {/* ── Nav ── */}
-      <nav
-        ref={navRef}
-        onScroll={handleNavScroll}
-        className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${rail ? "px-2 space-y-1" : "px-3 space-y-2"
-          }`}
-        style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}
-      >
+      <nav ref={navRef} onScroll={handleNavScroll} className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${rail ? "px-2 space-y-1" : "px-3 space-y-2"}`} style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
         {loading ? (
           <div className="space-y-1 pt-1">
             {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1"
-                style={{ animationDelay: `${i * 40}ms` }}
-              />
+              <div key={i} className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1" style={{ animationDelay: `${i * 40}ms` }} />
             ))}
           </div>
         ) : rail ? (
           groups.map((group, gi) => (
             <div key={group.label} className="space-y-0.5">
               {group.items.map((item) => (
-                <NavItem
-                  key={item.href}
-                  item={item}
-                  isActive={isItemActive(item.href, pathname)}
-                  onClick={onClose}
-                  badge={badges?.[item.href]}
-                  rail
-                />
+                <NavItem key={item.href} item={item} isActive={isItemActive(item.href, pathname)} onClick={onClose} badge={badges?.[item.href]} rail />
               ))}
               {gi < groups.length - 1 && <div className="mx-2 my-1.5 h-px bg-gray-100" />}
             </div>
@@ -1552,61 +908,21 @@ function SidebarContent({
             const isOpen = openMap[group.label] ?? true;
             const hasActive = group.items.some((it) => isItemActive(it.href, pathname));
             return (
-              <div
-                key={group.label}
-                style={{
-                  animation: "solitGroupIn 0.3s ease-out both",
-                  animationDelay: `${gi * 50}ms`,
-                }}
-              >
-                <button
-                  onClick={() => onToggleGroup(group.label)}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition group/cat"
-                >
-                  <span
-                    className={`text-[10px] font-bold uppercase tracking-[0.07em] flex-1 text-left truncate
-                    ${hasActive
-                        ? "text-[#1a1a2e]"
-                        : "text-gray-400 group-hover/cat:text-gray-600"
-                      }`}
-                  >
+              <div key={group.label} style={{ animation: "solitGroupIn 0.3s ease-out both", animationDelay: `${gi * 50}ms` }}>
+                <button onClick={() => onToggleGroup(group.label)} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition group/cat">
+                  <span className={`text-[10px] font-bold uppercase tracking-[0.07em] flex-1 text-left truncate ${hasActive ? "text-[#1a1a2e]" : "text-gray-400 group-hover/cat:text-gray-600"}`}>
                     {group.label}
                   </span>
-                  {hasActive && !isOpen && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse" />
-                  )}
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    className="text-gray-300 group-hover/cat:text-gray-500 flex-shrink-0"
-                    style={{
-                      transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
-                      transition: "transform .25s ease",
-                    }}
-                  >
+                  {hasActive && !isOpen && <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse" />}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-300 group-hover/cat:text-gray-500 flex-shrink-0" style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .25s ease" }}>
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 </button>
-                <div
-                  className={`grid transition-all duration-300 ease-out ${isOpen
-                    ? "grid-rows-[1fr] opacity-100 mt-0.5"
-                    : "grid-rows-[0fr] opacity-0"
-                    }`}
-                >
+                <div className={`grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 mt-0.5" : "grid-rows-[0fr] opacity-0"}`}>
                   <div className="overflow-hidden min-h-0">
                     <div className="space-y-0.5">
                       {group.items.map((item) => (
-                        <NavItem
-                          key={item.href}
-                          item={item}
-                          isActive={isItemActive(item.href, pathname)}
-                          onClick={onClose}
-                          badge={badges?.[item.href]}
-                        />
+                        <NavItem key={item.href} item={item} isActive={isItemActive(item.href, pathname)} onClick={onClose} badge={badges?.[item.href]} />
                       ))}
                     </div>
                   </div>
@@ -1617,14 +933,8 @@ function SidebarContent({
         )}
       </nav>
 
-      {/* ── Logout ── */}
       <div className={`pb-5 border-t border-gray-100 flex-shrink-0 ${rail ? "p-2" : "p-3"}`}>
-        <button
-          onClick={onLogout}
-          title={rail ? "Keluar" : undefined}
-          className={`w-full group flex items-center rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all
-            ${rail ? "justify-center py-2.5" : "gap-3 px-3 py-2"}`}
-        >
+        <button onClick={onLogout} title={rail ? "Keluar" : undefined} className={`w-full group flex items-center rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all ${rail ? "justify-center py-2.5" : "gap-3 px-3 py-2"}`}>
           <span className="flex-shrink-0 group-hover:text-red-500">{Icons.logout}</span>
           {!rail && <span>Keluar</span>}
         </button>
@@ -1666,37 +976,27 @@ export default function Sidebar() {
     if (!user?.id) return;
     fetch("/api/me/menu")
       .then((r) => r.json())
-      .then((d) => {
-        if (d.success) setDynamicGroups(d.groups);
-      })
+      .then((d) => { if (d.success) setDynamicGroups(d.groups); })
       .catch(() => { });
   }, [user?.id]);
 
   const [rail, setRail] = useState(false);
   const [width, setWidth] = useState(DEFAULT_W);
   const [dragging, setDragging] = useState(false);
-  // Transisi width baru diaktifkan setelah state tersimpan (localStorage) diterapkan,
-  // supaya loncatan awal saat load tidak ikut ke-animasi (bikin flash/kacau).
   const [hydrated, setHydrated] = useState(false);
   const widthRef = useRef(DEFAULT_W);
-  useEffect(() => {
-    widthRef.current = width;
-  }, [width]);
+  useEffect(() => { widthRef.current = width; }, [width]);
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const cached = getCachedUser();
-    if (cached) {
-      setUser(cached);
-      setLoading(false);
-    }
+    if (cached) { setUser(cached); setLoading(false); }
     try {
       setRail(localStorage.getItem(RAIL_KEY) === "1");
       const w = parseInt(localStorage.getItem(WIDTH_KEY) || "", 10);
       if (!Number.isNaN(w)) setWidth(Math.min(MAX_W, Math.max(MIN_W, w)));
     } catch { }
-    // Aktifkan transisi di frame berikutnya, setelah lebar tersimpan diterapkan tanpa animasi.
     const raf = requestAnimationFrame(() => setHydrated(true));
     return () => cancelAnimationFrame(raf);
   }, []);
@@ -1707,25 +1007,17 @@ export default function Sidebar() {
     const fetchUser = async () => {
       try {
         const res = await fetch("/api/auth/me");
-        if (!res.ok) {
-          window.location.href = "/login";
-          return;
-        }
+        if (!res.ok) { window.location.href = "/login"; return; }
         const result = await res.json();
         const fresh = result.user ?? null;
         setUser(fresh);
         setCachedUser(fresh);
-      } catch { }
-      finally {
-        setLoading(false);
-      }
+      } catch { } finally { setLoading(false); }
     };
     fetchUser();
   }, []);
 
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  useEffect(() => { setOpen(false); }, [pathname]);
 
   const handleLogout = async () => {
     sessionStorage.removeItem(CACHE_KEY);
@@ -1736,19 +1028,14 @@ export default function Sidebar() {
   const userRoles: string[] =
     Array.isArray(user?.roles) && user.roles.length > 0
       ? user.roles
-      : user?.role
-        ? [user.role]
-        : [];
+      : user?.role ? [user.role] : [];
 
   const effectiveRoles = expandRolesWithParents(userRoles);
 
   const staticGroups: MenuGroup[] =
     effectiveRoles.length > 0
-      ? dedupeGroups(
-        mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles)
-      )
+      ? dedupeGroups(mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles))
       : [];
-
 
   const groups: MenuGroup[] = dedupeGroups([
     ...staticGroups,
@@ -1763,9 +1050,7 @@ export default function Sidebar() {
   useEffect(() => {
     if (groups.length === 0) return;
     let saved: Record<string, boolean> | null = null;
-    try {
-      saved = JSON.parse(sessionStorage.getItem(GROUPS_KEY) || "null");
-    } catch { }
+    try { saved = JSON.parse(sessionStorage.getItem(GROUPS_KEY) || "null"); } catch { }
     setOpenMap(() => {
       const next: Record<string, boolean> = {};
       for (const g of groups) {
@@ -1780,22 +1065,16 @@ export default function Sidebar() {
   }, [groupsSig]);
 
   useEffect(() => {
-    const active = groups.find((g) =>
-      g.items.some((it) => isItemActive(it.href, pathname))
-    );
+    const active = groups.find((g) => g.items.some((it) => isItemActive(it.href, pathname)));
     if (!active) return;
-    setOpenMap((prev) =>
-      prev[active.label] ? prev : { ...prev, [active.label]: true }
-    );
+    setOpenMap((prev) => prev[active.label] ? prev : { ...prev, [active.label]: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, groupsSig]);
 
   const toggleGroup = useCallback((label: string) => {
     setOpenMap((prev) => {
       const next = { ...prev, [label]: !(prev[label] ?? true) };
-      try {
-        sessionStorage.setItem(GROUPS_KEY, JSON.stringify(next));
-      } catch { }
+      try { sessionStorage.setItem(GROUPS_KEY, JSON.stringify(next)); } catch { }
       return next;
     });
   }, []);
@@ -1803,9 +1082,7 @@ export default function Sidebar() {
   const toggleRail = useCallback(() => {
     setRail((v) => {
       const n = !v;
-      try {
-        localStorage.setItem(RAIL_KEY, n ? "1" : "0");
-      } catch { }
+      try { localStorage.setItem(RAIL_KEY, n ? "1" : "0"); } catch { }
       return n;
     });
   }, []);
@@ -1825,9 +1102,7 @@ export default function Sidebar() {
       setDragging(false);
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
-      try {
-        localStorage.setItem(WIDTH_KEY, String(widthRef.current));
-      } catch { }
+      try { localStorage.setItem(WIDTH_KEY, String(widthRef.current)); } catch { }
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -1838,10 +1113,7 @@ export default function Sidebar() {
   const prep = usePrepNotify(userRoles, user?.id);
 
   useEffect(() => {
-    const unlock = () => {
-      unlockAudio();
-      window.removeEventListener("pointerdown", unlock);
-    };
+    const unlock = () => { unlockAudio(); window.removeEventListener("pointerdown", unlock); };
     window.addEventListener("pointerdown", unlock);
     return () => window.removeEventListener("pointerdown", unlock);
   }, []);
@@ -1849,16 +1121,8 @@ export default function Sidebar() {
   const onAntrian = pathname.startsWith("/dashboard/preparation/antrian");
   const onSiapKirim = pathname.startsWith("/dashboard/preparation/siap-kirim");
 
-  usePrepAlarm(
-    onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })),
-    ALARM_KEYS.MENUNGGU,
-    true
-  );
-  usePrepAlarm(
-    onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })),
-    ALARM_KEYS.SIAP_KIRIM,
-    true
-  );
+  usePrepAlarm(onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, true);
+  usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true);
 
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
   const badges: Record<string, number> = {
@@ -1868,122 +1132,53 @@ export default function Sidebar() {
   };
 
   const sharedContentProps = {
-    user,
-    loading,
-    groups,
-    pathname,
-    onLogout: handleLogout,
-    badges,
-    openMap,
-    onToggleGroup: toggleGroup,
+    user, loading, groups, pathname,
+    onLogout: handleLogout, badges, openMap, onToggleGroup: toggleGroup,
   };
 
   return (
     <>
       <style>{`
-        @keyframes solitNavIn {
-          from { opacity: 0; transform: translateX(-8px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes solitGroupIn {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes solitBadgePop {
-          0%   { transform: scale(0.6); opacity: 0; }
-          60%  { transform: scale(1.15); }
-          100% { transform: scale(1); opacity: 1; }
-        }
+        @keyframes solitNavIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes solitGroupIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes solitBadgePop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
       `}</style>
 
-      {/* ── Alarm banners ── */}
       {!onAntrian && prep.menungguUnacked.length > 0 && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
-          <button
-            onClick={() => {
-              prep.ackMenunggu(prep.menungguUnacked);
-              router.push("/dashboard/preparation/antrian");
-            }}
-            className="w-full bg-red-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
-          >
+          <button onClick={() => { prep.ackMenunggu(prep.menungguUnacked); router.push("/dashboard/preparation/antrian"); }} className="w-full bg-red-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">
-              {prep.menungguUnacked.length} penyiapan baru — buka antrian
-            </span>
+            <span className="text-sm font-black">{prep.menungguUnacked.length} penyiapan baru — buka antrian</span>
           </button>
         </div>
       )}
       {!onSiapKirim && prep.siapKirimUnacked.length > 0 && (
-        <div
-          className="fixed left-1/2 -translate-x-1/2 z-[59] w-full max-w-sm px-2"
-          style={{ top: !onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12 }}
-        >
-          <button
-            onClick={() => {
-              prep.ackSiapKirim(prep.siapKirimUnacked);
-              router.push("/dashboard/preparation/siap-kirim");
-            }}
-            className="w-full bg-orange-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-orange-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition"
-          >
+        <div className="fixed left-1/2 -translate-x-1/2 z-[59] w-full max-w-sm px-2" style={{ top: !onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12 }}>
+          <button onClick={() => { prep.ackSiapKirim(prep.siapKirimUnacked); router.push("/dashboard/preparation/siap-kirim"); }} className="w-full bg-orange-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-orange-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">
-              {prep.siapKirimUnacked.length} barang siap — pilih pengiriman
-            </span>
+            <span className="text-sm font-black">{prep.siapKirimUnacked.length} barang siap — pilih pengiriman</span>
           </button>
         </div>
       )}
 
-      {/* ── Mobile toggle ── */}
-      <button
-        onClick={() => setOpen(true)}
-        className="lg:hidden fixed top-0 left-0 z-50 w-12 h-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition"
-        aria-label="Buka menu"
-      >
-        <svg
-          width="17"
-          height="17"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-        >
+      <button onClick={() => setOpen(true)} className="lg:hidden fixed top-0 left-0 z-50 w-12 h-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition" aria-label="Buka menu">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
           <line x1="3" y1="6" x2="21" y2="6" />
           <line x1="3" y1="12" x2="21" y2="12" />
           <line x1="3" y1="18" x2="21" y2="18" />
         </svg>
       </button>
 
-      {/* ── Mobile overlay ── */}
-      <div
-        className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          }`}
-        onClick={() => setOpen(false)}
-        aria-hidden="true"
-      />
+      <div className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} onClick={() => setOpen(false)} aria-hidden="true" />
 
-      {/* ── Mobile sidebar ── */}
-      <aside
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"
-          }`}
-      >
+      <aside className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <SidebarContent {...sharedContentProps} onClose={() => setOpen(false)} />
       </aside>
 
-      {/* ── Desktop sidebar (resizable) ── */}
-      <aside
-        style={{
-          width: rail ? RAIL_W : width,
-          transition: dragging || !hydrated ? "none" : "width 0.2s ease-out",
-        }}
-        className="relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start"
-      >
+      <aside style={{ width: rail ? RAIL_W : width, transition: dragging || !hydrated ? "none" : "width 0.2s ease-out" }} className="relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start">
         <SidebarContent {...sharedContentProps} rail={rail} onToggleRail={toggleRail} />
         {!rail && (
-          <div
-            onMouseDown={startResize}
-            className="absolute top-0 right-0 z-20 h-full w-1.5 cursor-col-resize group/resize"
-            title="Geser untuk ubah lebar"
-          >
+          <div onMouseDown={startResize} className="absolute top-0 right-0 z-20 h-full w-1.5 cursor-col-resize group/resize" title="Geser untuk ubah lebar">
             <div className="mx-auto h-full w-px bg-transparent group-hover/resize:bg-[#1a1a2e]/30 transition-colors" />
           </div>
         )}

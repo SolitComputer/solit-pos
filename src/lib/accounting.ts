@@ -208,11 +208,11 @@ export function cashflowKeterangan(e: {
   return `${label} · ${detail}`;
 }
 
-// ─── Baris jurnal ─────────────────────────────────────────────────────────────
 export interface DraftLine {
   account_code: string;
   side: JournalSide;
   nominal: number;
+  keterangan?: string | null; // catatan khusus untuk baris akun ini (opsional)
 }
 
 export function sumSide(lines: DraftLine[], side: JournalSide): number {

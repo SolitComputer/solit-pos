@@ -15,13 +15,13 @@ import {
     sumSide,
 } from "@/lib/accounting";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface JournalLine {
     id: string;
     account_code: string;
     account_name: string;
     side: JournalSide;
     nominal: number;
+    keterangan?: string | null;
     line_order: number;
 }
 
@@ -462,7 +462,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                             )}
                                                                         </td>
 
-                                                                        {/* Keterangan — kredit di-indent */}
                                                                         <td className="px-4 py-2 align-top">
                                                                             {first && (
                                                                                 <div className="flex items-center gap-1.5 mb-1 flex-wrap">
@@ -480,6 +479,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                             <div className={`text-[11px] ${isKredit ? "pl-10 text-emerald-800" : "pl-1 text-blue-800"} font-medium`}>
                                                                                 {line.account_name}
                                                                             </div>
+                                                                            {line.keterangan && (
+                                                                                <div className={`text-[10px] italic text-gray-400 mt-0.5 ${isKredit ? "pl-10" : "pl-1"}`}>
+                                                                                    {line.keterangan}
+                                                                                </div>
+                                                                            )}
                                                                         </td>
 
                                                                         {/* Ref = kode akun (post reference) */}
@@ -628,9 +632,14 @@ function EntryFormModal({
             .catch(() => { });
     }, []);
     const [lines, setLines] = useState<DraftLine[]>(
-        entry?.lines.map((l) => ({ account_code: l.account_code, side: l.side, nominal: Number(l.nominal) })) ?? [
-            { account_code: "110", side: "DEBIT", nominal: 0 },
-            { account_code: "410", side: "KREDIT", nominal: 0 },
+        entry?.lines.map((l) => ({
+            account_code: l.account_code,
+            side: l.side,
+            nominal: Number(l.nominal),
+            keterangan: l.keterangan ?? "",
+        })) ?? [
+            { account_code: "110", side: "DEBIT", nominal: 0, keterangan: "" },
+            { account_code: "410", side: "KREDIT", nominal: 0, keterangan: "" },
         ]
     );
     const [saving, setSaving] = useState(false);
@@ -640,7 +649,7 @@ function EntryFormModal({
         setTemplate(key);
         const t = MANUAL_TEMPLATES.find((x) => x.key === key);
         if (!t || t.lines.length === 0) return;
-        setLines(t.lines.map((l) => ({ ...l, nominal: 0 })));
+        setLines(t.lines.map((l) => ({ ...l, nominal: 0, keterangan: "" })));
     };
 
     const patch = (i: number, p: Partial<DraftLine>) =>
@@ -753,60 +762,69 @@ function EntryFormModal({
                         <div className="flex items-center justify-between mb-1.5">
                             <label className="text-xs font-semibold text-gray-500">Baris Jurnal</label>
                             <button
-                                onClick={() => setLines((p) => [...p, { account_code: "110", side: "DEBIT", nominal: 0 }])}
+                                onClick={() => setLines((p) => [...p, { account_code: "110", side: "DEBIT", nominal: 0, keterangan: "" }])}
                                 className="text-[11px] font-bold text-blue-600 hover:underline"
                             >
                                 + Tambah baris
                             </button>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-2.5">
                             {lines.map((l, i) => (
-                                <div key={i} className="flex gap-2 items-center">
-                                    <select
-                                        value={l.side}
-                                        onChange={(e) => patch(i, { side: e.target.value as JournalSide })}
-                                        className={`h-9 w-24 border rounded-lg px-2 text-xs font-bold ${l.side === "DEBIT"
-                                            ? "border-blue-200 bg-blue-50 text-blue-700"
-                                            : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                            }`}
-                                    >
-                                        <option value="DEBIT">Debit</option>
-                                        <option value="KREDIT">Kredit</option>
-                                    </select>
+                                <div key={i} className="p-2.5 rounded-lg border border-gray-100 bg-gray-50/50 space-y-1.5">
+                                    <div className="flex gap-2 items-center">
+                                        <select
+                                            value={l.side}
+                                            onChange={(e) => patch(i, { side: e.target.value as JournalSide })}
+                                            className={`h-9 w-24 border rounded-lg px-2 text-xs font-bold ${l.side === "DEBIT"
+                                                ? "border-blue-200 bg-blue-50 text-blue-700"
+                                                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                }`}
+                                        >
+                                            <option value="DEBIT">Debit</option>
+                                            <option value="KREDIT">Kredit</option>
+                                        </select>
 
-                                    <select
-                                        value={l.account_code}
-                                        onChange={(e) => patch(i, { account_code: e.target.value })}
-                                        className="h-9 flex-1 border border-gray-200 rounded-lg px-2 text-xs bg-white"
-                                    >
-                                        {ACCOUNT_TYPE_ORDER.map((type) => (
-                                            <optgroup key={type} label={ACCOUNT_TYPE_LABEL[type]}>
-                                                {allAccounts.filter((a) => a.type === type).map((a) => (
-                                                    <option key={a.code} value={a.code}>
-                                                        {a.code} · {a.name}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        ))}
-                                    </select>
+                                        <select
+                                            value={l.account_code}
+                                            onChange={(e) => patch(i, { account_code: e.target.value })}
+                                            className="h-9 flex-1 border border-gray-200 rounded-lg px-2 text-xs bg-white"
+                                        >
+                                            {ACCOUNT_TYPE_ORDER.map((type) => (
+                                                <optgroup key={type} label={ACCOUNT_TYPE_LABEL[type]}>
+                                                    {allAccounts.filter((a) => a.type === type).map((a) => (
+                                                        <option key={a.code} value={a.code}>
+                                                            {a.code} · {a.name}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
+                                        </select>
+
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={l.nominal || ""}
+                                            onChange={(e) => patch(i, { nominal: Math.max(0, Number(e.target.value)) })}
+                                            placeholder="0"
+                                            className="h-9 w-36 border border-gray-200 rounded-lg px-2 text-xs font-mono text-right"
+                                        />
+
+                                        <button
+                                            onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
+                                            disabled={lines.length <= 2}
+                                            className="w-8 h-9 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all duration-150 disabled:opacity-30 flex items-center justify-center"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
 
                                     <input
-                                        type="number"
-                                        min={0}
-                                        value={l.nominal || ""}
-                                        onChange={(e) => patch(i, { nominal: Math.max(0, Number(e.target.value)) })}
-                                        placeholder="0"
-                                        className="h-9 w-36 border border-gray-200 rounded-lg px-2 text-xs font-mono text-right"
+                                        value={l.keterangan ?? ""}
+                                        onChange={(e) => patch(i, { keterangan: e.target.value })}
+                                        placeholder="Keterangan khusus baris ini (opsional)"
+                                        className="w-full h-8 border border-gray-200 rounded-lg px-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition placeholder:text-gray-300"
                                     />
-
-                                    <button
-                                        onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
-                                        disabled={lines.length <= 2}
-                                        className="w-8 h-9 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all duration-150 disabled:opacity-30 flex items-center justify-center"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
                                 </div>
                             ))}
                         </div>

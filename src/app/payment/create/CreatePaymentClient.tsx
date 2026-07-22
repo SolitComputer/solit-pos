@@ -118,6 +118,7 @@ export default function CreatePaymentPage() {
     const fromPrep = Boolean(urlPrepId);
     const [prepOrderNumber, setPrepOrderNumber] = useState("");
     const [prepLoading, setPrepLoading] = useState(false);
+    const [prepResolveError, setPrepResolveError] = useState<string | null>(null);
 
     // ── Core state ────────────────────────────────────────────────────────────
     const [step, setStep] = useState(1);
@@ -361,6 +362,19 @@ export default function CreatePaymentPage() {
                     setSelectedUnits(resolved);
                     setValue("units", resolved);
                 }
+
+                if (resolved.length < items.length) {
+                    const failedSNs = items
+                        .filter((it) => !resolved.some((r) => r.serial_number === it.serial_number))
+                        .map((it) => it.serial_number)
+                        .join(", ");
+                    console.error("[loadPrep] Unit gagal di-resolve via check-sn:", failedSNs);
+                    setPrepResolveError(
+                        resolved.length === 0
+                            ? `Semua unit gagal dimuat (SN: ${failedSNs}). Kemungkinan status unit sudah berubah dari SIAP_JUAL, sehingga tidak lolos pengecekan ketersediaan di /api/units/check-sn.`
+                            : `${items.length - resolved.length} dari ${items.length} unit gagal dimuat (SN: ${failedSNs}).`
+                    );
+                }
             } catch { /* ignore */ } finally {
                 setPrepLoading(false);
             }
@@ -527,6 +541,18 @@ export default function CreatePaymentPage() {
         setShowConfirmModal(true);
     };
 
+    // Dipanggil react-hook-form kalau zodResolver gagal validasi.
+    // Sebelumnya tidak ada handler ini → kegagalan validasi senyap total,
+    // modal konfirmasi tidak muncul dan tidak ada pesan apapun ke user.
+    const onInvalidSubmit = (errs: Record<string, any>) => {
+        console.error("[CreatePayment] Validasi form gagal:", errs);
+        const firstKey = Object.keys(errs)[0];
+        const firstMsg = firstKey
+            ? (errs[firstKey]?.message || `Field "${firstKey}" tidak valid`)
+            : "Form tidak valid";
+        alert(`Tidak bisa lanjut — ${firstMsg}\n\n(Cek Console untuk detail lengkap semua field yang error)`);
+    };
+
     const handleConfirmedSubmit = async () => {
         if (!pendingSubmitData || !paymentPhoto) return;
         setShowConfirmModal(false);
@@ -660,6 +686,12 @@ export default function CreatePaymentPage() {
                     </div>
                 )}
 
+                {fromPrep && prepResolveError && (
+                    <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-4">
+                        <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-700">{prepResolveError}</p>
+                    </div>
+                )}
                 {/* Scan banner */}
                 {fromScan && (
                     <div className="flex items-center gap-3 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 mb-4">
@@ -688,7 +720,7 @@ export default function CreatePaymentPage() {
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+                <form onSubmit={handleSubmit(onSubmit, onInvalidSubmit)} className="space-y-3">
                     <input type="hidden" {...register("laptop_id")} />
                     <input type="hidden" {...register("laptop_name")} />
                     <input type="hidden" {...register("serial_number")} />
@@ -1365,7 +1397,7 @@ export default function CreatePaymentPage() {
                                     onClick={() => {
                                         setValue("units", selectedUnits);
                                         setValue("amount", rawDealPrice);
-                                        handleSubmit(onSubmit)();
+                                        handleSubmit(onSubmit, onInvalidSubmit)();
                                     }}
                                     className={`${btnPrimary} disabled:opacity-50 inline-flex items-center justify-center gap-1.5`}
                                 >

@@ -91,10 +91,38 @@ async function handler(req: NextRequest) {
       query = query.eq("invoice_number", invoiceExact.trim());
     } else {
       if (status !== "ALL") query = query.eq("status", status);
-      if (search.trim()) {
-        query = query.or(
-          `invoice_number.ilike.%${search}%,customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%,laptop_name.ilike.%${search}%`
+     if (search.trim()) {
+        const term = search.trim();
+        
+        const [{ data: snMatches }, { data: cpuLaptops }] = await Promise.all([
+          supabase.from("transaction_items").select("invoice_number").ilike("serial_number", `%${term}%`),
+          supabase.from("laptops").select("id").ilike("cpu", `%${term}%`),
+        ]);
+
+        const extraInvoiceNumbers = new Set<string>(
+          (snMatches ?? []).map((r: any) => r.invoice_number).filter(Boolean)
         );
+
+        if (cpuLaptops && cpuLaptops.length > 0) {
+          const { data: itemsByLaptop } = await supabase
+            .from("transaction_items")
+            .select("invoice_number")
+            .in("laptop_id", cpuLaptops.map((l: any) => l.id));
+          (itemsByLaptop ?? []).forEach((r: any) => { if (r.invoice_number) extraInvoiceNumbers.add(r.invoice_number); });
+        }
+
+        const orParts = [
+          `invoice_number.ilike.%${term}%`,
+          `customer_name.ilike.%${term}%`,
+          `customer_phone.ilike.%${term}%`,
+          `laptop_name.ilike.%${term}%`,
+          `serial_number.ilike.%${term}%`,
+        ];
+        if (extraInvoiceNumbers.size > 0) {
+          orParts.push(`invoice_number.in.(${Array.from(extraInvoiceNumbers).join(",")})`);
+        }
+
+        query = query.or(orParts.join(","));
       }
       if (customerType !== "ALL") {
         query = customerType === "UMUM"
