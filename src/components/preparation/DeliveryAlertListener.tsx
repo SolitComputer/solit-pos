@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bike } from "lucide-react";
 import { supabase } from "@/services/supabase";
-import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
+import { unlockAudio, playSoundByKey } from "@/lib/preparationSound";
+import { useNotificationSettings } from "@/hooks/useNotificationSound";
 
 interface Alert { id: string; order_number: string; customer_name: string }
 
@@ -18,9 +19,14 @@ export default function DeliveryAlertListener() {
   const [alert, setAlert] = useState<Alert | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const repeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const settings = useNotificationSettings(userId);
+  const settingsRef = useRef(settings);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   useEffect(() => {
-    fetch("/api/auth/me").then((r) => r.json()).then((r) => setUserId(r.user?.id ?? null)).catch(() => {});
+    fetch("/api/auth/me").then((r) => r.json()).then((r) => setUserId(r.user?.id ?? null)).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -30,7 +36,7 @@ export default function DeliveryAlertListener() {
   }, []);
 
   useEffect(() => {
-    try { seenRef.current = new Set(JSON.parse(localStorage.getItem("deliv_alert_seen") || "[]")); } catch {}
+    try { seenRef.current = new Set(JSON.parse(localStorage.getItem("deliv_alert_seen") || "[]")); } catch { }
   }, []);
 
   useEffect(() => {
@@ -56,13 +62,20 @@ export default function DeliveryAlertListener() {
           if (seenRef.current.has(row.id)) return;
 
           seenRef.current.add(row.id);
-          try { localStorage.setItem("deliv_alert_seen", JSON.stringify([...seenRef.current].slice(-100))); } catch {}
+          try { localStorage.setItem("deliv_alert_seen", JSON.stringify([...seenRef.current].slice(-100))); } catch { }
 
-          playNotifSound();
-          if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.([300, 120, 300, 120, 300]);
+          const s = settingsRef.current;
+          playSoundByKey(s.sound_key, s.custom_sound_url);
           setAlert({ id: row.id, order_number: row.order_number ?? "", customer_name: row.customer_name ?? "Customer" });
+
+          if (repeatRef.current) clearInterval(repeatRef.current);
           if (timerRef.current) clearTimeout(timerRef.current);
-          timerRef.current = setTimeout(() => setAlert(null), 12000);
+
+          if (s.repeat_enabled) {
+            repeatRef.current = setInterval(() => playSoundByKey(s.sound_key, s.custom_sound_url), s.repeat_interval_ms);
+          } else {
+            timerRef.current = setTimeout(() => setAlert(null), 12000);
+          }
         }
       )
       .subscribe();
@@ -73,7 +86,16 @@ export default function DeliveryAlertListener() {
     };
   }, [userId]);
 
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (repeatRef.current) clearInterval(repeatRef.current);
+  }, []);
+
+  const dismissAlert = () => {
+    if (repeatRef.current) { clearInterval(repeatRef.current); repeatRef.current = null; }
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    setAlert(null);
+  };
 
   if (!alert) return null;
   return (
@@ -83,11 +105,11 @@ export default function DeliveryAlertListener() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-black text-gray-900">Kamu ditugaskan mengantar!</p>
           <p className="text-xs text-gray-500 truncate mt-0.5">{alert.customer_name} · {alert.order_number}</p>
-          <Link href={`/dashboard/preparation/${alert.id}`} onClick={() => setAlert(null)} className="inline-block mt-1.5 text-xs font-bold text-violet-600 hover:underline">
+          <Link href={`/dashboard/preparation/${alert.id}`} onClick={dismissAlert} className="inline-block mt-1.5 text-xs font-bold text-violet-600 hover:underline">
             Buka & mulai antar →
           </Link>
         </div>
-        <button onClick={() => setAlert(null)} className="text-gray-300 hover:text-gray-500 flex-shrink-0">
+        <button onClick={dismissAlert} className="text-gray-300 hover:text-gray-500 flex-shrink-0">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>

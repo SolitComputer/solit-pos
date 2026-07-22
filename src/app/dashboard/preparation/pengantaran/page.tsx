@@ -6,6 +6,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
+import { useNotificationSettings } from "@/hooks/useNotificationSound";
 import { AlertCircle, Clock, Inbox, Package, Bike, CheckCircle2, Smartphone, Ruler, Target, MapPin, Home, type LucideIcon } from "lucide-react";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null; is_checked: boolean }
@@ -229,10 +230,14 @@ export default function MyDeliveryPage() {
     () => orders.filter((o) => o.status === "MENUNGGU_PENGANTAR"),
     [orders]
   );
+  const { sound_key: soundKey, custom_sound_url: customSoundUrl } = useNotificationSettings(userId);
   const { unackedIds: alarmIds, acknowledge: ackApproval } = usePrepAlarm(
     perluSetuju,
     ALARM_KEYS.APPROVAL,
-    soundOn
+    soundOn,
+    4000,
+    soundKey,
+    customSoundUrl
   );
 
   const filtered = useMemo(() => {
@@ -325,13 +330,13 @@ export default function MyDeliveryPage() {
             {STAT.map((s) => {
               const Icon = s.icon;
               return (
-              <div key={s.label} className={`bg-gradient-to-br ${s.color} border rounded-2xl p-3`}>
-                <div className="flex items-center justify-between">
-                  <Icon className="w-5 h-5" />
-                  <span className="text-2xl font-black tabular-nums">{s.value}</span>
+                <div key={s.label} className={`bg-gradient-to-br ${s.color} border rounded-2xl p-3`}>
+                  <div className="flex items-center justify-between">
+                    <Icon className="w-5 h-5" />
+                    <span className="text-2xl font-black tabular-nums">{s.value}</span>
+                  </div>
+                  <p className="text-[11px] font-bold uppercase tracking-wide mt-1 opacity-80">{s.label}</p>
                 </div>
-                <p className="text-[11px] font-bold uppercase tracking-wide mt-1 opacity-80">{s.label}</p>
-              </div>
               );
             })}
           </div>
