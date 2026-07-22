@@ -59,6 +59,52 @@ export default function AkuntansiPeriodPickerPage() {
         <div className="relative max-w-[1100px] mx-auto px-6 py-10 space-y-8">
           {/* Header — glass hero panel, foto & year switcher digabung jadi satu widget */}
           <div className="relative rounded-[28px] border border-white/70 bg-white/50 backdrop-blur-sm shadow-[0_10px_35px_rgba(150,120,80,0.10)] px-6 py-6 sm:px-8 sm:py-7 flex items-start justify-between flex-wrap gap-6">
+            <span aria-hidden="true" className="butterfly butterfly-1">
+              <svg viewBox="0 0 32 24" className="w-5 h-4 sm:w-6 sm:h-5">
+                <g className="butterfly-wing-l" style={{ transformOrigin: "16px 12px" }}>
+                  <path d="M16 12C10 2 0 2 2 10c1 6 8 6 14 2Z" fill="#8FBFA0" opacity="0.8" />
+                </g>
+                <g className="butterfly-wing-r" style={{ transformOrigin: "16px 12px" }}>
+                  <path d="M16 12c6-10 16-10 14-2-1 6-8 6-14 2Z" fill="#F6E3B4" opacity="0.8" />
+                </g>
+                <line x1="16" y1="6" x2="16" y2="18" stroke="#8A6A2F" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span aria-hidden="true" className="butterfly butterfly-2">
+              <svg viewBox="0 0 32 24" className="w-4 h-3 sm:w-5 sm:h-4">
+                <g className="butterfly-wing-l" style={{ transformOrigin: "16px 12px" }}>
+                  <path d="M16 12C10 2 0 2 2 10c1 6 8 6 14 2Z" fill="#E7D9F5" opacity="0.8" />
+                </g>
+                <g className="butterfly-wing-r" style={{ transformOrigin: "16px 12px" }}>
+                  <path d="M16 12c6-10 16-10 14-2-1 6-8 6-14 2Z" fill="#9FD8B5" opacity="0.8" />
+                </g>
+                <line x1="16" y1="6" x2="16" y2="18" stroke="#8A6A2F" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span aria-hidden="true" className="butterfly butterfly-3">
+              <svg viewBox="0 0 32 24" className="w-5 h-4 sm:w-6 sm:h-5">
+                <g className="butterfly-wing-l" style={{ transformOrigin: "16px 12px" }}>
+                  <path d="M16 12C10 2 0 2 2 10c1 6 8 6 14 2Z" fill="#F6E3B4" opacity="0.8" />
+                </g>
+                <g className="butterfly-wing-r" style={{ transformOrigin: "16px 12px" }}>
+                  <path d="M16 12c6-10 16-10 14-2-1 6-8 6-14 2Z" fill="#8FBFA0" opacity="0.8" />
+                </g>
+                <line x1="16" y1="6" x2="16" y2="18" stroke="#8A6A2F" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span aria-hidden="true" className="fairy-wisp fairy-wisp-1">
+              <span className="fairy-wisp-core" />
+              <span className="fairy-wisp-trail fairy-wisp-trail-a" />
+              <span className="fairy-wisp-trail fairy-wisp-trail-b" />
+            </span>
+            <span aria-hidden="true" className="fairy-wisp fairy-wisp-2">
+              <span className="fairy-wisp-core" />
+              <span className="fairy-wisp-trail fairy-wisp-trail-a" />
+              <span className="fairy-wisp-trail fairy-wisp-trail-b" />
+            </span>
+            <span aria-hidden="true" className="fairy-petal fairy-petal-1" style={{ background: "#F3C9DA" }} />
+            <span aria-hidden="true" className="fairy-petal fairy-petal-2" style={{ background: "#F6E3B4" }} />
+            <span aria-hidden="true" className="fairy-petal fairy-petal-3" style={{ background: "#BFE8CE" }} />
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-8 h-[2px] bg-gradient-to-r from-[#9FD8B5] to-transparent" />
@@ -138,12 +184,23 @@ export default function AkuntansiPeriodPickerPage() {
                   aria-label={`Buka pembukuan ${MONTH_LABELS[m - 1]} ${year}`}
                   style={{ animationDelay: `${i * 45}ms`, ["--tilt" as string]: tilt }}
                   className={`ledger-card group relative aspect-[4/5] rounded-lg overflow-hidden transition-all duration-200 flex flex-col items-center justify-center active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9C7420] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F7F8]
-                    ${
-                      isFuture
-                        ? "bg-white/60 border border-dashed border-gray-200 text-gray-300 hover:border-gray-300"
-                        : "paper bg-[#FBF7EC] border border-black/5 text-[#3A3528] shadow-sm hover:-translate-y-1.5 hover:shadow-lg hover:shadow-[#8FBFA0]/20 hover:border-[#BFE8CE]/60"
+                    ${isFuture
+                      ? "bg-white/60 border border-dashed border-gray-200 text-gray-300 hover:border-gray-300"
+                      : "paper bg-[#FBF7EC] border border-black/5 text-[#3A3528] shadow-sm hover:-translate-y-1.5 hover:shadow-lg hover:shadow-[#8FBFA0]/20 hover:border-[#BFE8CE]/60"
                     }`}
                 >
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 z-[-1] flex items-center justify-center opacity-[0.07]"
+                  >
+                    <Image
+                      src="/images/nahida-wle.png"
+                      alt=""
+                      width={160}
+                      height={160}
+                      className="w-full h-full object-contain scale-125"
+                    />
+                  </div>
                   {!isFuture && (
                     <svg
                       aria-hidden="true"
@@ -170,9 +227,8 @@ export default function AkuntansiPeriodPickerPage() {
                     {String(m).padStart(2, "0")}
                   </span>
                   <span
-                    className={`text-[10px] font-semibold uppercase tracking-wider mt-2 ${
-                      isFuture ? "text-gray-300" : "text-[#3A3528]/50"
-                    }`}
+                    className={`text-[10px] font-semibold uppercase tracking-wider mt-2 ${isFuture ? "text-gray-300" : "text-[#3A3528]/50"
+                      }`}
                   >
                     {MONTH_LABELS[m - 1]}
                   </span>
@@ -223,13 +279,264 @@ export default function AkuntansiPeriodPickerPage() {
         .nahida-float {
           animation: nahidaFloat 5s ease-in-out infinite;
         }
-        @keyframes nahidaFloat {
+      @keyframes nahidaFloat {
           0%,
           100% {
             transform: translateY(0px);
           }
           50% {
             transform: translateY(-10px);
+          }
+        }
+
+        .butterfly {
+          position: absolute;
+          pointer-events: none;
+          z-index: 5;
+          filter: drop-shadow(0 1px 2px rgba(58, 53, 40, 0.12));
+        }
+        .butterfly-1 {
+          top: 8%;
+          left: 38%;
+          animation: flutterA 9s ease-in-out infinite;
+        }
+        .butterfly-2 {
+          top: 55%;
+          left: 60%;
+          animation: flutterB 12s ease-in-out infinite;
+          animation-delay: 1.5s;
+        }
+        .butterfly-3 {
+          top: 20%;
+          left: 80%;
+          animation: flutterC 15s ease-in-out infinite;
+          animation-delay: 3s;
+        }
+        @keyframes flutterA {
+          0%,
+          100% {
+            transform: translate(0, 0) rotate(-4deg);
+          }
+          25% {
+            transform: translate(45px, -22px) rotate(6deg);
+          }
+          50% {
+            transform: translate(85px, 4px) rotate(-8deg);
+          }
+          75% {
+            transform: translate(40px, 24px) rotate(4deg);
+          }
+        }
+        @keyframes flutterB {
+          0%,
+          100% {
+            transform: translate(0, 0) rotate(5deg);
+          }
+          30% {
+            transform: translate(-55px, -16px) rotate(-6deg);
+          }
+          60% {
+            transform: translate(-90px, 10px) rotate(8deg);
+          }
+          85% {
+            transform: translate(-38px, 26px) rotate(-3deg);
+          }
+        }
+        @keyframes flutterC {
+          0%,
+          100% {
+            transform: translate(0, 0) rotate(0deg);
+          }
+          20% {
+            transform: translate(-40px, 18px) rotate(-5deg);
+          }
+          50% {
+            transform: translate(-75px, -12px) rotate(7deg);
+          }
+          80% {
+            transform: translate(-20px, -28px) rotate(-6deg);
+          }
+        }
+        .butterfly-wing-l,
+        .butterfly-wing-r {
+          animation: wingFlap 0.32s ease-in-out infinite alternate;
+        }
+        .butterfly-wing-r {
+          animation-delay: 0.06s;
+        }
+      @keyframes wingFlap {
+          from {
+            transform: scaleX(1);
+          }
+          to {
+            transform: scaleX(0.4);
+          }
+        }
+
+        .fairy-wisp {
+          position: absolute;
+          pointer-events: none;
+          z-index: 6;
+        }
+        .fairy-wisp-1 {
+          top: 65%;
+          left: 12%;
+          animation: fairyDrift1 11s ease-in-out infinite;
+        }
+        .fairy-wisp-2 {
+          top: 12%;
+          left: 62%;
+          animation: fairyDrift2 14s ease-in-out infinite;
+          animation-delay: 2.5s;
+        }
+        .fairy-wisp-core {
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          border-radius: 9999px;
+          background: radial-gradient(circle, #fff 0%, #F6E3B4 45%, rgba(191, 232, 206, 0.4) 75%, transparent 100%);
+          box-shadow: 0 0 10px 3px rgba(246, 227, 180, 0.55), 0 0 18px 6px rgba(191, 232, 206, 0.3);
+          animation: wispGlow 2.2s ease-in-out infinite;
+        }
+        .fairy-wisp-trail {
+          position: absolute;
+          width: 3px;
+          height: 3px;
+          border-radius: 9999px;
+          background: radial-gradient(circle, #fff 0%, #E7D9F5 60%, transparent 80%);
+        }
+        .fairy-wisp-trail-a {
+          top: 7px;
+          left: -8px;
+          animation: sparkleTwinkle 1.8s ease-in-out infinite;
+          animation-delay: 0.3s;
+        }
+        .fairy-wisp-trail-b {
+          top: 12px;
+          left: -15px;
+          animation: sparkleTwinkle 1.8s ease-in-out infinite;
+          animation-delay: 0.6s;
+        }
+        @keyframes wispGlow {
+          0%,
+          100% {
+            transform: scale(0.85);
+            opacity: 0.75;
+          }
+          50% {
+            transform: scale(1.15);
+            opacity: 1;
+          }
+        }
+        @keyframes fairyDrift1 {
+          0%,
+          100% {
+            transform: translate(0, 0);
+          }
+          25% {
+            transform: translate(35px, -25px);
+          }
+          50% {
+            transform: translate(70px, 5px);
+          }
+          75% {
+            transform: translate(30px, 20px);
+          }
+        }
+        @keyframes fairyDrift2 {
+          0%,
+          100% {
+            transform: translate(0, 0);
+          }
+          30% {
+            transform: translate(-40px, 18px);
+          }
+          60% {
+            transform: translate(-65px, -12px);
+          }
+          85% {
+            transform: translate(-25px, -28px);
+          }
+        }
+
+        .fairy-petal {
+          position: absolute;
+          top: -6%;
+          width: 10px;
+          height: 7px;
+          border-radius: 100% 0 100% 0;
+          pointer-events: none;
+          z-index: 4;
+        }
+        .fairy-petal-1 {
+          left: 22%;
+          animation: petalFall1 10s linear infinite;
+        }
+        .fairy-petal-2 {
+          left: 55%;
+          animation: petalFall2 13s linear infinite;
+          animation-delay: 3s;
+        }
+        .fairy-petal-3 {
+          left: 85%;
+          animation: petalFall3 16s linear infinite;
+          animation-delay: 6s;
+        }
+        @keyframes petalFall1 {
+          0% {
+            transform: translate(0, 0) rotate(0deg);
+            opacity: 0;
+          }
+          8% {
+            opacity: 0.85;
+          }
+          50% {
+            transform: translate(18px, 60px) rotate(160deg);
+          }
+          92% {
+            opacity: 0.85;
+          }
+          100% {
+            transform: translate(-10px, 130px) rotate(320deg);
+            opacity: 0;
+          }
+        }
+        @keyframes petalFall2 {
+          0% {
+            transform: translate(0, 0) rotate(0deg);
+            opacity: 0;
+          }
+          8% {
+            opacity: 0.8;
+          }
+          50% {
+            transform: translate(-22px, 65px) rotate(-140deg);
+          }
+          92% {
+            opacity: 0.8;
+          }
+          100% {
+            transform: translate(14px, 135px) rotate(-300deg);
+            opacity: 0;
+          }
+        }
+        @keyframes petalFall3 {
+          0% {
+            transform: translate(0, 0) rotate(0deg);
+            opacity: 0;
+          }
+          8% {
+            opacity: 0.85;
+          }
+          50% {
+            transform: translate(20px, 58px) rotate(180deg);
+          }
+          92% {
+            opacity: 0.85;
+          }
+          100% {
+            transform: translate(-16px, 128px) rotate(340deg);
+            opacity: 0;
           }
         }
 
@@ -268,14 +575,25 @@ export default function AkuntansiPeriodPickerPage() {
           }
         }
 
-        .ambient-sparkle {
+      .ambient-sparkle {
           position: absolute;
           width: 10px;
           height: 10px;
           border-radius: 9999px;
           background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(191, 232, 206, 0.5) 55%, transparent 75%);
-          animation: sparkleTwinkle 4.5s ease-in-out infinite;
+          animation: fairyDustDrift 6s ease-in-out infinite;
           pointer-events: none;
+        }
+        @keyframes fairyDustDrift {
+          0%,
+          100% {
+            opacity: 0;
+            transform: translate(0, 0) scale(0.4);
+          }
+          50% {
+            opacity: 1;
+            transform: translate(6px, -10px) scale(1.15);
+          }
         }
         .ambient-sparkle-1 {
           top: 14%;
@@ -427,7 +745,7 @@ export default function AkuntansiPeriodPickerPage() {
           }
         }
 
-        @media (prefers-reduced-motion: reduce) {
+  @media (prefers-reduced-motion: reduce) {
           .ledger-card,
           .ledger-ripple,
           .year-pop,
@@ -436,7 +754,20 @@ export default function AkuntansiPeriodPickerPage() {
           .sparkle,
           .ambient-sparkle,
           .leaf-drift,
-          .firefly-dot {
+          .firefly-dot,
+          .butterfly-1,
+          .butterfly-2,
+          .butterfly-3,
+          .butterfly-wing-l,
+          .butterfly-wing-r,
+          .fairy-wisp-1,
+          .fairy-wisp-2,
+          .fairy-wisp-core,
+          .fairy-wisp-trail-a,
+          .fairy-wisp-trail-b,
+          .fairy-petal-1,
+          .fairy-petal-2,
+          .fairy-petal-3 {
             animation: none !important;
           }
           .ledger-card.paper::after {
