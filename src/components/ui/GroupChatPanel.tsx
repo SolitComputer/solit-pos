@@ -7,7 +7,7 @@ import {
 import { getSupabaseClient } from "@/services/supabaseClient";
 import { useChatContext } from "@/contexts/ChatContext";
 import { VoicePlayer, VoiceRecorder } from "@/components/ui/VoiceNote";
-import { Inbox, FileText, ChevronUp } from "lucide-react";
+import { Inbox, FileText, ChevronUp, Camera, Image as ImageIcon } from "lucide-react";
 import { CreateGroupModal } from "@/components/ui/CreateGroupModal";
 import { GroupInfoModal } from "@/components/ui/GroupInfoModal";
 import { DEFAULT_GROUP_ID } from "@/lib/chatGroupsShared";
@@ -704,9 +704,22 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
     const [mentionQuery, setMentionQuery] = useState("");
     const [mentionIndex, setMentionIndex] = useState(0);
     const [mentionStart, setMentionStart] = useState(0);
+    const [showAttachMenu, setShowAttachMenu] = useState(false);
 
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
+    const cameraRef = useRef<HTMLInputElement>(null);
+    const docRef = useRef<HTMLInputElement>(null);
+    const attachMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!showAttachMenu) return;
+        const handler = (e: MouseEvent) => {
+            if (attachMenuRef.current && !attachMenuRef.current.contains(e.target as Node)) setShowAttachMenu(false);
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, [showAttachMenu]);
 
     const getMentionFilteredList = () => {
         const showSemua = "semua".includes(mentionQuery.toLowerCase()) || mentionQuery === "";
@@ -923,17 +936,56 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     )}
 
                     {/* Attach */}
-                    <button
-                        onClick={() => fileRef.current?.click()}
-                        disabled={isLoading}
-                        className="self-end mb-0.5 w-6 h-6 flex items-center justify-center transition-all hover:scale-110 flex-shrink-0 disabled:opacity-40"
-                        style={{ color: "#818cf8" }}
-                        title="Lampirkan file / foto">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                        </svg>
-                    </button>
+                    <div className="relative flex-shrink-0" ref={attachMenuRef}>
+                        <button
+                            onClick={() => setShowAttachMenu(v => !v)}
+                            disabled={isLoading}
+                            className="self-end mb-0.5 w-6 h-6 flex items-center justify-center transition-all hover:scale-110 flex-shrink-0 disabled:opacity-40"
+                            style={{ color: "#818cf8" }}
+                            title="Lampirkan file / foto">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                        </button>
+
+                        {showAttachMenu && (
+                            <div className="absolute bottom-full left-0 mb-3 w-52 bg-white overflow-hidden z-50 py-1.5"
+                                style={{
+                                    borderRadius: 18,
+                                    border: "1px solid #ebebf5",
+                                    boxShadow: "0 16px 48px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.05)",
+                                }}>
+                                <button
+                                    onClick={() => { cameraRef.current?.click(); setShowAttachMenu(false); }}
+                                    className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors">
+                                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-white"
+                                        style={{ borderRadius: 10, background: "linear-gradient(135deg, #f472b6, #ec4899)" }}>
+                                        <Camera className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-xs font-semibold text-slate-700">Kamera</span>
+                                </button>
+                                <button
+                                    onClick={() => { fileRef.current?.click(); setShowAttachMenu(false); }}
+                                    className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors">
+                                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-white"
+                                        style={{ borderRadius: 10, background: "linear-gradient(135deg, #818cf8, #6366f1)" }}>
+                                        <ImageIcon className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-xs font-semibold text-slate-700">Foto & Video</span>
+                                </button>
+                                <button
+                                    onClick={() => { docRef.current?.click(); setShowAttachMenu(false); }}
+                                    className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors">
+                                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-white"
+                                        style={{ borderRadius: 10, background: "linear-gradient(135deg, #34d399, #059669)" }}>
+                                        <FileText className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-xs font-semibold text-slate-700">Dokumen</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                     <textarea
                         ref={inputRef}
@@ -972,7 +1024,9 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     </div>
                 )}
 
-                <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange} accept="*/*" />
+                <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange} accept="image/*,video/*" />
+                <input ref={cameraRef} type="file" className="hidden" onChange={handleFileChange} accept="image/*" capture="environment" />
+                <input ref={docRef} type="file" className="hidden" onChange={handleFileChange} accept="*/*" />
             </div>
         </div>
     );
@@ -2036,7 +2090,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
                                 <div className="flex items-center justify-center text-4xl"
                                     style={{ width: 80, height: 80, borderRadius: 26, background: "#fff", border: "1px solid #ebebf5", boxShadow: "0 8px 24px rgba(0,0,0,0.06)" }}>
-                                    
+
                                 </div>
                                 <div>
                                     <p className="text-sm font-bold text-slate-700">Belum ada pesan</p>
