@@ -249,6 +249,7 @@ export default function ReportsPage() {
   const [groupBy, setGroupBy] = useState("day");
   const [activePreset, setActivePreset] = useState("this_month");
   const [isLoading, setIsLoading] = useState(false);
+  const [filterError, setFilterError] = useState("");
 
   const [summary, setSummary] = useState<Summary | null>(null);
   const [trend, setTrend] = useState<TrendItem[]>([]);
@@ -292,6 +293,21 @@ export default function ReportsPage() {
     setGroupBy(group);
 
     fetchReport(from, to, group);
+    setFilterError("");
+  };
+
+  // Dipakai tombol "Tampilkan" pada panel filter manual (Dari / Sampai / Kelompok)
+  const applyManualFilter = () => {
+    if (!dateFrom || !dateTo) {
+      setFilterError("Tanggal 'Dari' dan 'Sampai' wajib diisi.");
+      return;
+    }
+    if (dateFrom > dateTo) {
+      setFilterError("Tanggal 'Dari' tidak boleh lebih besar dari 'Sampai'.");
+      return;
+    }
+    setFilterError("");
+    fetchReport(dateFrom, dateTo, groupBy);
   };
 
   const trendLabels = trend.map(t => t.label);
@@ -478,7 +494,8 @@ export default function ReportsPage() {
               <input
                 type="date"
                 value={dateFrom}
-                onChange={e => { setDateFrom(e.target.value); setActivePreset(""); }}
+                onChange={e => { setDateFrom(e.target.value); setActivePreset(""); setFilterError(""); }}
+                onKeyDown={e => { if (e.key === "Enter") applyManualFilter(); }}
                 className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all"
               />
             </div>
@@ -487,7 +504,8 @@ export default function ReportsPage() {
               <input
                 type="date"
                 value={dateTo}
-                onChange={e => { setDateTo(e.target.value); setActivePreset(""); }}
+                onChange={e => { setDateTo(e.target.value); setActivePreset(""); setFilterError(""); }}
+                onKeyDown={e => { if (e.key === "Enter") applyManualFilter(); }}
                 className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all"
               />
             </div>
@@ -495,7 +513,7 @@ export default function ReportsPage() {
               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Kelompok</label>
               <select
                 value={groupBy}
-                onChange={e => setGroupBy(e.target.value)}
+                onChange={e => { setGroupBy(e.target.value); setFilterError(""); }}
                 className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all cursor-pointer"
               >
                 <option value="day">Per Hari</option>
@@ -503,8 +521,22 @@ export default function ReportsPage() {
                 <option value="month">Per Bulan</option>
               </select>
             </div>
+
+            {/* Tombol apply filter manual */}
+            <button
+              onClick={applyManualFilter}
+              disabled={isLoading}
+              className="h-9 px-5 rounded-xl bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              {isLoading ? "Memuat..." : "Tampilkan"}
+            </button>
           </div>
+
+          {filterError && (
+            <p className="text-[11px] text-red-500 font-medium mt-2">{filterError}</p>
+          )}
         </div>
+
         {/* ── SUMMARY CARDS ── */}
         {isLoading ? (
           <SummarySkeleton />
