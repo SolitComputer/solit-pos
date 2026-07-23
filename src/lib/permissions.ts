@@ -266,9 +266,12 @@ export const CC_REPORT_MANAGE_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_MARKETING",
 ];
 
-// ─── To-Do List — hanya ADMIN & PROGRAMMER ────────────────────────────────────
 export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
+
+// ─── Notification Sound Settings — atur suara notif pengantaran per akun ─────
+export const NOTIFICATION_SETTINGS_ROLES: UserRole[] = [...FULL_ACCESS];
+export const NOTIF_SOUND_KEYS = ["default", "urgent", "bell", "double_beep", "custom"] as const;
 
 // ─── Route Permissions ────────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
@@ -470,7 +473,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 
   "/dashboard/akutansi": [...AKUNTANSI_ROLES],
   "/dashboard/monitoring-ceo": [...MONITORING_CEO_ROLES],
+  "/dashboard/admin/notifikasi-pengantaran": [...NOTIFICATION_SETTINGS_ROLES],
   "/api/akutansi": [...AKUNTANSI_ROLES],
+  "/api/notification-settings": [...NOTIFICATION_SETTINGS_ROLES],
 };
 
 // ─── PERMISSIONS object ───────────────────────────────────────────────────────
@@ -613,6 +618,9 @@ export const PERMISSIONS = {
   // ── To-Do List ──────────────────────────────────────────────────────────────
   VIEW_TODOS: [...TODO_ROLES] as UserRole[],
   MANAGE_TODOS: [...TODO_ROLES] as UserRole[],
+
+  // ── Notification Sound Settings ─────────────────────────────────────────────
+  MANAGE_NOTIFICATION_SETTINGS: [...NOTIFICATION_SETTINGS_ROLES] as UserRole[],
 } as const;
 
 export function hasPermission(
