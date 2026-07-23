@@ -39,6 +39,12 @@ interface JournalEntry {
     created_by_user?: { id: string; name: string } | null;
     updated_by_user?: { id: string; name: string } | null;
     updated_at?: string;
+    trx_meta?: {
+        company_name: string | null;
+        cpu: string | null;
+        ram: string | null;
+        storage: string | null;
+    } | null;
 }
 
 interface PendingDraft {
@@ -49,6 +55,13 @@ interface PendingDraft {
     keterangan: string;
     total: number;
     lines: DraftLine[];
+    meta?: {
+        company_name?: string | null;
+        cpu?: string | null;
+        ram?: string | null;
+        storage?: string | null;
+        [key: string]: unknown;
+    };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -66,6 +79,19 @@ const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
 };
 
 const key = (d: { source_type: string; source_id: string }) => `${d.source_type}:${d.source_id}`;
+
+// Badge nama toko — replikasi persis logic getCompanyBadge() di transactions/page.tsx,
+// supaya label & warnanya konsisten dengan halaman Riwayat Transaksi.
+function getCompanyBadge(company?: string | null): { label: string; color: string } | null {
+    if (!company) return null;
+    const cn = company.toLowerCase();
+    if (cn.includes("sotech")) return { label: "Sotech", color: "bg-orange-50 text-orange-700 border-orange-200" };
+    if (cn.includes("solit")) return { label: "Solit 03", color: "bg-blue-50 text-blue-700 border-blue-200" };
+    if (cn.includes("on point") || cn.includes("onpoint")) return { label: "On Point", color: "bg-purple-50 text-purple-700 border-purple-200" };
+    if (cn.includes("zenit.id")) return { label: "Zenit.id", color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
+    if (cn.includes("zenit")) return { label: "Zenit", color: "bg-teal-50 text-teal-700 border-teal-200" };
+    return { label: company.trim(), color: "bg-gray-50 text-gray-600 border-gray-200" };
+}
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function JurnalUmum({ period }: { period: string }) {
@@ -192,7 +218,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     date: targetDate,
-                    orderedIds: sameDateEntries.map(e => e.id)
+                    orderedIds: sameDateEntries.map(e => e.id),
+                    sortOrder
                 })
             });
             const json = await res.json();
@@ -278,10 +305,14 @@ export default function JurnalUmum({ period }: { period: string }) {
                     {showPending && (
                         <>
                             <div className="max-h-[320px] overflow-y-auto divide-y divide-gray-100">
-                                {pending.map((d) => {
+                               {pending.map((d) => {
                                     const k = key(d);
                                     const checked = selected.has(k);
                                     const badge = SOURCE_BADGE[d.source_type];
+                                    // Badge toko & spek CUMA relevan untuk data TRANSACTION —
+                                    // Service dan Cashflow tidak punya konsep laptop_id/company_name.
+                                    const companyBadge = d.source_type === "TRANSACTION" ? getCompanyBadge(d.meta?.company_name) : null;
+                                    const specParts = [d.meta?.cpu, d.meta?.ram, d.meta?.storage].filter(Boolean) as string[];
                                     return (
                                         <label
                                             key={k}
@@ -305,7 +336,17 @@ export default function JurnalUmum({ period }: { period: string }) {
                                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${badge.color}`}>
                                                 {badge.label}
                                             </span>
-                                            <span className="text-xs text-gray-700 flex-1 truncate">{d.keterangan}</span>
+                                            {companyBadge && (
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${companyBadge.color}`}>
+                                                    {companyBadge.label}
+                                                </span>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs text-gray-700 truncate">{d.keterangan}</p>
+                                                {specParts.length > 0 && (
+                                                    <p className="text-[10px] text-gray-400 truncate mt-0.5">{specParts.join(" · ")}</p>
+                                                )}
+                                            </div>
                                             <span className="text-xs font-bold text-gray-900 font-mono shrink-0">{rp(d.total)}</span>
                                         </label>
                                     );
@@ -432,6 +473,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                                     ) : (
                                         filtered.map((entry, index) => {
                                             const badge = SOURCE_BADGE[entry.source_type];
+                                            const companyBadge = entry.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
+                                            const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
                                             return (
                                                 <Draggable key={entry.id} draggableId={entry.id} index={index}>
                                                     {(provided, snapshot) => (
@@ -462,12 +505,17 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                             )}
                                                                         </td>
 
-                                                                        <td className="px-4 py-2 align-top">
+                                                                       <td className="px-4 py-2 align-top">
                                                                             {first && (
                                                                                 <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                                                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
                                                                                         {badge.label}
                                                                                     </span>
+                                                                                    {companyBadge && (
+                                                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
+                                                                                            {companyBadge.label}
+                                                                                        </span>
+                                                                                    )}
                                                                                     {entry.is_edited && (
                                                                                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
                                                                                             diedit · {entry.updated_by_user?.name ?? "—"}
@@ -475,6 +523,9 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                     )}
                                                                                     <span className="text-[11px] font-bold text-gray-900">{entry.keterangan}</span>
                                                                                 </div>
+                                                                            )}
+                                                                            {first && specParts.length > 0 && (
+                                                                                <div className="text-[10px] text-gray-400 mb-1">{specParts.join(" · ")}</div>
                                                                             )}
                                                                             <div className={`text-[11px] ${isKredit ? "pl-10 text-emerald-800" : "pl-1 text-blue-800"} font-medium`}>
                                                                                 {line.account_name}
