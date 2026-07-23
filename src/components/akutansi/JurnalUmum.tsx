@@ -305,7 +305,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                     {showPending && (
                         <>
                             <div className="max-h-[320px] overflow-y-auto divide-y divide-gray-100">
-                               {pending.map((d) => {
+                                {pending.map((d) => {
                                     const k = key(d);
                                     const checked = selected.has(k);
                                     const badge = SOURCE_BADGE[d.source_type];
@@ -505,7 +505,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                             )}
                                                                         </td>
 
-                                                                       <td className="px-4 py-2 align-top">
+                                                                        <td className="px-4 py-2 align-top">
                                                                             {first && (
                                                                                 <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                                                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
@@ -682,15 +682,17 @@ function EntryFormModal({
             .then((j) => { if (j.success) setAllAccounts(j.data); })
             .catch(() => { });
     }, []);
-    const [lines, setLines] = useState<DraftLine[]>(
+
+    const [lines, setLines] = useState<(DraftLine & { _id: string })[]>(
         entry?.lines.map((l) => ({
             account_code: l.account_code,
             side: l.side,
             nominal: Number(l.nominal),
             keterangan: l.keterangan ?? "",
+            _id: crypto.randomUUID(),
         })) ?? [
-            { account_code: "110", side: "DEBIT", nominal: 0, keterangan: "" },
-            { account_code: "410", side: "KREDIT", nominal: 0, keterangan: "" },
+            { account_code: "110", side: "DEBIT", nominal: 0, keterangan: "", _id: crypto.randomUUID() },
+            { account_code: "410", side: "KREDIT", nominal: 0, keterangan: "", _id: crypto.randomUUID() },
         ]
     );
     const [saving, setSaving] = useState(false);
@@ -700,11 +702,24 @@ function EntryFormModal({
         setTemplate(key);
         const t = MANUAL_TEMPLATES.find((x) => x.key === key);
         if (!t || t.lines.length === 0) return;
-        setLines(t.lines.map((l) => ({ ...l, nominal: 0, keterangan: "" })));
+        setLines(t.lines.map((l) => ({ ...l, nominal: 0, keterangan: "", _id: crypto.randomUUID() })));
     };
 
     const patch = (i: number, p: Partial<DraftLine>) =>
         setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...p } : l)));
+
+    const handleLineDragEnd = (result: DropResult) => {
+        if (!result.destination) return;
+        const from = result.source.index;
+        const to = result.destination.index;
+        if (from === to) return;
+        setLines((prev) => {
+            const next = [...prev];
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved);
+            return next;
+        });
+    };
 
     const debit = sumSide(lines, "DEBIT");
     const kredit = sumSide(lines, "KREDIT");
@@ -726,7 +741,7 @@ function EntryFormModal({
                     keterangan: keterangan.trim(),
                     ref: ref.trim() || null,
                     source_category: isEdit ? undefined : template,
-                    lines: lines.filter((l) => Number(l.nominal) > 0),
+                    lines: lines.filter((l) => Number(l.nominal) > 0).map(({ _id, ...rest }) => rest),
                 }),
             });
             const json = await res.json();
@@ -813,72 +828,97 @@ function EntryFormModal({
                         <div className="flex items-center justify-between mb-1.5">
                             <label className="text-xs font-semibold text-gray-500">Baris Jurnal</label>
                             <button
-                                onClick={() => setLines((p) => [...p, { account_code: "110", side: "DEBIT", nominal: 0, keterangan: "" }])}
+                                onClick={() => setLines((p) => [...p, { account_code: "110", side: "DEBIT", nominal: 0, keterangan: "", _id: crypto.randomUUID() }])}
                                 className="text-[11px] font-bold text-blue-600 hover:underline"
                             >
                                 + Tambah baris
                             </button>
                         </div>
 
-                        <div className="space-y-2.5">
-                            {lines.map((l, i) => (
-                                <div key={i} className="p-2.5 rounded-lg border border-gray-100 bg-gray-50/50 space-y-1.5">
-                                    <div className="flex gap-2 items-center">
-                                        <select
-                                            value={l.side}
-                                            onChange={(e) => patch(i, { side: e.target.value as JournalSide })}
-                                            className={`h-9 w-24 border rounded-lg px-2 text-xs font-bold ${l.side === "DEBIT"
-                                                ? "border-blue-200 bg-blue-50 text-blue-700"
-                                                : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                                }`}
-                                        >
-                                            <option value="DEBIT">Debit</option>
-                                            <option value="KREDIT">Kredit</option>
-                                        </select>
+                       <DragDropContext onDragEnd={handleLineDragEnd}>
+                            <Droppable droppableId="jurnal-manual-lines">
+                                {(dropProvided) => (
+                                    <div className="space-y-2.5" ref={dropProvided.innerRef} {...dropProvided.droppableProps}>
+                                        {lines.map((l, i) => (
+                                            <Draggable key={l._id} draggableId={l._id} index={i}>
+                                                {(dragProvided, dragSnapshot) => (
+                                                    <div
+                                                        ref={dragProvided.innerRef}
+                                                        {...dragProvided.draggableProps}
+                                                        className={`p-2.5 rounded-lg border space-y-1.5 transition-colors ${dragSnapshot.isDragging
+                                                            ? "border-blue-300 bg-white shadow-lg ring-2 ring-blue-200"
+                                                            : "border-gray-100 bg-gray-50/50"
+                                                            }`}
+                                                    >
+                                                        <div className="flex gap-2 items-center">
+                                                            <div
+                                                                {...dragProvided.dragHandleProps}
+                                                                title="Tahan & geser untuk pindah urutan"
+                                                                className="shrink-0 w-6 h-9 flex items-center justify-center rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 cursor-grab active:cursor-grabbing transition-colors"
+                                                            >
+                                                                <GripVertical className="w-4 h-4" />
+                                                            </div>
+                                                            <select
+                                                                value={l.side}
+                                                                onChange={(e) => patch(i, { side: e.target.value as JournalSide })}
+                                                                className={`h-9 w-24 border rounded-lg px-2 text-xs font-bold ${l.side === "DEBIT"
+                                                                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                                                                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                                                    }`}
+                                                            >
+                                                                <option value="DEBIT">Debit</option>
+                                                                <option value="KREDIT">Kredit</option>
+                                                            </select>
 
-                                        <select
-                                            value={l.account_code}
-                                            onChange={(e) => patch(i, { account_code: e.target.value })}
-                                            className="h-9 flex-1 border border-gray-200 rounded-lg px-2 text-xs bg-white"
-                                        >
-                                            {ACCOUNT_TYPE_ORDER.map((type) => (
-                                                <optgroup key={type} label={ACCOUNT_TYPE_LABEL[type]}>
-                                                    {allAccounts.filter((a) => a.type === type).map((a) => (
-                                                        <option key={a.code} value={a.code}>
-                                                            {a.code} · {a.name}
-                                                        </option>
-                                                    ))}
-                                                </optgroup>
-                                            ))}
-                                        </select>
+                                                            <select
+                                                                value={l.account_code}
+                                                                onChange={(e) => patch(i, { account_code: e.target.value })}
+                                                                className="h-9 flex-1 border border-gray-200 rounded-lg px-2 text-xs bg-white"
+                                                            >
+                                                                {ACCOUNT_TYPE_ORDER.map((type) => (
+                                                                    <optgroup key={type} label={ACCOUNT_TYPE_LABEL[type]}>
+                                                                        {allAccounts.filter((a) => a.type === type).map((a) => (
+                                                                            <option key={a.code} value={a.code}>
+                                                                                {a.code} · {a.name}
+                                                                            </option>
+                                                                        ))}
+                                                                    </optgroup>
+                                                                ))}
+                                                            </select>
 
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            value={l.nominal || ""}
-                                            onChange={(e) => patch(i, { nominal: Math.max(0, Number(e.target.value)) })}
-                                            placeholder="0"
-                                            className="h-9 w-36 border border-gray-200 rounded-lg px-2 text-xs font-mono text-right"
-                                        />
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                value={l.nominal || ""}
+                                                                onChange={(e) => patch(i, { nominal: Math.max(0, Number(e.target.value)) })}
+                                                                placeholder="0"
+                                                                className="h-9 w-36 border border-gray-200 rounded-lg px-2 text-xs font-mono text-right"
+                                                            />
 
-                                        <button
-                                            onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
-                                            disabled={lines.length <= 2}
-                                            className="w-8 h-9 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all duration-150 disabled:opacity-30 flex items-center justify-center"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
+                                                            <button
+                                                                onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
+                                                                disabled={lines.length <= 2}
+                                                                className="w-8 h-9 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all duration-150 disabled:opacity-30 flex items-center justify-center"
+                                                            >
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+
+                                                        <input
+                                                            value={l.keterangan ?? ""}
+                                                            onChange={(e) => patch(i, { keterangan: e.target.value })}
+                                                            placeholder="Keterangan khusus baris ini (opsional)"
+                                                            className="w-full h-8 border border-gray-200 rounded-lg px-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition placeholder:text-gray-300"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {dropProvided.placeholder}
                                     </div>
-
-                                    <input
-                                        value={l.keterangan ?? ""}
-                                        onChange={(e) => patch(i, { keterangan: e.target.value })}
-                                        placeholder="Keterangan khusus baris ini (opsional)"
-                                        className="w-full h-8 border border-gray-200 rounded-lg px-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition placeholder:text-gray-300"
-                                    />
-                                </div>
-                            ))}
-                        </div>
+                                )}
+                            </Droppable>
+                        </DragDropContext>
                     </div>
 
                     {/* Balance indicator */}

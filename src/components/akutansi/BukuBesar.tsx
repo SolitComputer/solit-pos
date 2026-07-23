@@ -68,24 +68,29 @@ export default function BukuBesar({ period }: { period: string }) {
             .catch(() => { });
     }, []);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (opts?: { silent?: boolean }) => {
         if (!accountCode) return;
-        setLoading(true);
+        const silent = opts?.silent ?? false;
+        if (!silent) setLoading(true);
         setError("");
         try {
             const res = await fetch(`/api/akutansi/buku-besar?period=${period}&account_code=${accountCode}`);
             const json = await res.json();
             if (!json.success) {
-                setError(json.message ?? "Gagal memuat buku besar");
-                setData(null);
+                if (!silent) {
+                    setError(json.message ?? "Gagal memuat buku besar");
+                    setData(null);
+                }
                 return;
             }
             setData(json.data);
         } catch {
-            setError("Koneksi bermasalah");
-            setData(null);
+            if (!silent) {
+                setError("Koneksi bermasalah");
+                setData(null);
+            }
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [period, accountCode]);
 
@@ -133,9 +138,9 @@ export default function BukuBesar({ period }: { period: string }) {
 
     // Auto-refresh saat user kembali ke tab ini (misal habis edit di Jurnal Umum
     // lalu balik lagi ke Buku Besar) — supaya data selalu sinkron tanpa perlu reload manual.
-    useEffect(() => {
+useEffect(() => {
         const onVisible = () => {
-            if (document.visibilityState === "visible") load();
+            if (document.visibilityState === "visible") load({ silent: true });
         };
         document.addEventListener("visibilitychange", onVisible);
         window.addEventListener("focus", onVisible);
