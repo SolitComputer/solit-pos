@@ -49,6 +49,7 @@ interface Followup {
   // flag hasil kalkulasi server — SATU-SATUNYA sumber kebenaran untuk gating UI
   is_due: boolean;
   is_owner: boolean;
+  is_true_owner: boolean; // NEW — khusus buat badge "Kamu", beda dari is_owner yang sudah dilonggarkan
   can_followup: boolean;
   lock_reason: string | null;
 }
@@ -1027,7 +1028,7 @@ function PicBlock({ f }: { f: Followup }) {
             {picName ?? "Belum tercatat"}
           </p>
         </div>
-        {f.is_owner && f.pic_user_id && (
+        {f.is_true_owner && f.pic_user_id && (
           <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-600 text-white flex-shrink-0">
             Kamu
           </span>
@@ -1791,32 +1792,32 @@ export default function ManagementSellerPage() {
               <option value="BELUM">Belum FU</option>
               <option value="SUDAH">Sudah FU</option>
             </select>
-            
+
             <div className="relative w-full sm:w-64 lg:w-80">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                 <SearchIcon />
               </span>
               <input
-              type="text"
-              inputMode="search"
-              placeholder="Cari nama, HP, atau invoice…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Cari customer"
-              className="w-full border border-gray-200 rounded-xl h-12 sm:h-11 pl-10 pr-11 text-base sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 transition placeholder:text-gray-400"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className={cx(
-                  "absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700 transition",
-                  FOCUS_RING
-                )}
-                aria-label="Hapus pencarian"
-              >
-                <CloseIcon />
-              </button>
-            )}
+                type="text"
+                inputMode="search"
+                placeholder="Cari nama, HP, atau invoice…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Cari customer"
+                className="w-full border border-gray-200 rounded-xl h-12 sm:h-11 pl-10 pr-11 text-base sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 transition placeholder:text-gray-400"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className={cx(
+                    "absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700 transition",
+                    FOCUS_RING
+                  )}
+                  aria-label="Hapus pencarian"
+                >
+                  <CloseIcon />
+                </button>
+              )}
             </div>
           </div>
         </div>
