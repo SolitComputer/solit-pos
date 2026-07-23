@@ -1,6 +1,4 @@
 "use client";
-
-
 import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -136,13 +134,16 @@ const Icons = {
   missionProgress: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>),
   missionHistory: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1 0 21 12a9 9 0 0 0-8.83 7.5" /><polyline points="12 8 12 12 15 14" /></svg>),
   customerBirthday: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M20 21v-2a4 4 0 00-3-3.87M4 21v-2a4 4 0 013-3.87" /><path d="M16 3.13a4 4 0 010 7.75M8 3.13a4 4 0 000 7.75" /><path d="M12 17v4M10 21h4" /></svg>),
+  employeeBirthday: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M6 21v-8h12v8" /><path d="M4 21h16" /><path d="M12 13V9" /><path d="M12 6a2 2 0 100-4 2 2 0 000 4z" /><path d="M8 9h8" /></svg>),
+  leadsChat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>),
+  salesResult: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>),
   missionAll: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 9l9-6 9 6-9 6-9-6z" /><path d="M3 15l9 6 9-6" /><path d="M3 12l9 6 9-6" /></svg>),
   todo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>),
   accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" /><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" /></svg>),
-  monitoringCeo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
+const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
 const ITEM_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance };
 const ITEM_LEMBUR: MenuItem = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
 const ITEM_USERS: MenuItem = { name: "Management User", href: "/dashboard/users", icon: Icons.users };
@@ -157,16 +158,14 @@ const ITEM_CUSTOMER_BIRTHDAY: MenuItem = { name: "Ultah Customer", href: "/dashb
 const ITEM_TODOS: MenuItem = { name: "To-Do List", href: "/dashboard/todos", icon: Icons.todo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 
-const ITEM_MONITORING_CEO_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/monitoring-ceo/absensi", icon: Icons.monitoringCeo };
-const ITEM_MONITORING_CEO_OVERTIME: MenuItem = { name: "Lembur", href: "/dashboard/monitoring-ceo/overtime", icon: Icons.overtime };
-const ITEM_MONITORING_CEO_PENYEDIA: MenuItem = { name: "Penyedia Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.barang };
-const ITEM_MONITORING_CEO_SERVIS: MenuItem = { name: "Service", href: "/dashboard/service/statistik", icon: Icons.serviceQueue };
-const ITEM_MONITORING_CEO_PENGANTARAN: MenuItem = { name: "Pengantaran", href: "/dashboard/monitoring-ceo/pengantaran", icon: Icons.deliveryRoute };
-
-const MONITORING_CEO_MENU: MenuGroup = {
-  label: "Monitoring CEO",
-  items: [ITEM_MONITORING_CEO_ABSENSI, ITEM_MONITORING_CEO_OVERTIME, ITEM_MONITORING_CEO_PENYEDIA, ITEM_MONITORING_CEO_SERVIS, ITEM_MONITORING_CEO_PENGANTARAN],
-};
+// ── Item baru untuk grup hasil rombakan ──────────────────────────────────────
+const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
+const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
+const ITEM_LAPORAN_KEUANGAN: MenuItem = { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports };
+const ITEM_MONITOR_CHAT: MenuItem = { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat };
+const ITEM_LEADS_CHAT: MenuItem = { name: "Leads Chat Masuk", href: "/dashboard/leads-chat", icon: Icons.leadsChat };
+const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashboard/hasil-penjualan", icon: Icons.salesResult };
+const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboard/employee-birthdays", icon: Icons.employeeBirthday };
 
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
@@ -174,6 +173,14 @@ const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data
 const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
 const ITEM_LAPTOP_MINUS: MenuItem = { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LEADERBOARD_PEKERJAAN: MenuItem = { name: "Leaderboard Pekerjaan", href: "/dashboard/missions/leaderboard", icon: Icons.leaderboard };
+
+// ── Grup baru (pengganti Overview & Monitoring CEO) ──────────────────────────
+const GROUP_ABSENSI: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_LEMBUR] };
+const GROUP_LOG: MenuGroup = { label: "Log", items: [ITEM_LOG_LOGIN, ITEM_LOG_AKTIVITAS] };
+const GROUP_LAPORAN: MenuGroup = { label: "Laporan", items: [ITEM_LAPORAN_KEUANGAN, ITEM_CASHFLOW, ITEM_AKUNTANSI, ITEM_PKL_REPORT] };
+const GROUP_MANAGEMENT: MenuGroup = { label: "Management", items: [ITEM_USERS, ITEM_MANAGEMENT_SELLER, ITEM_MONITOR_CHAT] };
+const GROUP_MARKETING: MenuGroup = { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT, ITEM_HASIL_PENJUALAN] };
+const GROUP_ULTAH: MenuGroup = { label: "Ultah", items: [ITEM_CUSTOMER_BIRTHDAY, ITEM_ULTAH_KARYAWAN] };
 
 const MISSIONS_MENU: MenuGroup = {
   label: "Misi Pekerjaan",
@@ -247,21 +254,16 @@ const ADMIN_PENGANTARAN_MENU: MenuGroup = {
   ],
 };
 
-const ADMIN_OVERVIEW: MenuGroup = {
-  label: "Overview",
-  items: [
-    { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-    ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT, ITEM_MISSIONS,
-    { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
-    { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
-    { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-    { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
-    ITEM_AKUNTANSI,
-    { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
-    { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
-    ITEM_CUSTOMER_BIRTHDAY, ITEM_CC_REPORT, ITEM_LEADERBOARD_PEKERJAAN, ITEM_TODOS,
-  ],
+// ── Grup inti admin-level (pengganti ADMIN_OVERVIEW) ─────────────────────────
+const ADMIN_UTAMA: MenuGroup = {
+  label: "Utama",
+  items: [ITEM_DASHBOARD, ITEM_LEADERBOARD_PEKERJAAN, ITEM_TODOS],
 };
+
+const ADMIN_CORE_GROUPS: MenuGroup[] = [
+  ADMIN_UTAMA, GROUP_ABSENSI, GROUP_LOG, GROUP_LAPORAN,
+  GROUP_MANAGEMENT, GROUP_MARKETING, GROUP_ULTAH,
+];
 
 const ADMIN_INVENTARIS: MenuGroup = {
   label: "Inventaris",
@@ -292,14 +294,13 @@ const SERVICE_MENU: MenuGroup = {
   ],
 };
 
-const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup => ({
-  label: "Overview",
-  items: [
-    { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-    ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT, ITEM_MISSIONS, ITEM_CUSTOMER_BIRTHDAY,
-    ...extra,
-  ],
-});
+// ── Overview sales dipecah jadi beberapa grup ────────────────────────────────
+const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup[] => [
+  { label: "Utama", items: [ITEM_DASHBOARD, ...extra] },
+  GROUP_ABSENSI,
+  { label: "Laporan", items: [ITEM_PKL_REPORT] },
+  { label: "Ultah", items: [ITEM_CUSTOMER_BIRTHDAY, ITEM_ULTAH_KARYAWAN] },
+];
 
 const SALES_INVENTARIS: MenuGroup = {
   label: "Inventaris",
@@ -333,14 +334,17 @@ const PKL_INVENTARIS_BASIC: MenuGroup = {
 };
 
 const PKL_MENU: MenuGroup[] = [
-  { label: "Overview", items: [{ name: "Dashboard", href: "/dashboard", icon: Icons.dashboard }, ITEM_ABSENSI, ITEM_PKL_REPORT] },
+  { label: "Utama", items: [ITEM_DASHBOARD] },
+  { label: "Absensi", items: [ITEM_ABSENSI] },
+  { label: "Laporan", items: [ITEM_PKL_REPORT] },
   PKL_INVENTARIS_BASIC,
   { label: "Transaksi", items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }] },
   { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
 ];
 
 const PKL_SALES_MENU: MenuGroup[] = [
-  { label: "Overview", items: [{ name: "Dashboard", href: "/dashboard", icon: Icons.dashboard }, ITEM_ABSENSI, ITEM_PKL_REPORT] },
+  { label: "Utama", items: [ITEM_DASHBOARD, ITEM_PKL_REPORT] },
+  { label: "Absensi", items: [ITEM_ABSENSI] },
   PKL_INVENTARIS_BASIC,
   {
     label: "Transaksi",
@@ -354,7 +358,8 @@ const PKL_SALES_MENU: MenuGroup[] = [
 ];
 
 const PKL_PENYEDIA_MENU: MenuGroup[] = [
-  { label: "Overview", items: [{ name: "Dashboard", href: "/dashboard", icon: Icons.dashboard }, ITEM_ABSENSI, ITEM_PKL_REPORT] },
+  { label: "Utama", items: [ITEM_DASHBOARD, ITEM_PKL_REPORT] },
+  { label: "Absensi", items: [ITEM_ABSENSI] },
   PKL_INVENTARIS_BASIC,
   PREPARATION_PENYEDIA_MENU,
   { label: "Transaksi", items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }] },
@@ -362,90 +367,70 @@ const PKL_PENYEDIA_MENU: MenuGroup[] = [
 ];
 
 const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
-  ADMIN: [MONITORING_CEO_MENU, ADMIN_OVERVIEW, ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU],
+  ADMIN: [
+    ...ADMIN_CORE_GROUPS,
+    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
+  ],
 
   PROGRAMMER: [
-    MONITORING_CEO_MENU,
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT, ITEM_MISSIONS,
-        { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
-        { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
-        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-        ITEM_CASHFLOW, ITEM_AKUNTANSI,
-        { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
-        { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
-        ITEM_CC_REPORT, ITEM_TODOS,
-      ],
-    },
+    ...ADMIN_CORE_GROUPS,
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
 
   KEPALA_ZENITH: [
-    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    ...SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
     PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   ASISTEN_CEO: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT, ITEM_MISSIONS,
-        { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
-        { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
-        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-        { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
-        ITEM_CC_REPORT,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    GROUP_LOG,
+    { label: "Laporan", items: [ITEM_LAPORAN_KEUANGAN, ITEM_PKL_REPORT] },
+    { label: "Management", items: [ITEM_USERS] },
+    { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT, ITEM_HASIL_PENJUALAN] },
+    GROUP_ULTAH,
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
 
   KEPALA_SALES: [
-    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    ...SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
     PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   CREW_SALES: [
-    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    ...SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
     PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   SOTECH: [
-    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    ...SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
     PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   PENGANTARAN: [
-    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, PENGANTARAN_TRANSAKSI, PREPARATION_PENGANTARAN_MENU,
+    ...SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, PENGANTARAN_TRANSAKSI, PREPARATION_PENGANTARAN_MENU,
   ],
 
   KEPALA_ONPOINT: [
-    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    ...SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
     PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   ONPOINT: [
-    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    ...SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
     PREPARATION_SALES_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   KEPALA_SOTECH: [
-    SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
+    ...SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
     PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   TEKNISI: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
     {
       label: "Inventaris",
       items: [ITEM_DATA_BARANG, { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi }, ITEM_LAPTOP_MINUS],
@@ -456,13 +441,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   KEPALA_TEKNISI: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT, ITEM_MISSIONS,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD, ITEM_PKL_REPORT] },
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
     {
       label: "Inventaris",
       items: [
@@ -475,34 +456,21 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   ACCOUNTING: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT, ITEM_MISSIONS,
-        { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log },
-        { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog },
-        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-        { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow },
-        ITEM_AKUNTANSI,
-        { name: "Manajemen User", href: "/dashboard/users", icon: Icons.users },
-        { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat },
-        ITEM_CC_REPORT,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    GROUP_LOG,
+    GROUP_LAPORAN,
+    { label: "Management", items: [ITEM_USERS, ITEM_MONITOR_CHAT] },
+    { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT, ITEM_HASIL_PENJUALAN] },
+    GROUP_ULTAH,
     ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
   ],
 
   PURCHASING: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR,
-        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
-        ITEM_CASHFLOW, ITEM_USERS, ITEM_MISSIONS,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Laporan", items: [ITEM_LAPORAN_KEUANGAN, ITEM_CASHFLOW] },
+    { label: "Management", items: [ITEM_USERS] },
     {
       label: "Inventaris",
       items: [
@@ -514,27 +482,19 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   PENGELOLA_BARANG: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR,
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        ITEM_USERS, ITEM_MISSIONS,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS] },
+    { label: "Transaksi", items: [{ name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat }] },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
 
   KEPALA_PENGELOLA_BARANG: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT, ITEM_MISSIONS,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Laporan", items: [ITEM_PKL_REPORT] },
+    { label: "Management", items: [ITEM_USERS] },
     {
       label: "Inventaris",
       items: [
@@ -547,12 +507,15 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   MARKETING: [
-    { label: "Overview", items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS, ITEM_CC_REPORT] },
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
+    { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT, ITEM_HASIL_PENJUALAN] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
   ],
 
   KEPALA_MARKETING: [
-    SALES_OVERVIEW([ITEM_USERS, ITEM_CC_REPORT]),
+    ...SALES_OVERVIEW([ITEM_USERS]),
+    { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT, ITEM_HASIL_PENJUALAN] },
     {
       label: "Inventaris",
       items: [
@@ -565,65 +528,50 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
       items: [
         { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
         ITEM_MANAGEMENT_SELLER,
-        { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports },
+        ITEM_LAPORAN_KEUANGAN,
       ],
     },
     PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   KEBERSIHAN: [
-    {
-      label: "Overview",
-      items: [
-        ITEM_ABSENSI, ITEM_LEMBUR,
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
-        ITEM_USERS, ITEM_MISSIONS,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
+    { label: "Transaksi", items: [{ name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat }] },
   ],
 
   PENYEDIA_BARANG: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
     PREPARATION_PENYEDIA_MENU,
     { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
   ],
 
   KEPALA_PENYEDIA_BARANG: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_PKL_REPORT, ITEM_MISSIONS,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD, ITEM_PKL_REPORT] },
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
     PREPARATION_PENYEDIA_MENU,
     { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
   ],
 
   KONTEN: [
-    { label: "Overview", items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS, ITEM_CC_REPORT] },
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
+    { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
     { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
   ],
 
   CUSTOMER_SERVICE: [
-    {
-      label: "Overview",
-      items: [
-        { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard },
-        ITEM_ABSENSI, ITEM_LEMBUR, ITEM_USERS, ITEM_MISSIONS,
-      ],
-    },
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
     {
       label: "Transaksi",
@@ -692,12 +640,12 @@ const PKL_STRIP_HREFS = new Set<string>([
   const stripped = inherited
     .map((g) => ({ ...g, items: g.items.filter((it) => !PKL_STRIP_HREFS.has(it.href)) }))
     .filter((g) => g.items.length > 0);
-  const overviewIdx = stripped.findIndex((g) => g.label === "Overview");
-  if (overviewIdx >= 0) {
-    const alreadyHas = stripped[overviewIdx].items.some((it) => it.href === ITEM_PKL_REPORT.href);
-    if (!alreadyHas) stripped[overviewIdx].items.push(ITEM_PKL_REPORT);
+  const laporanIdx = stripped.findIndex((g) => g.label === "Laporan");
+  if (laporanIdx >= 0) {
+    const alreadyHas = stripped[laporanIdx].items.some((it) => it.href === ITEM_PKL_REPORT.href);
+    if (!alreadyHas) stripped[laporanIdx].items.push(ITEM_PKL_REPORT);
   } else {
-    stripped.unshift({ label: "Overview", items: [ITEM_PKL_REPORT] });
+    stripped.push({ label: "Laporan", items: [ITEM_PKL_REPORT] });
   }
   ROLE_MENUS[pklRole] = stripped;
 });
