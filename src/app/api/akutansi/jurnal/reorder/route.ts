@@ -13,7 +13,11 @@ function getAdmin(): SupabaseClient {
 
 export const PUT = withAuth(async (req) => {
   const body = await req.json();
-  const { date, orderedIds } = body as { date: string; orderedIds: string[] };
+  const { date, orderedIds, sortOrder } = body as {
+    date: string;
+    orderedIds: string[];
+    sortOrder?: "asc" | "desc";
+  };
 
   if (!date || !orderedIds || !Array.isArray(orderedIds) || orderedIds.length === 0) {
     return NextResponse.json({ success: false, message: "Invalid payload" }, { status: 400 });
@@ -28,8 +32,12 @@ export const PUT = withAuth(async (req) => {
 
   try {
     const promises = orderedIds.map((id, index) => {
-      // Adding index seconds to the base date
-      const newCreatedAt = new Date(baseDate.getTime() + index * 1000).toISOString();
+      // Index tampilan (top-to-bottom) harus diterjemahkan ke created_at sesuai arah sort aktif:
+      // - sortOrder "desc" (terbaru di atas) → baris PALING ATAS harus dapat created_at PALING BARU,
+      //   supaya tetap di atas saat data di-reload dengan urutan desc.
+      // - sortOrder "asc" / tidak dikirim → tetap seperti perilaku lama (baris atas = created_at paling lama).
+      const offsetIndex = sortOrder === "desc" ? (orderedIds.length - 1 - index) : index;
+      const newCreatedAt = new Date(baseDate.getTime() + offsetIndex * 1000).toISOString();
       return supabase
         .from("journal_entries")
         .update({ created_at: newCreatedAt })
