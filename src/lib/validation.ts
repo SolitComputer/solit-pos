@@ -100,4 +100,17 @@ export const createPaymentSchema = z.object({
   }
 });
 
+
+
 export type CreatePaymentType = z.infer<typeof createPaymentSchema>;
+
+export const updateSellerPhoneSchema = z.object({
+  customer_phone: z
+    .string()
+    .trim()
+    .min(8, "Nomor HP minimal 8 digit")
+    .max(20, "Nomor HP maksimal 20 karakter")
+    .regex(/^[0-9+\-\s]+$/, "Nomor HP hanya boleh berisi angka, +, atau -"),
+});
+
+export type UpdateSellerPhoneType = z.infer<typeof updateSellerPhoneSchema>;
