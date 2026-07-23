@@ -8,7 +8,7 @@ import {
   PointElement, LineElement, BarElement,
   Filler, Tooltip, Legend,
 } from "chart.js";
-import { FileText, Medal, Banknote, TrendingUp, ShoppingCart, Calculator, Percent, Award, Laptop, Smartphone } from "lucide-react";
+import { FileText, Medal, Banknote, TrendingUp, ShoppingCart, Calculator, Percent, Award, Laptop, Smartphone, Wallet, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { Line, Bar } from "react-chartjs-2";
 
 ChartJS.register(
@@ -21,10 +21,12 @@ const fmtRupiah = (n: number): string =>
   "Rp " + (n || 0).toLocaleString("id-ID");
 
 const fmtShort = (n: number): string => {
-  if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(1)}M`;
-  if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}Jt`;
-  if (n >= 1_000) return `Rp ${(n / 1_000).toFixed(0)}Rb`;
-  return `Rp ${n}`;
+  const sign = n < 0 ? "-" : "";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) return `${sign}Rp ${(abs / 1_000_000_000).toFixed(1)}M`;
+  if (abs >= 1_000_000) return `${sign}Rp ${(abs / 1_000_000).toFixed(1)}Jt`;
+  if (abs >= 1_000) return `${sign}Rp ${(abs / 1_000).toFixed(0)}Rb`;
+  return `${sign}Rp ${abs}`;
 };
 
 interface Summary {
@@ -40,6 +42,9 @@ interface TrendItem {
 }
 interface RankItem {
   name: string; revenue: number; profit?: number; count: number;
+}
+interface CashflowSummary {
+  totalMasuk: number; totalKeluar: number; saldo: number;
 }
 
 function getPreset(preset: string): { from: string; to: string } {
@@ -256,6 +261,7 @@ export default function ReportsPage() {
   const [topSales, setTopSales] = useState<RankItem[]>([]);
   const [topLaptop, setTopLaptop] = useState<RankItem[]>([]);
   const [topSource, setTopSource] = useState<RankItem[]>([]);
+  const [cashflowSummary, setCashflowSummary] = useState<CashflowSummary | null>(null);
 
   const fetchReport = async (from?: string, to?: string, group?: string) => {
     const f = from ?? dateFrom;
@@ -272,6 +278,7 @@ export default function ReportsPage() {
         setTopSales(result.data.topSales);
         setTopLaptop(result.data.topLaptop);
         setTopSource(result.data.topSource);
+        setCashflowSummary(result.data.cashflowSummary);
       }
     } catch {
       /* ignore */
@@ -545,14 +552,14 @@ export default function ReportsPage() {
             <StatCard
               label="Total Omzet"
               value={fmtRupiah(summary.totalRevenue)}
-              sub="Periode terpilih"
+              sub="Berdasarkan Akutansi"
               icon={<Banknote className="w-5 h-5 text-gray-500" />}
               rank={1}
             />
             <StatCard
               label="Total Profit"
               value={fmtRupiah(summary.totalProfit)}
-              sub={`Margin ${summary.profitMargin}%`}
+              sub={`Margin ${summary.profitMargin}% · Akutansi`}
               icon={<TrendingUp className="w-5 h-5 text-gray-500" />}
             />
             <StatCard
@@ -575,6 +582,30 @@ export default function ReportsPage() {
             />
           </div>
         ) : null}
+
+        {/* ── CASHFLOW SUMMARY ── */}
+        {!isLoading && cashflowSummary && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <StatCard
+              label="Kas Masuk"
+              value={fmtRupiah(cashflowSummary.totalMasuk)}
+              sub="Cashflow · periode terpilih"
+              icon={<ArrowDownCircle className="w-5 h-5 text-gray-500" />}
+            />
+            <StatCard
+              label="Kas Keluar"
+              value={fmtRupiah(cashflowSummary.totalKeluar)}
+              sub="Cashflow · periode terpilih"
+              icon={<ArrowUpCircle className="w-5 h-5 text-gray-500" />}
+            />
+            <StatCard
+              label="Saldo Kas"
+              value={fmtRupiah(cashflowSummary.saldo)}
+              sub="Masuk − Keluar"
+              icon={<Wallet className="w-5 h-5 text-gray-500" />}
+            />
+          </div>
+        )}
 
         {/* ── CHARTS ── */}
         {trend.length > 0 && (
