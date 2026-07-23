@@ -1,8 +1,8 @@
 // src/lib/pricelistPedagang.ts
 //
 // Kalkulasi "Price List Pedagang".
-// PENTING: markup dihitung dari HARGA MODAL (purchase_price) tiap UNIT,
-// bukan harga jual, dan bukan agregat per tipe laptop.
+// PENTING: markup dihitung dari TOTAL MODAL (purchase_price + charger_price +
+// laptop_bag_price) tiap UNIT, bukan harga jual, dan bukan agregat per tipe laptop.
 // Fitur ini murni tampilan/export — TIDAK menyentuh payment/transaksi.
 
 import { UserRole } from "@/lib/permissions";
@@ -48,12 +48,19 @@ export interface PedagangPriceResult {
   pedagangPrice: number; // harga final (sudah dibulatkan)
 }
 
-export function calculatePedagangPrice(modalPrice: number): PedagangPriceResult {
-  const modal = Math.max(0, Math.round(Number(modalPrice) || 0));
-  const tier = getPedagangTier(modal);
-  const rawPrice = modal * (1 + tier.percent);
+export function calculatePedagangPrice(
+  purchasePrice: number,
+  chargerPrice: number = 0,
+  bagPrice: number = 0,
+): PedagangPriceResult {
+  const base = Math.max(0, Math.round(Number(purchasePrice) || 0));
+  const charger = Math.max(0, Math.round(Number(chargerPrice) || 0));
+  const bag = Math.max(0, Math.round(Number(bagPrice) || 0));
+  const totalModal = base + charger + bag;
+  const tier = getPedagangTier(totalModal);
+  const rawPrice = totalModal * (1 + tier.percent);
   const pedagangPrice = roundUpTo50k(rawPrice);
-  return { modalPrice: modal, tier, rawPrice, pedagangPrice };
+  return { modalPrice: totalModal, tier, rawPrice, pedagangPrice };
 }
 
 // ─── Role gating (dipakai API route & halaman) ─────────────────────────────

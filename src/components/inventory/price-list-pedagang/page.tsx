@@ -2,12 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
-import { UserRole, hasAnyRole } from "@/lib/permissions";
-import {
-  PRICELIST_PEDAGANG_ROLES,
-  PRICELIST_MODAL_VIEW_ROLES,
-} from "@/lib/pricelistPedagang";
+import { UserRole, hasAnyRole, PERMISSIONS } from "@/lib/permissions";
 import { Tags, Package, Wallet, Download, RefreshCw } from "lucide-react";
+import EditableLaptopPriceCell from "@/components/inventory/EditableLaptopPriceCell";
+
+// Disamakan dengan PRICELIST_MODAL_VIEW_ROLES di pricelistPedagang.ts —
+// di-inline di sini supaya tidak import module yang transitif ke server code.
+const MODAL_VIEW_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
+  "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
+  "KEPALA_SOTECH", "KEPALA_ONPOINT", "KEPALA_ZENITH",
+];
 
 interface PedagangUnit {
   unit_id: string;
@@ -25,6 +30,8 @@ interface PedagangUnit {
     gpu: string;
     display: string;
   } | null;
+  charger_price: number;
+  laptop_bag_price: number;
   modal_price: number;
   tier_label: string;
   tier_percent: number;
@@ -60,7 +67,8 @@ function PriceListPedagangContent() {
   const [filterBrand, setFilterBrand] = useState("ALL");
 
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
-  const canSeeModal = hasAnyRole(userRoles, PRICELIST_MODAL_VIEW_ROLES);
+  const canSeeModal = hasAnyRole(userRoles, MODAL_VIEW_ROLES);
+  const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -149,31 +157,28 @@ function PriceListPedagangContent() {
       wb.creator = "Solit 03";
       wb.created = new Date();
 
-      const ws = wb.addWorksheet("Price List Pedagang", {
+      const ws = wb.addWorksheet("Laptop Siap Jual", {
         views: [{ state: "frozen", ySplit: 1 }],
         pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
       });
 
       const COLOR = {
-          headerBg: "FF4B5563",
-          headerFg: "FFFFFFFF",
-          rowEven: "FFF8FAFC",
-          rowOdd: "FFFFFFFF",
-          borderColor: "FFE2E8F0",
-          subTextFg: "FF64748B",
+        headerBg: "FF374151",
+        headerFg: "FFFFFFFF",
+        rowEven: "FFF8FAFC",
+        rowOdd: "FFFFFFFF",
+        borderColor: "FFE2E8F0",
+        subTextFg: "FF64748B",
       };
 
       const COLS = [
         { header: "No", key: "no", width: 6 },
-        { header: "Nama Laptop", key: "product", width: 34 },
-        { header: "Brand", key: "brand", width: 14 },
-        { header: "CPU", key: "cpu", width: 26 },
-        { header: "RAM", key: "ram", width: 10 },
-        { header: "Storage", key: "storage", width: 14 },
-        { header: "Grade", key: "grade", width: 10 },
-        { header: "Serial Number", key: "sn", width: 20 },
-        { header: "Kondisi", key: "condition", width: 26 },
-        { header: "Harga Pedagang", key: "price", width: 18 },
+        { header: "Product", key: "product", width: 36 },
+        { header: "CPU", key: "cpu", width: 22 },
+        { header: "RAM", key: "ram", width: 12 },
+        { header: "HDD/SSD", key: "storage", width: 16 },
+        { header: "Siap Jual", key: "qty", width: 12 },
+        { header: "Price Store", key: "price", width: 20 },
       ];
       ws.columns = COLS;
 
@@ -192,21 +197,60 @@ function PriceListPedagangContent() {
         };
         cell.alignment = { horizontal: "center", vertical: "middle" };
       });
-      ws.getRow(headerRowNum).height = 32;
+      ws.getRow(headerRowNum).height = 30;
 
-      filtered.forEach((u, idx) => {
-        const rowBg = idx % 2 === 0 ? COLOR.rowEven : COLOR.rowOdd;
+      // Ambil unit yang SIAP_JUAL (jika filter status ALL), atau ikuti filter status yang aktif
+      const unitsToExport = filterStatus === "ALL" 
+        ? filtered.filter((u) => u.status === "SIAP_JUAL")
+        : filtered;
+
+      // Agregasi unit per model laptop & harga pedagang
+      const groupedMap = new Map<string, {
+        product: string;
+        cpu: string;
+        ram: string;
+        storage: string;
+        qty: number;
+        price: number;
+      }>();
+
+      unitsToExport.forEach((u) => {
+        const product = u.laptop?.laptop_name || "-";
+        const cpu = u.laptop?.cpu || "-";
+        const ram = u.laptop?.ram || "-";
+        const storage = u.laptop?.storage || "-";
+        const price = u.pedagang_price || 0;
+
+        const key = `${product}|${cpu}|${ram}|${storage}|${price}`;
+
+        if (groupedMap.has(key)) {
+          groupedMap.get(key)!.qty += 1;
+        } else {
+          groupedMap.set(key, {
+            product,
+            cpu,
+            ram,
+            storage,
+            qty: 1,
+            price,
+          });
+        }
+      });
+
+      const groupedData = Array.from(groupedMap.values()).sort((a, b) =>
+        a.product.localeCompare(b.product, "id")
+      );
+
+      groupedData.forEach((item, idx) => {
+        const rowBg = idx % 2 === 0 ? COLOR.rowOdd : COLOR.rowEven;
         const rowData = {
           no: idx + 1,
-          product: u.laptop?.laptop_name || "-",
-          brand: u.laptop?.brand || "-",
-          cpu: u.laptop?.cpu || "-",
-          ram: u.laptop?.ram || "-",
-          storage: u.laptop?.storage || "-",
-          grade: `Grade ${u.grade}`,
-          sn: u.serial_number,
-          condition: u.condition_note || "-",
-          price: u.pedagang_price,
+          product: item.product,
+          cpu: item.cpu,
+          ram: item.ram,
+          storage: item.storage,
+          qty: item.qty,
+          price: item.price,
         };
 
         const row = ws.addRow(rowData);
@@ -218,27 +262,31 @@ function PriceListPedagangContent() {
           // ── Base styling ──────────────────────────────────────────────
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
           cell.border = {
-              top: { style: "hair", color: { argb: COLOR.borderColor } },
-              left: { style: "hair", color: { argb: COLOR.borderColor } },
-              bottom: { style: "hair", color: { argb: COLOR.borderColor } },
-              right: { style: "hair", color: { argb: COLOR.borderColor } },
+            top: { style: "hair", color: { argb: COLOR.borderColor } },
+            left: { style: "hair", color: { argb: COLOR.borderColor } },
+            bottom: { style: "hair", color: { argb: COLOR.borderColor } },
+            right: { style: "hair", color: { argb: COLOR.borderColor } },
           };
           cell.font = { size: 10, name: "Arial" };
           cell.alignment = { vertical: "middle" };
 
           // ── Per-column overrides ──────────────────────────────────────
           if (key === "no") {
-              cell.alignment = { horizontal: "center", vertical: "middle" };
-              cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-          } else if (key === "product" || key === "condition") {
-              cell.font = { size: 10, name: "Arial", bold: key === "product" };
-              cell.alignment = { horizontal: "left", vertical: "middle" };
-          } else if (["brand", "cpu", "ram", "storage", "grade", "sn"].includes(key)) {
-              cell.alignment = { horizontal: "center", vertical: "middle" };
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+            cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
+          } else if (key === "product") {
+            cell.font = { size: 10, name: "Arial", bold: true };
+            cell.alignment = { horizontal: "left", vertical: "middle" };
+          } else if (["cpu", "ram", "storage"].includes(key)) {
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+          } else if (key === "qty") {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } };
+            cell.font = { size: 10, name: "Arial", bold: true, color: { argb: "FF15803D" } };
+            cell.alignment = { horizontal: "center", vertical: "middle" };
           } else if (key === "price") {
-              cell.numFmt = '"Rp "#,##0';
-              cell.font = { size: 10, name: "Arial", bold: true };
-              cell.alignment = { horizontal: "right", vertical: "middle" };
+            cell.numFmt = '"Rp "#,##0';
+            cell.font = { size: 10, name: "Arial", bold: true };
+            cell.alignment = { horizontal: "right", vertical: "middle" };
           }
         });
       });
@@ -261,22 +309,13 @@ function PriceListPedagangContent() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
-      <div className="max-w-full mx-auto space-y-5">
+    <div className="space-y-4">
 
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 bg-gray-800 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-800/25 flex-shrink-0">
-              <Tags size={18} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">Price List Pedagang</h1>
-              <p className="text-xs text-gray-400 mt-0.5 font-medium">
-                Harga referensi untuk pedagang — tidak memengaruhi transaksi/payment
-              </p>
-            </div>
-          </div>
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-gray-400 font-medium">
+            Harga referensi untuk pedagang — tidak memengaruhi transaksi/payment
+          </p>
           <div className="flex items-center gap-2">
             <button onClick={fetchData}
               className="inline-flex items-center gap-1.5 h-9 px-3.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-50 transition">
@@ -284,7 +323,7 @@ function PriceListPedagangContent() {
               Refresh
             </button>
             <button onClick={exportToExcel} disabled={isExporting || filtered.length === 0}
-              className="inline-flex items-center gap-1.5 h-9 px-4 bg-gray-800 rounded-xl text-sm font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-gray-800/25">
+              className="inline-flex items-center gap-1.5 h-9 px-4 bg-gray-800 rounded-xl text-xs font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-gray-800/25">
               <Download className="w-3.5 h-3.5" />
               {isExporting ? "Mengexport..." : "Export Excel"}
             </button>
@@ -357,39 +396,45 @@ function PriceListPedagangContent() {
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[900px] text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b-2 border-gray-100">
                     <th className="px-4 py-3 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest w-10">No</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Laptop</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Serial Number</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Serial Number</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Grade</th>
                     <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
                     {canSeeModal && (
-                      <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Harga Modal</th>
+                      <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Biaya Charger</th>
                     )}
-                    <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest">Harga Pedagang</th>
+                    {canSeeModal && (
+                      <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Biaya Tas</th>
+                    )}
+                    {canSeeModal && (
+                      <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Harga Modal</th>
+                    )}
+                    <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Harga Pedagang</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filtered.map((u, idx) => (
                     <tr key={u.unit_id} className="hover:bg-gray-50/60 transition">
                       <td className="px-4 py-3.5 text-center text-xs font-semibold text-gray-300">{idx + 1}</td>
-                      <td className="px-4 py-3.5 max-w-[220px]">
+                      <td className="px-4 py-3.5 min-w-[200px] max-w-[280px]">
                         <p className="font-semibold text-gray-800 text-[13px] truncate">{u.laptop?.laptop_name || "—"}</p>
                         <p className="text-[11px] text-gray-400 truncate">
                           {[u.laptop?.brand, u.laptop?.cpu, u.laptop?.ram, u.laptop?.storage].filter(Boolean).join(" · ")}
                         </p>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-3.5 whitespace-nowrap">
                         <code className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{u.serial_number}</code>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-3.5 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${GRADE_BADGE[u.grade] || ""}`}>
                           Grade {u.grade}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-3.5 whitespace-nowrap">
                         {STATUS_STYLE[u.status] && (
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_STYLE[u.status].badge}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${STATUS_STYLE[u.status].dot}`} />
@@ -398,12 +443,40 @@ function PriceListPedagangContent() {
                         )}
                       </td>
                       {canSeeModal && (
-                        <td className="px-4 py-3.5 text-right">
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                          {canEditLaptop && u.laptop?.id ? (
+                            <EditableLaptopPriceCell
+                              laptopId={u.laptop.id}
+                              value={u.charger_price}
+                              field="charger_price"
+                              onSaved={fetchData}
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-500 tabular-nums">{fmt(u.charger_price)}</span>
+                          )}
+                        </td>
+                      )}
+                      {canSeeModal && (
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                          {canEditLaptop && u.laptop?.id ? (
+                            <EditableLaptopPriceCell
+                              laptopId={u.laptop.id}
+                              value={u.laptop_bag_price}
+                              field="laptop_bag_price"
+                              onSaved={fetchData}
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-500 tabular-nums">{fmt(u.laptop_bag_price)}</span>
+                          )}
+                        </td>
+                      )}
+                      {canSeeModal && (
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
                           <p className="text-xs text-gray-500 tabular-nums">{fmt(u.modal_price)}</p>
                           <p className="text-[10px] text-gray-300">{u.tier_label}</p>
                         </td>
                       )}
-                      <td className="px-4 py-3.5 text-right">
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
                         <span className="font-bold text-gray-800 tabular-nums">{fmt(u.pedagang_price)}</span>
                       </td>
                     </tr>
@@ -417,8 +490,7 @@ function PriceListPedagangContent() {
             </div>
           </div>
         )}
-      </div>
-    </main>
+    </div>
   );
 }
 

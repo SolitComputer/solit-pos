@@ -25,7 +25,9 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
           ram,
           storage,
           gpu,
-          display
+          display,
+          charger_price,
+          laptop_bag_price
         )
       `)
       .neq("status", "SOLD")
@@ -36,7 +38,11 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     }
 
     const result = (data || []).map((unit) => {
-      const calc = calculatePedagangPrice(unit.purchase_price);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const lap = unit.laptop as any;
+      const chargerPrice = lap?.charger_price ?? 0;
+      const bagPrice = lap?.laptop_bag_price ?? 0;
+      const calc = calculatePedagangPrice(unit.purchase_price, chargerPrice, bagPrice);
       return {
         unit_id: unit.id,
         serial_number: unit.serial_number,
@@ -44,6 +50,8 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
         condition_note: unit.condition_note,
         status: unit.status,
         laptop: unit.laptop,
+        charger_price: chargerPrice,
+        laptop_bag_price: bagPrice,
         modal_price: calc.modalPrice,
         tier_label: calc.tier.label,
         tier_percent: calc.tier.percent,
