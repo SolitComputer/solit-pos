@@ -8,9 +8,11 @@ import {
     ACCOUNTS,
     ACCOUNT_TYPE_LABEL,
     ACCOUNT_TYPE_ORDER,
+    AKUN,
     DraftLine,
     JournalSide,
     MANUAL_TEMPLATES,
+    accountName,
     isBalanced,
     sumSide,
 } from "@/lib/accounting";
@@ -61,6 +63,7 @@ interface PendingDraft {
         cpu?: string | null;
         ram?: string | null;
         storage?: string | null;
+        modal_missing?: boolean;
         [key: string]: unknown;
     };
 }
@@ -314,6 +317,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                     // Service dan Cashflow tidak punya konsep laptop_id/company_name.
                                     const companyBadge = d.source_type === "TRANSACTION" ? getCompanyBadge(d.meta?.company_name) : null;
                                     const specParts = [d.meta?.cpu, d.meta?.ram, d.meta?.storage].filter(Boolean) as string[];
+                                    const modalMissing = d.source_type === "TRANSACTION" && d.meta?.modal_missing === true;
                                     return (
                                         <label
                                             key={k}
@@ -340,6 +344,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                                             {companyBadge && (
                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${companyBadge.color}`}>
                                                     {companyBadge.label}
+                                                </span>
+                                            )}
+                                            {modalMissing && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
+                                                    <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
                                                 </span>
                                             )}
                                             <div className="flex-1 min-w-0">
@@ -476,6 +485,40 @@ export default function JurnalUmum({ period }: { period: string }) {
                                             const badge = SOURCE_BADGE[entry.source_type];
                                             const companyBadge = entry.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
                                             const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
+                                            // Modal belum diinput → tampilkan baris akun HPP (130) dengan nominal Rp0
+                                            // LANGSUNG di tabel (bukan badge terpisah), persis seperti baris akun lain.
+                                            // Baris ini tidak tersimpan di journal_lines (karena mergeLines() di
+                                            // accountingSource.ts memang skip baris nominal 0) — jadi cuma dirender
+                                            // di sini, tidak mempengaruhi total debit/kredit (nominalnya 0).
+                                            const modalMissing = entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing === true;
+                                            // Modal belum diinput → tampilkan PASANGAN akun HPP/Modal Keluar dengan
+                                            // nominal Rp0, persis posisi debit/kredit-nya seperti kalau modal > 0:
+                                            // 440 (Modal Keluar) di Debit, 130 (HPP) di Kredit — lihat buildTransactionDrafts()
+                                            // di accountingSource.ts. Kedua baris ini sintetis (tidak tersimpan di
+                                            // journal_lines), jadi tidak mempengaruhi Total Debit/Kredit di atas.
+                                            const displayLines: JournalLine[] = modalMissing
+                                                ? [
+                                                    ...entry.lines,
+                                                    {
+                                                        id: `${entry.id}-modal-keluar-missing`,
+                                                        account_code: AKUN.MODAL_KELUAR,
+                                                        account_name: accountName(AKUN.MODAL_KELUAR),
+                                                        side: "DEBIT",
+                                                        nominal: 0,
+                                                        keterangan: "Harga modal belum diinput",
+                                                        line_order: 999,
+                                                    },
+                                                    {
+                                                        id: `${entry.id}-hpp-missing`,
+                                                        account_code: AKUN.HPP,
+                                                        account_name: accountName(AKUN.HPP),
+                                                        side: "KREDIT",
+                                                        nominal: 0,
+                                                        keterangan: null,
+                                                        line_order: 1000,
+                                                    },
+                                                ]
+                                                : entry.lines;
                                             return (
                                                 <Draggable key={entry.id} draggableId={entry.id} index={index}>
                                                     {(provided, snapshot) => (
@@ -486,7 +529,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                             className={snapshot.isDragging ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400" : ""}
                                                             style={provided.draggableProps.style}
                                                         >
-                                                            {entry.lines.map((line, i) => {
+                                                            {displayLines.map((line, i) => {
                                                                 const first = i === 0;
                                                                 const isKredit = line.side === "KREDIT";
                                                                 return (
@@ -515,11 +558,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                     {companyBadge && (
                                                                                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
                                                                                             {companyBadge.label}
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing && (
-                                                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
-                                                                                            <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
                                                                                         </span>
                                                                                     )}
                                                                                     {entry.is_edited && (

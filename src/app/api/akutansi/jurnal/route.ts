@@ -4,6 +4,7 @@ import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES, AKUNTANSI_MANAGE_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import {
+  AKUN,
   DraftLine,
   isBalanced,
   isValidPeriod,
@@ -72,36 +73,22 @@ export const GET = withAuth(async (req) => {
 
   const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
 
-  // Harga modal (inventory_price) diambil langsung dari tabel transactions supaya status
-  // "belum diinput" (modal 0/null di Riwayat Transaksi) tetap kedeteksi di sini — bukan cuma
-  // di halaman Riwayat Transaksi. Query terpisah dari getTransactionMetaByInvoices karena
-  // field ini tidak termasuk meta yang dikembalikan fungsi itu.
-  const modalMissingMap = new Map<string, boolean>();
-  if (trxInvoiceNumbers.length > 0) {
-    const { data: trxModalRows, error: modalErr } = await supabase
-      .from("transactions")
-      .select("invoice_number, inventory_price")
-      .in("invoice_number", trxInvoiceNumbers);
-
-    if (modalErr) {
-      console.error("[akuntansi GET jurnal] gagal ambil inventory_price:", modalErr);
-    } else {
-      for (const row of (trxModalRows ?? []) as { invoice_number: string; inventory_price: number | null }[]) {
-        modalMissingMap.set(row.invoice_number, !row.inventory_price || Number(row.inventory_price) === 0);
-      }
-    }
-  }
-
   const entriesWithMeta = entries.map((e: any) => {
     if (e.source_type !== "TRANSACTION" || !e.source_id) {
       return { ...e, trx_meta: null };
     }
     const baseMeta = trxMetaMap.get(e.source_id) ?? null;
+    // Modal dianggap belum diinput kalau jurnal ini TIDAK punya baris HPP (130) —
+    // karena buildTransactionDrafts() cuma menambahkan baris Modal Keluar/HPP saat
+    // modal > 0 (lihat accountingSource.ts). Dicek langsung dari baris jurnal yang
+    // sudah tersimpan, supaya selalu konsisten dengan apa yang benar-benar diposting —
+    // bukan query terpisah ke kolom transactions.inventory_price yang bisa berbeda.
+    const hasModalLine = (e.lines ?? []).some((l: any) => l.account_code === AKUN.HPP);
     return {
       ...e,
       trx_meta: {
         ...(baseMeta ?? {}),
-        modal_missing: modalMissingMap.get(e.source_id) ?? false,
+        modal_missing: !hasModalLine,
       },
     };
   });

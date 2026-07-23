@@ -278,6 +278,7 @@ async function buildTransactionDrafts(
         invoice: t.invoice_number,
         deal,
         modal,
+        modal_missing: modal === 0, // modal 0 = harga beli unit belum diinput
         company_name: t.company_name ?? null,
         cpu: specs?.cpu ?? null,
         ram: specs?.ram ?? null,
