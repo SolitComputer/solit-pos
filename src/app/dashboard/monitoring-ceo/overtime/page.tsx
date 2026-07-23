@@ -8,6 +8,7 @@ import {
   Clock, CalendarDays, FileText, TrendingUp, Users,
   ArrowUpDown, ArrowUp, ArrowDown, Search, X, Trophy, ChevronLeft, ChevronRight,
   Medal, Activity, RefreshCw, Timer, DollarSign,
+  Briefcase, GraduationCap,
 } from "lucide-react";
 
 // ── TYPES ────────────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ type SummaryData = {
   totalPay: number;
   uniqueEmployees: number;
   statusCounts: Record<string, number>;
+  groupCounts: { karyawan: number; pkl: number };
   topEmployees: { id: string; name: string; role: string; sessions: number; minutes: number; pay: number }[];
   avgMinutesPerSession: number;
 };
@@ -52,6 +54,12 @@ type SummaryData = {
 type SortBy = "duration" | "pay" | "date";
 type SortOrder = "asc" | "desc";
 type EmployeeRef = { id: string; name: string; role: string };
+type GroupTab = "karyawan" | "pkl";
+
+const GROUP_TABS: { key: GroupTab; label: string }[] = [
+  { key: "karyawan", label: "Karyawan" },
+  { key: "pkl", label: "PKL" },
+];
 
 const MONITORING_CEO_ROLES = ["ADMIN", "PROGRAMMER"];
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -481,6 +489,7 @@ export default function CeoOvertimeMonitoringPage() {
   const [sortBy, setSortBy] = useState<SortBy>("duration");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [statusFilter, setStatusFilter] = useState<string>("Semua");
+  const [group, setGroup] = useState<GroupTab>("karyawan");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
 
@@ -495,6 +504,9 @@ export default function CeoOvertimeMonitoringPage() {
   const [employeeRows, setEmployeeRows] = useState<OvertimeRow[]>([]);
   const [employeeLoading, setEmployeeLoading] = useState(false);
 
+  // Label grup aktif — dipakai di beberapa tempat (hero, kartu, empty state)
+  const groupLabel = group === "pkl" ? "PKL" : "Karyawan";
+
   useEffect(() => {
     getCurrentUserClient().then(u => { setCurrentUser(u); setAuthChecked(true); });
   }, []);
@@ -507,7 +519,7 @@ export default function CeoOvertimeMonitoringPage() {
   const fetchData = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const params = new URLSearchParams({ startDate, endDate, sortBy, sortOrder });
+      const params = new URLSearchParams({ startDate, endDate, sortBy, sortOrder, group });
       if (statusFilter !== "Semua") params.set("status", statusFilter);
       if (search) params.set("search", search);
       const res = await fetch(`/api/attendance/overtime/monitoring?${params.toString()}`);
@@ -523,7 +535,7 @@ export default function CeoOvertimeMonitoringPage() {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate, sortBy, sortOrder, statusFilter, search]);
+  }, [startDate, endDate, sortBy, sortOrder, statusFilter, search, group]);
 
   useEffect(() => { if (authChecked) fetchData(); }, [authChecked, fetchData]);
 
@@ -548,6 +560,14 @@ export default function CeoOvertimeMonitoringPage() {
     fetchEmployeeData(employee);
   };
   const closeEmployee = () => { setSelectedEmployee(null); setEmployeeRows([]); };
+
+  // Ganti grup: reset filter status supaya tidak nyangkut di status yang
+  // tidak ada di grup tujuan (misal NEED_PROOF cuma ada di Karyawan).
+  const handleGroupChange = (next: GroupTab) => {
+    if (next === group) return;
+    setGroup(next);
+    setStatusFilter("Semua");
+  };
 
   const isAllowed = useMemo(() => {
     if (!currentUser) return true;
@@ -632,7 +652,7 @@ export default function CeoOvertimeMonitoringPage() {
                       ? (employeeLoading ? "Memuat data..." : `${selectedEmployee.name} · ${employeeRows.length} lemburan`)
                       : (loading
                         ? "Memuat data..."
-                        : `${rows.length} lemburan · ${startDate === endDate ? formatDateLabel(startDate) : `${formatDateLabel(startDate)} – ${formatDateLabel(endDate)}`}`)}
+                        : `${groupLabel} · ${rows.length} lemburan · ${startDate === endDate ? formatDateLabel(startDate) : `${formatDateLabel(startDate)} – ${formatDateLabel(endDate)}`}`)}
                   </p>
                 </div>
               </div>
@@ -674,12 +694,39 @@ export default function CeoOvertimeMonitoringPage() {
             />
           ) : (
             <>
+              {/* ─── GROUP TABS: KARYAWAN / PKL ─── */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 flex gap-1.5">
+                {GROUP_TABS.map(t => {
+                  const active = group === t.key;
+                  const count = t.key === "karyawan"
+                    ? summary?.groupCounts?.karyawan
+                    : summary?.groupCounts?.pkl;
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => handleGroupChange(t.key)}
+                      aria-pressed={active}
+                      className={`flex-1 h-12 rounded-xl flex items-center justify-center gap-2 text-xs font-black transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 ${active
+                        ? "bg-gray-900 text-white border-gray-900 shadow-sm"
+                        : "bg-white text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-800"
+                        }`}
+                    >
+                      {t.key === "karyawan" ? <Briefcase size={14} /> : <GraduationCap size={14} />}
+                      <span>{t.label}</span>
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md tabular-nums ${active ? "bg-white/15 text-white" : "bg-gray-100 text-gray-500"}`}>
+                        {loading ? "…" : count ?? 0}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
               {/* ─── SUMMARY CARDS ─── */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
                 {[
                   { label: "Total Lemburan", value: summary?.totalSessions ?? 0, icon: <FileText className="w-5 h-5" />, tone: "gray" as const },
                   { label: "Total Jam", value: `${summary?.totalHours ?? 0} j`, icon: <Clock className="w-5 h-5" />, tone: "violet" as const },
-                  { label: "Karyawan Terlibat", value: summary?.uniqueEmployees ?? 0, icon: <Users className="w-5 h-5" />, tone: "emerald" as const },
+                  { label: `${groupLabel} Terlibat`, value: summary?.uniqueEmployees ?? 0, icon: <Users className="w-5 h-5" />, tone: "emerald" as const },
                   { label: "Total Nominal", value: formatRupiah(summary?.totalPay ?? 0), icon: <TrendingUp className="w-5 h-5" />, tone: "blue" as const, small: true },
                 ].map(c => (
                   <StatCard key={c.label} label={c.label} value={c.value} icon={c.icon} tone={c.tone} small={c.small} loading={loading} />
@@ -731,7 +778,7 @@ export default function CeoOvertimeMonitoringPage() {
                   <div className="flex flex-col sm:flex-row gap-2.5 pt-3 border-t border-gray-100">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
-                      <input type="text" placeholder="Cari nama karyawan..." value={searchInput} onChange={e => setSearchInput(e.target.value)}
+                      <input type="text" placeholder={`Cari nama ${group === "pkl" ? "PKL" : "karyawan"}...`} value={searchInput} onChange={e => setSearchInput(e.target.value)}
                         className="w-full h-10 pl-9 pr-8 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition-all placeholder:text-gray-300" />
                       {searchInput && (
                         <button onClick={() => setSearchInput("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 p-1 hover:bg-gray-100 rounded-lg transition">
@@ -764,7 +811,7 @@ export default function CeoOvertimeMonitoringPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-black text-gray-900">Top 5 Jam Lembur</p>
-                      <p className="text-[10px] text-gray-400 font-medium">Di rentang tanggal ini</p>
+                      <p className="text-[10px] text-gray-400 font-medium">Grup {groupLabel} · di rentang tanggal ini</p>
                     </div>
                     <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 tabular-nums flex-shrink-0">
                       {summary.topEmployees.length}
@@ -809,7 +856,7 @@ export default function CeoOvertimeMonitoringPage() {
                     <div className="w-8 h-8 rounded-xl bg-white border border-gray-200 text-gray-700 flex items-center justify-center flex-shrink-0 shadow-sm">
                       <FileText className="w-4 h-4" />
                     </div>
-                    <p className="text-sm font-black text-gray-900">Detail Lemburan</p>
+                    <p className="text-sm font-black text-gray-900">Detail Lemburan {groupLabel}</p>
                     {!loading && rows.length > 0 && (
                       <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 tabular-nums">{rows.length}</span>
                     )}
@@ -842,7 +889,7 @@ export default function CeoOvertimeMonitoringPage() {
                       <FileText size={26} className="text-gray-300" />
                     </div>
                     <p className="text-sm font-black text-gray-500">Tidak Ada Data</p>
-                    <p className="text-xs text-gray-400 text-center">Tidak ada lemburan pada rentang atau filter ini</p>
+                    <p className="text-xs text-gray-400 text-center">Tidak ada lemburan {groupLabel.toLowerCase()} pada rentang atau filter ini</p>
                   </div>
                 ) : (
                   <>
@@ -851,7 +898,7 @@ export default function CeoOvertimeMonitoringPage() {
                       <table className="w-full min-w-[820px] text-xs">
                         <thead>
                           <tr className="bg-gray-50/70 border-b border-gray-100">
-                            <th className="text-left font-black text-gray-400 uppercase tracking-wider text-[9px] px-5 py-3">Karyawan</th>
+                            <th className="text-left font-black text-gray-400 uppercase tracking-wider text-[9px] px-5 py-3">{groupLabel}</th>
                             <th className="text-left font-black text-gray-400 uppercase tracking-wider text-[9px] px-3 py-3">Tanggal</th>
                             <th className="text-left font-black text-gray-400 uppercase tracking-wider text-[9px] px-3 py-3">Jam</th>
                             <th className="text-left font-black text-gray-400 uppercase tracking-wider text-[9px] px-3 py-3">Durasi</th>
