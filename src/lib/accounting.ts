@@ -13,7 +13,6 @@ export interface Account {
   normal: JournalSide;
 }
 
-// ─── Kode Akun ────────────────────────────────────────────────────────────────
 export const AKUN = {
   KAS_SALDO: "110",
   KAS_CASH: "120",
