@@ -12,9 +12,10 @@
 //    admin langsung lihat kondisi saat ini tanpa setting manual dari nol.
 // 2. Role Custom — dibuat lewat tombol "+ Buat Role", disimpan di tabel
 //    dynamic_roles, matrix-nya kosong sampai admin isi sendiri.
+//    Bisa di-Edit (label/icon/PKL/parent) dan di-Hapus lewat tombol di tiap baris.
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, AlertTriangle, Save } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Save, Pencil, Trash2 } from "lucide-react";
 
 interface DynamicRoleRow {
   id: string;
@@ -67,9 +68,8 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
   }, [onClose]);
   return (
     <div
-      className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold bg-white border ${
-        type === "ok" ? "text-slate-700 border-slate-100" : "text-red-600 border-red-100"
-      } flex items-center gap-2`}
+      className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold bg-white border ${type === "ok" ? "text-slate-700 border-slate-100" : "text-red-600 border-red-100"
+        } flex items-center gap-2`}
     >
       {type === "ok" ? <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" /> : <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
       {msg}
@@ -77,48 +77,75 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
   );
 }
 
-function CreateRoleModal({
+// ── Modal Buat / Edit Role ────────────────────────────────────────────────────
+// Satu komponen dipakai untuk 2 mode:
+// - create  → role === null/undefined, POST /api/admin/roles
+// - edit    → role terisi,             PUT  /api/admin/roles
+function RoleFormModal({
   onClose,
-  onCreated,
+  onSaved,
   existingRoles,
+  role,
 }: {
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
   existingRoles: DynamicRoleRow[];
+  role?: DynamicRoleRow | null;
 }) {
-  const [key, setKey] = useState("");
-  const [label, setLabel] = useState("");
-  const [icon, setIcon] = useState("");
-  const [isPkl, setIsPkl] = useState(false);
-  const [parentRole, setParentRole] = useState("");
+  const isEdit = !!role;
+  const [key, setKey] = useState(role?.key ?? "");
+  const [label, setLabel] = useState(role?.label ?? "");
+  const [icon, setIcon] = useState(role?.icon ?? "");
+  const [isPkl, setIsPkl] = useState(role?.is_pkl ?? false);
+  const [parentRole, setParentRole] = useState(role?.parent_role ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Role tidak boleh mewarisi akses dari dirinya sendiri (infinite loop resolusi permission)
+  const parentOptions = useMemo(
+    () => existingRoles.filter((r) => r.key !== role?.key),
+    [existingRoles, role?.key]
+  );
+
   const save = async () => {
     setError("");
-    if (!key.trim() || !label.trim()) {
-      setError("Key dan nama role wajib diisi");
+    if (!isEdit && !key.trim()) {
+      setError("Key role wajib diisi");
+      return;
+    }
+    if (!label.trim()) {
+      setError("Nama role wajib diisi");
       return;
     }
     setSaving(true);
     try {
       const res = await fetch("/api/admin/roles", {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key: key.trim(),
-          label: label.trim(),
-          icon,
-          is_pkl: isPkl,
-          parent_role: parentRole || null,
-        }),
+        body: JSON.stringify(
+          isEdit
+            ? {
+              id: role!.id,
+              label: label.trim(),
+              icon,
+              is_pkl: isPkl,
+              parent_role: parentRole || null,
+            }
+            : {
+              key: key.trim(),
+              label: label.trim(),
+              icon,
+              is_pkl: isPkl,
+              parent_role: parentRole || null,
+            }
+        ),
       });
       const data = await res.json();
       if (!data.success) {
         setError(data.message);
         return;
       }
-      onCreated();
+      onSaved();
       onClose();
     } catch {
       setError("Terjadi kesalahan");
@@ -131,7 +158,9 @@ function CreateRoleModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
-        <h3 className="font-black text-slate-800 text-base mb-4">Buat Role Baru</h3>
+        <h3 className="font-black text-slate-800 text-base mb-4">
+          {isEdit ? "Edit Role Custom" : "Buat Role Baru"}
+        </h3>
         {error && (
           <div className="mb-3 px-3 py-2.5 rounded-xl text-xs font-semibold bg-red-50 border border-red-100 text-red-600">
             {error}
@@ -144,10 +173,17 @@ function CreateRoleModal({
             </label>
             <input
               value={key}
+              disabled={isEdit}
               onChange={(e) => setKey(e.target.value.toUpperCase().replace(/\s+/g, "_"))}
               placeholder="contoh: GUDANG_CABANG_2"
-              className="w-full h-10 border rounded-xl px-3 text-sm border-slate-200"
+              className="w-full h-10 border rounded-xl px-3 text-sm border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
             />
+            {isEdit && (
+              <p className="text-[9.5px] text-slate-400 mt-1">
+                Key tidak bisa diubah — nilai ini tersimpan di kolom <code>users.role</code> &{" "}
+                <code>users.roles[]</code> dan di <code>role_page_permissions</code>.
+              </p>
+            )}
           </div>
           <div>
             <label className="text-[10.5px] font-bold uppercase tracking-widest text-slate-400 block mb-1">
@@ -184,7 +220,7 @@ function CreateRoleModal({
               className="w-full h-10 border rounded-xl px-3 text-sm border-slate-200 bg-white"
             >
               <option value="">— Tidak ada —</option>
-              {existingRoles.map((r) => (
+              {parentOptions.map((r) => (
                 <option key={r.key} value={r.key}>
                   {r.label}
                 </option>
@@ -202,7 +238,73 @@ function CreateRoleModal({
             className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50"
             style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}
           >
-            {saving ? "Menyimpan..." : "Buat Role"}
+            {saving ? "Menyimpan..." : isEdit ? "Simpan Perubahan" : "Buat Role"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Konfirmasi Hapus Role ───────────────────────────────────────────────
+function ConfirmDeleteRoleModal({
+  role,
+  loading,
+  onClose,
+  onConfirm,
+}: {
+  role: DynamicRoleRow;
+  loading: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7">
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "#fff1f2", border: "1px solid #fecaca" }}
+        >
+          <Trash2 className="w-8 h-8" style={{ color: "#dc2626" }} />
+        </div>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">
+          Hapus Role {role.label}?
+        </h3>
+        <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
+          Role beserta seluruh hak akses halamannya akan dihapus permanen.
+        </p>
+        <div
+          className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
+          style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}
+        >
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> Tindakan ini tidak bisa dibatalkan!
+        </div>
+        <div className="flex gap-2.5">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-200"
+            style={{ background: "#f1f5f9", color: "#64748b" }}
+          >
+            Batal
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)" }}
+          >
+            {loading ? (
+              <div
+                className="w-4 h-4 border-2 rounded-full animate-spin"
+                style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }}
+              />
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4" /> Ya, Hapus
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -221,6 +323,9 @@ export default function RoleAccessManager() {
   const [loadingMatrix, setLoadingMatrix] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [editRole, setEditRole] = useState<DynamicRoleRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DynamicRoleRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
   const [legacySearch, setLegacySearch] = useState("");
 
@@ -246,10 +351,58 @@ export default function RoleAccessManager() {
     if (data.success) setPages(data.pages);
   };
 
+  const handleDeleteRole = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/roles?id=${encodeURIComponent(deleteTarget.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showToast(data.message ?? "Gagal menghapus role", "err");
+        return;
+      }
+      // Kalau role yang dihapus sedang dibuka matrix-nya, kosongkan panel kanan
+      // supaya tidak menyimpan permission ke role yang sudah tidak ada.
+      if (selectedRole?.key === deleteTarget.key) {
+        setSelectedRole(null);
+        setPermMap({});
+      }
+      showToast(`Role "${deleteTarget.label}" berhasil dihapus`, "ok");
+      await loadRoles();
+    } catch {
+      showToast("Terjadi kesalahan", "err");
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
+  // Kalau label role yang sedang dibuka diubah lewat modal Edit,
+  // sinkronkan judul di panel kanan supaya tidak menampilkan nama lama.
+  const handleRoleSaved = async () => {
+    await loadRoles();
+    if (editRole && selectedRole?.key === editRole.key) {
+      setSelectedRole((prev) => (prev ? { ...prev } : prev));
+    }
+  };
+
   useEffect(() => {
     loadRoles();
     loadPages();
   }, []);
+
+  // Judul panel kanan diambil dari data terbaru dynamicRoles (bukan snapshot
+  // saat diklik), supaya hasil edit langsung terlihat tanpa klik ulang.
+  const selectedRoleDisplay = useMemo(() => {
+    if (!selectedRole) return null;
+    if (selectedRole.kind === "dynamic") {
+      const fresh = dynamicRoles.find((r) => r.key === selectedRole.key);
+      if (fresh) return { label: fresh.label, icon: fresh.icon };
+    }
+    return { label: selectedRole.label, icon: selectedRole.icon };
+  }, [selectedRole, dynamicRoles]);
 
   const loadMatrixFor = async (role: SelectedRole) => {
     setSelectedRole(role);
@@ -355,8 +508,27 @@ export default function RoleAccessManager() {
   return (
     <div className="space-y-4">
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-      {showCreate && (
-        <CreateRoleModal existingRoles={dynamicRoles} onClose={() => setShowCreate(false)} onCreated={loadRoles} />
+
+      {(showCreate || editRole) && (
+        <RoleFormModal
+          key={editRole?.id ?? "create"}
+          role={editRole}
+          existingRoles={dynamicRoles}
+          onClose={() => {
+            setShowCreate(false);
+            setEditRole(null);
+          }}
+          onSaved={handleRoleSaved}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDeleteRoleModal
+          role={deleteTarget}
+          loading={deleting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDeleteRole}
+        />
       )}
 
       <div className="flex gap-5 items-start">
@@ -382,9 +554,8 @@ export default function RoleAccessManager() {
                   <button
                     key={r.key}
                     onClick={() => loadMatrixFor({ kind: "legacy", key: r.key, label: r.label, icon: "🏷️" })}
-                    className={`w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-2 border-b border-slate-50 transition ${
-                      selectedRole?.key === r.key ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"
-                    }`}
+                    className={`w-full text-left px-4 py-2.5 text-[13px] font-semibold flex items-center gap-2 border-b border-slate-50 transition ${selectedRole?.key === r.key ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"
+                      }`}
                   >
                     <span className="flex-1 truncate">{r.label}</span>
                   </button>
@@ -414,22 +585,53 @@ export default function RoleAccessManager() {
               <div className="p-6 text-center text-xs text-slate-400">
                 Belum ada role custom.
                 <br />
-                Klik "Buat Role" untuk mulai.
+                Klik &quot;Buat Role&quot; untuk mulai.
               </div>
             ) : (
               <div className="max-h-64 overflow-y-auto">
                 {dynamicRoles.map((r) => (
-                  <button
+                  // Row dibungkus <div>, BUKAN <button>.
+                  // Kalau tombol Edit/Delete ditaruh di dalam <button>, HTML jadi
+                  // invalid (nested button) → hydration mismatch + klik ikut
+                  // men-trigger loadMatrixFor karena event bubbling.
+                  <div
                     key={r.id}
-                    onClick={() => loadMatrixFor({ kind: "dynamic", key: r.key, label: r.label, icon: r.icon })}
-                    className={`w-full text-left px-4 py-3 text-sm font-semibold flex items-center gap-2 border-b border-slate-50 transition ${
-                      selectedRole?.key === r.key ? "bg-violet-50 text-violet-700" : "text-slate-600 hover:bg-slate-50"
-                    }`}
+                    className={`flex items-center border-b border-slate-50 transition ${selectedRole?.key === r.key ? "bg-violet-50" : "hover:bg-slate-50"
+                      }`}
                   >
-                    <span>{r.icon}</span>
-                    <span className="flex-1 truncate">{r.label}</span>
-                    {r.is_pkl && <span className="text-[9px] font-bold text-amber-600">PKL</span>}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => loadMatrixFor({ kind: "dynamic", key: r.key, label: r.label, icon: r.icon })}
+                      className={`flex-1 min-w-0 text-left pl-4 pr-2 py-3 text-sm font-semibold flex items-center gap-2 ${selectedRole?.key === r.key ? "text-violet-700" : "text-slate-600"
+                        }`}
+                    >
+                      <span className="flex-shrink-0">{r.icon}</span>
+                      <span className="flex-1 truncate">{r.label}</span>
+                      {r.is_pkl && (
+                        <span className="text-[9px] font-bold text-amber-600 flex-shrink-0">PKL</span>
+                      )}
+                    </button>
+                    <div className="flex items-center gap-1 pr-3 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditRole(r)}
+                        title={`Edit role ${r.label}`}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg transition-all hover:scale-110 active:scale-95"
+                        style={{ background: "#f0f9ff", color: "#0369a1" }}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(r)}
+                        title={`Hapus role ${r.label}`}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg transition-all hover:scale-110 active:scale-95"
+                        style={{ background: "#fff1f2", color: "#dc2626" }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -449,7 +651,7 @@ export default function RoleAccessManager() {
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-black text-slate-800 truncate">
-                    {selectedRole.icon} {selectedRole.label}
+                    {selectedRoleDisplay?.icon} {selectedRoleDisplay?.label}
                   </p>
                   {autoDetected ? (
                     <p className="text-[10.5px] mt-0.5 flex items-center gap-1.5">
