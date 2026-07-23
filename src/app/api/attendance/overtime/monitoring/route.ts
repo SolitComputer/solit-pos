@@ -14,6 +14,16 @@ const PAYABLE_STATUSES = ["COMPLETED", "NEED_PROOF"];
 const VALID_SORT_BY = ["duration", "pay", "date"] as const;
 type SortBy = (typeof VALID_SORT_BY)[number];
 
+// ── Pemisahan grup: Karyawan (non-PKL) vs PKL ──
+const VALID_GROUPS = ["all", "karyawan", "pkl"] as const;
+type GroupFilter = (typeof VALID_GROUPS)[number];
+
+function isPklRole(role?: string | null): boolean {
+    if (!role) return false;
+    const r = role.toUpperCase();
+    return r === "PKL" || r.startsWith("PKL_");
+}
+
 type OvertimeRowRaw = {
     id: string;
     user_id: string;
@@ -67,6 +77,11 @@ export async function GET(request: Request) {
             ? (sortByParam as SortBy)
             : "duration";
         const sortOrder: "asc" | "desc" = searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
+
+        const groupParam = searchParams.get("group") ?? "all";
+        const group: GroupFilter = (VALID_GROUPS as readonly string[]).includes(groupParam)
+            ? (groupParam as GroupFilter)
+            : "all";
 
         if (!startDate || !endDate) {
             return NextResponse.json(
@@ -131,6 +146,18 @@ export async function GET(request: Request) {
             enriched = enriched.filter((o) => o.users?.name?.toLowerCase().includes(search));
         }
 
+        // ── Hitung jumlah tiap grup SEBELUM difilter (untuk badge tab di UI) ──
+        const groupCounts = {
+            karyawan: enriched.filter((o) => !isPklRole(o.users?.role)).length,
+            pkl: enriched.filter((o) => isPklRole(o.users?.role)).length,
+        };
+
+        if (group === "karyawan") {
+            enriched = enriched.filter((o) => !isPklRole(o.users?.role));
+        } else if (group === "pkl") {
+            enriched = enriched.filter((o) => isPklRole(o.users?.role));
+        }
+
         // ── Sorting ──
         const dir = sortOrder === "asc" ? 1 : -1;
         enriched.sort((a, b) => {
@@ -190,6 +217,7 @@ export async function GET(request: Request) {
                 totalPay,
                 uniqueEmployees,
                 statusCounts,
+                groupCounts,
                 topEmployees,
                 avgMinutesPerSession: payableRows.length
                     ? Math.round(totalMinutes / payableRows.length)

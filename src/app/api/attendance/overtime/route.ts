@@ -725,9 +725,21 @@ export async function PATCH(request: Request) {
         );
       }
 
-      if (overtime.status !== "COMPLETED" && overtime.status !== "NEED_PROOF") {
+if (overtime.status !== "COMPLETED") {
         return NextResponse.json(
           { success: false, message: "Bayaran hanya bisa diatur setelah lembur selesai" },
+          { status: 400 }
+        );
+      }
+
+      // Wajib ada foto bukti sebelum bayaran boleh diatur.
+      // NEED_PROOF = sudah selesai tapi foto belum diupload → tetap ditolak di sini.
+      if (!overtime.proof_photo_url) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Bayaran belum bisa diatur — karyawan belum upload foto bukti lembur",
+          },
           { status: 400 }
         );
       }
