@@ -8,6 +8,7 @@ import { periodLabel } from "@/lib/accounting";
 import JurnalUmum from "./JurnalUmum";
 import BukuBesar from "./BukuBesar";
 import Neraca from "./Neraca";
+import LabaRugi from "./LabaRugi";
 import AkunManager from "./AkunManager";
 import { Inbox, FileSpreadsheet } from "lucide-react";
 
@@ -123,23 +124,19 @@ export default function AkuntansiTabs({ period }: { period: string }) {
               key={t.key}
               onClick={() => setTab(t.key)}
               style={{ animationDelay: `${i * 40}ms` }}
-              className={`ledger-tab relative shrink-0 ${
-                active ? "h-11" : "h-10"
-              } min-w-[112px] flex items-center justify-center active:scale-[0.96] transition-all duration-200 ${
-                active ? "" : "hover:-translate-y-0.5"
-              }`}
+              className={`ledger-tab relative shrink-0 ${active ? "h-11" : "h-10"
+                } min-w-[112px] flex items-center justify-center active:scale-[0.96] transition-all duration-200 ${active ? "" : "hover:-translate-y-0.5"
+                }`}
             >
               <span
-                className={`ledger-tab-shape absolute inset-0 transition-colors duration-200 ${
-                  active
+                className={`ledger-tab-shape absolute inset-0 transition-colors duration-200 ${active
                     ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] shadow-lg shadow-black/20"
                     : "bg-white border border-gray-200 hover:bg-gray-50"
-                }`}
+                  }`}
               />
               <span
-                className={`relative z-10 text-xs font-bold whitespace-nowrap px-3 ${
-                  active ? "text-white" : "text-gray-500"
-                }`}
+                className={`relative z-10 text-xs font-bold whitespace-nowrap px-3 ${active ? "text-white" : "text-gray-500"
+                  }`}
               >
                 {t.label}
               </span>
@@ -156,6 +153,8 @@ export default function AkuntansiTabs({ period }: { period: string }) {
           <BukuBesar period={period} />
         ) : tab === "neraca" ? (
           <Neraca period={period} />
+        ) : tab === "laba-rugi" ? (
+          <LabaRugi period={period} />
         ) : tab === "akun" ? (
           <AkunManager />
         ) : (
