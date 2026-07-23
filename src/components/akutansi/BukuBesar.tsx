@@ -17,6 +17,12 @@ interface LedgerLine {
     saldo_kredit: number;
     checked: boolean;
     checked_at: string | null;
+    trx_meta: {
+        company_name: string | null;
+        cpu: string | null;
+        ram: string | null;
+        storage: string | null;
+    } | null;
 }
 
 interface OpeningBalance {
@@ -36,6 +42,19 @@ interface LedgerData {
 const rp = (n: number) => `Rp${Math.round(Number(n || 0)).toLocaleString("id-ID")}`;
 const fmtTgl = (d: string) =>
     new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" });
+
+// Badge nama toko — replikasi persis logic getCompanyBadge() di JurnalUmum.tsx,
+// supaya label & warnanya konsisten antar tab Akuntansi.
+function getCompanyBadge(company?: string | null): { label: string; color: string } | null {
+    if (!company) return null;
+    const cn = company.toLowerCase();
+    if (cn.includes("sotech")) return { label: "Sotech", color: "bg-orange-50 text-orange-700 border-orange-200" };
+    if (cn.includes("solit")) return { label: "Solit 03", color: "bg-blue-50 text-blue-700 border-blue-200" };
+    if (cn.includes("on point") || cn.includes("onpoint")) return { label: "On Point", color: "bg-purple-50 text-purple-700 border-purple-200" };
+    if (cn.includes("zenit.id")) return { label: "Zenit.id", color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
+    if (cn.includes("zenit")) return { label: "Zenit", color: "bg-teal-50 text-teal-700 border-teal-200" };
+    return { label: company.trim(), color: "bg-gray-50 text-gray-600 border-gray-200" };
+}
 
 type NormalSide = "DEBIT" | "KREDIT" | null;
 
@@ -360,45 +379,61 @@ export default function BukuBesar({ period }: { period: string }) {
                                             </td>
                                         </tr>
                                     ) : (
-                                        data.lines.map((l) => (
-                                            <tr key={l.id} className="hover:bg-blue-50/30 transition border-b border-gray-50">
-                                                <td className="px-4 py-2.5 text-[11px] font-semibold text-gray-700 whitespace-nowrap">
-                                                    {fmtTgl(l.tanggal)}
-                                                </td>
-                                                <td className="px-4 py-2.5 text-[11px] text-gray-800">{l.keterangan}</td>
-                                                <td className="px-4 py-2.5 text-center text-[10px] font-mono font-bold text-gray-400">
-                                                    {l.ref || "—"}
-                                                </td>
-                                                <td className="px-4 py-2.5 text-right text-[12px] font-bold text-gray-900 font-mono">
-                                                    {l.debit > 0 ? rp(l.debit) : ""}
-                                                </td>
-                                                <td className="px-4 py-2.5 text-right text-[12px] font-bold text-gray-900 font-mono">
-                                                    {l.kredit > 0 ? rp(l.kredit) : ""}
-                                                </td>
-                                                <td className="px-4 py-2.5 text-right text-[12px] font-mono text-blue-700 border-l-2 border-gray-100">
-                                                    {l.saldo_debit > 0 ? rp(l.saldo_debit) : ""}
-                                                </td>
-                                                <td className="px-4 py-2.5 text-right text-[12px] font-mono text-emerald-700">
-                                                    {l.saldo_kredit > 0 ? rp(l.saldo_kredit) : ""}
-                                                </td>
-                                                <td className="px-3 py-2.5 text-center border-l-2 border-gray-100">
-                                                    <button
-                                                        onClick={() => toggleChecked(l.id, !l.checked)}
-                                                        title={
-                                                            l.checked
-                                                                ? `Sudah dicek${l.checked_at ? " · " + fmtTgl(l.checked_at.slice(0, 10)) : ""}`
-                                                                : "Tandai sudah dicek"
-                                                        }
-                                                        className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${l.checked
-                                                            ? "bg-green-600 border-green-600 text-white"
-                                                            : "bg-white border-gray-300 text-transparent hover:border-gray-400 hover:text-gray-300"
-                                                            }`}
-                                                    >
-                                                        <Check className="w-3.5 h-3.5 mx-auto" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
+                                        data.lines.map((l) => {
+                                            const companyBadge = getCompanyBadge(l.trx_meta?.company_name);
+                                            const specParts = [l.trx_meta?.cpu, l.trx_meta?.ram, l.trx_meta?.storage].filter(Boolean) as string[];
+                                            return (
+                                                <tr key={l.id} className="hover:bg-blue-50/30 transition border-b border-gray-50">
+                                                    <td className="px-4 py-2.5 text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                                                        {fmtTgl(l.tanggal)}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-[11px] text-gray-800">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            {companyBadge && (
+                                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${companyBadge.color}`}>
+                                                                    {companyBadge.label}
+                                                                </span>
+                                                            )}
+                                                            <span>{l.keterangan}</span>
+                                                        </div>
+                                                        {specParts.length > 0 && (
+                                                            <div className="text-[10px] text-gray-400 mt-0.5">{specParts.join(" · ")}</div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-center text-[10px] font-mono font-bold text-gray-400">
+                                                        {l.ref || "—"}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-right text-[12px] font-bold text-gray-900 font-mono">
+                                                        {l.debit > 0 ? rp(l.debit) : ""}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-right text-[12px] font-bold text-gray-900 font-mono">
+                                                        {l.kredit > 0 ? rp(l.kredit) : ""}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-right text-[12px] font-mono text-blue-700 border-l-2 border-gray-100">
+                                                        {l.saldo_debit > 0 ? rp(l.saldo_debit) : ""}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-right text-[12px] font-mono text-emerald-700">
+                                                        {l.saldo_kredit > 0 ? rp(l.saldo_kredit) : ""}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-center border-l-2 border-gray-100">
+                                                        <button
+                                                            onClick={() => toggleChecked(l.id, !l.checked)}
+                                                            title={
+                                                                l.checked
+                                                                    ? `Sudah dicek${l.checked_at ? " · " + fmtTgl(l.checked_at.slice(0, 10)) : ""}`
+                                                                    : "Tandai sudah dicek"
+                                                            }
+                                                            className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${l.checked
+                                                                ? "bg-green-600 border-green-600 text-white"
+                                                                : "bg-white border-gray-300 text-transparent hover:border-gray-400 hover:text-gray-300"
+                                                                }`}
+                                                        >
+                                                            <Check className="w-3.5 h-3.5 mx-auto" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </>
                             )}
@@ -464,7 +499,6 @@ function OpeningBalanceModal({
     onClose: () => void;
     onSaved: () => void;
 }) {
-    // SESUDAH
     const isEdit = !!existing;
     const [side, setSide] = useState<"DEBIT" | "KREDIT">(existing?.side ?? "DEBIT");
     const [nominalInput, setNominalInput] = useState<string>(
