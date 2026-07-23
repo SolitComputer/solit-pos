@@ -64,6 +64,26 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       }
       updatePayload.selling_price = price;
     }
+    if (body.charger_price !== undefined && body.charger_price !== null) {
+      const price = Math.round(Number(body.charger_price));
+      if (!Number.isFinite(price) || price < 0) {
+        return NextResponse.json(
+          { success: false, message: "Harga charger tidak valid" },
+          { status: 400 }
+        );
+      }
+      updatePayload.charger_price = price;
+    }
+    if (body.laptop_bag_price !== undefined && body.laptop_bag_price !== null) {
+      const price = Math.round(Number(body.laptop_bag_price));
+      if (!Number.isFinite(price) || price < 0) {
+        return NextResponse.json(
+          { success: false, message: "Harga tas laptop tidak valid" },
+          { status: 400 }
+        );
+      }
+      updatePayload.laptop_bag_price = price;
+    }
 
     const { data, error } = await supabase
       .from("laptops")
