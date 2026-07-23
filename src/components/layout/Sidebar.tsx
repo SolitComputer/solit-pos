@@ -1142,11 +1142,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <style>{`
-        @keyframes solitNavIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes solitGroupIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes solitBadgePop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
-      `}</style>
+      <style dangerouslySetInnerHTML={{ __html: "@keyframes solitNavIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } } @keyframes solitGroupIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } } @keyframes solitBadgePop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }" }} />
 
       {!onAntrian && prep.menungguUnacked.length > 0 && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
