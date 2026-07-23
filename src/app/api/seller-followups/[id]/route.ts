@@ -90,9 +90,23 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
+    // ✅ Cek apakah PIC yang tercatat di customer ini masih aktif (whitelisted).
+    // Kalau PIC lama sudah dinonaktifkan Admin, customer ini dianggap terbuka lagi
+    // — sama seperti belum ada PIC — supaya tidak mengunci selamanya ke orang nonaktif.
+    let picStillActive = false;
+    if (existing.pic_user_id) {
+      const { data: picActiveRow } = await supabaseAdmin
+        .from("seller_followup_pics")
+        .select("is_active")
+        .eq("user_id", existing.pic_user_id)
+        .maybeSingle();
+      picStillActive = !!picActiveRow?.is_active;
+    }
+
     // ── Ownership ─────────────────────────────────────────────────────────────
     const isOwnedByMe = !!existing.pic_user_id && existing.pic_user_id === user.id;
-    const isUnowned = !existing.pic_user_id; // belum ada PIC → siapa pun bisa klaim
+    // belum ada PIC, ATAU PIC lama sudah dinonaktifkan Admin → siapa pun (berwenang) bisa klaim
+    const isUnowned = !existing.pic_user_id || !picStillActive;
 
     // ── GATE 0: non-supervisor hanya boleh sentuh miliknya atau yang belum ada PIC ──
     if (!isSupervisor && !isOwnedByMe && !isUnowned) {

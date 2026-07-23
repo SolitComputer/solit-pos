@@ -29,6 +29,14 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
       .maybeSingle();
     const isWhitelisted = !!picRow?.is_active;
 
+    // ✅ Daftar PIC yang MASIH aktif — dipakai untuk (1) visibility query di bawah
+    // dan (2) hitung ulang is_owner/can_followup per baris di bagian enrich.
+    const { data: activePicsRows } = await supabaseAdmin
+      .from("seller_followup_pics")
+      .select("user_id")
+      .eq("is_active", true);
+    const activePicIds = new Set((activePicsRows ?? []).map((p: any) => p.user_id as string));
+
     let query = supabase
       .from("seller_followups")
       .select("*")
@@ -40,8 +48,15 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
     // - PIC tidak aktif/role lain: hanya miliknya sendiri
     if (!isSupervisor) {
       if (isActorRole && isWhitelisted) {
-        // Bisa lihat: milik sendiri ATAU belum ada PIC-nya (bisa diambil)
-        query = query.or(`pic_user_id.eq.${user.id},pic_user_id.is.null`);
+        // Bisa lihat: milik sendiri, belum ada PIC-nya, ATAU PIC-nya sudah
+        // dinonaktifkan Admin (PIC lama tidak boleh mengunci customer selamanya)
+        const otherActiveIds = Array.from(activePicIds).filter((id) => id !== user.id);
+        if (otherActiveIds.length > 0) {
+          query = query.or(
+            `pic_user_id.is.null,pic_user_id.not.in.(${otherActiveIds.join(",")})`
+          );
+        }
+        // kalau tidak ada PIC aktif lain, semua row sudah "terbuka" — tidak perlu filter
       } else {
         // Hanya milik sendiri
         query = query.eq("pic_user_id", user.id);
@@ -67,12 +82,15 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
     const enriched = (data ?? []).map((row: any) => {
       const due = isDue(row.next_followup_at, now);
 
-      // is_owner: milik sendiri ATAU belum ada PIC (siapa pun bisa klaim)
-      const isOwner =
-        row.pic_user_id === null ||
-        (!!row.pic_user_id && row.pic_user_id === user.id);
+     // ✅ PIC lama yang sudah dinonaktifkan Admin dianggap tidak lagi "mengunci" —
+      // customer-nya kembali terbuka untuk PIC aktif mana pun (sama seperti unowned).
+      const picIsStillActive = !!row.pic_user_id && activePicIds.has(row.pic_user_id);
+      const isTrueOwner = row.pic_user_id === user.id;
 
-      // can_followup: harus role benar + whitelisted + owner/unowned
+      // is_owner (dipakai untuk gating tombol): milik sendiri, belum ada PIC,
+      // ATAU PIC yang tercatat sudah tidak aktif lagi
+      const isOwner = row.pic_user_id === null || isTrueOwner || !picIsStillActive;
+
       let lockReason: string | null = null;
       if (!isActorRole) {
         lockReason = "Role kamu tidak berwenang melakukan follow-up";
@@ -88,6 +106,7 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
         ...row,
         is_due: due,
         is_owner: isOwner,
+        is_true_owner: isTrueOwner, // NEW — dipakai frontend khusus untuk badge "Kamu"
         can_followup: canFollowup,
         lock_reason: lockReason,
       };
