@@ -4,6 +4,7 @@ import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { isValidPeriod } from "@/lib/accounting";
+import { getTransactionMetaByInvoices } from "@/lib/accountingSource";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -26,6 +27,8 @@ interface EntryRow {
   tanggal: string;
   keterangan: string;
   ref: string | null;
+  source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL";
+  source_id: string | null;
 }
 
 export const GET = withAuth(async (req) => {
@@ -94,7 +97,7 @@ export const GET = withAuth(async (req) => {
     // ── 2) Semua entry di periode berjalan ──
     const { data: periodEntries, error: entryErr } = await supabase
       .from("journal_entries")
-      .select("id, tanggal, keterangan, ref, created_at")
+      .select("id, tanggal, keterangan, ref, source_type, source_id, created_at")
       .eq("period", period)
       .order("tanggal", { ascending: true });
 
@@ -103,6 +106,15 @@ export const GET = withAuth(async (req) => {
     const entryMap = new Map<string, EntryRow & { created_at: string }>();
     for (const e of (periodEntries ?? []) as (EntryRow & { created_at: string })[]) entryMap.set(e.id, e);
     const periodEntryIds = Array.from(entryMap.keys());
+
+    // ── 2.5) Company_name & spek laptop untuk entry TRANSACTION — enrichment
+    // yang sama seperti di /api/akutansi/jurnal, biar Buku Besar juga bisa
+    // menampilkan badge toko + spek di baris mutasinya.
+    const trxInvoiceNumbers = Array.from(entryMap.values())
+      .filter((e) => e.source_type === "TRANSACTION" && e.source_id)
+      .map((e) => e.source_id as string);
+
+    const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
 
     // ── 3) Semua baris jurnal di entry-entry tsb (untuk hitung Ref lawan akun) ──
     let allLines: LineRow[] = [];
@@ -154,7 +166,7 @@ export const GET = withAuth(async (req) => {
       }
     }
 
-    let running = saldoAwal;
+   let running = saldoAwal;
     const lines = ownLines.map((l) => {
       const entry = entryMap.get(l.entry_id)!;
       const debit = l.side === "DEBIT" ? Number(l.nominal) : 0;
@@ -162,6 +174,10 @@ export const GET = withAuth(async (req) => {
       running += debit - kredit;
       const ref = (counterMap.get(l.entry_id) ?? []).join(", ");
       const checkedAt = checkedMap.get(l.id) ?? null; // (baru)
+      const trxMeta =
+        entry.source_type === "TRANSACTION" && entry.source_id
+          ? trxMetaMap.get(entry.source_id) ?? null
+          : null; // (baru) — badge toko & spek, null kalau bukan entry TRANSACTION
       return {
         id: l.id,
         tanggal: entry.tanggal,
@@ -173,6 +189,7 @@ export const GET = withAuth(async (req) => {
         saldo_kredit: running < 0 ? Math.abs(running) : 0,
         checked: !!checkedAt, // (baru)
         checked_at: checkedAt, // (baru)
+        trx_meta: trxMeta, // (baru)
       };
     });
 

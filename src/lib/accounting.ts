@@ -292,3 +292,64 @@ export const PROTECTED_ACCOUNT_CODES: string[] = [
   ...Object.values(AKUN),
   ...Object.values(CASHFLOW_OUT_ACCOUNT),
 ];
+
+// ─── Laba Rugi ────────────────────────────────────────────────────────────────
+export type LabaRugiGroup =
+  | "PENDAPATAN"
+  | "MODAL_KELUAR"
+  | "OPERASIONAL"
+  | "LUAR_OPERASIONAL"
+  | "LABA_DITAHAN";
+
+export const LABA_RUGI_GROUP_LABEL: Record<LabaRugiGroup, string> = {
+  PENDAPATAN: "Pendapatan",
+  MODAL_KELUAR: "Modal Keluar",
+  OPERASIONAL: "Operasional",
+  LUAR_OPERASIONAL: "Di Luar Operasional",
+  LABA_DITAHAN: "Laba Ditahan",
+};
+
+/** Sisi normal tiap grup — dipakai mengubah saldo bertanda (DEBIT=+, KREDIT=−)
+ *  jadi angka positif yang siap ditampilkan di laporan. */
+export const LABA_RUGI_GROUP_NORMAL: Record<LabaRugiGroup, JournalSide> = {
+  PENDAPATAN: "KREDIT",
+  MODAL_KELUAR: "DEBIT",
+  OPERASIONAL: "DEBIT",
+  LUAR_OPERASIONAL: "DEBIT",
+  LABA_DITAHAN: "KREDIT",
+};
+
+/** Akun laba ditahan = tipe MODAL & namanya diawali "Laba" (cth: "Laba Juni 2026") */
+export function isLabaAccount(acc: { name: string; type: string }): boolean {
+  return acc.type === "MODAL" && /^laba\b/i.test(acc.name.trim());
+}
+
+/** Nama akun laba untuk sebuah periode, cth: "2026-07" -> "Laba Juli 2026" */
+export function labaPeriodAccountName(period: string): string {
+  return `Laba ${periodLabel(period)}`;
+}
+
+/** Normalisasi nama akun untuk pencocokan (case & spasi ganda diabaikan) */
+export function normalizeAccountName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Tentukan akun masuk grup Laba Rugi yang mana. null = tidak masuk laporan
+ *  (aset/hutang/modal non-laba). Pakai rentang kode supaya akun CUSTOM buatan
+ *  user ikut ke-grup otomatis tanpa perlu hardcode satu-satu. */
+export function labaRugiGroup(acc: {
+  code: string;
+  name: string;
+  type: string;
+}): LabaRugiGroup | null {
+  if (isLabaAccount(acc)) return "LABA_DITAHAN";
+
+  const num = parseInt(acc.code, 10);
+  if (!Number.isFinite(num)) return null;
+
+  if (num >= 410 && num <= 439) return "PENDAPATAN";
+  if (num >= 440 && num <= 499) return "MODAL_KELUAR";
+  if (num >= 500 && num <= 529) return "OPERASIONAL";
+  if (num >= 530 && num <= 599) return "LUAR_OPERASIONAL";
+  return null;
+}
