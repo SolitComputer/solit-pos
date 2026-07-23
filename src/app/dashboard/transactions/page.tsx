@@ -1658,8 +1658,11 @@ export default function Page() {
         } else {
           const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0 ? item.serial_numbers : item.serial_number ? [item.serial_number] : [];
           const modal = canSeeFinancials ? (cached?.purchase_price_total ?? Number(item.inventory_price ?? 0)) : 0;
+          const qty = grouped.length > 0
+            ? Number(grouped[0]?.unit_count ?? 1)
+            : (sns.length > 0 ? sns.length : 1);
           rowNo += 1;
-          tableRows.push([rowNo, tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", 1, item.laptop_name ?? "", item.cpu ?? "", item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal, Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
+          tableRows.push([rowNo, tanggal, STATUS_LABEL[item.status] ?? item.status ?? "", qty, item.laptop_name ?? "", item.cpu ?? "", item.ram ?? "", item.storage ?? "", item.payment_method ?? "", modal, Number(item.deal_price ?? item.amount ?? 0), item.customer_name ?? "", item.customer_phone ?? "", item.company_name ?? "", sns.join(", "), item.notes ?? ""]);
         }
       }
 
