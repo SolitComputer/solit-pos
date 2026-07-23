@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { UserRole, hasAnyRole, PERMISSIONS } from "@/lib/permissions";
 import { Tags, Package, Wallet, Download, RefreshCw } from "lucide-react";
-import EditableLaptopPriceCell from "@/components/inventory/EditableLaptopPriceCell";
+import EditableLaptopCombinedPriceCell from "@/components/inventory/EditableLaptopCombinedPriceCell";
 
 // Disamakan dengan PRICELIST_MODAL_VIEW_ROLES di pricelistPedagang.ts —
 // di-inline di sini supaya tidak import module yang transitif ke server code.
@@ -69,6 +69,14 @@ function PriceListPedagangContent() {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const canSeeModal = hasAnyRole(userRoles, MODAL_VIEW_ROLES);
   const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP);
+
+  // ─── Bulk Edit State ───────────────────────────────────────────────────────
+  const [selectedLaptopIds, setSelectedLaptopIds] = useState<string[]>([]);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkPriceInput, setBulkPriceInput] = useState("0");
+  const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
+  const [bulkError, setBulkError] = useState("");
+  const [bulkSuccessMsg, setBulkSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -308,6 +316,136 @@ function PriceListPedagangContent() {
     }
   };
 
+  const groupedTableData = useMemo(() => {
+    const map = new Map<string, {
+      laptopId: string;
+      product: string;
+      brand: string;
+      cpu: string;
+      ram: string;
+      storage: string;
+      charger_price: number;
+      laptop_bag_price: number;
+      modal_price: number;
+      tier_label: string;
+      pedagang_price: number;
+      siapJualCount: number;
+      totalCount: number;
+    }>();
+
+    filtered.forEach((u) => {
+      const laptopId = u.laptop?.id || u.unit_id;
+      const product = u.laptop?.laptop_name || "—";
+      const brand = u.laptop?.brand || "—";
+      const cpu = u.laptop?.cpu || "—";
+      const ram = u.laptop?.ram || "—";
+      const storage = u.laptop?.storage || "—";
+      const charger_price = u.charger_price || 0;
+      const laptop_bag_price = u.laptop_bag_price || 0;
+      const modal_price = u.modal_price || 0;
+      const tier_label = u.tier_label || "";
+      const pedagang_price = u.pedagang_price || 0;
+
+      const key = `${laptopId}_${pedagang_price}`;
+
+      if (map.has(key)) {
+        const item = map.get(key)!;
+        item.totalCount += 1;
+        if (u.status === "SIAP_JUAL") item.siapJualCount += 1;
+      } else {
+        map.set(key, {
+          laptopId: u.laptop?.id || "",
+          product,
+          brand,
+          cpu,
+          ram,
+          storage,
+          charger_price,
+          laptop_bag_price,
+          modal_price,
+          tier_label,
+          pedagang_price,
+          siapJualCount: u.status === "SIAP_JUAL" ? 1 : 0,
+          totalCount: 1,
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.product.localeCompare(b.product, "id")
+    );
+  }, [filtered]);
+
+  // Checkbox selection logic
+  const allVisibleLaptopIds = useMemo(
+    () => groupedTableData.map((d) => d.laptopId).filter(Boolean),
+    [groupedTableData]
+  );
+
+  const isAllSelected =
+    allVisibleLaptopIds.length > 0 &&
+    allVisibleLaptopIds.every((id) => selectedLaptopIds.includes(id));
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedLaptopIds([]);
+    } else {
+      setSelectedLaptopIds(allVisibleLaptopIds);
+    }
+  };
+
+  const toggleSelectLaptop = (id: string) => {
+    if (!id) return;
+    setSelectedLaptopIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleApplyBulkEdit = async () => {
+    const parsedTotal = Math.round(Number(bulkPriceInput.replace(/\./g, "").replace(/,/g, "")));
+    if (!Number.isFinite(parsedTotal) || parsedTotal < 0) {
+      setBulkError("Nominal biaya tidak valid");
+      return;
+    }
+
+    if (selectedLaptopIds.length === 0) return;
+
+    setIsSubmittingBulk(true);
+    setBulkError("");
+    try {
+      const responses = await Promise.all(
+        selectedLaptopIds.map(async (id) => {
+          const res = await fetch(`/api/laptops/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              charger_price: parsedTotal,
+              laptop_bag_price: 0,
+            }),
+          });
+          return res.json();
+        })
+      );
+
+      const failed = responses.find((r) => !r.success);
+      if (failed) {
+        setBulkError(failed.message || "Gagal memperbarui beberapa laptop");
+        return;
+      }
+
+      setBulkSuccessMsg(`Berhasil memperbarui biaya untuk ${selectedLaptopIds.length} laptop!`);
+      setSelectedLaptopIds([]);
+      setIsBulkModalOpen(false);
+      await fetchData();
+
+      setTimeout(() => setBulkSuccessMsg(null), 4000);
+    } catch {
+      setBulkError("Koneksi gagal saat memperbarui data");
+    } finally {
+      setIsSubmittingBulk(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
 
@@ -317,6 +455,18 @@ function PriceListPedagangContent() {
             Harga referensi untuk pedagang — tidak memengaruhi transaksi/payment
           </p>
           <div className="flex items-center gap-2">
+            {canEditLaptop && selectedLaptopIds.length > 0 && (
+              <button
+                onClick={() => {
+                  setBulkPriceInput("0");
+                  setBulkError("");
+                  setIsBulkModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 h-9 px-4 bg-violet-600 hover:bg-violet-700 active:scale-[0.97] rounded-xl text-xs font-bold text-white shadow-lg shadow-violet-600/25 transition"
+              >
+                <span>⚡</span> Set Biaya Massal ({selectedLaptopIds.length})
+              </button>
+            )}
             <button onClick={fetchData}
               className="inline-flex items-center gap-1.5 h-9 px-3.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-50 transition">
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
@@ -336,6 +486,13 @@ function PriceListPedagangContent() {
           </div>
         )}
 
+        {bulkSuccessMsg && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-4 py-2.5 rounded-xl flex items-center justify-between animate-in fade-in">
+            <span>✅ {bulkSuccessMsg}</span>
+            <button onClick={() => setBulkSuccessMsg(null)} className="text-emerald-500 hover:text-emerald-700 text-xs font-bold">✕</button>
+          </div>
+        )}
+
         {/* Stat Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatCard label="Total Unit (difilter)" value={`${totals.count} unit`} icon={<Package size={16} className="text-gray-600" />} />
@@ -350,7 +507,7 @@ function PriceListPedagangContent() {
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
               </svg>
-              <input type="text" placeholder="Cari nama, brand, CPU, SN..." value={search} onChange={(e) => setSearch(e.target.value)}
+              <input type="text" placeholder="Cari nama, brand, CPU..." value={search} onChange={(e) => setSearch(e.target.value)}
                 className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition" />
             </div>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
@@ -388,7 +545,7 @@ function PriceListPedagangContent() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center text-sm text-gray-400">
             Memuat data...
           </div>
-        ) : filtered.length === 0 ? (
+        ) : groupedTableData.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
             <p className="text-gray-700 font-bold text-base">Tidak ada unit ditemukan</p>
             <p className="text-gray-400 text-sm mt-1.5">Coba ubah filter di atas</p>
@@ -398,86 +555,83 @@ function PriceListPedagangContent() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px] text-sm">
                 <thead>
-                  <tr className="bg-gray-50 border-b-2 border-gray-100">
-                    <th className="px-4 py-3 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest w-10">No</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Laptop</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Serial Number</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Grade</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
+                  <tr className="bg-gray-50 border-b border-gray-100 text-gray-500">
+                    {canEditLaptop && (
+                      <th className="px-3 py-3 text-center w-10">
+                        <input
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400 cursor-pointer"
+                          title="Pilih Semua Laptop"
+                        />
+                      </th>
+                    )}
+                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest w-10">No</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest">Product</th>
+                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">CPU</th>
+                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">RAM</th>
+                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">HDD/SSD</th>
+                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">Siap Jual</th>
                     {canSeeModal && (
-                      <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Biaya Charger</th>
+                      <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Biaya Charger & Tas</th>
                     )}
                     {canSeeModal && (
-                      <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Biaya Tas</th>
+                      <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Harga Modal</th>
                     )}
-                    {canSeeModal && (
-                      <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Harga Modal</th>
-                    )}
-                    <th className="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Harga Pedagang</th>
+                    <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Price Store</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filtered.map((u, idx) => (
-                    <tr key={u.unit_id} className="hover:bg-gray-50/60 transition">
-                      <td className="px-4 py-3.5 text-center text-xs font-semibold text-gray-300">{idx + 1}</td>
-                      <td className="px-4 py-3.5 min-w-[200px] max-w-[280px]">
-                        <p className="font-semibold text-gray-800 text-[13px] truncate">{u.laptop?.laptop_name || "—"}</p>
-                        <p className="text-[11px] text-gray-400 truncate">
-                          {[u.laptop?.brand, u.laptop?.cpu, u.laptop?.ram, u.laptop?.storage].filter(Boolean).join(" · ")}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <code className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{u.serial_number}</code>
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${GRADE_BADGE[u.grade] || ""}`}>
-                          Grade {u.grade}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        {STATUS_STYLE[u.status] && (
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_STYLE[u.status].badge}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_STYLE[u.status].dot}`} />
-                            {STATUS_STYLE[u.status].label}
-                          </span>
+                  {groupedTableData.map((item, idx) => (
+                    <tr key={`${item.laptopId}_${idx}`} className="hover:bg-gray-50/60 transition">
+                      {canEditLaptop && (
+                        <td className="px-3 py-3.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedLaptopIds.includes(item.laptopId)}
+                            onChange={() => toggleSelectLaptop(item.laptopId)}
+                            className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400 cursor-pointer"
+                          />
+                        </td>
+                      )}
+                      <td className="px-3 py-3.5 text-center text-xs font-semibold text-gray-400">{idx + 1}</td>
+                      <td className="px-4 py-3.5 min-w-[180px]">
+                        <p className="font-bold text-gray-900 text-[13px]">{item.product}</p>
+                        {item.brand && item.brand !== "—" && (
+                          <p className="text-[11px] text-gray-400 font-medium">{item.brand}</p>
                         )}
                       </td>
+                      <td className="px-3 py-3.5 text-center text-xs text-gray-700 font-medium whitespace-nowrap">{item.cpu}</td>
+                      <td className="px-3 py-3.5 text-center text-xs text-gray-700 font-medium whitespace-nowrap">{item.ram}</td>
+                      <td className="px-3 py-3.5 text-center text-xs text-gray-700 font-medium whitespace-nowrap">{item.storage}</td>
+                      <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {item.siapJualCount}
+                        </span>
+                      </td>
                       {canSeeModal && (
-                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                          {canEditLaptop && u.laptop?.id ? (
-                            <EditableLaptopPriceCell
-                              laptopId={u.laptop.id}
-                              value={u.charger_price}
-                              field="charger_price"
+                        <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                          {canEditLaptop && item.laptopId ? (
+                            <EditableLaptopCombinedPriceCell
+                              laptopId={item.laptopId}
+                              chargerPrice={item.charger_price}
+                              bagPrice={item.laptop_bag_price}
                               onSaved={fetchData}
                             />
                           ) : (
-                            <span className="text-xs text-gray-500 tabular-nums">{fmt(u.charger_price)}</span>
+                            <span className="text-xs text-gray-700 font-semibold tabular-nums">{fmt(item.charger_price + item.laptop_bag_price)}</span>
                           )}
                         </td>
                       )}
                       {canSeeModal && (
-                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                          {canEditLaptop && u.laptop?.id ? (
-                            <EditableLaptopPriceCell
-                              laptopId={u.laptop.id}
-                              value={u.laptop_bag_price}
-                              field="laptop_bag_price"
-                              onSaved={fetchData}
-                            />
-                          ) : (
-                            <span className="text-xs text-gray-500 tabular-nums">{fmt(u.laptop_bag_price)}</span>
-                          )}
+                        <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                          <p className="text-xs text-gray-500 tabular-nums font-medium">{fmt(item.modal_price)}</p>
+                          <p className="text-[10px] text-gray-400">{item.tier_label}</p>
                         </td>
                       )}
-                      {canSeeModal && (
-                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                          <p className="text-xs text-gray-500 tabular-nums">{fmt(u.modal_price)}</p>
-                          <p className="text-[10px] text-gray-300">{u.tier_label}</p>
-                        </td>
-                      )}
-                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                        <span className="font-bold text-gray-800 tabular-nums">{fmt(u.pedagang_price)}</span>
+                      <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                        <span className="font-bold text-gray-900 text-sm tabular-nums">{fmt(item.pedagang_price)}</span>
                       </td>
                     </tr>
                   ))}
@@ -485,8 +639,57 @@ function PriceListPedagangContent() {
               </table>
             </div>
             <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/60 text-xs text-gray-400">
-              <span className="text-gray-700 font-bold">{filtered.length}</span> unit
-              {units.length !== filtered.length && <span className="ml-1">dari {units.length}</span>}
+              <span className="text-gray-700 font-bold">{groupedTableData.length}</span> tipe laptop ({totals.count} unit total)
+            </div>
+          </div>
+        )}
+
+        {/* Modal Bulk Edit */}
+        {isBulkModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-2xl max-w-md w-full p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <span className="w-8 h-8 bg-violet-50 text-violet-600 rounded-xl flex items-center justify-center font-black">⚡</span>
+                  Set Biaya Massal (Bulk Edit)
+                </h3>
+                <button onClick={() => setIsBulkModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-sm font-semibold">✕</button>
+              </div>
+
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Menetapkan total biaya tambahan (charger & tas) sekaligus untuk <strong className="text-violet-600 font-bold">{selectedLaptopIds.length} laptop</strong> yang dipilih.
+              </p>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-700">Total Biaya Charger & Tas (Rp):</label>
+                <input
+                  type="number"
+                  value={bulkPriceInput}
+                  onChange={(e) => { setBulkPriceInput(e.target.value); setBulkError(""); }}
+                  placeholder="Contoh: 75000"
+                  min={0}
+                  autoFocus
+                  className="w-full h-10 px-3 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400 transition"
+                />
+              </div>
+
+              {bulkError && <p className="text-xs text-red-500 font-medium">{bulkError}</p>}
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setIsBulkModalOpen(false)}
+                  className="h-9 px-4 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-xs font-semibold transition"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleApplyBulkEdit}
+                  disabled={isSubmittingBulk}
+                  className="h-9 px-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50 shadow-md shadow-emerald-600/20 flex items-center gap-1.5"
+                >
+                  {isSubmittingBulk ? "Memproses..." : `Terapkan ke ${selectedLaptopIds.length} Laptop`}
+                </button>
+              </div>
             </div>
           </div>
         )}
