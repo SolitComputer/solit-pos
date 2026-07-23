@@ -56,7 +56,7 @@ export const GET = withAuth(async (req) => {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
- const entries = (data ?? []).map((e: any) => ({
+  const entries = (data ?? []).map((e: any) => ({
     ...e,
     lines: [...(e.lines ?? [])].sort((a: any, b: any) => {
       if (a.side !== b.side) return a.side === "DEBIT" ? -1 : 1;
@@ -72,10 +72,39 @@ export const GET = withAuth(async (req) => {
 
   const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
 
-  const entriesWithMeta = entries.map((e: any) => ({
-    ...e,
-    trx_meta: e.source_type === "TRANSACTION" && e.source_id ? trxMetaMap.get(e.source_id) ?? null : null,
-  }));
+  // Harga modal (inventory_price) diambil langsung dari tabel transactions supaya status
+  // "belum diinput" (modal 0/null di Riwayat Transaksi) tetap kedeteksi di sini — bukan cuma
+  // di halaman Riwayat Transaksi. Query terpisah dari getTransactionMetaByInvoices karena
+  // field ini tidak termasuk meta yang dikembalikan fungsi itu.
+  const modalMissingMap = new Map<string, boolean>();
+  if (trxInvoiceNumbers.length > 0) {
+    const { data: trxModalRows, error: modalErr } = await supabase
+      .from("transactions")
+      .select("invoice_number, inventory_price")
+      .in("invoice_number", trxInvoiceNumbers);
+
+    if (modalErr) {
+      console.error("[akuntansi GET jurnal] gagal ambil inventory_price:", modalErr);
+    } else {
+      for (const row of (trxModalRows ?? []) as { invoice_number: string; inventory_price: number | null }[]) {
+        modalMissingMap.set(row.invoice_number, !row.inventory_price || Number(row.inventory_price) === 0);
+      }
+    }
+  }
+
+  const entriesWithMeta = entries.map((e: any) => {
+    if (e.source_type !== "TRANSACTION" || !e.source_id) {
+      return { ...e, trx_meta: null };
+    }
+    const baseMeta = trxMetaMap.get(e.source_id) ?? null;
+    return {
+      ...e,
+      trx_meta: {
+        ...(baseMeta ?? {}),
+        modal_missing: modalMissingMap.get(e.source_id) ?? false,
+      },
+    };
+  });
 
   const totalDebit = entriesWithMeta.reduce(
     (s: number, e: any) =>
@@ -132,7 +161,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
   }
 
   const merged = cleanManualLines(lines);
-   if (!isBalanced(merged))
+  if (!isBalanced(merged))
     return NextResponse.json(
       { success: false, message: "Jurnal tidak balance — total debit harus sama dengan total kredit" },
       { status: 400 }
