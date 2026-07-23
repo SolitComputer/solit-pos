@@ -223,6 +223,12 @@ const CloseIcon = () => (
   </svg>
 );
 
+const PencilIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M17 3a2.85 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </svg>
+);
+
 const ChevronIcon = ({ open }: { open: boolean }) => (
   <svg
     width="12"
@@ -1054,6 +1060,119 @@ function PicBlock({ f }: { f: Followup }) {
   );
 }
 
+// ── Nomor telepon customer (inline edit) ──────────────────────────────────────
+function EditablePhoneCell({
+  phone,
+  canEdit,
+  saving,
+  onSave,
+}: {
+  phone: string;
+  canEdit: boolean;
+  saving: boolean;
+  onSave: (newPhone: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(phone);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sinkronkan value lokal kalau data dari server berubah (mis. setelah refresh),
+  // tapi jangan timpa saat user sedang mengetik.
+  useEffect(() => {
+    if (!editing) setValue(phone);
+  }, [phone, editing]);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const handleSave = () => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      toast.error("Nomor HP tidak boleh kosong");
+      return;
+    }
+    if (!/^[0-9+\-\s]{8,20}$/.test(trimmed)) {
+      toast.error("Format nomor HP tidak valid");
+      return;
+    }
+    if (trimmed === phone) {
+      setEditing(false);
+      return;
+    }
+    onSave(trimmed);
+    setEditing(false);
+  };
+
+  const handleCancel = () => {
+    setValue(phone);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1.5 mt-1">
+        <p className="text-[11px] text-gray-400 font-medium leading-none truncate tabular-nums">
+          {phone}
+        </p>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            disabled={saving}
+            title="Edit nomor HP"
+            aria-label="Edit nomor HP"
+            className={cx(
+              "flex-shrink-0 w-4 h-4 inline-flex items-center justify-center text-gray-300 hover:text-blue-600 transition-colors disabled:opacity-40",
+              FOCUS_RING
+            )}
+          >
+            <PencilIcon />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 mt-1">
+      <input
+        ref={inputRef}
+        type="tel"
+        inputMode="tel"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSave();
+          if (e.key === "Escape") handleCancel();
+        }}
+        disabled={saving}
+        className="w-32 h-6 px-1.5 text-[11px] font-medium tabular-nums border border-blue-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-50"
+      />
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={saving}
+        title="Simpan"
+        aria-label="Simpan nomor HP"
+        className="flex-shrink-0 w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 disabled:opacity-50"
+      >
+        {saving ? <Spinner /> : <CheckIcon />}
+      </button>
+      <button
+        type="button"
+        onClick={handleCancel}
+        disabled={saving}
+        title="Batal"
+        aria-label="Batal edit"
+        className="flex-shrink-0 w-5 h-5 rounded-md bg-gray-200 text-gray-500 flex items-center justify-center hover:bg-gray-300 disabled:opacity-50"
+      >
+        <CloseIcon />
+      </button>
+    </div>
+  );
+}
+
 // ── FollowupCard ──────────────────────────────────────────────────────────────
 function FollowupCard({
   f,
@@ -1063,6 +1182,7 @@ function FollowupCard({
   onFollowup,
   onArchive,
   onReactivate,
+  onEditPhone,
 }: {
   f: Followup;
   scope: Scope;
@@ -1071,6 +1191,7 @@ function FollowupCard({
   onFollowup: (id: string) => void;
   onArchive: (id: string) => void;
   onReactivate: (id: string) => void;
+  onEditPhone?: (id: string, phone: string) => void;
 }) {
   const diff = daysDiff(f.next_followup_at);
   const isPedagang = f.seller_type === "PEDAGANG";
@@ -1098,9 +1219,12 @@ function FollowupCard({
             <h3 className="text-sm font-bold text-gray-900 leading-tight truncate">
               {f.customer_name}
             </h3>
-            <p className="text-[11px] text-gray-400 font-medium mt-1 leading-none truncate tabular-nums">
-              {f.customer_phone}
-            </p>
+            <EditablePhoneCell
+              phone={f.customer_phone}
+              canEdit={f.can_followup || canManage}
+              saving={processing}
+             onSave={(newPhone) => onEditPhone?.(f.id, newPhone)}
+            />
           </div>
 
           <div className="flex-shrink-0">
@@ -1579,6 +1703,8 @@ export default function ManagementSellerPage() {
 
   const onArchive = (id: string) => runAction(id, { action: "archive" });
   const onReactivate = (id: string) => runAction(id, { action: "reactivate" });
+  const onEditPhone = (id: string, phone: string) =>
+    runAction(id, { action: "update_phone", customer_phone: phone });
 
   // ── Derived ──
   const userItems = useMemo(() => items.filter((i) => i.seller_type === "USER"), [items]);
@@ -1942,6 +2068,7 @@ export default function ManagementSellerPage() {
                   onFollowup={onFollowup}
                   onArchive={onArchive}
                   onReactivate={onReactivate}
+                  onEditPhone={onEditPhone}
                 />
               ))}
             </div>
