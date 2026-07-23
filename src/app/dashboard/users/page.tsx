@@ -196,7 +196,7 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
   useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
   return (
     <div
-      className={`fixed top-5 right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
+      className={`fixed top-4 right-4 left-4 sm:left-auto sm:top-5 sm:right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
         }`}
       style={{ boxShadow: type === "ok" ? "0 8px 32px rgba(0,0,0,0.10)" : "0 8px 32px rgba(220,38,38,0.12)" }}
     >
@@ -208,7 +208,7 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </div>
       }
-      {msg}
+      <span className="truncate">{msg}</span>
     </div>
   );
 }
@@ -218,9 +218,9 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-      <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn"
+      <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn max-h-[92vh] sm:max-h-[90vh] flex flex-col"
         style={{ boxShadow: "0 32px 80px rgba(0,0,0,0.18)" }}>
-        <div className="flex justify-center pt-3 pb-0 sm:hidden">
+        <div className="flex justify-center pt-3 pb-0 sm:hidden flex-shrink-0">
           <div className="w-10 h-1 rounded-full bg-gray-200" />
         </div>
         {children}
@@ -233,22 +233,22 @@ function ModalHeader({ title, subtitle, icon, onClose }: {
   title: string; subtitle: string; icon: React.ReactNode; onClose: () => void;
 }) {
   return (
-    <div className="relative px-6 py-5 flex items-center justify-between overflow-hidden"
+    <div className="relative px-5 sm:px-6 py-4 sm:py-5 flex items-center justify-between overflow-hidden flex-shrink-0"
       style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
       <div className="absolute inset-0 pointer-events-none"
         style={{ backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.18) 0%, transparent 60%)" }} />
-      <div className="flex items-center gap-3 z-10">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+      <div className="flex items-center gap-3 z-10 min-w-0">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.12)" }}>
           {icon}
         </div>
-        <div>
-          <p className="font-bold text-white text-sm tracking-tight">{title}</p>
-          <p className="text-[10.5px] mt-0.5" style={{ color: "rgba(255,255,255,0.45)" }}>{subtitle}</p>
+        <div className="min-w-0">
+          <p className="font-bold text-white text-sm tracking-tight truncate">{title}</p>
+          <p className="text-[10.5px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.45)" }}>{subtitle}</p>
         </div>
       </div>
       <button onClick={onClose}
-        className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110 z-10"
+        className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110 z-10 flex-shrink-0 ml-2"
         style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
@@ -275,7 +275,7 @@ function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full h-10 border rounded-xl px-3.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+      className="w-full h-11 sm:h-10 border rounded-xl px-3.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-violet-400/30"
       style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#1e293b" }}
     />
   );
@@ -320,7 +320,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </svg>
         }
       />
-      <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+      <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
         {error && (
           <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
             style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
@@ -344,7 +344,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <div className="flex gap-2">
             {(["PAGI", "SORE"] as const).map(s => (
               <button key={s} type="button" onClick={() => setShift(s)}
-                className="flex-1 h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
                 style={shift === s
                   ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
                   : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
@@ -356,14 +356,14 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </div>
         </Field>
       </div>
-      <div className="px-6 pb-6 pt-4 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9" }}>
+      <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid #f1f5f9" }}>
         <button onClick={onClose}
-          className="flex-1 h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
+          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
           style={{ background: "#f1f5f9", color: "#64748b" }}>
           Batal
         </button>
         <button onClick={save} disabled={saving}
-          className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
           style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
           {saving
             ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Membuat...</>
@@ -589,7 +589,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
           </div>
         }
       />
-      <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+      <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
         {error && (
           <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
             style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
@@ -608,7 +608,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
           <div className="flex gap-2">
             {(["PAGI", "SORE"] as const).map(s => (
               <button key={s} type="button" onClick={() => setShift(s)}
-                className="flex-1 h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
                 style={shift === s
                   ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
                   : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
@@ -618,14 +618,14 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
           </div>
         </Field>
       </div>
-      <div className="px-6 pb-6 pt-4 flex gap-2.5" style={{ borderTop: "1px solid #f1f5f9" }}>
+      <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid #f1f5f9" }}>
         <button onClick={onClose}
-          className="flex-1 h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
+          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
           style={{ background: "#f1f5f9", color: "#64748b" }}>
           Batal
         </button>
         <button onClick={save} disabled={saving}
-          className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
           style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
           {saving
             ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Menyimpan...</>
@@ -643,7 +643,7 @@ function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
         style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
           style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}><DoorOpen className="w-8 h-8" style={{ color: "#ea580c" }} /></div>
@@ -651,12 +651,12 @@ function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
         <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">Session aktif user ini akan diakhiri segera.</p>
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
-            className="flex-1 h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
             style={{ background: "#f1f5f9", color: "#64748b" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
             style={{ background: "linear-gradient(135deg, #ea580c, #dc2626)", boxShadow: "0 4px 14px rgba(234,88,12,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
@@ -675,7 +675,7 @@ function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
         style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
           style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><Trash2 className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
@@ -689,12 +689,12 @@ function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
         </div>
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
-            className="flex-1 h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
             style={{ background: "#f1f5f9", color: "#64748b" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
             style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
@@ -713,7 +713,7 @@ function ConfirmResetPasswordModal({ user, onClose, onConfirm, loading }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
         style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
           style={{ background: "#fffbeb", border: "1px solid #fde68a" }}><KeyRound className="w-8 h-8" style={{ color: "#d97706" }} /></div>
@@ -727,12 +727,12 @@ function ConfirmResetPasswordModal({ user, onClose, onConfirm, loading }: {
         </div>
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
-            className="flex-1 h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
             style={{ background: "#f1f5f9", color: "#64748b" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
             style={{ background: "linear-gradient(135deg, #d97706, #b45309)", boxShadow: "0 4px 14px rgba(217,119,6,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
@@ -762,16 +762,16 @@ function StatCard({ icon, value, label, sub, accent }: {
   icon: React.ReactNode; value: number; label: string; sub: string; accent: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl p-4 relative overflow-hidden group transition-all hover:shadow-md"
+    <div className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden group transition-all hover:shadow-md"
       style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
       <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: accent }} />
-      <div className="pl-3">
-        <div className="flex items-start justify-between mb-3">
+      <div className="pl-2.5 sm:pl-3">
+        <div className="flex items-start justify-between mb-2 sm:mb-3">
           <span className="text-slate-700">{icon}</span>
-          <span className="text-3xl font-black tabular-nums" style={{ color: "#0f172a" }}>{value}</span>
+          <span className="text-2xl sm:text-3xl font-black tabular-nums" style={{ color: "#0f172a" }}>{value}</span>
         </div>
-        <p className="text-[11px] font-bold" style={{ color: "#64748b" }}>{label}</p>
-        <p className="text-[10px] mt-0.5" style={{ color: "#94a3b8" }}>{sub}</p>
+        <p className="text-[10.5px] sm:text-[11px] font-bold truncate" style={{ color: "#64748b" }}>{label}</p>
+        <p className="text-[9.5px] sm:text-[10px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>{sub}</p>
       </div>
     </div>
   );
@@ -984,7 +984,7 @@ export default function UsersPage() {
       {isAdmin && confirmReset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => setConfirmReset(null)} />
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 animate-scaleIn"
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
             style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
               style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><ScanFace className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
@@ -992,12 +992,12 @@ export default function UsersPage() {
             <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">User harus scan ulang wajah saat login berikutnya.</p>
             <div className="flex gap-2.5">
               <button onClick={() => setConfirmReset(null)}
-                className="flex-1 h-10 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-all"
+                className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-all"
                 style={{ background: "#f1f5f9", color: "#64748b" }}>
                 Batal
               </button>
               <button onClick={() => handleReset(confirmReset)} disabled={resetting === confirmReset.id}
-                className="flex-1 h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
+                className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
                 style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
                 {resetting === confirmReset.id
                   ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
@@ -1024,10 +1024,11 @@ export default function UsersPage() {
       )}
 
       <div className="min-h-screen bg-[#F7F7F8]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-5">
 
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
+          {/* ── Header ─────────────────────────────────────────────────── */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
                 style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.35)" }}>
                 <svg style={{ width: 18, height: 18 }} fill="none" stroke="white" viewBox="0 0 24 24">
@@ -1035,9 +1036,9 @@ export default function UsersPage() {
                     d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
-              <div>
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">Manajemen User</h1>
-                <p className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight truncate">Manajemen User</h1>
+                <p className="text-[11px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>
                   {isAdmin
                     ? "Kelola akun, role, shift, dan wajah karyawan"
                     : isKepala
@@ -1051,30 +1052,31 @@ export default function UsersPage() {
               <NotificationToggle />
               <button
                 onClick={() => setOpenGroupChat(true)}
-                className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 h-10 sm:h-auto sm:py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
                 style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.35)" }}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
                 </svg>
-                <span className="hidden sm:inline">Grup Chat</span>
+                <span>Grup Chat</span>
               </button>
               {isAdmin && (
                 <button
                   onClick={() => setShowCreate(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 h-10 sm:h-auto sm:py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
                   style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Tambah User
+                  <span>Tambah User</span>
                 </button>
               )}
             </div>
           </div>
 
+          {/* ── Stat cards ─────────────────────────────────────────────── */}
           {!loading && isAdmin && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
               <StatCard icon={<Users className="w-5 h-5" />} value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
               <StatCard icon={<Crown className="w-5 h-5" />} value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
               <StatCard icon={<ScanFace className="w-5 h-5" />} value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
@@ -1083,6 +1085,7 @@ export default function UsersPage() {
             </div>
           )}
 
+          {/* ── Main tab switch (Users / Roles) ───────────────────────── */}
           {isRoleManager && (
             <div className="bg-white rounded-2xl p-1.5 border border-slate-100">
               <div className="flex gap-1.5">
@@ -1096,7 +1099,7 @@ export default function UsersPage() {
                       setMainTab(t.key);
                       if (t.key === "users") fetchCustomRoles();
                     }}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all"
+                    className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
                     style={
                       mainTab === t.key
                         ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
@@ -1104,7 +1107,7 @@ export default function UsersPage() {
                     }
                   >
                     <span>{t.icon}</span>
-                    <span>{t.label}</span>
+                    <span className="truncate">{t.label}</span>
                   </button>
                 ))}
               </div>
@@ -1125,7 +1128,7 @@ export default function UsersPage() {
                     ] as const).map(t => (
                       <button key={t.key}
                         onClick={() => { setActiveTab(t.key); setFilterRole("Semua"); }}
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all"
+                        className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
                         style={activeTab === t.key
                           ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
                           : { background: "#f5f7ff", color: "#64748b" }}>
@@ -1143,13 +1146,14 @@ export default function UsersPage() {
                 </div>
               )}
 
-              <div className="flex gap-5 items-start">
+              <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 items-start">
 
-                <div className="flex-1 min-w-0 space-y-3">
+                <div className="flex-1 min-w-0 w-full space-y-3">
 
+                  {/* ── Search / sort / filter panel ─────────────────── */}
                   <div className="bg-white rounded-2xl overflow-hidden"
                     style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                    <div className="px-4 pt-4 pb-3.5 space-y-3">
+                    <div className="px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-3.5 space-y-3">
                       <div className="flex gap-2 items-center">
                         <div className="relative flex-1 min-w-0">
                           <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }}
@@ -1158,7 +1162,7 @@ export default function UsersPage() {
                           </svg>
                           <input type="text" placeholder="Cari nama atau nomor..."
                             value={search} onChange={e => setSearch(e.target.value)}
-                            className="w-full h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition"
+                            className="w-full h-10 sm:h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition"
                             style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }} />
                           {search && (
                             <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform">
@@ -1169,7 +1173,7 @@ export default function UsersPage() {
                           )}
                         </div>
                         <button onClick={() => setSortOrder(s => s === "asc" ? "desc" : "asc")}
-                          className="h-9 px-3.5 rounded-xl text-[10.5px] font-black text-white flex-shrink-0 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
+                          className="h-10 sm:h-9 px-3 sm:px-3.5 rounded-xl text-[10.5px] font-black text-white flex-shrink-0 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
                           style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 2px 8px rgba(15,12,41,0.25)" }}>
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -1181,7 +1185,7 @@ export default function UsersPage() {
                         </button>
                       </div>
 
-                      <div className="flex gap-1.5 flex-wrap max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
+                      <div className="flex gap-1.5 flex-wrap max-h-[5.5rem] sm:max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
                         {["Semua", ...tabRoles].map(r => (
                           <button key={r} onClick={() => setFilterRole(r)}
                             className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex-shrink-0 active:scale-95"
@@ -1195,21 +1199,22 @@ export default function UsersPage() {
                     </div>
                   </div>
 
+                  {/* ── User list ─────────────────────────────────────── */}
                   <div className="bg-white rounded-2xl overflow-hidden"
                     style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
 
-                    <div className="px-4 sm:px-5 py-3.5 flex items-center justify-between flex-wrap gap-2"
+                    <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between flex-wrap gap-2"
                       style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-1 h-4 rounded-full" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
-                        <p className="text-[11px] font-bold" style={{ color: "#64748b" }}>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
+                        <p className="text-[11px] font-bold truncate" style={{ color: "#64748b" }}>
                           {filtered.length === totalInTab
                             ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
                             : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
                         </p>
                       </div>
                       {isAdmin && (
-                        <div className="hidden sm:flex items-center gap-3 text-[10px]" style={{ color: "#94a3b8" }}>
+                        <div className="hidden sm:flex items-center gap-3 text-[10px] flex-shrink-0" style={{ color: "#94a3b8" }}>
                           <span className="flex items-center gap-1.5">
                             <div className="w-2 h-2 rounded-full bg-emerald-400" />Wajah OK
                           </span>
@@ -1223,20 +1228,20 @@ export default function UsersPage() {
                     {loading ? (
                       <div>
                         {Array(6).fill(0).map((_, i) => (
-                          <div key={i} className="px-4 sm:px-5 py-4 flex items-center gap-3.5 animate-pulse"
+                          <div key={i} className="px-3.5 sm:px-5 py-4 flex items-center gap-3 sm:gap-3.5 animate-pulse"
                             style={{ borderBottom: "1px solid #f8f8fc" }}>
                             <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
-                            <div className="flex-1 space-y-2">
-                              <div className="h-3 rounded-full w-32" style={{ background: "#e2e8f0" }} />
+                            <div className="flex-1 space-y-2 min-w-0">
+                              <div className="h-3 rounded-full w-32 max-w-full" style={{ background: "#e2e8f0" }} />
                               <div className="h-2.5 rounded-full w-20" style={{ background: "#f1f5f9" }} />
                             </div>
-                            <div className="w-16 h-7 rounded-lg" style={{ background: "#f1f5f9" }} />
+                            <div className="w-16 h-7 rounded-lg flex-shrink-0 hidden sm:block" style={{ background: "#f1f5f9" }} />
                           </div>
                         ))}
                       </div>
 
                     ) : filtered.length === 0 ? (
-                      <div className="text-center py-20">
+                      <div className="text-center py-16 sm:py-20 px-4">
                         <div className="flex justify-center mb-3"><Inbox className="w-9 h-9" style={{ color: "#cbd5e1" }} /></div>
                         <p className="text-sm font-bold" style={{ color: "#475569" }}>Tidak ada user ditemukan</p>
                         <p className="text-xs mt-1" style={{ color: "#94a3b8" }}>Coba ubah filter atau kata kunci pencarian</p>
@@ -1258,7 +1263,7 @@ export default function UsersPage() {
 
                           return (
                             <div key={user.id}
-                              className="px-4 sm:px-5 py-3.5 hover:bg-slate-50/70 transition-colors group"
+                              className="px-3.5 sm:px-5 py-3 sm:py-3.5 hover:bg-slate-50/70 transition-colors group"
                               style={{ borderBottom: idx < filtered.length - 1 ? "1px solid #f5f5fb" : "none" }}>
                               <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
 
@@ -1282,7 +1287,7 @@ export default function UsersPage() {
 
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                    <span className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>
+                                    <span className="text-sm font-bold truncate max-w-full" style={{ color: "#0f172a" }}>
                                       {user.name}
                                     </span>
                                     {(user.roles?.length > 0 ? user.roles : [user.role]).map((r, i) => {
@@ -1318,11 +1323,11 @@ export default function UsersPage() {
                                     )}
                                   </div>
                                   {(isAdmin || isKepala) && user.phone_number && (
-                                    <p className="text-[11px] text-gray-400 font-medium mt-0.5">{user.phone_number}</p>
+                                    <p className="text-[11px] text-gray-400 font-medium mt-0.5 truncate">{user.phone_number}</p>
                                   )}
                                   {user.birth_date && (
-                                    <p className="text-[10px] text-gray-400 mt-0.5 inline-flex items-center gap-1">
-                                      <Cake className="w-3 h-3" /> {formatBirthDate(user.birth_date)}
+                                    <p className="text-[10px] text-gray-400 mt-0.5 inline-flex items-center gap-1 flex-wrap">
+                                      <Cake className="w-3 h-3 flex-shrink-0" /> {formatBirthDate(user.birth_date)}
                                       {isBirthdayToday(user.birth_date) && (
                                         <span className="ml-1 text-amber-600 font-bold inline-flex items-center gap-1">— Hari ini! <PartyPopper className="w-3 h-3" /></span>
                                       )}
@@ -1385,7 +1390,7 @@ export default function UsersPage() {
                               </div>
 
                               {(canChat || isAdmin) && (
-                                <div className="flex sm:hidden items-center gap-1.5 mt-2.5 pl-[52px]">
+                                <div className="flex sm:hidden items-center gap-1.5 mt-2.5 pl-[52px] flex-wrap">
                                   {canChat && (
                                     <ActionBtn
                                       onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
