@@ -328,6 +328,11 @@ function initials(name: string): string {
 }
 
 function pad2(n: number) { return String(n).padStart(2, "0"); }
+function minToHHMM(min: number): string {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${pad2(h)}:${pad2(m)}`;
+}
 
 function getUserStartDate(
     userCreatedAt: string | null | undefined,
@@ -2673,6 +2678,7 @@ export default function AttendanceDashboardPage() {
     const [monthlyOffs, setMonthlyOffs] = useState<MonthlyOff[]>([]);
     const [showShiftScheduleModal, setShowShiftScheduleModal] = useState(false);
     const [shiftSchedules, setShiftSchedules] = useState<ShiftScheduleRow[]>([]);
+    const [shiftConfigs, setShiftConfigs] = useState<any[]>([]);
 
     const fetchShiftSchedules = useCallback(async (y: number, m: number) => {
         try {
@@ -2681,6 +2687,16 @@ export default function AttendanceDashboardPage() {
             if (d.success) setShiftSchedules(d.data || []);
         } catch (err) {
             console.error("Failed to fetch shift schedules:", err);
+        }
+    }, []);
+
+    const fetchShiftConfigs = useCallback(async () => {
+        try {
+            const r = await fetch("/api/attendance/shift-config");
+            const d = await r.json();
+            if (d.success) setShiftConfigs(d.data || []);
+        } catch (err) {
+            console.error("Failed to fetch shift configs:", err);
         }
     }, []);
 
@@ -2877,8 +2893,9 @@ export default function AttendanceDashboardPage() {
             fetchAllUsers(),
             fetchSalaries(),
             fetchAllowances(),
-            fetchLeaveData(year, month), // FIX: sama seperti di atas
-            fetchShiftSchedules(year, month),   // tambah baris ini
+            fetchLeaveData(year, month),
+            fetchShiftSchedules(year, month),
+            fetchShiftConfigs(),
         ];
         Promise.all(tasks).finally(() => setLoading(false));
     }, [
@@ -2894,6 +2911,7 @@ export default function AttendanceDashboardPage() {
         fetchAllowances,
         fetchLeaveData,
         fetchShiftSchedules,
+        fetchShiftConfigs,
     ]);
 
     useEffect(() => {
@@ -2946,12 +2964,13 @@ export default function AttendanceDashboardPage() {
             fetchAllowances(),
             fetchLeaveData(year, month),
             fetchShiftSchedules(year, month),
+            fetchShiftConfigs(),
         ];
         Promise.all(tasks).finally(() => { if (!silent) setLoading(false); });
         if (userCanViewSalary(currentUser)) {
             fetchSalarySlips(year, month);
         }
-    }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchSalarySlips, currentUser]);
+    }, [selectedMonth, fetchAttendance, fetchDayOffs, fetchAllDateOffs, fetchManualRecords, fetchAllUsers, fetchSalaries, fetchAllowances, fetchLeaveData, fetchShiftSchedules, fetchShiftConfigs, fetchSalarySlips, currentUser]);
     // ── Derived ───────────────────────────────────────────────────────────────
     const dayOffByName = useMemo(() => { const m: Record<string, Set<number>> = {}; dayOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.day_of_week); }); return m; }, [dayOffs]);
     const dateOffByName = useMemo(() => { const m: Record<string, Set<string>> = {}; allDateOffs.forEach(d => { const n = d.users?.name; if (!n) return; if (!m[n]) m[n] = new Set(); m[n].add(d.off_date); }); return m; }, [allDateOffs]);
@@ -3107,29 +3126,72 @@ export default function AttendanceDashboardPage() {
         return m;
     }, [shiftSchedules]);
 
+    const configsByUser = useMemo(() => {
+        const m: Record<string, any> = {};
+        shiftConfigs.forEach(c => { m[c.user_id] = c; });
+        return m;
+    }, [shiftConfigs]);
+
     const effectiveShiftFor = useCallback((userId: string, dk: string) => {
         const sched = pickSchedule(schedulesByUser[userId] ?? [], dk);
+        const cfg = configsByUser[userId];
+        const userBaseShift = (allUsers.find(u => u.id === userId)?.shift ?? "PAGI") as "PAGI" | "SORE";
+
+        let shift: "PAGI" | "SORE" = userBaseShift;
+        let fromSchedule = false;
+        let openMin: number | null = null;
+        let lateMin: number | null = null;
+        let closeMin: number | null = null;
+
         if (sched) {
-            const base = SHIFT_DEFAULTS[sched.shift];
-            const custom = sched.open_hour != null && sched.late_hour != null && sched.close_hour != null;
-            return {
-                shift: sched.shift,
-                fromSchedule: true,
-                open: custom ? sched.open_hour! * 60 + (sched.open_minute ?? 0) : base.open_hour * 60 + base.open_minute,
-                late: custom ? sched.late_hour! * 60 + (sched.late_minute ?? 0) : base.late_hour * 60 + base.late_minute,
-                close: custom ? sched.close_hour! * 60 + (sched.close_minute ?? 0) : base.close_hour * 60 + base.close_minute,
-            };
+            fromSchedule = true;
+            shift = sched.shift;
+            if (sched.open_hour != null) {
+                openMin = sched.open_hour * 60 + (sched.open_minute ?? 0);
+            }
+            if (sched.late_hour != null) {
+                lateMin = sched.late_hour * 60 + (sched.late_minute ?? 0);
+            }
+            if (sched.close_hour != null) {
+                closeMin = sched.close_hour * 60 + (sched.close_minute ?? 0);
+            }
         }
-        const shift = (allUsers.find(u => u.id === userId)?.shift ?? "PAGI") as "PAGI" | "SORE";
-        const base = SHIFT_DEFAULTS[shift];
+
+        if (cfg) {
+            if (!sched) {
+                shift = (cfg.shift ?? userBaseShift) as "PAGI" | "SORE";
+            }
+            if (openMin == null && cfg.open_hour != null) {
+                openMin = cfg.open_hour * 60 + (cfg.open_minute ?? 0);
+            }
+            if (lateMin == null && cfg.late_hour != null) {
+                lateMin = cfg.late_hour * 60 + (cfg.late_minute ?? 0);
+            }
+            if (closeMin == null && cfg.close_hour != null) {
+                closeMin = cfg.close_hour * 60 + (cfg.close_minute ?? 0);
+            }
+        }
+
+        const base = SHIFT_DEFAULTS[shift] ?? SHIFT_DEFAULTS.PAGI;
+        if (openMin == null) openMin = base.open_hour * 60 + base.open_minute;
+        if (lateMin == null) lateMin = base.late_hour * 60 + base.late_minute;
+        if (closeMin == null) closeMin = base.close_hour * 60 + base.close_minute;
+
+        const defOpenMin = base.open_hour * 60 + base.open_minute;
+        const defLateMin = base.late_hour * 60 + base.late_minute;
+        const defCloseMin = base.close_hour * 60 + base.close_minute;
+
+        const isCustom = openMin !== defOpenMin || lateMin !== defLateMin || closeMin !== defCloseMin;
+
         return {
             shift,
-            fromSchedule: false,
-            open: base.open_hour * 60 + base.open_minute,
-            late: base.late_hour * 60 + base.late_minute,
-            close: base.close_hour * 60 + base.close_minute,
+            fromSchedule,
+            isCustom,
+            open: openMin,
+            late: lateMin,
+            close: closeMin,
         };
-    }, [schedulesByUser, allUsers]);
+    }, [schedulesByUser, configsByUser, allUsers]);
 
     const userSummary = useMemo(() => {
         type UserStat = {
@@ -4388,14 +4450,17 @@ export default function AttendanceDashboardPage() {
                                                                     : `${calYear}-${pad2(calMonth + 1)}-${pad2(new Date(calYear, calMonth + 1, 0).getDate())}`);
                                                                 return (
                                                                     <div className="flex flex-col items-center gap-1">
-                                                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg border ${eff.shift === "PAGI"
+                                                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg border ${eff.isCustom ? "bg-rose-50 text-rose-700 border-rose-200" : eff.shift === "PAGI"
                                                                             ? "bg-amber-50 text-amber-700 border-amber-200"
                                                                             : "bg-indigo-50 text-indigo-700 border-indigo-200"
                                                                             }`}>
-                                                                            {eff.shift === "PAGI" ? <Sun className="w-3.5 h-3.5 inline mr-1 text-amber-500" /> : <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />} {eff.shift}
+                                                                            {eff.shift === "PAGI" ? <Sun className="w-3.5 h-3.5 inline mr-1 text-amber-500" /> : <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />} {minToHHMM(eff.open)}–{minToHHMM(eff.close)}
                                                                         </span>
-                                                                        {eff.fromSchedule && (
+                                                                        {eff.fromSchedule && !eff.isCustom && (
                                                                             <span className="text-[8px] font-bold text-violet-500">dari jadwal</span>
+                                                                        )}
+                                                                        {eff.isCustom && (
+                                                                            <span className="text-[8px] font-black text-rose-600">Custom</span>
                                                                         )}
                                                                         {(isAdmin || u.userId !== currentUser?.id) && (
                                                                             <button
