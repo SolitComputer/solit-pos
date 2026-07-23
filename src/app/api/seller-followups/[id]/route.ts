@@ -11,6 +11,7 @@ import {
 } from "@/lib/permissions";
 import { nextFollowupISO, normalizeSellerType, SellerType } from "@/lib/sellerFollowup";
 import { logActivity } from "@/lib/activityLogger";
+import { updateSellerPhoneSchema } from "@/lib/validation";
 
 export const runtime = "nodejs"; // butuh Buffer untuk upload storage
 
@@ -181,6 +182,35 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         update.pic_user_id = user.id;
         update.closed_by = user.name;
       }
+    } else if (action === "update_phone") {
+      // GATE — sama seperti "followup": hanya yang berwenang FU customer ini atau Admin
+      if (!canManage && !hasAnyRole(roles, PERMS.FOLLOWUP_SELLER)) {
+        return NextResponse.json(
+          { success: false, message: "Kamu tidak berwenang mengubah nomor HP customer ini" },
+          { status: 403 }
+        );
+      }
+      if (!canManage && !isOwnedByMe && !isUnowned) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Customer ini sudah ditugaskan ke ${existing.closed_by ?? "PIC lain"}`,
+          },
+          { status: 403 }
+        );
+      }
+
+      const parsed = updateSellerPhoneSchema.safeParse({
+        customer_phone: fields.customer_phone,
+      });
+      if (!parsed.success) {
+        return NextResponse.json(
+          { success: false, message: parsed.error.issues[0]?.message ?? "Nomor HP tidak valid" },
+          { status: 400 }
+        );
+      }
+
+      update.customer_phone = parsed.data.customer_phone;
     } else if (action === "archive" || action === "reactivate" || action === "assign") {
       if (!canManage) {
         return NextResponse.json(
@@ -253,6 +283,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
         archive: "Arsip",
         reactivate: "Aktifkan",
         assign: "Assign PIC",
+        update_phone: "Edit Nomor HP",
       };
       try {
         await logActivity({
