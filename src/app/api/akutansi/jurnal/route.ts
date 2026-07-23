@@ -11,7 +11,7 @@ import {
   periodFromDate,
   totalOf,
 } from "@/lib/accounting";
-import { draftToLineRows } from "@/lib/accountingSource";
+import { draftToLineRows, getTransactionMetaByInvoices } from "@/lib/accountingSource";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -49,14 +49,14 @@ export const GET = withAuth(async (req) => {
     .select(ENTRY_SELECT)
     .eq("period", period)
     .order("tanggal", { ascending: sort === "asc" })
-    .order("created_at", { ascending: true }); // urutan dalam tanggal yang sama tetap konsisten (dipakai drag-and-drop reorder)
+    .order("created_at", { ascending: sort === "asc" }); // urutan dalam tanggal yang sama tetap konsisten (dipakai drag-and-drop reorder)
 
   if (error) {
     console.error("[akuntansi GET jurnal]", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
-  const entries = (data ?? []).map((e: any) => ({
+ const entries = (data ?? []).map((e: any) => ({
     ...e,
     lines: [...(e.lines ?? [])].sort((a: any, b: any) => {
       if (a.side !== b.side) return a.side === "DEBIT" ? -1 : 1;
@@ -64,12 +64,25 @@ export const GET = withAuth(async (req) => {
     }),
   }));
 
-  const totalDebit = entries.reduce(
+  // Enrich entry TRANSACTION dengan company_name & spek laptop — data live dari
+  // transactions/laptops, karena journal_entries tidak menyimpan kolom ini.
+  const trxInvoiceNumbers = entries
+    .filter((e: any) => e.source_type === "TRANSACTION" && e.source_id)
+    .map((e: any) => e.source_id as string);
+
+  const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
+
+  const entriesWithMeta = entries.map((e: any) => ({
+    ...e,
+    trx_meta: e.source_type === "TRANSACTION" && e.source_id ? trxMetaMap.get(e.source_id) ?? null : null,
+  }));
+
+  const totalDebit = entriesWithMeta.reduce(
     (s: number, e: any) =>
       s + e.lines.filter((l: any) => l.side === "DEBIT").reduce((x: number, l: any) => x + Number(l.nominal), 0),
     0
   );
-  const totalKredit = entries.reduce(
+  const totalKredit = entriesWithMeta.reduce(
     (s: number, e: any) =>
       s + e.lines.filter((l: any) => l.side === "KREDIT").reduce((x: number, l: any) => x + Number(l.nominal), 0),
     0
@@ -77,9 +90,9 @@ export const GET = withAuth(async (req) => {
 
   return NextResponse.json({
     success: true,
-    data: entries,
+    data: entriesWithMeta,
     summary: {
-      total_entry: entries.length,
+      total_entry: entriesWithMeta.length,
       total_debit: totalDebit,
       total_kredit: totalKredit,
       balanced: totalDebit === totalKredit,
