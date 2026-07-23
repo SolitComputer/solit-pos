@@ -438,8 +438,6 @@ export function LaptopsContent() {
 
         list = list.filter(x => (x.laptop_units?.length ?? 0) === 0 || (x.stok_tersedia ?? 0) > 0);
         // ── Filter stok tersisa ──────────────────────────────────────────────
-        // Default "TERSEDIA" → laptop dgn stok 0 otomatis tersembunyi ("hilang").
-        // User bisa pilih "ALL" untuk lihat semua, atau "HABIS" untuk lihat yg kosong saja.
        if (filterStock === "TERSEDIA") {
             list = list.filter(x => (x.laptop_units?.length ?? 0) === 0 || (x.stok_tersedia ?? 0) > 0);
         } else if (filterStock === "HABIS") {

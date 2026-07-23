@@ -33,6 +33,98 @@ export function draftKey(s: { source_type: string; source_id: string }): string 
   return `${s.source_type}:${s.source_id}`;
 }
 
+export interface TransactionMeta {
+  company_name: string | null;
+  cpu: string | null;
+  ram: string | null;
+  storage: string | null;
+}
+
+/**
+ * Ambil company_name & spek laptop (CPU/RAM/Storage) untuk daftar invoice_number.
+ * Dipakai untuk menampilkan badge toko + spek di Jurnal Umum (entry yang SUDAH
+ * di-posting/dikonfirmasi) — datanya tidak disimpan di journal_entries, jadi
+ * di-lookup live ke transactions/laptop_units/laptops, sama seperti logic di
+ * buildTransactionDrafts() di atas.
+ */
+export async function getTransactionMetaByInvoices(
+  supabase: SupabaseClient,
+  invoiceNumbers: string[]
+): Promise<Map<string, TransactionMeta>> {
+  const map = new Map<string, TransactionMeta>();
+  if (invoiceNumbers.length === 0) return map;
+
+  const { data: trxs, error } = await supabase
+    .from("transactions")
+    .select("invoice_number, company_name, laptop_id, unit_id, unit_ids")
+    .in("invoice_number", invoiceNumbers);
+
+  if (error) {
+    console.error("[akuntansi] fetch transaction meta:", error.message);
+    return map;
+  }
+  if (!trxs || trxs.length === 0) return map;
+
+  const unitIds = new Set<string>();
+  for (const t of trxs as any[]) {
+    if (t.unit_id) unitIds.add(t.unit_id);
+    if (Array.isArray(t.unit_ids)) for (const u of t.unit_ids) if (u) unitIds.add(u);
+  }
+
+  const unitLaptopMap = new Map<string, string>(); // unit_id -> laptop_id
+  if (unitIds.size > 0) {
+    const { data: units } = await supabase
+      .from("laptop_units")
+      .select("id, laptop_id")
+      .in("id", Array.from(unitIds));
+    for (const u of units ?? []) {
+      if (u.laptop_id) unitLaptopMap.set(u.id as string, u.laptop_id as string);
+    }
+  }
+
+  const laptopIds = new Set<string>();
+  for (const t of trxs as any[]) {
+    if (t.laptop_id) laptopIds.add(t.laptop_id);
+  }
+  for (const laptopId of unitLaptopMap.values()) laptopIds.add(laptopId);
+
+  const laptopSpecMap = new Map<string, { cpu?: string; ram?: string; storage?: string }>();
+  if (laptopIds.size > 0) {
+    const { data: laptops } = await supabase
+      .from("laptops")
+      .select("id, cpu, ram, storage")
+      .in("id", Array.from(laptopIds));
+    for (const l of laptops ?? []) {
+      laptopSpecMap.set(l.id as string, {
+        cpu: (l.cpu as string) ?? undefined,
+        ram: (l.ram as string) ?? undefined,
+        storage: (l.storage as string) ?? undefined,
+      });
+    }
+  }
+
+  for (const t of trxs as any[]) {
+    let resolvedLaptopId: string | undefined = t.laptop_id ?? undefined;
+    if (!resolvedLaptopId) {
+      const ids: string[] =
+        Array.isArray(t.unit_ids) && t.unit_ids.length > 0 ? t.unit_ids : t.unit_id ? [t.unit_id] : [];
+      for (const id of ids) {
+        const lid = unitLaptopMap.get(id);
+        if (lid) { resolvedLaptopId = lid; break; }
+      }
+    }
+    const specs = resolvedLaptopId ? laptopSpecMap.get(resolvedLaptopId) : undefined;
+    map.set(t.invoice_number as string, {
+      company_name: (t.company_name as string) ?? null,
+      cpu: specs?.cpu ?? null,
+      ram: specs?.ram ?? null,
+      storage: specs?.storage ?? null,
+    });
+  }
+
+  return map;
+}
+
 // ── TRANSAKSI ────────────────────────────────────────────────────────────────
 async function buildTransactionDrafts(
   supabase: SupabaseClient,
@@ -42,7 +134,7 @@ async function buildTransactionDrafts(
   const { data: trxs, error } = await supabase
     .from("transactions")
     .select(
-      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, dp_amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, created_at"
+      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, dp_amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, created_at, company_name, laptop_id"
     )
     .in("status", ["PAID", "HELD", "PACKING", "RESERVED"])
     .gte("created_at", startISO)
@@ -55,23 +147,50 @@ async function buildTransactionDrafts(
   }
   if (!trxs || trxs.length === 0) return [];
 
-  // Ambil SN + harga modal dari laptop_units
+  // Ambil SN + harga modal dari laptop_units — sekaligus laptop_id per unit,
+  // untuk fallback spek kalau transaksi lama tidak menyimpan laptop_id langsung.
   const unitIds = new Set<string>();
   for (const t of trxs as any[]) {
     if (t.unit_id) unitIds.add(t.unit_id);
     if (Array.isArray(t.unit_ids)) for (const u of t.unit_ids) if (u) unitIds.add(u);
   }
 
-  const unitMap = new Map<string, { purchase_price: number; serial_number?: string }>();
+  const unitMap = new Map<string, { purchase_price: number; serial_number?: string; laptop_id?: string }>();
   if (unitIds.size > 0) {
     const { data: units } = await supabase
       .from("laptop_units")
-      .select("id, purchase_price, serial_number")
+      .select("id, purchase_price, serial_number, laptop_id")
       .in("id", Array.from(unitIds));
     for (const u of units ?? []) {
       unitMap.set(u.id as string, {
         purchase_price: Math.round(Number(u.purchase_price ?? 0)),
         serial_number: (u.serial_number as string) ?? undefined,
+        laptop_id: (u.laptop_id as string) ?? undefined,
+      });
+    }
+  }
+
+  // Kumpulkan semua laptop_id yang perlu di-lookup spesifikasinya (CPU/RAM/Storage) —
+  // dari kolom transactions.laptop_id maupun dari laptop_units.laptop_id.
+  const laptopIds = new Set<string>();
+  for (const t of trxs as any[]) {
+    if (t.laptop_id) laptopIds.add(t.laptop_id);
+  }
+  for (const u of unitMap.values()) {
+    if (u.laptop_id) laptopIds.add(u.laptop_id);
+  }
+
+  const laptopSpecMap = new Map<string, { cpu?: string; ram?: string; storage?: string }>();
+  if (laptopIds.size > 0) {
+    const { data: laptops } = await supabase
+      .from("laptops")
+      .select("id, cpu, ram, storage")
+      .in("id", Array.from(laptopIds));
+    for (const l of laptops ?? []) {
+      laptopSpecMap.set(l.id as string, {
+        cpu: (l.cpu as string) ?? undefined,
+        ram: (l.ram as string) ?? undefined,
+        storage: (l.storage as string) ?? undefined,
       });
     }
   }
@@ -91,12 +210,16 @@ async function buildTransactionDrafts(
 
     let modal = 0;
     const sns: string[] = [];
+    let resolvedLaptopId: string | undefined = t.laptop_id ?? undefined;
     for (const id of ids) {
       const u = unitMap.get(id);
       if (!u) continue;
       modal += u.purchase_price;
       if (u.serial_number) sns.push(u.serial_number);
+      if (!resolvedLaptopId && u.laptop_id) resolvedLaptopId = u.laptop_id;
     }
+
+    const specs = resolvedLaptopId ? laptopSpecMap.get(resolvedLaptopId) : undefined;
 
     const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
     // Format keterangan sesuai requirement: tipe laptop - SN - nama customer
@@ -150,7 +273,16 @@ async function buildTransactionDrafts(
       ref: null,
       lines: merged,
       total: totalOf(merged),
-      meta: { status: t.status, invoice: t.invoice_number, deal, modal },
+      meta: {
+        status: t.status,
+        invoice: t.invoice_number,
+        deal,
+        modal,
+        company_name: t.company_name ?? null,
+        cpu: specs?.cpu ?? null,
+        ram: specs?.ram ?? null,
+        storage: specs?.storage ?? null,
+      },
     });
   }
 
