@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -44,6 +44,7 @@ interface JournalEntry {
         cpu: string | null;
         ram: string | null;
         storage: string | null;
+        modal_missing?: boolean;
     } | null;
 }
 
@@ -516,6 +517,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                             {companyBadge.label}
                                                                                         </span>
                                                                                     )}
+                                                                                    {entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing && (
+                                                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
+                                                                                            <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
+                                                                                        </span>
+                                                                                    )}
                                                                                     {entry.is_edited && (
                                                                                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
                                                                                             diedit · {entry.updated_by_user?.name ?? "—"}
@@ -835,7 +841,7 @@ function EntryFormModal({
                             </button>
                         </div>
 
-                       <DragDropContext onDragEnd={handleLineDragEnd}>
+                        <DragDropContext onDragEnd={handleLineDragEnd}>
                             <Droppable droppableId="jurnal-manual-lines">
                                 {(dropProvided) => (
                                     <div className="space-y-2.5" ref={dropProvided.innerRef} {...dropProvided.droppableProps}>
