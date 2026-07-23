@@ -80,6 +80,39 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
   );
 }
 
+function ExportProgressModal({ progress, label }: { progress: number; label: string }) {
+  const pct = Math.min(100, Math.max(0, Math.round(progress)));
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 ring-1 ring-black/5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-emerald-600 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-gray-900">Export Excel</p>
+            <p className="text-xs text-gray-400 truncate">{label || "Memproses..."}</p>
+          </div>
+        </div>
+        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-emerald-500 rounded-full transition-all duration-300 ease-out"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-[11px] text-gray-400">Jangan tutup halaman ini</span>
+          <span className="text-xs font-bold text-emerald-700 tabular-nums">{pct}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── STATUS & PAYMENT HELPERS ────────────────────────────────────────
 const STATUS_LABEL: Record<string, string> = {
   PAID: "LUNAS", PENDING: "PENDING", CANCELLED: "BATAL", FAILED: "GAGAL",
@@ -1407,6 +1440,8 @@ export default function Page() {
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportLabel, setExportLabel] = useState("");
   const [photoModal, setPhotoModal] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -1573,9 +1608,11 @@ export default function Page() {
   const handleExportExcel = async () => {
     if (isExporting) return;
     setIsExporting(true);
+    setExportProgress(0);
+    setExportLabel("Menyiapkan proses export...");
     try {
-      // Lazy-load ExcelJS hanya saat export ditekan — jangan bebani bundle halaman
       const { default: ExcelJS } = await import("exceljs");
+      setExportProgress(5);
 
       // Ambil SEMUA baris yang match filter aktif (bukan cuma 1 halaman yang lagi ditampilkan)
       const exportParams = new URLSearchParams({ export: "1", status, sortOrder });
@@ -1591,9 +1628,11 @@ export default function Page() {
       if (sourcePlatform !== "ALL") exportParams.set("sourcePlatform", sourcePlatform);
       if (companyName !== "ALL") exportParams.set("companyName", companyName);
 
+      setExportLabel("Mengambil daftar transaksi...");
       const exportRes = await fetch(`/api/transaction?${exportParams.toString()}`);
       const exportResult = await exportRes.json();
       const exportRows: any[] = exportResult.data || [];
+      setExportProgress(15);
 
       const wb = new ExcelJS.Workbook();
       wb.creator = "Solit POS"; wb.created = new Date();
@@ -1618,7 +1657,10 @@ export default function Page() {
       type DetailCache = { purchase_price_total: number; grouped_items?: Array<{ laptop_name: string; purchase_price_total: number; margin: number }> };
       const detailCache = new Map<string, DetailCache>();
 
-      if (canSeeFinancials) {
+      if (canSeeFinancials && exportRows.length > 0) {
+        let completedDetail = 0;
+        const totalDetail = exportRows.length;
+        setExportLabel(`Menghitung harga modal (0/${totalDetail})...`);
         await Promise.allSettled(exportRows.map(async (item) => {
           try {
             const res = await fetch(`/api/transaction/${item.invoice_number}`);
@@ -1630,8 +1672,16 @@ export default function Page() {
               purchase_price_total: Number(d.purchase_price_total ?? d.inventory_price ?? 0),
               grouped_items: Array.isArray(d.grouped_items) ? d.grouped_items : undefined,
             });
-          } catch { /* skip */ }
+          } catch { /* skip */ } finally {
+            completedDetail += 1;
+            // Tahap ini yang paling lama (1 request per transaksi), jadi diberi porsi
+            // terbesar dari progress bar: 15% - 80%.
+            setExportProgress(15 + Math.round((completedDetail / totalDetail) * 65));
+            setExportLabel(`Menghitung harga modal (${completedDetail}/${totalDetail})...`);
+          }
         }));
+      } else {
+        setExportProgress(80);
       }
 
       const LEFT_KEYS = new Set(["tanggal"]);
@@ -1639,6 +1689,7 @@ export default function Page() {
       const NUM_KEYS = new Set(["qty", "no"]);
       const tableRows: (string | number)[][] = [];
 
+      setExportLabel("Menyusun baris data...");
       let rowNo = 0;
       for (const item of exportRows) {
         const grouped: any[] = item.grouped_items ?? [];
@@ -1666,6 +1717,8 @@ export default function Page() {
         }
       }
 
+      setExportProgress(85);
+      setExportLabel("Membuat tabel Excel...");
       if (tableRows.length > 0) {
         ws.addTable({ name: "TabelTransaksi", ref: "A1", headerRow: true, totalsRow: false, style: { theme: "TableStyleMedium7", showRowStripes: true }, columns: COL_DEFS.map((c) => ({ name: c.header, filterButton: true })), rows: tableRows });
       }
@@ -1695,6 +1748,8 @@ export default function Page() {
 
       COL_DEFS.forEach((col, idx) => { ws.getColumn(idx + 1).width = col.width; });
 
+      setExportProgress(95);
+      setExportLabel("Menyusun file Excel...");
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const link = document.createElement("a");
@@ -1702,16 +1757,24 @@ export default function Page() {
       const dateStr = new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
       link.download = `Transaksi_Solit_${dateStr}.xlsx`;
       document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(link.href);
+      setExportProgress(100);
+      setExportLabel("Selesai!");
+      await new Promise((resolve) => setTimeout(resolve, 400));
     } catch (err) {
       console.error("Export error:", err);
       alert(`Gagal export Excel: ${err instanceof Error ? err.message : String(err)}`);
-    } finally { setIsExporting(false); }
+    } finally {
+      setIsExporting(false);
+      setExportProgress(0);
+      setExportLabel("");
+    }
   };
 
   return (
     <DashboardLayout>
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
       {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} />}
+      {isExporting && <ExportProgressModal progress={exportProgress} label={exportLabel} />}
 
       {/* ── Page wrapper ── */}
       <div className={`${isMobile ? "px-4 py-4" : "max-w-[1920px] mx-auto px-6 py-4"} space-y-3`}>
@@ -1739,8 +1802,7 @@ export default function Page() {
                 className="inline-flex items-center gap-1.5 px-3 h-9 bg-white border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isExporting ? (
-                  <><svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Export...</>
-                ) : (
+                  <><svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Export... {exportProgress}%</>) : (
                   <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><polyline points="8 13 12 17 16 13" /><line x1="12" y1="17" x2="12" y2="11" /></svg>Export Excel</>
                 )}
               </button>
