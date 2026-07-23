@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { playNotifSound } from "@/lib/preparationSound";
+import { playSoundByKey } from "@/lib/preparationSound";
 
 export const ALARM_KEYS = {
   MENUNGGU: "prep_alarm_menunggu",
@@ -23,7 +23,9 @@ export function usePrepAlarm(
   items: { id: string }[],
   storageKey: string,
   soundEnabled: boolean,
-  intervalMs = 4000
+  intervalMs = 4000,
+  soundKey: string = "default",
+  customSoundUrl: string | null = null
 ) {
   const [ackedIds, setAckedIds] = useState<Set<string>>(() => readAck(storageKey));
 
@@ -48,10 +50,10 @@ export function usePrepAlarm(
   useEffect(() => {
     if (alarmRef.current) { clearInterval(alarmRef.current); alarmRef.current = null; }
     if (unacked.length === 0 || !soundEnabled) return;
-    playNotifSound(); // bunyi langsung
-    alarmRef.current = setInterval(playNotifSound, intervalMs);
+    playSoundByKey(soundKey, customSoundUrl); // bunyi langsung
+    alarmRef.current = setInterval(() => playSoundByKey(soundKey, customSoundUrl), intervalMs);
     return () => { if (alarmRef.current) clearInterval(alarmRef.current); };
-  }, [unacked.length, soundEnabled, intervalMs]);
+  }, [unacked.length, soundEnabled, intervalMs, soundKey, customSoundUrl]);
 
   useEffect(() => () => { if (alarmRef.current) clearInterval(alarmRef.current); }, []);
 
