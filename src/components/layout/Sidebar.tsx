@@ -158,7 +158,7 @@ const ITEM_TODOS: MenuItem = { name: "To-Do List", href: "/dashboard/todos", ico
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 
 const ITEM_MONITORING_CEO_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/monitoring-ceo/absensi", icon: Icons.monitoringCeo };
-const ITEM_MONITORING_CEO_OVERTIME: MenuItem = { name: "Monitor Lembur", href: "/dashboard/monitoring-ceo/overtime", icon: Icons.overtime };
+const ITEM_MONITORING_CEO_OVERTIME: MenuItem = { name: "Lembur", href: "/dashboard/monitoring-ceo/overtime", icon: Icons.overtime };
 const ITEM_MONITORING_CEO_PENYEDIA: MenuItem = { name: "Penyedia Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.barang };
 const ITEM_MONITORING_CEO_SERVIS: MenuItem = { name: "Service", href: "/dashboard/service/statistik", icon: Icons.serviceQueue };
 const ITEM_MONITORING_CEO_PENGANTARAN: MenuItem = { name: "Pengantaran", href: "/dashboard/monitoring-ceo/pengantaran", icon: Icons.deliveryRoute };
