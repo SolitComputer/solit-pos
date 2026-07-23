@@ -338,8 +338,16 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
           {canApproveTarget(currentUser?.role, o.users?.role) && o.status === "PENDING" && (
             <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Setujui</button>
           )}
-          {canSetPay(currentUser?.role) && (o.status === "COMPLETED" || o.status === "NEED_PROOF") && (
+          {/* Bayaran hanya boleh diatur kalau lembur selesai DAN foto bukti sudah ada */}
+          {canSetPay(currentUser?.role) && o.status === "COMPLETED" && !!o.proof_photo_url && (
             <button onClick={() => { onClose(); setTimeout(onSetPay, 100); }} className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> {o.rate_per_hour ? "Edit Bayaran" : "Set Bayaran"}</button>
+          )}
+          {/* Placeholder informatif: admin tahu kenapa tombol Set Bayaran belum muncul */}
+          {canSetPay(currentUser?.role) && !o.proof_photo_url && (o.status === "NEED_PROOF" || o.status === "COMPLETED") && (
+            <div className="flex-1 h-10 rounded-xl border border-dashed border-gray-200 bg-gray-50 text-gray-400 text-[10px] font-semibold flex items-center justify-center gap-1.5 px-3 text-center">
+              <Camera size={13} className="flex-shrink-0" />
+              <span>Menunggu foto bukti</span>
+            </div>
           )}
           {isAdminRole(currentUser?.role) && (
             <>
