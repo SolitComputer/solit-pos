@@ -266,7 +266,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             )}
 
             {/* ── Summary ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                 <Stat label="Total Entry" value={String(filtered.length)} tone="gray" />
                 <Stat label="Total Debit" value={rp(totalDebit)} tone="blue" />
                 <Stat label="Total Kredit" value={rp(totalKredit)} tone="emerald" />
@@ -321,7 +321,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                     return (
                                         <label
                                             key={k}
-                                            className={`flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors ${checked ? "bg-blue-50/40" : ""}`}
+                                            className={`flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors ${checked ? "bg-blue-50/40" : ""}`}
                                         >
                                             <input
                                                 type="checkbox"
@@ -333,9 +333,9 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                         return next;
                                                     })
                                                 }
-                                                className="w-4 h-4 rounded border-gray-300 accent-[#1a1545]"
+                                                className="w-4 h-4 rounded border-gray-300 accent-[#1a1545] shrink-0"
                                             />
-                                            <span className="text-[10px] text-gray-400 font-mono w-16 shrink-0">
+                                            <span className="text-[10px] text-gray-400 font-mono w-14 sm:w-16 shrink-0">
                                                 {fmtTgl(d.tanggal)}
                                             </span>
                                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${badge.color}`}>
@@ -351,13 +351,17 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                     <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
                                                 </span>
                                             )}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-xs text-gray-700 truncate">{d.keterangan}</p>
-                                                {specParts.length > 0 && (
-                                                    <p className="text-[10px] text-gray-400 truncate mt-0.5">{specParts.join(" · ")}</p>
-                                                )}
+                                            <div className="w-full sm:contents">
+                                                <div className="flex items-center justify-between gap-3 sm:flex-1 sm:min-w-0">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs text-gray-700 truncate">{d.keterangan}</p>
+                                                        {specParts.length > 0 && (
+                                                            <p className="text-[10px] text-gray-400 truncate mt-0.5">{specParts.join(" · ")}</p>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs font-bold text-gray-900 font-mono shrink-0">{rp(d.total)}</span>
+                                                </div>
                                             </div>
-                                            <span className="text-xs font-bold text-gray-900 font-mono shrink-0">{rp(d.total)}</span>
                                         </label>
                                     );
                                 })}
@@ -378,7 +382,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             )}
 
             {/* ── Toolbar ── */}
-            <div className="bg-white rounded-xl border border-gray-200 p-3 flex gap-2">
+            <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                     <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
@@ -389,35 +393,37 @@ export default function JurnalUmum({ period }: { period: string }) {
                     />
                 </div>
 
-                <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg p-1 shrink-0">
+                <div className="flex gap-2">
+                    <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg p-1 shrink-0">
+                        <button
+                            onClick={() => setSortOrder("desc")}
+                            title="Terbaru ke terlama"
+                            className={`h-8 px-2.5 rounded-md text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all duration-150 ${sortOrder === "desc"
+                                ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white"
+                                : "text-gray-400 hover:bg-gray-50"
+                                }`}
+                        >
+                            <ArrowUpDown className="w-3 h-3" /> Terbaru
+                        </button>
+                        <button
+                            onClick={() => setSortOrder("asc")}
+                            title="Terlama ke terbaru"
+                            className={`h-8 px-2.5 rounded-md text-[11px] font-bold active:scale-95 transition-all duration-150 ${sortOrder === "asc"
+                                ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white"
+                                : "text-gray-400 hover:bg-gray-50"
+                                }`}
+                        >
+                            Terlama
+                        </button>
+                    </div>
+
                     <button
-                        onClick={() => setSortOrder("desc")}
-                        title="Terbaru ke terlama"
-                        className={`h-8 px-2.5 rounded-md text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all duration-150 ${sortOrder === "desc"
-                            ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white"
-                            : "text-gray-400 hover:bg-gray-50"
-                            }`}
+                        onClick={() => setShowManual(true)}
+                        className="flex-1 sm:flex-none h-10 px-4 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-bold hover:opacity-90 active:scale-[0.96] transition-all duration-150 whitespace-nowrap"
                     >
-                        <ArrowUpDown className="w-3 h-3" /> Terbaru
-                    </button>
-                    <button
-                        onClick={() => setSortOrder("asc")}
-                        title="Terlama ke terbaru"
-                        className={`h-8 px-2.5 rounded-md text-[11px] font-bold active:scale-95 transition-all duration-150 ${sortOrder === "asc"
-                            ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white"
-                            : "text-gray-400 hover:bg-gray-50"
-                            }`}
-                    >
-                        Terlama
+                        + Jurnal Manual
                     </button>
                 </div>
-
-                <button
-                    onClick={() => setShowManual(true)}
-                    className="h-10 px-4 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-bold hover:opacity-90 active:scale-[0.96] transition-all duration-150 whitespace-nowrap"
-                >
-                    + Jurnal Manual
-                </button>
             </div>
 
             {/* ── Total — di ATAS, di luar tabel (bar ringkasan) ── */}
@@ -441,18 +447,18 @@ export default function JurnalUmum({ period }: { period: string }) {
                             {(provided) => (
                                 <table
                                     className="w-full border-collapse"
-                                    style={{ minWidth: "900px" }}
+                                    style={{ minWidth: "760px" }}
                                     ref={provided.innerRef}
                                     {...provided.droppableProps}
                                 >
                                     <thead>
                                         <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
-                                            <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[110px]">Tanggal</th>
-                                            <th className="px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
-                                            <th className="px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[80px]">Ref</th>
-                                            <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[150px]">Debit</th>
-                                            <th className="px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[150px]">Kredit</th>
-                                            <th className="px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[110px]">Aksi</th>
+                                            <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[95px] sm:w-[110px]">Tanggal</th>
+                                            <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
+                                            <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[70px] sm:w-[80px]">Ref</th>
+                                            <th className="px-2 sm:px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[120px] sm:w-[150px]">Debit</th>
+                                            <th className="px-2 sm:px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[120px] sm:w-[150px]">Kredit</th>
+                                            <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[90px] sm:w-[110px]">Aksi</th>
                                         </tr>
                                     </thead>
 
@@ -894,7 +900,7 @@ function EntryFormModal({
                                                             : "border-gray-100 bg-gray-50/50"
                                                             }`}
                                                     >
-                                                        <div className="flex gap-2 items-center">
+                                                        <div className="flex flex-wrap gap-2 items-center">
                                                             <div
                                                                 {...dragProvided.dragHandleProps}
                                                                 title="Tahan & geser untuk pindah urutan"
@@ -905,7 +911,7 @@ function EntryFormModal({
                                                             <select
                                                                 value={l.side}
                                                                 onChange={(e) => patch(i, { side: e.target.value as JournalSide })}
-                                                                className={`h-9 w-24 border rounded-lg px-2 text-xs font-bold ${l.side === "DEBIT"
+                                                                className={`h-9 w-20 sm:w-24 shrink-0 border rounded-lg px-2 text-xs font-bold ${l.side === "DEBIT"
                                                                     ? "border-blue-200 bg-blue-50 text-blue-700"
                                                                     : "border-emerald-200 bg-emerald-50 text-emerald-700"
                                                                     }`}
@@ -917,7 +923,7 @@ function EntryFormModal({
                                                             <select
                                                                 value={l.account_code}
                                                                 onChange={(e) => patch(i, { account_code: e.target.value })}
-                                                                className="h-9 flex-1 border border-gray-200 rounded-lg px-2 text-xs bg-white"
+                                                                className="h-9 flex-1 min-w-[140px] border border-gray-200 rounded-lg px-2 text-xs bg-white"
                                                             >
                                                                 {ACCOUNT_TYPE_ORDER.map((type) => (
                                                                     <optgroup key={type} label={ACCOUNT_TYPE_LABEL[type]}>
@@ -936,13 +942,13 @@ function EntryFormModal({
                                                                 value={l.nominal || ""}
                                                                 onChange={(e) => patch(i, { nominal: Math.max(0, Number(e.target.value)) })}
                                                                 placeholder="0"
-                                                                className="h-9 w-36 border border-gray-200 rounded-lg px-2 text-xs font-mono text-right"
+                                                                className="h-9 w-28 sm:w-36 shrink-0 border border-gray-200 rounded-lg px-2 text-xs font-mono text-right"
                                                             />
 
                                                             <button
                                                                 onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
                                                                 disabled={lines.length <= 2}
-                                                                className="w-8 h-9 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all duration-150 disabled:opacity-30 flex items-center justify-center"
+                                                                className="w-8 h-9 shrink-0 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all duration-150 disabled:opacity-30 flex items-center justify-center"
                                                             >
                                                                 <X className="w-4 h-4" />
                                                             </button>
@@ -967,7 +973,7 @@ function EntryFormModal({
 
                     {/* Balance indicator */}
                     <div
-                        className={`rounded-xl border p-3 flex items-center justify-between ${balanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
+                        className={`rounded-xl border p-3 flex flex-wrap items-center justify-between gap-2 ${balanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
                             }`}
                     >
                         <span className={`text-xs font-bold inline-flex items-center gap-1 ${balanced ? "text-emerald-700" : "text-red-700"}`}>
@@ -1048,7 +1054,7 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
                                     oleh <b className="text-gray-700">{l.changed_by_user?.name ?? "—"}</b>
                                 </p>
                                 {l.action === "EDIT" && l.before_data && (
-                                    <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
+                                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
                                         <div className="bg-white border border-red-100 rounded-lg p-2">
                                             <p className="text-red-500 font-bold mb-0.5">Sebelum</p>
                                             <p className="text-gray-600">{l.before_data.keterangan}</p>

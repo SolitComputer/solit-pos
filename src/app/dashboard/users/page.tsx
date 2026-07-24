@@ -1037,7 +1037,7 @@ export default function UsersPage() {
                 </svg>
               </div>
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight truncate">Manajemen User</h1>
+                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight truncate">Manajemen Aktifitas</h1>
                 <p className="text-[11px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>
                   {isAdmin
                     ? "Kelola akun, role, shift, dan wajah karyawan"

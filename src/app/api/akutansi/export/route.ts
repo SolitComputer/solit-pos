@@ -1,4 +1,4 @@
-// src/app/api/akutansi/buku-besar/export/route.ts
+// src/app/api/akutansi/export/route.ts
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
@@ -19,6 +19,20 @@ function getAdmin(): SupabaseClient {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false } }
   );
+}
+
+// Batasi ukuran query .in() supaya nggak lewat limit panjang URL Supabase/PostgREST.
+// Query .in() dengan ratusan/ribuan UUID bikin request GET jadi puluhan KB dan
+// di-reject duluan oleh gateway (Kong/PostgREST) sebelum sampai ke database —
+// makanya errornya generic "Bad Request", bukan pesan spesifik dari kode kita.
+const IN_CLAUSE_CHUNK_SIZE = 200;
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -438,7 +452,8 @@ export const GET = withAuth(async (req) => {
       openingMap.set(o.account_code, { side: o.side, nominal: Number(o.nominal) });
     }
 
-    // 3) Mutasi sebelum periode — semua akun sekaligus
+    // 3) Mutasi sebelum periode — semua akun, di-batch supaya .in() nggak
+    //    kepanjangan (lihat catatan IN_CLAUSE_CHUNK_SIZE di atas).
     const { data: priorEntries, error: priorEntryErr } = await supabase
       .from("journal_entries")
       .select("id")
@@ -447,11 +462,11 @@ export const GET = withAuth(async (req) => {
     const priorEntryIds = (priorEntries ?? []).map((e: { id: string }) => e.id);
 
     const mutasiSebelumMap = new Map<string, number>();
-    if (priorEntryIds.length > 0) {
+    for (const idChunk of chunkArray(priorEntryIds, IN_CLAUSE_CHUNK_SIZE)) {
       const { data: priorLines, error: priorLineErr } = await supabase
         .from("journal_lines")
         .select("account_code, side, nominal")
-        .in("entry_id", priorEntryIds);
+        .in("entry_id", idChunk);
       if (priorLineErr) throw priorLineErr;
       for (const l of (priorLines ?? []) as { account_code: string; side: "DEBIT" | "KREDIT"; nominal: number }[]) {
         const signed = l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal);
@@ -512,14 +527,15 @@ export const GET = withAuth(async (req) => {
       linesByAccount.set(l.account_code, arr);
     }
 
-    // 5) Status "sudah dicek" — semua baris sekaligus
+    // 5) Status "sudah dicek" — semua baris, di-batch juga (sama alasannya
+    //    dengan mutasiSebelumMap di atas).
     const allLineIds = allLines.map((l) => l.id);
     const checkedMap = new Map<string, string>();
-    if (allLineIds.length > 0) {
+    for (const idChunk of chunkArray(allLineIds, IN_CLAUSE_CHUNK_SIZE)) {
       const { data: checksData, error: checksErr } = await supabase
         .from("journal_line_checks")
         .select("line_id, checked_at")
-        .in("line_id", allLineIds);
+        .in("line_id", idChunk);
       if (checksErr) throw checksErr;
       for (const c of (checksData ?? []) as { line_id: string; checked_at: string }[]) {
         checkedMap.set(c.line_id, c.checked_at);
