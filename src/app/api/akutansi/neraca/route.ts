@@ -3,8 +3,25 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { ACCOUNTS, ACCOUNT_TYPE_NORMAL_SIDE, AccountType, JournalSide, isValidPeriod } from "@/lib/accounting";
+import {
+  ACCOUNTS,
+  ACCOUNT_TYPE_NORMAL_SIDE,
+  AccountType,
+  JournalSide,
+  isValidPeriod,
+  labaPeriodAccountName,
+  normalizeAccountName,
+} from "@/lib/accounting";
 import { createClient as createClientForAccounts } from "@supabase/supabase-js";
+
+// Akun Pendapatan (410-430), Modal Keluar (440-460), dan Operasional/Beban
+// (510-540) sudah tercakup di tab Laba Rugi — jadi disembunyikan dari tabel
+// Neraca. Efek periode berjalannya (Laba Periode Berjalan) dilipat ke akun
+// "Laba <periode ini>" (mis. kode 311 Laba Juli 2026), dan Total di bawah
+// tabel dihitung dari baris yang TAMPIL saja (bukan semua akun lagi).
+const NERACA_HIDDEN_CODES = new Set([
+  "410", "420", "430", "440", "450", "460", "510", "520", "530", "540",
+]);
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -29,20 +46,31 @@ export const GET = withAuth(async (req) => {
     // ── 1) Semua entry sampai & termasuk periode ini ──
     const { data: entries, error: entryErr } = await supabase
       .from("journal_entries")
-      .select("id")
+      .select("id, period")
       .lte("period", period);
 
     if (entryErr) throw entryErr;
 
     const entryIds = (entries ?? []).map((e: any) => e.id as string);
 
-    // ── 2) Agregasi mutasi journal_lines per akun (bertanda: DEBIT=+, KREDIT=-) ──
+    // Entry yang persis di periode ini (bukan periode-periode sebelumnya) —
+    // dipakai untuk menghitung "Laba Periode Berjalan" akun 410-540 yang
+    // nanti dilipat ke akun Laba <periode ini>.
+    const currentPeriodEntryIds = new Set(
+      (entries ?? [])
+        .filter((e: any) => e.period === period)
+        .map((e: any) => e.id as string)
+    );
+
+   // ── 2) Agregasi mutasi journal_lines per akun (bertanda: DEBIT=+, KREDIT=-) ──
     const balanceMap = new Map<string, number>();
+    // Mutasi HANYA periode ini — dipakai khusus utk hitung Laba Periode Berjalan
+    const currentPeriodBalanceMap = new Map<string, number>();
 
     if (entryIds.length > 0) {
       const { data: lines, error: lineErr } = await supabase
         .from("journal_lines")
-        .select("account_code, side, nominal")
+        .select("entry_id, account_code, side, nominal")
         .in("entry_id", entryIds);
 
       if (lineErr) throw lineErr;
@@ -50,6 +78,12 @@ export const GET = withAuth(async (req) => {
       for (const l of (lines ?? []) as any[]) {
         const signed = l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal);
         balanceMap.set(l.account_code, (balanceMap.get(l.account_code) ?? 0) + signed);
+        if (currentPeriodEntryIds.has(l.entry_id)) {
+          currentPeriodBalanceMap.set(
+            l.account_code,
+            (currentPeriodBalanceMap.get(l.account_code) ?? 0) + signed
+          );
+        }
       }
     }
 
@@ -80,7 +114,7 @@ export const GET = withAuth(async (req) => {
       ...dbAccountMap.keys(),
     ]);
 
-    const allAccountsForNeraca = Array.from(allCodes).map((code) => {
+   const allAccountsForNeraca = Array.from(allCodes).map((code) => {
       const dbAcc = dbAccountMap.get(code);
       if (dbAcc) return dbAcc;
       const staticAcc = ACCOUNTS.find((a) => a.code === code)!;
@@ -91,9 +125,26 @@ export const GET = withAuth(async (req) => {
       ACCOUNTS.map((a) => [a.code, a.normal])
     );
 
+    // ── Laba Periode Berjalan — net akun 410-540 KHUSUS periode ini, rumus
+    // sama persis dengan tab Laba Rugi. Nilainya dilipat (ditambahkan) ke
+    // saldo akun "Laba <periode ini>" di bawah, supaya Neraca tetap
+    // menunjukkan laba terkini walau akun 410-540 sendiri disembunyikan.
+    let labaPeriodeBerjalanSigned = 0;
+    for (const code of NERACA_HIDDEN_CODES) {
+      labaPeriodeBerjalanSigned += currentPeriodBalanceMap.get(code) ?? 0;
+    }
+
+    const currentLabaName = normalizeAccountName(labaPeriodAccountName(period));
+    const labaPeriodeAccount = allAccountsForNeraca.find(
+      (a) => a.type === "MODAL" && normalizeAccountName(a.name) === currentLabaName
+    );
+
     const rows = allAccountsForNeraca
       .map((a) => {
-        const balance = balanceMap.get(a.code) ?? 0;
+        let balance = balanceMap.get(a.code) ?? 0;
+        if (labaPeriodeAccount && a.code === labaPeriodeAccount.code) {
+          balance += labaPeriodeBerjalanSigned;
+        }
         const debit = balance > 0 ? balance : 0;
         const kredit = balance < 0 ? Math.abs(balance) : 0;
 
@@ -115,14 +166,21 @@ export const GET = withAuth(async (req) => {
         return a.code.localeCompare(b.code);
       });
 
-    const totalDebit = rows.reduce((s, r) => s + r.debit, 0);
-    const totalKredit = rows.reduce((s, r) => s + r.kredit, 0);
+    // Baris yang dikirim ke tabel — akun 410/420/430/440/450/460/510/520/
+    // 530/540 disembunyikan (efeknya sudah dilipat ke akun Laba periode ini
+    // di atas, dan lengkapnya sudah ada di tab Laba Rugi).
+    const displayRows = rows.filter((r) => !NERACA_HIDDEN_CODES.has(r.code));
+
+    // Total sekarang dihitung dari baris yang DITAMPILKAN saja — jadi ikut
+    // berkurang dibanding sebelum akun 410-540 disembunyikan.
+    const totalDebit = displayRows.reduce((s, r) => s + r.debit, 0);
+    const totalKredit = displayRows.reduce((s, r) => s + r.kredit, 0);
     const selisih = totalDebit - totalKredit;
 
     return NextResponse.json({
       success: true,
       data: {
-        rows,
+        rows: displayRows,
         totals: {
           debit: totalDebit,
           kredit: totalKredit,
