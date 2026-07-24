@@ -84,12 +84,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const baseSchedule = await resolveShiftConfigFromDB(user.id, supabaseAdmin);
-    const scheduleOverride = await resolveScheduleOverride(
-      supabaseAdmin,
-      user.id,
-      todayDateCheck
-    );
+    const [baseSchedule, scheduleOverride] = await Promise.all([
+      resolveShiftConfigFromDB(user.id, supabaseAdmin),
+      resolveScheduleOverride(supabaseAdmin, user.id, todayDateCheck),
+    ]);
 
     const schedule = scheduleOverride
       ? { ...baseSchedule, ...toAuthScheduleShape(scheduleOverride) }
@@ -128,34 +126,33 @@ export async function POST(request: Request) {
     const device = parseDevice(ua);
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
 
-    const { data: userFullData } = await supabaseAdmin
-      .from("users")
-      .select("face_embedding, shift")
-      .eq("id", user.id)
-      .single();
+    const nowWIB = new Date(Date.now() + 7 * 3600_000);
+    const todayDate = nowWIB.toISOString().slice(0, 10);
+
+    const [{ data: userFullData }, { data: alreadyToday }] = await Promise.all([
+      supabaseAdmin
+        .from("users")
+        .select("face_embedding, shift")
+        .eq("id", user.id)
+        .single(),
+      supabaseAdmin
+        .from("face_verifications")
+        .select("id, created_at")
+        .eq("user_id", user.id)
+        .eq("status", "SUCCESS")
+        .gte("created_at", `${todayDate}T00:00:00+07:00`)
+        .lte("created_at", `${todayDate}T23:59:59+07:00`)
+        .maybeSingle(),
+    ]);
 
     const userShift = (scheduleOverride?.shift
       ?? userFullData?.shift
       ?? "PAGI") as "PAGI" | "SORE";
 
-    // Hitung weight berdasarkan schedule yang sudah diresolved
     const { weight } = calcAttendanceWeightFromSchedule(
       new Date().toISOString(),
       schedule
     );
-
-    // Cek apakah sudah absen hari ini
-    const nowWIB = new Date(Date.now() + 7 * 3600_000);
-    const todayDate = nowWIB.toISOString().slice(0, 10);
-
-    const { data: alreadyToday } = await supabaseAdmin
-      .from("face_verifications")
-      .select("id, created_at")
-      .eq("user_id", user.id)
-      .eq("status", "SUCCESS")
-      .gte("created_at", `${todayDate}T00:00:00+07:00`)
-      .lte("created_at", `${todayDate}T23:59:59+07:00`)
-      .maybeSingle();
 
     if (alreadyToday) {
       const expiry = getAttendanceExpiry();
@@ -176,7 +173,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const THRESHOLD = 0.45;
+    const THRESHOLD = 0.5;
     const distance = euclideanDistance(embedding, userFullData.face_embedding);
     const matched = distance < THRESHOLD;
 
