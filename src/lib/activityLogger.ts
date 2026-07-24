@@ -18,7 +18,8 @@ export type LogEntity =
   | "seller_followup_pic"   
   | "seller_followup_reminder"   
   | "preparation"
-  | "cashflow";
+  | "cashflow"
+  | "cashflow_audit_access";
 
 interface LogActivityParams {
   userId: string;
