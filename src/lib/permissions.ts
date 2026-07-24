@@ -95,7 +95,7 @@ const ALL_ROLES: UserRole[] = [
 export const ALL_STATIC_ROLES: string[] = [...ALL_ROLES];
 
 const SALES_ACCESS: UserRole[] = [
-  "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN",
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "PENGANTARAN", "ONPOINT",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
 ];
 
@@ -187,9 +187,11 @@ export const PREPARATION_CREATE_ROLES: UserRole[] = Array.from(new Set<UserRole>
   ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
 ]));
 
+
 export const PREPARATION_DONE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS,
   ...PREPARATION_PENYEDIA_ROLES,
+  ...PREPARATION_PENYEDIA_EXTRA_ROLES, // tambahan: role yg memang muncul di menu "Selesai Disiapkan"
 ]));
 
 export const PREPARATION_DISPATCH_ROLES: UserRole[] = Array.from(new Set<UserRole>([
@@ -417,12 +419,14 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/attendance": [...ALL_ROLES],
   "/api/service": [...SERVICE_VIEW_ROLES],
 
+  // AFTER
   "/dashboard/pkl-reports": [
     ...FULL_ACCESS,
     "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG", // ditambahkan
   ],
   "/api/pkl-reports": [
     ...FULL_ACCESS,
@@ -430,6 +434,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG", // ditambahkan
   ],
 
   "/dashboard/management-seller": [...SELLER_FOLLOWUP_VIEW_ROLES],
