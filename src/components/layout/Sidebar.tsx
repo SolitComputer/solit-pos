@@ -140,6 +140,7 @@ const Icons = {
   missionAll: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 9l9-6 9 6-9 6-9-6z" /><path d="M3 15l9 6 9-6" /><path d="M3 12l9 6 9-6" /></svg>),
   todo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>),
   accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" /><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" /></svg>),
+  patchNotes: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>),
 };
 
 // ── Shared items ──────────────────────────────────────────────────────────────
@@ -156,6 +157,7 @@ const ITEM_CASHFLOW: MenuItem = { name: "Cashflow", href: "/dashboard/cashflow",
 const ITEM_CC_REPORT: MenuItem = { name: "Laporan Konten (CC)", href: "/dashboard/cc-reports", icon: Icons.ccReport };
 const ITEM_CUSTOMER_BIRTHDAY: MenuItem = { name: "Ultah Customer", href: "/dashboard/customer-birthdays", icon: Icons.customerBirthday };
 const ITEM_TODOS: MenuItem = { name: "To-Do List", href: "/dashboard/todos", icon: Icons.todo };
+const ITEM_PATCH_NOTES: MenuItem = { name: "Patch Notes", href: "/dashboard/admin/patch-notes", icon: Icons.patchNotes };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 
 // ── Item baru untuk grup hasil rombakan ──────────────────────────────────────
@@ -257,7 +259,7 @@ const ADMIN_PENGANTARAN_MENU: MenuGroup = {
 // ── Grup inti admin-level (pengganti ADMIN_OVERVIEW) ─────────────────────────
 const ADMIN_UTAMA: MenuGroup = {
   label: "Utama",
-  items: [ITEM_DASHBOARD, ITEM_LEADERBOARD_PEKERJAAN, ITEM_TODOS],
+  items: [ITEM_DASHBOARD, ITEM_LEADERBOARD_PEKERJAAN, ITEM_TODOS, ITEM_PATCH_NOTES],
 };
 
 const ADMIN_CORE_GROUPS: MenuGroup[] = [
