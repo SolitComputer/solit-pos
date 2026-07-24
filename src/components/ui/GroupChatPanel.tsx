@@ -179,7 +179,7 @@ function SolitLogo({ size = 44, radius = 12 }: { size?: number; radius?: number 
             <div className="flex items-center justify-center font-black text-white"
                 style={{
                     width: size, height: size, borderRadius: radius,
-                    background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                    background: "#2563eb",
                     fontSize: size * 0.22, letterSpacing: "0.5px",
                 }}>
                 S03
@@ -281,15 +281,14 @@ function AttachmentDisplay({ url, type, name, size, isMine }: {
     const ext = name?.split(".").pop()?.toUpperCase() ?? "FILE";
     return (
         <a href={url} target="_blank" rel="noopener noreferrer" download={name ?? ""}
-            className={`flex items-center gap-3 px-3 py-2.5 no-underline transition-all hover:scale-[1.01] ${isMine
-                ? "bg-white/10 hover:bg-white/15 rounded-2xl border border-white/10"
-                : "bg-white rounded-2xl border border-slate-100 hover:bg-slate-50"
+            className={`flex items-center gap-3 px-3 py-2.5 no-underline transition-all hover:scale-[1.01] rounded-2xl ${isMine
+                ? "bg-white/70 hover:bg-white border border-blue-100"
+                : "bg-white border border-slate-100 hover:bg-slate-50"
                 }`}
             style={{ maxWidth: 240 }}
             onClick={e => e.stopPropagation()}>
-            <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-[8.5px] font-black gap-0.5 ${isMine ? "bg-white/20 text-white" : "text-white"
-                }`}
-                style={!isMine ? { background: "linear-gradient(135deg, #4f46e5, #7c3aed)" } : undefined}>
+            <div className="w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-[8.5px] font-bold gap-0.5 text-white"
+                style={{ background: isMine ? "#3b82f6" : "#2563eb" }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -297,16 +296,16 @@ function AttachmentDisplay({ url, type, name, size, isMine }: {
                 <span>{ext.slice(0, 4)}</span>
             </div>
             <div className="flex-1 min-w-0">
-                <p className={`text-xs font-semibold truncate ${isMine ? "text-white" : "text-slate-800"}`}>
+                <p className="text-xs font-semibold truncate text-slate-800">
                     {name ?? "File"}
                 </p>
                 {size != null && (
-                    <p className={`text-[10px] mt-0.5 ${isMine ? "text-white/50" : "text-slate-400"}`}>
+                    <p className="text-[10px] mt-0.5 text-slate-400">
                         {formatFileSize(size)}
                     </p>
                 )}
             </div>
-            <svg className={`w-4 h-4 flex-shrink-0 ${isMine ? "text-white/50" : "text-slate-400"}`}
+            <svg className="w-4 h-4 flex-shrink-0 text-slate-400"
                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -391,7 +390,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                         </span>
                     )}
                     <div className="px-3 py-2 text-slate-400 text-xs italic flex items-center gap-1.5"
-                        style={{ background: "#f1f5f9", border: "1px solid #e8ecf0", borderRadius: 12 }}>
+                        style={{ background: "#f1f5f9", border: "1px solid #e5e7eb", borderRadius: 12 }}>
                         <FileText className="w-4 h-4 inline opacity-60" />
                         <span>Pesan dihapus</span>
                     </div>
@@ -425,10 +424,10 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                     {isEditing ? (
                         <div className={`px-3.5 pt-3 pb-2.5 min-w-[220px]`}
                             style={{
-                                borderRadius: isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
-                                background: isMine ? "linear-gradient(135deg, #1e1b4b 0%, #3730a3 100%)" : "#fff",
-                                border: isMine ? "none" : "1px solid #e2e8f0",
-                                boxShadow: isMine ? "0 4px 20px rgba(30,27,75,0.35)" : "0 2px 12px rgba(0,0,0,0.06)",
+                                borderRadius: isMine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                                background: isMine ? "#eaf2ff" : "#fff",
+                                border: isMine ? "1px solid #dbeafe" : "1px solid #e5e7eb",
+                                boxShadow: "0 1px 4px rgba(15,23,42,0.04)",
                             }}>
                             <textarea
                                 ref={editRef}
@@ -441,26 +440,23 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                 onKeyDown={handleEditKeyDown}
                                 maxLength={2000}
                                 rows={1}
-                                className={`w-full bg-transparent text-sm resize-none outline-none leading-relaxed ${isMine ? "text-white placeholder:text-white/40" : "text-slate-800"
-                                    }`}
+                                className="w-full bg-transparent text-sm resize-none outline-none leading-relaxed text-slate-800"
                                 style={{ minHeight: 22 }}
                             />
                             <div className="flex items-center justify-between mt-2.5 gap-2">
-                                <span className={`text-[9px] ${isMine ? "text-white/35" : "text-slate-400"}`}>
+                                <span className="text-[9px] text-slate-400">
                                     Enter simpan · Esc batal
                                 </span>
                                 <div className="flex gap-1.5">
                                     <button
                                         onClick={() => { setIsEditing(false); setEditContent(msg.content); }}
-                                        className={`text-[10px] px-2.5 py-1 rounded-lg transition font-medium ${isMine ? "text-white/60 hover:bg-white/10" : "text-slate-500 hover:bg-slate-100"
-                                            }`}>
+                                        className="text-[10px] px-2.5 py-1 rounded-lg transition font-medium text-slate-500 hover:bg-slate-100">
                                         Batal
                                     </button>
                                     <button
                                         onClick={handleSaveEdit}
                                         disabled={saving || !editContent.trim()}
-                                        className={`text-[10px] px-3 py-1 rounded-lg font-bold transition disabled:opacity-40 ${isMine ? "bg-white/20 text-white" : "bg-indigo-600 text-white"
-                                            }`}>
+                                        className="text-[10px] px-3 py-1 rounded-lg font-semibold transition disabled:opacity-40 bg-blue-600 text-white hover:bg-blue-700">
                                         {saving ? "..." : "Simpan"}
                                     </button>
                                 </div>
@@ -470,11 +466,11 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                         <div
                             className={`relative px-3.5 py-2.5 cursor-pointer select-text transition-all`}
                             style={{
-                                borderRadius: isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
-                                background: isMine ? "linear-gradient(135deg, #1e1b4b 0%, #3730a3 100%)" : "#fff",
-                                border: isMine ? "none" : "1px solid #e8ecf0",
-                                boxShadow: isMine ? "0 4px 20px rgba(30,27,75,0.3)" : "0 2px 10px rgba(0,0,0,0.05)",
-                                color: isMine ? "#fff" : "#1e293b",
+                                borderRadius: isMine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                                background: isMine ? "#eaf2ff" : "#fff",
+                                border: isMine ? "1px solid #dbeafe" : "1px solid #e5e7eb",
+                                boxShadow: "0 1px 3px rgba(15,23,42,0.05)",
+                                color: "#1e293b",
                             }}
                             onContextMenu={(e) => { e.preventDefault(); setShowMenu(true); }}>
 
@@ -484,16 +480,16 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                     className="mb-2.5 px-2.5 py-1.5 cursor-pointer text-[10px]"
                                     style={{
                                         borderRadius: 10,
-                                        borderLeft: `2.5px solid ${isMine ? "rgba(255,255,255,0.4)" : "#6366f1"}`,
-                                        background: isMine ? "rgba(255,255,255,0.08)" : "#f5f7ff",
+                                        borderLeft: `2.5px solid ${isMine ? "#93c5fd" : "#3b82f6"}`,
+                                        background: isMine ? "rgba(255,255,255,0.6)" : "#f8fafc",
                                     }}
                                     onClick={() => onScrollToReply(msg.reply_to_id!)}>
-                                    <p className="font-bold truncate text-[9.5px]"
-                                        style={{ color: isMine ? "rgba(255,255,255,0.8)" : "#6366f1" }}>
+                                    <p className="font-semibold truncate text-[9.5px]"
+                                        style={{ color: "#2563eb" }}>
                                         {msg.reply_to.sender_name}
                                     </p>
                                     <p className="truncate mt-0.5 text-[9px]"
-                                        style={{ color: isMine ? "rgba(255,255,255,0.5)" : "#94a3b8" }}>
+                                        style={{ color: "#94a3b8" }}>
                                         {msg.reply_to.is_deleted ? " Pesan dihapus"
                                             : msg.reply_to.attachment_type === "image" ? " Foto"
                                                 : msg.reply_to.attachment_type === "voice" ? " Pesan suara"
@@ -525,7 +521,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
 
                             {/* Timestamp */}
                             <div className="flex items-center justify-end gap-1 mt-1.5"
-                                style={{ color: isMine ? "rgba(255,255,255,0.35)" : "#94a3b8" }}>
+                                style={{ color: "#94a3b8" }}>
                                 {msg.edited_at && <span className="text-[9px] italic">diedit ·</span>}
                                 <span className="text-[9.5px]">{formatTime(msg.created_at)}</span>
                             </div>
@@ -557,7 +553,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                                     <div style={{ height: 1, background: "#f1f5f9", margin: "2px 12px" }} />
                                     <button
                                         onClick={() => { setIsEditing(true); setShowMenu(false); }}
-                                        className="w-full text-left px-4 py-2.5 text-xs text-indigo-600 hover:bg-indigo-50 flex items-center gap-3 transition font-medium">
+                                        className="w-full text-left px-4 py-2.5 text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-3 transition font-medium">
                                         <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -590,10 +586,10 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
                 <div className={`opacity-0 group-hover:opacity-100 flex items-center self-end mb-1 transition-all duration-150 ${isMine ? "order-first" : ""}`}>
                     <button
                         onClick={() => onReply(msg)}
-                        className="w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110 hover:bg-indigo-50"
-                        style={{ background: "#fff", border: "1px solid #e8ecf0", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
+                        className="w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110 hover:bg-blue-50"
+                        style={{ background: "#fff", border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
                         title="Balas">
-                        <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                         </svg>
@@ -628,12 +624,12 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
         <div className="absolute bottom-full left-0 mb-3 w-64 bg-white overflow-hidden z-50"
             style={{
                 borderRadius: 18,
-                border: "1px solid #ebebf5",
+                border: "1px solid #e5e7eb",
                 boxShadow: "0 16px 48px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.05)",
             }}>
             {/* Header */}
             <div className="px-4 py-2.5 flex items-center gap-2"
-                style={{ borderBottom: "1px solid #f0f0f8", background: "#fafbff" }}>
+                style={{ borderBottom: "1px solid #e5e7eb", background: "#fafafa" }}>
                 <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Mention Anggota</span>
             </div>
             <div className="max-h-52 overflow-y-auto">
@@ -657,7 +653,7 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
                     return (
                         <button
                             key={user.id}
-                            className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${selectedIndex === idx ? "bg-indigo-50" : "hover:bg-slate-50"
+                            className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${selectedIndex === idx ? "bg-blue-50" : "hover:bg-slate-50"
                                 }`}
                             onMouseDown={(e) => { e.preventDefault(); onSelect(user); }}>
                             <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold"
@@ -669,7 +665,7 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
                                 <p className="text-[9.5px] text-slate-400 truncate mt-0.5">{ROLE_LABEL[user.role] ?? user.role}</p>
                             </div>
                             {selectedIndex === idx && (
-                                <svg className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                 </svg>
                             )}
@@ -851,14 +847,14 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
     const isLoading = uploading || sending;
 
     return (
-        <div className="flex-shrink-0 bg-white" style={{ borderTop: "1px solid #f0f0f8" }}>
+        <div className="flex-shrink-0 bg-white" style={{ borderTop: "1px solid #e5e7eb" }}>
 
             {/* Reply preview */}
             {replyTo && (
                 <div className="flex items-center gap-3 px-5 py-3"
-                    style={{ borderBottom: "1px solid #f0f0f8", background: "#fafbff" }}>
-                    <div className="flex-1 min-w-0 pl-3" style={{ borderLeft: "3px solid #6366f1" }}>
-                        <p className="text-[10px] font-black text-indigo-500 mb-0.5">{replyTo.sender_name}</p>
+                    style={{ borderBottom: "1px solid #e5e7eb", background: "#fafafa" }}>
+                    <div className="flex-1 min-w-0 pl-3" style={{ borderLeft: "3px solid #3b82f6" }}>
+                        <p className="text-[10px] font-semibold text-blue-600 mb-0.5">{replyTo.sender_name}</p>
                         <p className="text-xs text-slate-500 truncate">
                             {replyTo.attachment_type === "image" ? " Foto"
                                 : replyTo.attachment_type === "voice" ? " Pesan suara"
@@ -878,15 +874,15 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
 
             {/* File preview */}
             {preview && (
-                <div className="px-4 py-3" style={{ borderBottom: "1px solid #f0f0f8" }}>
+                <div className="px-4 py-3" style={{ borderBottom: "1px solid #e5e7eb" }}>
                     <div className="flex items-center gap-3 p-2.5 rounded-2xl"
-                        style={{ background: "#f5f7ff", border: "1px solid #e8ecff" }}>
+                        style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
                         {preview.type === "image" ? (
                             <img src={preview.url} alt="preview" className="object-cover flex-shrink-0"
                                 style={{ width: 52, height: 52, borderRadius: 12, border: "1px solid #e0e0f0" }} />
                         ) : (
                             <div className="flex flex-col items-center justify-center flex-shrink-0 gap-1"
-                                style={{ width: 52, height: 52, borderRadius: 12, background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
+                                style={{ width: 52, height: 52, borderRadius: 12, background: "#2563eb" }}>
                                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -919,8 +915,8 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
 
                 <div className="flex-1 flex items-end gap-2 relative"
                     style={{
-                        background: "#f5f7ff",
-                        border: "1.5px solid #e8ecff",
+                        background: "#f8fafc",
+                        border: "1.5px solid #e5e7eb",
                         borderRadius: 22,
                         padding: "9px 14px",
                         minHeight: 44,
@@ -941,7 +937,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                             onClick={() => setShowAttachMenu(v => !v)}
                             disabled={isLoading}
                             className="self-end mb-0.5 w-6 h-6 flex items-center justify-center transition-all hover:scale-110 flex-shrink-0 disabled:opacity-40"
-                            style={{ color: "#818cf8" }}
+                            style={{ color: "#3b82f6" }}
                             title="Lampirkan file / foto">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -953,14 +949,14 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                             <div className="absolute bottom-full left-0 mb-3 w-52 bg-white overflow-hidden z-50 py-1.5"
                                 style={{
                                     borderRadius: 18,
-                                    border: "1px solid #ebebf5",
+                                    border: "1px solid #e5e7eb",
                                     boxShadow: "0 16px 48px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.05)",
                                 }}>
                                 <button
                                     onClick={() => { cameraRef.current?.click(); setShowAttachMenu(false); }}
                                     className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors">
-                                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-white"
-                                        style={{ borderRadius: 10, background: "linear-gradient(135deg, #f472b6, #ec4899)" }}>
+                                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0"
+                                        style={{ borderRadius: 10, background: "#fce7f3", color: "#db2777" }}>
                                         <Camera className="w-4 h-4" />
                                     </div>
                                     <span className="text-xs font-semibold text-slate-700">Kamera</span>
@@ -968,8 +964,8 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                                 <button
                                     onClick={() => { fileRef.current?.click(); setShowAttachMenu(false); }}
                                     className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors">
-                                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-white"
-                                        style={{ borderRadius: 10, background: "linear-gradient(135deg, #818cf8, #6366f1)" }}>
+                                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0"
+                                        style={{ borderRadius: 10, background: "#dbeafe", color: "#2563eb" }}>
                                         <ImageIcon className="w-4 h-4" />
                                     </div>
                                     <span className="text-xs font-semibold text-slate-700">Foto & Video</span>
@@ -977,8 +973,8 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                                 <button
                                     onClick={() => { docRef.current?.click(); setShowAttachMenu(false); }}
                                     className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors">
-                                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-white"
-                                        style={{ borderRadius: 10, background: "linear-gradient(135deg, #34d399, #059669)" }}>
+                                    <div className="w-8 h-8 flex items-center justify-center flex-shrink-0"
+                                        style={{ borderRadius: 10, background: "#d1fae5", color: "#059669" }}>
                                         <FileText className="w-4 h-4" />
                                     </div>
                                     <span className="text-xs font-semibold text-slate-700">Dokumen</span>
@@ -1011,7 +1007,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                         onClick={preview ? handleSendFile : handleSendText}
                         disabled={!canSend}
                         className="flex items-center justify-center flex-shrink-0 text-white transition-all self-end disabled:opacity-40 hover:scale-105 active:scale-95"
-                        style={{ width: 44, height: 44, borderRadius: 14, background: canSend ? "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)" : "#e2e8f0", boxShadow: canSend ? "0 4px 16px rgba(79,70,229,0.4)" : "none" }}>
+                        style={{ width: 44, height: 44, borderRadius: 14, background: canSend ? "#2563eb" : "#e2e8f0", boxShadow: canSend ? "0 2px 8px rgba(37,99,235,0.3)" : "none" }}>
                         {isLoading ? (
                             <div className="animate-spin" style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%" }} />
                         ) : (
@@ -1184,7 +1180,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2" style={{ background: "#f7f8fc" }}>
                 {loading ? (
                     <div className="flex items-center justify-center h-full">
-                        <div className="w-5 h-5 rounded-full animate-spin" style={{ border: "2px solid #e2e8f0", borderTopColor: "#6366f1" }} />
+                        <div className="w-5 h-5 rounded-full animate-spin" style={{ border: "2px solid #e2e8f0", borderTopColor: "#2563eb" }} />
                     </div>
                 ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
@@ -1208,10 +1204,10 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                             <div className="max-w-[82%] px-3 py-2"
                                 style={{
                                     borderRadius: isMine ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
-                                    background: isMine ? "linear-gradient(135deg,#1e1b4b,#3730a3)" : "#fff",
-                                    border: isMine ? "none" : "1px solid #e8ecf0",
-                                    boxShadow: isMine ? "0 2px 8px rgba(79,70,229,0.25)" : "0 1px 4px rgba(0,0,0,0.06)",
-                                    color: isMine ? "#fff" : "#1e293b",
+                                    background: isMine ? "#eaf2ff" : "#fff",
+                                    border: isMine ? "1px solid #dbeafe" : "1px solid #e5e7eb",
+                                    boxShadow: "0 1px 3px rgba(15,23,42,0.05)",
+                                    color: "#1e293b",
                                 }}>
                                 {hasAttachment && (
                                     <div className={hasContent ? "mb-1.5" : ""}>
@@ -1226,11 +1222,11 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                                 )}
                                 {hasContent && <p className="text-xs leading-relaxed break-words font-medium">{msg.content}</p>}
                                 <div className="flex items-center justify-end gap-1 mt-1"
-                                    style={{ color: isMine ? "rgba(255,255,255,0.4)" : "#94a3b8" }}>
+                                    style={{ color: "#94a3b8" }}>
                                     {msg.edited_at && <span className="text-[8px] italic">diedit ·</span>}
                                     <span className="text-[9px]">{formatTime(msg.created_at)}</span>
                                     {isMine && (
-                                        <span className="text-[9px]" style={{ color: msg.is_read ? "#93c5fd" : "rgba(255,255,255,0.35)" }}>
+                                        <span className="text-[9px]" style={{ color: msg.is_read ? "#2563eb" : "#94a3b8" }}>
                                             {msg.is_read ? "" : ""}
                                         </span>
                                     )}
@@ -1243,7 +1239,7 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
             </div>
 
             {/* Input — teks → tombol kirim, kosong → mic VN */}
-            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-3 bg-white" style={{ borderTop: "1px solid #f0f0f8" }}>
+            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-3 bg-white" style={{ borderTop: "1px solid #e5e7eb" }}>
                 <input
                     ref={inputRef}
                     value={input}
@@ -1252,15 +1248,15 @@ function EmbeddedDMMessages({ currentUser, targetUser }: EmbeddedDMMessagesProps
                     placeholder="Tulis pesan pribadi..."
                     maxLength={1000}
                     disabled={isBusy}
-                    className="flex-1 h-9 rounded-xl px-3.5 text-xs font-medium outline-none disabled:opacity-50 transition focus:ring-2 focus:ring-indigo-200"
-                    style={{ background: "#f5f7ff", border: "1.5px solid #e8ecff", color: "#334155" }}
+                    className="flex-1 h-9 rounded-xl px-3.5 text-xs font-medium outline-none disabled:opacity-50 transition focus:ring-2 focus:ring-blue-200"
+                    style={{ background: "#f8fafc", border: "1.5px solid #e5e7eb", color: "#334155" }}
                 />
                 {input.trim() ? (
                     <button
                         onClick={send}
                         disabled={!input.trim() || sending}
                         className="w-9 h-9 rounded-xl flex items-center justify-center text-white transition hover:scale-105 active:scale-95 disabled:opacity-40 flex-shrink-0"
-                        style={{ background: "linear-gradient(135deg,#4f46e5,#7c3aed)", boxShadow: "0 2px 8px rgba(79,70,229,0.35)" }}>
+                        style={{ background: "#2563eb", boxShadow: "0 2px 8px rgba(37,99,235,0.3)" }}>
                         {sending
                             ? <div className="w-3 h-3 rounded-full animate-spin" style={{ border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
                             : <svg className="w-3.5 h-3.5" fill="none" stroke="white" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>}
@@ -1754,26 +1750,26 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     return (
         <div
             className="fixed inset-0 z-[9998] flex items-center justify-center p-0 md:p-4"
-            style={{ backdropFilter: "blur(16px)", backgroundColor: "rgba(10,8,30,0.75)" }}>
+            style={{ backdropFilter: "blur(8px)", backgroundColor: "rgba(15,23,42,0.45)" }}>
             <div
-                className="relative flex overflow-hidden w-full h-full rounded-none md:w-[min(1160px,100%)] md:h-[min(800px,95vh)] md:rounded-[26px]"
+                className="relative flex overflow-hidden w-full h-full rounded-none md:w-[min(1160px,100%)] md:h-[min(800px,95vh)] md:rounded-2xl"
                 style={{
                     background: "#fff",
-                    boxShadow: "0 40px 120px rgba(10,8,30,0.3), 0 4px 20px rgba(0,0,0,0.08)",
-                    border: "1px solid rgba(255,255,255,0.8)",
+                    boxShadow: "0 20px 60px rgba(15,23,42,0.18), 0 2px 8px rgba(15,23,42,0.06)",
+                    border: "1px solid #e5e7eb",
                 }}>
 
                 {/* ── Sidebar kiri: Member List ── */}
-                <div className={`flex-col flex-shrink-0 w-full md:w-60 md:border-r md:border-[#f0f0f8] ${embeddedDMUser ? "hidden md:flex" : `${mobileView === "members" ? "flex" : "hidden"} md:flex`}`}
-                    style={{ background: "#fafbff" }}>
+                <div className={`flex-col flex-shrink-0 w-full md:w-60 md:border-r md:border-[#e5e7eb] ${embeddedDMUser ? "hidden md:flex" : `${mobileView === "members" ? "flex" : "hidden"} md:flex`}`}
+                    style={{ background: "#fafafa" }}>
 
                     {/* Sidebar header */}
                     <div className="px-4 pt-4 pb-3 flex-shrink-0"
-                        style={{ borderBottom: "1px solid #f0f0f8" }}>
+                        style={{ borderBottom: "1px solid #e5e7eb" }}>
                         {/* Tombol kembali — mobile only */}
                         <button
                             onClick={() => setMobileView("chat")}
-                            className="md:hidden flex items-center gap-1.5 mb-3 text-[11px] font-bold text-indigo-600 active:scale-95 transition">
+                            className="md:hidden flex items-center gap-1.5 mb-3 text-[11px] font-bold text-blue-600 active:scale-95 transition">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                             </svg>
@@ -1802,7 +1798,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 placeholder="Cari anggota..."
                                 value={memberSearch}
                                 onChange={e => setMemberSearch(e.target.value)}
-                                className="w-full h-8 rounded-xl pl-8 pr-3 text-[11px] font-medium outline-none focus:ring-2 focus:ring-indigo-200 transition"
+                                className="w-full h-8 rounded-xl pl-8 pr-3 text-[11px] font-medium outline-none focus:ring-2 focus:ring-blue-200 transition"
                                 style={{
                                     background: "#f1f5f9",
                                     border: "1px solid #e2e8f0",
@@ -1825,10 +1821,10 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     {/* BARU: entri grup — klik untuk balik ke All Team Solit dari sidebar */}
                     <button
                         onClick={() => { setEmbeddedDMUser(null); setMobileView("chat"); setActiveGroupId(DEFAULT_GROUP_ID); }}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${!embeddedDMUser && activeGroupId === DEFAULT_GROUP_ID ? "bg-indigo-50" : "hover:bg-slate-50"}`}
-                        style={{ borderBottom: "1px solid #f0f0f8" }}>
+                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${!embeddedDMUser && activeGroupId === DEFAULT_GROUP_ID ? "bg-blue-50" : "hover:bg-slate-50"}`}
+                        style={{ borderBottom: "1px solid #e5e7eb" }}>
                         <div className="relative flex-shrink-0"
-                            style={{ width: 34, height: 34, borderRadius: 11, overflow: "hidden", boxShadow: "0 2px 6px rgba(99,102,241,0.35)" }}>
+                            style={{ width: 34, height: 34, borderRadius: 11, overflow: "hidden", border: "1px solid #e5e7eb" }}>
                             <SolitLogo size={34} radius={11} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1837,37 +1833,37 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 Grup chat seluruh tim{onlineCount > 0 ? ` · ${onlineCount} online` : ""}
                             </p>
                         </div>
-                        {!embeddedDMUser && activeGroupId === DEFAULT_GROUP_ID && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />}
+                        {!embeddedDMUser && activeGroupId === DEFAULT_GROUP_ID && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />}
                     </button>
 
                     {canCreateGroup && (
                         <button onClick={() => setShowCreateGroup(true)}
                             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all hover:bg-slate-50 flex-shrink-0"
-                            style={{ borderBottom: "1px solid #f0f0f8" }}>
+                            style={{ borderBottom: "1px solid #e5e7eb" }}>
                             <div className="flex items-center justify-center flex-shrink-0"
-                                style={{ width: 34, height: 34, borderRadius: 11, background: "#eef2ff", border: "1px dashed #a5b4fc" }}>
-                                <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                style={{ width: 34, height: 34, borderRadius: 11, background: "#eff6ff", border: "1px dashed #93c5fd" }}>
+                                <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                                 </svg>
                             </div>
-                            <p className="text-[12px] font-bold text-indigo-600">Buat Grup Baru</p>
+                            <p className="text-[12px] font-bold text-blue-600">Buat Grup Baru</p>
                         </button>
                     )}
 
                     {customGroups.map(g => (
                         <button key={g.id}
                             onClick={() => { setActiveGroupId(g.id); setEmbeddedDMUser(null); setMobileView("chat"); }}
-                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${activeGroupId === g.id ? "bg-indigo-50" : "hover:bg-slate-50"}`}
-                            style={{ borderBottom: "1px solid #f0f0f8" }}>
+                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all flex-shrink-0 ${activeGroupId === g.id ? "bg-blue-50" : "hover:bg-slate-50"}`}
+                            style={{ borderBottom: "1px solid #e5e7eb" }}>
                             <div className="flex items-center justify-center flex-shrink-0 text-white font-black text-xs"
-                                style={{ width: 34, height: 34, borderRadius: 11, background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+                                style={{ width: 34, height: 34, borderRadius: 11, background: "#2563eb" }}>
                                 {g.name.slice(0, 2).toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-[12px] font-bold text-slate-800 truncate">{g.name}</p>
                                 <p className="text-[9.5px] text-slate-400 truncate">{g.my_role === "owner" ? "Kamu pembuat grup" : "Grup"}</p>
                             </div>
-                            {activeGroupId === g.id && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />}
+                            {activeGroupId === g.id && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />}
                         </button>
                     ))}
 
@@ -1889,8 +1885,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                         );
                                     }}
                                     className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all group ${embeddedDMUser?.id === user.id
-                                        ? "bg-indigo-50"
-                                        : "hover:bg-indigo-50"
+                                        ? "bg-blue-50"
+                                        : "hover:bg-blue-50"
                                         }`}                            >
                                     {/* Avatar + status dot */}
                                     <div className="relative flex-shrink-0">
@@ -1899,19 +1895,18 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                             style={{
                                                 width: 32, height: 32,
                                                 borderRadius: 10,
-                                                background: `linear-gradient(135deg, ${getAvatarColor(user.role)}cc, ${getAvatarColor(user.role)})`,
-                                                boxShadow: `0 2px 6px ${getAvatarColor(user.role)}44`,
+                                                backgroundColor: getAvatarColor(user.role),
                                                 opacity: isOnline ? 1 : 0.5,
                                             }}>
                                             {getInitials(user.name)}
                                         </div>
-                                        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#fafbff] ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-300"
+                                        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#fafafa] ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-300"
                                             }`} />
                                     </div>
 
                                     {/* Info */}
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[11.5px] font-semibold truncate text-slate-800 group-hover:text-indigo-700 transition-colors">
+                                        <p className="text-[11.5px] font-semibold truncate text-slate-800 group-hover:text-blue-700 transition-colors">
                                             {user.name}
                                         </p>
                                         <p className="text-[9.5px] truncate" style={{ color: getAvatarColor(user.role) }}>
@@ -1933,7 +1928,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                                 </span>
                                             )}
                                         </div>
-                                        <svg className="w-3.5 h-3.5 text-indigo-400 hidden group-hover:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-3.5 h-3.5 text-blue-400 hidden group-hover:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                                 d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                         </svg>
@@ -1945,13 +1940,13 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
                     {/* Footer sidebar — current user info */}
                     <div className="flex-shrink-0 px-3 py-3 flex items-center gap-2.5"
-                        style={{ borderTop: "1px solid #f0f0f8", background: "#f5f7ff" }}>
+                        style={{ borderTop: "1px solid #e5e7eb", background: "#f8fafc" }}>
                         <div
                             className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[10px]"
                             style={{
                                 width: 30, height: 30,
                                 borderRadius: 9,
-                                background: `linear-gradient(135deg, ${getAvatarColor(currentUser.role)}cc, ${getAvatarColor(currentUser.role)})`,
+                                backgroundColor: getAvatarColor(currentUser.role),
                             }}>
                             {getInitials(currentUser.name)}
                         </div>
@@ -1972,20 +1967,15 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
                     {/* ── Header ── */}
                     <div
-                        className="flex-shrink-0 flex items-center gap-3.5 px-4 md:px-6 py-4 relative overflow-hidden"
-                        style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
-
-                        {/* Ambient glow — satu radial lembut, ganti 2 layer lama yang numpuk */}
-                        <div className="absolute inset-0 pointer-events-none" style={{
-                            backgroundImage: "radial-gradient(ellipse 420px 200px at 10% -20%, rgba(99,102,241,0.25) 0%, transparent 70%)",
-                        }} />
+                        className="flex-shrink-0 flex items-center gap-3.5 px-4 md:px-6 py-4 relative"
+                        style={{ background: "#ffffff", borderBottom: "1px solid #e5e7eb" }}>
 
                         {/* Logo */}
                         <div className="relative flex-shrink-0 z-10">
                             <div style={{
                                 borderRadius: 14,
                                 overflow: "hidden",
-                                boxShadow: "0 4px 14px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08)",
+                                border: "1px solid #e5e7eb",
                             }}>
                                 <SolitLogo size={48} radius={14} />
                             </div>
@@ -1995,11 +1985,11 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             className={`flex-1 min-w-0 z-10 ${activeGroupId !== DEFAULT_GROUP_ID ? "cursor-pointer" : ""}`}
                             onClick={() => { if (activeGroupId !== DEFAULT_GROUP_ID) setShowGroupInfo(true); }}>
                             <div className="flex items-center gap-1.5">
-                                <h2 className="text-sm font-black text-white tracking-tight truncate">
+                                <h2 className="text-sm font-semibold text-slate-800 tracking-tight truncate">
                                     {activeGroupId === DEFAULT_GROUP_ID ? "All Team Solit" : customGroups.find(g => g.id === activeGroupId)?.name ?? "Grup"}
                                 </h2>
                                 {activeGroupId !== DEFAULT_GROUP_ID && (
-                                    <svg className="w-3.5 h-3.5 text-white/30 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
                                 )}
@@ -2007,9 +1997,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             <div className="flex items-center gap-1.5 mt-1 min-w-0">
                                 <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
                                 </span>
-                                <span className="text-[10.5px] font-medium truncate" style={{ color: "rgba(255,255,255,0.45)" }}>
+                                <span className="text-[10.5px] font-medium truncate" style={{ color: "#94a3b8" }}>
                                     {activeGroupId === DEFAULT_GROUP_ID
                                         ? (onlineCount > 0 ? `${onlineCount} anggota online` : "Grup chat seluruh tim Solit 03")
                                         : (customGroups.find(g => g.id === activeGroupId)?.my_role === "owner" ? "Kamu pembuat grup" : "Grup")}
@@ -2023,9 +2013,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             className="md:hidden w-9 h-9 flex items-center justify-center transition-all active:scale-95 flex-shrink-0 z-10 mr-1 relative"
                             style={{
                                 borderRadius: 12,
-                                background: "rgba(255,255,255,0.06)",
-                                border: "1px solid rgba(255,255,255,0.08)",
-                                color: "rgba(255,255,255,0.65)",
+                                background: "#f8fafc",
+                                border: "1px solid #e5e7eb",
+                                color: "#64748b",
                             }}
                             title="Anggota tim">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2033,28 +2023,25 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                     d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-2.5-4.66" />
                             </svg>
                             {onlineCount > 0 && (
-                                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-emerald-500 text-white text-[8px] font-black flex items-center justify-center border border-[#0f0c29]">
+                                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-full bg-emerald-500 text-white text-[8px] font-bold flex items-center justify-center border-2 border-white">
                                     {onlineCount}
                                 </span>
                             )}
                         </button>
                         <button
                             onClick={onClose}
-                            className="w-9 h-9 flex items-center justify-center transition-all hover:bg-white/10 flex-shrink-0 z-10"
+                            className="w-9 h-9 flex items-center justify-center transition-all hover:bg-slate-100 flex-shrink-0 z-10"
                             style={{
                                 borderRadius: 12,
-                                background: "rgba(255,255,255,0.06)",
-                                border: "1px solid rgba(255,255,255,0.08)",
-                                color: "rgba(255,255,255,0.55)",
+                                background: "#f8fafc",
+                                border: "1px solid #e5e7eb",
+                                color: "#64748b",
                             }}>
                             <svg style={{ width: 17, height: 17 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
-
-                    {/* Accent line */}
-                    <div style={{ height: 2, background: "linear-gradient(90deg, #6366f1 0%, #8b5cf6 45%, transparent 90%)", opacity: 0.6, flexShrink: 0 }} />
 
                     {/* ── Messages ── */}
                     <div
@@ -2066,15 +2053,15 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         {loadingMore && (
                             <div className="flex justify-center py-3">
                                 <div className="animate-spin rounded-full"
-                                    style={{ width: 20, height: 20, border: "2.5px solid #e8ecf5", borderTopColor: "#6366f1" }} />
+                                    style={{ width: 20, height: 20, border: "2.5px solid #e5e7eb", borderTopColor: "#2563eb" }} />
                             </div>
                         )}
 
                         {hasMore && !loadingMore && (
                             <div className="flex justify-center py-2">
                                 <button onClick={loadMore}
-                                    className="text-[11px] text-indigo-600 hover:text-indigo-700 transition-all px-5 py-2 font-semibold hover:scale-105"
-                                    style={{ background: "#fff", border: "1px solid #e0e4f5", borderRadius: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+                                    className="text-[11px] text-blue-600 hover:text-blue-700 transition-all px-5 py-2 font-semibold hover:scale-105"
+                                    style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 100, boxShadow: "0 1px 4px rgba(15,23,42,0.04)" }}>
                                     <ChevronUp className="inline w-3.5 h-3.5 mr-1" />Muat pesan lebih lama
                                 </button>
                             </div>
@@ -2083,13 +2070,13 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         {loading ? (
                             <div className="flex flex-col items-center justify-center h-full gap-3">
                                 <div className="animate-spin rounded-full"
-                                    style={{ width: 30, height: 30, border: "3px solid #e8ecf5", borderTopColor: "#6366f1" }} />
+                                    style={{ width: 30, height: 30, border: "3px solid #e5e7eb", borderTopColor: "#2563eb" }} />
                                 <p className="text-xs text-slate-400 font-medium">Memuat pesan...</p>
                             </div>
                         ) : messages.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
                                 <div className="flex items-center justify-center text-4xl"
-                                    style={{ width: 80, height: 80, borderRadius: 26, background: "#fff", border: "1px solid #ebebf5", boxShadow: "0 8px 24px rgba(0,0,0,0.06)" }}>
+                                    style={{ width: 80, height: 80, borderRadius: 26, background: "#fff", border: "1px solid #e5e7eb", boxShadow: "0 8px 24px rgba(0,0,0,0.06)" }}>
 
                                 </div>
                                 <div>
@@ -2103,12 +2090,12 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                     {/* Date pill */}
                                     <div className="flex items-center justify-center py-4">
                                         <div className="flex items-center gap-3">
-                                            <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, transparent, #d1d5f5)" }} />
+                                            <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, transparent, #e5e7eb)" }} />
                                             <div className="text-slate-400 text-[9.5px] font-semibold px-3.5 py-1.5 bg-white"
-                                                style={{ borderRadius: 100, border: "1px solid #ebebf5", boxShadow: "0 2px 6px rgba(0,0,0,0.04)", letterSpacing: "0.03em" }}>
+                                                style={{ borderRadius: 100, border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(15,23,42,0.03)", letterSpacing: "0.03em" }}>
                                                 {group.dateLabel}
                                             </div>
-                                            <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, #d1d5f5, transparent)" }} />
+                                            <div style={{ height: 1, width: 40, background: "linear-gradient(90deg, #e5e7eb, transparent)" }} />
                                         </div>
                                     </div>
                                     {group.msgs.map((msg: GroupMessage, idx: number) => {
@@ -2145,10 +2132,10 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 style={{
                                     borderRadius: "50%",
                                     background: "#fff",
-                                    border: "1px solid #e8ecf5",
+                                    border: "1px solid #e5e7eb",
                                     boxShadow: "0 6px 24px rgba(0,0,0,0.1)",
                                 }}>
-                                <svg className="w-4 h-4" style={{ color: "#6366f1" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4" style={{ color: "#2563eb" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                                 </svg>
                                 {unread > 0 && (
@@ -2157,9 +2144,9 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                             top: -6, right: -6,
                                             minWidth: 18, height: 18,
                                             borderRadius: 9,
-                                            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                                            background: "#2563eb",
                                             padding: "0 4px",
-                                            boxShadow: "0 2px 8px rgba(99,102,241,0.4)",
+                                            boxShadow: "0 2px 6px rgba(37,99,235,0.35)",
                                         }}>
                                         {unread > 9 ? "9+" : unread}
                                     </span>
@@ -2187,9 +2174,8 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                         <div
                             className="flex-shrink-0 flex items-center gap-3 px-4 py-3.5"
                             style={{
-                                background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)",
-                                borderBottom: "2px solid transparent",
-                                backgroundClip: "padding-box",
+                                background: "#ffffff",
+                                borderBottom: "1px solid #e5e7eb",
                             }}
                         >
                             <div
@@ -2197,14 +2183,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                 style={{
                                     width: 34, height: 34,
                                     borderRadius: 10,
-                                    background: `linear-gradient(135deg, ${getAvatarColor(embeddedDMUser.role)}cc, ${getAvatarColor(embeddedDMUser.role)})`,
-                                    boxShadow: `0 2px 8px ${getAvatarColor(embeddedDMUser.role)}55`,
+                                    backgroundColor: getAvatarColor(embeddedDMUser.role),
+                                    boxShadow: `0 2px 6px ${getAvatarColor(embeddedDMUser.role)}44`,
                                 }}
                             >
                                 {getInitials(embeddedDMUser.name)}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-[12px] font-bold text-white truncate leading-tight">
+                                <p className="text-[12px] font-semibold text-slate-800 truncate leading-tight">
                                     {embeddedDMUser.name}
                                 </p>
                                 <p className="text-[9.5px] mt-0.5 truncate"
@@ -2216,16 +2202,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             </div>
                             <button
                                 onClick={() => setEmbeddedDMUser(null)}
-                                className="w-7 h-7 flex items-center justify-center rounded-xl transition hover:bg-white/10 flex-shrink-0"
-                                style={{ color: "rgba(255,255,255,0.45)" }}
+                                className="w-7 h-7 flex items-center justify-center rounded-xl transition hover:bg-slate-100 flex-shrink-0"
+                                style={{ color: "#94a3b8" }}
                             >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
-                        {/* Accent line */}
-                        <div style={{ height: 2, background: "linear-gradient(90deg,#6366f1,#8b5cf6 50%,#ec4899)", flexShrink: 0, opacity: 0.7 }} />
 
                         {/* DM Messages — pakai EmbeddedDMMessages */}
                         <EmbeddedDMMessages

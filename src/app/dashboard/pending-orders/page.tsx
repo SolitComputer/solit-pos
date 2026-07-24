@@ -10,6 +10,7 @@ interface PendingTransaction {
     id: string;
     invoice_number: string;
     status: "RESERVED" | "HELD" | "PAID";
+    sales_id: string;
     customer_name: string;
     customer_phone: string | null;
     company_name: string | null;
@@ -724,6 +725,8 @@ export default function PendingOrdersPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [filterStatus, setFilterStatus] = useState<"ALL" | "RESERVED" | "HELD">("ALL");
     const [searchQuery, setSearchQuery] = useState("");
+    const [minSisa, setMinSisa] = useState("");
+    const [maxSisa, setMaxSisa] = useState("");
 
     const [activeTab, setActiveTab] = useState<"pending" | "history">("pending");
     const [historyTransactions, setHistoryTransactions] = useState<PendingTransaction[]>([]);
@@ -736,21 +739,15 @@ export default function PendingOrdersPage() {
     const [cancelTx, setCancelTx] = useState<PendingTransaction | null>(null);
     const [cancelling, setCancelling] = useState(false);
 
-    const CAN_CONFIRM_PAYMENT_ROLES: UserRole[] = [
-        "ADMIN",
-        "ASISTEN_CEO",
-        "PROGRAMMER",
-        "KEPALA_SALES",
-        "KEPALA_SOTECH",
-        "SOTECH",
-    ];
-
-    const canConfirm = userRole ? CAN_CONFIRM_PAYMENT_ROLES.includes(userRole) : false;
+    const [userId, setUserId] = useState<string | null>(null);
     // Reuse permission yang sama dengan tombol "Restore/Batal" di halaman Riwayat Transaksi
     const canCancel = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
 
     useEffect(() => {
-        fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
+        fetch("/api/auth/me").then(r => r.json()).then(r => {
+            setUserRole(r.user?.role ?? null);
+            setUserId(r.user?.id ?? null);
+        }).catch(() => { setUserRole(null); setUserId(null); });
     }, []);
 
     const fetchData = useCallback(async () => {
@@ -834,6 +831,9 @@ export default function PendingOrdersPage() {
 
     const filtered = transactions.filter(tx => {
         if (filterStatus !== "ALL" && tx.status !== filterStatus) return false;
+        const sisa = (tx.deal_price || tx.amount || 0) - (tx.dp_amount || 0);
+        if (minSisa && sisa < Number(minSisa)) return false;
+        if (maxSisa && sisa > Number(maxSisa)) return false;
         if (searchQuery) {
             const q = searchQuery.toLowerCase();
             return tx.customer_name.toLowerCase().includes(q) ||
@@ -958,9 +958,9 @@ export default function PendingOrdersPage() {
                                 )}
                             </div>
 
-                            {/* Filter pills — only for pending tab */}
+                          {/* Filter pills — only for pending tab */}
                             {activeTab === "pending" && (
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                     {([
                                         { value: "ALL", label: "Semua", count: counts.all },
                                         { value: "RESERVED", label: <><CreditCard size={12} /> DP</>, count: counts.reserved },
@@ -972,6 +972,10 @@ export default function PendingOrdersPage() {
                                             <span className={`text-[10px] font-bold px-1 rounded-full ${filterStatus === opt.value ? "bg-white/20" : "bg-gray-200/80 text-gray-500"}`}>{opt.count}</span>
                                         </button>
                                     ))}
+                                    <input type="number" placeholder="Sisa min (Rp)" value={minSisa} onChange={e => setMinSisa(e.target.value)}
+                                        className="h-7 w-28 border border-gray-200 rounded-lg px-2 text-[11px] bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20" />
+                                    <input type="number" placeholder="Sisa max (Rp)" value={maxSisa} onChange={e => setMaxSisa(e.target.value)}
+                                        className="h-7 w-28 border border-gray-200 rounded-lg px-2 text-[11px] bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20" />
                                 </div>
                             )}
                         </div>
@@ -998,7 +1002,9 @@ export default function PendingOrdersPage() {
                                             </tr>
                                         ) : (
                                             filtered.map((tx, idx) => (
-                                                <PendingRow key={tx.id} tx={tx} idx={idx} canConfirm={canConfirm} canCancel={canCancel}
+                                                <PendingRow key={tx.id} tx={tx} idx={idx}
+                                                    canConfirm={!!userId && tx.sales_id === userId}
+                                                    canCancel={canCancel}
                                                     onConfirm={setConfirmPaymentTx}
                                                     onCancel={setCancelTx}
                                                     onDetail={setDetailTx}

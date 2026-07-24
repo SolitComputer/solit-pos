@@ -26,7 +26,8 @@ interface UnitOption {
     id: string;
     serial_number: string;
     purchase_price?: number;
-    grade: "A" | "B" | "C" | null;
+    charger_price?: number;
+    laptop_bag_price?: number; grade: "A" | "B" | "C" | null;
     selling_price: number;
     condition_note: string;
     status: string;
@@ -145,6 +146,8 @@ export default function CreatePaymentPage() {
     const [splitTF, setSplitTF] = useState<number>(0);
     const [splitCash, setSplitCash] = useState<number>(0);
 
+    const [pedagangPriceMap, setPedagangPriceMap] = useState<Record<string, number>>({});
+
     // ── Trade-in ──────────────────────────────────────────────────────────────
     const [isTradeIn, setIsTradeIn] = useState(false);
     const [tradeInItem, setTradeInItem] = useState("");
@@ -215,6 +218,13 @@ export default function CreatePaymentPage() {
     const tradeInReceived = isTradeIn ? (rawDealPrice - tradeInValue) : 0;
 
     useEffect(() => {
+        if (fromScan || fromPrep) {
+            setPaymentFlow("DIRECT");
+            setIsEcommerce(false);
+        }
+    }, [fromScan, fromPrep]);
+
+    useEffect(() => {
         fetch("/api/auth/me")
             .then(r => r.json())
             .then(r => setUserRole(r.user?.role ?? null))
@@ -224,6 +234,43 @@ export default function CreatePaymentPage() {
     const canSeeMargin = userRole
         ? hasPermission(userRole, ["ADMIN", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG"])
         : false;
+
+    // ── Fetch price list pedagang saat sellerType = PEDAGANG ──────────────────
+    useEffect(() => {
+        if (sellerType !== "PEDAGANG") return;
+        const loadPedagangPrices = async () => {
+            try {
+                const res = await fetch("/api/price-list-pedagang");
+                const result = await res.json();
+                if (result.success) {
+                    const map: Record<string, number> = {};
+                    (result.data || []).forEach((row: any) => {
+                        map[row.unit_id] = row.pedagang_price;
+                    });
+                    setPedagangPriceMap(map);
+                }
+            } catch {
+                /* biarkan harga manual kalau fetch gagal */
+            }
+        };
+        loadPedagangPrices();
+    }, [sellerType]);
+
+    useEffect(() => {
+        if (sellerType !== "PEDAGANG") return;
+        setUnitPrices(prev => {
+            const next = { ...prev };
+            let changed = false;
+            selectedUnits.forEach(u => {
+                const pedagangPrice = pedagangPriceMap[u.unit_id];
+                if (pedagangPrice !== undefined && !prev[u.unit_id]) {
+                    next[u.unit_id] = pedagangPrice;
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [sellerType, selectedUnits, pedagangPriceMap]);
 
     useEffect(() => {
         const laptopTotal = selectedUnits.reduce((sum, u) => sum + (unitPrices[u.unit_id] || 0), 0);
@@ -581,6 +628,9 @@ export default function CreatePaymentPage() {
                     latitude, longitude,
                     warranty_duration: warrantyDuration,
                     seller_type: sellerType,
+                    payment_mode: paymentFlow === "PENDING" ? "PENDING" : "DIRECT",
+                    dp_amount: pendingSubType === "DP_AMBIL" ? dpAmount : 0,
+                    dp_status: pendingSubType === "DP_AMBIL" ? (dpAmount > 0 ? "RESERVED" : "HELD") : undefined,
                     is_ecommerce: isEcommerce,
                     ecommerce_platform: isEcommerce ? ecommercePlatform : null,
                     ecommerce_order_id: isEcommerce ? ecommerceOrderId : null,
@@ -622,12 +672,11 @@ export default function CreatePaymentPage() {
         }
     };
 
-    // ── Styles ────────────────────────────────────────────────────────────────
     const inputClass = "border border-gray-200 rounded-xl h-11 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 bg-white w-full transition-all duration-200";
     const selectClass = "border border-gray-200 rounded-xl h-11 px-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 w-full transition-all duration-200";
     const btnSecondary = "flex-1 bg-white text-gray-600 border border-gray-200 rounded-xl h-11 font-medium hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98] transition-all duration-200 text-sm";
     const btnPrimary = "flex-1 bg-gray-700 text-white rounded-xl h-11 font-medium hover:bg-gray-800 active:scale-[0.98] transition-all duration-200 text-sm shadow-sm";
-
+    const hasPedagangPrice = (unitId: string) => sellerType === "PEDAGANG" && pedagangPriceMap[unitId] !== undefined;
     const stepLabels = ["Data Pembeli", "Pilih Unit", "Pengambilan", "Pembayaran"];
     const stepIcons = [User, Laptop, CalendarDays, Wallet];
     const goBack3 = () => fromScan ? setStep(1) : setStep(2);
@@ -733,33 +782,46 @@ export default function CreatePaymentPage() {
                     {!paymentFlow && (
                         <div className="space-y-3">
                             <p className="text-xs text-gray-500 text-center">Pilih jenis payment</p>
-                            <button type="button" onClick={() => { setPaymentFlow("DIRECT"); setIsEcommerce(false); }}
+                            <button type="button" onClick={() => { setPaymentFlow("DIRECT"); setPendingSubType(null); setIsEcommerce(false); setDpAmount(0); }}
                                 className="w-full p-4 rounded-xl border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition text-left">
                                 <p className="text-sm font-bold text-gray-800">Payment Transaksi</p>
                                 <p className="text-xs text-gray-400 mt-0.5">Langsung lunas, tanpa pending</p>
                             </button>
-                            <button type="button" onClick={() => setPaymentFlow("PENDING")}
+                            <button type="button" onClick={() => { setPaymentFlow("PENDING"); setPendingSubType("ECOMMERCE"); setIsEcommerce(true); }}
                                 className="w-full p-4 rounded-xl border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition text-left">
                                 <p className="text-sm font-bold text-gray-800">Payment Pending</p>
-                                <p className="text-xs text-gray-400 mt-0.5">E-Commerce, DP, atau Ambil Dulu</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Default E-Commerce — bisa diganti ke DP/Ambil Dulu di dalam form</p>
                             </button>
                         </div>
                     )}
 
-                    {paymentFlow === "PENDING" && !pendingSubType && (
-                        <div className="space-y-3">
-                            <button type="button" onClick={() => setPaymentFlow(null)} className="text-xs text-gray-400">&larr; Kembali</button>
+                    {paymentFlow === "PENDING" && (
+                        <div className="flex gap-2 mb-3">
                             <button type="button" onClick={() => { setPendingSubType("ECOMMERCE"); setIsEcommerce(true); }}
-                                className="w-full p-4 rounded-xl border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition text-left">
-                                <p className="text-sm font-bold text-gray-800">E-Commerce</p>
-                                <p className="text-xs text-gray-400 mt-0.5">Shopee / Tokopedia / TikTok / dll</p>
+                                className={`flex-1 h-9 rounded-lg text-xs font-semibold border transition ${pendingSubType === "ECOMMERCE" ? "bg-sky-600 text-white border-sky-600" : "bg-white text-gray-500 border-gray-200"}`}>
+                                E-Commerce
                             </button>
-                            <button type="button" onClick={() => { setPendingSubType("DP_AMBIL"); setIsEcommerce(false); }}
-                                className="w-full p-4 rounded-xl border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition text-left">
-                                <p className="text-sm font-bold text-gray-800">DP / Ambil Dulu</p>
-                                <p className="text-xs text-gray-400 mt-0.5">Isi nominal 0 untuk Ambil Dulu</p>
+                            <button type="button" onClick={() => { setPendingSubType("DP_AMBIL"); setIsEcommerce(false); setDpAmount(0); }}
+                                className={`flex-1 h-9 rounded-lg text-xs font-semibold border transition ${pendingSubType === "DP_AMBIL" ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-500 border-gray-200"}`}>
+                                DP / Ambil Dulu
                             </button>
                         </div>
+                    )}
+
+                    {!fromScan && !fromPrep && paymentFlow && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setPaymentFlow(null);
+                                setPendingSubType(null);
+                                setIsEcommerce(false);
+                                setDpAmount(0);
+                                setStep(1);
+                            }}
+                            className="text-xs text-gray-400 hover:text-gray-600 inline-flex items-center gap-1 -mt-1 mb-1"
+                        >
+                            <ChevronLeft size={14} /> Ganti Jenis Payment
+                        </button>
                     )}
 
                     {/* ──────────────────────── STEP 1: Data Pembeli ─────────────────── */}
@@ -946,7 +1008,11 @@ export default function CreatePaymentPage() {
                                                     )}
                                                 </div>
                                                 <p className="text-[10px] font-mono text-gray-400 ml-5.5">SN: {u.serial_number}</p>
+                                                {hasPedagangPrice(u.unit_id) && (
+                                                    <p className="text-[10px] text-emerald-600 font-medium ml-5.5">Harga mengikuti price list pedagang — masih bisa diubah manual</p>
+                                                )}
                                                 <input
+                                                    key={`${u.unit_id}-${pedagangPriceMap[u.unit_id] ?? "none"}`}
                                                     type="text" inputMode="numeric"
                                                     placeholder="Harga deal unit ini"
                                                     className={inputClass}
@@ -970,6 +1036,30 @@ export default function CreatePaymentPage() {
                                             <span className="text-gray-600 font-semibold">Total ({selectedUnits.length} unit)</span>
                                             <span className="font-bold text-gray-800 font-mono">{fmt(rawDealPrice)}</span>
                                         </div>
+
+                                        {pendingSubType === "DP_AMBIL" && (
+                                            <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 space-y-1.5 mt-2">
+                                                <label className="text-xs font-semibold text-violet-700 block">
+                                                    Nominal DP <span className="text-violet-400 font-normal">(isi 0 = Ambil Dulu)</span>
+                                                </label>
+                                                <input
+                                                    type="text" inputMode="numeric"
+                                                    value={dpAmount > 0 ? dpAmount.toLocaleString("id-ID") : ""}
+                                                    placeholder="0"
+                                                    onChange={e => {
+                                                        const raw = e.target.value.replace(/\D/g, "");
+                                                        const num = raw ? Number(raw) : 0;
+                                                        setDpAmount(Math.min(num, Math.max(0, rawDealPrice - 1)));
+                                                    }}
+                                                    className={inputClass}
+                                                />
+                                                <p className="text-[11px] text-violet-500">
+                                                    {dpAmount > 0
+                                                        ? `Sisa setelah DP: ${fmt(Math.max(0, rawDealPrice - dpAmount))}`
+                                                        : "Status: Ambil Dulu (belum ada pembayaran)"}
+                                                </p>
+                                            </div>
+                                        )}
 
                                         {rawDealPrice > 0 && canSeeMargin && (
                                             <div className="flex justify-between text-sm">
@@ -1180,7 +1270,11 @@ export default function CreatePaymentPage() {
                                                 <span className="font-semibold">{i + 1}. {u.laptop_name}</span>
                                                 <span className="font-mono text-gray-500 ml-2">SN: {u.serial_number}</span>
                                             </div>
+                                            {hasPedagangPrice(u.unit_id) && (
+                                                <p className="text-[10px] text-emerald-600 font-medium">Harga mengikuti price list pedagang — masih bisa diubah manual</p>
+                                            )}
                                             <input
+                                                key={`${u.unit_id}-${pedagangPriceMap[u.unit_id] ?? "none"}`}
                                                 type="text" inputMode="numeric"
                                                 placeholder="Harga deal unit ini"
                                                 className={inputClass}

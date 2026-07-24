@@ -14,8 +14,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ data: [] });
     }
 
-    // ── Query kedua tabel secara paralel ──────────────────────────────────────
-    const [laptopResult, accessoryResult] = await Promise.all([
+   const [laptopResult, accessoryResult] = await Promise.all([
         supabase
             .from("laptop_units")
             .select(`
@@ -28,7 +27,9 @@ export async function GET(req: NextRequest) {
                 status,
                 laptops (
                     id,
-                    laptop_name
+                    laptop_name,
+                    charger_price,
+                    laptop_bag_price
                 )
             `)
             .ilike("serial_number", `%${q}%`)
