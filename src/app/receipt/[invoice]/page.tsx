@@ -206,7 +206,7 @@ export default async function Page(props: Props) {
                   <div className="mt-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 flex items-center justify-between">
                     <div>
                       <p className="text-xs font-semibold text-blue-700">Cek Garansi Online</p>
-                      <p className="text-[10px] text-blue-500 mt-0.5">solit03.com/cek-garansi</p>
+                      <p className="tesxt-[10px] text-blue-500 mt-0.5">solit03.com/cek-garansi</p>
                     </div>
                     <div className="text-xs font-mono text-blue-600 bg-blue-100 px-2 py-1 rounded-lg">
                       SN: {data.serial_number || "—"}

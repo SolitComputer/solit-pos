@@ -81,6 +81,14 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 }))
             : [];
 
+        // ── Mode pembayaran: DIRECT (lunas langsung) vs PENDING (DP/Ambil Dulu) ──
+        // Ecommerce tetap pakai flag is_ecommerce lama (selalu PACKING, terpisah dari DP/Ambil Dulu).
+        const isEcommerceEarly = Boolean(body.is_ecommerce);
+        const isPendingDp = body.payment_mode === "PENDING" && !isEcommerceEarly;
+        const dpAmountInput = isPendingDp ? Math.max(0, Math.round(Number(body.dp_amount) || 0)) : 0;
+        const isAmbilDulu = isPendingDp && dpAmountInput === 0;
+        const isDP = isPendingDp && dpAmountInput > 0;
+
         // Minimal 1 item (laptop ATAU aksesori)
         if (laptopUnits.length === 0 && accessoriesInput.length === 0)
             return NextResponse.json({ success: false, message: "Minimal 1 unit atau aksesori harus dipilih" }, { status: 400 });
@@ -132,6 +140,13 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const invoice_number = await generateInvoice();
         const deal_price = Number(body.amount) || 0;
 
+        if (isDP && dpAmountInput >= deal_price) {
+            return NextResponse.json({
+                success: false,
+                message: "Nominal DP harus lebih kecil dari harga deal. Kalau bayar penuh, gunakan Payment Transaksi (langsung lunas), bukan DP.",
+            }, { status: 400 });
+        }
+
         // deal price per laptop unit
         const unitPriceMap = new Map<string, number>();
         if (Array.isArray(body.unit_prices))
@@ -158,9 +173,11 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const gross_profit = deal_price - inventory_price;
         const profitStatus = gross_profit > 0 ? "✓ PROFIT" : gross_profit < 0 ? "⚠️ LOSS" : "➖ BREAK EVEN";
 
-        const isEcommerce = Boolean(body.is_ecommerce);
-        const txStatus = isEcommerce ? "PACKING" : "PAID";
-        const laptopUnitStatus = isEcommerce ? "RESERVED" : "SOLD";
+        const isEcommerce = isEcommerceEarly;
+        const txStatus = isEcommerce ? "PACKING" : isDP ? "RESERVED" : isAmbilDulu ? "HELD" : "PAID";
+        // Status unit MENGIKUTI status transaksi selama masih pending (bukan cuma "RESERVED" generik).
+        // Baru jadi SOLD ketika transaksi benar-benar lunas (dilakukan lewat FU / confirm-payment).
+        const laptopUnitStatus = txStatus === "PAID" ? "SOLD" : txStatus; // "PACKING" | "RESERVED" | "HELD"
 
         // ── Display name & primary unit (handle aksesori-saja) ──
         const hasLaptops = laptopUnits.length > 0;
@@ -199,6 +216,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 serial_numbers: laptopUnits.map(u => u.serial_number),
 
                 deal_price, amount: deal_price, inventory_price, other: gross_profit,
+                dp_amount: isDP ? dpAmountInput : 0,
 
                 payment_method,
                 payment_method_2: isTfCash ? (body.payment_method_2 || "CASH") : null,
@@ -220,7 +238,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
 
                 customer_birth_date: body.customer_birth_date || null,
                 status: txStatus,
-                paid_at: isEcommerce ? null : new Date().toISOString(),
+                paid_at: txStatus === "PAID" ? new Date().toISOString() : null,
             })
             .select().single();
         if (txError) throw txError;
@@ -251,6 +269,19 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const { error: itemsError } = await supabase
             .from("transaction_items").insert([...laptopItems, ...accessoryItems]);
         if (itemsError) console.error("[transaction_items]", itemsError.message);
+
+        // 6b. Catat DP awal — supaya otomatis ke-pickup sync cashflow (kalau 0 / Ambil Dulu, TIDAK dicatat)
+        if (isDP && dpAmountInput > 0) {
+            const { error: dpPayErr } = await supabase.from("transaction_payments").insert({
+                transaction_id: transaction.id,
+                invoice_number,
+                amount: dpAmountInput,
+                payment_type: "DP",
+                payment_method,
+                created_by_name: user.name,
+            });
+            if (dpPayErr) console.error("[transaction/create] gagal catat DP:", dpPayErr.message);
+        }
 
         // 7. Update status laptop_units
         if (laptopUnitIds.length > 0) {
@@ -291,8 +322,8 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             }));
         }
 
-        // 9. Warranty — hanya laptop, hanya PAID
-        if (!isEcommerce && laptopUnits.length > 0) {
+        // 9. Warranty — hanya laptop, hanya kalau sudah benar-benar PAID (bukan DP/Ambil-Dulu/Ecommerce)
+        if (txStatus === "PAID" && laptopUnits.length > 0) {
             const warrantyDuration = Number(body.warranty_duration) || 30;
             const wStart = new Date(); const wEnd = new Date();
             wEnd.setDate(wEnd.getDate() + warrantyDuration);
@@ -359,9 +390,17 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             catch (e: any) { console.error("[WA]", e?.message ?? e); }
         }
 
+        const pendingLabel = isDP
+            ? `DP diterima Rp${dpAmountInput.toLocaleString("id-ID")}, sisa Rp${(deal_price - dpAmountInput).toLocaleString("id-ID")}`
+            : isAmbilDulu
+                ? "Status: Ambil Dulu (belum bayar)"
+                : isEcommerce
+                    ? "Status: Packing (menunggu dana cair)"
+                    : `${profitStatus} Rp${Math.abs(gross_profit).toLocaleString("id-ID")}`;
+
         return NextResponse.json({
             success: true, data: transaction, invoice_number,
-            message: `✓ Transaksi berhasil (${laptopUnits.length} unit, ${totalAccQty} aksesori) | ${profitStatus} Rp${Math.abs(gross_profit).toLocaleString("id-ID")}`,
+            message: `✓ Transaksi berhasil (${laptopUnits.length} unit, ${totalAccQty} aksesori) | ${pendingLabel}`,
         });
     } catch (err: any) {
         console.error("[transaction/create]", err);
