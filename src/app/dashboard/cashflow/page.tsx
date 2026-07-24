@@ -1558,8 +1558,12 @@ export default function CashflowPage() {
                                             <tr key={e.id} onClick={() => isClickable && handleRowClick(e)}
                                                 className={`transition-colors group ${e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-gray-50/50"}`}>
                                                 <td className="pl-5 pr-3 py-3 whitespace-nowrap">
-                                                    <span className="text-[11px] font-semibold text-gray-600">{fmtTanggalShort(e.tanggal)}</span>
-                                                    <p className="text-[9px] text-gray-300 font-mono mt-0.5">{e.tanggal}</p>
+                                                    <span className="text-[11px] font-semibold text-gray-600">
+                                                        {e.created_at
+                                                            ? new Date(e.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })
+                                                            : "—"}
+                                                    </span>
+                                                    <p className="text-[9px] text-gray-400 font-mono mt-0.5">{fmtTanggal(e.tanggal)}</p>
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap"><SourceBadge sourceType={e.source_type} /></td>
                                                 <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
