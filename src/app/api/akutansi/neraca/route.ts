@@ -6,6 +6,14 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { ACCOUNTS, ACCOUNT_TYPE_NORMAL_SIDE, AccountType, JournalSide, isValidPeriod } from "@/lib/accounting";
 import { createClient as createClientForAccounts } from "@supabase/supabase-js";
 
+// Akun Pendapatan (410-430), Modal Keluar (440-460), dan Operasional/Beban
+// (510-540) sudah tercakup di tab Laba Rugi — di tabel Neraca cukup jadi
+// bagian dari perhitungan Total (biar validasi balance tetap akurat), tapi
+// baris akunnya sendiri tidak perlu ditampilkan.
+const NERACA_HIDDEN_CODES = new Set([
+  "410", "420", "430", "440", "450", "460", "510", "520", "530", "540",
+]);
+
 function getAdmin(): SupabaseClient {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -115,14 +123,21 @@ export const GET = withAuth(async (req) => {
         return a.code.localeCompare(b.code);
       });
 
+    // Total tetap dihitung dari SEMUA akun (termasuk yang disembunyikan di
+    // bawah) — supaya validasi Balance/Tidak Balance tetap merefleksikan
+    // seluruh trial balance, bukan cuma akun yang ditampilkan di tabel.
     const totalDebit = rows.reduce((s, r) => s + r.debit, 0);
     const totalKredit = rows.reduce((s, r) => s + r.kredit, 0);
     const selisih = totalDebit - totalKredit;
 
+    // Baris yang dikirim ke tabel — akun 410/420/430/440/450/460/510/520/
+    // 530/540 disembunyikan (sudah ada di tab Laba Rugi).
+    const displayRows = rows.filter((r) => !NERACA_HIDDEN_CODES.has(r.code));
+
     return NextResponse.json({
       success: true,
       data: {
-        rows,
+        rows: displayRows,
         totals: {
           debit: totalDebit,
           kredit: totalKredit,
