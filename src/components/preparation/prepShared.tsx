@@ -7,7 +7,7 @@ export interface PrepItem { id: string; serial_number: string; laptop_name: stri
 export interface PrepOrder {
   id: string; order_number: string; customer_name: string; customer_phone: string | null;
   status: string; delivery_method: string | null;
-  created_by: string | null;                
+  created_by: string | null;
   created_by_name: string | null; created_by_role?: string | null;
   received_by_name: string | null; done_by_name: string | null;
   delivery_address: string | null; created_at: string;
@@ -69,6 +69,7 @@ export function OrderCard({ o, canReceive = false, receivingId = null, onReceive
               <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`} />{sm.label}
             </span>
             {dm && <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200"><dm.icon size={11} /> {dm.label}</span>}
+            {o.received_by_name && <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200"><User size={11} /> {o.received_by_name}</span>}
             {isNew && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-500 text-white animate-pulse">BARU</span>}
           </div>
           <p className="text-base font-black text-gray-900 leading-tight">{o.customer_name}</p>
@@ -88,7 +89,6 @@ export function OrderCard({ o, canReceive = false, receivingId = null, onReceive
             {checked}/{total} dicek · {pct}%
           </span>
         )}
-        {o.created_by_name && <span className="text-gray-400">oleh <span className="font-semibold text-gray-600">{o.created_by_name}</span></span>}
       </div>
 
       {o.status === "DIPROSES" && total > 0 && (
