@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { CASHFLOW_ROLES } from "@/lib/permissions";
+import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES, CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES, humanizeRoleKey } from "@/lib/permissions";
 import type ExcelJS from "exceljs";
 import {
     INCOME_CATEGORIES,
@@ -37,6 +37,7 @@ import {
     Check,
     Search,
     Inbox,
+    Shield,
 } from "lucide-react";
 
 const fmtRupiah = (n: number) => `Rp${Number(n || 0).toLocaleString("id-ID")}`;
@@ -395,7 +396,7 @@ function SourceBadge({ sourceType }: { sourceType: Entry["source_type"] }) {
 }
 
 // ── Audit Cell ────────────────────────────────────────────────────────────────
-function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void; busy: boolean }) {
+function AuditCell({ entry, onAudit, busy, canAudit = true }: { entry: Entry; onAudit: () => void; busy: boolean; canAudit?: boolean }) {
     if (entry.is_voided) return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
             title="Transaksi sumber sudah di-restore/dibatalkan — tidak bisa diaudit">
@@ -413,6 +414,12 @@ function AuditCell({ entry, onAudit, busy }: { entry: Entry; onAudit: () => void
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
             title="Nominal 0 — edit nominal terlebih dahulu sebelum audit">
             <AlertTriangle size={12} /> Nominal 0
+        </span>
+    );
+    if (!canAudit) return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
+            title="Role Anda tidak diizinkan mengaudit uang keluar">
+            <Lock size={12} /> Belum Audit
         </span>
     );
     return (
@@ -553,6 +560,150 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
                 <button onClick={onSet} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 transition shadow-sm active:scale-95 shrink-0">
                     <IconPlus /> Atur Sekarang
                 </button>
+            </div>
+        </div>
+    );
+}
+
+// ── Audit Access Modal ────────────────────────────────────────────────────────
+type AuditAccessRow = {
+    user_id: string;
+    name: string;
+    role: string;
+    roles: string[];
+    role_grants_access: boolean;
+    is_active: boolean;
+};
+
+function AuditAccessModal({ onClose }: { onClose: () => void }) {
+    const [loading, setLoading] = useState(true);
+    const [rows, setRows] = useState<AuditAccessRow[]>([]);
+    const [changed, setChanged] = useState<Record<string, boolean>>({});
+    const [search, setSearch] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+    const [savedOk, setSavedOk] = useState(false);
+
+    const load = useCallback(async () => {
+        setLoading(true); setError("");
+        try {
+            const res = await fetch("/api/cashflow/audit-access", { cache: "no-store" });
+            const json = await res.json();
+            if (json.success) setRows(json.data ?? []);
+            else setError(json.message || "Gagal memuat daftar akun");
+        } catch { setError("Terjadi kesalahan koneksi"); }
+        finally { setLoading(false); }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    const toggle = (userId: string, current: boolean) => {
+        setSavedOk(false);
+        setChanged((prev) => ({ ...prev, [userId]: !current }));
+    };
+
+    const effectiveState = (row: AuditAccessRow) => changed[row.user_id] ?? row.is_active;
+
+    const filteredRows = rows.filter((r) => r.name.toLowerCase().includes(search.trim().toLowerCase()));
+    const hasChanges = Object.keys(changed).length > 0;
+
+    const submit = async () => {
+        if (!hasChanges) return;
+        setSaving(true); setError(""); setSavedOk(false);
+        try {
+            const items = Object.entries(changed).map(([user_id, is_active]) => ({ user_id, is_active }));
+            const res = await fetch("/api/cashflow/audit-access", {
+                method: "PUT", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ items }),
+            });
+            const json = await res.json();
+            if (!json.success) return setError(json.message || "Gagal menyimpan");
+            setChanged({});
+            setSavedOk(true);
+            await load();
+        } catch { setError("Terjadi kesalahan koneksi"); }
+        finally { setSaving(false); }
+    };
+
+    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
+                <div className="h-1 bg-gradient-to-r from-gray-700 to-gray-900" />
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-base"><Shield size={16} className="text-gray-700" /></div>
+                        <div>
+                            <p className="text-sm font-bold text-gray-900">Manajemen Akses Audit Uang Keluar</p>
+                            <p className="text-[11px] text-gray-400">Pilih akun yang diizinkan mengaudit entry Uang Keluar</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
+                </div>
+                <div className="p-5 space-y-3">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 text-[11px] text-amber-700">
+                        Semua akun bisa diatur di sini, <b>termasuk Admin/Accounting</b>. Badge "Default: Role" hanya penanda default awal — centang/hilangkan tetap berlaku sebagai keputusan final untuk akun tersebut.
+                    </div>
+                    <input
+                        type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Cari nama akun…" className={inputCls}
+                    />
+                    <div className="border border-gray-100 rounded-xl max-h-80 overflow-y-auto divide-y divide-gray-50">
+                        {loading ? (
+                            <div className="p-6 text-center text-sm text-gray-400">Memuat…</div>
+                        ) : filteredRows.length === 0 ? (
+                            <div className="p-6 text-center text-sm text-gray-400">Tidak ada akun ditemukan</div>
+                        ) : (
+                            filteredRows.map((row) => {
+                                const checked = effectiveState(row);
+                                const overridden = changed[row.user_id] !== undefined && changed[row.user_id] !== row.role_grants_access;
+                                return (
+                                    <label
+                                        key={row.user_id}
+                                        className="flex items-center justify-between gap-3 px-3.5 py-2.5 cursor-pointer hover:bg-gray-50"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-gray-800 truncate">{row.name}</p>
+                                            <p className="text-[10px] text-gray-400">{humanizeRoleKey(row.role)}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {row.role_grants_access && (
+                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100" title="Role akun ini secara default diizinkan mengaudit — tapi tetap bisa dinonaktifkan di sini">
+                                                    Default: Role
+                                                </span>
+                                            )}
+                                            {overridden && (
+                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-100">Override</span>
+                                            )}
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() => toggle(row.user_id, checked)}
+                                                className="w-4 h-4 accent-gray-900"
+                                            />
+                                        </div>
+                                    </label>
+                                );
+                            })
+                        )}
+                    </div>
+                    {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
+                    {savedOk && !hasChanges && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-700">Perubahan tersimpan.</div>}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
+                    <button onClick={onClose} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition">Tutup</button>
+                    <button onClick={submit} disabled={saving || !hasChanges} className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-60">
+                        {saving ? "Menyimpan..." : "Simpan Perubahan"}
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -1267,13 +1418,27 @@ export default function CashflowPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [exporting, setExporting] = useState(false);
     const [allowed, setAllowed] = useState<boolean | null>(null);
+    const [canAuditOut, setCanAuditOut] = useState(false);
+    const [canManageAuditAccess, setCanManageAuditAccess] = useState(false);
+    const [showAuditAccessModal, setShowAuditAccessModal] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const ITEMS_PER_PAGE = 70;
 
     useEffect(() => {
         fetch("/api/auth/me").then((r) => r.json()).then((r) => {
             const roles: string[] = r.user?.roles?.length ? r.user.roles : [r.user?.role].filter(Boolean);
-            setAllowed(roles.some((x) => (CASHFLOW_ROLES as string[]).includes(x)));
+            const isAllowed = roles.some((x) => (CASHFLOW_ROLES as string[]).includes(x));
+            setAllowed(isAllowed);
+            setCanAuditOut(roles.some((x) => (CASHFLOW_AUDIT_OUT_ROLES as string[]).includes(x)));
+            setCanManageAuditAccess(roles.some((x) => (CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES as string[]).includes(x)));
+
+            if (!isAllowed) return;
+            // /api/cashflow/audit-access adalah sumber kebenaran final: Admin/Programmer bisa
+            // meng-override (mencabut ATAU memberi) akses audit uang keluar per akun, jadi
+            // nilainya bisa membalik nilai default berbasis role di atas — termasuk untuk ADMIN.
+            fetch("/api/cashflow/audit-access", { cache: "no-store" }).then((r2) => r2.json()).then((r2) => {
+                if (r2.success) setCanAuditOut(!!r2.my_access);
+            }).catch(() => { });
         }).catch(() => setAllowed(false));
     }, []);
 
@@ -1313,6 +1478,7 @@ export default function CashflowPage() {
 
     const toggleAudit = async (entry: Entry) => {
         if (entry.is_audited) return;
+        if (entry.direction === "OUT" && !canAuditOut) return;
         setAuditingId(entry.id);
         try {
             const res = await fetch(`/api/cashflow/${entry.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "toggle_audit" }) });
@@ -1380,6 +1546,7 @@ export default function CashflowPage() {
             {showIncomeModal && <IncomeModal onClose={() => setShowIncomeModal(false)} onSaved={() => fetchData(true)} />}
             {detailEntry && <DetailModal entry={detailEntry} onClose={() => setDetailEntry(null)} onDelete={deleteEntry} onEdit={(e) => setEditEntry(e)} />}
             {editEntry && <EditExpenseModal entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => fetchData(true)} />}
+            {showAuditAccessModal && <AuditAccessModal onClose={() => setShowAuditAccessModal(false)} />}
 
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-5">
 
@@ -1477,6 +1644,11 @@ export default function CashflowPage() {
                             <IconFilter /> Filter
                             {filterCount > 0 && <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"}`}>{filterCount}</span>}
                         </button>
+                        {canManageAuditAccess && (
+                            <button onClick={() => setShowAuditAccessModal(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition">
+                                <Shield size={14} /> Akses Audit
+                            </button>
+                        )}
                     </div>
                     {tab === "IN" && (
                         <button onClick={() => setShowIncomeModal(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition shadow-sm">
@@ -1606,7 +1778,7 @@ export default function CashflowPage() {
                                                     )}
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                    <AuditCell entry={e} busy={auditingId === e.id} onAudit={() => toggleAudit(e)} />
+                                                    <AuditCell entry={e} busy={auditingId === e.id} onAudit={() => toggleAudit(e)} canAudit={e.direction === "OUT" ? canAuditOut : true} />
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap">
                                                     {e.audited_by_user?.name

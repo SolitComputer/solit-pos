@@ -1,7 +1,7 @@
 // src/app/api/cashflow/[id]/route.ts
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
-import { CASHFLOW_ROLES } from "@/lib/permissions";
+import { CASHFLOW_ROLES, CASHFLOW_AUDIT_OUT_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { isValidCategory } from "@/lib/cashflow";
 
@@ -107,6 +107,28 @@ export const PATCH = withAuth(async (req, ctx, user: any) => {
             { success: false, message: fetchErr?.message || "Entry tidak ditemukan" },
             { status: 404 }
         );
+    }
+
+    if (entry.direction === "OUT") {
+        const userRoles: string[] = user.roles ?? [user.role];
+        const roleDefault = userRoles.some((r) => (CASHFLOW_AUDIT_OUT_ROLES as string[]).includes(r));
+
+        // Baris di cashflow_audit_out_access = override eksplisit dari Admin/Programmer
+        // (bisa MENCABUT akses akun ber-role ADMIN/ACCOUNTING sekalipun). Kalau belum
+        // pernah di-override, fallback ke default berdasarkan role.
+        const { data: access } = await supabase
+            .from("cashflow_audit_out_access")
+            .select("is_active")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        const isAllowed = access ? !!access.is_active : roleDefault;
+
+        if (!isAllowed)
+            return NextResponse.json(
+                { success: false, message: "Akun Anda tidak diizinkan mengaudit uang keluar" },
+                { status: 403 }
+            );
     }
 
     if (await isEntryVoided(supabase, entry))
