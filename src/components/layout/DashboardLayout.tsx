@@ -13,6 +13,7 @@ import { MissionSoundNotifier } from "@/components/layout/MissionSoundNotifier";
 import { useMissionSound } from "@/hooks/useMissionSound";
 import { SellerReminderNotifier } from "@/components/layout/SellerReminderNotifier";
 import { unlockReminderAudio } from "@/lib/reminderSound";
+import PatchNoteFab from "@/components/ui/PatchNoteFab";
 
 function ScrollRestorer() {
   const pathname = usePathname();
@@ -85,6 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
 
         <SellerReminderNotifier userId={soundUserId} />
+        <PatchNoteFab />
 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile topbar */}
