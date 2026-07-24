@@ -259,6 +259,13 @@ export const SERVICE_TEKNISI_ROLES: UserRole[] = [
 
 export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PURCHASING"];
 
+// PURCHASING boleh lihat & input cashflow, tapi tidak boleh audit uang keluar.
+export const CASHFLOW_AUDIT_OUT_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
+
+// Tidak ada role SUPERADMIN di sistem ini — ADMIN & PROGRAMMER dipakai sebagai
+// pemegang akses penuh yang boleh mengatur whitelist akun audit uang keluar.
+export const CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
+
 export const CC_REPORT_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING", "KONTEN",
 ];
@@ -457,6 +464,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/customer-birthdays": [...ALL_ROLES],
   "/api/transaction/customer-birthdays": [...ALL_ROLES],
   "/api/cashflow": [...CASHFLOW_ROLES],
+  "/api/cashflow/audit-access": [...CASHFLOW_ROLES],
 
   "/dashboard/missions": [...ALL_ROLES],
   "/dashboard/missions/progress": [...ALL_ROLES],
@@ -609,6 +617,7 @@ export const PERMISSIONS = {
   VIEW_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
   MANAGE_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
   AUDIT_CASHFLOW: [...CASHFLOW_ROLES] as UserRole[],
+  MANAGE_CASHFLOW_AUDIT_ACCESS: [...CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES] as UserRole[],
 
   // ── Content Creator ─────────────────────────────────────────────────────────
   VIEW_CC_REPORT: [...CC_REPORT_ROLES] as UserRole[],
