@@ -36,8 +36,8 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     const url = new URL(req.url);
     const status = url.searchParams.get("status") ?? "ALL";
     const search = url.searchParams.get("search")?.trim() ?? "";
-    const from = url.searchParams.get("from");          
-    const to = url.searchParams.get("to");               
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
     const pageParam = url.searchParams.get("page");
     const limitParam = url.searchParams.get("limit");
 
@@ -73,6 +73,7 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
         `order_number.ilike.%${s}%`,
         `customer_name.ilike.%${s}%`,
         `customer_phone.ilike.%${s}%`,
+        `received_by_name.ilike.%${s}%`,
       ];
       if (snIds.length > 0) ors.push(`id.in.(${snIds.join(",")})`);
       query = query.or(ors.join(","));
