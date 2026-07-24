@@ -43,8 +43,17 @@ export default function AkuntansiTabs({ period }: { period: string }) {
     try {
       const res = await fetch(`/api/akutansi/export?period=${period}`);
       if (!res.ok) {
-        const json = await res.json().catch(() => null);
-        throw new Error(json?.message ?? "Gagal export akuntansi");
+        const rawText = await res.text().catch(() => "");
+        let json: any = null;
+        try { json = rawText ? JSON.parse(rawText) : null; } catch { /* bukan JSON */ }
+        console.error("[export akutansi] gagal:", {
+          status: res.status,
+          statusText: res.statusText,
+          body: rawText,
+        });
+        throw new Error(
+          json?.message ?? `Gagal export akuntansi (${res.status} ${res.statusText})`
+        );
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -130,8 +139,8 @@ export default function AkuntansiTabs({ period }: { period: string }) {
             >
               <span
                 className={`ledger-tab-shape absolute inset-0 transition-colors duration-200 ${active
-                    ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] shadow-lg shadow-black/20"
-                    : "bg-white border border-gray-200 hover:bg-gray-50"
+                  ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] shadow-lg shadow-black/20"
+                  : "bg-white border border-gray-200 hover:bg-gray-50"
                   }`}
               />
               <span
