@@ -28,6 +28,17 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
+    // ── Gate kepemilikan: hanya sales yang MEMBUAT transaksi ini yang boleh FU/Lunas ──
+    if (transaction.sales_id !== user.id) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Hanya sales yang membuat transaksi ini yang bisa menyelesaikan pembayaran.",
+        },
+        { status: 403 }
+      );
+    }
+
     // ── Gate kepemilikan: hanya sales yang MEMBUAT transaksi ini yang boleh FU ──
     if (transaction.sales_id !== user.id) {
       return NextResponse.json(
