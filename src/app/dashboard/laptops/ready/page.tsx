@@ -562,22 +562,7 @@ function ReadyContent() {
 
                                                     <td className="px-4 py-3.5 whitespace-nowrap">
                                                         <div className="flex items-center justify-end gap-1.5">
-                                                            {isAvailable && canCreateTx && (
-                                                                <>
-                                                                    <button
-                                                                        onClick={() => setReserveTarget({ unit, type: "RESERVED" })}
-                                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition active:scale-95"
-                                                                    >
-                                                                        <Lock size={12} /> DP
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setReserveTarget({ unit, type: "HELD" })}
-                                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition active:scale-95"
-                                                                    >
-                                                                        <Package size={12} /> Ambil
-                                                                    </button>
-                                                                </>
-                                                            )}
+                                                            {/* DP / Ambil Dulu dipindah ke alur Payment Create — tidak lagi dari sini */}
                                                             {isPending && canConfirmTx && !confirmedUnitIds.has(unit.id) && (
                                                                 <button
                                                                     onClick={() => setConfirmTarget(unit)}
