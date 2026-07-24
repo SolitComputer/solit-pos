@@ -62,7 +62,7 @@ function PriceListPedagangContent() {
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
-  const [filterGrade, setFilterGrade] = useState("ALL");    
+  const [filterGrade, setFilterGrade] = useState("ALL");
   const [filterBrand, setFilterBrand] = useState("ALL");
 
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
@@ -198,7 +198,7 @@ function PriceListPedagangContent() {
       ws.getRow(headerRowNum).height = 30;
 
       // Ambil unit yang SIAP_JUAL (jika filter status ALL), atau ikuti filter status yang aktif
-      const unitsToExport = filterStatus === "ALL" 
+      const unitsToExport = filterStatus === "ALL"
         ? filtered.filter((u) => u.status === "SIAP_JUAL")
         : filtered;
 
@@ -321,6 +321,7 @@ function PriceListPedagangContent() {
       pedagang_price: number;
       siapJualCount: number;
       totalCount: number;
+      serialNumbers: string[];
     }>();
 
     filtered.forEach((u) => {
@@ -339,9 +340,12 @@ function PriceListPedagangContent() {
       const key = `${laptopId}_${pedagang_price}`;
 
       if (map.has(key)) {
-        const item = map.get(key)!;
+       const item = map.get(key)!;
         item.totalCount += 1;
-        if (u.status === "SIAP_JUAL") item.siapJualCount += 1;
+        if (u.status === "SIAP_JUAL") {
+          item.siapJualCount += 1;
+          item.serialNumbers.push(u.serial_number);
+        }
       } else {
         map.set(key, {
           laptopId: u.laptop?.id || "",
@@ -357,6 +361,7 @@ function PriceListPedagangContent() {
           pedagang_price,
           siapJualCount: u.status === "SIAP_JUAL" ? 1 : 0,
           totalCount: 1,
+          serialNumbers: u.status === "SIAP_JUAL" ? [u.serial_number] : [],
         });
       }
     });
@@ -369,143 +374,149 @@ function PriceListPedagangContent() {
   return (
     <div className="space-y-4">
 
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-gray-400 font-medium">
-            Harga referensi untuk pedagang — tidak memengaruhi transaksi/payment
-          </p>
-          <div className="flex items-center gap-2">
-            <button onClick={fetchData}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-50 transition">
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-              Refresh
-            </button>
-            <button onClick={exportToExcel} disabled={isExporting || filtered.length === 0}
-              className="inline-flex items-center gap-1.5 h-9 px-4 bg-gray-800 rounded-xl text-xs font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-gray-800/25">
-              <Download className="w-3.5 h-3.5" />
-              {isExporting ? "Mengexport..." : "Export Excel"}
-            </button>
-          </div>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-gray-400 font-medium">
+          Harga referensi untuk pedagang — tidak memengaruhi transaksi/payment
+        </p>
+        <div className="flex items-center gap-2">
+          <button onClick={fetchData}
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-500 hover:bg-gray-50 transition">
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+          <button onClick={exportToExcel} disabled={isExporting || filtered.length === 0}
+            className="inline-flex items-center gap-1.5 h-9 px-4 bg-gray-800 rounded-xl text-xs font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-gray-800/25">
+            <Download className="w-3.5 h-3.5" />
+            {isExporting ? "Mengexport..." : "Export Excel"}
+          </button>
         </div>
+      </div>
 
-        {accessError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
-            {accessError}
+      {accessError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
+          {accessError}
+        </div>
+      )}
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <StatCard label="Total Unit (difilter)" value={`${totals.count} unit`} icon={<Package size={16} className="text-gray-600" />} />
+        <StatCard label="Siap Jual" value={`${totals.siapJual} unit`} icon={<Tags size={16} className="text-emerald-600" />} />
+        <StatCard label="Total Nilai Pricelist" value={fmt(totals.value)} icon={<Wallet size={16} className="text-gray-600" />} />
+      </div>
+
+      {/* Filter */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+          <div className="relative sm:col-span-2">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+            <input type="text" placeholder="Cari nama, brand, CPU..." value={search} onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition" />
           </div>
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer">
+            <option value="ALL">Semua Status</option>
+            <option value="SIAP_JUAL">Siap Jual</option>
+            <option value="BELUM_SIAP">Belum Siap</option>
+            <option value="SERVICE">Service</option>
+            <option value="RESERVED">Dipesan</option>
+            <option value="HELD">Diambil Dulu</option>
+            <option value="PACKING">Packing</option>
+          </select>
+          <select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)}
+            className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer">
+            <option value="ALL">Semua Grade</option>
+            <option value="A">Grade A</option>
+            <option value="B">Grade B</option>
+            <option value="C">Grade C</option>
+          </select>
+          <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)}
+            className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer">
+            {uniqueBrands.map((b) => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
+          </select>
+        </div>
+        {hasActiveFilter && (
+          <button onClick={resetFilters}
+            className="h-8 px-3 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition">
+            Reset Filter
+          </button>
         )}
+      </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <StatCard label="Total Unit (difilter)" value={`${totals.count} unit`} icon={<Package size={16} className="text-gray-600" />} />
-          <StatCard label="Siap Jual" value={`${totals.siapJual} unit`} icon={<Tags size={16} className="text-emerald-600" />} />
-          <StatCard label="Total Nilai Pricelist" value={fmt(totals.value)} icon={<Wallet size={16} className="text-gray-600" />} />
+      {/* Table */}
+      {isLoading ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center text-sm text-gray-400">
+          Memuat data...
         </div>
-
-        {/* Filter */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3.5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-            <div className="relative sm:col-span-2">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-              </svg>
-              <input type="text" placeholder="Cari nama, brand, CPU..." value={search} onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition" />
-            </div>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-              className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer">
-              <option value="ALL">Semua Status</option>
-              <option value="SIAP_JUAL">Siap Jual</option>
-              <option value="BELUM_SIAP">Belum Siap</option>
-              <option value="SERVICE">Service</option>
-              <option value="RESERVED">Dipesan</option>
-              <option value="HELD">Diambil Dulu</option>
-              <option value="PACKING">Packing</option>
-            </select>
-            <select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)}
-              className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer">
-              <option value="ALL">Semua Grade</option>
-              <option value="A">Grade A</option>
-              <option value="B">Grade B</option>
-              <option value="C">Grade C</option>
-            </select>
-            <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)}
-              className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer">
-              {uniqueBrands.map((b) => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
-            </select>
-          </div>
-          {hasActiveFilter && (
-            <button onClick={resetFilters}
-              className="h-8 px-3 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition">
-              Reset Filter
-            </button>
-          )}
+      ) : groupedTableData.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
+          <p className="text-gray-700 font-bold text-base">Tidak ada unit ditemukan</p>
+          <p className="text-gray-400 text-sm mt-1.5">Coba ubah filter di atas</p>
         </div>
-
-        {/* Table */}
-        {isLoading ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center text-sm text-gray-400">
-            Memuat data...
-          </div>
-        ) : groupedTableData.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-20 text-center">
-            <p className="text-gray-700 font-bold text-base">Tidak ada unit ditemukan</p>
-            <p className="text-gray-400 text-sm mt-1.5">Coba ubah filter di atas</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100 text-gray-500">
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest w-10">No</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest">Product</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">CPU</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">RAM</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">HDD/SSD</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">Siap Jual</th>
-                    {canSeeModal && (
-                      <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Harga Modal</th>
-                    )}
-                    <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Price Store</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {groupedTableData.map((item, idx) => (
-                    <tr key={`${item.laptopId}_${idx}`} className="hover:bg-gray-50/60 transition">
-                      <td className="px-3 py-3.5 text-center text-xs font-semibold text-gray-400">{idx + 1}</td>
-                      <td className="px-4 py-3.5 min-w-[180px]">
-                        <p className="font-bold text-gray-900 text-[13px]">{item.product}</p>
-                        {item.brand && item.brand !== "—" && (
-                          <p className="text-[11px] text-gray-400 font-medium">{item.brand}</p>
-                        )}
-                      </td>
-                      <td className="px-3 py-3.5 text-center text-xs text-gray-700 font-medium whitespace-nowrap">{item.cpu}</td>
-                      <td className="px-3 py-3.5 text-center text-xs text-gray-700 font-medium whitespace-nowrap">{item.ram}</td>
-                      <td className="px-3 py-3.5 text-center text-xs text-gray-700 font-medium whitespace-nowrap">{item.storage}</td>
-                      <td className="px-3 py-3.5 text-center whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {item.siapJualCount}
-                        </span>
-                      </td>
-                      {canSeeModal && (
-                        <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                          <p className="text-xs text-gray-500 tabular-nums font-medium">{fmt(item.modal_price)}</p>
-                          <p className="text-[10px] text-gray-400">{item.tier_label}</p>
-                        </td>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-gray-500">
+                  <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest w-10">No</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest">Product</th>
+                  <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest">SN</th>
+                  <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">CPU</th>
+                  <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">RAM</th>
+                  <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">HDD/SSD</th>
+                  <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">Siap Jual</th>
+                  {canSeeModal && (
+                    <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Harga Modal</th>
+                  )}
+                  <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Price Store</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {groupedTableData.map((item, idx) => (
+                  <tr key={`${item.laptopId}_${idx}`} className="hover:bg-gray-50/60 transition">
+                    <td className="px-3 py-3.5 text-center text-xs font-semibold text-gray-400">{idx + 1}</td>
+                    <td className="px-4 py-3.5 min-w-[180px]">
+                      <p className="font-bold text-gray-900 text-[13px]">{item.product}</p>
+                      {item.brand && item.brand !== "—" && (
+                        <p className="text-[11px] text-gray-400 font-medium">{item.brand}</p>
                       )}
+                    </td>
+                    <td className="px-3 py-3.5 text-xs text-gray-600 font-mono max-w-[140px]">
+                      <span className="block truncate" title={item.serialNumbers.join(", ")}>
+                        {item.serialNumbers.join(", ")}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3.5 text-center text-xs text-gray-700 font-medium whitespace-nowrap">{item.cpu}</td>
+                    <td className="px-3 py-3.5 text-center text-xs text-gray-700 font-medium whitespace-nowrap">{item.ram}</td>
+                    <td className="px-3 py-3.5 text-center text-xs text-gray-700 font-medium whitespace-nowrap">{item.storage}</td>
+                    <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {item.siapJualCount}
+                      </span>
+                    </td>
+                    {canSeeModal && (
                       <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                        <span className="font-bold text-gray-900 text-sm tabular-nums">{fmt(item.pedagang_price)}</span>
+                        <p className="text-xs text-gray-500 tabular-nums font-medium">{fmt(item.modal_price)}</p>
+                        <p className="text-[10px] text-gray-400">{item.tier_label}</p>
                       </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/60 text-xs text-gray-400">
-              <span className="text-gray-700 font-bold">{groupedTableData.length}</span> tipe laptop ({totals.count} unit total)
-            </div>
+                    )}
+                    <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                      <span className="font-bold text-gray-900 text-sm tabular-nums">{fmt(item.pedagang_price)}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
+          <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/60 text-xs text-gray-400">
+            <span className="text-gray-700 font-bold">{groupedTableData.length}</span> tipe laptop ({totals.count} unit total)
+          </div>
+        </div>
+      )}
     </div>
   );
 }

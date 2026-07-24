@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasAnyRole } from "@/lib/permissions";
 import { LaptopsContent } from "../laptops/LaptopsContent";
@@ -89,7 +89,7 @@ export default function DataBarangPage() {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [rolesLoaded, setRolesLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("laptops");
-
+  const topRef = useRef<HTMLDivElement>(null);
   // ── Load roles
   useEffect(() => {
     const controller = new AbortController();
@@ -111,6 +111,12 @@ export default function DataBarangPage() {
       }
     })();
     return () => controller.abort();
+  }, []);
+
+  // ── Reset posisi scroll ke atas tiap kali halaman ini mount
+  // (fix: header hilang saat kembali dari halaman Units)
+  useEffect(() => {
+    topRef.current?.scrollIntoView({ block: "start" });
   }, []);
 
   // ── Deep-link: baca ?tab= dari URL
@@ -147,7 +153,7 @@ export default function DataBarangPage() {
   return (
     <DashboardLayout>
       {/* ── PAGE HEADER — scrolls away normally ───────────────── */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden mb-0">
+      <div ref={topRef} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden mb-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 gap-3 sm:gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 sm:w-9 sm:h-9 bg-gray-900 rounded-[10px] flex items-center justify-center flex-shrink-0 shadow-md">

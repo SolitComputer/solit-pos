@@ -174,25 +174,22 @@ function ReadyContent() {
     const [isLoading, setIsLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
-    const [salesName, setSalesName] = useState("");
 
     const [search, setSearch] = useState("");
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterGrade, setFilterGrade] = useState("ALL");
 
     const [alertMsg, setAlertMsg] = useState<string | null>(null);
-    const [reserveTarget, setReserveTarget] = useState<{ unit: LaptopUnit; type: "RESERVED" | "HELD" } | null>(null);
     const [confirmTarget, setConfirmTarget] = useState<LaptopUnit | null>(null);
     const [confirmedUnitIds, setConfirmedUnitIds] = useState<Set<string>>(new Set());
 
     const isPKL = userRole ? (userRole === "PKL" || userRole.startsWith("PKL_") || userRole.startsWith("PKL-")) : false;
-    const canCreateTx = userRole ? hasPermission(userRole, PERMISSIONS.RESERVE_UNIT) && !isPKL : false;
     const canConfirmTx = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) && !isPKL : false;
 
     useEffect(() => {
         fetch("/api/auth/me")
             .then(r => r.json())
-            .then(r => { setUserRole(r.user?.role ?? null); setSalesName(r.user?.name ?? ""); })
+            .then(r => setUserRole(r.user?.role ?? null))
             .catch(() => setUserRole(null));
     }, []);
 
@@ -614,16 +611,6 @@ function ReadyContent() {
             {/* ── Modals ─────────────────────────────────────────────────── */}
             {alertMsg && <AlertModal message={alertMsg} onClose={() => setAlertMsg(null)} />}
 
-            {reserveTarget && (
-                <ReserveModal
-                    unit={reserveTarget.unit}
-                    type={reserveTarget.type}
-                    salesName={salesName}
-                    onClose={() => setReserveTarget(null)}
-                    onSuccess={() => { setAlertMsg("Berhasil disimpan"); fetchUnits(); }}
-                />
-            )}
-
             {confirmTarget && (
                 <ConfirmPaymentModal
                     unit={confirmTarget}
@@ -644,198 +631,6 @@ export default function ReadyPage() {
         <DashboardLayout>
             <ReadyContent />
         </DashboardLayout>
-    );
-}
-
-// ─── ReserveModal ─────────────────────────────────────────────────────────────
-function ReserveModal({ unit, type, salesName, onClose, onSuccess }: {
-    unit: LaptopUnit; type: "RESERVED" | "HELD"; salesName: string;
-    onClose: () => void; onSuccess: () => void;
-}) {
-    const isDP = type === "RESERVED";
-    const [form, setForm] = useState({
-        customer_name: "",
-        customer_phone: "",
-        company_name: "Solit",
-        dp_amount: "",
-        deal_price: String(unit.selling_price || ""),
-        payment_method: "TRANSFER",
-        source_platform: "",
-        notes: "",
-        software_request: "",
-        pickup_method: "COD",
-        pickup_date: "",
-        pickup_time: "",
-        pickup_location: "",
-    });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-
-    useEffect(() => {
-        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-        window.addEventListener("keydown", h);
-        return () => window.removeEventListener("keydown", h);
-    }, [onClose]);
-
-    const set = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-        setForm(p => ({ ...p, [e.target.name]: e.target.value }));
-
-    const handleSubmit = async (e?: React.FormEvent) => {
-        e?.preventDefault();
-        if (!form.customer_name.trim()) { setError("Nama pelanggan wajib diisi"); return; }
-        if (isDP && !form.dp_amount) { setError("Jumlah DP wajib diisi"); return; }
-        if (!form.deal_price) { setError("Harga deal wajib diisi"); return; }
-        setLoading(true); setError("");
-        try {
-            const res = await fetch("/api/units/reserve", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    unit_id: unit.id,
-                    type,
-                    customer_name: form.customer_name.trim(),
-                    customer_phone: form.customer_phone.trim() || null,
-                    company_name: form.company_name.trim() || null,
-                    dp_amount: isDP ? Number(form.dp_amount) : undefined,
-                    deal_price: Number(form.deal_price),
-                    payment_method: form.payment_method,
-                    source_platform: form.source_platform || null,
-                    notes: form.notes || null,
-                    sales_name: salesName,
-                    software_request: form.software_request || null,
-                    pickup_method: form.pickup_method || null,
-                    pickup_date: form.pickup_date || null,
-                    pickup_time: form.pickup_time || null,
-                    pickup_location: form.pickup_location || null,
-                }),
-            });
-            const result = await res.json();
-            if (!result.success) { setError(result.message || "Gagal"); return; }
-            onSuccess(); onClose();
-        } catch { setError("Terjadi kesalahan koneksi"); }
-        finally { setLoading(false); }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-fadeIn">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[94dvh] overflow-hidden animate-slideUp">
-
-                <div className={`px-5 py-4 flex-shrink-0 ${isDP ? "bg-gray-800" : "bg-gray-700"} text-white`}>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">{isDP ? <Lock size={20} /> : <Package size={20} />}</div>
-                            <div>
-                                <h2 className="font-bold text-base">{isDP ? "Pesanan DP" : "Ambil Dulu"}</h2>
-                                <p className="text-xs text-white/70 mt-0.5">{isDP ? "Unit dikunci, pembayaran sebagian" : "Barang dibawa, pembayaran menyusul"}</p>
-                            </div>
-                        </div>
-                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </div>
-                </div>
-
-                <div className="px-5 pt-4 pb-0 flex-shrink-0">
-                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-gray-800 truncate">{unit.laptop?.laptop_name || "—"}</p>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                <code className="text-[11px] font-mono bg-gray-100 px-2 py-0.5 rounded-md text-gray-700">SN: {unit.serial_number}</code>
-                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${GRADE_BADGE[unit.grade] || ""}`}>Grade {unit.grade}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-5 py-4 space-y-4 overscroll-contain">
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2.5 rounded-xl flex items-center gap-2">
-                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
-                            {error}
-                        </div>
-                    )}
-                    <div>
-                        <label className={labelCls}>Nama Pelanggan / Reseller <span className="text-red-400">*</span></label>
-                        <input name="customer_name" value={form.customer_name} onChange={set} placeholder="Nama lengkap..." autoFocus className={inputCls} required />
-                    </div>
-                    <div>
-                        <label className={labelCls}>No. WhatsApp</label>
-                        <input name="customer_phone" value={form.customer_phone} onChange={set} placeholder="08xxxxxxxxxx" className={inputCls} />
-                    </div>
-                    <div className={`grid gap-3 ${isDP ? "grid-cols-2" : "grid-cols-1"}`}>
-                        <div>
-                            <label className={labelCls}>Harga Deal (Rp) <span className="text-red-400">*</span></label>
-                            <input name="deal_price" type="number" value={form.deal_price} onChange={set} placeholder={String(unit.selling_price)} className={inputCls} required />
-                        </div>
-                        {isDP && (
-                            <div>
-                                <label className={labelCls}>Jumlah DP (Rp) <span className="text-red-400">*</span></label>
-                                <input name="dp_amount" type="number" value={form.dp_amount} onChange={set} placeholder="Nominal DP..." className={inputCls} required />
-                            </div>
-                        )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className={labelCls}>Metode Pembayaran</label>
-                            <select name="payment_method" value={form.payment_method} onChange={set} className={inputCls}>
-                                <option value="TRANSFER">Transfer</option>
-                                <option value="TUNAI">Tunai</option>
-                                <option value="QRIS">QRIS</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className={labelCls}>Sumber / Platform</label>
-                            <select name="source_platform" value={form.source_platform} onChange={set} className={inputCls}>
-                                <option value="">— Pilih —</option>
-                                <option value="WhatsApp">WhatsApp</option>
-                                <option value="Shopee">Shopee</option>
-                                <option value="Tokopedia">Tokopedia</option>
-                                <option value="Facebook">Facebook</option>
-                                <option value="COD">COD</option>
-                                <option value="Lainnya">Lainnya</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className={labelCls}>Metode Pengambilan</label>
-                            <select name="pickup_method" value={form.pickup_method} onChange={set} className={inputCls}>
-                                <option value="COD">COD</option>
-                                <option value="DATANG">Datang Langsung</option>
-                                <option value="PENGIRIMAN">Pengiriman</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className={labelCls}>Tanggal Ambil</label>
-                            <input name="pickup_date" type="date" value={form.pickup_date} onChange={set} className={inputCls} />
-                        </div>
-                    </div>
-                    <div>
-                        <label className={labelCls}>Request Software</label>
-                        <input name="software_request" value={form.software_request} onChange={set} placeholder="e.g. Office, Windows 11..." className={inputCls} />
-                    </div>
-                    <div>
-                        <label className={labelCls}>Catatan</label>
-                        <input name="notes" value={form.notes} onChange={set} placeholder="Catatan tambahan..." className={inputCls} />
-                    </div>
-                </form>
-
-                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0 bg-white">
-                    <button type="button" onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
-                    <button type="button" onClick={() => handleSubmit()} disabled={loading}
-                        className={`flex-1 h-11 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md ${isDP ? "bg-gray-800 hover:bg-gray-900" : "bg-gray-700 hover:bg-gray-800"}`}>
-                        {loading
-                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
-                            : isDP ? "Kunci Unit (DP)" : "Konfirmasi Ambil"
-                        }
-                    </button>
-                </div>
-            </div>
-        </div>
     );
 }
 
