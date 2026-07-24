@@ -176,6 +176,9 @@ export default function CreatePaymentPage() {
     const [sellerType, setSellerType] = useState<"USER" | "PEDAGANG">("USER");
     const [customerBirthDate, setCustomerBirthDate] = useState("");
 
+    const [paymentFlow, setPaymentFlow] = useState<"PENDING" | "DIRECT" | null>(null);
+    const [pendingSubType, setPendingSubType] = useState<"ECOMMERCE" | "DP_AMBIL" | null>(null);
+    const [dpAmount, setDpAmount] = useState<number>(0); // 0 = Ambil Dulu, >0 = DP
 
     const { register, handleSubmit, watch, setValue, formState: { errors } } =
         useForm<CreatePaymentType, any, CreatePaymentType>({
@@ -727,8 +730,40 @@ export default function CreatePaymentPage() {
                     <input type="hidden" {...register("unit_id" as any)} />
                     <input type="hidden" {...register("customer_type")} />
 
+                    {!paymentFlow && (
+                        <div className="space-y-3">
+                            <p className="text-xs text-gray-500 text-center">Pilih jenis payment</p>
+                            <button type="button" onClick={() => { setPaymentFlow("DIRECT"); setIsEcommerce(false); }}
+                                className="w-full p-4 rounded-xl border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition text-left">
+                                <p className="text-sm font-bold text-gray-800">Payment Transaksi</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Langsung lunas, tanpa pending</p>
+                            </button>
+                            <button type="button" onClick={() => setPaymentFlow("PENDING")}
+                                className="w-full p-4 rounded-xl border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition text-left">
+                                <p className="text-sm font-bold text-gray-800">Payment Pending</p>
+                                <p className="text-xs text-gray-400 mt-0.5">E-Commerce, DP, atau Ambil Dulu</p>
+                            </button>
+                        </div>
+                    )}
+
+                    {paymentFlow === "PENDING" && !pendingSubType && (
+                        <div className="space-y-3">
+                            <button type="button" onClick={() => setPaymentFlow(null)} className="text-xs text-gray-400">&larr; Kembali</button>
+                            <button type="button" onClick={() => { setPendingSubType("ECOMMERCE"); setIsEcommerce(true); }}
+                                className="w-full p-4 rounded-xl border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition text-left">
+                                <p className="text-sm font-bold text-gray-800">E-Commerce</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Shopee / Tokopedia / TikTok / dll</p>
+                            </button>
+                            <button type="button" onClick={() => { setPendingSubType("DP_AMBIL"); setIsEcommerce(false); }}
+                                className="w-full p-4 rounded-xl border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition text-left">
+                                <p className="text-sm font-bold text-gray-800">DP / Ambil Dulu</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Isi nominal 0 untuk Ambil Dulu</p>
+                            </button>
+                        </div>
+                    )}
+
                     {/* ──────────────────────── STEP 1: Data Pembeli ─────────────────── */}
-                    {step === 1 && (
+                    {step === 1 && (paymentFlow === "DIRECT" || pendingSubType) && (
                         <>
                             <input type="text" placeholder="Atas Nama *" className={inputClass} {...register("customer_name")} />
                             <div>
