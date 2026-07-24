@@ -277,7 +277,7 @@ const ADMIN_TRANSAKSI: MenuGroup = {
   label: "Transaksi",
   items: [
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+    { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
@@ -312,7 +312,7 @@ const SALES_TRANSAKSI: MenuGroup = {
   items: [
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+    { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     ITEM_MANAGEMENT_SELLER,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
@@ -323,7 +323,7 @@ const PENGANTARAN_TRANSAKSI: MenuGroup = {
   items: [
     { name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat },
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
-    { name: "DP & Ambil Dulu", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+    { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
