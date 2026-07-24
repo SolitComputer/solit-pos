@@ -281,8 +281,8 @@ export async function GET(
       <div class="sig-block">
         <div class="sig-city-date">Depok, ${today}</div>
         <div class="sig-line"></div>
-        <div class="sig-name">Herliana Agustina</div>
-        <div class="sig-title">Finance Purchasing</div>
+        <div class="sig-name">Yoga Adi Prakoso</div>
+        <div class="sig-title">Finance</div>
       </div>
     </div>
 
