@@ -63,6 +63,7 @@ export default function FaceVerifyPage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const holdCountRef = useRef(0);
   const isCapturingRef = useRef(false);
+  const isDetectingRef = useRef(false);
   const logEndRef = useRef<HTMLDivElement>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptsRef = useRef(0);
@@ -294,6 +295,7 @@ export default function FaceVerifyPage() {
     streamRef.current = null;
     holdCountRef.current = 0;
     isCapturingRef.current = false;
+    isDetectingRef.current = false;
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -338,6 +340,23 @@ export default function FaceVerifyPage() {
     return det ? Array.from(det.descriptor) : null;
   }, []);
 
+  const captureAveragedEmbedding = useCallback(async (samples = 3): Promise<number[] | null> => {
+    const collected: number[][] = [];
+    for (let i = 0; i < samples; i++) {
+      const emb = await captureEmbedding();
+      if (emb) collected.push(emb);
+      await new Promise(res => setTimeout(res, 60));
+    }
+    if (collected.length === 0) return null;
+    const dims = collected[0].length;
+    const avg = new Array(dims).fill(0);
+    for (const emb of collected) {
+      for (let d = 0; d < dims; d++) avg[d] += emb[d];
+    }
+    for (let d = 0; d < dims; d++) avg[d] /= collected.length;
+    return avg;
+  }, [captureEmbedding]);
+
   const doVerify = useCallback(async (embedding: number[], attempt: number, coords: GpsCoords | null) => {
     const res = await fetch("/api/auth/face-verify", {
       method: "POST",
@@ -356,9 +375,11 @@ export default function FaceVerifyPage() {
     if (intervalRef.current) clearInterval(intervalRef.current);
     holdCountRef.current = 0;
     isCapturingRef.current = false;
+    isDetectingRef.current = false; // ✅ NEW
 
     intervalRef.current = setInterval(async () => {
-      if (!videoRef.current || !canvasRef.current || isCapturingRef.current) return;
+      if (!videoRef.current || !canvasRef.current || isCapturingRef.current || isDetectingRef.current) return;
+      isDetectingRef.current = true;
       try {
         const detections = await faceapi
           .detectAllFaces(
@@ -402,7 +423,7 @@ export default function FaceVerifyPage() {
             holdCountRef.current = 0;
             setHoldProgress(0);
 
-            const embedding = await captureEmbedding();
+            const embedding = await captureAveragedEmbedding(mode === "enroll" ? 4 : 3);
             if (!embedding) { isCapturingRef.current = false; return; }
 
             if (mode === "enroll") {
@@ -483,10 +504,12 @@ export default function FaceVerifyPage() {
         }
       } catch (err) {
         console.error("Detection loop error:", err);
+      } finally {
+        isDetectingRef.current = false; // ✅ NEW
       }
     }, 150);
-  }, [addLog, captureEmbedding, doVerify, redirectTo, userShift]);
-
+  }, [addLog, captureEmbedding, captureAveragedEmbedding, doVerify, redirectTo, userShift]);
+  
   useEffect(() => {
     if (stage === "enroll" || stage === "verify") {
       startCamera().then(result => {
