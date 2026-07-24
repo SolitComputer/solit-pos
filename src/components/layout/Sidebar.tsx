@@ -98,58 +98,57 @@ interface MenuGroup {
 }
 
 const Icons = {
-  dashboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>),
-  attendance: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2" /></svg>),
-  overtime: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>),
-  riwayat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>),
-  laptop: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>),
-  garansi: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>),
-  payment: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>),
-  scanner: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M4 7V5a1 1 0 011-1h2" /><path d="M20 7V5a1 1 0 00-1-1h-2" /><path d="M4 17v2a1 1 0 001 1h2" /><path d="M20 17v2a1 1 0 01-1 1h-2" /><path d="M7 12h10" /></svg>),
-  logout: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>),
-  log: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>),
-  loginLog: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" /></svg>),
-  reports: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" /></svg>),
-  laptopReady: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 12l2 2 4-4" /><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>),
-  laptopMinus: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 9v4m0 4h.01" /><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>),
-  pendingOrders: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" ry="1" /><path d="M9 12h6M9 16h4" /></svg>),
-  users: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>),
-  leaderboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8" /><path d="M12 17v4" /><path d="M7 4h10l1 7H6l1-7z" /><path d="M6 11v6a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-6" /></svg>),
-  code: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></svg>),
-  serviceQueue: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" /></svg>),
-  serviceDone: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="20 6 9 17 4 12" /></svg>),
-  serviceHistory: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1021 12a9 9 0 00-8.83 7.5" /></svg>),
-  pklReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><path d="M9 13h6M9 17h4M9 9h1" /></svg>),
-  accessories: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" /><path d="M8 12h.01M12 12h.01M16 12h.01" /></svg>),
-  barang: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg>),
-  allUnits: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 2 2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg>),
-  monitorChat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>),
-  cashflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>),
-  managementSeller: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3z" /><path d="M8 11c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3z" /><path d="M8 13c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /><path d="M16 13c-.29 0-.62.02-.97.05C16.19 13.89 17 15.02 17 16.35V19h7v-2c0-2.66-5.33-4-8-4z" /></svg>),
-  deliveryRoute: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" /><path d="M8 19h7a3 3 0 003-3v-6M16 5H9a3 3 0 00-3 3v6" /></svg>),
-  notifSound: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M15.536 8.464a5 5 0 010 7.072M17.5 5.5a9 9 0 010 13M6 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h2l4-4v14l-4-4z" /></svg>),
-  missions: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>),
-  ccReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>),
-  missionDashboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></svg>),
-  missionProgress: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>),
-  missionHistory: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1 0 21 12a9 9 0 0 0-8.83 7.5" /><polyline points="12 8 12 12 15 14" /></svg>),
-  customerBirthday: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M20 21v-2a4 4 0 00-3-3.87M4 21v-2a4 4 0 013-3.87" /><path d="M16 3.13a4 4 0 010 7.75M8 3.13a4 4 0 000 7.75" /><path d="M12 17v4M10 21h4" /></svg>),
-  employeeBirthday: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M6 21v-8h12v8" /><path d="M4 21h16" /><path d="M12 13V9" /><path d="M12 6a2 2 0 100-4 2 2 0 000 4z" /><path d="M8 9h8" /></svg>),
-  leadsChat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" /></svg>),
-  salesResult: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>),
-  missionAll: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 9l9-6 9 6-9 6-9-6z" /><path d="M3 15l9 6 9-6" /><path d="M3 12l9 6 9-6" /></svg>),
-  todo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>),
-  accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" /><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" /></svg>),
+  dashboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="8" height="8" rx="2" /><rect x="13" y="3" width="8" height="8" rx="2" /><rect x="3" y="13" width="8" height="8" rx="2" /><rect x="13" y="13" width="8" height="8" rx="2" /></svg>),
+  attendance: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><path d="M9 14.5l2 2 4-4.5" /></svg>),
+  overtime: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>),
+  riwayat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z" /><path d="M14 3v5h5" /><path d="M8.5 13h7M8.5 17h7" /></svg>),
+  laptop: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M2 20h20" /></svg>),
+  garansi: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.5l7.5 3v6c0 5-3.2 8.7-7.5 10-4.3-1.3-7.5-5-7.5-10v-6z" /><path d="M9 12l2 2 4-4.5" /></svg>),
+  payment: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /><path d="M6 15h4" /></svg>),
+  scanner: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V6a2 2 0 012-2h2" /><path d="M16 4h2a2 2 0 012 2v2" /><path d="M20 16v2a2 2 0 01-2 2h-2" /><path d="M8 20H6a2 2 0 01-2-2v-2" /><path d="M4 12h16" /></svg>),
+  logout: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H6a2 2 0 01-2-2V5a2 2 0 012-2h3" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>),
+  log: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3a1 1 0 011-1h4a1 1 0 011 1v1" /><path d="M9 13l2 2 4-4.5" /></svg>),
+  loginLog: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 21h3a2 2 0 002-2V5a2 2 0 00-2-2h-3" /><path d="M8 17l-5-5 5-5" /><path d="M3 12h12" /></svg>),
+  reports: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v16a2 2 0 002 2h16" /><rect x="7" y="13" width="3" height="5" rx="0.5" /><rect x="12" y="9" width="3" height="9" rx="0.5" /><rect x="17" y="6" width="3" height="12" rx="0.5" /></svg>),
+  laptopReady: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M2 20h20" /><path d="M9 10l2 2 4-4" /></svg>),
+  laptopMinus: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M2 20h20" /><path d="M9 10h6" /></svg>),
+  pendingOrders: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l2 3h6l2-3h4" /><path d="M5.5 5h13l2.5 7v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6z" /></svg>),
+  users: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" /><circle cx="9" cy="8" r="4" /><path d="M22.5 21v-2a4 4 0 00-3-3.87" /><path d="M16.5 3.2a4 4 0 010 7.6" /></svg>),
+  leaderboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4h10v5a5 5 0 01-10 0z" /><path d="M7 5H4.5a2 2 0 000 4H7M17 5h2.5a2 2 0 010 4H17" /><path d="M12 14v3" /><path d="M8 21h8" /></svg>),
+  code: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l-6-6 6-6" /><path d="M15 6l6 6-6 6" /></svg>),
+  serviceQueue: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.7 2.7-2-2z" /></svg>),
+  serviceDone: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>),
+  serviceHistory: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.4" /><path d="M3 4v4.5H7.5" /><path d="M12 8v4l3 2" /></svg>),
+  pklReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6l4 4v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z" /><path d="M14 3v4h4" /><circle cx="12" cy="13" r="1.8" /><path d="M9 18c0-1.7 1.3-3 3-3s3 1.3 3 3" /></svg>),
+  accessories: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="6.5" cy="6.5" r="1.4" /><circle cx="12" cy="6.5" r="1.4" /><circle cx="17.5" cy="6.5" r="1.4" /><circle cx="6.5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="17.5" cy="12" r="1.4" /><circle cx="6.5" cy="17.5" r="1.4" /><circle cx="12" cy="17.5" r="1.4" /><circle cx="17.5" cy="17.5" r="1.4" /></svg>),
+  barang: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" /><path d="M4 7.5l8 4.5 8-4.5" /><path d="M12 12v9" /></svg>),
+  allUnits: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></svg>),
+  monitorChat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z" /><circle cx="12" cy="12" r="3" /></svg>),
+  cashflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h13" /><path d="M13 3l4 4-4 4" /><path d="M20 17H7" /><path d="M11 21l-4-4 4-4" /></svg>),
+  managementSeller: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2" /><path d="M3 20a6 6 0 0112 0" /><circle cx="17.5" cy="9.5" r="2.3" /><path d="M15.5 20a5 5 0 016.5-3.8" /></svg>),
+  deliveryRoute: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="19" r="2.2" /><circle cx="18" cy="5" r="2.2" /><path d="M8 19h6a3 3 0 003-3V9M16 5H10a3 3 0 00-3 3v3" /></svg>),
+  notifSound: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15V9h4l5-4v14l-5-4H4z" /><path d="M17 8.5a5 5 0 010 7" /><path d="M19.5 6a8 8 0 010 12" /></svg>),
+  missions: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v18" /><path d="M6 4h11l-2.5 4L17 12H6" /></svg>),
+  ccReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="15" height="14" rx="2" /><path d="M17 9l5-3v12l-5-3" /></svg>),
+  missionDashboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></svg>),
+  missionProgress: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 8-5-16-3 8H2" /></svg>),
+  missionHistory: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 109-9 9 9 0 00-7 3.4" /><path d="M3 4v4.5H7.5" /><path d="M12 7.5v5l3.5 2" /></svg>),
+  customerBirthday: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 21v-7a2 2 0 012-2h12a2 2 0 012 2v7" /><path d="M2 21h20" /><path d="M12 12V7" /><circle cx="12" cy="5.5" r="1.5" /><path d="M4 17c1 1 2 1 3 0s2-1 3 0 2 1 3 0 2-1 3 0 2 1 3 0" /></svg>),
+  employeeBirthday: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="9" width="18" height="12" rx="1.5" /><path d="M3 13h18" /><path d="M12 9v12" /><path d="M12 9c-1.8 0-3.2-1.2-3.2-2.7S9.5 4 12 6c2.5-2 3.2-.2 3.2 1.3S13.8 9 12 9z" /></svg>),
+  leadsChat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 01-8.9 8.4 8.7 8.7 0 01-3.5-.8L3 21l1.9-5.4a8.4 8.4 0 01-.8-3.6A8.4 8.4 0 0112.5 3a8.4 8.4 0 018.5 8.5z" /></svg>),
+  salesResult: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8" /><path d="M15 6h6v6" /></svg>),
+  missionAll: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 6l1.5 1.5L9 5" /><path d="M12 6h9" /><path d="M5 12l1.5 1.5L9 11" /><path d="M12 12h9" /><path d="M5 18l1.5 1.5L9 17" /><path d="M12 18h9" /></svg>),
+  todo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="6" height="6" rx="1.2" /><path d="M4.5 7l1.2 1.2L7.5 6" /><rect x="3" y="14" width="6" height="6" rx="1.2" /><path d="M4.5 17l1.2 1.2L7.5 16" /><path d="M12 6h9M12 17h9" /></svg>),
+  accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4.5c2.5-1 5.5-1 8 .3v14c-2.5-1.3-5.5-1.3-8-.3z" /><path d="M22 4.5c-2.5-1-5.5-1-8 .3v14c2.5-1.3 5.5-1.3 8-.3z" /></svg>),
 };
 
-// ── Shared items ──────────────────────────────────────────────────────────────
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
 const ITEM_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance };
 const ITEM_LEMBUR: MenuItem = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
 const ITEM_USERS: MenuItem = { name: "Management User", href: "/dashboard/users", icon: Icons.users };
 const ITEM_PKL_REPORT: MenuItem = { name: "Laporan Kerja PKL", href: "/dashboard/pkl-reports", icon: Icons.pklReport };
 const ITEM_ACCESSORIES: MenuItem = { name: "Data Aksesori", href: "/dashboard/accessories", icon: Icons.accessories };
-const ITEM_ALL_UNITS: MenuItem = { name: "Terjual", href: "/dashboard/units", icon: Icons.allUnits };
+const ITEM_ALL_UNITS: MenuItem = { name: "Barang Terjual", href: "/dashboard/units", icon: Icons.allUnits };
 const ITEM_MANAGEMENT_SELLER: MenuItem = { name: "Management Seller", href: "/dashboard/management-seller", icon: Icons.managementSeller };
 const ITEM_MISSIONS: MenuItem = { name: "Misi Pekerjaan", href: "/dashboard/missions", icon: Icons.missions };
 const ITEM_CASHFLOW: MenuItem = { name: "Cashflow", href: "/dashboard/cashflow", icon: Icons.cashflow };
@@ -158,7 +157,6 @@ const ITEM_CUSTOMER_BIRTHDAY: MenuItem = { name: "Ultah Customer", href: "/dashb
 const ITEM_TODOS: MenuItem = { name: "To-Do List", href: "/dashboard/todos", icon: Icons.todo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 
-// ── Item baru untuk grup hasil rombakan ──────────────────────────────────────
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
 const ITEM_LAPORAN_KEUANGAN: MenuItem = { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports };
@@ -170,14 +168,14 @@ const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboar
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
 const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang?tab=laptops", icon: Icons.barang };
-const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
-const ITEM_LAPTOP_MINUS: MenuItem = { name: "Laptop Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
+const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Barang Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
+const ITEM_LAPTOP_MINUS: MenuItem = { name: "Barang Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LEADERBOARD_PEKERJAAN: MenuItem = { name: "Leaderboard Pekerjaan", href: "/dashboard/missions/leaderboard", icon: Icons.leaderboard };
 
-// ── Grup baru (pengganti Overview & Monitoring CEO) ──────────────────────────
 const GROUP_ABSENSI: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_LEMBUR] };
+const GROUP_ABSENSI_WITH_PKL: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT] };
 const GROUP_LOG: MenuGroup = { label: "Log", items: [ITEM_LOG_LOGIN, ITEM_LOG_AKTIVITAS] };
-const GROUP_LAPORAN: MenuGroup = { label: "Laporan", items: [ITEM_LAPORAN_KEUANGAN, ITEM_CASHFLOW, ITEM_AKUNTANSI, ITEM_PKL_REPORT] };
+const GROUP_KEUANGAN: MenuGroup = { label: "Keuangan", items: [ITEM_LAPORAN_KEUANGAN, ITEM_CASHFLOW, ITEM_AKUNTANSI] };
 const GROUP_MANAGEMENT: MenuGroup = { label: "Management", items: [ITEM_USERS, ITEM_MANAGEMENT_SELLER, ITEM_MONITOR_CHAT] };
 const GROUP_MARKETING: MenuGroup = { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT, ITEM_HASIL_PENJUALAN] };
 const GROUP_ULTAH: MenuGroup = { label: "Ultah", items: [ITEM_CUSTOMER_BIRTHDAY, ITEM_ULTAH_KARYAWAN] };
@@ -254,14 +252,13 @@ const ADMIN_PENGANTARAN_MENU: MenuGroup = {
   ],
 };
 
-// ── Grup inti admin-level (pengganti ADMIN_OVERVIEW) ─────────────────────────
 const ADMIN_UTAMA: MenuGroup = {
   label: "Utama",
   items: [ITEM_DASHBOARD, ITEM_LEADERBOARD_PEKERJAAN, ITEM_TODOS],
 };
 
 const ADMIN_CORE_GROUPS: MenuGroup[] = [
-  ADMIN_UTAMA, GROUP_ABSENSI, GROUP_LOG, GROUP_LAPORAN,
+  ADMIN_UTAMA, GROUP_ABSENSI_WITH_PKL, GROUP_LOG, GROUP_KEUANGAN,
   GROUP_MANAGEMENT, GROUP_MARKETING, GROUP_ULTAH,
 ];
 
@@ -294,11 +291,9 @@ const SERVICE_MENU: MenuGroup = {
   ],
 };
 
-// ── Overview sales dipecah jadi beberapa grup ────────────────────────────────
 const SALES_OVERVIEW = (extra: MenuItem[] = []): MenuGroup[] => [
   { label: "Utama", items: [ITEM_DASHBOARD, ...extra] },
-  GROUP_ABSENSI,
-  { label: "Laporan", items: [ITEM_PKL_REPORT] },
+  GROUP_ABSENSI_WITH_PKL,
   { label: "Ultah", items: [ITEM_CUSTOMER_BIRTHDAY, ITEM_ULTAH_KARYAWAN] },
 ];
 
@@ -335,16 +330,15 @@ const PKL_INVENTARIS_BASIC: MenuGroup = {
 
 const PKL_MENU: MenuGroup[] = [
   { label: "Utama", items: [ITEM_DASHBOARD] },
-  { label: "Absensi", items: [ITEM_ABSENSI] },
-  { label: "Laporan", items: [ITEM_PKL_REPORT] },
+  { label: "Absensi", items: [ITEM_ABSENSI, ITEM_PKL_REPORT] },
   PKL_INVENTARIS_BASIC,
   { label: "Transaksi", items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }] },
   { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
 ];
 
 const PKL_SALES_MENU: MenuGroup[] = [
-  { label: "Utama", items: [ITEM_DASHBOARD, ITEM_PKL_REPORT] },
-  { label: "Absensi", items: [ITEM_ABSENSI] },
+  { label: "Utama", items: [ITEM_DASHBOARD] },
+  { label: "Absensi", items: [ITEM_ABSENSI, ITEM_PKL_REPORT] },
   PKL_INVENTARIS_BASIC,
   {
     label: "Transaksi",
@@ -358,8 +352,8 @@ const PKL_SALES_MENU: MenuGroup[] = [
 ];
 
 const PKL_PENYEDIA_MENU: MenuGroup[] = [
-  { label: "Utama", items: [ITEM_DASHBOARD, ITEM_PKL_REPORT] },
-  { label: "Absensi", items: [ITEM_ABSENSI] },
+  { label: "Utama", items: [ITEM_DASHBOARD] },
+  { label: "Absensi", items: [ITEM_ABSENSI, ITEM_PKL_REPORT] },
   PKL_INVENTARIS_BASIC,
   PREPARATION_PENYEDIA_MENU,
   { label: "Transaksi", items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }] },
@@ -384,9 +378,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
   ASISTEN_CEO: [
     { label: "Utama", items: [ITEM_DASHBOARD] },
-    GROUP_ABSENSI,
+    GROUP_ABSENSI_WITH_PKL,
     GROUP_LOG,
-    { label: "Laporan", items: [ITEM_LAPORAN_KEUANGAN, ITEM_PKL_REPORT] },
+    { label: "Keuangan", items: [ITEM_LAPORAN_KEUANGAN] },
     { label: "Management", items: [ITEM_USERS] },
     { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT, ITEM_HASIL_PENJUALAN] },
     GROUP_ULTAH,
@@ -441,8 +435,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   KEPALA_TEKNISI: [
-    { label: "Utama", items: [ITEM_DASHBOARD, ITEM_PKL_REPORT] },
-    GROUP_ABSENSI,
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI_WITH_PKL,
     { label: "Management", items: [ITEM_USERS] },
     {
       label: "Inventaris",
@@ -457,9 +451,9 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
   ACCOUNTING: [
     { label: "Utama", items: [ITEM_DASHBOARD] },
-    GROUP_ABSENSI,
+    GROUP_ABSENSI_WITH_PKL,
     GROUP_LOG,
-    GROUP_LAPORAN,
+    GROUP_KEUANGAN,
     { label: "Management", items: [ITEM_USERS, ITEM_MONITOR_CHAT] },
     { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT, ITEM_HASIL_PENJUALAN] },
     GROUP_ULTAH,
@@ -469,13 +463,13 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PURCHASING: [
     { label: "Utama", items: [ITEM_DASHBOARD] },
     GROUP_ABSENSI,
-    { label: "Laporan", items: [ITEM_LAPORAN_KEUANGAN, ITEM_CASHFLOW] },
+    { label: "Keuangan", items: [ITEM_LAPORAN_KEUANGAN, ITEM_CASHFLOW] },
     { label: "Management", items: [ITEM_USERS] },
     {
       label: "Inventaris",
       items: [
         { name: "Data Laptop", href: "/dashboard/laptops", icon: Icons.laptop },
-        { name: "Laptop Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
+        { name: "Barang Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady },
       ],
     },
     { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
@@ -492,8 +486,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
   KEPALA_PENGELOLA_BARANG: [
     { label: "Utama", items: [ITEM_DASHBOARD] },
-    GROUP_ABSENSI,
-    { label: "Laporan", items: [ITEM_PKL_REPORT] },
+    GROUP_ABSENSI_WITH_PKL,
     { label: "Management", items: [ITEM_USERS] },
     {
       label: "Inventaris",
@@ -552,8 +545,8 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   KEPALA_PENYEDIA_BARANG: [
-    { label: "Utama", items: [ITEM_DASHBOARD, ITEM_PKL_REPORT] },
-    GROUP_ABSENSI,
+    { label: "Utama", items: [ITEM_DASHBOARD] },
+    GROUP_ABSENSI_WITH_PKL,
     { label: "Management", items: [ITEM_USERS] },
     { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
     PREPARATION_PENYEDIA_MENU,
@@ -596,7 +589,6 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
 };
 
-// ── Missions normalization pass ───────────────────────────────────────────────
 const MISSION_HREFS = new Set([...MISSIONS_MENU.items.map((i) => i.href), ITEM_MISSION_ALL.href]);
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
@@ -616,7 +608,6 @@ const MISSION_HREFS = new Set([...MISSIONS_MENU.items.map((i) => i.href), ITEM_M
   }
 });
 
-// ── PKL inherit dari parent role ──────────────────────────────────────────────
 const PKL_MENU_INHERIT: Partial<Record<UserRole, UserRole>> = {
   PKL_MARKETING: "MARKETING",
   PKL_SALES: "CREW_SALES",
@@ -640,17 +631,16 @@ const PKL_STRIP_HREFS = new Set<string>([
   const stripped = inherited
     .map((g) => ({ ...g, items: g.items.filter((it) => !PKL_STRIP_HREFS.has(it.href)) }))
     .filter((g) => g.items.length > 0);
-  const laporanIdx = stripped.findIndex((g) => g.label === "Laporan");
-  if (laporanIdx >= 0) {
-    const alreadyHas = stripped[laporanIdx].items.some((it) => it.href === ITEM_PKL_REPORT.href);
-    if (!alreadyHas) stripped[laporanIdx].items.push(ITEM_PKL_REPORT);
+  const absensiIdx = stripped.findIndex((g) => g.label === "Absensi");
+  if (absensiIdx >= 0) {
+    const alreadyHas = stripped[absensiIdx].items.some((it) => it.href === ITEM_PKL_REPORT.href);
+    if (!alreadyHas) stripped[absensiIdx].items.push(ITEM_PKL_REPORT);
   } else {
-    stripped.push({ label: "Laporan", items: [ITEM_PKL_REPORT] });
+    stripped.push({ label: "Absensi", items: [ITEM_PKL_REPORT] });
   }
   ROLE_MENUS[pklRole] = stripped;
 });
 
-// ── Konsolidasi item inventaris → satu "Data Barang" ─────────────────────────
 const DATA_BARANG_LEGACY_HREFS = new Set<string>(["/dashboard/laptops", "/dashboard/accessories"]);
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
@@ -670,13 +660,9 @@ const DATA_BARANG_LEGACY_HREFS = new Set<string>(["/dashboard/laptops", "/dashbo
     .filter((group) => group.items.length > 0);
 });
 
-// ── Urutan tampilan grup sidebar (sesuai permintaan) ─────────────────────────
-// Catatan: ini HANYA mengurutkan ulang grup yang sudah ada di ROLE_MENUS.
-// Tidak ada item/href/logic role yang diubah — label yang tidak ada di daftar
-// ini (mis. "Tools") akan otomatis ditaruh paling akhir, urutan aslinya tetap.
 const GROUP_ORDER: string[] = [
   "Utama",
-  "Laporan",
+  "Keuangan",
   "Transaksi",
   "Penyedia Barang",
   "Penyiapan Barang",
