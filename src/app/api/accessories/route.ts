@@ -24,7 +24,7 @@ export const GET = withAuth(async (req: NextRequest) => {
     const search = searchParams.get("search")?.trim() ?? "";
     const category = searchParams.get("category") ?? "";
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
-    const limit = Math.min(100, parseInt(searchParams.get("limit") ?? "20", 10));
+    const limit = Math.min(10000, parseInt(searchParams.get("limit") ?? "20", 10));
     const offset = (page - 1) * limit;
 
     let query = supabaseAdmin
