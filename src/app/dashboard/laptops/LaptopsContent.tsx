@@ -17,6 +17,7 @@ interface LaptopUnit {
     grade: string;
     status: string;
     selling_price: number;
+    sparepart_cost?: number;
     //  Field berikut hanya ada kalau /api/laptops mengirimnya (lihat Tahap A di
     //  api/laptops/route.ts) dan role user termasuk BARANG_PRIVATE_VIEW_ROLES.
     laptop_id?: string;
@@ -47,6 +48,8 @@ interface Laptop {
     ready_to_sell: boolean;
     notes: string;
     created_at: string;
+    audited_at?: string | null;
+    audited_by?: string | null;
     laptop_units?: LaptopUnit[];
 }
 
@@ -66,6 +69,15 @@ const EMPTY_FORM = {
 };
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
+
+// ── Audit Data Barang ──────────────────────────────────────────────────────
+// Meeting 25/07 sempat menyebut 3 hari; instruksi terbaru = 2 hari.
+// Ganti angka ini saja kalau nanti balik ke 3 hari.
+const AUDIT_TTL_DAYS = 2;
+const AUDIT_TTL_MS = AUDIT_TTL_DAYS * 24 * 60 * 60 * 1000;
+// Auto-reset via read-time: audit dianggap "aktif" hanya jika belum lewat TTL.
+const isAuditActive = (auditedAt?: string | null) =>
+    !!auditedAt && Date.now() - new Date(auditedAt).getTime() < AUDIT_TTL_MS;
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-green-500", label: "Siap Jual" },
@@ -362,8 +374,30 @@ export function LaptopsContent() {
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ laptop: Laptop; unitCount: number } | null>(null);
+    //  Audit: id laptop yang lagi diproses (biar tombolnya loading & tidak dobel klik)
+    const [auditingId, setAuditingId] = useState<string | null>(null);
 
     const showAlert = (msg: string) => setAlertModal(msg);
+
+    //  Toggle audit 1 model laptop. Server yang menentukan set/clear-nya,
+    //  hasilnya (audited_at, audited_by) langsung update state lokal.
+    const toggleAudit = async (id: string) => {
+        setAuditingId(id);
+        try {
+            const res = await fetch(`/api/laptops/${id}/audit`, { method: "PATCH" });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal memperbarui audit");
+            setLaptops(prev => prev.map(l =>
+                l.id === id
+                    ? { ...l, audited_at: json.data.audited_at, audited_by: json.data.audited_by }
+                    : l
+            ));
+        } catch (e) {
+            showAlert(e instanceof Error ? e.message : "Gagal memperbarui audit");
+        } finally {
+            setAuditingId(null);
+        }
+    };
 
     useEffect(() => { fetchLaptops(); }, []);
 
@@ -647,6 +681,12 @@ export function LaptopsContent() {
         const max = modals.length ? Math.max(...modals) : 0;
         const jt = (n: number) => (n / 1_000_000).toFixed(1).replace(".", ",");
 
+        //  Modal Sparepart per-unit — 1 unit: nilai pas; >1 unit: rentang min–max
+        //  (pakai fmt penuh, bukan "jt", karena nominal sparepart biasanya kecil).
+        const spareparts = aktif.map(u => u.sparepart_cost).filter((n): n is number => n != null && n > 0);
+        const spMin = spareparts.length ? Math.min(...spareparts) : 0;
+        const spMax = spareparts.length ? Math.max(...spareparts) : 0;
+
         const sumberSet = new Set(aktif.map(u => u.source).filter(Boolean));
 
         return {
@@ -660,6 +700,11 @@ export function LaptopsContent() {
             harga_modal_note: one ? undefined
                 : modals.length === 0 ? undefined
                     : min === max ? `Rp ${jt(min)} jt` : `Rp ${jt(min)}–${jt(max)} jt`,
+
+            sparepart_modal: one ? (one.sparepart_cost ?? 0) : null,
+            sparepart_note: one ? undefined
+                : spareparts.length === 0 ? undefined
+                    : spMin === spMax ? fmt(spMin) : `${fmt(spMin)} – ${fmt(spMax)}`,
 
             harga_jual: l.selling_price,
 
@@ -855,12 +900,27 @@ export function LaptopsContent() {
                                 rows={tableRows}
                                 canSeePrivate={canSeePrivateBarang}
                                 canSeeStock={canViewTotalStok}
+                                showSparepart
+                                showTotalJual
                                 sortBy={sortBy}
                                 onSort={handleSort}
                                 onRowClick={(row) => {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (l) handleRowClick(l);
                                 }}
+                                renderAudit={canSeePrivateBarang ? (row) => {
+                                    const l = filteredLaptops.find(x => x.id === row.id);
+                                    if (!l) return null;
+                                    return (
+                                        <AuditButton
+                                            active={isAuditActive(l.audited_at)}
+                                            loading={auditingId === l.id}
+                                            auditedBy={l.audited_by}
+                                            auditedAt={l.audited_at}
+                                            onClick={() => toggleAudit(l.id)}
+                                        />
+                                    );
+                                } : undefined}
                                 renderActions={(row) => {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (!l) return null;
@@ -1268,6 +1328,48 @@ function FooterStat({ label, value, dot, color }: { label: string; value: number
     );
 }
 
+//  Tombol Audit per baris Data Barang.
+//  Hijau = sudah diaudit & masih dalam masa berlaku; abu = belum / sudah auto-reset.
+//  Tooltip menampilkan siapa yang audit (history).
+function AuditButton({ active, loading, auditedBy, auditedAt, onClick }: {
+    active: boolean; loading: boolean;
+    auditedBy?: string | null; auditedAt?: string | null;
+    onClick: () => void;
+}) {
+    const title = active
+        ? `Diaudit oleh ${auditedBy ?? "—"}${auditedAt ? " · " + new Date(auditedAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}\nKlik untuk batalkan audit`
+        : "Klik untuk tandai sudah diaudit";
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={loading}
+            title={title}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition
+                ${loading ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}
+                ${active
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                    : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}
+        >
+            {active ? (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Teraudit
+                </>
+            ) : (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" />
+                    </svg>
+                    Audit
+                </>
+            )}
+        </button>
+    );
+}
+
 function ModalActions({ onCancel, loading, submitLabel }: { onCancel: () => void; loading: boolean; submitLabel: string }) {
     return (
         <div className="flex gap-3 pt-4 border-t border-gray-100">
@@ -1299,7 +1401,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "CPU", "RAM", "Storage", "Harga Modal", "Harga Jual", "Sumber", "Tanggal Masuk", "SN", "ST", "SJ", "M", "Aksi"].map(h => (
+                            {["No", "Nama Laptop", "CPU", "RAM", "Storage", "Modal Laptop", "Modal Sparepart", "Harga Jual", "Total Jual", "Sumber", "Tanggal Masuk", "SN", "ST", "SJ", "M", "Audit", "Aksi"].map(h => (
                                 <th key={h} className="px-3 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
