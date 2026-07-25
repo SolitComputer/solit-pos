@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans } from "next/font/google"; // 1. Ubah import menjadi 
 import { Toaster } from "sonner";
 import "./globals.css";
 import NetworkStatus from "@/components/ui/NetworkStatus";
+import ServiceWorkerUpdater from "@/components/ui/ServiceWorkerUpdater";
 
 // 2. Inisialisasi font Plus Jakarta Sans dan buat variabelnya
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -57,6 +58,7 @@ export default function RootLayout({
           }}
         />
         <NetworkStatus />
+        <ServiceWorkerUpdater />
         {children}
         <Toaster richColors />
       </body>
