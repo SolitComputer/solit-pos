@@ -558,6 +558,8 @@ function UnitCard({
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
+// Halaman "Barang Terjual" — khusus menampilkan unit berstatus SOLD saja.
+// Tidak ada lagi toggle/tab untuk status Siap Jual, Belum Siap, atau Service.
 
 export default function AllUnitsPage() {
     const [units, setUnits] = useState<GlobalUnit[]>([]);
@@ -565,7 +567,6 @@ export default function AllUnitsPage() {
     const [isExporting, setIsExporting] = useState(false);
 
     // Filter & search state
-    const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterGradeTab, setFilterGradeTab] = useState("ALL");
     const [searchSN, setSearchSN] = useState("");
     const [searchLaptop, setSearchLaptop] = useState("");
@@ -573,7 +574,6 @@ export default function AllUnitsPage() {
     const [filterPriceMax, setFilterPriceMax] = useState("");
     const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
     const [snSortOrder, setSnSortOrder] = useState<SortOrder>("asc");
-    const [showSold, setShowSold] = useState(false);
 
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
@@ -651,13 +651,13 @@ export default function AllUnitsPage() {
     }, []);
 
     // ── Computed data ─────────────────────────────────────────────────────────
+    // Sumber data halaman ini SELALU unit berstatus SOLD — unit Siap Jual,
+    // Belum Siap, dan Service tidak pernah masuk ke sini.
 
-    const activeUnits = units.filter(u => u.status !== "SOLD");
-    const baseUnits = showSold ? units : activeUnits;
+    const soldUnits = units.filter(u => u.status === "SOLD");
 
     const filteredUnits = sortUnits(
-        baseUnits.filter(u => {
-            if (filterStatus !== "ALL" && u.status !== filterStatus) return false;
+        soldUnits.filter(u => {
             if (filterGradeTab !== "ALL" && u.grade !== filterGradeTab) return false;
             if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;
             if (searchLaptop && !u.laptop_name.toLowerCase().includes(searchLaptop.toLowerCase())) return false;
@@ -673,23 +673,18 @@ export default function AllUnitsPage() {
     const resetFilters = () => {
         setSearchSN(""); setSearchLaptop("");
         setFilterPriceMin(""); setFilterPriceMax("");
-        setFilterStatus("ALL"); setFilterGradeTab("ALL");
+        setFilterGradeTab("ALL");
     };
 
     const counts = {
-        total: activeUnits.length,
-        siap: activeUnits.filter(u => u.status === "SIAP_JUAL").length,
-        belum: activeUnits.filter(u => u.status === "BELUM_SIAP").length,
-        service: activeUnits.filter(u => u.status === "SERVICE").length,
-        sold: units.filter(u => u.status === "SOLD").length,
-        gradeA: activeUnits.filter(u => u.grade === "A").length,
-        gradeB: activeUnits.filter(u => u.grade === "B").length,
-        gradeC: activeUnits.filter(u => u.grade === "C").length,
+        gradeA: soldUnits.filter(u => u.grade === "A").length,
+        gradeB: soldUnits.filter(u => u.grade === "B").length,
+        gradeC: soldUnits.filter(u => u.grade === "C").length,
     };
 
-    // Total summary card — hanya unit aktif (non-SOLD)
-    const totalSparepart = activeUnits.reduce((s, u) => s + (u.sparepart_cost || 0), 0);
-    const totalPurchase = activeUnits.reduce((s, u) => s + (u.purchase_price || 0), 0);
+    // Total summary card — total modal dari unit yang SUDAH TERJUAL
+    const totalSparepart = soldUnits.reduce((s, u) => s + (u.sparepart_cost || 0), 0);
+    const totalPurchase = soldUnits.reduce((s, u) => s + (u.purchase_price || 0), 0);
     const totalModal = totalSparepart + totalPurchase;
 
     const openEdit = (unit: GlobalUnit) => { setNewUnitLaptop(null); setEditingUnit(unit); };
@@ -720,7 +715,7 @@ export default function AllUnitsPage() {
             wb.creator = "Solit POS";
             wb.created = new Date();
 
-            const ws = wb.addWorksheet("Semua Unit", {
+            const ws = wb.addWorksheet("Barang Terjual", {
                 views: [{ state: "frozen", ySplit: 1 }],
                 pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
             });
@@ -766,7 +761,7 @@ export default function AllUnitsPage() {
 
             if (tableRows.length > 0) {
                 ws.addTable({
-                    name: "TabelSemuaUnit", ref: "A1",
+                    name: "TabelBarangTerjual", ref: "A1",
                     headerRow: true, totalsRow: false,
                     style: { theme: "TableStyleMedium7", showRowStripes: true },
                     columns: COL_DEFS.map(c => ({ name: c.header, filterButton: true })),
@@ -825,7 +820,7 @@ export default function AllUnitsPage() {
             const dateStr = new Date()
                 .toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" })
                 .replace(/\//g, "-");
-            link.download = `Semua_Unit_Solit_${dateStr}.xlsx`;
+            link.download = `Barang_Terjual_Solit_${dateStr}.xlsx`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -858,9 +853,9 @@ export default function AllUnitsPage() {
                                         <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
                                     </svg>
                                 </div>
-                                <h1 className="text-lg sm:text-xl font-bold text-[#1a1a2e] tracking-tight">Semua Unit</h1>
+                                <h1 className="text-lg sm:text-xl font-bold text-[#1a1a2e] tracking-tight">Barang Terjual</h1>
                             </div>
-                            <p className="text-[11px] sm:text-xs text-gray-400 ml-9">Lihat &amp; kelola unit dari semua laptop sekaligus</p>
+                            <p className="text-[11px] sm:text-xs text-gray-400 ml-9">Daftar semua unit laptop yang sudah terjual</p>
                         </div>
 
                         {/* Toolbar — grid 2 kolom di HP, sebaris di desktop */}
@@ -918,7 +913,7 @@ export default function AllUnitsPage() {
                         </div>
                     </div>
 
-                    {/* ── Summary Card: Sparepart + Modal = Total ── */}
+                    {/* ── Summary Card: Sparepart + Modal = Total (dari unit terjual) ── */}
                     {canSeePriceInfo && (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                             <div className="grid grid-cols-2 lg:flex lg:items-center gap-3 lg:gap-4">
@@ -974,7 +969,7 @@ export default function AllUnitsPage() {
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5">
                         <div className="grid grid-cols-4 gap-1.5">
                             {[
-                                { value: "ALL", label: "Semua Grade", count: activeUnits.length },
+                                { value: "ALL", label: "Semua Grade", count: soldUnits.length },
                                 { value: "A", label: "Grade A", count: counts.gradeA },
                                 { value: "B", label: "Grade B", count: counts.gradeB },
                                 { value: "C", label: "Grade C", count: counts.gradeC },
@@ -992,54 +987,6 @@ export default function AllUnitsPage() {
                                     </button>
                                 );
                             })}
-                        </div>
-                    </div>
-
-                    {/* ── Status Filter Tabs ── */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2">
-                        <div className="flex flex-wrap gap-1.5 items-center">
-                            {[
-                                {
-                                    value: "ALL", label: "Semua Status",
-                                    count: filterGradeTab === "ALL"
-                                        ? (showSold ? units.length : activeUnits.length)
-                                        : (showSold ? units : activeUnits).filter(u => u.grade === filterGradeTab).length,
-                                },
-                                {
-                                    value: "SIAP_JUAL", label: "Siap Jual",
-                                    count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SIAP_JUAL").length,
-                                },
-                                {
-                                    value: "BELUM_SIAP", label: "Belum Siap",
-                                    count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "BELUM_SIAP").length,
-                                },
-                                {
-                                    value: "SERVICE", label: "Service",
-                                    count: activeUnits.filter(u => (filterGradeTab === "ALL" || u.grade === filterGradeTab) && u.status === "SERVICE").length,
-                                },
-                            ].map(opt => (
-                                <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
-                                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition active:scale-95 ${filterStatus === opt.value ? "bg-[#1a1a2e] text-white shadow-sm" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
-                                    {opt.label}
-                                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[11px] ${filterStatus === opt.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
-                                        {opt.count}
-                                    </span>
-                                </button>
-                            ))}
-
-                            {/* Toggle tampil SOLD — full width di HP, kanan di desktop */}
-                            <button
-                                onClick={() => { setShowSold(v => !v); setFilterStatus("ALL"); }}
-                                className={`w-full sm:w-auto sm:ml-auto mt-1 sm:mt-0 px-3 py-2 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition border active:scale-[0.98] ${showSold ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
-                            >
-                                <span className="flex items-center justify-center sm:justify-start gap-1.5">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${showSold ? "bg-gray-300" : "bg-gray-400"}`} />
-                                    Terjual
-                                    <span className={`px-1.5 py-0.5 rounded text-[11px] ${showSold ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
-                                        {counts.sold}
-                                    </span>
-                                </span>
-                            </button>
                         </div>
                     </div>
 
@@ -1132,11 +1079,11 @@ export default function AllUnitsPage() {
                             <div className="flex justify-center mb-2 opacity-50"><Inbox className="w-8 h-8" /></div>
                             <p className="text-gray-500 text-sm font-medium">Tidak ada unit ditemukan</p>
                             <p className="text-gray-400 text-xs mt-1">
-                                {hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL"
+                                {hasActiveFilter || filterGradeTab !== "ALL"
                                     ? "Coba ubah filter pencarian"
-                                    : canManageUnits ? "Klik 'Tambah Unit' untuk mendaftarkan SN" : "Belum ada unit yang tersedia"}
+                                    : "Belum ada unit yang terjual"}
                             </p>
-                            {(hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL") && (
+                            {(hasActiveFilter || filterGradeTab !== "ALL") && (
                                 <button onClick={resetFilters} className="mt-3 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition">
                                     Reset semua filter
                                 </button>
@@ -1307,10 +1254,9 @@ export default function AllUnitsPage() {
                                     <span className="text-xs text-gray-400">
                                         Menampilkan{" "}
                                         <span className="font-medium text-gray-600">{filteredUnits.length}</span> dari{" "}
-                                        <span className="font-medium text-gray-600">{showSold ? units.length : activeUnits.length}</span> unit
-                                        {showSold && <span className="ml-1 text-gray-400">(termasuk terjual)</span>}
+                                        <span className="font-medium text-gray-600">{soldUnits.length}</span> unit terjual
                                     </span>
-                                    {(hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL") && (
+                                    {(hasActiveFilter || filterGradeTab !== "ALL") && (
                                         <span className="text-xs text-amber-600 font-medium">Filter aktif</span>
                                     )}
                                 </div>
@@ -1322,7 +1268,7 @@ export default function AllUnitsPage() {
                                 <div className="flex items-center justify-between gap-2 px-1">
                                     <span className="text-[11px] text-gray-400">
                                         <span className="font-semibold text-gray-600">{filteredUnits.length}</span> dari{" "}
-                                        <span className="font-semibold text-gray-600">{showSold ? units.length : activeUnits.length}</span> unit
+                                        <span className="font-semibold text-gray-600">{soldUnits.length}</span> unit terjual
                                     </span>
                                     <SnSortButton
                                         order={snSortOrder}
@@ -1343,7 +1289,7 @@ export default function AllUnitsPage() {
                                     />
                                 ))}
 
-                                {(hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL") && (
+                                {(hasActiveFilter || filterGradeTab !== "ALL") && (
                                     <p className="text-center text-[11px] text-amber-600 font-medium pt-1">Filter aktif</p>
                                 )}
                             </div>
