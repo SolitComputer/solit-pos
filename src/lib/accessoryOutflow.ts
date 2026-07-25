@@ -42,17 +42,33 @@ export async function recordOutflow(data: OutflowData) {
 
 export async function cancelOutflowByInvoice(invoice: string) {
   try {
-    // Return units to available status if there are unit_ids attached
     const { data: outflows } = await supabaseAdmin
       .from("accessory_outflows")
-      .select("unit_id")
+      .select("accessory_id, unit_id, qty")
       .eq("transaction_invoice", invoice)
-      .eq("status", "active")
-      .not("unit_id", "is", null);
-      
+      .eq("status", "active");
+
     if (outflows && outflows.length > 0) {
-      const unitIds = outflows.map(o => o.unit_id);
-      await supabaseAdmin.from("accessory_units").update({ status: "TERSEDIA" }).in("id", unitIds);
+      const unitIds = outflows.filter(o => o.unit_id).map(o => o.unit_id as string);
+      if (unitIds.length > 0) {
+        await supabaseAdmin.from("accessory_units").update({ status: "TERSEDIA" }).in("id", unitIds);
+      }
+
+      const qtyByAccessory = new Map<string, number>();
+      for (const o of outflows) {
+        if (o.unit_id) continue; 
+        qtyByAccessory.set(o.accessory_id, (qtyByAccessory.get(o.accessory_id) ?? 0) + Number(o.qty || 0));
+      }
+      for (const [accessoryId, qty] of qtyByAccessory) {
+        if (qty <= 0) continue;
+        const { error: incErr } = await supabaseAdmin.rpc("increment_accessory_stock", {
+          p_accessory_id: accessoryId,
+          p_qty: qty,
+        });
+        if (incErr) {
+          console.error("[cancelOutflowByInvoice] increment_accessory_stock error:", incErr.message);
+        }
+      }
     }
 
     const { error } = await supabaseAdmin
@@ -79,7 +95,7 @@ export async function cancelOutflowByService(serviceId: string) {
       .eq("service_id", serviceId)
       .eq("status", "active")
       .not("unit_id", "is", null);
-      
+
     if (outflows && outflows.length > 0) {
       const unitIds = outflows.map(o => o.unit_id);
       await supabaseAdmin.from("accessory_units").update({ status: "TERSEDIA" }).in("id", unitIds);
