@@ -693,6 +693,22 @@ function sortGroupsByCanonicalOrder(groups: MenuGroup[]): MenuGroup[] {
   ROLE_MENUS[role] = sortGroupsByCanonicalOrder(ROLE_MENUS[role]);
 });
 
+// Data Barang: sembunyikan item sidebar untuk role selain 4 ini, selaras dengan
+// pembatasan baru di ROUTE_PERMISSIONS["/dashboard/data-barang"] (lib/permissions.ts)
+const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
+  "ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+]);
+
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (DATA_BARANG_ALLOWED_ROLES.has(role)) return;
+  ROLE_MENUS[role] = ROLE_MENUS[role]
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((it) => !it.href.startsWith("/dashboard/data-barang")),
+    }))
+    .filter((group) => group.items.length > 0);
+});
+
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
   KEPALA_SALES: { label: "Kepala Sales", className: "bg-emerald-50 text-emerald-700" },
