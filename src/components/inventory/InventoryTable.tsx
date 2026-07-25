@@ -2,17 +2,14 @@
 // src/components/inventory/InventoryTable.tsx
 //
 // Tabel inventaris reusable — layout mengikuti papan tulis toko:
-//   No | Nama Laptop | CPU | RAM | Storage | Harga Modal | Harga Jual |
+//   No | Nama Laptop | CPU | RAM | Storage | Harga Modal | Harga Official |
 //   Sumber | Tanggal Masuk | SN | ST | SJ | M
 //
 // Dipakai di 2 tempat supaya struktur kolomnya identik:
 //   1. Data Barang (LaptopsContent) — 1 baris = 1 model laptop
 //   2. Halaman Units                — 1 baris = 1 unit
-//
-// Kolom Harga Modal / Sumber / Tanggal Masuk / SN bersifat per-unit.
-// Saat 1 baris mewakili >1 unit, isi `*_note` dengan ringkasan (abu-abu).
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 export interface InventoryRow {
     id: string;
@@ -21,16 +18,18 @@ export interface InventoryRow {
     ram: string;
     storage: string;
 
-    /** null bila baris mewakili >1 unit dengan nilai berbeda → pakai harga_modal_note */
     harga_modal: number | null;
     harga_modal_note?: string;
+
+    /** Modal sparepart per-unit (agregat kalau >1 unit) — kolom baru Data Barang */
+    sparepart_modal?: number | null;
+    sparepart_note?: string;
 
     harga_jual: number;
 
     sumber: string | null;
     sumber_note?: string;
 
-    /** ISO string. null bila tidak seragam → pakai tanggal_note */
     tanggal_masuk: string | null;
     tanggal_note?: string;
 
@@ -48,8 +47,14 @@ interface Props {
     canSeePrivate: boolean;
     /** Boleh lihat kolom ST & M (agregat stok internal) */
     canSeeStock: boolean;
+    /** Tampilkan kolom Modal Sparepart (opt-in — hanya Data Barang) */
+    showSparepart?: boolean;
+    /** Tampilkan kolom Total Jual = Harga Jual × Stok Tersisa (opt-in — Data Barang) */
+    showTotalJual?: boolean;
     onRowClick?: (row: InventoryRow) => void;
     renderActions?: (row: InventoryRow) => React.ReactNode;
+    /** Render kolom Audit di samping Aksi (opt-in — Data Barang) */
+    renderAudit?: (row: InventoryRow) => React.ReactNode;
     /** Header sortable — opsional, dipakai Data Barang */
     sortBy?: string;
     onSort?: (asc: string, desc: string) => void;
@@ -67,36 +72,89 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
 );
 
+type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "PRICE" | "SN" | "STOK" | "SIAP" | "MINUS";
+
 export default function InventoryTable({
-    rows, canSeePrivate, canSeeStock, onRowClick, renderActions, sortBy, onSort,
+    rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual,
+    onRowClick, renderActions, renderAudit, sortBy, onSort,
 }: Props) {
+    const [localSort, setLocalSort] = useState<{ col: SortKey; dir: "asc" | "desc" } | null>(null);
+
+    // Apply local column sorting if selected
+    const sortedRows = React.useMemo(() => {
+        if (!localSort) return rows;
+        const list = [...rows];
+        const mult = localSort.dir === "asc" ? 1 : -1;
+
+        list.sort((a, b) => {
+            let valA: any = "";
+            let valB: any = "";
+
+            switch (localSort.col) {
+                case "NAMA": valA = a.laptop_name || ""; valB = b.laptop_name || ""; break;
+                case "CPU": valA = a.cpu || ""; valB = b.cpu || ""; break;
+                case "RAM": valA = a.ram || ""; valB = b.ram || ""; break;
+                case "STORAGE": valA = a.storage || ""; valB = b.storage || ""; break;
+                case "MODAL": valA = a.harga_modal ?? 0; valB = b.harga_modal ?? 0; break;
+                case "PRICE": valA = a.harga_jual ?? 0; valB = b.harga_jual ?? 0; break;
+                case "SN": valA = a.sn || ""; valB = b.sn || ""; break;
+                case "STOK": valA = a.stok_tersisa ?? 0; valB = b.stok_tersisa ?? 0; break;
+                case "SIAP": valA = a.siap_jual ?? 0; valB = b.siap_jual ?? 0; break;
+            }
+
+            if (typeof valA === "number" && typeof valB === "number") {
+                return (valA - valB) * mult;
+            }
+            return String(valA).localeCompare(String(valB), "id") * mult;
+        });
+
+        return list;
+    }, [rows, localSort]);
+
+    const handleSort = (colKey: SortKey, dir: "asc" | "desc", ascCode: string, descCode: string) => {
+        setLocalSort({ col: colKey, dir });
+        if (onSort) {
+            onSort(ascCode, descCode);
+        }
+    };
+
+    const handleResetSort = () => {
+        setLocalSort(null);
+        if (onSort) {
+            onSort("DEFAULT", "DEFAULT");
+        }
+    };
+
     return (
         <div className="overflow-x-auto table-scroll">
             <table className="w-full text-sm border-collapse">
                 <thead>
-                    <tr className="bg-gray-50 border-b-2 border-gray-100">
+                    <tr className="bg-gray-50 border-b border-gray-100">
                         <Th center>No</Th>
                         <Th sortKey="NAMA" activeSort={sortBy} onSort={onSort}>Nama Laptop</Th>
                         <Th sortKey="CPU" activeSort={sortBy} onSort={onSort}>CPU</Th>
                         <Th sortKey="RAM" activeSort={sortBy} onSort={onSort}>RAM</Th>
                         <Th sortKey="STORAGE" activeSort={sortBy} onSort={onSort}>Storage</Th>
-                        {canSeePrivate && <Th right>Harga Modal</Th>}
+                        {canSeePrivate && <Th right>Modal Laptop</Th>}
+                        {canSeePrivate && showSparepart && <Th right>Modal Sparepart</Th>}
                         <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Jual</Th>
+                        {showTotalJual && canSeeStock && <Th right>Total Jual</Th>}
                         {canSeePrivate && <Th>Sumber</Th>}
                         {canSeePrivate && <Th>Tanggal Masuk</Th>}
                         <Th>SN</Th>
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
                         <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
+                        {renderAudit && <Th center>Audit</Th>}
                         {renderActions && <Th right>Aksi</Th>}
                     </tr>
                 </thead>
-                <tbody>
-                    {rows.map((row, idx) => (
+                <tbody className="divide-y divide-gray-50">
+                    {sortedRows.map((row, idx) => (
                         <tr
                             key={row.id}
                             onClick={onRowClick ? () => onRowClick(row) : undefined}
-                            className={`group data-row border-b border-gray-50 last:border-0 ${onRowClick ? "cursor-pointer" : ""}`}
+                            className={`group data-row border-b border-gray-50 last:border-0 hover:bg-gray-50/60 ${onRowClick ? "cursor-pointer" : ""}`}
                         >
                             <td className="px-3 py-3.5 text-center w-10">
                                 <span className="text-xs font-semibold text-gray-300 tabular-nums">
@@ -104,13 +162,13 @@ export default function InventoryTable({
                                 </span>
                             </td>
 
-                            <td className="px-3 py-3.5 max-w-[190px]">
-                                <span className="block font-semibold text-gray-800 truncate text-[13px]" title={row.laptop_name}>
+                            <td className="px-3.5 py-3.5 min-w-[200px]">
+                                <span className="block font-semibold text-gray-800 text-[13px]" title={row.laptop_name}>
                                     {row.laptop_name}
                                 </span>
                             </td>
 
-                            <td className="px-3 py-3.5 max-w-[150px]">
+                            <td className="px-3.5 py-3.5 max-w-[150px]">
                                 <span className="block text-xs text-gray-600 truncate" title={row.cpu}>
                                     {row.cpu || <Dash />}
                                 </span>
@@ -125,7 +183,7 @@ export default function InventoryTable({
                             </td>
 
                             {canSeePrivate && (
-                                <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
                                     {row.harga_modal != null ? (
                                         <span className="text-xs font-semibold text-gray-600 tabular-nums">{fmt(row.harga_modal)}</span>
                                     ) : row.harga_modal_note ? (
@@ -134,12 +192,28 @@ export default function InventoryTable({
                                 </td>
                             )}
 
+                            {canSeePrivate && showSparepart && (
+                                <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                    {row.sparepart_modal != null ? (
+                                        <span className="text-xs font-semibold text-gray-600 tabular-nums">{fmt(row.sparepart_modal)}</span>
+                                    ) : row.sparepart_note ? (
+                                        <Note>{row.sparepart_note}</Note>
+                                    ) : <Dash />}
+                                </td>
+                            )}
+
                             <td className="px-3 py-3.5 text-right whitespace-nowrap">
                                 <span className="text-[13px] font-bold text-gray-800 tabular-nums">{fmt(row.harga_jual)}</span>
                             </td>
 
+                            {showTotalJual && canSeeStock && (
+                                <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                    <span className="text-[13px] font-bold text-gray-900 tabular-nums">{fmt(row.harga_jual * row.stok_tersisa)}</span>
+                                </td>
+                            )}
+
                             {canSeePrivate && (
-                                <td className="px-3 py-3.5 max-w-[130px]">
+                                <td className="px-3.5 py-3.5 max-w-[130px]">
                                     {row.sumber ? (
                                         <span className="block text-xs text-gray-600 truncate" title={row.sumber}>{row.sumber}</span>
                                     ) : row.sumber_note ? <Note>{row.sumber_note}</Note> : <Dash />}
@@ -147,7 +221,7 @@ export default function InventoryTable({
                             )}
 
                             {canSeePrivate && (
-                                <td className="px-3 py-3.5 whitespace-nowrap">
+                                <td className="px-3.5 py-3.5 whitespace-nowrap">
                                     {row.tanggal_masuk ? (
                                         <span className="text-xs text-gray-500 tabular-nums">{fmtDate(row.tanggal_masuk)}</span>
                                     ) : row.tanggal_note ? <Note>{row.tanggal_note}</Note> : <Dash />}
@@ -182,6 +256,12 @@ export default function InventoryTable({
                                 </td>
                             )}
 
+                            {renderAudit && (
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                    {renderAudit(row)}
+                                </td>
+                            )}
+
                             {renderActions && (
                                 <td className="px-3 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                     <div className="flex items-center justify-end gap-1">{renderActions(row)}</div>
@@ -195,26 +275,96 @@ export default function InventoryTable({
     );
 }
 
-function Th({ children, right, center, title, sortKey, activeSort, onSort }: {
-    children: React.ReactNode; right?: boolean; center?: boolean; title?: string;
-    sortKey?: string; activeSort?: string; onSort?: (asc: string, desc: string) => void;
+function Th({
+    children, titleName, right, center, title, sortKey, isNumeric, activeSort, onSort, className,
+}: {
+    children?: React.ReactNode;
+    titleName?: string;
+    right?: boolean;
+    center?: boolean;
+    title?: string;
+    sortKey?: SortKey;
+    isNumeric?: boolean;
+    activeSort?: string;
+    onSort?: (asc: string, desc: string) => void;
+    className?: string;
 }) {
-    const isSortable = !!sortKey && !!onSort;
-    const ascKey = sortKey === "NAMA" ? "AZ" : `${sortKey}_ASC`;
-    const descKey = sortKey === "NAMA" ? "ZA" : `${sortKey}_DESC`;
+    const [open, setOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    const ascCode = sortKey ? `${sortKey}_ASC` : "";
+    const descCode = sortKey ? `${sortKey}_DESC` : "";
+    const isCurrent = !!sortKey && (activeSort === ascCode || activeSort === descCode);
+    const currentDir: "asc" | "desc" | undefined =
+        activeSort === ascCode ? "asc" : activeSort === descCode ? "desc" : undefined;
+
+    useEffect(() => {
+        if (!open) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [open]);
+
+    const isFilterable = !!sortKey && !!onSort;
+    const label = titleName || (typeof children === "string" ? children : "");
 
     return (
         <th
             title={title}
-            onClick={isSortable ? () => onSort!(ascKey, descKey) : undefined}
-            className={`px-3 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap ${right ? "text-right" : center ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-700 select-none group/th" : ""}`}
+            className={`px-3 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap relative ${right ? "text-right" : center ? "text-center" : "text-left"} ${className || ""}`}
         >
-            <div className={`flex items-center gap-1.5 ${right ? "justify-end" : center ? "justify-center" : "justify-start"}`}>
-                {children}
-                {isSortable && (
-                    <div className="flex flex-col -space-y-[3px]">
-                        <svg className={`w-2.5 h-2.5 ${activeSort === ascKey ? "text-gray-800" : "text-gray-300 group-hover/th:text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg>
-                        <svg className={`w-2.5 h-2.5 ${activeSort === descKey ? "text-gray-800" : "text-gray-300 group-hover/th:text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
+            <div className={`flex items-center gap-1 ${right ? "justify-end" : center ? "justify-center" : "justify-start"}`}>
+                <span>{children || label}</span>
+
+                {isFilterable && (
+                    <div className="relative inline-block text-left" ref={menuRef} onClick={(e) => e.stopPropagation()}>
+                        <button
+                            type="button"
+                            onClick={() => setOpen(!open)}
+                            className={`p-0.5 rounded hover:bg-gray-200 transition-colors flex items-center ${isCurrent ? "text-emerald-600 font-bold bg-emerald-50" : "text-gray-400 hover:text-gray-700"}`}
+                            title={`Filter / Sort ${label}`}
+                        >
+                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        {open && (
+                            <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-50 text-left normal-case text-xs animate-fadeIn font-normal">
+                                <div className="px-3 py-1.5 border-b border-gray-100 font-bold text-gray-700 text-[11px] bg-gray-50 flex items-center justify-between">
+                                    <span>Sort {label}</span>
+                                    {isCurrent && (
+                                        <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                            {currentDir?.toUpperCase()}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={() => { onSort!(ascCode, descCode); setOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors text-xs ${isCurrent && currentDir === "asc" ? "font-bold text-emerald-600 bg-emerald-50/50" : "text-gray-700"}`}
+                                >
+                                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                                    </svg>
+                                    {isNumeric ? "Sort Terendah → Tertinggi" : "Sort A → Z"}
+                                </button>
+
+                                <button
+                                    onClick={() => { onSort!(ascCode, descCode); setOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors text-xs ${isCurrent && currentDir === "desc" ? "font-bold text-emerald-600 bg-emerald-50/50" : "text-gray-700"}`}
+                                >
+                                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m-4 0l4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    {isNumeric ? "Sort Tertinggi → Terendah" : "Sort Z → A"}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
