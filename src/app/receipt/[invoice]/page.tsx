@@ -10,8 +10,7 @@ interface Props {
 export default async function Page(props: Props) {
   const params = await props.params;
 
-  // ── Fetch transaksi + garansi paralel ────────────────────────────────────
-  const [{ data }, { data: warranty }] = await Promise.all([
+  const [{ data }, { data: warranty }, { data: txItems }] = await Promise.all([
     supabase
       .from("transactions")
       .select("*")
@@ -22,7 +21,20 @@ export default async function Page(props: Props) {
       .select("warranty_start, warranty_end, warranty_duration, status, notes")
       .eq("invoice_number", params.invoice)
       .single(),
+    supabase
+      .from("transaction_items")
+      .select("item_type, item_name, serial_number, quantity, deal_price, is_bonus")
+      .eq("invoice_number", params.invoice),
   ]);
+
+  const laptopItems = (txItems ?? []).filter((it: any) => it.item_type !== "accessory");
+  const accessoryItems = (txItems ?? []).filter((it: any) => it.item_type === "accessory");
+  const itemKind: "laptop" | "accessory" | "mixed" =
+    laptopItems.length > 0 && accessoryItems.length > 0
+      ? "mixed"
+      : accessoryItems.length > 0
+        ? "accessory"
+        : "laptop";
 
   if (!data || data.status !== "PAID") {
     return (
@@ -130,6 +142,31 @@ export default async function Page(props: Props) {
               </p>
               <p className="text-emerald-500 text-xs mt-1">{data.payment_method}</p>
             </div>
+
+            <Separator />
+
+            {/* Detail Pembelian */}
+            <Section
+              title={itemKind === "accessory" ? "Detail Aksesoris" : itemKind === "mixed" ? "Detail Pembelian" : "Detail Laptop"}
+              icon={<Package className="w-4 h-4" />}
+            >
+              {laptopItems.map((it: any, i: number) => (
+                <InfoRow
+                  key={`laptop-${i}`}
+                  label={it.serial_number ? `${it.item_name} (${it.serial_number})` : it.item_name}
+                  value={`Rp${Number(it.deal_price ?? 0).toLocaleString("id-ID")}`}
+                  mono
+                />
+              ))}
+              {accessoryItems.map((it: any, i: number) => (
+                <InfoRow
+                  key={`acc-${i}`}
+                  label={`${it.item_name}${it.quantity > 1 ? ` x${it.quantity}` : ""}`}
+                  value={it.is_bonus ? "Bonus" : `Rp${Number(it.deal_price ?? 0).toLocaleString("id-ID")}`}
+                  mono
+                />
+              ))}
+            </Section>
 
             <Separator />
 
@@ -257,7 +294,7 @@ export default async function Page(props: Props) {
               invoiceNumber={data.invoice_number}
               customerName={data.customer_name || ""}
               laptopName={data.laptop_name || ""}
-              serialNumber={data.serial_number || ""}
+              serialNumber={itemKind === "accessory" ? "" : (data.serial_number || "")}
               amount={data.amount || 0}
               paymentMethod={data.payment_method || ""}
               pickupMethod={data.pickup_method || ""}
@@ -266,7 +303,8 @@ export default async function Page(props: Props) {
               softwareRequest={data.software_request || undefined}
               warrantyEnd={warranty?.warranty_end || undefined}
               warrantyDaysLeft={warrantyDaysLeft ?? undefined}
-              customerType={data.customer_type || "UMUM"} 
+              customerType={data.customer_type || "UMUM"}
+              itemKind={itemKind}
             />
           </div>
         </div>
