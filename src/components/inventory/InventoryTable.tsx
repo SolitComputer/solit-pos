@@ -25,6 +25,10 @@ export interface InventoryRow {
     harga_modal: number | null;
     harga_modal_note?: string;
 
+    /** Modal sparepart per-unit (agregat kalau >1 unit) — kolom baru Data Barang */
+    sparepart_modal?: number | null;
+    sparepart_note?: string;
+
     harga_jual: number;
 
     sumber: string | null;
@@ -48,8 +52,14 @@ interface Props {
     canSeePrivate: boolean;
     /** Boleh lihat kolom ST & M (agregat stok internal) */
     canSeeStock: boolean;
+    /** Tampilkan kolom Modal Sparepart (opt-in — hanya Data Barang) */
+    showSparepart?: boolean;
+    /** Tampilkan kolom Total Jual = Harga Jual × Stok Tersisa (opt-in — Data Barang) */
+    showTotalJual?: boolean;
     onRowClick?: (row: InventoryRow) => void;
     renderActions?: (row: InventoryRow) => React.ReactNode;
+    /** Render kolom Audit di samping Aksi (opt-in — Data Barang) */
+    renderAudit?: (row: InventoryRow) => React.ReactNode;
     /** Header sortable — opsional, dipakai Data Barang */
     sortBy?: string;
     onSort?: (asc: string, desc: string) => void;
@@ -68,7 +78,8 @@ const Note = ({ children }: { children: React.ReactNode }) => (
 );
 
 export default function InventoryTable({
-    rows, canSeePrivate, canSeeStock, onRowClick, renderActions, sortBy, onSort,
+    rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual,
+    onRowClick, renderActions, renderAudit, sortBy, onSort,
 }: Props) {
     return (
         <div className="overflow-x-auto table-scroll">
@@ -80,14 +91,17 @@ export default function InventoryTable({
                         <Th sortKey="CPU" activeSort={sortBy} onSort={onSort}>CPU</Th>
                         <Th sortKey="RAM" activeSort={sortBy} onSort={onSort}>RAM</Th>
                         <Th sortKey="STORAGE" activeSort={sortBy} onSort={onSort}>Storage</Th>
-                        {canSeePrivate && <Th right>Harga Modal</Th>}
+                        {canSeePrivate && <Th right>Modal Laptop</Th>}
+                        {canSeePrivate && showSparepart && <Th right>Modal Sparepart</Th>}
                         <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Jual</Th>
+                        {showTotalJual && canSeeStock && <Th right>Total Jual</Th>}
                         {canSeePrivate && <Th>Sumber</Th>}
                         {canSeePrivate && <Th>Tanggal Masuk</Th>}
                         <Th>SN</Th>
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
                         <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
+                        {renderAudit && <Th center>Audit</Th>}
                         {renderActions && <Th right>Aksi</Th>}
                     </tr>
                 </thead>
@@ -134,9 +148,25 @@ export default function InventoryTable({
                                 </td>
                             )}
 
+                            {canSeePrivate && showSparepart && (
+                                <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                    {row.sparepart_modal != null ? (
+                                        <span className="text-xs font-semibold text-gray-600 tabular-nums">{fmt(row.sparepart_modal)}</span>
+                                    ) : row.sparepart_note ? (
+                                        <Note>{row.sparepart_note}</Note>
+                                    ) : <Dash />}
+                                </td>
+                            )}
+
                             <td className="px-3 py-3.5 text-right whitespace-nowrap">
                                 <span className="text-[13px] font-bold text-gray-800 tabular-nums">{fmt(row.harga_jual)}</span>
                             </td>
+
+                            {showTotalJual && canSeeStock && (
+                                <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                    <span className="text-[13px] font-bold text-gray-900 tabular-nums">{fmt(row.harga_jual * row.stok_tersisa)}</span>
+                                </td>
+                            )}
 
                             {canSeePrivate && (
                                 <td className="px-3 py-3.5 max-w-[130px]">
@@ -182,10 +212,16 @@ export default function InventoryTable({
                                 </td>
                             )}
 
+                            {renderAudit && (
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                    {renderAudit(row)}
+                                </td>
+                            )}
+
                             {renderActions && (
                                 <td className="px-3 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                     <div className="flex items-center justify-end gap-1">{renderActions(row)}</div>
-                                </td>
+                            </td>
                             )}
                         </tr>
                     ))}
