@@ -70,10 +70,9 @@ async function restockActiveOutflows(outflows: { unit_id: string | null; accesso
 
 export async function cancelOutflowByInvoice(invoice: string) {
   try {
-    // Kembalikan stok aksesoris + status unit sebelum outflow ditandai cancelled
     const { data: outflows } = await supabaseAdmin
       .from("accessory_outflows")
-      .select("unit_id, accessory_id, qty")
+      .select("accessory_id, unit_id, qty")
       .eq("transaction_invoice", invoice)
       .eq("status", "active");
 
