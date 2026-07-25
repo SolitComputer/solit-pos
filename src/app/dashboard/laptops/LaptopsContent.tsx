@@ -4,8 +4,12 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import ExcelJS from "exceljs";
 import Link from "next/link";
 import BarcodeModal from "@/components/ui/BarcodeModal";
-import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES } from "@/lib/permissions";
 import { Laptop } from "lucide-react";
+import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
+import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
+import LaptopUnitsPreview, { PreviewUnit } from "@/components/inventory/LaptopUnitsPreview";
+import { exportInventoryExcel } from "@/lib/inventoryExport";
 
 interface LaptopUnit {
     id: string;
@@ -13,6 +17,14 @@ interface LaptopUnit {
     grade: string;
     status: string;
     selling_price: number;
+    //  Field berikut hanya ada kalau /api/laptops mengirimnya (lihat Tahap A di
+    //  api/laptops/route.ts) dan role user termasuk BARANG_PRIVATE_VIEW_ROLES.
+    laptop_id?: string;
+    condition_note?: string;
+    source?: string | null;
+    purchase_price?: number;
+    notes?: string;
+    created_at?: string;
 }
 
 interface Laptop {
@@ -333,18 +345,25 @@ export function LaptopsContent() {
         "MARKETING", "KEPALA_MARKETING",
     ] as UserRole[]);
     const canViewUnits = hasAnyRole(userRoles, PERMISSIONS.VIEW_UNITS);
-    const canViewTotalStok = hasAnyRole(userRoles, [
-        "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING",
-        "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
-    ] as UserRole[]);
     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
+
+    //  Full Access barang → boleh Edit semua field unit lewat Pop-up Detail
+    const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
+    //  Boleh lihat Harga Modal / Sumber / Tgl Masuk + kolom ST & M. Sales = false.
+    //  Satu konstanta dipakai untuk semuanya supaya tidak ada 3 daftar role
+    //  terpisah yang harus diedit bersamaan tiap ada perubahan.
+    const canSeePrivateBarang = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
+    const canViewTotalStok = canSeePrivateBarang;
+
+    //  Pop-up Detail unit — dipakai saat stok = 1 (tanpa perlu masuk halaman Units)
+    const [unitDetail, setUnitDetail] = useState<{ unit: UnitDetailData; laptop: Laptop } | null>(null);
+    const [unitDetailLoading, setUnitDetailLoading] = useState(false);
+
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ laptop: Laptop; unitCount: number } | null>(null);
 
     const showAlert = (msg: string) => setAlertModal(msg);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const showConfirm = (msg: string, onConfirm: () => void) => setConfirmModal({ message: msg, onConfirm });
 
     useEffect(() => { fetchLaptops(); }, []);
 
@@ -382,7 +401,7 @@ export function LaptopsContent() {
                     ...l,
                     selling_price: Math.round(Number(l.selling_price) || 0),
                     qty: units.length,
-                    // ✅ Stok Tersisa = Siap Jual + Minus saja.
+                    // Stok Tersisa = Siap Jual + Minus saja.
                     // Unit RESERVED/HELD/PACKING sengaja TIDAK dihitung sebagai stok tersedia
                     // karena statusnya sudah "diproses" (dipesan/ditahan/dikemas), bukan stok bebas.
                     stok_tersedia: siapJual + stokMinus,
@@ -436,9 +455,8 @@ export function LaptopsContent() {
             list = list.filter(x => x.laptop_units?.some(u => u.serial_number.toLowerCase().includes(snQ)));
         }
 
-        list = list.filter(x => (x.laptop_units?.length ?? 0) === 0 || (x.stok_tersedia ?? 0) > 0);
         // ── Filter stok tersisa ──────────────────────────────────────────────
-       if (filterStock === "TERSEDIA") {
+        if (filterStock === "TERSEDIA") {
             list = list.filter(x => (x.laptop_units?.length ?? 0) === 0 || (x.stok_tersedia ?? 0) > 0);
         } else if (filterStock === "HABIS") {
             list = list.filter(x => (x.stok_tersedia ?? 0) === 0);
@@ -471,25 +489,6 @@ export function LaptopsContent() {
         return list;
     }, [laptops, search, filterSN, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, filterStock, sortBy]);
 
-    const uniqueProcessors = useMemo(() => {
-        const types = new Set<string>();
-        laptops.forEach(x => {
-            const cpu = (x.cpu || "").toLowerCase();
-            if (cpu.includes("i3")) types.add("Intel i3");
-            else if (cpu.includes("i5")) types.add("Intel i5");
-            else if (cpu.includes("i7")) types.add("Intel i7");
-            else if (cpu.includes("i9")) types.add("Intel i9");
-            else if (cpu.includes("ryzen 3")) types.add("AMD Ryzen 3");
-            else if (cpu.includes("ryzen 5")) types.add("AMD Ryzen 5");
-            else if (cpu.includes("ryzen 7")) types.add("AMD Ryzen 7");
-            else if (cpu.includes("ryzen 9")) types.add("AMD Ryzen 9");
-            else if (cpu.includes("apple m") || cpu.includes("m1") || cpu.includes("m2") || cpu.includes("m3")) types.add("Apple Silicon");
-            else if (cpu.includes("celeron")) types.add("Intel Celeron");
-            else if (cpu.includes("pentium")) types.add("Intel Pentium");
-        });
-        return ["ALL", ...Array.from(types).sort()];
-    }, [laptops]);
-
     const uniqueRams = useMemo(() => {
         const r = new Set(laptops.map(x => x.ram).filter(Boolean));
         return ["ALL", ...Array.from(r).sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0))];
@@ -512,6 +511,30 @@ export function LaptopsContent() {
             if (result.data) setSelectedLaptop(result.data);
         } catch { /* use cached */ } finally {
             setDetailLoading(false);
+        }
+    };
+
+    //  Router aksi klik baris berdasarkan jumlah stok:
+    //    stok = 1  → langsung buka Pop-up Detail unit (editable)
+    //    stok ≠ 1  → buka Detail Laptop (untuk stok > 1, breakdown via tombol Units)
+    const handleRowClick = async (item: Laptop) => {
+        const activeUnits = (item.laptop_units || []).filter(u => u.status !== "SOLD");
+
+        if (activeUnits.length !== 1) { openDetail(item); return; }
+
+        setUnitDetailLoading(true);
+        try {
+            // Detail lengkap (condition_note, notes, dsb) diambil dari endpoint units
+            // supaya modal tidak menampilkan field kosong.
+            const res = await fetch(`/api/laptops/${item.id}/units`);
+            const result = await res.json();
+            const full = (result.data || []).find((u: UnitDetailData) => u.id === activeUnits[0].id);
+            if (full) setUnitDetail({ unit: full, laptop: item });
+            else openDetail(item);
+        } catch {
+            openDetail(item);
+        } finally {
+            setUnitDetailLoading(false);
         }
     };
 
@@ -548,7 +571,7 @@ export function LaptopsContent() {
             });
             const result = await res.json();
             if (!result.success) { showAlert(result.message || "Gagal menambahkan laptop"); return; }
-            closeModal(); fetchLaptops(); showAlert("Laptop berhasil ditambahkan ");
+            closeModal(); fetchLaptops(); showAlert("Laptop berhasil ditambahkan");
         } catch {
             showAlert("Terjadi kesalahan saat menyimpan");
         } finally {
@@ -590,212 +613,76 @@ export function LaptopsContent() {
 
     // ─── Export Excel ─────────────────────────────────────────────────────────
     //  Export disesuaikan dengan filterStatus yang aktif:
-    //    - ALL     → tampilkan semua kolom (Stock Total, Siap Jual, Minus, Terjual)
+    //    - ALL        → tampilkan semua kolom (Stock Total, Siap Jual, Minus)
     //    - SIAP_JUAL  → hanya kolom "Siap Jual", data hanya unit SIAP_JUAL
     //    - BELUM_SIAP → hanya kolom "Minus", data hanya unit SERVICE/BELUM_SIAP
+    //  Export dipindah ke lib/inventoryExport.ts supaya kolomnya selalu
+    //  sinkron dengan tabel di layar, dan bisa dipakai ulang di halaman lain.
     const exportToExcel = async () => {
-        const wb = new ExcelJS.Workbook();
-        wb.creator = "Solit Inventory";
-        wb.created = new Date();
+        const filterLabel = [
+            filterStatus !== "ALL" && (filterStatus === "SIAP_JUAL" ? "Siap Jual" : "Minus"),
+            filterBrand !== "ALL" && `Brand ${filterBrand}`,
+            filterRam !== "ALL" && `RAM ${filterRam}`,
+            search.trim() && `Cari "${search.trim()}"`,
+        ].filter(Boolean).join(" · ");
 
-        // Tentukan konteks berdasarkan filter status aktif
-        const isSiapJualOnly = filterStatus === "SIAP_JUAL";
-        const isMinusOnly = filterStatus === "BELUM_SIAP";
-        const isAllMode = !isSiapJualOnly && !isMinusOnly;
-
-        // Sheet name & file suffix mengikuti filter
-        const sheetLabel = isSiapJualOnly
-            ? "Laptop Siap Jual"
-            : isMinusOnly
-                ? "Laptop Minus"
-                : "Data Laptop";
-
-        const fileSuffix = isSiapJualOnly
-            ? "_siap_jual"
-            : isMinusOnly
-                ? "_minus"
-                : "";
-
-        const ws = wb.addWorksheet(sheetLabel, {
-            views: [{ state: "frozen", ySplit: 1 }],
-            pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
+        await exportInventoryExcel({
+            laptops: filteredLaptops,
+            canSeePrivate: canSeePrivateBarang,
+            filterLabel: filterLabel ? `Filter: ${filterLabel}` : "Tanpa filter",
+            fileSuffix: filterStatus === "SIAP_JUAL" ? "_siap_jual"
+                : filterStatus === "BELUM_SIAP" ? "_minus" : "",
         });
-
-        const COLOR = {
-            headerBg: "FF4B5563",
-            headerFg: "FFFFFFFF",
-            rowEven: "FFF8FAFC",
-            rowOdd: "FFFFFFFF",
-            borderColor: "FFE2E8F0",
-            subTextFg: "FF64748B",
-            siapBg: "FFD1FAE5", // green-100
-            siapFg: "FF065F46", // green-900
-            minusBg: "FFFEE2E2", // red-100
-            minusFg: "FF7F1D1D", // red-900
-        };
-
-        //  Definisi kolom dinamis: mode filter menentukan kolom stok yang ditampilkan
-        ws.columns = [
-            { header: "No", key: "no", width: 6 },
-            { header: "Product", key: "product", width: 35 },
-            { header: "CPU", key: "cpu", width: 28 },
-            { header: "RAM", key: "ram", width: 14 },
-            { header: "HDD/SSD", key: "storage", width: 16 },
-            // Kolom stok utama — labelnya berubah sesuai konteks filter
-            {
-                header: isSiapJualOnly ? "Siap Jual" : isMinusOnly ? "Minus" : "Stock Total",
-                key: "stock",
-                width: 13,
-            },
-            // Kolom detail stok hanya muncul di mode ALL
-            ...(isAllMode ? [
-                { header: "Siap Jual", key: "siap_jual", width: 12 },
-                { header: "Minus", key: "minus", width: 10 },
-            ] : []),
-            { header: "Price Store", key: "price_store", width: 18 },
-        ];
-
-        // Header row styling
-        const headerRow = ws.getRow(1);
-        headerRow.height = 32;
-        headerRow.eachCell(cell => {
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
-            cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
-            cell.border = {
-                top: { style: "thin", color: { argb: COLOR.borderColor } },
-                left: { style: "thin", color: { argb: COLOR.borderColor } },
-                bottom: { style: "medium", color: { argb: "FF94A3B8" } },
-                right: { style: "thin", color: { argb: COLOR.borderColor } },
-            };
-            cell.alignment = { horizontal: "center", vertical: "middle" };
-        });
-
-        //  Data rows — nilai kolom stok dihitung ulang sesuai filterStatus
-        filteredLaptops.forEach((item, idx) => {
-            const rowBg = idx % 2 === 0 ? COLOR.rowEven : COLOR.rowOdd;
-            const units = item.laptop_units || [];
-
-            // Hitung per-jenis unit dari raw laptop_units (bukan dari field cached)
-            const siapJualCount = units.filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
-            const minusCount = units.filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
-            const tersediaCount = units.filter((u: LaptopUnit) => u.status !== "SOLD").length;
-
-            //  Nilai kolom "stock" disesuaikan dengan konteks filter
-            const stockValue = isSiapJualOnly
-                ? siapJualCount
-                : isMinusOnly
-                    ? minusCount
-                    : tersediaCount;
-
-            // Bangun row data — kolom detail hanya di mode ALL
-            const rowData: Record<string, string | number> = {
-                no: idx + 1,
-                product: item.laptop_name || "",
-                cpu: item.cpu || "",
-                ram: item.ram || "",
-                storage: item.storage || "",
-                stock: stockValue,
-                price_store: item.selling_price || 0,
-            };
-
-            if (isAllMode) {
-                rowData.siap_jual = siapJualCount;
-                rowData.minus = minusCount;
-            }
-
-            const row = ws.addRow(rowData);
-            row.height = 22;
-
-            row.eachCell((cell, colNum) => {
-                const key = ws.getColumn(colNum).key as string;
-
-                // ── Base styling ──────────────────────────────────────────────
-                cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
-                cell.border = {
-                    top: { style: "hair", color: { argb: COLOR.borderColor } },
-                    left: { style: "hair", color: { argb: COLOR.borderColor } },
-                    bottom: { style: "hair", color: { argb: COLOR.borderColor } },
-                    right: { style: "hair", color: { argb: COLOR.borderColor } },
-                };
-                cell.font = { size: 10, name: "Arial" };
-                cell.alignment = { vertical: "middle" };
-
-                // ── Per-column overrides ──────────────────────────────────────
-                if (key === "no") {
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                    cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-
-                } else if (key === "product") {
-                    cell.font = { size: 10, name: "Arial", bold: true };
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-
-                } else if (["cpu", "ram", "storage"].includes(key)) {
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-
-                } else if (key === "price_store") {
-                    cell.numFmt = '"Rp "#,##0';
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-
-                } else if (key === "stock") {
-                    //  Warna kolom "stock" mengikuti konteks filter
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                    if (isSiapJualOnly) {
-                        if (stockValue > 0) {
-                            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.siapBg } };
-                            cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.siapFg } };
-                        } else {
-                            cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-                        }
-                    } else if (isMinusOnly) {
-                        if (stockValue > 0) {
-                            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.minusBg } };
-                            cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.minusFg } };
-                        } else {
-                            cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-                        }
-                    } else {
-                        // ALL mode — kolom Stock Total, tidak diberi warna khusus
-                        cell.font = { size: 10, name: "Arial" };
-                    }
-
-                } else if (key === "siap_jual") {
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                    if (siapJualCount > 0) {
-                        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.siapBg } };
-                        cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.siapFg } };
-                    } else {
-                        cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-                    }
-
-                } else if (key === "minus") {
-                    cell.alignment = { horizontal: "center", vertical: "middle" };
-                    if (minusCount > 0) {
-                        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.minusBg } };
-                        cell.font = { size: 10, name: "Arial", bold: true, color: { argb: COLOR.minusFg } };
-                    } else {
-                        cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-                    }
-                }
-            });
-        });
-
-        // Download
-        const buffer = await wb.xlsx.writeBuffer();
-        const blob = new Blob([buffer], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `data_laptop${fileSuffix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     };
 
+    //  Mapping model laptop → baris tabel (layout papan tulis).
+    //  Kolom per-unit (Harga Modal / Sumber / Tgl Masuk / SN) hanya punya nilai
+    //  tunggal kalau stok = 1. Kalau >1, diisi ringkasan abu-abu + arahkan ke Units.
+    const tableRows: InventoryRow[] = useMemo(() => filteredLaptops.map(l => {
+        const aktif = (l.laptop_units || []).filter(u => u.status !== "SOLD");
+        const one = aktif.length === 1 ? aktif[0] : null;
+
+        const modals = aktif.map(u => u.purchase_price).filter((n): n is number => n != null && n > 0);
+        const min = modals.length ? Math.min(...modals) : 0;
+        const max = modals.length ? Math.max(...modals) : 0;
+        const jt = (n: number) => (n / 1_000_000).toFixed(1).replace(".", ",");
+
+        const sumberSet = new Set(aktif.map(u => u.source).filter(Boolean));
+
+        return {
+            id: l.id,
+            laptop_name: l.laptop_name,
+            cpu: l.cpu,
+            ram: l.ram,
+            storage: l.storage,
+
+            harga_modal: one ? (one.purchase_price ?? 0) : null,
+            harga_modal_note: one ? undefined
+                : modals.length === 0 ? undefined
+                    : min === max ? `Rp ${jt(min)} jt` : `Rp ${jt(min)}–${jt(max)} jt`,
+
+            harga_jual: l.selling_price,
+
+            sumber: one ? (one.source ?? null) : null,
+            sumber_note: one ? undefined
+                : sumberSet.size === 0 ? undefined
+                    : sumberSet.size === 1 ? String([...sumberSet][0]) : `${sumberSet.size} sumber`,
+
+            tanggal_masuk: one ? (one.created_at ?? null) : null,
+            tanggal_note: one ? undefined : aktif.length > 1 ? "beragam" : undefined,
+
+            sn: one ? one.serial_number : null,
+            sn_note: one ? undefined : aktif.length > 1 ? `${aktif.length} SN` : undefined,
+
+            stok_tersisa: l.stok_tersedia ?? 0,
+            siap_jual: l.siap_jual ?? 0,
+            minus: l.stok_minus ?? 0,
+        };
+    }), [filteredLaptops]);
+
     const totalSisa = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
-    const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.laptop_units || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length, 0);
+    const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.siap_jual ?? 0), 0);
     const totalMinus = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
-    const totalTerjual = filteredLaptops.reduce((s, l) => s + (l.terjual ?? 0), 0);
 
     return (
         <>
@@ -870,6 +757,7 @@ export function LaptopsContent() {
                             )}
                         </div>
                     </div>
+
                     {/* ── STAT CARDS ───────────────────────────────────── */}
                     <div className={`grid gap-3 animate-slideDown ${canViewTotalStok ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"}`}>
                         {canViewTotalStok && (
@@ -959,98 +847,53 @@ export function LaptopsContent() {
                         </div>
                     ) : (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
-                            <div className="overflow-x-auto table-scroll">
-                                <table className="w-full text-sm border-collapse">
-                                    <thead>
-                                        <tr className="bg-gray-50 border-b-2 border-gray-100">
-                                            <Th center sortKey="NO" activeSort={sortBy} onSort={handleSort}>No</Th>
-                                            <Th sortKey="NAMA" activeSort={sortBy} onSort={handleSort}>Nama Laptop</Th>
-                                            <Th sortKey="CPU" activeSort={sortBy} onSort={handleSort}>CPU</Th>
-                                            <Th sortKey="RAM" activeSort={sortBy} onSort={handleSort}>RAM</Th>
-                                            <Th sortKey="STORAGE" activeSort={sortBy} onSort={handleSort}>Storage</Th>
-                                            <Th right sortKey="PRICE" activeSort={sortBy} onSort={handleSort}>Harga Jual</Th>
-                                            {canViewTotalStok && <Th right sortKey="STOK" activeSort={sortBy} onSort={handleSort}>Stok Tersisa</Th>}
-                                            <Th right sortKey="SIAP" activeSort={sortBy} onSort={handleSort}>Siap Jual</Th>
-                                            {canViewTotalStok && <Th right sortKey="MINUS" activeSort={sortBy} onSort={handleSort}>Minus</Th>}
-                                            <Th right>Aksi</Th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredLaptops.map((item, idx) => (
-                                            <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0" onClick={() => openDetail(item)}>
-                                                <td className="px-4 py-3.5 text-center w-10">
-                                                    <span className="text-xs font-semibold text-gray-300 tabular-nums">{String(idx + 1).padStart(2, "0")}</span>
-                                                </td>
-                                                <td className="px-4 py-3.5 max-w-[200px]">
-                                                    <span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.laptop_name}>{item.laptop_name}</span>
-                                                </td>
-                                                <td className="px-4 py-3.5 max-w-[160px]">
-                                                    <span className="block text-xs text-gray-600 truncate" title={item.cpu}>{item.cpu || <span className="text-gray-200">—</span>}</span>
-                                                </td>
-                                                <td className="px-4 py-3.5 whitespace-nowrap">
-                                                    <span className="text-xs font-medium text-gray-600">{item.ram || <span className="text-gray-200">—</span>}</span>
-                                                </td>
-                                                <td className="px-4 py-3.5 whitespace-nowrap">
-                                                    <span className="text-xs font-medium text-gray-600">{item.storage || <span className="text-gray-200">—</span>}</span>
-                                                </td>
-                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                    <span className="text-[13px] font-bold text-gray-800 tabular-nums">{fmt(item.selling_price)}</span>
-                                                </td>
-                                                {canViewTotalStok && (
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                        <span className={`text-sm font-semibold tabular-nums ${(item.stok_tersedia ?? 0) === 0 ? "text-red-400" : "text-gray-700"}`}>
-                                                            {item.stok_tersedia ?? 0}
-                                                        </span>
-                                                    </td>
-                                                )}
-                                                <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                    <span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.siap_jual ?? 0) === 0 ? "bg-red-50 text-red-500 ring-1 ring-red-200" : "bg-green-50 text-green-700 ring-1 ring-green-200"}`}>
-                                                        {item.siap_jual ?? 0}
-                                                    </span>
-                                                </td>
-                                                {canViewTotalStok && (
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                        <span className={`text-sm font-semibold tabular-nums ${(item.stok_minus ?? 0) > 0 ? "text-red-500" : "text-gray-200"}`}>
-                                                            {(item.stok_minus ?? 0) > 0 ? `-${item.stok_minus}` : "—"}
-                                                        </span>
-                                                    </td>
-                                                )}
-                                                <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        {canViewBarcode && (
-                                                            <button onClick={() => setBarcodeTarget({ id: item.id, name: item.laptop_name })}
-                                                                className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150"
-                                                                title="Lihat Barcode">
-                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
-                                                                </svg>
-                                                            </button>
-                                                        )}
-                                                        {canViewUnits && (
-                                                            <Link href={`/dashboard/laptops/${item.id}/units`} onClick={e => e.stopPropagation()}
-                                                                className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150 flex items-center">
-                                                                Units
-                                                            </Link>
-                                                        )}
-                                                        {canEditLaptop && (
-                                                            <>
-                                                                <button onClick={() => openEdit(item)}
-                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150">
-                                                                    Edit
-                                                                </button>
-                                                                <button onClick={() => handleDelete(item.id)}
-                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-all duration-150">
-                                                                    Hapus
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+
+                            {/*  Tabel reusable — struktur kolom sama persis dengan halaman Units:
+                                No | Nama Laptop | CPU | RAM | Storage | Harga Modal | Harga Jual |
+                                Sumber | Tanggal Masuk | SN | ST | SJ | M | Aksi              */}
+                            <InventoryTable
+                                rows={tableRows}
+                                canSeePrivate={canSeePrivateBarang}
+                                canSeeStock={canViewTotalStok}
+                                sortBy={sortBy}
+                                onSort={handleSort}
+                                onRowClick={(row) => {
+                                    const l = filteredLaptops.find(x => x.id === row.id);
+                                    if (l) handleRowClick(l);
+                                }}
+                                renderActions={(row) => {
+                                    const l = filteredLaptops.find(x => x.id === row.id);
+                                    if (!l) return null;
+                                    return (
+                                        <>
+                                            {canViewBarcode && (
+                                                <button onClick={() => setBarcodeTarget({ id: l.id, name: l.laptop_name })}
+                                                    className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-150"
+                                                    title="Lihat Barcode">
+                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9V6a1 1 0 011-1h2M3 15v3a1 1 0 001 1h2m13-13h2a1 1 0 011 1v3m0 6v3a1 1 0 01-1 1h-2M9 5v14M12 5v14M15 5v14" />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                            {/*  Stok > 1 → wajib masuk halaman Units dulu untuk breakdown per-SN.
+                                                Stok = 1 → tidak ada tombol Units; klik baris langsung buka Pop-up Detail.
+                                                Tombol Edit & Hapus dihapus dari tabel — semua aksi pindah ke Pop-up. */}
+                                            {canViewUnits && row.stok_tersisa > 1 && (
+                                                <Link href={`/dashboard/laptops/${l.id}/units`}
+                                                    className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150 flex items-center gap-1">
+                                                    Units
+                                                    <span className="text-[10px] font-bold text-gray-400 tabular-nums">{row.stok_tersisa}</span>
+                                                </Link>
+                                            )}
+                                            {row.stok_tersisa === 1 && (
+                                                <span className="h-7 px-2.5 text-[11px] font-semibold text-gray-400 bg-gray-50 border border-gray-100 rounded-lg flex items-center">
+                                                    Detail
+                                                </span>
+                                            )}
+                                        </>
+                                    );
+                                }}
+                            />
 
                             {/* Table Footer */}
                             <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
@@ -1083,7 +926,7 @@ export function LaptopsContent() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <p className="text-xs text-blue-700 leading-relaxed">
-                            Setiap unit laptop memiliki SN, grade, dan harga modal sendiri.
+                            Setiap unit laptop memiliki SN, grade, sumber, dan harga modal sendiri.
                             Data unit ditambahkan setelah laptop berhasil dibuat.
                         </p>
                     </div>
@@ -1162,7 +1005,7 @@ export function LaptopsContent() {
                 </form>
             </Modal>
 
-            {/* Detail Modal */}
+            {/* Detail Modal — dipakai saat stok ≠ 1 (0 atau >1) */}
             <Modal open={modalMode === "detail"} onClose={closeModal} title="Detail Laptop" size="lg">
                 {detailLoading ? (
                     <ModalDetailSkeleton />
@@ -1217,14 +1060,17 @@ export function LaptopsContent() {
                             </div>
                         </div>
 
-                        <div className="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3.5">
-                            <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <p className="text-xs text-gray-600 leading-relaxed">
-                                Stok & harga modal dikelola per-unit. Klik <span className="font-bold text-gray-800">Lihat Units</span> untuk mengelola SN, grade, dan harga modal masing-masing unit.
-                            </p>
-                        </div>
+                        {/*  Daftar unit langsung di dalam pop-up — sebelumnya modal ini
+                            hanya menampilkan spesifikasi model, jadi terlihat kosong. */}
+                        <LaptopUnitsPreview
+                            laptopId={selectedLaptop.id}
+                            canSeePrivate={canSeePrivateBarang}
+                            onSelectUnit={(u: PreviewUnit) => {
+                                const l = selectedLaptop;
+                                closeModal();
+                                setTimeout(() => setUnitDetail({ unit: u as UnitDetailData, laptop: l }), 60);
+                            }}
+                        />
 
                         {(selectedLaptop.condition_note || selectedLaptop.notes) && (
                             <div className="space-y-2.5">
@@ -1273,6 +1119,34 @@ export function LaptopsContent() {
                 ) : null}
             </Modal>
 
+            {/*  Loader singkat saat menarik detail unit (stok = 1) */}
+            {unitDetailLoading && (
+                <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
+                    <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin" />
+                </div>
+            )}
+
+            {/*  Pop-up Detail unit — stok = 1 */}
+            {unitDetail && (
+                <UnitDetailModal
+                    unit={unitDetail.unit}
+                    laptopName={unitDetail.laptop.laptop_name}
+                    laptopMeta={[unitDetail.laptop.brand, unitDetail.laptop.cpu, unitDetail.laptop.ram, unitDetail.laptop.storage].filter(Boolean).join(" · ")}
+                    laptopSpecs={[
+                        { label: "Brand", value: unitDetail.laptop.brand },
+                        { label: "CPU", value: unitDetail.laptop.cpu },
+                        { label: "RAM", value: unitDetail.laptop.ram },
+                        { label: "Storage", value: unitDetail.laptop.storage },
+                        { label: "GPU", value: unitDetail.laptop.gpu },
+                        { label: "Display", value: unitDetail.laptop.display },
+                    ]} canEdit={canFullAccessBarang}
+                    canSeePrivate={canSeePrivateBarang}
+                    onClose={() => setUnitDetail(null)}
+                    onSaved={() => { setUnitDetail(null); fetchLaptops(); }}
+                    onEditLaptop={() => { const l = unitDetail.laptop; setUnitDetail(null); setTimeout(() => openEdit(l), 60); }}
+                />
+            )}
+
             {barcodeTarget && (
                 <BarcodeModal laptopId={barcodeTarget.id} laptopName={barcodeTarget.name} onClose={() => setBarcodeTarget(null)} />
             )}
@@ -1294,7 +1168,7 @@ export function LaptopsContent() {
                             if (!result.success) { showAlert(`Gagal menghapus: ${result.message || "Terjadi kesalahan"}`); return; }
                             if (modalMode === "detail") closeModal();
                             fetchLaptops();
-                            showAlert("Laptop berhasil dihapus ");
+                            showAlert("Laptop berhasil dihapus");
                         } catch {
                             showAlert("Gagal menghapus laptop. Periksa koneksi dan coba lagi.");
                         }
@@ -1413,6 +1287,7 @@ function ModalActions({ onCancel, loading, submitLabel }: { onCancel: () => void
     );
 }
 
+//  Skeleton disesuaikan dengan kolom baru (13 kolom + Aksi)
 function SkeletonTable() {
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1420,24 +1295,28 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "CPU", "RAM", "Storage", "Harga", "Stok Tersisa", "Siap", "Minus", "Aksi"].map(h => (
-                                <th key={h} className="px-4 py-3"><Shimmer h={10} /></th>
+                            {["No", "Nama Laptop", "CPU", "RAM", "Storage", "Harga Modal", "Harga Jual", "Sumber", "Tanggal Masuk", "SN", "ST", "SJ", "M", "Aksi"].map(h => (
+                                <th key={h} className="px-3 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
                         {[1, 2, 3, 4, 5, 6].map(r => (
                             <tr key={r} className="border-b border-gray-50">
-                                <td className="px-4 py-3.5"><Shimmer w={24} h={12} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={140} h={13} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={100} h={12} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={44} h={12} /></td>
-                                <td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td>
-                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td>
-                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={26} h={22} r="8px" /></div></td>
-                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={13} /></div></td>
-                                <td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={20} h={13} /></div></td>
-                                <td className="px-4 py-3.5"><div className="flex justify-end gap-1.5"><Shimmer w={44} h={28} r="8px" /><Shimmer w={36} h={28} r="8px" /></div></td>
+                                <td className="px-3 py-3.5"><Shimmer w={20} h={12} /></td>
+                                <td className="px-3 py-3.5"><Shimmer w={130} h={13} /></td>
+                                <td className="px-3 py-3.5"><Shimmer w={90} h={12} /></td>
+                                <td className="px-3 py-3.5"><Shimmer w={40} h={12} /></td>
+                                <td className="px-3 py-3.5"><Shimmer w={60} h={12} /></td>
+                                <td className="px-3 py-3.5"><div className="flex justify-end"><Shimmer w={70} h={12} /></div></td>
+                                <td className="px-3 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td>
+                                <td className="px-3 py-3.5"><Shimmer w={70} h={12} /></td>
+                                <td className="px-3 py-3.5"><Shimmer w={70} h={12} /></td>
+                                <td className="px-3 py-3.5"><Shimmer w={80} h={20} r="8px" /></td>
+                                <td className="px-3 py-3.5"><div className="flex justify-center"><Shimmer w={16} h={13} /></div></td>
+                                <td className="px-3 py-3.5"><div className="flex justify-center"><Shimmer w={26} h={22} r="8px" /></div></td>
+                                <td className="px-3 py-3.5"><div className="flex justify-center"><Shimmer w={16} h={13} /></div></td>
+                                <td className="px-3 py-3.5"><div className="flex justify-end gap-1.5"><Shimmer w={28} h={28} r="8px" /><Shimmer w={52} h={28} r="8px" /></div></td>
                             </tr>
                         ))}
                     </tbody>
@@ -1510,34 +1389,6 @@ function Modal({ open, onClose, title, children, size = "md" }: {
                 <div className="overflow-y-auto flex-1 px-6 py-5">{children}</div>
             </div>
         </div>
-    );
-}
-
-function Th({ children, right, center, sortKey, activeSort, onSort }: {
-    children: React.ReactNode; right?: boolean; center?: boolean;
-    sortKey?: string; activeSort?: string; onSort?: (asc: string, desc: string) => void;
-}) {
-    const isSortable = !!sortKey && !!onSort;
-    const ascKey = sortKey === 'NAMA' ? 'AZ' : (sortKey === 'NO' ? 'DEFAULT' : `${sortKey}_ASC`);
-    const descKey = sortKey === 'NAMA' ? 'ZA' : (sortKey === 'NO' ? 'NO_DESC' : `${sortKey}_DESC`);
-    const isActiveAsc = activeSort === ascKey;
-    const isActiveDesc = activeSort === descKey;
-
-    return (
-        <th
-            onClick={isSortable ? () => onSort(ascKey, descKey) : undefined}
-            className={`px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap ${right ? "text-right" : center ? "text-center" : "text-left"} ${isSortable ? "cursor-pointer hover:text-gray-700 select-none group/th" : ""}`}
-        >
-            <div className={`flex items-center gap-1.5 ${right ? "justify-end" : center ? "justify-center" : "justify-start"}`}>
-                {children}
-                {isSortable && (
-                    <div className="flex flex-col -space-y-[3px]">
-                        <svg className={`w-2.5 h-2.5 ${isActiveAsc ? "text-gray-800" : "text-gray-300 group-hover/th:text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 15l7-7 7 7" /></svg>
-                        <svg className={`w-2.5 h-2.5 ${isActiveDesc ? "text-gray-800" : "text-gray-300 group-hover/th:text-gray-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-                    </div>
-                )}
-            </div>
-        </th>
     );
 }
 
