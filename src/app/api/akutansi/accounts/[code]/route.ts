@@ -53,6 +53,17 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
       return NextResponse.json({ success: false, message: renameErr.message }, { status: 409 });
     }
 
+    // Pengaman tambahan: pastikan journal_lines & journal_opening_balances ikut
+    // pindah ke kode baru, jaga-jaga kalau RPC rename_account_code di DB tidak
+    // (atau belum) meng-cascade ke tabel-tabel ini — supaya Buku Besar/Neraca
+    // tidak pernah "kehilangan" mutasi akibat kode lama jadi yatim.
+    const [{ error: lineCascadeErr }, { error: openingCascadeErr }] = await Promise.all([
+      supabase.from("journal_lines").update({ account_code: trimmedNewCode }).eq("account_code", code),
+      supabase.from("journal_opening_balances").update({ account_code: trimmedNewCode }).eq("account_code", code),
+    ]);
+    if (lineCascadeErr) console.error("[accounts PUT] cascade journal_lines:", lineCascadeErr.message);
+    if (openingCascadeErr) console.error("[accounts PUT] cascade opening_balances:", openingCascadeErr.message);
+
     effectiveCode = trimmedNewCode;
   }
 
