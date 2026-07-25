@@ -677,6 +677,130 @@ function MentionDropdown({ query, users, selectedIndex, onSelect }: MentionDropd
     );
 }
 
+// ─── CameraCaptureModal ───────────────────────────────────────────────────────
+interface CameraCaptureModalProps {
+    onCapture: (file: File) => void;
+    onClose: () => void;
+}
+
+function CameraCaptureModal({ onCapture, onClose }: CameraCaptureModalProps) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [ready, setReady] = useState(false);
+    const [capturing, setCapturing] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: "environment" } },
+                    audio: false,
+                });
+                if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+                streamRef.current = stream;
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    await videoRef.current.play();
+                }
+                setReady(true);
+            } catch (err) {
+                console.error("[CameraCaptureModal]", err);
+                setError("Tidak bisa mengakses kamera. Pastikan izin kamera sudah diizinkan di browser.");
+            }
+        }
+        startCamera();
+        return () => {
+            cancelled = true;
+            streamRef.current?.getTracks().forEach(t => t.stop());
+        };
+    }, []);
+
+    useEffect(() => {
+        const handler = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        document.addEventListener("keydown", handler);
+        return () => document.removeEventListener("keydown", handler);
+    }, [onClose]);
+
+    const handleCapture = () => {
+        const video = videoRef.current;
+        if (!video || capturing) return;
+        setCapturing(true);
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { setCapturing(false); return; }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+            setCapturing(false);
+            if (!blob) return;
+            const file = new File([blob], `camera_${Date.now()}.jpg`, { type: "image/jpeg" });
+            streamRef.current?.getTracks().forEach(t => t.stop());
+            onCapture(file);
+        }, "image/jpeg", 0.92);
+    };
+
+    const handleClose = () => {
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center"
+            style={{ backgroundColor: "rgba(0,0,0,0.9)", backdropFilter: "blur(8px)" }}>
+            <div className="relative w-full max-w-lg mx-4 flex flex-col items-center gap-4">
+                <button
+                    onClick={handleClose}
+                    className="absolute -top-14 right-0 w-11 h-11 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                    style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+
+                {error ? (
+                    <div className="flex flex-col items-center gap-3 text-center px-6 py-10 bg-white"
+                        style={{ borderRadius: 20 }}>
+                        <Camera className="w-8 h-8 text-slate-300" />
+                        <p className="text-sm font-semibold text-slate-700">{error}</p>
+                        <button onClick={handleClose}
+                            className="text-xs font-semibold px-4 py-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition">
+                            Tutup
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="relative w-full overflow-hidden" style={{ borderRadius: 20, aspectRatio: "4/3", background: "#000" }}>
+                            <video ref={videoRef} playsInline muted
+                                className="w-full h-full object-cover" />
+                            {!ready && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="animate-spin rounded-full"
+                                        style={{ width: 28, height: 28, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+                                </div>
+                            )}
+                        </div>
+                        <button
+                            onClick={handleCapture}
+                            disabled={!ready || capturing}
+                            className="w-16 h-16 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                            style={{ background: "#fff", border: "4px solid rgba(255,255,255,0.3)" }}>
+                            {capturing ? (
+                                <div className="animate-spin rounded-full"
+                                    style={{ width: 18, height: 18, border: "2.5px solid #e5e7eb", borderTopColor: "#2563eb" }} />
+                            ) : (
+                                <div className="rounded-full" style={{ width: 52, height: 52, background: "#2563eb" }} />
+                            )}
+                        </button>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ─── InputArea ────────────────────────────────────────────────────────────────
 interface InputAreaProps {
     currentUser: CurrentUser;
@@ -701,10 +825,10 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
     const [mentionIndex, setMentionIndex] = useState(0);
     const [mentionStart, setMentionStart] = useState(0);
     const [showAttachMenu, setShowAttachMenu] = useState(false);
+    const [showCameraModal, setShowCameraModal] = useState(false);
 
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
-    const cameraRef = useRef<HTMLInputElement>(null);
     const docRef = useRef<HTMLInputElement>(null);
     const attachMenuRef = useRef<HTMLDivElement>(null);
 
@@ -837,10 +961,17 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
         e.target.value = "";
     };
 
-    const cancelPreview = () => {
+   const cancelPreview = () => {
         if (preview?.url) URL.revokeObjectURL(preview.url);
         setPreview(null);
         setSelectedFile(null);
+    };
+
+    const handleCameraCapture = (file: File) => {
+        setShowCameraModal(false);
+        const previewUrl = URL.createObjectURL(file);
+        setPreview({ url: previewUrl, name: file.name, type: "image", size: file.size });
+        setSelectedFile(file);
     };
 
     const canSend = preview ? !uploading : (!!input.trim() && !sending);
@@ -952,8 +1083,8 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                                     border: "1px solid #e5e7eb",
                                     boxShadow: "0 16px 48px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.05)",
                                 }}>
-                                <button
-                                    onClick={() => { cameraRef.current?.click(); setShowAttachMenu(false); }}
+                               <button
+                                    onClick={() => { setShowCameraModal(true); setShowAttachMenu(false); }}
                                     className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors">
                                     <div className="w-8 h-8 flex items-center justify-center flex-shrink-0"
                                         style={{ borderRadius: 10, background: "#fce7f3", color: "#db2777" }}>
@@ -1020,10 +1151,16 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     </div>
                 )}
 
-                <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange} accept="image/*,video/*" />
-                <input ref={cameraRef} type="file" className="hidden" onChange={handleFileChange} accept="image/*" capture="environment" />
+              <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange} accept="image/*,video/*" />
                 <input ref={docRef} type="file" className="hidden" onChange={handleFileChange} accept="*/*" />
             </div>
+
+            {showCameraModal && (
+                <CameraCaptureModal
+                    onCapture={handleCameraCapture}
+                    onClose={() => setShowCameraModal(false)}
+                />
+            )}
         </div>
     );
 }

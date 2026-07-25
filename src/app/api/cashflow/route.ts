@@ -512,20 +512,20 @@ export const GET = withAuth(async () => {
                 e.is_audited &&
                 Number(e.nominal ?? 0) !== tx.nominal;
 
-            return { ...e, is_voided: isVoided, is_stale: isStale, source_nominal: tx?.nominal ?? null, tx_payment_method: tx?.paymentMethod ?? null };
+           return { ...e, is_voided: isVoided, is_stale: isStale, source_nominal: tx?.nominal ?? null, tx_payment_method: tx?.paymentMethod ?? null, invoice_number: e.source_id as string };
         }
 
         if (e.source_type === "TRANSACTION_PAYMENT" && e.source_id) {
             const invoiceNumber = paymentInvoiceMap.get(e.source_id as string);
             const tx = invoiceNumber ? txMap.get(invoiceNumber) : undefined;
             const isVoided = !!tx && tx.status === "CANCELLED";
-            return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null, tx_payment_method: tx?.paymentMethod ?? null };
+            return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null, tx_payment_method: tx?.paymentMethod ?? null, invoice_number: invoiceNumber ?? null };
         }
 
         if (e.source_type === "TRANSACTION_DP" && e.source_id) {
             const tx = txMap.get(e.source_id as string);
             const isVoided = !!tx && tx.status === "CANCELLED";
-            return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null, tx_payment_method: tx?.paymentMethod ?? null };
+            return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null, tx_payment_method: tx?.paymentMethod ?? null, invoice_number: e.source_id as string };
         }
 
         return { ...e, is_voided: false, is_stale: false };
