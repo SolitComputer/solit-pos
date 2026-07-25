@@ -261,7 +261,7 @@ export const SERVICE_TEKNISI_ROLES: UserRole[] = [
 
 export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PURCHASING"];
 
-// PURCHASING boleh lihat & input cashflow, tapi tidak boleh audit uang keluar.
+export const ACCESSORY_ONLY_SALES_ROLES: UserRole[] = ["CUSTOMER_SERVICE"];
 export const CASHFLOW_AUDIT_OUT_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 
 // Tidak ada role SUPERADMIN di sistem ini — ADMIN & PROGRAMMER dipakai sebagai
@@ -342,7 +342,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/payment": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
-    "PKL_SALES", "KEPALA_ZENITH",
+    "PKL_SALES", "KEPALA_ZENITH", "CUSTOMER_SERVICE",
   ],
 
   "/api/messages": ALL_ROLES.filter(r => !r.startsWith("PKL")),
@@ -369,6 +369,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "CUSTOMER_SERVICE",
   ],
   "/api/transaction": [
     ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "PURCHASING", "CREW_SALES", "SOTECH",
@@ -513,6 +514,7 @@ export const PERMISSIONS = {
     "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "CUSTOMER_SERVICE",
   ] as UserRole[],
 
   EDIT_TRANSACTION: [

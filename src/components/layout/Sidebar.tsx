@@ -10,7 +10,7 @@ import { mergeMenuGroups, isPKLRole, expandRolesWithParents } from "@/lib/permis
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
 
-const CACHE_KEY = "solit_sidebar_user";
+const CACHE_KEY = "solit_sidebar_userit";
 const RAIL_KEY = "solit_sidebar_rail";
 const WIDTH_KEY = "solit_sidebar_width";
 const GROUPS_KEY = "solit_sidebar_groups_open";

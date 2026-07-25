@@ -5,6 +5,7 @@ import { generateInvoice } from "@/lib/invoice";
 import { sendWhatsapp, buildPaymentMessage } from "@/service/whatsapp";
 import { logActivity } from "@/lib/activityLogger";
 import { recordOutflow } from "@/lib/accessoryOutflow";
+import { ACCESSORY_ONLY_SALES_ROLES, UserRole } from "@/lib/permissions";
 
 function toNumber(value: any): number {
     if (value === null || value === undefined) return 0;
@@ -88,6 +89,14 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const dpAmountInput = isPendingDp ? Math.max(0, Math.round(Number(body.dp_amount) || 0)) : 0;
         const isAmbilDulu = isPendingDp && dpAmountInput === 0;
         const isDP = isPendingDp && dpAmountInput > 0;
+
+        // ── Role Customer Service hanya boleh transaksi aksesoris (tanpa laptop) ──
+        if (ACCESSORY_ONLY_SALES_ROLES.includes(user.role as UserRole) && laptopUnits.length > 0) {
+            return NextResponse.json({
+                success: false,
+                message: "Customer Service hanya bisa membuat transaksi aksesoris (tanpa unit laptop).",
+            }, { status: 403 });
+        }
 
         // Minimal 1 item (laptop ATAU aksesori)
         if (laptopUnits.length === 0 && accessoriesInput.length === 0)
@@ -239,6 +248,11 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 customer_birth_date: body.customer_birth_date || null,
                 status: txStatus,
                 paid_at: txStatus === "PAID" ? new Date().toISOString() : null,
+                item_kind: hasLaptops && accessoriesInput.length > 0
+                    ? "mixed"
+                    : hasLaptops
+                        ? "laptop"
+                        : "accessory",
             })
             .select().single();
         if (txError) throw txError;
