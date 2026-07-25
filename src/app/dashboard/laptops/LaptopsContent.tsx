@@ -875,9 +875,11 @@ export function LaptopsContent() {
                                                     </svg>
                                                 </button>
                                             )}
-                                            {/*  Stok > 1 → wajib masuk halaman Units dulu untuk breakdown per-SN.
-                                                Stok = 1 → tidak ada tombol Units; klik baris langsung buka Pop-up Detail.
-                                                Tombol Edit & Hapus dihapus dari tabel — semua aksi pindah ke Pop-up. */}
+                                            {/*  Stok > 1 → arahkan ke halaman Units untuk kelola banyak SN sekaligus.
+                                                Stok = 1 → TIDAK diarahkan ke halaman Units sama sekali. Klik baris
+                                                membuka Pop-up Detail, dan "Tambah Unit" untuk kasus ini sudah ada
+                                                LANGSUNG di dalam pop-up itu (lihat UnitDetailModal → tombol
+                                                "+ Tambah Unit", buka form tambah unit tanpa pindah halaman). */}
                                             {canViewUnits && row.stok_tersisa > 1 && (
                                                 <Link href={`/dashboard/laptops/${l.id}/units`}
                                                     className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150 flex items-center gap-1">
@@ -1141,8 +1143,10 @@ export function LaptopsContent() {
                         { label: "Display", value: unitDetail.laptop.display },
                     ]} canEdit={canFullAccessBarang}
                     canSeePrivate={canSeePrivateBarang}
+                    defaultSellingPrice={unitDetail.laptop.selling_price}
                     onClose={() => setUnitDetail(null)}
                     onSaved={() => { setUnitDetail(null); fetchLaptops(); }}
+                    onCreated={() => { setUnitDetail(null); fetchLaptops(); }}
                     onEditLaptop={() => { const l = unitDetail.laptop; setUnitDetail(null); setTimeout(() => openEdit(l), 60); }}
                 />
             )}
