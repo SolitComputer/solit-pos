@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { isValidPeriod } from "@/lib/accounting";
+import { AKUN, isValidPeriod } from "@/lib/accounting";
 import { getTransactionMetaByInvoices } from "@/lib/accountingSource";
 
 function getAdmin(): SupabaseClient {
@@ -136,8 +136,26 @@ export const GET = withAuth(async (req) => {
       counterMap.set(l.entry_id, arr);
     }
 
-    const ownLines = allLines
-      .filter((l) => l.account_code === accountCode)
+    const syntheticIds = new Set<string>();
+    const syntheticLines: LineRow[] = [];
+    if (accountCode === AKUN.HPP || accountCode === AKUN.MODAL_KELUAR) {
+      for (const entry of entryMap.values()) {
+        if (entry.source_type !== "TRANSACTION" || !entry.source_id) continue;
+        const hasHppLine = allLines.some((l) => l.entry_id === entry.id && l.account_code === AKUN.HPP);
+        if (hasHppLine) continue; // modal sudah diinput normal — tidak perlu baris sintetis
+        const syntheticId = `${entry.id}-${accountCode === AKUN.HPP ? "hpp" : "modal-keluar"}-missing`;
+        syntheticIds.add(syntheticId);
+        syntheticLines.push({
+          id: syntheticId,
+          entry_id: entry.id,
+          account_code: accountCode,
+          side: accountCode === AKUN.HPP ? "KREDIT" : "DEBIT",
+          nominal: 0,
+        });
+      }
+    }
+
+    const ownLines = [...allLines.filter((l) => l.account_code === accountCode), ...syntheticLines]
       .sort((a, b) => {
         const ea = entryMap.get(a.entry_id)!;
         const eb = entryMap.get(b.entry_id)!;
@@ -146,11 +164,7 @@ export const GET = withAuth(async (req) => {
         return new Date(ea.created_at).getTime() - new Date(eb.created_at).getTime();
       });
 
-    // ── 3.5) Ambil status "sudah dicek" untuk baris-baris akun ini ──
-    // (baru) — tanpa ini, field checked/checked_at tidak pernah dikirim ke frontend,
-    // jadi checkbox selalu terlihat "kosong" tiap kali halaman di-refresh/dibuka lagi,
-    // padahal data cek-nya sudah tersimpan di tabel journal_line_checks.
-    const ownLineIds = ownLines.map((l) => l.id);
+    const ownLineIds = ownLines.filter((l) => !syntheticIds.has(l.id)).map((l) => l.id);
 
     const checkedMap = new Map<string, string>(); // line_id -> checked_at
     if (ownLineIds.length > 0) {
@@ -166,7 +180,7 @@ export const GET = withAuth(async (req) => {
       }
     }
 
-   let running = saldoAwal;
+    let running = saldoAwal;
     const lines = ownLines.map((l) => {
       const entry = entryMap.get(l.entry_id)!;
       const debit = l.side === "DEBIT" ? Number(l.nominal) : 0;
@@ -183,13 +197,15 @@ export const GET = withAuth(async (req) => {
         tanggal: entry.tanggal,
         keterangan: entry.keterangan,
         ref,
+        side: l.side, // (baru) — dipakai frontend buat nentuin baris sintetis nominal 0 harus tampil di kolom Debit atau Kredit
         debit,
         kredit,
         saldo_debit: running >= 0 ? running : 0,
         saldo_kredit: running < 0 ? Math.abs(running) : 0,
-        checked: !!checkedAt, // (baru)
-        checked_at: checkedAt, // (baru)
-        trx_meta: trxMeta, // (baru)
+        checked: !!checkedAt,
+        checked_at: checkedAt,
+        trx_meta: trxMeta,
+        is_synthetic: syntheticIds.has(l.id),
       };
     });
 

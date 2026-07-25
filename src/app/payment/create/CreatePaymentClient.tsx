@@ -1237,6 +1237,13 @@ export default function CreatePaymentPage() {
                                             </div>
                                         </div>
                                     ))}
+
+                                    {!selectedUnits.length && (
+                                        <div className="flex justify-between text-xs border-t border-gray-200 pt-2 px-1">
+                                            <span className="text-gray-600 font-semibold">Total ({selectedAccessories.length} item)</span>
+                                            <span className="font-bold text-gray-800 font-mono">{fmt(rawDealPrice)}</span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -1245,7 +1252,9 @@ export default function CreatePaymentPage() {
                             <div className="flex gap-2 pt-1">
                                 <button type="button" onClick={() => setStep(1)} className={`${btnSecondary} inline-flex items-center justify-center gap-1.5`}><ChevronLeft size={16} /> Kembali</button>
                                 <button type="button" onClick={() => {
-                                    if (!selectedUnits.length) { alert("Cari dan pilih minimal 1 unit dulu"); return; }
+                                    const paidAcc = selectedAccessories.filter(a => !a.is_bonus).length;
+                                    if (!selectedUnits.length && selectedAccessories.length === 0) { alert("Pilih minimal 1 unit atau aksesori dulu"); return; }
+                                    if (!selectedUnits.length && paidAcc === 0) { alert("Transaksi hanya berisi bonus. Tambahkan unit atau aksesori berbayar."); return; }
                                     if (!rawDealPrice) { alert("Masukkan harga deal"); return; }
                                     if (isTradeIn && !tradeInItem) { alert("Isi nama barang tukar"); return; }
                                     if (isTradeIn && !tradeInValue) { alert("Isi nilai barang tukar"); return; }
@@ -1538,7 +1547,7 @@ export default function CreatePaymentPage() {
                 </form>
 
                 {/* ── Modal Konfirmasi ── */}
-                {showConfirmModal && selectedUnits.length > 0 && (
+                {showConfirmModal && (selectedUnits.length > 0 || selectedAccessories.length > 0) && (
                     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
                         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
                         <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh]">
@@ -1551,7 +1560,10 @@ export default function CreatePaymentPage() {
                                     <div>
                                         <p className="font-bold text-white text-sm">Konfirmasi Transaksi</p>
                                         <p className="text-xs text-gray-300 mt-0.5">
-                                            {selectedUnits.length} unit · {fmt(rawDealPrice)}
+                                            {[
+                                                selectedUnits.length > 0 ? `${selectedUnits.length} unit` : null,
+                                                selectedAccessories.length > 0 ? `${selectedAccessories.length} aksesori` : null,
+                                            ].filter(Boolean).join(" · ")} · {fmt(rawDealPrice)}
                                         </p>
                                     </div>
                                 </div>
@@ -1580,15 +1592,30 @@ export default function CreatePaymentPage() {
                                     <div className="h-px bg-gray-200" />
 
                                     {/* Unit list */}
-                                    <div>
-                                        <p className="text-xs text-gray-400 mb-1.5 inline-flex items-center gap-1"><Laptop size={12} /> Unit ({selectedUnits.length})</p>
-                                        {selectedUnits.map((u, i) => (
-                                            <div key={u.unit_id} className="flex justify-between text-xs mb-1">
-                                                <span className="text-gray-600 truncate max-w-[45%]">{i + 1}. {u.laptop_name}</span>
-                                                <span className="font-mono text-gray-700 font-semibold">{fmt(unitPrices[u.unit_id] || 0)}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    {selectedUnits.length > 0 && (
+                                        <div>
+                                            <p className="text-xs text-gray-400 mb-1.5 inline-flex items-center gap-1"><Laptop size={12} /> Unit ({selectedUnits.length})</p>
+                                            {selectedUnits.map((u, i) => (
+                                                <div key={u.unit_id} className="flex justify-between text-xs mb-1">
+                                                    <span className="text-gray-600 truncate max-w-[45%]">{i + 1}. {u.laptop_name}</span>
+                                                    <span className="font-mono text-gray-700 font-semibold">{fmt(unitPrices[u.unit_id] || 0)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Aksesori list */}
+                                    {selectedAccessories.length > 0 && (
+                                        <div>
+                                            <p className="text-xs text-gray-400 mb-1.5 inline-flex items-center gap-1"><Gift size={12} /> Aksesori ({selectedAccessories.length})</p>
+                                            {selectedAccessories.map((a, i) => (
+                                                <div key={a.accessory_id} className="flex justify-between text-xs mb-1">
+                                                    <span className="text-gray-600 truncate max-w-[45%]">{i + 1}. {a.name}{a.quantity > 1 ? ` x${a.quantity}` : ""}</span>
+                                                    <span className="font-mono text-gray-700 font-semibold">{a.is_bonus ? "GRATIS" : fmt(a.unit_price * a.quantity)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
 
                                     {/* Trade-in */}
                                     {isTradeIn && tradeInValue > 0 && (

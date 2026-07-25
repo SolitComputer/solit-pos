@@ -33,7 +33,7 @@ export const createPaymentSchema = z.object({
   company_name: z.string().optional(),
   customer_phone: z.string().min(10, "Nomor HP tidak valid"),
 
-  units: z.array(unitItemSchema).min(1, "Minimal 1 unit harus dipilih"),
+  units: z.array(unitItemSchema).default([]),
 
   laptop_id: z.string().default(""),
   laptop_name: z.string().default(""),
