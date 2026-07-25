@@ -28,8 +28,8 @@ export default function Neraca({ period }: { period: string }) {
         setLoading(true);
         setError("");
         try {
-            const res = await fetch(`/api/akutansi/neraca?period=${period}`);
-            const json = await res.json();
+            const res = await fetch(`/api/akutansi/neraca?period=${period}`, { cache: "no-store" });
+             const json = await res.json();
             if (!json.success) {
                 setError(json.message ?? "Gagal memuat neraca");
                 setData(null);

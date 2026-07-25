@@ -21,6 +21,10 @@ export interface InventoryRow {
     harga_modal: number | null;
     harga_modal_note?: string;
 
+    /** Modal sparepart per-unit (agregat kalau >1 unit) — kolom baru Data Barang */
+    sparepart_modal?: number | null;
+    sparepart_note?: string;
+
     harga_jual: number;
 
     sumber: string | null;
@@ -43,8 +47,14 @@ interface Props {
     canSeePrivate: boolean;
     /** Boleh lihat kolom ST & M (agregat stok internal) */
     canSeeStock: boolean;
+    /** Tampilkan kolom Modal Sparepart (opt-in — hanya Data Barang) */
+    showSparepart?: boolean;
+    /** Tampilkan kolom Total Jual = Harga Jual × Stok Tersisa (opt-in — Data Barang) */
+    showTotalJual?: boolean;
     onRowClick?: (row: InventoryRow) => void;
     renderActions?: (row: InventoryRow) => React.ReactNode;
+    /** Render kolom Audit di samping Aksi (opt-in — Data Barang) */
+    renderAudit?: (row: InventoryRow) => React.ReactNode;
     /** Header sortable — opsional, dipakai Data Barang */
     sortBy?: string;
     onSort?: (asc: string, desc: string) => void;
@@ -62,10 +72,11 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
 );
 
-type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "PRICE" | "SN" | "STOK" | "SIAP";
+type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "PRICE" | "SN" | "STOK" | "SIAP" | "MINUS";
 
 export default function InventoryTable({
-    rows, canSeePrivate, canSeeStock, onRowClick, renderActions, sortBy, onSort,
+    rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual,
+    onRowClick, renderActions, renderAudit, sortBy, onSort,
 }: Props) {
     const [localSort, setLocalSort] = useState<{ col: SortKey; dir: "asc" | "desc" } | null>(null);
 
@@ -120,93 +131,22 @@ export default function InventoryTable({
                 <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                         <Th center>No</Th>
-                        <Th
-                            colKey="NAMA"
-                            titleName="Nama Laptop"
-                            isNumeric={false}
-                            currentSort={localSort}
-                            onSelectSort={(dir) => handleSort("NAMA", dir, "AZ", "ZA")}
-                            onResetSort={handleResetSort}
-                            className="w-full"
-                        />
-                        <Th
-                            colKey="CPU"
-                            titleName="CPU"
-                            isNumeric={false}
-                            currentSort={localSort}
-                            onSelectSort={(dir) => handleSort("CPU", dir, "CPU_ASC", "CPU_DESC")}
-                            onResetSort={handleResetSort}
-                        />
-                        <Th
-                            colKey="RAM"
-                            titleName="RAM"
-                            isNumeric={false}
-                            currentSort={localSort}
-                            onSelectSort={(dir) => handleSort("RAM", dir, "RAM_ASC", "RAM_DESC")}
-                            onResetSort={handleResetSort}
-                        />
-                        <Th
-                            colKey="STORAGE"
-                            titleName="Storage"
-                            isNumeric={false}
-                            currentSort={localSort}
-                            onSelectSort={(dir) => handleSort("STORAGE", dir, "STORAGE_ASC", "STORAGE_DESC")}
-                            onResetSort={handleResetSort}
-                        />
-                        {canSeePrivate && (
-                            <Th
-                                right
-                                colKey="MODAL"
-                                titleName="Harga Modal"
-                                isNumeric={true}
-                                currentSort={localSort}
-                                onSelectSort={(dir) => handleSort("MODAL", dir, "MODAL_ASC", "MODAL_DESC")}
-                                onResetSort={handleResetSort}
-                            />
-                        )}
-                        <Th
-                            right
-                            colKey="PRICE"
-                            titleName="Harga Official"
-                            isNumeric={true}
-                            currentSort={localSort}
-                            onSelectSort={(dir) => handleSort("PRICE", dir, "PRICE_ASC", "PRICE_DESC")}
-                            onResetSort={handleResetSort}
-                        />
+                        <Th sortKey="NAMA" activeSort={sortBy} onSort={onSort}>Nama Laptop</Th>
+                        <Th sortKey="CPU" activeSort={sortBy} onSort={onSort}>CPU</Th>
+                        <Th sortKey="RAM" activeSort={sortBy} onSort={onSort}>RAM</Th>
+                        <Th sortKey="STORAGE" activeSort={sortBy} onSort={onSort}>Storage</Th>
+                        {canSeePrivate && <Th right>Modal Laptop</Th>}
+                        {canSeePrivate && showSparepart && <Th right>Modal Sparepart</Th>}
+                        <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Jual</Th>
+                        {showTotalJual && canSeeStock && <Th right>Total Jual</Th>}
                         {canSeePrivate && <Th>Sumber</Th>}
                         {canSeePrivate && <Th>Tanggal Masuk</Th>}
-                        <Th
-                            colKey="SN"
-                            titleName="SN"
-                            isNumeric={false}
-                            currentSort={localSort}
-                            onSelectSort={(dir) => handleSort("SN", dir, "SN_ASC", "SN_DESC")}
-                            onResetSort={handleResetSort}
-                        />
-                        {canSeeStock && (
-                            <Th
-                                center
-                                colKey="STOK"
-                                titleName="ST"
-                                title="Stok Tersisa"
-                                isNumeric={true}
-                                currentSort={localSort}
-                                onSelectSort={(dir) => handleSort("STOK", dir, "STOK_ASC", "STOK_DESC")}
-                                onResetSort={handleResetSort}
-                            />
-                        )}
-                        <Th
-                            center
-                            colKey="SIAP"
-                            titleName="SJ"
-                            title="Siap Jual"
-                            isNumeric={true}
-                            currentSort={localSort}
-                            onSelectSort={(dir) => handleSort("SIAP", dir, "SIAP_ASC", "SIAP_DESC")}
-                            onResetSort={handleResetSort}
-                        />
-                        {canSeeStock && <Th center title="Minus">M</Th>}
-                        {renderActions && <Th center>Aksi</Th>}
+                        <Th>SN</Th>
+                        {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
+                        <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
+                        {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
+                        {renderAudit && <Th center>Audit</Th>}
+                        {renderActions && <Th right>Aksi</Th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -252,9 +192,25 @@ export default function InventoryTable({
                                 </td>
                             )}
 
-                            <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
+                            {canSeePrivate && showSparepart && (
+                                <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                    {row.sparepart_modal != null ? (
+                                        <span className="text-xs font-semibold text-gray-600 tabular-nums">{fmt(row.sparepart_modal)}</span>
+                                    ) : row.sparepart_note ? (
+                                        <Note>{row.sparepart_note}</Note>
+                                    ) : <Dash />}
+                                </td>
+                            )}
+
+                            <td className="px-3 py-3.5 text-right whitespace-nowrap">
                                 <span className="text-[13px] font-bold text-gray-800 tabular-nums">{fmt(row.harga_jual)}</span>
                             </td>
+
+                            {showTotalJual && canSeeStock && (
+                                <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                    <span className="text-[13px] font-bold text-gray-900 tabular-nums">{fmt(row.harga_jual * row.stok_tersisa)}</span>
+                                </td>
+                            )}
 
                             {canSeePrivate && (
                                 <td className="px-3.5 py-3.5 max-w-[130px]">
@@ -300,9 +256,15 @@ export default function InventoryTable({
                                 </td>
                             )}
 
+                            {renderAudit && (
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                    {renderAudit(row)}
+                                </td>
+                            )}
+
                             {renderActions && (
-                                <td className="px-4 py-3.5 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                    <div className="flex items-center justify-center gap-1">{renderActions(row)}</div>
+                                <td className="px-3 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                    <div className="flex items-center justify-end gap-1">{renderActions(row)}</div>
                                 </td>
                             )}
                         </tr>
@@ -314,24 +276,27 @@ export default function InventoryTable({
 }
 
 function Th({
-    children, titleName, right, center, title, colKey, isNumeric, currentSort, onSelectSort, onResetSort, className,
+    children, titleName, right, center, title, sortKey, isNumeric, activeSort, onSort, className,
 }: {
     children?: React.ReactNode;
     titleName?: string;
     right?: boolean;
     center?: boolean;
     title?: string;
-    colKey?: SortKey;
+    sortKey?: SortKey;
     isNumeric?: boolean;
-    currentSort?: { col: SortKey; dir: "asc" | "desc" } | null;
-    onSelectSort?: (dir: "asc" | "desc") => void;
-    onResetSort?: () => void;
+    activeSort?: string;
+    onSort?: (asc: string, desc: string) => void;
     className?: string;
 }) {
     const [open, setOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
-    const isCurrent = currentSort?.col === colKey;
+    const ascCode = sortKey ? `${sortKey}_ASC` : "";
+    const descCode = sortKey ? `${sortKey}_DESC` : "";
+    const isCurrent = !!sortKey && (activeSort === ascCode || activeSort === descCode);
+    const currentDir: "asc" | "desc" | undefined =
+        activeSort === ascCode ? "asc" : activeSort === descCode ? "desc" : undefined;
 
     useEffect(() => {
         if (!open) return;
@@ -344,7 +309,7 @@ function Th({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [open]);
 
-    const isFilterable = !!colKey && !!onSelectSort;
+    const isFilterable = !!sortKey && !!onSort;
     const label = titleName || (typeof children === "string" ? children : "");
 
     return (
@@ -374,14 +339,14 @@ function Th({
                                     <span>Sort {label}</span>
                                     {isCurrent && (
                                         <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                                            {currentSort?.dir.toUpperCase()}
+                                            {currentDir?.toUpperCase()}
                                         </span>
                                     )}
                                 </div>
 
                                 <button
-                                    onClick={() => { onSelectSort!("asc"); setOpen(false); }}
-                                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors text-xs ${isCurrent && currentSort?.dir === "asc" ? "font-bold text-emerald-600 bg-emerald-50/50" : "text-gray-700"}`}
+                                    onClick={() => { onSort!(ascCode, descCode); setOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors text-xs ${isCurrent && currentDir === "asc" ? "font-bold text-emerald-600 bg-emerald-50/50" : "text-gray-700"}`}
                                 >
                                     <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
@@ -390,28 +355,14 @@ function Th({
                                 </button>
 
                                 <button
-                                    onClick={() => { onSelectSort!("desc"); setOpen(false); }}
-                                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors text-xs ${isCurrent && currentSort?.dir === "desc" ? "font-bold text-emerald-600 bg-emerald-50/50" : "text-gray-700"}`}
+                                    onClick={() => { onSort!(ascCode, descCode); setOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors text-xs ${isCurrent && currentDir === "desc" ? "font-bold text-emerald-600 bg-emerald-50/50" : "text-gray-700"}`}
                                 >
                                     <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m-4 0l4 4m0 0l-4-4m4 4V4" />
                                     </svg>
                                     {isNumeric ? "Sort Tertinggi → Terendah" : "Sort Z → A"}
                                 </button>
-
-                                {isCurrent && onResetSort && (
-                                    <div className="border-t border-gray-100 mt-1 pt-1">
-                                        <button
-                                            onClick={() => { onResetSort(); setOpen(false); }}
-                                            className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 flex items-center gap-2 transition-colors text-[11px] font-semibold"
-                                        >
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                            Reset Urutan
-                                        </button>
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>
