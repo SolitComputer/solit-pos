@@ -7,7 +7,7 @@ import * as faceapi from "face-api.js";
 type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
   | "enrolling" | "verifying" | "success" | "error"
-  | "out-of-range" | "out-of-time" | "no-camera" | "day-off";
+  | "out-of-range" | "out-of-time" | "no-camera" | "day-off" | "gps-denied";
 
 const MAX_ATTEMPTS = 5;
 const AUTO_CAPTURE_CONFIDENCE = 0.75;
@@ -63,6 +63,7 @@ export default function FaceVerifyPage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const holdCountRef = useRef(0);
   const isCapturingRef = useRef(false);
+  const isDetectingRef = useRef(false);
   const logEndRef = useRef<HTMLDivElement>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptsRef = useRef(0);
@@ -115,6 +116,34 @@ export default function FaceVerifyPage() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
+  // Dipakai baik untuk percobaan pertama maupun fallback timeout,
+  // biar logic sukses tidak duplikat.
+  const handleGpsSuccess = useCallback((position: GeolocationPosition) => {
+    const { latitude, longitude, accuracy } = position.coords;
+    const distance = calculateDistance(latitude, longitude, COMPANY_LAT, COMPANY_LNG);
+    const distRound = Math.round(distance);
+    setCurrentDistance(distRound);
+    setGpsCoords({ latitude, longitude, accuracy });
+    setGpsLoading(false);
+    addLog(
+      `GPS: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} | ±${Math.round(accuracy)}m | jarak ${distRound}m`,
+      distance <= MAX_DISTANCE_METERS ? "ok" : "warn"
+    );
+    if (distance > MAX_DISTANCE_METERS) {
+      setStage("out-of-range");
+      setMessage(`Anda berada di luar radius (${distRound}m)`);
+    } else {
+      addLog(`Lokasi valid — dalam radius ${MAX_DISTANCE_METERS}m`, "ok");
+      if (needEnrollState) {
+        setStage("enroll");
+        setMessage("Lokasi valid. Daftarkan wajah Anda sekarang");
+      } else {
+        setStage("verify");
+        setMessage("Lokasi valid. Silakan lakukan verifikasi wajah");
+      }
+    }
+  }, [addLog, needEnrollState]);
+
   const checkLocation = useCallback(async () => {
     setStage("checking");
     setGpsLoading(true);
@@ -129,41 +158,51 @@ export default function FaceVerifyPage() {
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        const distance = calculateDistance(latitude, longitude, COMPANY_LAT, COMPANY_LNG);
-        const distRound = Math.round(distance);
-        setCurrentDistance(distRound);
-        setGpsCoords({ latitude, longitude, accuracy });
-        setGpsLoading(false);
-        addLog(
-          `GPS: ${latitude.toFixed(5)}, ${longitude.toFixed(5)} | ±${Math.round(accuracy)}m | jarak ${distRound}m`,
-          distance <= MAX_DISTANCE_METERS ? "ok" : "warn"
-        );
-        if (distance > MAX_DISTANCE_METERS) {
-          setStage("out-of-range");
-          setMessage(`Anda berada di luar radius (${distRound}m)`);
-        } else {
-          addLog(`Lokasi valid — dalam radius ${MAX_DISTANCE_METERS}m`, "ok");
-          //  FIX: jika akun baru (needEnroll), langsung ke enroll bukan verify
-          if (needEnrollState) {
-            setStage("enroll");
-            setMessage("Lokasi valid. Daftarkan wajah Anda sekarang");
-          } else {
-            setStage("verify");
-            setMessage("Lokasi valid. Silakan lakukan verifikasi wajah");
-          }
-        }
-      },
+      handleGpsSuccess,
       (err) => {
+        addLog(`GPS error [code ${err.code}]: ${err.message}`, "err");
+
+        // ✅ FIX: PERMISSION_DENIED (code 1) — izin lokasi diblokir di browser
+        // ATAU Location Services HP mati. Sebelumnya ini dilempar ke stage
+        // "error" generik yang cuma punya tombol "Refresh halaman" — padahal
+        // refresh TIDAK menyelesaikan masalah izin yang diblokir.
+        if (err.code === err.PERMISSION_DENIED) {
+          setGpsLoading(false);
+          setStage("gps-denied");
+          setMessage("Izin lokasi diblokir. Ikuti panduan di bawah untuk mengaktifkan.");
+          return;
+        }
+
+        // ✅ FIX: TIMEOUT (code 3) — coba sekali lagi dengan akurasi lebih
+        // rendah, ini sering berhasil di area indoor/sinyal GPS lemah.
+        if (err.code === err.TIMEOUT) {
+          addLog("timeout — mencoba ulang dengan akurasi rendah...", "warn");
+          navigator.geolocation.getCurrentPosition(
+            handleGpsSuccess,
+            (fallbackErr) => {
+              setGpsLoading(false);
+              addLog(`GPS fallback gagal [code ${fallbackErr.code}]: ${fallbackErr.message}`, "err");
+              if (fallbackErr.code === fallbackErr.PERMISSION_DENIED) {
+                setStage("gps-denied");
+                setMessage("Izin lokasi diblokir. Ikuti panduan di bawah untuk mengaktifkan.");
+              } else {
+                setStage("error");
+                setMessage("Gagal mendapatkan lokasi. Pastikan GPS aktif dan coba lagi.");
+              }
+            },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+          );
+          return;
+        }
+
+        // POSITION_UNAVAILABLE (code 2) atau kasus lain
         setGpsLoading(false);
-        addLog(`GPS error: ${err.message}`, "err");
         setStage("error");
-        setMessage("Tidak dapat mengakses GPS. Izinkan lokasi di browser.");
+        setMessage("Lokasi tidak tersedia. Pastikan GPS/lokasi perangkat menyala.");
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [addLog, needEnrollState]);
+  }, [addLog, handleGpsSuccess]);
 
   useEffect(() => {
     let cancelled = false;
@@ -256,6 +295,7 @@ export default function FaceVerifyPage() {
     streamRef.current = null;
     holdCountRef.current = 0;
     isCapturingRef.current = false;
+    isDetectingRef.current = false;
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -300,6 +340,23 @@ export default function FaceVerifyPage() {
     return det ? Array.from(det.descriptor) : null;
   }, []);
 
+  const captureAveragedEmbedding = useCallback(async (samples = 3): Promise<number[] | null> => {
+    const collected: number[][] = [];
+    for (let i = 0; i < samples; i++) {
+      const emb = await captureEmbedding();
+      if (emb) collected.push(emb);
+      await new Promise(res => setTimeout(res, 60));
+    }
+    if (collected.length === 0) return null;
+    const dims = collected[0].length;
+    const avg = new Array(dims).fill(0);
+    for (const emb of collected) {
+      for (let d = 0; d < dims; d++) avg[d] += emb[d];
+    }
+    for (let d = 0; d < dims; d++) avg[d] /= collected.length;
+    return avg;
+  }, [captureEmbedding]);
+
   const doVerify = useCallback(async (embedding: number[], attempt: number, coords: GpsCoords | null) => {
     const res = await fetch("/api/auth/face-verify", {
       method: "POST",
@@ -318,9 +375,11 @@ export default function FaceVerifyPage() {
     if (intervalRef.current) clearInterval(intervalRef.current);
     holdCountRef.current = 0;
     isCapturingRef.current = false;
+    isDetectingRef.current = false; // ✅ NEW
 
     intervalRef.current = setInterval(async () => {
-      if (!videoRef.current || !canvasRef.current || isCapturingRef.current) return;
+      if (!videoRef.current || !canvasRef.current || isCapturingRef.current || isDetectingRef.current) return;
+      isDetectingRef.current = true;
       try {
         const detections = await faceapi
           .detectAllFaces(
@@ -364,7 +423,7 @@ export default function FaceVerifyPage() {
             holdCountRef.current = 0;
             setHoldProgress(0);
 
-            const embedding = await captureEmbedding();
+            const embedding = await captureAveragedEmbedding(mode === "enroll" ? 4 : 3);
             if (!embedding) { isCapturingRef.current = false; return; }
 
             if (mode === "enroll") {
@@ -445,10 +504,12 @@ export default function FaceVerifyPage() {
         }
       } catch (err) {
         console.error("Detection loop error:", err);
+      } finally {
+        isDetectingRef.current = false; // ✅ NEW
       }
     }, 150);
-  }, [addLog, captureEmbedding, doVerify, redirectTo, userShift]);
-
+  }, [addLog, captureEmbedding, captureAveragedEmbedding, doVerify, redirectTo, userShift]);
+  
   useEffect(() => {
     if (stage === "enroll" || stage === "verify") {
       startCamera().then(result => {
@@ -463,7 +524,7 @@ export default function FaceVerifyPage() {
         }
       });
     }
-    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera", "day-off"].includes(stage)) {
+    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera", "day-off", "gps-denied"].includes(stage)) {
       stopCamera();
     }
   }, [stage]);
@@ -646,7 +707,7 @@ export default function FaceVerifyPage() {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 margin: "0 auto 16px", fontSize: 26,
               }}>
-                
+
               </div>
               <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
                 Hari Ini Kamu Libur
@@ -832,6 +893,71 @@ export default function FaceVerifyPage() {
           </div>
         )}
 
+        {/* GPS Permission Denied — NEW */}
+        {stage === "gps-denied" && (
+          <div style={{ padding: "8px 0 16px" }}>
+            <div style={{
+              width: "100%",
+              background: "rgba(248,113,113,0.06)",
+              border: "0.5px solid rgba(248,113,113,0.25)",
+              borderRadius: 14,
+              padding: "20px",
+              textAlign: "center",
+              marginBottom: 16,
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%",
+                background: "rgba(248,113,113,0.1)",
+                border: "0.5px solid rgba(248,113,113,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 16px",
+              }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <line x1="4" y1="4" x2="20" y2="20" stroke="#f87171" strokeWidth={1.5} strokeLinecap="round" />
+                </svg>
+              </div>
+
+              <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
+                Izin Lokasi Diblokir
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7, marginBottom: 16 }}>
+                Browser atau HP kamu menolak akses lokasi.<br />
+                Ikuti salah satu langkah di bawah ini:
+              </div>
+
+              <div style={{ textAlign: "left", background: "rgba(255,255,255,0.03)", border: "0.5px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "14px 16px" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
+                  1. Cek Location Services HP
+                </div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.7, marginBottom: 12 }}>
+                  Buka <b>Setelan HP → Lokasi</b>, pastikan tombol lokasi dalam keadaan <b>ON/Aktif</b>.
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
+                  2. Cek izin lokasi di browser
+                </div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+                  Tap ikon di sebelah kiri alamat website (address bar) → <b>Site settings/Permissions</b> → <b>Location</b> → ubah ke <b>Allow/Izinkan</b>.
+                </div>
+              </div>
+            </div>
+
+            <button className="btn-main" onClick={checkLocation} disabled={gpsLoading}>
+              {gpsLoading ? (
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid rgba(255,255,255,0.7)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                  Mengecek ulang...
+                </span>
+              ) : "Sudah Diaktifkan — Coba Lagi"}
+            </button>
+            <button className="btn-ghost" style={{ marginTop: 10, color: "rgba(248,113,113,0.5)" }}
+              onClick={handleRejectAttendance} disabled={skipping}>
+              {skipping ? "Mengalihkan..." : "Lewati absen →"}
+            </button>
+          </div>
+        )}
+
         {/* Location stage */}
         {stage === "location" && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "28px 0" }}>
@@ -924,7 +1050,7 @@ export default function FaceVerifyPage() {
             {!isProcessing && (
               <div className="tip-box">
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.7 }}>
-                   Tips: Pastikan <span style={{ color: "rgba(255,255,255,0.6)" }}>cahaya cukup</span>, wajah <span style={{ color: "rgba(255,255,255,0.6)" }}>menghadap kamera</span>, dan tidak tertutup masker
+                  Tips: Pastikan <span style={{ color: "rgba(255,255,255,0.6)" }}>cahaya cukup</span>, wajah <span style={{ color: "rgba(255,255,255,0.6)" }}>menghadap kamera</span>, dan tidak tertutup masker
                 </div>
               </div>
             )}
