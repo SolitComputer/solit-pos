@@ -18,6 +18,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
           status,
           selling_price,
           purchase_price,
+          sparepart_cost,
           source,
           created_at
         )

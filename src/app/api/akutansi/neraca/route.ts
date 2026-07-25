@@ -43,42 +43,27 @@ export const GET = withAuth(async (req) => {
   const supabase = getAdmin();
 
   try {
-    // ── 1) Semua entry sampai & termasuk periode ini ──
-    const { data: entries, error: entryErr } = await supabase
+   // ── 1 & 2) Ambil entry + lines dalam SATU query via JOIN — supaya tidak ada
+    // celah waktu antara "ambil daftar entry_id" dan "ambil lines-nya". Celah itu
+    // sebelumnya bisa membuat Neraca menangkap kondisi transisi kalau ada proses
+    // confirm/delete journal_lines yang sedang berjalan bersamaan (race condition),
+    // menyebabkan salah satu sisi Debit/Kredit dari sebuah entry hilang sesaat.
+    const { data: entriesWithLines, error: entryErr } = await supabase
       .from("journal_entries")
-      .select("id, period")
+      .select("id, period, lines:journal_lines(account_code, side, nominal)")
       .lte("period", period);
 
     if (entryErr) throw entryErr;
 
-    const entryIds = (entries ?? []).map((e: any) => e.id as string);
-
-    // Entry yang persis di periode ini (bukan periode-periode sebelumnya) —
-    // dipakai untuk menghitung "Laba Periode Berjalan" akun 410-540 yang
-    // nanti dilipat ke akun Laba <periode ini>.
-    const currentPeriodEntryIds = new Set(
-      (entries ?? [])
-        .filter((e: any) => e.period === period)
-        .map((e: any) => e.id as string)
-    );
-
-    // ── 2) Agregasi mutasi journal_lines per akun (bertanda: DEBIT=+, KREDIT=-) ──
     const balanceMap = new Map<string, number>();
-    // Mutasi HANYA periode ini — dipakai khusus utk hitung Laba Periode Berjalan
     const currentPeriodBalanceMap = new Map<string, number>();
 
-    if (entryIds.length > 0) {
-      const { data: lines, error: lineErr } = await supabase
-        .from("journal_lines")
-        .select("entry_id, account_code, side, nominal")
-        .in("entry_id", entryIds);
-
-      if (lineErr) throw lineErr;
-
-      for (const l of (lines ?? []) as any[]) {
+    for (const e of (entriesWithLines ?? []) as any[]) {
+      const isCurrentPeriod = e.period === period;
+      for (const l of (e.lines ?? []) as any[]) {
         const signed = l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal);
         balanceMap.set(l.account_code, (balanceMap.get(l.account_code) ?? 0) + signed);
-        if (currentPeriodEntryIds.has(l.entry_id)) {
+        if (isCurrentPeriod) {
           currentPeriodBalanceMap.set(
             l.account_code,
             (currentPeriodBalanceMap.get(l.account_code) ?? 0) + signed
