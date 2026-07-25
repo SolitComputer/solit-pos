@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
 import { createPortal } from "react-dom";
@@ -212,6 +213,12 @@ function getCompanyBadge(company: string): { label: string; color: string } {
   if (cn.includes("zenit")) return { label: "Zenit", color: "bg-teal-50 text-teal-700 ring-1 ring-teal-200" };
   if (!company || company.trim() === "") return { label: "—", color: "bg-gray-50 text-gray-300" };
   return { label: company.trim(), color: "bg-gray-50 text-gray-600 ring-1 ring-gray-200" };
+}
+
+function getItemKindBadge(kind: string | undefined): { label: string; color: string } | null {
+  if (kind === "accessory") return { label: " Aksesoris", color: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" };
+  if (kind === "mixed") return { label: " Laptop+Aksesoris", color: "bg-fuchsia-50 text-fuchsia-700 ring-1 ring-fuchsia-200" };
+  return null;
 }
 
 function getCustomerTypeBadge(type: string): { text: string; icon: LucideIcon } {
@@ -646,6 +653,10 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
           {item.source_platform && (
             <span className={`px-2 py-0.5 rounded-lg font-semibold text-[10px] whitespace-nowrap ${platformBadge.color}`}>{platformBadge.text}</span>
           )}
+          {(() => {
+            const ik = getItemKindBadge(item.item_kind);
+            return ik ? <span className={`px-2 py-0.5 rounded-lg font-semibold text-[10px] whitespace-nowrap ${ik.color}`}>{ik.label}</span> : null;
+          })()}
           {item.customer_type && item.customer_type !== "UMUM" && (
             <span className="px-2 py-0.5 rounded-lg font-semibold text-[10px] bg-amber-100 text-amber-800 ring-1 ring-amber-200 whitespace-nowrap inline-flex items-center gap-1">
               <CustomerTypeIcon className="w-3 h-3" /> {customerTypeBadge.text}
@@ -1153,9 +1164,15 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
           </div>
         </td>
         <td className="px-4 py-3.5 text-center">
-          {item.source_platform ? (
-            <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${platformBadge.color}`}>{platformBadge.text}</span>
-          ) : <span className="text-[10px] text-gray-300">—</span>}
+          <div className="flex flex-col items-center gap-1">
+            {item.source_platform ? (
+              <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${platformBadge.color}`}>{platformBadge.text}</span>
+            ) : <span className="text-[10px] text-gray-300">—</span>}
+            {(() => {
+              const ik = getItemKindBadge(item.item_kind);
+              return ik ? <span className={`inline-flex text-[9px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${ik.color}`}>{ik.label}</span> : null;
+            })()}
+          </div>
         </td>
         <td className="px-4 py-3.5 text-center">
           {(() => {
@@ -1460,20 +1477,25 @@ export default function Page() {
   const sortBy = sort.by;
   const sortDir = sort.dir;
   const [companyName, setCompanyName] = useState("ALL");
+  const [itemKind, setItemKind] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = isMobile ? 10 : 25;
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [detailItem, setDetailItem] = useState<any | null>(null);
-  const [focusInvoice, setFocusInvoice] = useState<string | null>(null);
   const [paymentMethodOptions, setPaymentMethodOptions] = useState<string[]>([]);
   const [sourcePlatformOptions, setSourcePlatformOptions] = useState<string[]>([]);
 
-  // Dipertahankan buat kompatibilitas param lama di API (`sortOrder`)
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusInvoiceParam = searchParams.get("invoice") ?? searchParams.get("highlight");
+  const focusInvoice = focusInvoiceParam ? focusInvoiceParam.trim() : null;
+
+ // Dipertahankan buat kompatibilitas param lama di API (`sortOrder`)
   const sortOrder: "newest" | "oldest" =
     sortBy === "date" && sortDir === "asc" ? "oldest" : "newest";
 
-  useEffect(() => {
+ useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener("resize", checkMobile);
@@ -1486,12 +1508,6 @@ export default function Page() {
       const roles: UserRole[] = Array.isArray(r.user?.roles) && r.user.roles.length > 0 ? r.user.roles : role ? [role] : [];
       setUserRole(role); setUserRoles(roles);
     }).catch(() => { setUserRole(null); setUserRoles([]); });
-  }, []);
-
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const inv = p.get("invoice") ?? p.get("highlight");
-    if (inv) setFocusInvoice(inv.trim());
   }, []);
 
   const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
@@ -1554,6 +1570,7 @@ export default function Page() {
         if (paymentMethod !== "ALL") params.set("paymentMethod", paymentMethod);
         if (sourcePlatform !== "ALL") params.set("sourcePlatform", sourcePlatform);
         if (companyName !== "ALL") params.set("companyName", companyName);
+        if (itemKind !== "ALL") params.set("itemKind", itemKind);
       }
 
       const response = await fetch(`/api/transaction?${params.toString()}`);
@@ -1569,16 +1586,14 @@ export default function Page() {
     } finally { setIsLoading(false); }
   };
 
-  // Reset ke halaman 1 tiap kali filter (atau jumlah item per halaman) berubah
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortBy, sortDir, companyName, itemsPerPage]);
+  }, [debouncedSearch, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortBy, sortDir, companyName, itemKind, itemsPerPage]);
 
-  // Fetch tiap kali halaman atau filter berubah
   useEffect(() => {
     fetchTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage, status, sortBy, sortDir, debouncedSearch, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, companyName, focusInvoice]);
+  }, [currentPage, itemsPerPage, status, sortBy, sortDir, debouncedSearch, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, companyName, itemKind, focusInvoice]);
 
   // Server sudah filter + paginasi. Khusus kolom Margin, urutkan di client
   // karena nilainya baru ada setelah server menggabungkan data unit (bukan kolom tabel).
@@ -1596,12 +1611,12 @@ export default function Page() {
   const uniquePaymentMethods = useMemo(() => ["ALL", ...paymentMethodOptions], [paymentMethodOptions]);
   const uniqueSourcePlatforms = useMemo(() => ["ALL", ...sourcePlatformOptions], [sourcePlatformOptions]);
 
-  const hasActiveFilter = status !== "ALL" || customerType !== "ALL" || !!dateFrom || !!dateTo || paymentMethod !== "ALL" || sourcePlatform !== "ALL" || companyName !== "ALL";
-  const activeFilterCount = [status !== "ALL", customerType !== "ALL", !!dateFrom, !!dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL", companyName !== "ALL"].filter(Boolean).length;
+  const hasActiveFilter = status !== "ALL" || customerType !== "ALL" || !!dateFrom || !!dateTo || paymentMethod !== "ALL" || sourcePlatform !== "ALL" || companyName !== "ALL" || itemKind !== "ALL";
+  const activeFilterCount = [status !== "ALL", customerType !== "ALL", !!dateFrom, !!dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL", companyName !== "ALL", itemKind !== "ALL"].filter(Boolean).length;
 
   const resetFilters = () => {
     setSearch(""); setDebouncedSearch(""); setStatus("ALL"); setCustomerType("ALL"); setDateFrom(""); setDateTo("");
-    setPaymentMethod("ALL"); setSourcePlatform("ALL"); setCompanyName("ALL");
+    setPaymentMethod("ALL"); setSourcePlatform("ALL"); setCompanyName("ALL"); setItemKind("ALL");
   };
 
   // ─── EXPORT EXCEL ──────────────────────────────────────────────────
@@ -1627,6 +1642,7 @@ export default function Page() {
       if (paymentMethod !== "ALL") exportParams.set("paymentMethod", paymentMethod);
       if (sourcePlatform !== "ALL") exportParams.set("sourcePlatform", sourcePlatform);
       if (companyName !== "ALL") exportParams.set("companyName", companyName);
+      if (itemKind !== "ALL") exportParams.set("itemKind", itemKind);
 
       setExportLabel("Mengambil daftar transaksi...");
       const exportRes = await fetch(`/api/transaction?${exportParams.toString()}`);
@@ -1818,7 +1834,7 @@ export default function Page() {
               {allTransactions[0]?.customer_name && <> · <b>{allTransactions[0].customer_name}</b></>}
               {allTransactions.length === 0 && !isLoading && <span className="text-amber-500"> — tidak ditemukan</span>}
             </p>
-            <button onClick={() => { setFocusInvoice(null); window.history.replaceState({}, "", "/dashboard/transactions"); }}
+           <button onClick={() => router.replace("/dashboard/transactions")}
               className="text-[11px] text-amber-600 hover:text-amber-900 font-semibold whitespace-nowrap flex-shrink-0"> Semua</button>
           </div>
         )}
@@ -1957,6 +1973,24 @@ export default function Page() {
                   ].map((c) => (
                     <button key={c.value} onClick={() => setCompanyName(c.value)}
                       className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${companyName === c.value ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Jenis Barang */}
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Jenis Barang</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { value: "ALL", label: "Semua" },
+                    { value: "laptop", label: "Laptop" },
+                    { value: "accessory", label: "Aksesoris" },
+                    { value: "mixed", label: "Campuran" },
+                  ].map((c) => (
+                    <button key={c.value} onClick={() => setItemKind(c.value)}
+                      className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${itemKind === c.value ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                       {c.label}
                     </button>
                   ))}
