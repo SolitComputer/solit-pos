@@ -216,7 +216,7 @@ function AccessoriesContent() {
     const [deletingAcc, setDeletingAcc] = useState(false); const [selectedAcc, setSelectedAcc] = useState<Accessory | null>(null);
     const [view, setView] = useState<"detail" | null>(null);
 
-    const LIMIT = 20;
+    const LIMIT = 9999;
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const fetchItems = useCallback(async (p = 1, q = search, cat = filterCategory) => {
@@ -352,7 +352,6 @@ function AccessoriesContent() {
                                 </table>
                             </div>
                             <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
-                                <p className="text-xs text-gray-400 font-medium">Menampilkan <span className="text-gray-700 font-bold">{(page - 1) * LIMIT + 1}</span>–<span className="text-gray-700 font-bold">{Math.min(page * LIMIT, total)}</span> dari <span className="text-gray-700 font-bold">{total}</span></p>
                                 {totalPages > 1 && (<div className="flex items-center gap-1.5"><button disabled={page <= 1} onClick={() => fetchItems(page - 1)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg></button>{Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (<button key={p} onClick={() => fetchItems(p)} className={`w-7 h-7 rounded-lg text-xs font-bold transition ${p === page ? "bg-gray-800 text-white" : "text-gray-500 hover:bg-gray-100"}`}>{p}</button>))}<button disabled={page >= totalPages} onClick={() => fetchItems(page + 1)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg></button></div>)}
                             </div>
                         </div>
