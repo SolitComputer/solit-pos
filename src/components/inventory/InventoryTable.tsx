@@ -81,7 +81,7 @@ export default function InventoryTable({
                         <Th sortKey="RAM" activeSort={sortBy} onSort={onSort}>RAM</Th>
                         <Th sortKey="STORAGE" activeSort={sortBy} onSort={onSort}>Storage</Th>
                         {canSeePrivate && <Th right>Harga Modal</Th>}
-                        <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Jual</Th>
+                        <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Official</Th>
                         {canSeePrivate && <Th>Sumber</Th>}
                         {canSeePrivate && <Th>Tanggal Masuk</Th>}
                         <Th>SN</Th>
