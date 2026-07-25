@@ -308,15 +308,15 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
   ],
- "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
+  "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
 
-"/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH"],
+  "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH"],
 
   "/dashboard/warranty": [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGANTARAN", "KEPALA_MARKETING", "KEPALA_ZENITH",
-  "KEPALA_ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_ONPOINT", "KEPALA_SOTECH",
     "PKL_SALES",
   ],
 
@@ -418,6 +418,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/attendance/shift-config": [
     ...FULL_ACCESS, "KEPALA_TEKNISI", "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+    "KEPALA_PENGELOLA_BARANG",
   ],
   "/api/attendance/schedule": [...FULL_ACCESS],
   "/api/attendance/users": [...ALL_ROLES],
@@ -425,6 +426,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/attendance/overtime/rates": [
     ...FULL_ACCESS, "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+    "KEPALA_PENGELOLA_BARANG",
   ],
   "/api/attendance": [...ALL_ROLES],
   "/api/service": [...SERVICE_VIEW_ROLES],
@@ -772,6 +774,7 @@ export function canViewOvertimePay(role: string): boolean {
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
     "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_PENYEDIA_BARANG", "KEPALA_ONPOINT", "KEPALA_SOTECH",
+    "KEPALA_PENGELOLA_BARANG",
   ];
   return (PAY_VIEW as string[]).includes(role);
 }
@@ -872,17 +875,17 @@ export function getEffectiveSubordinates(userRoles: string[]): UserRole[] {
 // ── Data Barang: Full Access (CRUD semua field unit termasuk SN & Sumber) ────
 // Rafi, Lionel, Rehan, Yoga, Reinaldy → berada di role-role ini.
 export const BARANG_FULL_ACCESS_ROLES: UserRole[] = [
-    "ADMIN",
-    "PROGRAMMER",
-    "PENGELOLA_BARANG",
-    "KEPALA_PENGELOLA_BARANG",
+  "ADMIN",
+  "PROGRAMMER",
+  "PENGELOLA_BARANG",
+  "KEPALA_PENGELOLA_BARANG",
 ];
 
 // ── Role yang boleh melihat data sensitif unit (sumber, harga modal, tgl masuk)
 // Sales & role lain di luar list ini hanya lihat SN + Status.
 export const BARANG_PRIVATE_VIEW_ROLES: UserRole[] = [
-    ...BARANG_FULL_ACCESS_ROLES,
-    "ASISTEN_CEO",
-    "ACCOUNTING",
-    "KEPALA_TEKNISI",
+  ...BARANG_FULL_ACCESS_ROLES,
+  "ASISTEN_CEO",
+  "ACCOUNTING",
+  "KEPALA_TEKNISI",
 ];
