@@ -11,12 +11,14 @@ interface LedgerLine {
     tanggal: string;
     keterangan: string;
     ref: string;
+    side: "DEBIT" | "KREDIT";
     debit: number;
     kredit: number;
     saldo_debit: number;
     saldo_kredit: number;
     checked: boolean;
     checked_at: string | null;
+    is_synthetic: boolean;
     trx_meta: {
         company_name: string | null;
         cpu: string | null;
@@ -157,7 +159,7 @@ export default function BukuBesar({ period }: { period: string }) {
 
     // Auto-refresh saat user kembali ke tab ini (misal habis edit di Jurnal Umum
     // lalu balik lagi ke Buku Besar) — supaya data selalu sinkron tanpa perlu reload manual.
-useEffect(() => {
+    useEffect(() => {
         const onVisible = () => {
             if (document.visibilityState === "visible") load({ silent: true });
         };
@@ -399,6 +401,11 @@ useEffect(() => {
                                                                     {companyBadge.label}
                                                                 </span>
                                                             )}
+                                                            {l.is_synthetic && (
+                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
+                                                                    <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
+                                                                </span>
+                                                            )}
                                                             <span>{l.keterangan}</span>
                                                         </div>
                                                         {specParts.length > 0 && (
@@ -408,11 +415,11 @@ useEffect(() => {
                                                     <td className="px-4 py-2.5 text-center text-[10px] font-mono font-bold text-gray-400">
                                                         {l.ref || "—"}
                                                     </td>
-                                                    <td className="px-4 py-2.5 text-right text-[12px] font-bold text-gray-900 font-mono">
-                                                        {l.debit > 0 ? rp(l.debit) : ""}
+                                                    <td className={`px-4 py-2.5 text-right text-[12px] font-mono ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
+                                                        {l.debit > 0 || (l.is_synthetic && l.side === "DEBIT") ? rp(l.debit) : ""}
                                                     </td>
-                                                    <td className="px-4 py-2.5 text-right text-[12px] font-bold text-gray-900 font-mono">
-                                                        {l.kredit > 0 ? rp(l.kredit) : ""}
+                                                    <td className={`px-4 py-2.5 text-right text-[12px] font-mono ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
+                                                        {l.kredit > 0 || (l.is_synthetic && l.side === "KREDIT") ? rp(l.kredit) : ""}
                                                     </td>
                                                     <td className="px-4 py-2.5 text-right text-[12px] font-mono text-blue-700 border-l-2 border-gray-100">
                                                         {l.saldo_debit > 0 ? rp(l.saldo_debit) : ""}
@@ -421,20 +428,29 @@ useEffect(() => {
                                                         {l.saldo_kredit > 0 ? rp(l.saldo_kredit) : ""}
                                                     </td>
                                                     <td className="px-3 py-2.5 text-center border-l-2 border-gray-100">
-                                                        <button
-                                                            onClick={() => toggleChecked(l.id, !l.checked)}
-                                                            title={
-                                                                l.checked
-                                                                    ? `Sudah dicek${l.checked_at ? " · " + fmtTgl(l.checked_at.slice(0, 10)) : ""}`
-                                                                    : "Tandai sudah dicek"
-                                                            }
-                                                            className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${l.checked
-                                                                ? "bg-green-600 border-green-600 text-white"
-                                                                : "bg-white border-gray-300 text-transparent hover:border-gray-400 hover:text-gray-300"
-                                                                }`}
-                                                        >
-                                                            <Check className="w-3.5 h-3.5 mx-auto" />
-                                                        </button>
+                                                        {l.is_synthetic ? (
+                                                            <span
+                                                                title="Baris otomatis (modal belum diinput) — tidak bisa dicek manual"
+                                                                className="w-6 h-6 rounded-md border border-dashed border-gray-200 flex items-center justify-center text-gray-300 mx-auto"
+                                                            >
+                                                                —
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => toggleChecked(l.id, !l.checked)}
+                                                                title={
+                                                                    l.checked
+                                                                        ? `Sudah dicek${l.checked_at ? " · " + fmtTgl(l.checked_at.slice(0, 10)) : ""}`
+                                                                        : "Tandai sudah dicek"
+                                                                }
+                                                                className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${l.checked
+                                                                    ? "bg-green-600 border-green-600 text-white"
+                                                                    : "bg-white border-gray-300 text-transparent hover:border-gray-400 hover:text-gray-300"
+                                                                    }`}
+                                                            >
+                                                                <Check className="w-3.5 h-3.5 mx-auto" />
+                                                            </button>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             );
