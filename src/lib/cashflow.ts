@@ -148,10 +148,33 @@ export function applyFilters<T extends {
     if (filter.paymentMethod !== "ALL" && e.payment_method !== filter.paymentMethod) return false; // ⬅️ BARU
     if (filter.status === "ACTIVE" && e.is_voided) return false; // ⬅️ BARU
     if (filter.status === "VOIDED" && !e.is_voided) return false; // ⬅️ BARU
-    if (q) {
+   if (q) {
       const haystack = `${e.nama || ""} ${e.keterangan || ""}`.toLowerCase();
       if (!haystack.includes(q)) return false;
     }
     return true;
   });
+}
+
+// ── Metode Pembayaran Transaksi (disamakan dengan label di Riwayat Transaksi) ─
+function normalizeTxPaymentLabel(raw: string): string {
+  const m = raw.toUpperCase();
+  if (m.includes("TUNAI") || m.includes("CASH")) return "Tunai";
+  if (m.includes("TRANSFER") || m.includes("TF") || m.includes("BCA") || m.includes("BRI")) return "Transfer";
+  if (m.includes("QRIS") || m.includes("QR")) return "QRIS";
+  return raw.trim();
+}
+
+/** Gabungkan payment_method + payment_method_2 dari tabel `transactions` jadi label
+ *  singkat seperti di Riwayat Transaksi: "Tunai", "Transfer", "QRIS", atau gabungan
+ *  "Tunai+Transfer" kalau transaksi dibayar pakai 2 metode sekaligus. */
+export function formatTxPaymentMethod(
+  method1?: string | null,
+  method2?: string | null
+): string {
+  const label1 = normalizeTxPaymentLabel(method1 ?? "");
+  const label2 = normalizeTxPaymentLabel(method2 ?? "");
+  if (!label1 && !label2) return "-";
+  if (!label2 || label1 === label2) return label1 || label2;
+  return `${label1}+${label2}`;
 }
