@@ -108,7 +108,7 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
 
       const { error: unitErr } = await supabase
         .from("laptop_units")
-        .update({ status: "SIAP_JUAL" })
+        .update({ status: "SIAP_JUAL", reserved_by: null, reserved_invoice: null })
         .in("id", unitIds);
 
       if (unitErr) {
@@ -137,6 +137,7 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
         .update({
           qty: newQty,
           status: newQty > 0 ? "SIAP_JUAL" : "SOLD",
+          ready_to_sell: newQty > 0,
         })
         .eq("id", laptopId);
     }
