@@ -76,7 +76,7 @@ function getNormalSide(code: string): NormalSide {
 export default function BukuBesar({ period }: { period: string }) {
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     const [accountCode, setAccountCode] = useState<string>(ACCOUNTS[0]?.code ?? "");
-    const [search, setSearch] = useState("");
+    const [tableSearch, setTableSearch] = useState("");
     const [data, setData] = useState<LedgerData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -171,11 +171,18 @@ export default function BukuBesar({ period }: { period: string }) {
         };
     }, [load]);
 
-    const filteredAccounts = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        if (!q) return allAccounts;
-        return allAccounts.filter((a) => a.code.includes(q) || a.name.toLowerCase().includes(q));
-    }, [search, allAccounts]);
+    // Filter baris buku besar berdasarkan keterangan, nominal debit, atau nominal kredit.
+    const filteredLines = useMemo(() => {
+        if (!data) return [];
+        const q = tableSearch.trim().toLowerCase();
+        if (!q) return data.lines;
+        return data.lines.filter((l) => {
+            if (l.keterangan.toLowerCase().includes(q)) return true;
+            if (l.debit > 0 && (String(l.debit).includes(q) || rp(l.debit).toLowerCase().includes(q))) return true;
+            if (l.kredit > 0 && (String(l.kredit).includes(q) || rp(l.kredit).toLowerCase().includes(q))) return true;
+            return false;
+        });
+    }, [data, tableSearch]);
 
     const normalSide = useMemo(() => getNormalSide(accountCode), [accountCode]);
 
@@ -183,22 +190,13 @@ export default function BukuBesar({ period }: { period: string }) {
         <div className="space-y-4">
             {/* ── Account picker ── */}
             <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col sm:flex-row gap-2">
-                <div className="relative sm:w-64">
-                    <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Cari kode / nama akun..."
-                        className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                    />
-                </div>
                 <select
                     value={accountCode}
                     onChange={(e) => setAccountCode(e.target.value)}
                     className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                 >
                     {ACCOUNT_TYPE_ORDER.map((type) => {
-                        const accs = filteredAccounts.filter((a) => a.type === type);
+                        const accs = allAccounts.filter((a) => a.type === type);
                         if (accs.length === 0) return null;
                         return (
                             <optgroup key={type} label={ACCOUNT_TYPE_LABEL[type]}>
@@ -302,6 +300,19 @@ export default function BukuBesar({ period }: { period: string }) {
                 </div>
             )}
 
+            {/* ── Cari baris buku besar ── */}
+            {data && (
+                <div className="relative">
+                    <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                        value={tableSearch}
+                        onChange={(e) => setTableSearch(e.target.value)}
+                        placeholder="Cari keterangan, nominal debit, atau kredit..."
+                        className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                    />
+                </div>
+            )}
+
             {/* ── Tabel Buku Besar ── */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
@@ -385,8 +396,18 @@ export default function BukuBesar({ period }: { period: string }) {
                                                 </p>
                                             </td>
                                         </tr>
+                                    ) : filteredLines.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={8} className="py-14 text-center">
+                                                <div className="flex justify-center mb-3 opacity-40"><Search className="w-10 h-10" /></div>
+                                                <p className="text-sm text-gray-500 font-medium">Tidak ada baris yang cocok dengan pencarian</p>
+                                                <p className="text-xs text-gray-400 mt-1">
+                                                    Coba kata kunci lain untuk keterangan, debit, atau kredit.
+                                                </p>
+                                            </td>
+                                        </tr>
                                     ) : (
-                                        data.lines.map((l) => {
+                                        filteredLines.map((l) => {
                                             const companyBadge = getCompanyBadge(l.trx_meta?.company_name);
                                             const specParts = [l.trx_meta?.cpu, l.trx_meta?.ram, l.trx_meta?.storage].filter(Boolean) as string[];
                                             return (

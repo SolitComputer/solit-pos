@@ -1,8 +1,8 @@
 "use client";
 // src/components/akutansi/JurnalUmum.tsx
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -106,6 +106,14 @@ export default function JurnalUmum({ period }: { period: string }) {
     } | null>(null); const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [search, setSearch] = useState("");
+    // Filter berdasarkan akun yang dipilih lewat dropdown "Ref" — bisa lebih dari satu (OR).
+    const [accountCodeFilter, setAccountCodeFilter] = useState<Set<string>>(new Set());
+    const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
+    const [showAccountFilter, setShowAccountFilter] = useState(false);
+    const [accountFilterSearch, setAccountFilterSearch] = useState("");
+    const accountFilterRef = useRef<HTMLDivElement>(null);
+    const accountFilterButtonRef = useRef<HTMLButtonElement>(null);
+    const [filterDropdownPos, setFilterDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // default: terbaru dulu
     const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
@@ -152,6 +160,27 @@ export default function JurnalUmum({ period }: { period: string }) {
             localStorage.setItem("jurnal-show-pending", String(showPending));
         }
     }, [showPending]);
+
+    // Daftar lengkap akun untuk dropdown filter "Ref" — dimuat sekali saat komponen mount,
+    // supaya dropdown menampilkan SEMUA akun yang ada (bukan cuma yang sedang tampil di tabel).
+    useEffect(() => {
+        fetch("/api/akutansi/accounts")
+            .then((r) => r.json())
+            .then((j) => { if (j.success) setAllAccounts(j.data); })
+            .catch(() => { });
+    }, []);
+
+    // Tutup dropdown filter akun kalau user klik di luar area dropdown.
+    useEffect(() => {
+        if (!showAccountFilter) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (accountFilterRef.current && !accountFilterRef.current.contains(e.target as Node)) {
+                setShowAccountFilter(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [showAccountFilter]);
 
     const confirmItems = async (items: PendingDraft[]) => {
         if (items.length === 0 || busy) return;
@@ -239,14 +268,52 @@ export default function JurnalUmum({ period }: { period: string }) {
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return entries;
-        return entries.filter(
-            (e) =>
-                e.keterangan.toLowerCase().includes(q) ||
-                (e.ref ?? "").toLowerCase().includes(q) ||
-                e.lines.some((l) => l.account_code.includes(q) || l.account_name.toLowerCase().includes(q))
-        );
-    }, [entries, search]);
+        let result = entries;
+
+        if (q) {
+            result = result.filter(
+                (e) =>
+                    e.keterangan.toLowerCase().includes(q) ||
+                    (e.ref ?? "").toLowerCase().includes(q) ||
+                    e.lines.some((l) => l.account_code.includes(q) || l.account_name.toLowerCase().includes(q))
+            );
+        }
+
+        // Filter kode akun: OR — entry lolos kalau salah satu baris akunnya
+        // ada di dalam accountCodeFilter (jadi bisa pilih 110 saja, atau 110 + 440 sekaligus).
+        if (accountCodeFilter.size > 0) {
+            result = result.filter((e) => e.lines.some((l) => accountCodeFilter.has(l.account_code)));
+        }
+
+        return result;
+    }, [entries, search, accountCodeFilter]);
+
+    // Buka/tutup dropdown filter akun. Posisinya dihitung dari posisi tombol "Ref" di layar
+    // (pakai position: fixed) supaya dropdown tidak terpotong oleh area scroll tabel.
+    const openAccountFilterDropdown = () => {
+        const btn = accountFilterButtonRef.current;
+        if (btn) {
+            const rect = btn.getBoundingClientRect();
+            setFilterDropdownPos({ top: rect.bottom + 6, left: Math.max(8, rect.right - 288) });
+        }
+        setShowAccountFilter((v) => !v);
+    };
+
+    // Klik akun di dropdown "Ref": kalau sudah aktif, dihapus dari filter; kalau belum, ditambahkan.
+    const toggleAccountCodeFilter = (code: string) => {
+        setAccountCodeFilter((prev) => {
+            const next = new Set(prev);
+            next.has(code) ? next.delete(code) : next.add(code);
+            return next;
+        });
+    };
+
+    // Daftar akun yang ditampilkan di dalam dropdown, disaring oleh kotak pencarian dropdown.
+    const accountsForDropdown = useMemo(() => {
+        const q = accountFilterSearch.trim().toLowerCase();
+        if (!q) return allAccounts;
+        return allAccounts.filter((a) => a.code.includes(q) || a.name.toLowerCase().includes(q));
+    }, [allAccounts, accountFilterSearch]);
 
     const totalDebit = filtered.reduce((s, e) => s + sumSide(e.lines, "DEBIT"), 0);
     const totalKredit = filtered.reduce((s, e) => s + sumSide(e.lines, "KREDIT"), 0);
@@ -426,6 +493,28 @@ export default function JurnalUmum({ period }: { period: string }) {
                 </div>
             </div>
 
+            {/* ── Filter akun aktif — muncul kalau ada kode akun yang diklik di kolom Ref ── */}
+            {accountCodeFilter.size > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 -mt-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Filter akun:</span>
+                    {Array.from(accountCodeFilter).map((code) => (
+                        <button
+                            key={code}
+                            onClick={() => toggleAccountCodeFilter(code)}
+                            className="inline-flex items-center gap-1 text-[11px] font-mono font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full hover:bg-blue-700 active:scale-95 transition-all duration-150"
+                        >
+                            {code} <X className="w-3 h-3" />
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setAccountCodeFilter(new Set())}
+                        className="text-[10px] font-semibold text-gray-400 hover:text-gray-600 underline ml-1"
+                    >
+                        Hapus semua
+                    </button>
+                </div>
+            )}
+
             {/* ── Total — di ATAS, di luar tabel (bar ringkasan) ── */}
             {!loading && filtered.length > 0 && (
                 <div className="bg-gray-100 border border-gray-300 border-t-2 border-t-[#D9A94A]/50 rounded-xl px-4 py-3 flex flex-wrap items-center justify-end gap-x-6 gap-y-1">
@@ -455,7 +544,96 @@ export default function JurnalUmum({ period }: { period: string }) {
                                         <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
                                             <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[95px] sm:w-[110px]">Tanggal</th>
                                             <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
-                                            <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[70px] sm:w-[80px]">Ref</th>
+                                            <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[70px] sm:w-[80px]">
+                                                <div ref={accountFilterRef} className="inline-block">
+                                                    <button
+                                                        ref={accountFilterButtonRef}
+                                                        type="button"
+                                                        onClick={openAccountFilterDropdown}
+                                                        className={`inline-flex items-center gap-0.5 hover:text-gray-900 transition-colors ${accountCodeFilter.size > 0 ? "text-blue-600" : ""}`}
+                                                    >
+                                                        Ref
+                                                        <ChevronDown className="w-3 h-3" />
+                                                        {accountCodeFilter.size > 0 && (
+                                                            <span className="ml-0.5 inline-flex items-center justify-center min-w-[14px] h-[14px] px-0.5 rounded-full bg-blue-600 text-white text-[9px] font-bold normal-case">
+                                                                {accountCodeFilter.size}
+                                                            </span>
+                                                        )}
+                                                    </button>
+
+                                                    {showAccountFilter && filterDropdownPos && (
+                                                        <div
+                                                            className="fixed z-[90] w-72 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden text-left normal-case"
+                                                            style={{ top: filterDropdownPos.top, left: filterDropdownPos.left }}
+                                                        >
+                                                            <div className="p-2 border-b border-gray-100">
+                                                                <div className="relative">
+                                                                    <Search className="w-3.5 h-3.5 text-gray-300 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                                                    <input
+                                                                        autoFocus
+                                                                        value={accountFilterSearch}
+                                                                        onChange={(e) => setAccountFilterSearch(e.target.value)}
+                                                                        placeholder="Cari akun..."
+                                                                        className="w-full h-8 border border-gray-200 rounded-lg pl-8 pr-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                                                                    />
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="max-h-64 overflow-y-auto py-1">
+                                                                {accountsForDropdown.length === 0 ? (
+                                                                    <p className="px-3 py-4 text-xs text-gray-400 text-center">Akun tidak ditemukan</p>
+                                                                ) : (
+                                                                    ACCOUNT_TYPE_ORDER.map((type) => {
+                                                                        const group = accountsForDropdown.filter((a) => a.type === type);
+                                                                        if (group.length === 0) return null;
+                                                                        return (
+                                                                            <div key={type}>
+                                                                                <p className="px-3 pt-2 pb-1 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                                                                                    {ACCOUNT_TYPE_LABEL[type as keyof typeof ACCOUNT_TYPE_LABEL] ?? type}
+                                                                                </p>
+                                                                                {group.map((a) => {
+                                                                                    const checked = accountCodeFilter.has(a.code);
+                                                                                    return (
+                                                                                        <label
+                                                                                            key={a.code}
+                                                                                            className={`flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50 ${checked ? "bg-blue-50/60" : ""}`}
+                                                                                        >
+                                                                                            <input
+                                                                                                type="checkbox"
+                                                                                                checked={checked}
+                                                                                                onChange={() => toggleAccountCodeFilter(a.code)}
+                                                                                                className="w-3.5 h-3.5 rounded border-gray-300 accent-[#1a1545] shrink-0"
+                                                                                            />
+                                                                                            <span className="font-mono font-bold text-gray-400 shrink-0">{a.code}</span>
+                                                                                            <span className="text-gray-700 truncate">{a.name}</span>
+                                                                                        </label>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        );
+                                                                    })
+                                                                )}
+                                                            </div>
+
+                                                            <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50">
+                                                                <button
+                                                                    onClick={() => setAccountCodeFilter(new Set())}
+                                                                    disabled={accountCodeFilter.size === 0}
+                                                                    className="text-[11px] font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                                >
+                                                                    Hapus semua
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setShowAccountFilter(false)}
+                                                                    className="text-[11px] font-bold text-blue-600 hover:underline"
+                                                                >
+                                                                    Selesai
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </th>
                                             <th className="px-2 sm:px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[120px] sm:w-[150px]">Debit</th>
                                             <th className="px-2 sm:px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[120px] sm:w-[150px]">Kredit</th>
                                             <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[90px] sm:w-[110px]">Aksi</th>
@@ -587,9 +765,15 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                             )}
                                                                         </td>
 
-                                                                        {/* Ref = kode akun (post reference) */}
+                                                                        {/* Ref = kode akun (post reference). Filternya sekarang lewat dropdown di header "Ref". */}
                                                                         <td className="px-4 py-2 text-center align-bottom">
-                                                                            <span className="text-[10px] font-mono font-bold text-gray-400">
+                                                                            <span
+                                                                                className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${
+                                                                                    accountCodeFilter.has(line.account_code)
+                                                                                        ? "bg-blue-50 text-blue-700"
+                                                                                        : "text-gray-400"
+                                                                                }`}
+                                                                            >
                                                                                 {line.account_code}
                                                                             </span>
                                                                             {first && entry.ref && (
