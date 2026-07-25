@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
-import * as XLSX from "xlsx";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import { Laptop, CheckCircle2, Lock, Package, Trophy, ThumbsUp, AlertTriangle, Camera } from "lucide-react";
@@ -249,43 +248,114 @@ function ReadyContent() {
     }), [filtered]);
 
     // ── Export Excel ──────────────────────────────────────────────────────────
-    const exportToExcel = () => {
+    const exportToExcel = async () => {
         if (filtered.length === 0) return;
+
+        const validUnits = filtered.filter((u) => {
+            const qty = (u as any).quantity ?? ((u as any).qty ?? (u.status === "SOLD" ? 0 : 1));
+            return qty > 0;
+        });
+
+        if (validUnits.length === 0) {
+            setAlertMsg("Tidak ada data dengan quantity > 0 untuk di-export.");
+            return;
+        }
+
         setIsExporting(true);
         try {
-            const rows = filtered.map((u, idx) => ({
-                "No": idx + 1,
-                "Nama Laptop": u.laptop?.laptop_name ?? "—",
-                "Brand": u.laptop?.brand ?? "—",
-                "CPU": u.laptop?.cpu ?? "—",
-                "RAM": u.laptop?.ram ?? "—",
-                "Storage": u.laptop?.storage ?? "—",
-                "Serial Number": u.serial_number ?? "—",
-                "Grade": `Grade ${u.grade}`,
-                "Harga Beli": u.purchase_price,
-                "Harga Jual": u.selling_price,
-                "Status": STATUS_CONFIG[u.status]?.label ?? u.status,
-                "Catatan": u.notes ?? "—",
-                "Tanggal Input": u.created_at
-                    ? new Date(u.created_at).toLocaleDateString("id-ID", {
-                        day: "2-digit", month: "short", year: "numeric",
-                    })
-                    : "—",
-            }));
+            const { default: ExcelJS } = await import("exceljs");
+            const wb = new ExcelJS.Workbook();
+            wb.creator = "Solit POS";
+            wb.created = new Date();
 
-            const ws = XLSX.utils.json_to_sheet(rows);
-            ws["!cols"] = [
-                { wch: 5 }, { wch: 36 }, { wch: 14 }, { wch: 24 },
-                { wch: 10 }, { wch: 14 }, { wch: 24 }, { wch: 10 },
-                { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 30 }, { wch: 16 },
+            const ws = wb.addWorksheet("Laptop Siap Jual", {
+                pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
+            });
+
+            const colDefs = [
+                { header: "No", width: 6, align: "center" as const },
+                { header: "Nama Laptop", width: 36, align: "left" as const },
+                { header: "Brand", width: 14, align: "left" as const },
+                { header: "CPU", width: 22, align: "left" as const },
+                { header: "RAM", width: 12, align: "center" as const },
+                { header: "Storage", width: 16, align: "center" as const },
+                { header: "Serial Number", width: 24, align: "center" as const },
+                { header: "Grade", width: 12, align: "center" as const },
+                { header: "Quantity", width: 12, align: "center" as const },
+                { header: "Harga Jual", width: 18, align: "right" as const, numFmt: '"Rp "#,##0' },
+                { header: "Status", width: 16, align: "center" as const },
+                { header: "Catatan", width: 30, align: "left" as const },
+                { header: "Tanggal Input", width: 16, align: "center" as const },
             ];
 
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Laptop Siap Jual");
+            const tableRows = validUnits.map((u, idx) => {
+                const qty = (u as any).quantity ?? ((u as any).qty ?? 1);
+                return [
+                    idx + 1,
+                    u.laptop?.laptop_name ?? "—",
+                    u.laptop?.brand ?? "—",
+                    u.laptop?.cpu ?? "—",
+                    u.laptop?.ram ?? "—",
+                    u.laptop?.storage ?? "—",
+                    u.serial_number ?? "—",
+                    `Grade ${u.grade}`,
+                    qty,
+                    u.selling_price || 0,
+                    STATUS_CONFIG[u.status]?.label ?? u.status,
+                    u.notes ?? "—",
+                    u.created_at
+                        ? new Date(u.created_at).toLocaleDateString("id-ID", {
+                            day: "2-digit", month: "short", year: "numeric",
+                        })
+                        : "—",
+                ];
+            });
 
+            ws.addTable({
+                name: "TabelSiapJual",
+                ref: "A1",
+                headerRow: true,
+                totalsRow: false,
+                style: { theme: "TableStyleMedium7", showRowStripes: true },
+                columns: colDefs.map((c) => ({ name: c.header, filterButton: true })),
+                rows: tableRows,
+            });
+
+            colDefs.forEach((col, colIdx) => {
+                const wsCol = ws.getColumn(colIdx + 1);
+                wsCol.width = col.width;
+            });
+
+            ws.eachRow((row, rowNumber) => {
+                row.height = rowNumber === 1 ? 28 : 22;
+                row.eachCell((cell, colNumber) => {
+                    const colDef = colDefs[colNumber - 1];
+                    if (rowNumber > 1 && colDef) {
+                        cell.alignment = {
+                            vertical: "middle",
+                            horizontal: colDef.align,
+                        };
+                        if (colDef.numFmt) {
+                            cell.numFmt = colDef.numFmt;
+                        }
+                    }
+                });
+            });
+
+            const buffer = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buffer], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
             const now = new Date();
             const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-            XLSX.writeFile(wb, `SiapJual_${dateStr}.xlsx`);
+            a.download = `SiapJual_${dateStr}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         } catch (err) {
             console.error("Export Excel gagal:", err);
             setAlertMsg("Gagal export Excel. Coba lagi.");
