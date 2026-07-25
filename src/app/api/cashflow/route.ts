@@ -8,6 +8,7 @@ import {
     isValidCategory,
     isModalAwalActive,
     isManualIncomeCategory,
+    formatTxPaymentMethod,
 } from "@/lib/cashflow";
 import { fetchAllRows } from "@/lib/supabaseFetch";
 
@@ -470,17 +471,23 @@ export const GET = withAuth(async () => {
         new Set([...txSourceIds, ...Array.from(paymentInvoiceMap.values())])
     );
 
-    const txMap = new Map<string, { status: string; nominal: number }>();
+    const txMap = new Map<string, { status: string; nominal: number; paymentMethod: string }>();
     if (allInvoiceNumbers.length > 0) {
         const { data: linkedTx } = await supabase
             .from("transactions")
-            .select("invoice_number, status, deal_price, amount")
+            .select("invoice_number, status, deal_price, amount, payment_method, payment_method_2, amount_method_2")
             .in("invoice_number", allInvoiceNumbers);
 
         for (const t of linkedTx ?? []) {
+            // amount_method_2 > 0 = transaksi ini memang dibayar pakai 2 metode.
+            // Kalau 0/null, payment_method_2 diabaikan (sama seperti PaymentBreakdown
+            // di halaman Riwayat Transaksi).
+            const amountMethod2 = Number((t as any).amount_method_2 ?? 0);
+            const method2 = amountMethod2 > 0 ? ((t as any).payment_method_2 as string) : null;
             txMap.set(t.invoice_number as string, {
                 status: t.status as string,
                 nominal: Math.round(Number((t as any).deal_price ?? (t as any).amount ?? 0)),
+                paymentMethod: formatTxPaymentMethod((t as any).payment_method as string, method2),
             });
         }
     }
@@ -495,20 +502,20 @@ export const GET = withAuth(async () => {
                 e.is_audited &&
                 Number(e.nominal ?? 0) !== tx.nominal;
 
-            return { ...e, is_voided: isVoided, is_stale: isStale, source_nominal: tx?.nominal ?? null };
+            return { ...e, is_voided: isVoided, is_stale: isStale, source_nominal: tx?.nominal ?? null, tx_payment_method: tx?.paymentMethod ?? null };
         }
 
         if (e.source_type === "TRANSACTION_PAYMENT" && e.source_id) {
             const invoiceNumber = paymentInvoiceMap.get(e.source_id as string);
             const tx = invoiceNumber ? txMap.get(invoiceNumber) : undefined;
             const isVoided = !!tx && tx.status === "CANCELLED";
-            return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null };
+            return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null, tx_payment_method: tx?.paymentMethod ?? null };
         }
 
         if (e.source_type === "TRANSACTION_DP" && e.source_id) {
             const tx = txMap.get(e.source_id as string);
             const isVoided = !!tx && tx.status === "CANCELLED";
-            return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null };
+            return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null, tx_payment_method: tx?.paymentMethod ?? null };
         }
 
         return { ...e, is_voided: false, is_stale: false };

@@ -78,6 +78,7 @@ type Entry = {
     is_voided?: boolean;
     is_stale?: boolean;
     source_nominal?: number | null;
+    tx_payment_method?: string | null;
     created_by_user?: { name: string } | null;
     audited_by_user?: { name: string } | null;
 };
@@ -1738,11 +1739,17 @@ export default function CashflowPage() {
                                                     <p className="text-[9px] text-gray-400 font-mono mt-0.5">{fmtTanggal(e.tanggal)}</p>
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap"><SourceBadge sourceType={e.source_type} /></td>
-                                                <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
+                                               <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
                                                     {e.direction === "OUT" && e.source_type === "MANUAL" ? (
                                                         e.payment_method === "SALDO"
                                                             ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={11} /> Saldo</span>
                                                             : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={11} /> Cash</span>
+                                                    ) : e.direction === "IN" &&
+                                                        (e.source_type === "TRANSACTION" || e.source_type === "TRANSACTION_PAYMENT" || e.source_type === "TRANSACTION_DP") &&
+                                                        e.tx_payment_method ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-100 whitespace-nowrap">
+                                                            {e.tx_payment_method === "Tunai" ? <Banknote size={11} /> : <Landmark size={11} />} {e.tx_payment_method}
+                                                        </span>
                                                     ) : <span className="text-gray-300 text-[11px]">—</span>}
                                                 </td>
                                                 <td className="px-3 py-3 max-w-[140px]">
