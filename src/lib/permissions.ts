@@ -310,7 +310,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
  "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
 
-  "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"],
+"/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH"],
 
   "/dashboard/warranty": [
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
