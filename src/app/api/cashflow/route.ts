@@ -31,6 +31,15 @@ function getJoinedName(joined: any): string | null {
     return (joined as { id: string; name: string }).name ?? null;
 }
 
+// Keterangan gabung nama customer + laptop yang dibeli. Kalau transaksi multi-laptop
+// (laptop_name di tabel transactions kosong karena datanya tersebar di transaction_items),
+// fallback ke "Multi Laptop" — supaya tetap informatif tanpa perlu join tambahan.
+function formatCustomerLaptopKeterangan(customerName?: string | null, laptopName?: string | null): string {
+    const customer = (customerName as string) || "—";
+    const laptop = (laptopName as string)?.trim() || "Multi Laptop";
+    return `${customer} · ${laptop}`;
+}
+
 function buildTxPayload(t: any) {
     const refDate = (t.paid_at || t.created_at) as string;
     return {
@@ -39,7 +48,7 @@ function buildTxPayload(t: any) {
         nama: (t.sales_name as string) || "Sales",
         nominal: Math.round(Number(t.deal_price ?? t.amount ?? 0)),
         modal: null,
-        keterangan: `Penjualan laptop · ${t.invoice_number} · ${(t.customer_name as string) || "—"}`,
+        keterangan: formatCustomerLaptopKeterangan(t.customer_name, t.laptop_name),
         tanggal: jakartaDate(refDate),
         source_type: "TRANSACTION",
         source_id: t.invoice_number as string,
@@ -77,9 +86,9 @@ function diffPayload(existing: any, desired: Record<string, any>): Record<string
 }
 
 async function syncTransactionEntries(supabase: SupabaseClient) {
-    const { data: transactions, error } = await supabase
+   const { data: transactions, error } = await supabase
         .from("transactions")
-        .select("invoice_number, customer_name, sales_name, deal_price, amount, created_at, paid_at, status")
+        .select("invoice_number, customer_name, sales_name, laptop_name, deal_price, amount, created_at, paid_at, status")
         .eq("status", "PAID")
         .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
 
@@ -212,14 +221,14 @@ async function syncServiceEntries(
     }
 }
 
-function buildPaymentPayload(p: any, customerName: string, salesName: string) {
+function buildPaymentPayload(p: any, customerName: string, salesName: string, laptopName: string) {
     return {
         direction: "IN",
         category: "PENJUALAN_LAPTOP",
         nama: salesName || "Sales",
         nominal: Math.round(Number(p.amount ?? 0)),
         modal: null,
-        keterangan: `${p.payment_type === "DP" ? "DP" : p.payment_type === "CICILAN" ? "Cicilan" : "Pelunasan"} · ${p.invoice_number} · ${customerName || "—"}`,
+        keterangan: formatCustomerLaptopKeterangan(customerName, laptopName),
         tanggal: jakartaDate(p.created_at),
         source_type: "TRANSACTION_PAYMENT",
         source_id: p.id as string,
@@ -235,7 +244,7 @@ function buildDpPayload(t: any) {
         nama: (t.sales_name as string) || "Sales",
         nominal: Math.round(Number(t.dp_amount ?? 0)),
         modal: null,
-        keterangan: `DP · ${t.invoice_number} · ${(t.customer_name as string) || "—"}`,
+        keterangan: formatCustomerLaptopKeterangan(t.customer_name, t.laptop_name),
         tanggal: jakartaDate(refDate),
         source_type: "TRANSACTION_DP",
         source_id: t.invoice_number as string,
@@ -251,9 +260,9 @@ function buildDpPayload(t: any) {
 // nanti transaksi itu dapat cicilan baru (menambah dp_amount di transactions),
 // tidak dobel-hitung dengan cicilan baru yang tercatat terpisah lewat transaction_payments.
 async function syncLegacyDpEntries(supabase: SupabaseClient) {
-    const { data: pendingTx, error } = await supabase
+   const { data: pendingTx, error } = await supabase
         .from("transactions")
-        .select("id, invoice_number, customer_name, sales_name, dp_amount, status, created_at")
+        .select("id, invoice_number, customer_name, sales_name, laptop_name, dp_amount, status, created_at")
         .in("status", ["RESERVED", "HELD", "PACKING"])
         .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
 
@@ -328,19 +337,19 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
     const missing = dedupedPayments.filter((p: any) => !existingIds.has(p.id as string));
     if (missing.length === 0) return;
 
-    const invoiceNumbers = [...new Set(missing.map((p: any) => p.invoice_number as string))];
+   const invoiceNumbers = [...new Set(missing.map((p: any) => p.invoice_number as string))];
     const { data: txRows } = await supabase
         .from("transactions")
-        .select("invoice_number, customer_name, sales_name")
+        .select("invoice_number, customer_name, sales_name, laptop_name")
         .in("invoice_number", invoiceNumbers);
-    const txInfoMap = new Map<string, { customer_name: string; sales_name: string }>(
+    const txInfoMap = new Map<string, { customer_name: string; sales_name: string; laptop_name: string }>(
         (txRows ?? []).map((t: any) => [t.invoice_number as string, t])
     );
 
     const toInsert = missing
         .map((p: any) => {
             const info = txInfoMap.get(p.invoice_number as string);
-            return buildPaymentPayload(p, info?.customer_name ?? "—", info?.sales_name ?? "Sales");
+            return buildPaymentPayload(p, info?.customer_name ?? "—", info?.sales_name ?? "Sales", info?.laptop_name ?? "");
         })
         .filter((e) => e.nominal > 0 && e.tanggal >= CASHFLOW_START_DATE)
         .map((e) => ({ ...e, is_audited: false }));
