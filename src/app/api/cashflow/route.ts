@@ -475,19 +475,20 @@ export const GET = withAuth(async () => {
     if (allInvoiceNumbers.length > 0) {
         const { data: linkedTx } = await supabase
             .from("transactions")
-            .select("invoice_number, status, deal_price, amount, payment_method, payment_method_2, amount_method_2")
+            .select("invoice_number, status, deal_price, amount, payment_method, payment_method_2")
             .in("invoice_number", allInvoiceNumbers);
 
         for (const t of linkedTx ?? []) {
-            // amount_method_2 > 0 = transaksi ini memang dibayar pakai 2 metode.
-            // Kalau 0/null, payment_method_2 diabaikan (sama seperti PaymentBreakdown
-            // di halaman Riwayat Transaksi).
-            const amountMethod2 = Number((t as any).amount_method_2 ?? 0);
-            const method2 = amountMethod2 > 0 ? ((t as any).payment_method_2 as string) : null;
+            // formatTxPaymentMethod scan payment_method + payment_method_2 langsung
+            // (sama seperti getPaymentStyle di Riwayat Transaksi) — tidak butuh cek
+            // amount_method_1/2 lagi, karena itu bukan penentu split yang sebenarnya.
             txMap.set(t.invoice_number as string, {
                 status: t.status as string,
                 nominal: Math.round(Number((t as any).deal_price ?? (t as any).amount ?? 0)),
-                paymentMethod: formatTxPaymentMethod((t as any).payment_method as string, method2),
+                paymentMethod: formatTxPaymentMethod(
+                    (t as any).payment_method as string,
+                    (t as any).payment_method_2 as string
+                ),
             });
         }
     }
