@@ -11,29 +11,96 @@ type OutflowType = (typeof VALID_TYPES)[number];
 const VALID_KINDS = ["LAPTOP", "ACCESSORY"] as const;
 type ItemKind = (typeof VALID_KINDS)[number];
 
-// ── GET ───────────────────────────────────────────────────────────────────
 async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
     try {
         const { searchParams } = new URL(req.url);
         const type = searchParams.get("type");
 
-        let query = supabase
-            .from("item_outflows")
-            .select("*")
-            .order("created_at", { ascending: false });
+        const wantsAll = !type || type === "ALL";
+        const wantsItemOutflows = wantsAll || (VALID_TYPES as readonly string[]).includes(type as string);
+        const wantsTransaksi = wantsAll || type === "TRANSAKSI";
 
-        if (type && (VALID_TYPES as readonly string[]).includes(type)) {
-            query = query.eq("outflow_type", type);
+        // ── Bagian 1: pengambilan manual (SERVICE / KEBUTUHAN) — dari item_outflows ──
+        let manualRows: any[] = [];
+        if (wantsItemOutflows) {
+            let query = supabase
+                .from("item_outflows")
+                .select("*")
+                .order("created_at", { ascending: false });
+
+            if (type && (VALID_TYPES as readonly string[]).includes(type)) {
+                query = query.eq("outflow_type", type);
+            }
+
+            const { data, error } = await query;
+            if (error) {
+                return NextResponse.json(
+                    { success: false, message: error.message },
+                    { status: 400 }
+                );
+            }
+            manualRows = data ?? [];
         }
 
-        const { data, error } = await query;
-        if (error) {
-            return NextResponse.json(
-                { success: false, message: error.message },
-                { status: 400 }
-            );
+        // ── Bagian 2: penjualan aksesoris via transaksi — dari accessory_outflows ──
+        // Sumber ini sudah otomatis tercatat & disinkronkan restore-nya oleh sistem
+        // transaksi (transaction/create + restore), jadi tinggal ditampilkan di sini,
+        // tidak perlu ditulis ulang.
+        let transaksiRows: any[] = [];
+        if (wantsTransaksi) {
+            const { data: accOutflows, error: accErr } = await supabaseAdmin
+                .from("accessory_outflows")
+                .select("id, accessory_id, qty, status, transaction_invoice, notes, created_at")
+                .eq("source_type", "transaction")
+                .order("created_at", { ascending: false });
+
+            if (accErr) {
+                console.error("[item-outflows][GET] gagal ambil accessory_outflows:", accErr.message);
+            } else if (accOutflows && accOutflows.length > 0) {
+                const accessoryIds = [...new Set(accOutflows.map((o) => o.accessory_id).filter(Boolean))];
+                const invoiceNumbers = [...new Set(accOutflows.map((o) => o.transaction_invoice).filter(Boolean))];
+
+                const [{ data: accessories }, { data: transactions }] = await Promise.all([
+                    accessoryIds.length > 0
+                        ? supabaseAdmin.from("accessories").select("id, name").in("id", accessoryIds)
+                        : Promise.resolve({ data: [] as any[] }),
+                    invoiceNumbers.length > 0
+                        ? supabaseAdmin.from("transactions").select("invoice_number, customer_name, sales_name").in("invoice_number", invoiceNumbers)
+                        : Promise.resolve({ data: [] as any[] }),
+                ]);
+
+                const accessoryNameMap = new Map((accessories ?? []).map((a: any) => [a.id, a.name]));
+                const txMap = new Map((transactions ?? []).map((t: any) => [t.invoice_number, t]));
+
+                transaksiRows = accOutflows.map((o: any) => {
+                    const tx = o.transaction_invoice ? txMap.get(o.transaction_invoice) : null;
+                    return {
+                        id: o.id,
+                        outflow_type: "TRANSAKSI",
+                        person_name: tx?.customer_name ?? "—",
+                        item_kind: "ACCESSORY",
+                        item_ref_id: o.accessory_id,
+                        item_name: accessoryNameMap.get(o.accessory_id) ?? "Aksesoris",
+                        purpose: o.notes ?? (o.transaction_invoice ? `Penjualan ${o.transaction_invoice}` : "Penjualan"),
+                        nominal: null,
+                        is_audited: false,
+                        audited_by: null,
+                        audited_at: null,
+                        created_by_name: tx?.sales_name ?? null,
+                        created_by_role: null,
+                        created_at: o.created_at,
+                        status: o.status,
+                        transaction_invoice: o.transaction_invoice,
+                    };
+                });
+            }
         }
-        return NextResponse.json({ success: true, data: data ?? [] });
+
+        const combined = [...manualRows, ...transaksiRows].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+
+        return NextResponse.json({ success: true, data: combined });
     } catch (err) {
         console.error("[item-outflows][GET]", err);
         return NextResponse.json({ success: false }, { status: 500 });

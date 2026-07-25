@@ -73,6 +73,7 @@ async function handler(req: NextRequest) {
     const sourcePlatform = url.searchParams.get("sourcePlatform") ?? "ALL";
     const customerType = url.searchParams.get("customerType") ?? "ALL";
     const companyName = url.searchParams.get("companyName") ?? "ALL";
+    const itemKind = url.searchParams.get("itemKind") ?? "ALL";
     const sortOrder = url.searchParams.get("sortOrder") === "oldest" ? "oldest" : "newest";
 
     // ── Sorting per kolom (klik header tabel) ──────────────────────────
@@ -140,6 +141,7 @@ async function handler(req: NextRequest) {
       if (paymentMethod !== "ALL") query = query.eq("payment_method", paymentMethod);
       if (sourcePlatform !== "ALL") query = query.eq("source_platform", sourcePlatform);
       if (companyName !== "ALL") query = applyCompanyFilter(query, companyName);
+      if (itemKind !== "ALL") query = query.eq("item_kind", itemKind);
     }
 
     // Baris yang nilainya NULL selalu ditaruh paling belakang, biar mirip perilaku sort Excel.
@@ -186,16 +188,21 @@ async function handler(req: NextRequest) {
     // ── Fetch transaction_items — sumber deal_price aktual per unit ─────────
     const { data: txItems } = await supabase
       .from("transaction_items")
-      .select("invoice_number, unit_id, laptop_id, laptop_name, deal_price, selling_price, serial_number")
+      .select("invoice_number, unit_id, laptop_id, laptop_name, deal_price, selling_price, serial_number, item_type")
       .in("invoice_number", allInvoiceNumbers);
 
-    // Map: invoice_number → array of items
     const txItemsMap = new Map<string, any[]>();
+    const itemKindMap = new Map<string, { hasLaptop: boolean; hasAccessory: boolean }>();
     for (const item of txItems ?? []) {
       if (!txItemsMap.has(item.invoice_number)) txItemsMap.set(item.invoice_number, []);
       txItemsMap.get(item.invoice_number)!.push(item);
       if (item.unit_id) allUnitIds.add(item.unit_id);
       if (item.laptop_id) allLaptopIds.add(item.laptop_id);
+
+      if (!itemKindMap.has(item.invoice_number)) itemKindMap.set(item.invoice_number, { hasLaptop: false, hasAccessory: false });
+      const kindFlags = itemKindMap.get(item.invoice_number)!;
+      if (item.item_type === "accessory") kindFlags.hasAccessory = true;
+      else kindFlags.hasLaptop = true;
     }
 
     // ── Fetch purchase_price dari laptop_units ───────────────────────────────
@@ -415,7 +422,7 @@ async function handler(req: NextRequest) {
       const hasModal = matchedAnyUnit || (trx.inventory_price !== null && trx.inventory_price !== undefined);
       const totalMargin = hasModal ? dealPrice - finalInventoryPrice : 0;
       const modalMissing = finalInventoryPrice === 0; // modal 0 = belum di-set, apapun sumbernya
-      
+
       return {
         ...trx,
         cpu: trx.cpu || laptopSpecs?.cpu || undefined,
@@ -433,6 +440,13 @@ async function handler(req: NextRequest) {
         purchase_price_current: finalInventoryPrice,
         grouped_items: grouped_items_with_margin,
         is_multi_laptop: grouped_items.length > 1,
+        item_kind: trx.item_kind ?? (() => {
+          const flags = itemKindMap.get(trx.invoice_number);
+          if (!flags) return unitIds.length > 0 ? "laptop" : "accessory";
+          if (flags.hasAccessory && flags.hasLaptop) return "mixed";
+          if (flags.hasAccessory) return "accessory";
+          return "laptop";
+        })(),
       };
     });
 

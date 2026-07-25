@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-type OutflowType = "SERVICE" | "KEBUTUHAN";
+type OutflowType = "SERVICE" | "KEBUTUHAN" | "TRANSAKSI";
 type ItemKind = "LAPTOP" | "ACCESSORY";
 
 interface ItemOutflow {
@@ -22,6 +22,9 @@ interface ItemOutflow {
     created_by_name: string | null;
     created_by_role: string | null;
     created_at: string;
+    // ── Khusus row hasil penjualan (sumber: accessory_outflows) ──
+    status?: "active" | "cancelled";
+    transaction_invoice?: string | null;
 }
 
 interface MasterItem {
@@ -44,10 +47,12 @@ const formatDate = (iso: string) =>
 const TYPE_BADGE: Record<OutflowType, string> = {
     SERVICE: "bg-blue-50 text-blue-700 border-blue-200",
     KEBUTUHAN: "bg-amber-50 text-amber-700 border-amber-200",
+    TRANSAKSI: "bg-violet-50 text-violet-700 border-violet-200",
 };
 const TYPE_LABEL: Record<OutflowType, string> = {
     SERVICE: "Service",
     KEBUTUHAN: "Kebutuhan",
+    TRANSAKSI: "Penjualan",
 };
 const KIND_BADGE: Record<ItemKind, string> = {
     LAPTOP: "bg-violet-50 text-violet-700 border-violet-200",
@@ -212,6 +217,7 @@ export default function OutflowsContent() {
                         <option value="">Semua Tipe</option>
                         <option value="SERVICE">Service</option>
                         <option value="KEBUTUHAN">Kebutuhan</option>
+                        <option value="TRANSAKSI">Penjualan</option>
                     </select>
 
                     {/* Jenis Barang */}
@@ -269,11 +275,11 @@ export default function OutflowsContent() {
                         <>
                             <span>·</span>
                             <span className="text-emerald-600 font-medium">
-                                {rows.filter(r => r.is_audited).length} diaudit
+                                {rows.filter(r => r.outflow_type !== "TRANSAKSI" && r.is_audited).length} diaudit
                             </span>
                             <span>·</span>
                             <span className="text-amber-600 font-medium">
-                                {rows.filter(r => !r.is_audited).length} belum diaudit
+                                {rows.filter(r => r.outflow_type !== "TRANSAKSI" && !r.is_audited).length} belum diaudit
                             </span>
                         </>
                     )}
@@ -328,9 +334,16 @@ export default function OutflowsContent() {
                                             {String(i + 1).padStart(2, "0")}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className={`inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full border ${TYPE_BADGE[row.outflow_type]}`}>
-                                                {TYPE_LABEL[row.outflow_type]}
-                                            </span>
+                                            <div className="flex flex-col gap-1">
+                                                <span className={`inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full border w-fit ${TYPE_BADGE[row.outflow_type]}`}>
+                                                    {TYPE_LABEL[row.outflow_type]}
+                                                </span>
+                                                {row.status === "cancelled" && (
+                                                    <span className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 text-red-600 border-red-200 w-fit">
+                                                        Batal
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-4 py-3 font-medium text-gray-800">{row.person_name}</td>
                                         <td className="px-4 py-3">
@@ -350,37 +363,41 @@ export default function OutflowsContent() {
 
                                         {/* ── Kolom Audit ── */}
                                         <td className="px-4 py-3 text-center">
-                                            <button
-                                                onClick={() => toggleAudit(row.id)}
-                                                disabled={auditingId === row.id}
-                                                title={
-                                                    row.is_audited
-                                                        ? `Diaudit oleh ${row.audited_by ?? "—"} · ${row.audited_at ? formatDate(row.audited_at) : ""}`
-                                                        : "Klik untuk tandai sudah diaudit"
-                                                }
-                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition
-                          ${auditingId === row.id ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}
-                          ${row.is_audited
-                                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                                                        : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"
-                                                    }`}
-                                            >
-                                                {row.is_audited ? (
-                                                    <>
-                                                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                                            <polyline points="20 6 9 17 4 12" />
-                                                        </svg>
-                                                        Teraudit
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                                            <circle cx="12" cy="12" r="10" />
-                                                        </svg>
-                                                        Audit
-                                                    </>
-                                                )}
-                                            </button>
+                                            {row.outflow_type === "TRANSAKSI" ? (
+                                                <span className="text-[11px] text-gray-300" title="Tercatat otomatis dari transaksi — tidak ada audit manual di sini">—</span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => toggleAudit(row.id)}
+                                                    disabled={auditingId === row.id}
+                                                    title={
+                                                        row.is_audited
+                                                            ? `Diaudit oleh ${row.audited_by ?? "—"} · ${row.audited_at ? formatDate(row.audited_at) : ""}`
+                                                            : "Klik untuk tandai sudah diaudit"
+                                                    }
+                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition
+                              ${auditingId === row.id ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}
+                              ${row.is_audited
+                                                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                                            : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"
+                                                        }`}
+                                                >
+                                                    {row.is_audited ? (
+                                                        <>
+                                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                                                <polyline points="20 6 9 17 4 12" />
+                                                            </svg>
+                                                            Teraudit
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                                <circle cx="12" cy="12" r="10" />
+                                                            </svg>
+                                                            Audit
+                                                        </>
+                                                    )}
+                                                </button>
+                                            )}
                                         </td>
 
                                         <td className="px-4 py-3 text-gray-400 whitespace-nowrap tabular-nums">
@@ -555,7 +572,7 @@ function OutflowFormModal({
                         )}
                         {selected && (
                             <p className="mt-1 text-[11px] text-emerald-600 font-medium">
-                                 Terpilih: [{KIND_LABEL[selected.kind]}] {selected.name}
+                                Terpilih: [{KIND_LABEL[selected.kind]}] {selected.name}
                             </p>
                         )}
                     </div>
