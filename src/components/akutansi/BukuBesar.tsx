@@ -11,12 +11,14 @@ interface LedgerLine {
     tanggal: string;
     keterangan: string;
     ref: string;
+    side: "DEBIT" | "KREDIT";
     debit: number;
     kredit: number;
     saldo_debit: number;
     saldo_kredit: number;
     checked: boolean;
     checked_at: string | null;
+    is_synthetic: boolean;
     trx_meta: {
         company_name: string | null;
         cpu: string | null;
@@ -74,7 +76,7 @@ function getNormalSide(code: string): NormalSide {
 export default function BukuBesar({ period }: { period: string }) {
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     const [accountCode, setAccountCode] = useState<string>(ACCOUNTS[0]?.code ?? "");
-    const [search, setSearch] = useState("");
+    const [tableSearch, setTableSearch] = useState("");
     const [data, setData] = useState<LedgerData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -157,7 +159,7 @@ export default function BukuBesar({ period }: { period: string }) {
 
     // Auto-refresh saat user kembali ke tab ini (misal habis edit di Jurnal Umum
     // lalu balik lagi ke Buku Besar) — supaya data selalu sinkron tanpa perlu reload manual.
-useEffect(() => {
+    useEffect(() => {
         const onVisible = () => {
             if (document.visibilityState === "visible") load({ silent: true });
         };
@@ -169,11 +171,18 @@ useEffect(() => {
         };
     }, [load]);
 
-    const filteredAccounts = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        if (!q) return allAccounts;
-        return allAccounts.filter((a) => a.code.includes(q) || a.name.toLowerCase().includes(q));
-    }, [search, allAccounts]);
+    // Filter baris buku besar berdasarkan keterangan, nominal debit, atau nominal kredit.
+    const filteredLines = useMemo(() => {
+        if (!data) return [];
+        const q = tableSearch.trim().toLowerCase();
+        if (!q) return data.lines;
+        return data.lines.filter((l) => {
+            if (l.keterangan.toLowerCase().includes(q)) return true;
+            if (l.debit > 0 && (String(l.debit).includes(q) || rp(l.debit).toLowerCase().includes(q))) return true;
+            if (l.kredit > 0 && (String(l.kredit).includes(q) || rp(l.kredit).toLowerCase().includes(q))) return true;
+            return false;
+        });
+    }, [data, tableSearch]);
 
     const normalSide = useMemo(() => getNormalSide(accountCode), [accountCode]);
 
@@ -181,22 +190,13 @@ useEffect(() => {
         <div className="space-y-4">
             {/* ── Account picker ── */}
             <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col sm:flex-row gap-2">
-                <div className="relative sm:w-64">
-                    <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Cari kode / nama akun..."
-                        className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                    />
-                </div>
                 <select
                     value={accountCode}
                     onChange={(e) => setAccountCode(e.target.value)}
                     className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                 >
                     {ACCOUNT_TYPE_ORDER.map((type) => {
-                        const accs = filteredAccounts.filter((a) => a.type === type);
+                        const accs = allAccounts.filter((a) => a.type === type);
                         if (accs.length === 0) return null;
                         return (
                             <optgroup key={type} label={ACCOUNT_TYPE_LABEL[type]}>
@@ -300,6 +300,19 @@ useEffect(() => {
                 </div>
             )}
 
+            {/* ── Cari baris buku besar ── */}
+            {data && (
+                <div className="relative">
+                    <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                        value={tableSearch}
+                        onChange={(e) => setTableSearch(e.target.value)}
+                        placeholder="Cari keterangan, nominal debit, atau kredit..."
+                        className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                    />
+                </div>
+            )}
+
             {/* ── Tabel Buku Besar ── */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
@@ -383,8 +396,18 @@ useEffect(() => {
                                                 </p>
                                             </td>
                                         </tr>
+                                    ) : filteredLines.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={8} className="py-14 text-center">
+                                                <div className="flex justify-center mb-3 opacity-40"><Search className="w-10 h-10" /></div>
+                                                <p className="text-sm text-gray-500 font-medium">Tidak ada baris yang cocok dengan pencarian</p>
+                                                <p className="text-xs text-gray-400 mt-1">
+                                                    Coba kata kunci lain untuk keterangan, debit, atau kredit.
+                                                </p>
+                                            </td>
+                                        </tr>
                                     ) : (
-                                        data.lines.map((l) => {
+                                        filteredLines.map((l) => {
                                             const companyBadge = getCompanyBadge(l.trx_meta?.company_name);
                                             const specParts = [l.trx_meta?.cpu, l.trx_meta?.ram, l.trx_meta?.storage].filter(Boolean) as string[];
                                             return (
@@ -399,6 +422,11 @@ useEffect(() => {
                                                                     {companyBadge.label}
                                                                 </span>
                                                             )}
+                                                            {l.is_synthetic && (
+                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
+                                                                    <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
+                                                                </span>
+                                                            )}
                                                             <span>{l.keterangan}</span>
                                                         </div>
                                                         {specParts.length > 0 && (
@@ -408,11 +436,11 @@ useEffect(() => {
                                                     <td className="px-4 py-2.5 text-center text-[10px] font-mono font-bold text-gray-400">
                                                         {l.ref || "—"}
                                                     </td>
-                                                    <td className="px-4 py-2.5 text-right text-[12px] font-bold text-gray-900 font-mono">
-                                                        {l.debit > 0 ? rp(l.debit) : ""}
+                                                    <td className={`px-4 py-2.5 text-right text-[12px] font-mono ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
+                                                        {l.debit > 0 || (l.is_synthetic && l.side === "DEBIT") ? rp(l.debit) : ""}
                                                     </td>
-                                                    <td className="px-4 py-2.5 text-right text-[12px] font-bold text-gray-900 font-mono">
-                                                        {l.kredit > 0 ? rp(l.kredit) : ""}
+                                                    <td className={`px-4 py-2.5 text-right text-[12px] font-mono ${l.is_synthetic ? "text-gray-400" : "font-bold text-gray-900"}`}>
+                                                        {l.kredit > 0 || (l.is_synthetic && l.side === "KREDIT") ? rp(l.kredit) : ""}
                                                     </td>
                                                     <td className="px-4 py-2.5 text-right text-[12px] font-mono text-blue-700 border-l-2 border-gray-100">
                                                         {l.saldo_debit > 0 ? rp(l.saldo_debit) : ""}
@@ -421,20 +449,29 @@ useEffect(() => {
                                                         {l.saldo_kredit > 0 ? rp(l.saldo_kredit) : ""}
                                                     </td>
                                                     <td className="px-3 py-2.5 text-center border-l-2 border-gray-100">
-                                                        <button
-                                                            onClick={() => toggleChecked(l.id, !l.checked)}
-                                                            title={
-                                                                l.checked
-                                                                    ? `Sudah dicek${l.checked_at ? " · " + fmtTgl(l.checked_at.slice(0, 10)) : ""}`
-                                                                    : "Tandai sudah dicek"
-                                                            }
-                                                            className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${l.checked
-                                                                ? "bg-green-600 border-green-600 text-white"
-                                                                : "bg-white border-gray-300 text-transparent hover:border-gray-400 hover:text-gray-300"
-                                                                }`}
-                                                        >
-                                                            <Check className="w-3.5 h-3.5 mx-auto" />
-                                                        </button>
+                                                        {l.is_synthetic ? (
+                                                            <span
+                                                                title="Baris otomatis (modal belum diinput) — tidak bisa dicek manual"
+                                                                className="w-6 h-6 rounded-md border border-dashed border-gray-200 flex items-center justify-center text-gray-300 mx-auto"
+                                                            >
+                                                                —
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => toggleChecked(l.id, !l.checked)}
+                                                                title={
+                                                                    l.checked
+                                                                        ? `Sudah dicek${l.checked_at ? " · " + fmtTgl(l.checked_at.slice(0, 10)) : ""}`
+                                                                        : "Tandai sudah dicek"
+                                                                }
+                                                                className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${l.checked
+                                                                    ? "bg-green-600 border-green-600 text-white"
+                                                                    : "bg-white border-gray-300 text-transparent hover:border-gray-400 hover:text-gray-300"
+                                                                    }`}
+                                                            >
+                                                                <Check className="w-3.5 h-3.5 mx-auto" />
+                                                            </button>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             );
