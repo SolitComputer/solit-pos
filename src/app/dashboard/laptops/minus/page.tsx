@@ -461,7 +461,7 @@ function MinusContent() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-900 bg-clip-text text-transparent">
-                    Laptop Minus
+                    Barang Minus
                   </h1>
                   <p className="text-xs text-gray-400 mt-0.5">Unit dalam perbaikan atau belum siap</p>
                 </div>
