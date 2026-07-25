@@ -20,9 +20,15 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get("user_id");
 
+    const now = new Date();
+    const year = parseInt(searchParams.get("year") || String(now.getFullYear()), 10);
+    const month = parseInt(searchParams.get("month") || String(now.getMonth() + 1), 10);
+
     let q = supabase
       .from("user_allowances")
       .select("*")
+      .eq("year", year)
+      .eq("month", month)
       .order("user_id");
 
     if (!FULL_ACCESS_ROLES.includes(user.role)) {
@@ -66,12 +72,16 @@ export async function POST(request: Request) {
       deduction_pension = 0,
     } = body;
 
+    const now = new Date();
+    const year = parseInt(body.year, 10) || now.getFullYear();
+    const month = parseInt(body.month, 10) || (now.getMonth() + 1);
+
     if (!user_id) {
       return NextResponse.json({ success: false, message: "user_id wajib" }, { status: 400 });
     }
 
     console.log("[allowances POST] Received user_id:", user_id);
-    
+
     const { data: targetUser, error: targetErr } = await supabase
       .from("users")
       .select("id")
@@ -104,19 +114,20 @@ export async function POST(request: Request) {
       }
     }
 
-    // Upsert ke user_allowances
     const { data, error } = await supabase
       .from("user_allowances")
       .upsert(
         {
           user_id,
+          year,
+          month,
           allowance_wife: Math.round(allowance_wife),
           allowance_child: Math.round(allowance_child),
           deduction_loan: Math.round(deduction_loan),
           deduction_pension: Math.round(deduction_pension),
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "user_id" }
+        { onConflict: "user_id,year,month" }
       )
       .select()
       .single();
@@ -161,15 +172,18 @@ export async function DELETE(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("user_id");
+    const yearParam = searchParams.get("year");
+    const monthParam = searchParams.get("month");
 
     if (!userId) {
       return NextResponse.json({ success: false, message: "user_id wajib" }, { status: 400 });
     }
 
-    const { error } = await supabase
-      .from("user_allowances")
-      .delete()
-      .eq("user_id", userId);
+    let delQuery = supabase.from("user_allowances").delete().eq("user_id", userId);
+    if (yearParam && monthParam) {
+      delQuery = delQuery.eq("year", parseInt(yearParam, 10)).eq("month", parseInt(monthParam, 10));
+    }
+    const { error } = await delQuery;
 
     if (error) {
       console.error("[allowances DELETE] error:", error);
