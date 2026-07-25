@@ -954,7 +954,7 @@ export function LaptopsContent() {
                         <FormField label="Display / Layar">
                             <input name="display" placeholder='14" FHD IPS, 120Hz' value={formData.display} onChange={handleFormChange} className={inputCls} />
                         </FormField>
-                        <FormField label="Harga Jual (Default)" required>
+                        <FormField label="Harga Official" required>
                             <input name="selling_price" type="number" placeholder="0" value={formData.selling_price} onChange={handleFormChange} required className={inputCls} />
                         </FormField>
                     </div>
@@ -993,7 +993,7 @@ export function LaptopsContent() {
                         <FormField label="Display / Layar">
                             <input name="display" value={formData.display} onChange={handleFormChange} className={inputCls} />
                         </FormField>
-                        <FormField label="Harga Jual (Default)" required>
+                        <FormField label="Harga Official" required>
                             <input name="selling_price" type="number" value={formData.selling_price} onChange={handleFormChange} required className={inputCls} />
                         </FormField>
                     </div>
@@ -1034,7 +1034,7 @@ export function LaptopsContent() {
                                 </div>
                             </div>
                             <div className="sm:text-right flex-shrink-0">
-                                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Harga Jual</p>
+                                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Harga Official</p>
                                 <p className="text-2xl font-black text-gray-900 mt-0.5 tabular-nums">{fmt(selectedLaptop.selling_price)}</p>
                                 <p className="text-xs text-gray-400 mt-1.5">Stok:{" "}
                                     <span className={`font-bold ${(selectedLaptop.qty ?? 0) === 0 ? "text-red-500" : "text-gray-700"}`}>{selectedLaptop.qty ?? 0}</span>
@@ -1299,7 +1299,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "CPU", "RAM", "Storage", "Harga Modal", "Harga Jual", "Sumber", "Tanggal Masuk", "SN", "ST", "SJ", "M", "Aksi"].map(h => (
+                            {["No", "Nama Laptop", "CPU", "RAM", "Storage", "Harga Modal", "Harga Official", "Sumber", "Tanggal Masuk", "SN", "ST", "SJ", "M", "Aksi"].map(h => (
                                 <th key={h} className="px-3 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>

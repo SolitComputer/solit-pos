@@ -19,6 +19,9 @@ interface ItemOutflow {
     is_audited: boolean;
     audited_by: string | null;
     audited_at: string | null;
+    is_restored: boolean;
+    restored_by: string | null;
+    restored_at: string | null;
     created_by_name: string | null;
     created_by_role: string | null;
     created_at: string;
@@ -77,6 +80,8 @@ export default function OutflowsContent() {
     const [error, setError] = useState<string | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [auditingId, setAuditingId] = useState<string | null>(null);
+    const [restoringId, setRestoringId] = useState<string | null>(null);
+    const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null);
 
     // ── Nama akun login ──
     const [currentUserName, setCurrentUserName] = useState("");
@@ -125,6 +130,25 @@ export default function OutflowsContent() {
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "Gagal update audit");
         } finally { setAuditingId(null); }
+    };
+
+    // ── Restore barang ke stok ──
+    const restoreOutflow = async (id: string) => {
+        setRestoringId(id);
+        try {
+            const res = await fetch(`/api/item-outflows/${id}/restore`, { method: "POST" });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal mengembalikan barang");
+            setRows(prev =>
+                prev.map(r => r.id === id ? { ...r, ...json.data } : r)
+            );
+            toast.success("Barang berhasil dikembalikan ke stok");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal mengembalikan barang");
+        } finally {
+            setRestoringId(null);
+            setConfirmRestoreId(null);
+        }
     };
 
     // ── Client-side filter ──
@@ -319,6 +343,7 @@ export default function OutflowsContent() {
                                     <th className="text-right font-semibold px-4 py-3">Nominal</th>
                                     <th className="text-center font-semibold px-4 py-3">Audit</th>
                                     <th className="text-left font-semibold px-4 py-3">Tanggal</th>
+                                    <th className="text-center font-semibold px-4 py-3">Stok</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -386,6 +411,36 @@ export default function OutflowsContent() {
                                         <td className="px-4 py-3 text-gray-400 whitespace-nowrap tabular-nums">
                                             {formatDate(row.created_at)}
                                         </td>
+
+                                        {/* ── Kolom Restore ── */}
+                                        <td className="px-4 py-3 text-center">
+                                            {row.is_restored ? (
+                                                <span
+                                                    title={`Dikembalikan oleh ${row.restored_by ?? "—"} · ${row.restored_at ? formatDate(row.restored_at) : ""}`}
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border bg-sky-50 text-sky-700 border-sky-200"
+                                                >
+                                                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                                        <polyline points="20 6 9 17 4 12" />
+                                                    </svg>
+                                                    Dikembalikan
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setConfirmRestoreId(row.id)}
+                                                    disabled={restoringId === row.id}
+                                                    title="Kembalikan barang ke stok"
+                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition
+                          bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 hover:text-gray-700
+                          ${restoringId === row.id ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}`}
+                                                >
+                                                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                        <polyline points="1 4 1 10 7 10" />
+                                                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                                                    </svg>
+                                                    Restore
+                                                </button>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -400,6 +455,38 @@ export default function OutflowsContent() {
                     onClose={() => setModalOpen(false)}
                     onSuccess={() => { setModalOpen(false); loadOutflows(); }}
                 />
+            )}
+
+            {confirmRestoreId && (
+                <div
+                    className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+                    onClick={() => setConfirmRestoreId(null)}
+                >
+                    <div
+                        className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-5"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <h3 className="text-base font-bold text-gray-900 mb-1.5">Kembalikan Barang?</h3>
+                        <p className="text-[13px] text-gray-500 mb-5">
+                            Stok barang ini akan ditambah kembali 1 unit dan pengambilan ditandai sudah dikembalikan.
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setConfirmRestoreId(null)}
+                                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={() => restoreOutflow(confirmRestoreId)}
+                                disabled={restoringId === confirmRestoreId}
+                                className="flex-1 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white text-sm font-semibold transition disabled:opacity-60 active:scale-[0.98]"
+                            >
+                                {restoringId === confirmRestoreId ? "Memproses…" : "Ya, Kembalikan"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
