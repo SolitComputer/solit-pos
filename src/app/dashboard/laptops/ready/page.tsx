@@ -335,7 +335,7 @@ function ReadyContent() {
                                 </svg>
                             </div>
                             <div>
-                                <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Laptop Siap Jual</h1>
+                                <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Barang Siap Jual</h1>
                                 <p className="text-xs text-gray-400 font-medium mt-0.5">
                                     {isLoading ? "Memuat data..." : `${units.length} unit terdaftar`}
                                 </p>

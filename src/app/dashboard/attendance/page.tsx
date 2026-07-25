@@ -779,17 +779,20 @@ function SalaryModal({ users, salaries, onClose, onSaved }: {
     );
 }
 
-// ─── Modal: Edit Tunjangan & Potongan ────────────────────────────────────────
 function EditAllowanceModal({
     userId,
     userName,
     currentAllowance,
+    calYear,
+    calMonth,
     onClose,
     onSaved,
 }: {
     userId: string;
     userName: string;
     currentAllowance?: UserAllowances;
+    calYear: number;
+    calMonth: number;
     onClose: () => void;
     onSaved: () => void;
 }) {
@@ -811,6 +814,8 @@ function EditAllowanceModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     user_id: userId,
+                    year: calYear,
+                    month: calMonth + 1,
                     ...form,
                 }),
             });
@@ -2739,8 +2744,8 @@ export default function AttendanceDashboardPage() {
             setLeaveData(Array.isArray(raw) ? raw : raw ? [raw] : []);
         }
     }, []);
-    const fetchAllowances = useCallback(async () => {
-        const r = await fetch("/api/attendance/allowances");
+    const fetchAllowances = useCallback(async (y: number, m: number) => {
+        const r = await fetch(`/api/attendance/allowances?year=${y}&month=${m + 1}`);
         const d = await r.json();
         if (d.success) setAllowances(d.data || []);
     }, []);
@@ -2860,7 +2865,7 @@ export default function AttendanceDashboardPage() {
     useEffect(() => {
         if (!selectedMonth) return;
         fetchOvertimeTotal(selectedMonth.year, selectedMonth.month);
-        fetchAllowances();
+        fetchAllowances(selectedMonth.year, selectedMonth.month);
     }, [selectedMonth, fetchOvertimeTotal, fetchAllowances]);
 
     useEffect(() => {
@@ -2892,7 +2897,7 @@ export default function AttendanceDashboardPage() {
             fetchManualRecords(year, month),
             fetchAllUsers(),
             fetchSalaries(),
-            fetchAllowances(),
+            fetchAllowances(year, month),
             fetchLeaveData(year, month),
             fetchShiftSchedules(year, month),
             fetchShiftConfigs(),
@@ -2961,7 +2966,7 @@ export default function AttendanceDashboardPage() {
             fetchManualRecords(year, month),
             fetchAllUsers(),
             fetchSalaries(),
-            fetchAllowances(),
+            fetchAllowances(year, month),
             fetchLeaveData(year, month),
             fetchShiftSchedules(year, month),
             fetchShiftConfigs(),
@@ -3937,7 +3942,7 @@ export default function AttendanceDashboardPage() {
                                                     return dk >= startDate;
                                                 }).length > 0
                                                 : false;
-                                 // AFTER
+                                            // AFTER
                                             const hasManual = mc > 0;
                                             const showLiburLine = !tot && (isUserDayOff || hasAnyDayOff);
                                             return (
@@ -5951,9 +5956,11 @@ export default function AttendanceDashboardPage() {
                     userId={editAllowanceUser.userId}
                     userName={editAllowanceUser.userName}
                     currentAllowance={editAllowanceUser.currentAllowance}
+                    calYear={calYear}
+                    calMonth={calMonth}
                     onClose={() => setEditAllowanceUser(null)}
                     onSaved={() => {
-                        fetchAllowances();
+                        fetchAllowances(calYear, calMonth);
                         setEditAllowanceUser(null);
                     }}
                 />
