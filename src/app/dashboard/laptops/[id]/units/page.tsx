@@ -182,6 +182,10 @@ export default function UnitsPage() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [toast, setToast] = useState("");
+    //  Bulk edit "Sumber Barang" — set 1x untuk semua unit model ini
+    const [showSourceModal, setShowSourceModal] = useState(false);
+    const [sourceInput, setSourceInput] = useState("");
+    const [sourceSaving, setSourceSaving] = useState(false);
 
 
     const activeUnits = units.filter(u => u.status !== "SOLD");
@@ -376,6 +380,39 @@ export default function UnitsPage() {
         setFilterStatus("ALL"); setFilterGradeTab("ALL");
     };
 
+    //  Buka modal set-sumber. Kalau semua unit sumbernya sudah sama, prefill.
+    const openSourceModal = () => {
+        const sources = Array.from(new Set(activeUnits.map(u => u.source).filter(Boolean)));
+        setSourceInput(sources.length === 1 ? String(sources[0]) : "");
+        setShowSourceModal(true);
+    };
+
+    //  Update source SEMUA unit laptop ini sekaligus (bukan 1-1).
+    const handleBulkSource = async () => {
+        setSourceSaving(true);
+        try {
+            const res = await fetch(`/api/laptops/${laptopId}/units/source`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ source: sourceInput.trim() }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal memperbarui sumber");
+
+            const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
+            const freshData = await freshRes.json();
+            setUnits(freshData.data || []);
+
+            setShowSourceModal(false);
+            setSourceInput("");
+            setToast(`Sumber ${json.updated ?? 0} unit berhasil diperbarui!`);
+        } catch (e) {
+            setAlertModal(e instanceof Error ? e.message : "Gagal memperbarui sumber");
+        } finally {
+            setSourceSaving(false);
+        }
+    };
+
     return (
         <DashboardLayout>
             <main className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8">
@@ -424,6 +461,16 @@ export default function UnitsPage() {
                                         Tambah Banyak
                                     </button>
                                 </>
+                            )}
+
+                            {canManageUnits && activeUnits.length > 0 && (
+                                <button onClick={openSourceModal}
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5a2 2 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                                    </svg>
+                                    Set Sumber
+                                </button>
                             )}
                         </div>
                     </div>
@@ -589,7 +636,7 @@ export default function UnitsPage() {
                         </div>
                     ) : (
                         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                           <InventoryTable
+                            <InventoryTable
                                 rows={tableRows}
                                 canSeePrivate={canSeePriceInfo}
                                 canSeeStock={canSeePriceInfo}
@@ -632,7 +679,7 @@ export default function UnitsPage() {
                 />
             )}
 
-          {/*  Pop-up Detail unit — komponen sama dgn yg dipakai di Data Barang */}
+            {/*  Pop-up Detail unit — komponen sama dgn yg dipakai di Data Barang */}
             {detailUnit && (
                 <UnitDetailModal
                     unit={detailUnit as UnitDetailData}
@@ -661,7 +708,16 @@ export default function UnitsPage() {
                     onSuccess={handleFormSuccess}
                 />
             )}
-            {toast && <Toast message={toast} onDone={() => setToast("")} />}
+           {toast && <Toast message={toast} onDone={() => setToast("")} />}
+            {showSourceModal && (
+                <SourceBulkModal
+                    value={sourceInput}
+                    onChange={setSourceInput}
+                    saving={sourceSaving}
+                    onCancel={() => setShowSourceModal(false)}
+                    onSave={handleBulkSource}
+                />
+            )}
         </DashboardLayout>
     );
 }
@@ -702,5 +758,60 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
         <th className={`px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap ${right ? "text-right" : "text-left"}`}>
             {children}
         </th>
+    );
+}
+
+//  Modal set "Sumber Barang" untuk SEMUA unit satu model sekaligus.
+function SourceBulkModal({ value, onChange, saving, onCancel, onSave }: {
+    value: string; onChange: (v: string) => void; saving: boolean;
+    onCancel: () => void; onSave: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel]);
+
+    const canSave = !saving && value.trim().length > 0;
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-5">
+                <div className="flex items-center gap-2.5 mb-4">
+                    <div className="w-9 h-9 rounded-lg bg-[#1a1a2e] flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5a2 2 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                    </div>
+                    <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-gray-800">Set Sumber Semua Unit</h3>
+                        <p className="text-[11px] text-gray-400">Ketik 1x → semua unit model ini ikut terisi</p>
+                    </div>
+                </div>
+
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Sumber Barang</label>
+                <input
+                    type="text"
+                    autoFocus
+                    value={value}
+                    onChange={e => onChange(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && canSave) onSave(); }}
+                    placeholder="Contoh: Bu Reta, COD Depok, Supplier A..."
+                    className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                />
+
+                <div className="flex gap-2 mt-4">
+                    <button onClick={onCancel} disabled={saving}
+                        className="flex-1 h-9 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                        Batal
+                    </button>
+                    <button onClick={onSave} disabled={!canSave}
+                        className="flex-1 h-9 bg-[#1a1a2e] text-white rounded-lg text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? (<><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>) : "Terapkan ke Semua"}
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }

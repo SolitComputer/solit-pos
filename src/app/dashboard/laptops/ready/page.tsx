@@ -3,9 +3,10 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
-import { Laptop, CheckCircle2, Lock, Package, Trophy, ThumbsUp, AlertTriangle, Camera } from "lucide-react";
+import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
+import { Laptop, CheckCircle2, Lock, Trophy, ThumbsUp, AlertTriangle, Camera } from "lucide-react";
 
-// ─── Types ──────────────────────────────────────────────────────────────── ──
+// ─── Types ──────────────────────────────────────────────────────────────────
 interface LaptopUnit {
     id: string;
     laptop_id: string;
@@ -26,6 +27,7 @@ interface LaptopUnit {
         cpu: string;
         ram: string;
         storage: string;
+        display?: string;
         selling_price: number;
     };
 }
@@ -39,16 +41,14 @@ const GRADE_BADGE: Record<string, string> = {
     C: "bg-red-50 text-red-700 border-red-200",
 };
 
+// Hanya SIAP_JUAL & RESERVED yang tampil di halaman ini — status HELD/PACKING
+// dihilangkan karena sudah bisa dilihat lewat halaman Transaksi.
 const STATUS_CONFIG: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", label: "Siap Jual" },
     RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)" },
-    HELD: { badge: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500", label: "Diambil Dulu" },
-    SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
-    PACKING: { badge: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500", label: "Packing" },
 };
 
-const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500/20 focus:border-gray-400 focus:bg-white transition";
-const labelCls = "block text-xs font-medium text-gray-500 mb-1.5";
+const selectCls = "h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer font-medium";
 
 // ─── AlertModal ───────────────────────────────────────────────────────────────
 function AlertModal({ message, onClose }: { message: string; onClose: () => void }) {
@@ -73,6 +73,75 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
     );
 }
 
+// ─── UnitInfoModal — pop-up detail saat item diklik ────────────────────────────
+function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => void }) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    const st = STATUS_CONFIG[unit.status];
+    const GradeIcon = unit.grade === "A" ? Trophy : unit.grade === "B" ? ThumbsUp : AlertTriangle;
+
+    const rows: { label: string; value: React.ReactNode }[] = [
+        { label: "Brand", value: unit.laptop?.brand || "—" },
+        { label: "CPU", value: unit.laptop?.cpu || "—" },
+        { label: "Display", value: unit.laptop?.display || "—" },
+        {
+            label: "Grade", value: (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${GRADE_BADGE[unit.grade] || ""}`}>
+                    <GradeIcon size={12} /> Grade {unit.grade}
+                </span>
+            )
+        },
+        { label: "Harga Jual", value: <span className="font-bold text-gray-800">{fmt(unit.selling_price)}</span> },
+        { label: "Kondisi", value: unit.condition_note || "—" },
+        { label: "Catatan", value: unit.notes || "—" },
+    ];
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center animate-fadeIn">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
+                <div className="bg-gray-800 px-5 py-4 flex-shrink-0">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                            <h3 className="font-bold text-white truncate">{unit.laptop?.laptop_name || "—"}</h3>
+                            <div className="flex items-center gap-2 mt-1">
+                                <code className="font-mono text-[11px] text-gray-200 bg-white/10 px-2 py-0.5 rounded-md">{unit.serial_number}</code>
+                                {st && (
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${st.badge}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
+                        {rows.map(row => (
+                            <div key={row.label} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                                <span className="text-xs text-gray-400 flex-shrink-0">{row.label}</span>
+                                <span className="text-xs font-medium text-gray-700 text-right">{row.value}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Tutup</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── SkeletonRows ─────────────────────────────────────────────────────────────
 function SkeletonRows() {
     return (
@@ -81,7 +150,7 @@ function SkeletonRows() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-100">
-                            {["No", "Laptop", "Serial Number", "Grade", "Harga Jual", "Status", "Pemesan", "Aksi"].map(h => (
+                            {["No", "Laptop", "CPU", "RAM", "Storage", "Harga Jual", "SN", "SJ", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3.5 text-left">
                                     <div className="h-2.5 bg-gray-200 rounded-full w-16 animate-pulse" />
                                 </th>
@@ -91,22 +160,9 @@ function SkeletonRows() {
                     <tbody className="divide-y divide-gray-50">
                         {[...Array(6)].map((_, i) => (
                             <tr key={i} style={{ opacity: 1 - i * 0.13 }}>
-                                <td className="px-4 py-3.5"><div className="h-3 bg-gray-100 rounded-full w-5 mx-auto animate-pulse" /></td>
-                                <td className="px-4 py-3.5 space-y-1.5">
-                                    <div className="h-3.5 bg-gray-100 rounded-full w-36 animate-pulse" />
-                                    <div className="h-2.5 bg-gray-100 rounded-full w-24 animate-pulse" />
-                                </td>
-                                <td className="px-4 py-3.5"><div className="h-6 bg-gray-100 rounded-lg w-28 animate-pulse" /></td>
-                                <td className="px-4 py-3.5"><div className="h-5 bg-gray-100 rounded-full w-16 animate-pulse" /></td>
-                                <td className="px-4 py-3.5"><div className="h-3.5 bg-gray-100 rounded-full w-24 ml-auto animate-pulse" /></td>
-                                <td className="px-4 py-3.5"><div className="h-5 bg-gray-100 rounded-full w-20 animate-pulse" /></td>
-                                <td className="px-4 py-3.5"><div className="h-3.5 bg-gray-100 rounded-full w-20 animate-pulse" /></td>
-                                <td className="px-4 py-3.5">
-                                    <div className="flex gap-1.5 justify-end">
-                                        <div className="h-7 bg-gray-100 rounded-lg w-14 animate-pulse" />
-                                        <div className="h-7 bg-gray-100 rounded-lg w-14 animate-pulse" />
-                                    </div>
-                                </td>
+                                {[...Array(9)].map((_, j) => (
+                                    <td key={j} className="px-4 py-3.5"><div className="h-3 bg-gray-100 rounded-full w-16 animate-pulse" /></td>
+                                ))}
                             </tr>
                         ))}
                     </tbody>
@@ -138,30 +194,18 @@ function StatCard({ label, value, icon, color, bg, bar }: {
 }
 
 // ─── TotalBar ─────────────────────────────────────────────────────────────────
-function TotalBar({ totals, count }: {
-    totals: { selling: number; purchase: number; margin: number };
-    count: number;
-}) {
-    const isPositive = totals.margin >= 0;
+// Harga Beli / Margin sengaja tidak ditampilkan di sini — turunan dari Harga
+// Modal yang memang disembunyikan di halaman Barang Siap Jual.
+function TotalBar({ totalSelling, count }: { totalSelling: number; count: number }) {
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex flex-wrap gap-4 sm:gap-0 sm:divide-x sm:divide-gray-100 animate-fadeUp">
             <div className="flex-1 min-w-[140px] sm:pr-6">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Unit (difilter)</p>
                 <p className="text-2xl font-black text-gray-900 tabular-nums">{count}</p>
             </div>
-            <div className="flex-1 min-w-[160px] sm:px-6">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Jual</p>
-                <p className="text-xl font-black text-gray-800 tabular-nums">{fmt(totals.selling)}</p>
-            </div>
-            <div className="flex-1 min-w-[160px] sm:px-6">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Beli</p>
-                <p className="text-xl font-black text-gray-600 tabular-nums">{fmt(totals.purchase)}</p>
-            </div>
             <div className="flex-1 min-w-[160px] sm:pl-6">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Estimasi Margin</p>
-                <p className={`text-xl font-black tabular-nums ${isPositive ? "text-emerald-600" : "text-red-500"}`}>
-                    {isPositive ? "+" : ""}{fmt(totals.margin)}
-                </p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Jual</p>
+                <p className="text-xl font-black text-gray-800 tabular-nums">{fmt(totalSelling)}</p>
             </div>
         </div>
     );
@@ -174,13 +218,18 @@ function ReadyContent() {
     const [isExporting, setIsExporting] = useState(false);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
 
+    // ── Filter — disamakan dengan filter di Data Barang ────────────────────────
     const [search, setSearch] = useState("");
-    const [filterStatus, setFilterStatus] = useState("ALL");
-    const [filterGrade, setFilterGrade] = useState("ALL");
+    const [filterSN, setFilterSN] = useState("");
+    const [filterBrand, setFilterBrand] = useState("ALL");
+    const [filterRam, setFilterRam] = useState("ALL");
+    const [filterPriceRange, setFilterPriceRange] = useState("ALL");
+    const [sortBy, setSortBy] = useState("DEFAULT");
 
     const [alertMsg, setAlertMsg] = useState<string | null>(null);
     const [confirmTarget, setConfirmTarget] = useState<LaptopUnit | null>(null);
     const [confirmedUnitIds, setConfirmedUnitIds] = useState<Set<string>>(new Set());
+    const [detailUnit, setDetailUnit] = useState<LaptopUnit | null>(null);
 
     const isPKL = userRole ? (userRole === "PKL" || userRole.startsWith("PKL_") || userRole.startsWith("PKL-")) : false;
     const canConfirmTx = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) && !isPKL : false;
@@ -198,7 +247,10 @@ function ReadyContent() {
             const res = await fetch("/api/laptops/ready-units");
             const result = await res.json();
             if (result.success) {
-                setUnits((result.data || []).map((u: LaptopUnit) => ({
+                // Status HELD/PACKING dihilangkan dari halaman ini — sudah bisa
+                // dilihat lewat halaman Transaksi.
+                const cleaned = (result.data || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL" || u.status === "RESERVED");
+                setUnits(cleaned.map((u: LaptopUnit) => ({
                     ...u,
                     purchase_price: Math.round(Number(u.purchase_price) || 0),
                     selling_price: Math.round(Number(u.selling_price) || 0),
@@ -210,57 +262,72 @@ function ReadyContent() {
 
     useEffect(() => { fetchUnits(); }, []);
 
+    const uniqueBrands = useMemo(() => {
+        const b = new Set(units.map(u => u.laptop?.brand).filter(Boolean) as string[]);
+        return ["ALL", ...Array.from(b)];
+    }, [units]);
+
+    const uniqueRams = useMemo(() => {
+        const r = new Set(units.map(u => u.laptop?.ram).filter(Boolean) as string[]);
+        return ["ALL", ...Array.from(r).sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0))];
+    }, [units]);
+
     const filtered = useMemo(() => {
         let list = [...units];
-        if (filterStatus !== "ALL") list = list.filter(u => u.status === filterStatus);
-        if (filterGrade !== "ALL") list = list.filter(u => u.grade === filterGrade);
         if (search.trim()) {
             const t = search.toLowerCase();
             list = list.filter(u =>
                 u.laptop?.laptop_name?.toLowerCase().includes(t) ||
-                u.serial_number?.toLowerCase().includes(t) ||
                 u.laptop?.brand?.toLowerCase().includes(t) ||
-                u.reserved_by?.toLowerCase().includes(t)
+                u.laptop?.cpu?.toLowerCase().includes(t)
             );
         }
-        const order: Record<string, number> = { SIAP_JUAL: 0, HELD: 1, RESERVED: 2, SOLD: 3 };
-        list.sort((a, b) => {
-            const d = (order[a.status] ?? 9) - (order[b.status] ?? 9);
-            if (d !== 0) return d;
-            return (a.laptop?.laptop_name ?? "").localeCompare(b.laptop?.laptop_name ?? "", "id");
-        });
+        if (filterSN.trim()) {
+            const snQ = filterSN.trim().toLowerCase();
+            list = list.filter(u => u.serial_number?.toLowerCase().includes(snQ));
+        }
+        if (filterBrand !== "ALL") list = list.filter(u => u.laptop?.brand === filterBrand);
+        if (filterRam !== "ALL") list = list.filter(u => u.laptop?.ram === filterRam);
+        if (filterPriceRange !== "ALL") {
+            const ranges: Record<string, [number, number]> = {
+                "1-2": [1_000_000, 2_000_000],
+                "2-3": [2_000_000, 3_000_000],
+                "3-4": [3_000_000, 4_000_000],
+                "4+": [4_000_000, Infinity],
+            };
+            const [min, max] = ranges[filterPriceRange] ?? [0, Infinity];
+            list = list.filter(u => u.selling_price >= min && u.selling_price < max);
+        }
+
+        switch (sortBy) {
+            case "AZ": list.sort((a, b) => (a.laptop?.laptop_name || "").localeCompare(b.laptop?.laptop_name || "", "id")); break;
+            case "ZA": list.sort((a, b) => (b.laptop?.laptop_name || "").localeCompare(a.laptop?.laptop_name || "", "id")); break;
+            case "PRICE_ASC": list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0)); break;
+            case "PRICE_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
+            case "SN": list.sort((a, b) => (a.serial_number || "").localeCompare(b.serial_number || "", undefined, { numeric: true })); break;
+            default: {
+                const order: Record<string, number> = { SIAP_JUAL: 0, RESERVED: 1 };
+                list.sort((a, b) => {
+                    const d = (order[a.status] ?? 9) - (order[b.status] ?? 9);
+                    if (d !== 0) return d;
+                    return (a.laptop?.laptop_name ?? "").localeCompare(b.laptop?.laptop_name ?? "", "id");
+                });
+            }
+        }
         return list;
-    }, [units, filterStatus, filterGrade, search]);
+    }, [units, search, filterSN, filterBrand, filterRam, filterPriceRange, sortBy]);
 
     const counts = {
         all: units.length,
         siap: units.filter(u => u.status === "SIAP_JUAL").length,
         reserved: units.filter(u => u.status === "RESERVED").length,
-        held: units.filter(u => u.status === "HELD").length,
-        packing: units.filter(u => u.status === "PACKING").length,
     };
 
-    // ── Totals (ikut filter aktif) ────────────────────────────────────────────
-    const totals = useMemo(() => ({
-        selling: filtered.reduce((sum, u) => sum + (u.selling_price || 0), 0),
-        purchase: filtered.reduce((sum, u) => sum + (u.purchase_price || 0), 0),
-        margin: filtered.reduce((sum, u) => sum + ((u.selling_price || 0) - (u.purchase_price || 0)), 0),
-    }), [filtered]);
+    const totalSelling = useMemo(() => filtered.reduce((sum, u) => sum + (u.selling_price || 0), 0), [filtered]);
 
     // ── Export Excel ──────────────────────────────────────────────────────────
     const exportToExcel = async () => {
         if (filtered.length === 0) return;
-
-        const validUnits = filtered.filter((u) => {
-            const qty = (u as any).quantity ?? ((u as any).qty ?? (u.status === "SOLD" ? 0 : 1));
-            return qty > 0;
-        });
-
-        if (validUnits.length === 0) {
-            setAlertMsg("Tidak ada data dengan quantity > 0 untuk di-export.");
-            return;
-        }
-
         setIsExporting(true);
         try {
             const { default: ExcelJS } = await import("exceljs");
@@ -277,39 +344,28 @@ function ReadyContent() {
                 { header: "Nama Laptop", width: 36, align: "left" as const },
                 { header: "Brand", width: 14, align: "left" as const },
                 { header: "CPU", width: 22, align: "left" as const },
-                { header: "RAM", width: 12, align: "center" as const },
-                { header: "Storage", width: 16, align: "center" as const },
+                { header: "Display", width: 20, align: "left" as const },
                 { header: "Serial Number", width: 24, align: "center" as const },
                 { header: "Grade", width: 12, align: "center" as const },
-                { header: "Quantity", width: 12, align: "center" as const },
                 { header: "Harga Jual", width: 18, align: "right" as const, numFmt: '"Rp "#,##0' },
                 { header: "Status", width: 16, align: "center" as const },
+                { header: "Kondisi", width: 26, align: "left" as const },
                 { header: "Catatan", width: 30, align: "left" as const },
-                { header: "Tanggal Input", width: 16, align: "center" as const },
             ];
 
-            const tableRows = validUnits.map((u, idx) => {
-                const qty = (u as any).quantity ?? ((u as any).qty ?? 1);
-                return [
-                    idx + 1,
-                    u.laptop?.laptop_name ?? "—",
-                    u.laptop?.brand ?? "—",
-                    u.laptop?.cpu ?? "—",
-                    u.laptop?.ram ?? "—",
-                    u.laptop?.storage ?? "—",
-                    u.serial_number ?? "—",
-                    `Grade ${u.grade}`,
-                    qty,
-                    u.selling_price || 0,
-                    STATUS_CONFIG[u.status]?.label ?? u.status,
-                    u.notes ?? "—",
-                    u.created_at
-                        ? new Date(u.created_at).toLocaleDateString("id-ID", {
-                            day: "2-digit", month: "short", year: "numeric",
-                        })
-                        : "—",
-                ];
-            });
+            const tableRows = filtered.map((u, idx) => [
+                idx + 1,
+                u.laptop?.laptop_name ?? "—",
+                u.laptop?.brand ?? "—",
+                u.laptop?.cpu ?? "—",
+                u.laptop?.display ?? "—",
+                u.serial_number ?? "—",
+                `Grade ${u.grade}`,
+                u.selling_price || 0,
+                STATUS_CONFIG[u.status]?.label ?? u.status,
+                u.condition_note ?? "—",
+                u.notes ?? "—",
+            ]);
 
             ws.addTable({
                 name: "TabelSiapJual",
@@ -322,8 +378,7 @@ function ReadyContent() {
             });
 
             colDefs.forEach((col, colIdx) => {
-                const wsCol = ws.getColumn(colIdx + 1);
-                wsCol.width = col.width;
+                ws.getColumn(colIdx + 1).width = col.width;
             });
 
             ws.eachRow((row, rowNumber) => {
@@ -331,13 +386,8 @@ function ReadyContent() {
                 row.eachCell((cell, colNumber) => {
                     const colDef = colDefs[colNumber - 1];
                     if (rowNumber > 1 && colDef) {
-                        cell.alignment = {
-                            vertical: "middle",
-                            horizontal: colDef.align,
-                        };
-                        if (colDef.numFmt) {
-                            cell.numFmt = colDef.numFmt;
-                        }
+                        cell.alignment = { vertical: "middle", horizontal: colDef.align };
+                        if (colDef.numFmt) cell.numFmt = colDef.numFmt;
                     }
                 });
             });
@@ -364,7 +414,30 @@ function ReadyContent() {
         }
     };
 
-    const hasActiveFilter = search || filterStatus !== "ALL" || filterGrade !== "ALL";
+    const hasActiveFilter = search || filterSN || filterBrand !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || sortBy !== "DEFAULT";
+    const resetFilters = () => {
+        setSearch(""); setFilterSN(""); setFilterBrand("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setSortBy("DEFAULT");
+    };
+
+    // ── Mapping unit → baris InventoryTable. Struktur kolom sama seperti Data
+    //    Barang, tapi Harga Modal/Sumber/Tanggal Masuk selalu disembunyikan
+    //    (canSeePrivate=false) dan ST/M ikut disembunyikan (canSeeStock=false)
+    //    sehingga hanya SN dan SJ yang tampil.
+    const tableRows: InventoryRow[] = filtered.map(u => ({
+        id: u.id,
+        laptop_name: u.laptop?.laptop_name ?? "—",
+        cpu: u.laptop?.cpu ?? "",
+        ram: u.laptop?.ram ?? "",
+        storage: u.laptop?.storage ?? "",
+        harga_modal: null,
+        harga_jual: u.selling_price ?? 0,
+        sumber: null,
+        tanggal_masuk: null,
+        sn: u.serial_number,
+        stok_tersisa: 0,
+        siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
+        minus: 0,
+    }));
 
     return (
         <>
@@ -453,73 +526,65 @@ function ReadyContent() {
                     </div>
 
                     {/* ── Stat Cards ─────────────────────────────────────── */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fadeUp">
+                    <div className="grid grid-cols-3 gap-3 animate-fadeUp">
                         <StatCard label="Total Unit" value={counts.all} icon={<Laptop size={18} className="text-white" />} color="text-gray-900" bg="bg-white" bar="bg-gray-800" />
                         <StatCard label="Siap Jual" value={counts.siap} icon={<CheckCircle2 size={18} className="text-white" />} color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
                         <StatCard label="Dipesan" value={counts.reserved} icon={<Lock size={18} className="text-white" />} color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
-                        <StatCard label="Diambil" value={counts.held} icon={<Package size={18} className="text-white" />} color="text-orange-600" bg="bg-orange-50" bar="bg-orange-500" />
                     </div>
 
-                    {/* ── Filter ─────────────────────────────────────────── */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="px-4 pt-4 pb-3 border-b border-gray-100">
-                            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-                                {[
-                                    { value: "ALL", label: "Semua", count: counts.all, dot: "" },
-                                    { value: "SIAP_JUAL", label: "Siap Jual", count: counts.siap, dot: "bg-emerald-500" },
-                                    { value: "RESERVED", label: "Dipesan (DP)", count: counts.reserved, dot: "bg-violet-500" },
-                                    { value: "HELD", label: "Diambil Dulu", count: counts.held, dot: "bg-orange-500" },
-                                    { value: "PACKING", label: "Packing", count: counts.packing, dot: "bg-sky-500" },
-                                ].map(opt => {
-                                    const isActive = filterStatus === opt.value;
-                                    return (
-                                        <button
-                                            key={opt.value}
-                                            onClick={() => setFilterStatus(opt.value)}
-                                            className={`flex-shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold transition-all duration-150 ${isActive ? "bg-gray-900 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800"}`}
-                                        >
-                                            {opt.dot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? "bg-white/60" : opt.dot}`} />}
-                                            <span>{opt.label}</span>
-                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${isActive ? "bg-white/20 text-white" : "bg-white text-gray-500"}`}>
-                                                {opt.count}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <div className="px-4 py-3 flex flex-wrap gap-2">
-                            <div className="relative flex-1 min-w-[180px]">
+                    {/* ── Filter — disamakan dengan Data Barang ───────────── */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                            <div className="relative">
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                                 <input
                                     type="text"
-                                    placeholder="Cari nama, SN, brand, atau pemesan..."
+                                    placeholder="Cari nama, brand, CPU..."
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
                                     className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition"
                                 />
-                                {search && (
-                                    <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
-                                )}
                             </div>
-                            <select
-                                value={filterGrade}
-                                onChange={e => setFilterGrade(e.target.value)}
-                                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer font-medium"
-                            >
-                                <option value="ALL">Semua Grade</option>
-                                <option value="A">Grade A</option>
-                                <option value="B">Grade B</option>
-                                <option value="C">Grade C</option>
+                            <div className="relative">
+                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                                </svg>
+                                <input
+                                    type="text"
+                                    placeholder="Cari Serial Number..."
+                                    value={filterSN}
+                                    onChange={e => setFilterSN(e.target.value)}
+                                    className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition"
+                                />
+                            </div>
+                            <select value={filterBrand} onChange={e => setFilterBrand(e.target.value)} className={selectCls}>
+                                {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
+                            </select>
+                            <select value={filterRam} onChange={e => setFilterRam(e.target.value)} className={selectCls}>
+                                {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
+                            </select>
+                            <select value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)} className={selectCls}>
+                                <option value="ALL">Semua Harga</option>
+                                <option value="1-2">Rp 1 jt – 2 jt</option>
+                                <option value="2-3">Rp 2 jt – 3 jt</option>
+                                <option value="3-4">Rp 3 jt – 4 jt</option>
+                                <option value="4+">Rp 4 jt ke atas</option>
+                            </select>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <select value={sortBy} onChange={e => setSortBy(e.target.value)} className={selectCls}>
+                                <option value="DEFAULT">Urutan Default</option>
+                                <option value="AZ">Nama: A → Z</option>
+                                <option value="ZA">Nama: Z → A</option>
+                                <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
+                                <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
+                                <option value="SN">Urut SN</option>
                             </select>
                             {hasActiveFilter && (
                                 <button
-                                    onClick={() => { setSearch(""); setFilterStatus("ALL"); setFilterGrade("ALL"); }}
+                                    onClick={resetFilters}
                                     className="h-9 px-3 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1.5 active:scale-[0.98]"
                                 >
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -543,7 +608,7 @@ function ReadyContent() {
                             </div>
                             {hasActiveFilter && (
                                 <button
-                                    onClick={() => { setSearch(""); setFilterStatus("ALL"); setFilterGrade("ALL"); }}
+                                    onClick={resetFilters}
                                     className="mt-1 h-9 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition"
                                 >
                                     Reset Filter
@@ -552,108 +617,47 @@ function ReadyContent() {
                         </div>
                     ) : (
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div className="overflow-x-auto table-scroll">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="bg-gray-50/80 border-b border-gray-100">
-                                            <th className="px-4 py-3 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest w-10">No</th>
-                                            <th className="px-4 py-3 text-left  text-[9px] font-black text-gray-400 uppercase tracking-widest">Laptop</th>
-                                            <th className="px-4 py-3 text-left  text-[9px] font-black text-gray-400 uppercase tracking-widest">Serial Number</th>
-                                            <th className="px-4 py-3 text-left  text-[9px] font-black text-gray-400 uppercase tracking-widest">Grade</th>
-                                            <th className="px-4 py-3 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Harga Jual</th>
-                                            <th className="px-4 py-3 text-left  text-[9px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                            <th className="px-4 py-3 text-left  text-[9px] font-black text-gray-400 uppercase tracking-widest">Pemesan</th>
-                                            <th className="px-4 py-3 text-right text-[9px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {filtered.map((unit, idx) => {
-                                            const st = STATUS_CONFIG[unit.status];
-                                            const isAvailable = unit.status === "SIAP_JUAL";
-                                            const isPending = unit.status === "RESERVED" || unit.status === "HELD" || unit.status === "PACKING";
-                                            return (
-                                                <tr
-                                                    key={unit.id}
-                                                    className={`data-row ${unit.status === "RESERVED" ? "bg-violet-50/20 hover:bg-violet-50/40" : unit.status === "HELD" ? "bg-orange-50/20 hover:bg-orange-50/40" : "hover:bg-gray-50/60"}`}
+                            <InventoryTable
+                                rows={tableRows}
+                                canSeePrivate={false}
+                                canSeeStock={false}
+                                onRowClick={(row) => {
+                                    const u = filtered.find(x => x.id === row.id);
+                                    if (u) setDetailUnit(u);
+                                }}
+                                renderActions={(row) => {
+                                    const u = filtered.find(x => x.id === row.id);
+                                    if (!u) return null;
+                                    const st = STATUS_CONFIG[u.status];
+                                    const isPending = u.status === "RESERVED";
+                                    return (
+                                        <div className="flex items-center gap-1.5">
+                                            {st && (
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap ${st.badge}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${st.dot}`} />
+                                                    {st.label}
+                                                </span>
+                                            )}
+                                            {isPending && canConfirmTx && !confirmedUnitIds.has(u.id) && (
+                                                <button
+                                                    onClick={() => setConfirmTarget(u)}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition active:scale-95"
                                                 >
-                                                    <td className="px-4 py-3.5 text-center w-10">
-                                                        <span className="text-[11px] font-semibold text-gray-300 tabular-nums">{idx + 1}</span>
-                                                    </td>
-
-                                                    <td className="px-4 py-3.5" style={{ maxWidth: 240 }}>
-                                                        <p className="font-semibold text-gray-800 text-xs truncate" title={unit.laptop?.laptop_name}>
-                                                            {unit.laptop?.laptop_name || "—"}
-                                                        </p>
-                                                        <div className="flex flex-wrap gap-1 mt-1.5">
-                                                            {unit.laptop?.brand && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.brand}</span>}
-                                                            {unit.laptop?.cpu && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.cpu}</span>}
-                                                            {unit.laptop?.ram && <span className="text-[9px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md">{unit.laptop.ram}</span>}
-                                                        </div>
-                                                    </td>
-
-                                                    <td className="px-4 py-3.5 whitespace-nowrap">
-                                                        <code className="font-mono text-[11px] text-gray-700 bg-gray-100 px-2 py-1 rounded-lg">{unit.serial_number}</code>
-                                                    </td>
-
-                                                    <td className="px-4 py-3.5 whitespace-nowrap">
-                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${GRADE_BADGE[unit.grade] || ""}`}>
-                                                            {unit.grade === "A" ? <Trophy size={12} /> : unit.grade === "B" ? <ThumbsUp size={12} /> : <AlertTriangle size={12} />} Grade {unit.grade}
-                                                        </span>
-                                                    </td>
-
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                                        <span className="font-bold text-gray-800 text-xs tabular-nums">{fmt(unit.selling_price)}</span>
-                                                    </td>
-
-                                                    <td className="px-4 py-3.5 whitespace-nowrap">
-                                                        {st && (
-                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${st.badge}`}>
-                                                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${st.dot}`} />
-                                                                {st.label}
-                                                            </span>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-4 py-3.5">
-                                                        {isPending && unit.reserved_by ? (
-                                                            <div>
-                                                                <p className="text-xs font-semibold text-gray-700">{unit.reserved_by}</p>
-                                                                {unit.reserved_invoice && (
-                                                                    <p className="text-[9px] text-gray-400 font-mono mt-0.5 bg-gray-100 px-1.5 py-0.5 rounded-md inline-block">{unit.reserved_invoice}</p>
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-gray-200 text-xs">—</span>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-4 py-3.5 whitespace-nowrap">
-                                                        <div className="flex items-center justify-end gap-1.5">
-                                                            {/* DP / Ambil Dulu dipindah ke alur Payment Create — tidak lagi dari sini */}
-                                                            {isPending && canConfirmTx && !confirmedUnitIds.has(unit.id) && (
-                                                                <button
-                                                                    onClick={() => setConfirmTarget(unit)}
-                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition active:scale-95"
-                                                                >
-                                                                    <CheckCircle2 size={12} /> Lunas
-                                                                </button>
-                                                            )}
-                                                            {isPending && confirmedUnitIds.has(unit.id) && (
-                                                                <span className="px-2.5 py-1.5 text-[11px] font-semibold text-gray-400 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-1">
-                                                                    <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                                                    </svg>
-                                                                    Lunas
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                    <CheckCircle2 size={12} /> Lunas
+                                                </button>
+                                            )}
+                                            {isPending && confirmedUnitIds.has(u.id) && (
+                                                <span className="px-2.5 py-1.5 text-[11px] font-semibold text-gray-400 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-1">
+                                                    <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    Lunas
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                }}
+                            />
 
                             {/* Footer tabel */}
                             <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/60 flex items-center justify-between gap-3">
@@ -665,14 +669,13 @@ function ReadyContent() {
                                     unit
                                     {hasActiveFilter && <span className="ml-1 text-gray-400">(difilter)</span>}
                                 </p>
-
                             </div>
                         </div>
                     )}
 
                     {/* ── Total Nominal ───────────────────────────────────── */}
                     {!isLoading && filtered.length > 0 && (
-                        <TotalBar totals={totals} count={filtered.length} />
+                        <TotalBar totalSelling={totalSelling} count={filtered.length} />
                     )}
 
                 </div>
@@ -680,6 +683,8 @@ function ReadyContent() {
 
             {/* ── Modals ─────────────────────────────────────────────────── */}
             {alertMsg && <AlertModal message={alertMsg} onClose={() => setAlertMsg(null)} />}
+
+            {detailUnit && <UnitInfoModal unit={detailUnit} onClose={() => setDetailUnit(null)} />}
 
             {confirmTarget && (
                 <ConfirmPaymentModal
@@ -757,10 +762,6 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
         finally { setLoading(false); }
     };
 
-    const statusColor = unit.status === "RESERVED" ? "bg-violet-50 text-violet-700 border-violet-200" : "bg-orange-50 text-orange-700 border-orange-200";
-    const statusDot = unit.status === "RESERVED" ? "bg-violet-500" : "bg-orange-500";
-    const statusLabel = unit.status === "RESERVED" ? "DP" : "Ambil Dulu";
-
     return (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center animate-fadeIn">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -786,7 +787,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
                         {[
-                            { label: "Status", value: <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}><span className={`w-1.5 h-1.5 rounded-full ${statusDot} animate-pulse`} />{statusLabel}</span> },
+                            { label: "Status", value: <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-violet-50 text-violet-700 border-violet-200"><span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />DP</span> },
                             { label: "Invoice", value: <span className="text-xs font-mono font-semibold text-gray-700">{unit.reserved_invoice || "—"}</span> },
                             { label: "Dipesan oleh", value: <span className="text-xs font-semibold text-gray-800">{unit.reserved_by || "—"}</span> },
                             { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800">{unit.laptop?.laptop_name || "—"}</span> },

@@ -19,6 +19,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
           cpu,
           ram,
           storage,
+          display,
           selling_price
         )
       `)

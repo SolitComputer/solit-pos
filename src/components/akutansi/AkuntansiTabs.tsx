@@ -161,7 +161,7 @@ export default function AkuntansiTabs({ period }: { period: string }) {
         ) : tab === "buku-besar" ? (
           <BukuBesar period={period} />
         ) : tab === "neraca" ? (
-          <Neraca period={period} />
+          <Neraca key={`neraca-${period}`} period={period} />
         ) : tab === "laba-rugi" ? (
           <LabaRugi period={period} />
         ) : tab === "akun" ? (
