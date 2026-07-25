@@ -69,6 +69,7 @@ type Entry = {
     keterangan: string | null;
     source_type: "MANUAL" | "TRANSACTION" | "TRANSACTION_PAYMENT" | "TRANSACTION_DP" | "SERVICE" | "MODAL_AWAL";
     source_id: string | null;
+    invoice_number?: string | null;
     tanggal: string;
     payment_method: "CASH" | "SALDO" | null;
     photo_url: string | null;
@@ -1499,11 +1500,15 @@ export default function CashflowPage() {
 
     const isDetailRow = (e: Entry) => e.direction === "OUT" || (e.direction === "IN" && e.source_type === "MANUAL");
 
-    const handleRowClick = (e: Entry) => {
+  const handleRowClick = (e: Entry) => {
         if (e.source_type === "MODAL_AWAL") return;
         if (isDetailRow(e)) { setDetailEntry(e); return; }
-        if (e.source_type === "TRANSACTION" && e.source_id) router.push(`/dashboard/transactions?invoice=${encodeURIComponent(e.source_id)}`);
-        else if (e.source_type === "SERVICE") router.push("/dashboard/service/history");
+        if (e.source_type === "TRANSACTION" || e.source_type === "TRANSACTION_PAYMENT" || e.source_type === "TRANSACTION_DP") {
+            const invoice = e.invoice_number || e.source_id;
+            if (invoice) router.push(`/dashboard/transactions?invoice=${encodeURIComponent(invoice)}`);
+            return;
+        }
+        if (e.source_type === "SERVICE") router.push("/dashboard/service/history");
     };
 
     if (allowed === false) return (

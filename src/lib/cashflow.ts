@@ -157,24 +157,39 @@ export function applyFilters<T extends {
 }
 
 // ── Metode Pembayaran Transaksi (disamakan dengan label di Riwayat Transaksi) ─
-function normalizeTxPaymentLabel(raw: string): string {
-  const m = raw.toUpperCase();
-  if (m.includes("TUNAI") || m.includes("CASH")) return "Tunai";
-  if (m.includes("TRANSFER") || m.includes("TF") || m.includes("BCA") || m.includes("BRI")) return "Transfer";
-  if (m.includes("QRIS") || m.includes("QR")) return "QRIS";
-  return raw.trim();
+// PENTING: deteksi kata kunci dilakukan INDEPENDEN (bukan if-else berurutan yang
+// langsung return), persis seperti getPaymentStyle() di halaman Riwayat Transaksi.
+// Kenapa: field payment_method kadang isinya sudah gabungan teks sendiri
+// (mis. "Tunai, Transfer"), jadi kalau dicek berurutan dan langsung return begitu
+// ketemu "Tunai", kata "Transfer" di string yang sama tidak akan pernah terbaca.
+function hasPaymentKeyword(text: string, keywords: string[]): boolean {
+  const m = text.toUpperCase();
+  return keywords.some((k) => m.includes(k));
 }
 
 /** Gabungkan payment_method + payment_method_2 dari tabel `transactions` jadi label
  *  singkat seperti di Riwayat Transaksi: "Tunai", "Transfer", "QRIS", atau gabungan
- *  "Tunai+Transfer" kalau transaksi dibayar pakai 2 metode sekaligus. */
+ *  "Tunai+Transfer" kalau transaksi dibayar pakai lebih dari satu metode — baik itu
+ *  tergabung dalam satu field (payment_method = "Tunai, Transfer") maupun terpisah
+ *  di dua field (payment_method + payment_method_2). Tidak bergantung pada
+ *  amount_method_1/amount_method_2 — itu field terpisah untuk widget breakdown Rp
+ *  per metode (PaymentBreakdown), bukan penentu split di badge Metode utama. */
 export function formatTxPaymentMethod(
   method1?: string | null,
   method2?: string | null
 ): string {
-  const label1 = normalizeTxPaymentLabel(method1 ?? "");
-  const label2 = normalizeTxPaymentLabel(method2 ?? "");
-  if (!label1 && !label2) return "-";
-  if (!label2 || label1 === label2) return label1 || label2;
-  return `${label1}+${label2}`;
+  const combined = `${method1 ?? ""} ${method2 ?? ""}`;
+  const hasCash = hasPaymentKeyword(combined, ["TUNAI", "CASH"]);
+  const hasTransfer = hasPaymentKeyword(combined, ["TRANSFER", "TF", "BCA", "BRI"]);
+  const hasQris = hasPaymentKeyword(combined, ["QRIS", "QR"]);
+
+  const parts: string[] = [];
+  if (hasCash) parts.push("Tunai");
+  if (hasTransfer) parts.push("Transfer");
+  if (hasQris) parts.push("QRIS");
+  if (parts.length > 0) return parts.join("+");
+
+  // Metode lain yang tidak masuk kata kunci di atas (mis. "OVO", "Dana") — tampilkan apa adanya
+  const raw = (method1 ?? "").trim();
+  return raw || "-";
 }
