@@ -696,7 +696,7 @@ function sortGroupsByCanonicalOrder(groups: MenuGroup[]): MenuGroup[] {
 // Data Barang: sembunyikan item sidebar untuk role selain 4 ini, selaras dengan
 // pembatasan baru di ROUTE_PERMISSIONS["/dashboard/data-barang"] (lib/permissions.ts)
 const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
-  "ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH",
 ]);
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
