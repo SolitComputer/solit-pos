@@ -4,7 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
-import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES } from "@/lib/permissions";
+import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
+import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
 import { Trash2, Package, CheckCircle2, Wrench, Wallet } from "lucide-react";
 import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
 import UnitFormModal from "@/components/inventory/UnitFormModal";
@@ -16,6 +18,7 @@ interface LaptopUnit {
     serial_number: string;
     grade: "A" | "B" | "C";
     condition_note: string;
+    source?: string | null;
     purchase_price: number;
     selling_price: number;
     status: string;
@@ -168,6 +171,11 @@ export default function UnitsPage() {
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
     ] as UserRole[]);
+    //  Full Access → boleh toggle mode Edit di Pop-up Detail unit
+    const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
+    //  Unit yang sedang dibuka di Pop-up Detail
+    const [detailUnit, setDetailUnit] = useState<LaptopUnit | null>(null);
+
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [showBulkModal, setShowBulkModal] = useState(false);
@@ -307,6 +315,24 @@ export default function UnitsPage() {
         gradeB: activeUnits.filter(u => u.grade === "B").length,
         gradeC: activeUnits.filter(u => u.grade === "C").length,
     };
+
+    //  Mapping unit → baris tabel. Struktur kolom identik dgn Data Barang,
+    //  bedanya di sini ST/SJ/M bernilai 0 atau 1 karena 1 baris = 1 unit.
+    const tableRows: InventoryRow[] = filteredUnits.map(u => ({
+        id: u.id,
+        laptop_name: laptop?.laptop_name ?? "—",
+        cpu: laptop?.cpu ?? "",
+        ram: laptop?.ram ?? "",
+        storage: laptop?.storage ?? "",
+        harga_modal: u.purchase_price ?? 0,
+        harga_jual: u.selling_price ?? 0,
+        sumber: u.source ?? null,
+        tanggal_masuk: u.created_at ?? null,
+        sn: u.serial_number,
+        stok_tersisa: u.status !== "SOLD" ? 1 : 0,
+        siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
+        minus: (u.status === "SERVICE" || u.status === "BELUM_SIAP") ? 1 : 0,
+    }));
 
     const openCreate = () => {
         setEditingUnit(null);
@@ -563,133 +589,25 @@ export default function UnitsPage() {
                         </div>
                     ) : (
                         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="bg-gray-50/80 border-b border-gray-100">
-                                            {canManageUnits && (
-                                                <th className="px-4 py-3 w-14">
-                                                    <button onClick={toggleSelectAll}
-                                                        className={`w-4 h-4 rounded border-2 flex items-center justify-center transition flex-shrink-0 ${isAllSelected ? "bg-[#1a1a2e] border-[#1a1a2e]" : isIndeterminate ? "bg-gray-300 border-gray-300" : "bg-white border-gray-300 hover:border-gray-400"}`}>
-                                                        {(isAllSelected || isIndeterminate) && (
-                                                            <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d={isIndeterminate ? "M5 12h14" : "M5 13l4 4L19 7"} />
-                                                            </svg>
-                                                        )}
-                                                    </button>
-                                                </th>
-                                            )}
-                                            <Th>Serial Number</Th>
-                                            <Th>Grade</Th>
-                                            <Th>Kondisi</Th>
-                                            <Th>Tgl Masuk</Th>
-                                            {canSeePriceInfo && (
-                                                <Th right>
-                                                    {canManageUnits ? (
-                                                        <span className="flex items-center justify-end gap-1">
-                                                            Harga Modal
-                                                            <span className="text-violet-400 font-bold normal-case tracking-normal">(editable)</span>
-                                                        </span>
-                                                    ) : (
-                                                        "Harga Modal"
-                                                    )}
-                                                </Th>
-                                            )}
-                                            <Th right>Harga Jual</Th>
-                                            {canSeePriceInfo && <Th right>Margin</Th>}
-                                            <Th>Status</Th>
-                                            <Th right>Aksi</Th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {filteredUnits.map(unit => {
-                                            const s = STATUS_STYLE[unit.status];
-                                            const g = GRADE_STYLE[unit.grade];
-                                            const margin = (unit.selling_price || 0) - (unit.purchase_price || 0);
-                                            const isSelected = selectedIds.has(unit.id);
-                                            return (
-                                                <tr key={unit.id} className={`transition-colors group ${isSelected ? "bg-red-50/60" : "hover:bg-gray-50/60"}`}>
-                                                    {canManageUnits && (
-                                                        <td className="px-4 py-3">
-                                                            <button onClick={() => toggleSelect(unit.id)}
-                                                                className={`w-4 h-4 rounded border-2 flex items-center justify-center transition flex-shrink-0 ${isSelected ? "bg-red-500 border-red-500" : "bg-white border-gray-300 hover:border-gray-400"}`}>
-                                                                {isSelected && (
-                                                                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                                    </svg>
-                                                                )}
-                                                            </button>
-                                                        </td>
-                                                    )}
-                                                    <td className="px-4 py-3">
-                                                        <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">{unit.serial_number}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3 whitespace-nowrap">
-                                                        {g && (
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${g.badge}`}>{g.label}</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3 max-w-[180px]">
-                                                        <span className="text-xs text-gray-600 line-clamp-2" title={unit.condition_note}>
-                                                            {unit.condition_note || <span className="text-gray-300">—</span>}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 whitespace-nowrap">
-                                                        <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
-                                                    </td>
-                                                    {canSeePriceInfo && (
-                                                        <td className="px-4 py-3 whitespace-nowrap">
-                                                            {canManageUnits ? (
-                                                                <EditablePriceCell
-                                                                    unitId={unit.id}
-                                                                    value={unit.purchase_price}
-                                                                    onSaved={handlePriceSaved}
-                                                                />
-                                                            ) : (
-                                                                <div className="text-right text-xs text-gray-500 tabular-nums">
-                                                                    {fmt(unit.purchase_price)}
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    )}
-                                                    <td className="px-4 py-3 text-right font-semibold text-gray-800 whitespace-nowrap tabular-nums">{fmt(unit.selling_price)}</td>
-                                                    {canSeePriceInfo && (
-                                                        <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
-                                                            <span className={`text-xs font-semibold ${margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                                                                {margin >= 0 ? "+" : ""}{fmt(Math.abs(margin))}
-                                                            </span>
-                                                        </td>
-                                                    )}
-                                                    <td className="px-4 py-3 whitespace-nowrap">
-                                                        {s && (
-                                                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                                                                {s.label}
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            {canManageUnits && (
-                                                                <button onClick={() => openEdit(unit)}
-                                                                    className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
-                                                                    Edit
-                                                                </button>
-                                                            )}
-                                                            {canManageUnits && (
-                                                                <button onClick={() => handleDelete(unit)}
-                                                                    className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                           <InventoryTable
+                                rows={tableRows}
+                                canSeePrivate={canSeePriceInfo}
+                                canSeeStock={canSeePriceInfo}
+                                onRowClick={(row) => {
+                                    const u = filteredUnits.find(x => x.id === row.id);
+                                    if (u) setDetailUnit(u);
+                                }}
+                                renderActions={(row) => {
+                                    const u = filteredUnits.find(x => x.id === row.id);
+                                    if (!u || !canManageUnits) return null;
+                                    return (
+                                        <button onClick={() => handleDelete(u)}
+                                            className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    );
+                                }}
+                            />
                             <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between">
                                 <span className="text-xs text-gray-400">
                                     Menampilkan <span className="font-medium text-gray-600">{filteredUnits.length}</span> dari <span className="font-medium text-gray-600">{units.length}</span> unit
@@ -711,6 +629,23 @@ export default function UnitsPage() {
                     onClose={closeForm}
                     onSuccess={handleFormSuccess}
                     onError={(msg) => setAlertModal(msg)}
+                />
+            )}
+
+          {/*  Pop-up Detail unit — komponen sama dgn yg dipakai di Data Barang */}
+            {detailUnit && (
+                <UnitDetailModal
+                    unit={detailUnit as UnitDetailData}
+                    laptopName={laptop?.laptop_name}
+                    laptopMeta={[laptop?.brand, laptop?.cpu, laptop?.ram, laptop?.storage].filter(Boolean).join(" · ")}
+                    canEdit={canFullAccessBarang}
+                    canSeePrivate={canSeePriceInfo}
+                    onClose={() => setDetailUnit(null)}
+                    onSaved={(updated) => {
+                        setUnits(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u));
+                        setDetailUnit(null);
+                        setToast("Data unit berhasil diperbarui!");
+                    }}
                 />
             )}
 
