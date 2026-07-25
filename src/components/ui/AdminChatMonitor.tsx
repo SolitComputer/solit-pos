@@ -40,6 +40,24 @@ interface Conversation {
     unreadCount: number;
 }
 
+// ─── Design tokens (tema terang) ───────────────────────────────────────────────
+// Disentralisasi supaya warna konsisten di semua sub-komponen dan gampang
+// diubah lagi nanti tanpa cari-cari satu-satu.
+const THEME = {
+    bg: "#ffffff",
+    bgSoft: "#f7f7f8",
+    bgHover: "#f4f4f5",
+    border: "#e4e4e7",
+    borderSoft: "#ececef",
+    textPrimary: "#18181b",
+    textSecondary: "#52525b",
+    textMuted: "#a1a1aa",
+    accent: "#6366f1",
+    accentSoft: "rgba(99,102,241,0.08)",
+    accentSoftBorder: "rgba(99,102,241,0.18)",
+    accentText: "#4f46e5",
+};
+
 // ─── Responsive hook ──────────────────────────────────────────────────────────
 function useIsMobile() {
     const [isMobile, setIsMobile] = useState(false);
@@ -67,7 +85,7 @@ function formatTime(iso: string) {
     return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short" });
 }
 
-// ─── Avatar color system (dark + aksen indigo/biru) ──────────────────────────
+// ─── Avatar color system (tetap vivid supaya kontras di atas putih) ──────────
 const AVATAR_PALETTES = [
     { from: "#6366f1", to: "#4338ca" },
     { from: "#3b82f6", to: "#1e40af" },
@@ -107,6 +125,8 @@ function Avatar({ name, size = "md" }: { name: string; size?: "xs" | "sm" | "md"
 }
 
 // ─── Photo Lightbox ───────────────────────────────────────────────────────────
+// Overlay tetap gelap (bukan putih) — ini standar UX untuk viewer foto supaya
+// foto jadi fokus utama & kontrasnya enak dilihat, terlepas dari tema komponen.
 function PhotoLightbox({ url, onClose }: { url: string; onClose: () => void }) {
     const isMobile = useIsMobile();
 
@@ -177,11 +197,11 @@ function UserChip({ user, isMobile }: { user: { id: string; name: string; role: 
             <Avatar name={user.name} size="sm" />
             <div style={{ minWidth: 0 }}>
                 <p style={{
-                    fontSize: 12, fontWeight: 700, color: "#e4e4e7", lineHeight: 1.2, margin: 0,
+                    fontSize: 12, fontWeight: 700, color: THEME.textPrimary, lineHeight: 1.2, margin: 0,
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                     maxWidth: isMobile ? 74 : 160,
                 }}>{user.name}</p>
-                <p style={{ fontSize: 10, color: "#818cf8", lineHeight: 1.2, margin: 0, marginTop: 1 }}>
+                <p style={{ fontSize: 10, color: THEME.accentText, lineHeight: 1.2, margin: 0, marginTop: 1 }}>
                     {ROLE_LABEL[user.role] ?? user.role}
                 </p>
             </div>
@@ -194,14 +214,14 @@ function SkeletonRow() {
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 20px" }}>
             <div style={{ position: "relative", width: 46, height: 46, flexShrink: 0 }}>
-                <div style={{ position: "absolute", top: 0, left: 0, width: 32, height: 32, borderRadius: 10, background: "#27272a" }} />
-                <div style={{ position: "absolute", bottom: 0, right: 0, width: 32, height: 32, borderRadius: 10, background: "#3f3f46" }} />
+                <div style={{ position: "absolute", top: 0, left: 0, width: 32, height: 32, borderRadius: 10, background: THEME.border }} />
+                <div style={{ position: "absolute", bottom: 0, right: 0, width: 32, height: 32, borderRadius: 10, background: "#d4d4d8" }} />
             </div>
             <div style={{ flex: 1 }}>
-                <div style={{ height: 13, width: 170, borderRadius: 6, background: "#27272a", marginBottom: 8 }} />
-                <div style={{ height: 11, width: 230, borderRadius: 6, background: "#1f1f22" }} />
+                <div style={{ height: 13, width: 170, borderRadius: 6, background: THEME.border, marginBottom: 8 }} />
+                <div style={{ height: 11, width: 230, borderRadius: 6, background: THEME.bgHover }} />
             </div>
-            <div style={{ height: 11, width: 36, borderRadius: 6, background: "#1f1f22" }} />
+            <div style={{ height: 11, width: 36, borderRadius: 6, background: THEME.bgHover }} />
         </div>
     );
 }
@@ -258,16 +278,16 @@ export function AdminChatMonitor() {
 
     return (
         <div style={{
-            background: "#0c0c0e", borderRadius: isMobile ? 14 : 22, overflow: "hidden",
-            border: "1px solid #27272a",
-            boxShadow: "0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.06)",
+            background: THEME.bg, borderRadius: isMobile ? 14 : 22, overflow: "hidden",
+            border: `1px solid ${THEME.border}`,
+            boxShadow: "0 8px 30px rgba(15,23,42,0.08), 0 0 0 1px rgba(99,102,241,0.05)",
             display: "flex", flexDirection: "column",
         }}>
             {/* ── HEADER ── */}
             <div style={{
                 padding: isMobile ? "16px 14px 14px" : "20px 22px 16px",
-                background: "linear-gradient(140deg,#0a0a0d 0%,#111117 40%,#1a1b2e 75%,#20224a 100%)",
-                borderBottom: "1px solid rgba(99,102,241,0.15)",
+                background: "linear-gradient(140deg,#ffffff 0%,#fafafa 45%,#f2f3ff 80%,#eceeff 100%)",
+                borderBottom: `1px solid ${THEME.accentSoftBorder}`,
                 flexShrink: 0,
                 position: "relative",
                 overflow: "hidden",
@@ -275,27 +295,27 @@ export function AdminChatMonitor() {
                 <div style={{
                     position: "absolute", top: -40, right: -30,
                     width: 160, height: 160, borderRadius: "50%",
-                    background: "radial-gradient(circle,rgba(99,102,241,0.25),transparent 70%)",
+                    background: "radial-gradient(circle,rgba(99,102,241,0.12),transparent 70%)",
                     pointerEvents: "none",
                 }} />
                 <div style={{
                     position: "absolute", bottom: -50, left: 30,
                     width: 110, height: 110, borderRadius: "50%",
-                    background: "radial-gradient(circle,rgba(59,130,246,0.15),transparent 70%)",
+                    background: "radial-gradient(circle,rgba(59,130,246,0.08),transparent 70%)",
                     pointerEvents: "none",
                 }} />
 
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: isMobile ? 12 : 16, position: "relative" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: isMobile ? 12 : 16, position: "relative", gap: 10 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, minWidth: 0 }}>
                         <div style={{
                             width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: 14,
-                            background: "linear-gradient(135deg,rgba(99,102,241,0.25),rgba(59,130,246,0.15))",
-                            border: "1px solid rgba(129,140,248,0.35)",
+                            background: "linear-gradient(135deg,rgba(99,102,241,0.14),rgba(59,130,246,0.08))",
+                            border: "1px solid rgba(99,102,241,0.22)",
                             display: "flex", alignItems: "center", justifyContent: "center",
                             flexShrink: 0,
-                            boxShadow: "0 4px 20px rgba(99,102,241,0.2)",
+                            boxShadow: "0 4px 16px rgba(99,102,241,0.12)",
                         }}>
-                            <svg style={{ width: isMobile ? 17 : 20, height: isMobile ? 17 : 20, color: "#a5b4fc" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg style={{ width: isMobile ? 17 : 20, height: isMobile ? 17 : 20, color: THEME.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
                                     d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
@@ -303,16 +323,16 @@ export function AdminChatMonitor() {
                             </svg>
                         </div>
                         <div style={{ minWidth: 0 }}>
-                            <p style={{ fontSize: isMobile ? 14 : 16, fontWeight: 800, color: "white", margin: 0, lineHeight: 1.2, letterSpacing: "-0.3px" }}>
+                            <p style={{ fontSize: isMobile ? 14 : 16, fontWeight: 800, color: THEME.textPrimary, margin: 0, lineHeight: 1.2, letterSpacing: "-0.3px" }}>
                                 Monitor Chat
                             </p>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
                                 <div style={{
                                     width: 6, height: 6, borderRadius: "50%",
-                                    background: "#818cf8",
-                                    boxShadow: "0 0 8px #818cf8",
+                                    background: THEME.accent,
+                                    boxShadow: `0 0 8px ${THEME.accent}`,
                                 }} />
-                                <p style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", margin: 0 }}>
+                                <p style={{ fontSize: 10, color: THEME.textSecondary, margin: 0 }}>
                                     {conversations.length} percakapan aktif
                                 </p>
                             </div>
@@ -324,13 +344,13 @@ export function AdminChatMonitor() {
                         title="Refresh"
                         style={{
                             width: 36, height: 36, borderRadius: 11,
-                            background: "rgba(99,102,241,0.12)",
-                            border: "1px solid rgba(99,102,241,0.25)",
+                            background: THEME.accentSoft,
+                            border: `1px solid ${THEME.accentSoftBorder}`,
                             display: "flex", alignItems: "center", justifyContent: "center",
                             cursor: "pointer", flexShrink: 0,
                         }}
                     >
-                        <svg style={{ width: 16, height: 16, color: "#a5b4fc" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg style={{ width: 16, height: 16, color: THEME.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
@@ -341,7 +361,7 @@ export function AdminChatMonitor() {
                     <svg
                         style={{
                             position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)",
-                            width: 15, height: 15, color: "rgba(165,180,252,0.5)", pointerEvents: "none",
+                            width: 15, height: 15, color: THEME.accent, opacity: 0.55, pointerEvents: "none",
                         }}
                         fill="none" stroke="currentColor" viewBox="0 0 24 24"
                     >
@@ -354,9 +374,9 @@ export function AdminChatMonitor() {
                         style={{
                             width: "100%", height: 40, borderRadius: 11,
                             paddingLeft: 38, paddingRight: 14,
-                            fontSize: 12, color: "white",
-                            background: "rgba(99,102,241,0.08)",
-                            border: "1px solid rgba(99,102,241,0.2)",
+                            fontSize: 12, color: THEME.textPrimary,
+                            background: THEME.bg,
+                            border: `1px solid ${THEME.border}`,
                             outline: "none", boxSizing: "border-box",
                         }}
                     />
@@ -398,7 +418,7 @@ function ConversationList({
                 <style>{`@keyframes acmPulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
                 {Array(5).fill(0).map((_, i) => (
                     <div key={i} style={{
-                        borderBottom: "1px solid #1c1c1f",
+                        borderBottom: `1px solid ${THEME.borderSoft}`,
                         animation: "acmPulse 1.4s ease-in-out infinite",
                         animationDelay: `${i * 0.1}s`,
                     }}>
@@ -414,24 +434,24 @@ function ConversationList({
             <div style={{ padding: isMobile ? "44px 18px" : "60px 24px", textAlign: "center" }}>
                 <div style={{
                     width: 60, height: 60, borderRadius: 20,
-                    background: "linear-gradient(135deg,rgba(99,102,241,0.15),rgba(59,130,246,0.1))",
-                    border: "1px solid rgba(99,102,241,0.2)",
+                    background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(59,130,246,0.08))",
+                    border: "1px solid rgba(99,102,241,0.18)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     margin: "0 auto 16px",
                 }}>
-                    <svg style={{ width: 28, height: 28, color: "#818cf8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg style={{ width: 28, height: 28, color: THEME.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                             d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                 </div>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "#e4e4e7", margin: 0 }}>Belum ada percakapan</p>
-                <p style={{ fontSize: 12, color: "#71717a", margin: "5px 0 0" }}>Percakapan tim akan muncul di sini</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: THEME.textPrimary, margin: 0 }}>Belum ada percakapan</p>
+                <p style={{ fontSize: 12, color: THEME.textMuted, margin: "5px 0 0" }}>Percakapan tim akan muncul di sini</p>
             </div>
         );
     }
 
     return (
-        <div style={{ overflowY: "auto", maxHeight: isMobile ? "60vh" : 460, background: "#0c0c0e" }}>
+        <div style={{ overflowY: "auto", maxHeight: isMobile ? "60vh" : 460, background: THEME.bg }}>
             {conversations.map((conv, idx) => {
                 const pA = getAvatarPalette(conv.userA.name);
                 const pB = getAvatarPalette(conv.userB.name);
@@ -449,12 +469,12 @@ function ConversationList({
                             width: "100%", textAlign: "left", cursor: "pointer",
                             display: "flex", alignItems: "center", gap: isMobile ? 10 : 14,
                             padding: isMobile ? "13px 14px" : "15px 22px",
-                            background: "#0c0c0e", border: "none",
-                            borderBottom: idx < conversations.length - 1 ? "1px solid #1c1c1f" : "none",
+                            background: THEME.bg, border: "none",
+                            borderBottom: idx < conversations.length - 1 ? `1px solid ${THEME.borderSoft}` : "none",
                             transition: "background 0.12s",
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "#15151c")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "#0c0c0e")}
+                        onMouseEnter={e => (e.currentTarget.style.background = THEME.bgHover)}
+                        onMouseLeave={e => (e.currentTarget.style.background = THEME.bg)}
                     >
                         <div style={{ position: "relative", width: isMobile ? 40 : 46, height: isMobile ? 40 : 46, flexShrink: 0 }}>
                             <div style={{
@@ -463,8 +483,8 @@ function ConversationList({
                                 background: `linear-gradient(135deg,${pA.from},${pA.to})`,
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 color: "white", fontSize: 9, fontWeight: 900,
-                                border: "2.5px solid #0c0c0e", zIndex: 2,
-                                boxShadow: `0 3px 10px ${pA.from}66`,
+                                border: `2.5px solid ${THEME.bg}`, zIndex: 2,
+                                boxShadow: `0 3px 10px ${pA.from}55`,
                             }}>
                                 {getInitials(conv.userA.name)}
                             </div>
@@ -474,8 +494,8 @@ function ConversationList({
                                 background: `linear-gradient(135deg,${pB.from},${pB.to})`,
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 color: "white", fontSize: 9, fontWeight: 900,
-                                border: "2.5px solid #0c0c0e", zIndex: 1,
-                                boxShadow: `0 3px 10px ${pB.from}66`,
+                                border: `2.5px solid ${THEME.bg}`, zIndex: 1,
+                                boxShadow: `0 3px 10px ${pB.from}55`,
                             }}>
                                 {getInitials(conv.userB.name)}
                             </div>
@@ -483,16 +503,16 @@ function ConversationList({
 
                         <div style={{ flex: 1, minWidth: 0 }}>
                             <p style={{
-                                fontSize: isMobile ? 12 : 13, fontWeight: 700, color: "#e4e4e7",
+                                fontSize: isMobile ? 12 : 13, fontWeight: 700, color: THEME.textPrimary,
                                 margin: 0, lineHeight: 1.3,
                                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                             }}>
                                 {conv.userA.name}
-                                <span style={{ color: "#4c4c52", margin: "0 6px", fontWeight: 400, fontSize: 11 }}>↔</span>
+                                <span style={{ color: THEME.textMuted, margin: "0 6px", fontWeight: 400, fontSize: 11 }}>↔</span>
                                 {conv.userB.name}
                             </p>
                             <p style={{
-                                fontSize: 11, color: conv.lastMessage.is_deleted ? "#52525b" : "#71717a",
+                                fontSize: 11, color: conv.lastMessage.is_deleted ? THEME.textMuted : THEME.textSecondary,
                                 margin: 0, marginTop: 4, lineHeight: 1.3,
                                 whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                                 fontStyle: conv.lastMessage.is_deleted ? "italic" : "normal",
@@ -502,14 +522,14 @@ function ConversationList({
                         </div>
 
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-                            <span style={{ fontSize: 10, color: "#52525b" }}>{formatTime(conv.lastMessage.created_at)}</span>
+                            <span style={{ fontSize: 10, color: THEME.textMuted }}>{formatTime(conv.lastMessage.created_at)}</span>
                             {conv.unreadCount > 0 && (
                                 <span style={{
                                     minWidth: 20, height: 20, borderRadius: 10, padding: "0 5px",
                                     background: "linear-gradient(135deg,#6366f1,#4338ca)",
                                     color: "white", fontSize: 9, fontWeight: 900,
                                     display: "flex", alignItems: "center", justifyContent: "center",
-                                    boxShadow: "0 2px 10px rgba(99,102,241,0.5)",
+                                    boxShadow: "0 2px 10px rgba(99,102,241,0.4)",
                                 }}>
                                     {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
                                 </span>
@@ -561,22 +581,22 @@ function MessageView({
                 <div style={{
                     display: "flex", alignItems: "center", gap: isMobile ? 8 : 12,
                     padding: isMobile ? "10px 12px" : "13px 18px",
-                    background: "#0c0c0e",
-                    borderBottom: "1px solid #1c1c1f",
+                    background: THEME.bg,
+                    borderBottom: `1px solid ${THEME.border}`,
                     flexShrink: 0,
                 }}>
                     <button
                         onClick={onBack}
-                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,0.18)")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(99,102,241,0.1)")}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,0.16)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = THEME.accentSoft)}
                         style={{
                             width: 36, height: 36, borderRadius: 11,
-                            background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)",
+                            background: THEME.accentSoft, border: `1px solid ${THEME.accentSoftBorder}`,
                             display: "flex", alignItems: "center", justifyContent: "center",
                             cursor: "pointer", flexShrink: 0, transition: "background 0.12s",
                         }}
                     >
-                        <svg style={{ width: 16, height: 16, color: "#a5b4fc" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg style={{ width: 16, height: 16, color: THEME.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                         </svg>
                     </button>
@@ -585,11 +605,11 @@ function MessageView({
                         <UserChip user={conv.userA} isMobile={isMobile} />
                         <div style={{
                             width: 26, height: 26, borderRadius: 8, flexShrink: 0,
-                            background: "rgba(99,102,241,0.1)",
-                            border: "1px solid rgba(99,102,241,0.2)",
+                            background: THEME.accentSoft,
+                            border: `1px solid ${THEME.accentSoftBorder}`,
                             display: "flex", alignItems: "center", justifyContent: "center",
                         }}>
-                            <svg style={{ width: 12, height: 12, color: "#818cf8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg style={{ width: 12, height: 12, color: THEME.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h8M8 12h8m-8 5h4" />
                             </svg>
                         </div>
@@ -599,10 +619,10 @@ function MessageView({
                     {!isMobile && (
                         <div style={{
                             padding: "5px 12px", borderRadius: 20,
-                            background: "rgba(99,102,241,0.1)",
-                            border: "1px solid rgba(99,102,241,0.2)", flexShrink: 0,
+                            background: THEME.accentSoft,
+                            border: `1px solid ${THEME.accentSoftBorder}`, flexShrink: 0,
                         }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "#a5b4fc" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: THEME.accentText }}>
                                 {messages.length} pesan
                             </span>
                         </div>
@@ -613,50 +633,50 @@ function MessageView({
                 <div style={{
                     flex: 1, overflowY: "auto",
                     padding: isMobile ? "14px 10px" : "18px 18px",
-                    background: "linear-gradient(180deg,#0a0a0c 0%,#0f0f13 100%)",
+                    background: "linear-gradient(180deg,#fafafa 0%,#f7f7f8 100%)",
                 }}>
                     {loading ? (
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "56px 0", gap: 16 }}>
                             <style>{`@keyframes acmSpin{to{transform:rotate(360deg)}}`}</style>
                             <div style={{
                                 width: 40, height: 40, borderRadius: "50%",
-                                border: "3px solid rgba(99,102,241,0.15)", borderTopColor: "#818cf8",
+                                border: "3px solid rgba(99,102,241,0.15)", borderTopColor: THEME.accent,
                                 animation: "acmSpin 0.8s linear infinite",
                             }} />
-                            <p style={{ fontSize: 12, color: "#52525b", margin: 0 }}>Memuat pesan...</p>
+                            <p style={{ fontSize: 12, color: THEME.textMuted, margin: 0 }}>Memuat pesan...</p>
                         </div>
                     ) : messages.length === 0 ? (
                         <div style={{ textAlign: "center", padding: "56px 0" }}>
                             <div style={{
                                 width: 56, height: 56, borderRadius: 18,
-                                background: "linear-gradient(135deg,rgba(99,102,241,0.15),rgba(59,130,246,0.1))",
-                                border: "1px solid rgba(99,102,241,0.2)",
+                                background: "linear-gradient(135deg,rgba(99,102,241,0.12),rgba(59,130,246,0.08))",
+                                border: "1px solid rgba(99,102,241,0.18)",
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 margin: "0 auto 14px",
                             }}>
-                                <svg style={{ width: 26, height: 26, color: "#818cf8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg style={{ width: 26, height: 26, color: THEME.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                                         d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
                             </div>
-                            <p style={{ fontSize: 13, color: "#e4e4e7", fontWeight: 700, margin: 0 }}>Tidak ada pesan</p>
+                            <p style={{ fontSize: 13, color: THEME.textPrimary, fontWeight: 700, margin: 0 }}>Tidak ada pesan</p>
                         </div>
                     ) : (
                         grouped.map(group => (
                             <div key={group.date}>
                                 {/* Date divider */}
                                 <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0 16px" }}>
-                                    <div style={{ flex: 1, height: 1, background: "linear-gradient(to right,transparent,rgba(99,102,241,0.25))" }} />
+                                    <div style={{ flex: 1, height: 1, background: "linear-gradient(to right,transparent,rgba(99,102,241,0.2))" }} />
                                     <span style={{
-                                        fontSize: 10, fontWeight: 700, color: "#a5b4fc",
+                                        fontSize: 10, fontWeight: 700, color: THEME.accentText,
                                         padding: "5px 16px", borderRadius: 20,
-                                        background: "#111117", border: "1px solid rgba(99,102,241,0.25)",
-                                        boxShadow: "0 1px 8px rgba(99,102,241,0.1)",
+                                        background: THEME.bg, border: `1px solid ${THEME.accentSoftBorder}`,
+                                        boxShadow: "0 1px 6px rgba(99,102,241,0.08)",
                                         whiteSpace: "nowrap",
                                     }}>
                                         {group.label}
                                     </span>
-                                    <div style={{ flex: 1, height: 1, background: "linear-gradient(to left,transparent,rgba(99,102,241,0.25))" }} />
+                                    <div style={{ flex: 1, height: 1, background: "linear-gradient(to left,transparent,rgba(99,102,241,0.2))" }} />
                                 </div>
 
                                 {/* Messages */}
@@ -692,7 +712,7 @@ function MessageView({
 
                                                 <div style={{ maxWidth: isMobile ? "82%" : "72%" }}>
                                                     <p style={{
-                                                        fontSize: 9, fontWeight: 700, color: "#71717a",
+                                                        fontSize: 9, fontWeight: 700, color: THEME.textMuted,
                                                         margin: 0, marginBottom: 4,
                                                         textAlign: isA ? "left" : "right",
                                                         paddingLeft: isA ? 2 : 0,
@@ -705,16 +725,16 @@ function MessageView({
                                                         padding: isMobile ? "9px 12px" : "11px 15px",
                                                         borderRadius: isA ? "4px 18px 18px 18px" : "18px 4px 18px 18px",
                                                         background: isA
-                                                            ? "#1a1a1e"
+                                                            ? THEME.bgHover
                                                             : "linear-gradient(140deg,#4338ca 0%,#4f46e5 55%,#6366f1 100%)",
-                                                        border: isA ? "1px solid #2a2a2f" : "none",
-                                                        color: isA ? "#e4e4e7" : "white",
+                                                        border: isA ? `1px solid ${THEME.border}` : "none",
+                                                        color: isA ? THEME.textPrimary : "white",
                                                         boxShadow: isA
-                                                            ? "0 2px 12px rgba(0,0,0,0.3)"
-                                                            : "0 6px 24px rgba(99,102,241,0.35)",
+                                                            ? "0 1px 4px rgba(15,23,42,0.05)"
+                                                            : "0 6px 20px rgba(99,102,241,0.3)",
                                                     }}>
                                                         {msg.is_deleted ? (
-                                                            <p style={{ fontSize: 12, fontStyle: "italic", opacity: 0.45, margin: 0 }}>
+                                                            <p style={{ fontSize: 12, fontStyle: "italic", opacity: isA ? 0.6 : 0.75, margin: 0 }}>
                                                                 Pesan dihapus
                                                             </p>
                                                         ) : (
@@ -731,7 +751,7 @@ function MessageView({
                                                                             alt="foto"
                                                                             style={{ maxWidth: "100%", maxHeight: isMobile ? 140 : 170, objectFit: "cover", display: "block", borderRadius: 11 }}
                                                                         />
-                                                                        <p style={{ fontSize: 9, textAlign: "center", margin: "5px 0 0", opacity: 0.5 }}>
+                                                                        <p style={{ fontSize: 9, textAlign: "center", margin: "5px 0 0", opacity: 0.6 }}>
                                                                             Tap untuk perbesar
                                                                         </p>
                                                                     </div>
@@ -746,12 +766,12 @@ function MessageView({
                                                                         style={{
                                                                             display: "flex", alignItems: "center", gap: 9,
                                                                             marginBottom: 7, textDecoration: "none",
-                                                                            color: isA ? "#a5b4fc" : "rgba(255,255,255,0.9)",
+                                                                            color: isA ? THEME.accentText : "rgba(255,255,255,0.95)",
                                                                         }}
                                                                     >
                                                                         <div style={{
                                                                             width: 30, height: 30, borderRadius: 9, flexShrink: 0,
-                                                                            background: isA ? "rgba(99,102,241,0.15)" : "rgba(255,255,255,0.18)",
+                                                                            background: isA ? "rgba(99,102,241,0.12)" : "rgba(255,255,255,0.2)",
                                                                             display: "flex", alignItems: "center", justifyContent: "center",
                                                                         }}>
                                                                             <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -779,11 +799,11 @@ function MessageView({
                                                             justifyContent: isA ? "flex-start" : "flex-end",
                                                         }}>
                                                             {msg.edited_at && (
-                                                                <span style={{ fontSize: 9, opacity: 0.4 }}>diedit ·</span>
+                                                                <span style={{ fontSize: 9, opacity: 0.55 }}>diedit ·</span>
                                                             )}
-                                                            <span style={{ fontSize: 9, opacity: 0.45 }}>{timeStr}</span>
+                                                            <span style={{ fontSize: 9, opacity: 0.6 }}>{timeStr}</span>
                                                             {!isA && msg.is_read && (
-                                                                <svg style={{ width: 12, height: 12, opacity: 0.65, flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <svg style={{ width: 12, height: 12, opacity: 0.75, flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                                                 </svg>
                                                             )}
