@@ -18,6 +18,7 @@ interface Props {
     warrantyEnd?: string;
     warrantyDaysLeft?: number;
     customerType?: string;
+    itemKind?: "laptop" | "accessory" | "mixed";
 }
 export default function ReceiptActions({
     customerPhone,
@@ -34,6 +35,7 @@ export default function ReceiptActions({
     warrantyEnd,
     warrantyDaysLeft,
     customerType,
+    itemKind,
 }: Props) {
     const [downloading, setDownloading] = useState(false);
     const [waSent, setWaSent] = useState(false);
@@ -69,7 +71,7 @@ export default function ReceiptActions({
             ` *Detail Transaksi*`,
             `━━━━━━━━━━━━━━━━━━`,
             ` Nota           : ${invoiceNumber}`,
-            ` Laptop        : ${laptopName}`,
+            itemKind === "accessory" ? ` Barang         : ${laptopName}` : ` Laptop        : ${laptopName}`,
             serialNumber ? ` Serial No    : ${serialNumber}` : null,
             ` Total           : Rp${amount?.toLocaleString("id-ID")}`,
             ` Pembayaran  : ${paymentMethod}`,
@@ -158,7 +160,7 @@ export default function ReceiptActions({
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        WA Dibuka 
+                        WA Dibuka
                     </>
                 ) : (
                     <>

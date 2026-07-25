@@ -62,7 +62,7 @@ export const GET = withAuth(async (req) => {
         .map((e: any) => e.id as string)
     );
 
-   // ── 2) Agregasi mutasi journal_lines per akun (bertanda: DEBIT=+, KREDIT=-) ──
+    // ── 2) Agregasi mutasi journal_lines per akun (bertanda: DEBIT=+, KREDIT=-) ──
     const balanceMap = new Map<string, number>();
     // Mutasi HANYA periode ini — dipakai khusus utk hitung Laba Periode Berjalan
     const currentPeriodBalanceMap = new Map<string, number>();
@@ -109,12 +109,44 @@ export const GET = withAuth(async (req) => {
       (dbAccounts ?? []).map((a: any) => [a.code as string, a])
     );
 
-    const allCodes = new Set<string>([
+    let allCodes = new Set<string>([
       ...ACCOUNTS.map((a) => a.code),
       ...dbAccountMap.keys(),
     ]);
 
-   const allAccountsForNeraca = Array.from(allCodes).map((code) => {
+    // Auto-provision akun "Laba <periode ini>" kalau belum ada — supaya efek
+    // Pendapatan/Beban bulan berjalan SELALU punya tempat dilipat, tidak pernah
+    // "hilang" diam-diam dan bikin Neraca selisih (lihat kasus akun Laba Juli
+    // 2026 yang belum dibuat manual sebelumnya).
+    const currentLabaNameCheck = normalizeAccountName(labaPeriodAccountName(period));
+    const labaExists = Array.from(allCodes).some((code) => {
+      const acc = dbAccountMap.get(code) ?? ACCOUNTS.find((a) => a.code === code);
+      return acc?.type === "MODAL" && normalizeAccountName(acc.name) === currentLabaNameCheck;
+    });
+
+    if (!labaExists) {
+      const [y, m] = period.split("-");
+      const autoLabaCode = `3${y.slice(2)}${m}`; // cth "2026-07" -> "32607", unik per bulan
+      const { data: createdLaba, error: createLabaErr } = await supabase
+        .from("chart_of_accounts")
+        .insert({
+          code: autoLabaCode,
+          name: labaPeriodAccountName(period),
+          type: "MODAL",
+          is_builtin: false,
+        })
+        .select("code, name, type")
+        .maybeSingle();
+
+      if (!createLabaErr && createdLaba) {
+        dbAccountMap.set(autoLabaCode, createdLaba as any);
+        allCodes = new Set<string>([...allCodes, autoLabaCode]);
+      } else if (createLabaErr) {
+        console.error("[neraca GET] auto-create akun Laba:", createLabaErr.message);
+      }
+    }
+
+    const allAccountsForNeraca = Array.from(allCodes).map((code) => {
       const dbAcc = dbAccountMap.get(code);
       if (dbAcc) return dbAcc;
       const staticAcc = ACCOUNTS.find((a) => a.code === code)!;
