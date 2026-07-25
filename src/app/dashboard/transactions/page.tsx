@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
 import { createPortal } from "react-dom";
@@ -1465,15 +1466,19 @@ export default function Page() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [detailItem, setDetailItem] = useState<any | null>(null);
-  const [focusInvoice, setFocusInvoice] = useState<string | null>(null);
   const [paymentMethodOptions, setPaymentMethodOptions] = useState<string[]>([]);
   const [sourcePlatformOptions, setSourcePlatformOptions] = useState<string[]>([]);
 
-  // Dipertahankan buat kompatibilitas param lama di API (`sortOrder`)
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusInvoiceParam = searchParams.get("invoice") ?? searchParams.get("highlight");
+  const focusInvoice = focusInvoiceParam ? focusInvoiceParam.trim() : null;
+
+ // Dipertahankan buat kompatibilitas param lama di API (`sortOrder`)
   const sortOrder: "newest" | "oldest" =
     sortBy === "date" && sortDir === "asc" ? "oldest" : "newest";
 
-  useEffect(() => {
+ useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener("resize", checkMobile);
@@ -1486,12 +1491,6 @@ export default function Page() {
       const roles: UserRole[] = Array.isArray(r.user?.roles) && r.user.roles.length > 0 ? r.user.roles : role ? [role] : [];
       setUserRole(role); setUserRoles(roles);
     }).catch(() => { setUserRole(null); setUserRoles([]); });
-  }, []);
-
-  useEffect(() => {
-    const p = new URLSearchParams(window.location.search);
-    const inv = p.get("invoice") ?? p.get("highlight");
-    if (inv) setFocusInvoice(inv.trim());
   }, []);
 
   const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
@@ -1818,7 +1817,7 @@ export default function Page() {
               {allTransactions[0]?.customer_name && <> · <b>{allTransactions[0].customer_name}</b></>}
               {allTransactions.length === 0 && !isLoading && <span className="text-amber-500"> — tidak ditemukan</span>}
             </p>
-            <button onClick={() => { setFocusInvoice(null); window.history.replaceState({}, "", "/dashboard/transactions"); }}
+           <button onClick={() => router.replace("/dashboard/transactions")}
               className="text-[11px] text-amber-600 hover:text-amber-900 font-semibold whitespace-nowrap flex-shrink-0"> Semua</button>
           </div>
         )}
