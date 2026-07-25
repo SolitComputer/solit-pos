@@ -864,3 +864,21 @@ export function getEffectiveSubordinates(userRoles: string[]): UserRole[] {
   }
   return Array.from(result);
 }
+
+// ── Data Barang: Full Access (CRUD semua field unit termasuk SN & Sumber) ────
+// Rafi, Lionel, Rehan, Yoga, Reinaldy → berada di role-role ini.
+export const BARANG_FULL_ACCESS_ROLES: UserRole[] = [
+    "ADMIN",
+    "PROGRAMMER",
+    "PENGELOLA_BARANG",
+    "KEPALA_PENGELOLA_BARANG",
+];
+
+// ── Role yang boleh melihat data sensitif unit (sumber, harga modal, tgl masuk)
+// Sales & role lain di luar list ini hanya lihat SN + Status.
+export const BARANG_PRIVATE_VIEW_ROLES: UserRole[] = [
+    ...BARANG_FULL_ACCESS_ROLES,
+    "ASISTEN_CEO",
+    "ACCOUNTING",
+    "KEPALA_TEKNISI",
+];

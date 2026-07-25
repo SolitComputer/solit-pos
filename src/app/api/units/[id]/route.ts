@@ -3,6 +3,7 @@ import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
+import { BARANG_FULL_ACCESS_ROLES, hasAnyRole } from "@/lib/permissions";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -15,20 +16,22 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     const body = await req.json();
 
     const {
-      serial_number, grade, condition_note,
+      serial_number, grade, condition_note, source,
       purchase_price, selling_price, status, notes,
     } = body;
 
-    // Cek duplicate SN
+    // Cek duplicate SN.
+    // Pakai limit(1), BUKAN .single() — .single() error saat 0 baris maupun
+    // >1 baris, jadi SN yang justru sudah terduplikasi di DB malah lolos.
     if (serial_number) {
       const { data: existing } = await supabase
         .from("laptop_units")
         .select("id")
-        .eq("serial_number", serial_number)
+        .eq("serial_number", String(serial_number).trim())
         .neq("id", id)
-        .single();
+        .limit(1);
 
-      if (existing) {
+      if (existing && existing.length > 0) {
         return NextResponse.json(
           { success: false, message: `Serial number "${serial_number}" sudah dipakai` },
           { status: 409 }
@@ -43,12 +46,43 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       .eq("id", id)
       .single();
 
+    //  Field-level authorization.
+    //  PUT tetap terbuka untuk PERMISSIONS.EDIT_UNITS supaya Kepala Teknisi &
+    //  Accounting tidak kehilangan kemampuan ubah status/kondisi/harga unit.
+    //  Tapi SN & Sumber Barang hanya boleh disentuh role Full Access Barang.
+    const actorRoles: string[] =
+      Array.isArray((user as { roles?: string[] }).roles) &&
+        (user as { roles?: string[] }).roles!.length > 0
+        ? (user as { roles?: string[] }).roles!
+        : [user.role];
+
+    const isBarangFullAccess = hasAnyRole(actorRoles, BARANG_FULL_ACCESS_ROLES);
+
+    if (!isBarangFullAccess) {
+      const snChanged =
+        serial_number !== undefined &&
+        String(serial_number).trim() !== (before?.serial_number ?? "");
+
+      if (snChanged || source !== undefined) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Serial number & sumber barang hanya bisa diubah oleh Pengelola Barang",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const { data, error } = await supabase
       .from("laptop_units")
       .update({
-        ...(serial_number !== undefined && { serial_number }),
+        ...(serial_number !== undefined && { serial_number: String(serial_number).trim() }),
         ...(grade !== undefined && { grade }),
         ...(condition_note !== undefined && { condition_note }),
+        //  Kolom baru "Sumber Barang". String kosong disimpan sebagai null
+        //  supaya konsisten dgn unit lama yang belum pernah diisi.
+        ...(source !== undefined && { source: source === "" ? null : source }),
         ...(purchase_price !== undefined && { purchase_price: Math.round(Number(purchase_price)) }),
         ...(selling_price !== undefined && { selling_price: Math.round(Number(selling_price)) }),
         ...(body.sparepart_cost !== undefined && { sparepart_cost: Math.round(Number(body.sparepart_cost)) }),
@@ -322,6 +356,9 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const PUT = withAuth(putHandler, PERMISSIONS.EDIT_UNITS);
+export const PUT = withAuth(putHandler, BARANG_FULL_ACCESS_ROLES);
 export const PATCH = withAuth(patchHandler, PERMISSIONS.EDIT_UNITS);
+
+
+
 export const DELETE = withAuth(deleteHandler, PERMISSIONS.EDIT_UNITS);
