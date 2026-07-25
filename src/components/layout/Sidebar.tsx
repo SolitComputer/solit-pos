@@ -91,7 +91,14 @@ interface MenuItem {
   name: string;
   href: string;
   icon: React.ReactNode;
-}  dashboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="8" height="8" rx="2" /><rect x="13" y="3" width="8" height="8" rx="2" /><rect x="3" y="13" width="8" height="8" rx="2" /><rect x="13" y="13" width="8" height="8" rx="2" /></svg>),
+}
+interface MenuGroup {
+  label: string;
+  items: MenuItem[];
+}
+
+const Icons = {
+  dashboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="8" height="8" rx="2" /><rect x="13" y="3" width="8" height="8" rx="2" /><rect x="3" y="13" width="8" height="8" rx="2" /><rect x="13" y="13" width="8" height="8" rx="2" /></svg>),
   attendance: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><path d="M9 14.5l2 2 4-4.5" /></svg>),
   overtime: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>),
   riwayat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z" /><path d="M14 3v5h5" /><path d="M8.5 13h7M8.5 17h7" /></svg>),
@@ -132,8 +139,8 @@ interface MenuItem {
   salesResult: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l6-6 4 4 8-8" /><path d="M15 6h6v6" /></svg>),
   missionAll: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 6l1.5 1.5L9 5" /><path d="M12 6h9" /><path d="M5 12l1.5 1.5L9 11" /><path d="M12 12h9" /><path d="M5 18l1.5 1.5L9 17" /><path d="M12 18h9" /></svg>),
   todo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="6" height="6" rx="1.2" /><path d="M4.5 7l1.2 1.2L7.5 6" /><rect x="3" y="14" width="6" height="6" rx="1.2" /><path d="M4.5 17l1.2 1.2L7.5 16" /><path d="M12 6h9M12 17h9" /></svg>),
-  accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4.5c2.5-1 5.5-1 8 .3v14c-2.5-1.3-5.5-1.3-8-.3z" /><path d="M22 4.5c-2.5-1-5.5-1-8 .3v14c2.5-1.3-5.5-1.3-8-.3z" /></svg>),
-  patchNotes: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>),
+  accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4.5c2.5-1 5.5-1 8 .3v14c-2.5-1.3-5.5-1.3-8-.3z" /><path d="M22 4.5c-2.5-1-5.5-1-8 .3v14c2.5-1.3 5.5-1.3 8-.3z" /></svg>),
+  patchNotes: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
