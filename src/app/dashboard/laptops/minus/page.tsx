@@ -586,7 +586,6 @@ function MinusContent() {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Laptop</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">SN</th>
                       <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                       <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Perbaikan</th>
                       {/* ── BARU: Kolom Analisa ── */}
@@ -606,19 +605,23 @@ function MinusContent() {
 
                       return (
                         <tr key={unit.id}
-                          className={`transition-colors hover:bg-gray-50 ${missingAnalisa ? "bg-amber-50/40" : idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"
+                          onClick={() => canEdit && setEditTarget(unit)}
+                          className={`transition-colors hover:bg-gray-50 ${canEdit ? "cursor-pointer" : ""} ${missingAnalisa ? "bg-amber-50/40" : idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"
                             }`}
                         >
                           <td className="px-4 py-3.5 max-w-[180px]">
                             <p className="font-semibold text-gray-800 truncate text-sm" title={unit.laptop?.laptop_name}>
                               {unit.laptop?.laptop_name || "—"}
                             </p>
-                            <p className="text-[11px] text-gray-400 mt-0.5">
-                              {[unit.laptop?.brand, unit.laptop?.cpu].filter(Boolean).join(" · ")}
+                            <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5">
+                              <span className="font-mono text-gray-500">{unit.serial_number}</span>
+                              {(unit.laptop?.brand || unit.laptop?.cpu) && (
+                                <>
+                                  <span>·</span>
+                                  <span>{[unit.laptop?.brand, unit.laptop?.cpu].filter(Boolean).join(" · ")}</span>
+                                </>
+                              )}
                             </p>
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">{unit.serial_number}</span>
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             {ust && (
@@ -663,7 +666,7 @@ function MinusContent() {
                           </td>
                           <td className="px-4 py-3.5 text-right whitespace-nowrap">
                             {canEdit && (
-                              <button onClick={() => setEditTarget(unit)}
+                              <button onClick={(e) => { e.stopPropagation(); setEditTarget(unit); }}
                                 className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${missingAnalisa
                                   ? "text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100"
                                   : "text-gray-600 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
