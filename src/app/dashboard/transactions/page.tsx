@@ -679,12 +679,35 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
                       <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5">{g.unit_count}x</span>
                       <p className="text-xs font-bold text-gray-900 leading-snug min-w-0">{g.laptop_name}</p>
                     </div>
-                    <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1">
                       {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.cpu}</span>}
                       {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.ram}</span>}
                       {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-semibold">{g.storage}</span>}
                     </div>
                     {g.serial_numbers?.length > 0 && <div className="mt-1.5"><SerialNumberList serials={g.serial_numbers} maxVisible={3} size="md" emptyDash={false} /></div>}
+                   {/* Harga satuan per laptop di borongan */}
+                    {(() => {
+                      const unitCount = Number(g.unit_count ?? 1);
+                      const groupTotal = Number(g.allocated_deal_price ?? 0);
+                      const perUnit = unitCount > 0 ? Math.round(groupTotal / unitCount) : groupTotal;
+                      return (
+                        <div className="mt-2 border-t border-gray-100 pt-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-blue-500 font-semibold uppercase tracking-wide">Harga Satuan</span>
+                            <span className="text-sm font-bold text-blue-900 font-mono tabular-nums">
+                              Rp{perUnit.toLocaleString("id-ID")}
+                              <span className="text-[9px] text-blue-400 font-sans font-semibold ml-0.5">/unit</span>
+                            </span>
+                          </div>
+                          {unitCount > 1 && (
+                            <div className="flex items-center justify-between mt-0.5">
+                              <span className="text-[9px] text-gray-400">{unitCount} unit · subtotal</span>
+                              <span className="text-[11px] font-semibold text-gray-500 font-mono tabular-nums">Rp{groupTotal.toLocaleString("id-ID")}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
@@ -1123,18 +1146,67 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
             return <SerialNumberList serials={sns} maxVisible={3} size="sm" />;
           })()}
         </td>
-        <td className="px-4 py-3.5 text-right">
+       <td className="px-4 py-3.5 text-right">
           {(() => {
             const priceDisplay = getPrimaryPriceDisplay(item);
-            return (
-              <div className="flex flex-col items-end gap-0.5">
-                <span className="text-sm font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">
-                  Rp{priceDisplay.value.toLocaleString("id-ID")}
-                </span>
-                {priceDisplay.isDP && (
-                  <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md whitespace-nowrap">
-                    DP dari Rp{priceDisplay.totalDeal.toLocaleString("id-ID")}
+            const grouped: any[] = item.grouped_items ?? [];
+            const isMulti = grouped.length > 1;
+
+            // Transaksi 1 laptop / legacy → tampilan lama, tidak diubah
+            if (!isMulti) {
+              return (
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className="text-sm font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">
+                    Rp{priceDisplay.value.toLocaleString("id-ID")}
                   </span>
+                  {priceDisplay.isDP && (
+                    <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                      DP dari Rp{priceDisplay.totalDeal.toLocaleString("id-ID")}
+                    </span>
+                  )}
+                </div>
+              );
+            }
+
+            // Borongan → mini-card per laptop: HARGA SATUAN ditonjolkan, subtotal kecil di bawah
+            return (
+              <div className="flex flex-col items-stretch gap-1.5">
+                {grouped.map((g: any, idx: number) => {
+                  const unitCount = Number(g.unit_count ?? 1);
+                  const groupTotal = Number(g.allocated_deal_price ?? 0);
+                  const perUnit = unitCount > 0 ? Math.round(groupTotal / unitCount) : groupTotal;
+                  return (
+                    <div key={idx} className="rounded-lg border border-gray-100 bg-gray-50/60 px-2 py-1.5 text-right">
+                      <p className="text-[9px] font-semibold text-gray-500 leading-tight truncate text-left mb-0.5" title={g.laptop_name}>
+                        {g.laptop_name || "—"}
+                      </p>
+                      <p className="text-xs font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">
+                        Rp{perUnit.toLocaleString("id-ID")}
+                        <span className="text-[8px] text-gray-400 font-sans font-semibold ml-0.5">/unit</span>
+                      </p>
+                      {unitCount > 1 && (
+                        <p className="text-[9px] text-gray-400 mt-0.5 whitespace-nowrap">
+                          {unitCount} unit · <span className="font-mono">Rp{groupTotal.toLocaleString("id-ID")}</span>
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Grand total (jumlah semua satuan × qty) */}
+                <div className="flex items-center justify-between gap-1 border-t-2 border-gray-200 pt-1.5 mt-0.5">
+                  <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
+                  <span className="text-sm font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">
+                    Rp{priceDisplay.totalDeal.toLocaleString("id-ID")}
+                  </span>
+                </div>
+                {priceDisplay.isDP && (
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[8px] font-semibold text-blue-500">DP terbayar</span>
+                    <span className="text-[10px] font-bold text-blue-700 font-mono tabular-nums whitespace-nowrap">
+                      Rp{priceDisplay.value.toLocaleString("id-ID")}
+                    </span>
+                  </div>
                 )}
               </div>
             );
