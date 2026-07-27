@@ -27,6 +27,14 @@ export interface InventoryRow {
 
     harga_jual: number;
 
+    /** Harga Official — harga yang sudah di-mark up, terpisah dari Harga Store */
+    official_price?: number | null;
+    official_price_note?: string;
+
+    /** Gross Profit = Harga Store - Harga Sparepart - Harga Modal */
+    gross_profit?: number | null;
+    gross_profit_note?: string;
+
     sumber: string | null;
     sumber_note?: string;
 
@@ -75,7 +83,7 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
 );
 
-type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "PRICE" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "AKSI";
+type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "AKSI";
 
 export default function InventoryTable({
     rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual,
@@ -101,6 +109,8 @@ export default function InventoryTable({
                 case "MODAL": valA = a.harga_modal ?? 0; valB = b.harga_modal ?? 0; break;
                 case "SPAREPART": valA = a.sparepart_modal ?? 0; valB = b.sparepart_modal ?? 0; break;
                 case "PRICE": valA = a.harga_jual ?? 0; valB = b.harga_jual ?? 0; break;
+                case "OFFICIAL": valA = a.official_price ?? 0; valB = b.official_price ?? 0; break;
+                case "GROSS_PROFIT": valA = a.gross_profit ?? 0; valB = b.gross_profit ?? 0; break;
                 case "TOTAL_JUAL": valA = (a.harga_jual ?? 0) * (a.stok_tersisa ?? 0); valB = (b.harga_jual ?? 0) * (b.stok_tersisa ?? 0); break;
                 case "SUMBER": valA = a.sumber || a.sumber_note || ""; valB = b.sumber || b.sumber_note || ""; break;
                 case "TANGGAL": valA = a.tanggal_masuk || a.tanggal_note || ""; valB = b.tanggal_masuk || b.tanggal_note || ""; break;
@@ -147,7 +157,9 @@ export default function InventoryTable({
                         <Th sortKey="STORAGE" activeSort={sortBy} onSort={onSort}>Storage</Th>
                         {canSeePrivate && <Th right sortKey="MODAL" activeSort={sortBy} onSort={onSort}>Modal Laptop</Th>}
                         {canSeePrivate && showSparepart && <Th right sortKey="SPAREPART" activeSort={sortBy} onSort={onSort}>Modal Sparepart</Th>}
-                        <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Jual</Th>
+                        <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Store</Th>
+                        <Th right sortKey="OFFICIAL" activeSort={sortBy} onSort={onSort}>Harga Official</Th>
+                        {canSeePrivate && <Th right sortKey="GROSS_PROFIT" activeSort={sortBy} onSort={onSort}>Gross Profit</Th>}
                         {showTotalJual && canSeeStock && <Th right sortKey="TOTAL_JUAL" activeSort={sortBy} onSort={onSort}>Total Jual</Th>}
                         {canSeePrivate && <Th sortKey="SUMBER" activeSort={sortBy} onSort={onSort}>Sumber</Th>}
                         {canSeePrivate && <Th sortKey="TANGGAL" activeSort={sortBy} onSort={onSort}>Tanggal Masuk</Th>}
@@ -215,6 +227,26 @@ export default function InventoryTable({
                             <td className="px-3 py-3.5 text-right whitespace-nowrap">
                                 <span className="text-[13px] font-bold text-gray-800 tabular-nums">{fmt(row.harga_jual)}</span>
                             </td>
+
+                            <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                {row.official_price != null ? (
+                                    <span className="text-xs font-semibold text-gray-600 tabular-nums">{fmt(row.official_price)}</span>
+                                ) : row.official_price_note ? (
+                                    <Note>{row.official_price_note}</Note>
+                                ) : <Dash />}
+                            </td>
+
+                            {canSeePrivate && (
+                                <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                    {row.gross_profit != null ? (
+                                        <span className={`text-xs font-bold tabular-nums ${row.gross_profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                            {row.gross_profit >= 0 ? "+" : "−"}{fmt(Math.abs(row.gross_profit))}
+                                        </span>
+                                    ) : row.gross_profit_note ? (
+                                        <Note>{row.gross_profit_note}</Note>
+                                    ) : <Dash />}
+                                </td>
+                            )}
 
                             {showTotalJual && canSeeStock && (
                                 <td className="px-3 py-3.5 text-right whitespace-nowrap">
@@ -326,22 +358,19 @@ function Th({
         <th
             title={title || (isFilterable ? `Klik 1x untuk mengurutkan ${label}` : undefined)}
             onClick={handleClick}
-            className={`sticky top-0 z-20 px-3 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap select-none group transition-colors shadow-2xs ${
-                isFilterable ? "cursor-pointer hover:bg-gray-200" : ""
-            } ${isActive ? "text-emerald-800 bg-emerald-50" : "text-gray-400 bg-gray-50"} ${
-                right ? "text-right" : center ? "text-center" : "text-left"
-            } ${className || ""}`}
+            className={`sticky top-0 z-20 px-3 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap select-none group transition-colors shadow-2xs ${isFilterable ? "cursor-pointer hover:bg-gray-200" : ""
+                } ${isActive ? "text-emerald-800 bg-emerald-50" : "text-gray-400 bg-gray-50"} ${right ? "text-right" : center ? "text-center" : "text-left"
+                } ${className || ""}`}
         >
             <div className={`flex items-center gap-1.5 ${right ? "justify-end" : center ? "justify-center" : "justify-start"}`}>
                 <span>{children || label}</span>
 
                 {isFilterable && (
                     <span
-                        className={`p-1 rounded-md transition-all inline-flex items-center justify-center flex-shrink-0 ${
-                            isActive
-                                ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 shadow-2xs"
-                                : "bg-gray-100 text-gray-500 group-hover:bg-gray-200 group-hover:text-gray-800"
-                        }`}
+                        className={`p-1 rounded-md transition-all inline-flex items-center justify-center flex-shrink-0 ${isActive
+                            ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 shadow-2xs"
+                            : "bg-gray-100 text-gray-500 group-hover:bg-gray-200 group-hover:text-gray-800"
+                            }`}
                     >
                         {isAsc ? (
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
