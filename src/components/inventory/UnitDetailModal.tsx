@@ -21,6 +21,7 @@ export interface UnitDetailData {
     purchase_price: number;
     sparepart_cost?: number;
     selling_price: number;
+    official_price?: number;
     status: string;
     notes: string;
     created_at: string;
@@ -44,6 +45,8 @@ interface Props {
     defaultSellingPrice?: number;
     /** Dipanggil setelah unit BARU berhasil dibuat lewat form "Tambah Unit" di dalam pop-up ini */
     onCreated?: (created: UnitDetailData) => void;
+    /** Kalau modal ini dibuka dari Pop-up Detail Laptop, tampilkan tombol "Kembali" di header */
+    onBack?: () => void;
 }
 
 const GRADE_STYLE: Record<string, { badge: string; desc: string }> = {
@@ -86,7 +89,7 @@ const inputCls =
 
 export default function UnitDetailModal({
     unit, laptopName, laptopMeta, laptopSpecs, canEdit, canSeePrivate, onClose, onSaved, onEditLaptop,
-    defaultSellingPrice, onCreated,
+    defaultSellingPrice, onCreated, onBack,
 }: Props) {
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -99,6 +102,7 @@ export default function UnitDetailModal({
         purchase_price: String(unit.purchase_price ?? 0),
         sparepart_cost: String(unit.sparepart_cost ?? 0),
         selling_price: String(unit.selling_price ?? 0),
+        official_price: String(unit.official_price ?? 0),
         status: unit.status ?? "SIAP_JUAL",
         notes: unit.notes ?? "",
         received_at: toDateInput(unit.created_at),
@@ -118,6 +122,7 @@ export default function UnitDetailModal({
         purchase_price: "0",
         sparepart_cost: "0",
         selling_price: String(defaultSellingPrice ?? unit.selling_price ?? 0),
+        official_price: "0",
         status: "SIAP_JUAL",
         notes: "",
     });
@@ -137,6 +142,7 @@ export default function UnitDetailModal({
     const modalNow = isEditing ? Number(form.purchase_price) || 0 : (unit.purchase_price ?? 0);
     const sparepartNow = isEditing ? Number(form.sparepart_cost) || 0 : (unit.sparepart_cost ?? 0);
     const jualNow = isEditing ? Number(form.selling_price) || 0 : (unit.selling_price ?? 0);
+    const officialNow = isEditing ? Number(form.official_price) || 0 : (unit.official_price ?? 0);
     const totalModal = modalNow + sparepartNow;
     const margin = jualNow - totalModal;
     const marginPct = totalModal > 0 ? (margin / totalModal) * 100 : 0;
@@ -156,6 +162,7 @@ export default function UnitDetailModal({
                     purchase_price: Number(form.purchase_price) || 0,
                     sparepart_cost: Number(form.sparepart_cost) || 0,
                     selling_price: Number(form.selling_price) || 0,
+                    official_price: Number(form.official_price) || 0,
                     status: form.status,
                     notes: form.notes,
                     received_at: form.received_at ? new Date(form.received_at).toISOString() : undefined,
@@ -189,6 +196,7 @@ export default function UnitDetailModal({
                     purchase_price: Number(addForm.purchase_price) || 0,
                     sparepart_cost: Number(addForm.sparepart_cost) || 0,
                     selling_price: Number(addForm.selling_price) || 0,
+                    official_price: Number(addForm.official_price) || 0,
                     status: addForm.status,
                     notes: addForm.notes,
                 }),
@@ -218,15 +226,28 @@ export default function UnitDetailModal({
 
                 {/* ── Header ── */}
                 <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-                    <div className="min-w-0">
-                        <h2 className="font-bold text-gray-900 text-[15px] tracking-tight truncate">
-                            {laptopName || "Detail Unit"}
-                        </h2>
-                        <p className="text-[11px] text-gray-400 mt-0.5 truncate">
-                            {isAdding
-                                ? "Menambahkan unit baru — isi Serial Number & data unit"
-                                : isEditing ? "Mode edit aktif — semua field bisa diubah" : (laptopMeta || "Detail unit")}
-                        </p>
+                    <div className="flex items-start gap-2 min-w-0">
+                        {onBack && (
+                            <button
+                                onClick={() => !saving && !addSaving && onBack()}
+                                title="Kembali ke Detail Laptop"
+                                className="w-8 h-8 mt-0.5 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition flex-shrink-0"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                        )}
+                        <div className="min-w-0">
+                            <h2 className="font-bold text-gray-900 text-[15px] tracking-tight truncate">
+                                {laptopName || "Detail Unit"}
+                            </h2>
+                            <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                                {isAdding
+                                    ? "Menambahkan unit baru — isi Serial Number & data unit"
+                                    : isEditing ? "Mode edit aktif — semua field bisa diubah" : (laptopMeta || "Detail unit")}
+                            </p>
+                        </div>
                     </div>
                     <button onClick={() => !saving && !addSaving && onClose()}
                         className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition flex-shrink-0">
@@ -286,9 +307,13 @@ export default function UnitDetailModal({
                                                 <input type="number" min={0} value={addForm.sparepart_cost}
                                                     onChange={e => setAdd("sparepart_cost", e.target.value)} className={`${inputCls} tabular-nums`} />
                                             </Field>
-                                            <Field label="Harga Jual">
+                                            <Field label="Harga Store">
                                                 <input type="number" min={0} value={addForm.selling_price}
                                                     onChange={e => setAdd("selling_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                            </Field>
+                                            <Field label="Harga Official">
+                                                <input type="number" min={0} value={addForm.official_price}
+                                                    onChange={e => setAdd("official_price", e.target.value)} className={`${inputCls} tabular-nums`} />
                                             </Field>
                                         </div>
                                     </div>
@@ -427,12 +452,20 @@ export default function UnitDetailModal({
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(sparepartNow)}</p>
                                                 )}
                                             </Field>
-                                            <Field label="Harga Jual">
+                                            <Field label="Harga Store">
                                                 {isEditing ? (
                                                     <input type="number" min={0} value={form.selling_price}
                                                         onChange={e => set("selling_price", e.target.value)} className={`${inputCls} tabular-nums`} />
                                                 ) : (
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(jualNow)}</p>
+                                                )}
+                                            </Field>
+                                            <Field label="Harga Official">
+                                                {isEditing ? (
+                                                    <input type="number" min={0} value={form.official_price}
+                                                        onChange={e => set("official_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                ) : (
+                                                    <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(officialNow)}</p>
                                                 )}
                                             </Field>
                                         </div>
@@ -503,7 +536,7 @@ export default function UnitDetailModal({
                 </div>
 
                 {/* ── Footer ── */}
-               <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
                     {isAdding ? (
                         <>
                             <button onClick={() => { setIsAdding(false); setAddError(""); setAddForm(emptyAddForm()); }} disabled={addSaving}
@@ -536,7 +569,7 @@ export default function UnitDetailModal({
                                 className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
                                 Tutup
                             </button>
-                           {canEdit && onEditLaptop && (
+                            {canEdit && onEditLaptop && (
                                 <button onClick={onEditLaptop}
                                     className="h-11 px-4 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
                                     Info Laptop
