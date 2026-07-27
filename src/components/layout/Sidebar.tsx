@@ -6,7 +6,7 @@ import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES } from "@/lib/permissions";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
 
@@ -141,6 +141,7 @@ const Icons = {
   todo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="6" height="6" rx="1.2" /><path d="M4.5 7l1.2 1.2L7.5 6" /><rect x="3" y="14" width="6" height="6" rx="1.2" /><path d="M4.5 17l1.2 1.2L7.5 16" /><path d="M12 6h9M12 17h9" /></svg>),
   accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4.5c2.5-1 5.5-1 8 .3v14c-2.5-1.3-5.5-1.3-8-.3z" /><path d="M22 4.5c-2.5-1-5.5-1-8 .3v14c2.5-1.3 5.5-1.3 8-.3z" /></svg>),
   patchNotes: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>),
+  aiCeo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8z" /><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -157,6 +158,7 @@ const ITEM_CC_REPORT: MenuItem = { name: "Laporan Konten (CC)", href: "/dashboar
 const ITEM_CUSTOMER_BIRTHDAY: MenuItem = { name: "Ultah Customer", href: "/dashboard/customer-birthdays", icon: Icons.customerBirthday };
 const ITEM_TODOS: MenuItem = { name: "To-Do List", href: "/dashboard/todos", icon: Icons.todo };
 const ITEM_PATCH_NOTES: MenuItem = { name: "Patch Notes", href: "/dashboard/admin/patch-notes", icon: Icons.patchNotes };
+const ITEM_AI_CEO: MenuItem = { name: "AI CEO", href: "/dashboard/ai-ceo", icon: Icons.aiCeo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
@@ -693,8 +695,6 @@ function sortGroupsByCanonicalOrder(groups: MenuGroup[]): MenuGroup[] {
   ROLE_MENUS[role] = sortGroupsByCanonicalOrder(ROLE_MENUS[role]);
 });
 
-// Data Barang: sembunyikan item sidebar untuk role selain 4 ini, selaras dengan
-// pembatasan baru di ROUTE_PERMISSIONS["/dashboard/data-barang"] (lib/permissions.ts)
 const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   "ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH",
 ]);
@@ -707,6 +707,17 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
       items: group.items.filter((it) => !it.href.startsWith("/dashboard/data-barang")),
     }))
     .filter((group) => group.items.length > 0);
+});
+
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (!(AI_CEO_ROLES as string[]).includes(role)) return;
+  const utamaIdx = ROLE_MENUS[role].findIndex((g) => g.label === "Utama");
+  if (utamaIdx >= 0) {
+    const already = ROLE_MENUS[role][utamaIdx].items.some((it) => it.href === ITEM_AI_CEO.href);
+    if (!already) ROLE_MENUS[role][utamaIdx].items.push(ITEM_AI_CEO);
+  } else {
+    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_AI_CEO] }, ...ROLE_MENUS[role]];
+  }
 });
 
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {

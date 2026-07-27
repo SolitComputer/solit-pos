@@ -388,5 +388,7 @@ export const config = {
     "/api/todos/:path*",
     "/dashboard/akuntansi/:path*",
     "/api/akutansi/:path*",
+    "/dashboard/ai-ceo/:path*",
+    "/api/ai-ceo/:path*",
   ],
 };
