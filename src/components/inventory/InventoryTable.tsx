@@ -39,6 +39,9 @@ export interface InventoryRow {
     stok_tersisa: number;
     siap_jual: number;
     minus: number;
+
+    is_audited?: boolean;
+    audited_at?: string | null;
 }
 
 interface Props {
@@ -72,7 +75,7 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
 );
 
-type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "PRICE" | "SN" | "STOK" | "SIAP" | "MINUS";
+type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "PRICE" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "AKSI";
 
 export default function InventoryTable({
     rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual,
@@ -96,10 +99,17 @@ export default function InventoryTable({
                 case "RAM": valA = a.ram || ""; valB = b.ram || ""; break;
                 case "STORAGE": valA = a.storage || ""; valB = b.storage || ""; break;
                 case "MODAL": valA = a.harga_modal ?? 0; valB = b.harga_modal ?? 0; break;
+                case "SPAREPART": valA = a.sparepart_modal ?? 0; valB = b.sparepart_modal ?? 0; break;
                 case "PRICE": valA = a.harga_jual ?? 0; valB = b.harga_jual ?? 0; break;
-                case "SN": valA = a.sn || ""; valB = b.sn || ""; break;
+                case "TOTAL_JUAL": valA = (a.harga_jual ?? 0) * (a.stok_tersisa ?? 0); valB = (b.harga_jual ?? 0) * (b.stok_tersisa ?? 0); break;
+                case "SUMBER": valA = a.sumber || a.sumber_note || ""; valB = b.sumber || b.sumber_note || ""; break;
+                case "TANGGAL": valA = a.tanggal_masuk || a.tanggal_note || ""; valB = b.tanggal_masuk || b.tanggal_note || ""; break;
+                case "SN": valA = a.sn || a.sn_note || ""; valB = b.sn || b.sn_note || ""; break;
                 case "STOK": valA = a.stok_tersisa ?? 0; valB = b.stok_tersisa ?? 0; break;
                 case "SIAP": valA = a.siap_jual ?? 0; valB = b.siap_jual ?? 0; break;
+                case "MINUS": valA = a.minus ?? 0; valB = b.minus ?? 0; break;
+                case "AUDIT": valA = a.is_audited ? 1 : 0; valB = b.is_audited ? 1 : 0; break;
+                case "AKSI": valA = a.stok_tersisa ?? 0; valB = b.stok_tersisa ?? 0; break;
             }
 
             if (typeof valA === "number" && typeof valB === "number") {
@@ -126,7 +136,7 @@ export default function InventoryTable({
     };
 
     return (
-        <div className="overflow-x-auto table-scroll">
+        <div className="overflow-x-auto table-scroll max-h-[calc(100dvh-220px)] overflow-y-auto">
             <table className="w-full text-sm border-collapse">
                 <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
@@ -135,18 +145,18 @@ export default function InventoryTable({
                         <Th sortKey="CPU" activeSort={sortBy} onSort={onSort}>CPU</Th>
                         <Th sortKey="RAM" activeSort={sortBy} onSort={onSort}>RAM</Th>
                         <Th sortKey="STORAGE" activeSort={sortBy} onSort={onSort}>Storage</Th>
-                        {canSeePrivate && <Th right>Modal Laptop</Th>}
-                        {canSeePrivate && showSparepart && <Th right>Modal Sparepart</Th>}
+                        {canSeePrivate && <Th right sortKey="MODAL" activeSort={sortBy} onSort={onSort}>Modal Laptop</Th>}
+                        {canSeePrivate && showSparepart && <Th right sortKey="SPAREPART" activeSort={sortBy} onSort={onSort}>Modal Sparepart</Th>}
                         <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Jual</Th>
-                        {showTotalJual && canSeeStock && <Th right>Total Jual</Th>}
-                        {canSeePrivate && <Th>Sumber</Th>}
-                        {canSeePrivate && <Th>Tanggal Masuk</Th>}
+                        {showTotalJual && canSeeStock && <Th right sortKey="TOTAL_JUAL" activeSort={sortBy} onSort={onSort}>Total Jual</Th>}
+                        {canSeePrivate && <Th sortKey="SUMBER" activeSort={sortBy} onSort={onSort}>Sumber</Th>}
+                        {canSeePrivate && <Th sortKey="TANGGAL" activeSort={sortBy} onSort={onSort}>Tanggal Masuk</Th>}
                         <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
                         <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
-                        {renderAudit && <Th center>Audit</Th>}
-                        {renderActions && <Th right>Aksi</Th>}
+                        {renderAudit && <Th center sortKey="AUDIT" activeSort={sortBy} onSort={onSort}>Audit</Th>}
+                        {renderActions && <Th right sortKey="AKSI" activeSort={sortBy} onSort={onSort}>Aksi</Th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -316,9 +326,9 @@ function Th({
         <th
             title={title || (isFilterable ? `Klik 1x untuk mengurutkan ${label}` : undefined)}
             onClick={handleClick}
-            className={`px-3 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap select-none group transition-colors ${
-                isFilterable ? "cursor-pointer hover:bg-gray-200/80" : ""
-            } ${isActive ? "text-emerald-800 bg-emerald-50/80" : "text-gray-400"} ${
+            className={`sticky top-0 z-20 px-3 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap select-none group transition-colors shadow-2xs ${
+                isFilterable ? "cursor-pointer hover:bg-gray-200" : ""
+            } ${isActive ? "text-emerald-800 bg-emerald-50" : "text-gray-400 bg-gray-50"} ${
                 right ? "text-right" : center ? "text-center" : "text-left"
             } ${className || ""}`}
         >
