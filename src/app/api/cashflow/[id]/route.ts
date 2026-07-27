@@ -143,18 +143,14 @@ export const PATCH = withAuth(async (req, ctx, user: any) => {
             { status: 400 }
         );
 
-    if (entry.is_audited)
-        return NextResponse.json(
-            { success: false, message: "Entry sudah diaudit, tidak bisa dibatalkan" },
-            { status: 400 }
-        );
+    const nextIsAudited = !entry.is_audited;
 
     const { data: updated, error: updateErr } = await supabase
         .from("cashflow_entries")
         .update({
-            is_audited: true,
-            audited_at: new Date().toISOString(),
-            audited_by: user.id,
+            is_audited: nextIsAudited,
+            audited_at: nextIsAudited ? new Date().toISOString() : null,
+            audited_by: nextIsAudited ? user.id : null,
         })
         .eq("id", id)
         .select(`*, audited_by_user:users!cashflow_entries_audited_by_fkey(id, name)`)
