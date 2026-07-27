@@ -148,20 +148,28 @@ interface ToolContext {
     conversationId: string | null;
 }
 
+function resolveInternalOrigin(req: NextRequest): string {
+    if (process.env.INTERNAL_API_BASE_URL) return process.env.INTERNAL_API_BASE_URL;
+    if (process.env.PORT) return `http://127.0.0.1:${process.env.PORT}`;
+    return req.nextUrl.origin;
+}
+
 async function fetchInternal(req: NextRequest, path: string): Promise<any> {
     const token = req.cookies.get("token")?.value;
+    const base = resolveInternalOrigin(req);
     let res: Response;
     try {
-        res = await fetch(`${req.nextUrl.origin}${path}`, {
+        res = await fetch(`${base}${path}`, {
             headers: {
                 ...(token ? { Cookie: `token=${token}` } : {}),
                 "User-Agent": "solit-pos-ai-ceo-internal/1.0",
+                Host: req.headers.get("host") ?? "",
             },
             cache: "no-store",
             signal: AbortSignal.timeout(15000),
         });
     } catch (err: any) {
-        console.error(`[ai-ceo] fetchInternal gagal konek ke ${path}:`, err?.message ?? err);
+        console.error(`[ai-ceo] fetchInternal gagal konek ke ${base}${path}:`, err?.message ?? err);
         return { error: `Gagal terhubung ke ${path} (masalah jaringan internal server). Coba tanya ulang sebentar lagi.` };
     }
 
