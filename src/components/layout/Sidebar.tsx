@@ -176,6 +176,7 @@ const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Barang Siap Jual", href: "/dash
 const ITEM_LAPTOP_MINUS: MenuItem = { name: "Barang Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LEADERBOARD_PEKERJAAN: MenuItem = { name: "Leaderboard Pekerjaan", href: "/dashboard/missions/leaderboard", icon: Icons.leaderboard };
 
+const GROUP_ABSENSI_SIMPLE: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI] };
 const GROUP_ABSENSI: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_LEMBUR] };
 const GROUP_ABSENSI_WITH_PKL: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT] };
 const GROUP_LOG: MenuGroup = { label: "Log", items: [ITEM_LOG_LOGIN, ITEM_LOG_AKTIVITAS] };
@@ -392,8 +393,13 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
 
   KEPALA_SALES: [
-    ...SALES_OVERVIEW([ITEM_USERS]), SALES_INVENTARIS, SALES_TRANSAKSI,
-    PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
+    { label: "Utama", items: [ITEM_DASHBOARD, ITEM_USERS] },
+    GROUP_ABSENSI_SIMPLE,
+    { label: "Ultah", items: [ITEM_CUSTOMER_BIRTHDAY, ITEM_ULTAH_KARYAWAN] },
+    SALES_INVENTARIS,
+    SALES_TRANSAKSI,
+    PREPARATION_SALES_MENU,
+    PREPARATION_PENYEDIA_MENU,
   ],
 
   CREW_SALES: [
