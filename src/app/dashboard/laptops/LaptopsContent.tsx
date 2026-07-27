@@ -101,6 +101,20 @@ const SORT_LABELS: Record<string, string> = {
     STORAGE_DESC: "Storage ↓",
     PRICE_ASC: "Harga: Rendah → Tinggi",
     PRICE_DESC: "Harga: Tinggi → Rendah",
+    MODAL_ASC: "Modal Laptop: Rendah → Tinggi",
+    MODAL_DESC: "Modal Laptop: Tinggi → Rendah",
+    SPAREPART_ASC: "Modal Sparepart: Rendah → Tinggi",
+    SPAREPART_DESC: "Modal Sparepart: Tinggi → Rendah",
+    TOTAL_JUAL_ASC: "Total Jual: Rendah → Tinggi",
+    TOTAL_JUAL_DESC: "Total Jual: Tinggi → Rendah",
+    SUMBER_ASC: "Sumber: A → Z",
+    SUMBER_DESC: "Sumber: Z → A",
+    TANGGAL_ASC: "Tanggal: Lama → Baru",
+    TANGGAL_DESC: "Tanggal: Baru → Lama",
+    AUDIT_ASC: "Audit: Belum → Sudah",
+    AUDIT_DESC: "Audit: Sudah → Belum",
+    AKSI_ASC: "Aksi: Sedikit → Banyak",
+    AKSI_DESC: "Aksi: Banyak → Sedikit",
     STOK_ASC: "Stok ↑",
     STOK_DESC: "Stok ↓",
     SIAP_ASC: "Siap ↑",
@@ -353,9 +367,9 @@ export function LaptopsContent() {
     //  Semua permission check sekarang pakai hasAnyRole(userRoles, ...)
     const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP);
     const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP);
-    const canExport = hasAnyRole(userRoles, [
+   const canExport = hasAnyRole(userRoles, [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
-        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
+        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "KEPALA_SOTECH",
         "MARKETING", "KEPALA_MARKETING",
     ] as UserRole[]);
     const canViewUnits = hasAnyRole(userRoles, PERMISSIONS.VIEW_UNITS);
@@ -521,6 +535,20 @@ export function LaptopsContent() {
             case "STORAGE_DESC": list.sort((a, b) => (b.storage || "").localeCompare(a.storage || "")); break;
             case "PRICE_ASC": list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0)); break;
             case "PRICE_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
+            case "MODAL_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0) - (b.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0)); break;
+            case "MODAL_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0) - (a.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0)); break;
+            case "SPAREPART_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0) - (b.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0)); break;
+            case "SPAREPART_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0) - (a.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0)); break;
+            case "TOTAL_JUAL_ASC": list.sort((a, b) => ((a.selling_price || 0) * (a.stok_tersedia || 0)) - ((b.selling_price || 0) * (b.stok_tersedia || 0))); break;
+            case "TOTAL_JUAL_DESC": list.sort((a, b) => ((b.selling_price || 0) * (b.stok_tersedia || 0)) - ((a.selling_price || 0) * (a.stok_tersedia || 0))); break;
+            case "SUMBER_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.source || "").localeCompare(b.laptop_units?.find(u => u.status !== "SOLD")?.source || "", "id")); break;
+            case "SUMBER_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.source || "").localeCompare(a.laptop_units?.find(u => u.status !== "SOLD")?.source || "", "id")); break;
+            case "TANGGAL_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.created_at || a.created_at || "").localeCompare(b.laptop_units?.find(u => u.status !== "SOLD")?.created_at || b.created_at || "")); break;
+            case "TANGGAL_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.created_at || b.created_at || "").localeCompare(a.laptop_units?.find(u => u.status !== "SOLD")?.created_at || a.created_at || "")); break;
+            case "AUDIT_ASC": list.sort((a, b) => (isAuditActive(a.audited_at) ? 1 : 0) - (isAuditActive(b.audited_at) ? 1 : 0)); break;
+            case "AUDIT_DESC": list.sort((a, b) => (isAuditActive(b.audited_at) ? 1 : 0) - (isAuditActive(a.audited_at) ? 1 : 0)); break;
+            case "AKSI_ASC": list.sort((a, b) => (a.stok_tersedia ?? 0) - (b.stok_tersedia ?? 0)); break;
+            case "AKSI_DESC": list.sort((a, b) => (b.stok_tersedia ?? 0) - (a.stok_tersedia ?? 0)); break;
             case "STOK_ASC": list.sort((a, b) => (a.stok_tersedia ?? 0) - (b.stok_tersedia ?? 0)); break;
             case "STOK_DESC": list.sort((a, b) => (b.stok_tersedia ?? 0) - (a.stok_tersedia ?? 0)); break;
             case "SIAP_ASC": list.sort((a, b) => (a.siap_jual ?? 0) - (b.siap_jual ?? 0)); break;
@@ -733,12 +761,28 @@ export function LaptopsContent() {
             stok_tersisa: l.stok_tersedia ?? 0,
             siap_jual: l.siap_jual ?? 0,
             minus: l.stok_minus ?? 0,
+            is_audited: isAuditActive(l.audited_at),
+            audited_at: l.audited_at ?? null,
         };
     }), [filteredLaptops]);
 
     const totalSisa = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
     const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.siap_jual ?? 0), 0);
     const totalMinus = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
+
+    //  Total Keseluruhan (grand total) untuk 4 kolom finansial di tabel:
+    //  Modal Laptop, Modal Sparepart, Harga Jual, dan Total Jual — dijumlah dari
+    //  filteredLaptops yang sedang tampil (ikut filter aktif), bukan dari seluruh data.
+    const totalModalLaptop = filteredLaptops.reduce((sum, l) => {
+        const aktif = (l.laptop_units || []).filter(u => u.status !== "SOLD");
+        return sum + aktif.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
+    }, 0);
+    const totalModalSparepart = filteredLaptops.reduce((sum, l) => {
+        const aktif = (l.laptop_units || []).filter(u => u.status !== "SOLD");
+        return sum + aktif.reduce((s, u) => s + (u.sparepart_cost ?? 0), 0);
+    }, 0);
+    const totalHargaJual = filteredLaptops.reduce((s, l) => s + (l.selling_price || 0), 0);
+    const totalNilaiJual = filteredLaptops.reduce((s, l) => s + (l.selling_price || 0) * (l.stok_tersedia ?? 0), 0);
 
     return (
         <>
@@ -871,8 +915,22 @@ export function LaptopsContent() {
                                 <option value="DEFAULT">Urutan Default</option>
                                 <option value="AZ">Nama: A → Z</option>
                                 <option value="ZA">Nama: Z → A</option>
-                                <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
-                                <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
+                                <option value="PRICE_ASC">Harga Jual: Rendah → Tinggi</option>
+                                <option value="PRICE_DESC">Harga Jual: Tinggi → Rendah</option>
+                                {canSeePrivateBarang && <option value="MODAL_ASC">Modal Laptop: Rendah → Tinggi</option>}
+                                {canSeePrivateBarang && <option value="MODAL_DESC">Modal Laptop: Tinggi → Rendah</option>}
+                                {canSeePrivateBarang && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
+                                {canSeePrivateBarang && <option value="SPAREPART_DESC">Modal Sparepart: Tinggi → Rendah</option>}
+                                <option value="TOTAL_JUAL_ASC">Total Jual: Rendah → Tinggi</option>
+                                <option value="TOTAL_JUAL_DESC">Total Jual: Tinggi → Rendah</option>
+                                {canSeePrivateBarang && <option value="SUMBER_ASC">Sumber: A → Z</option>}
+                                {canSeePrivateBarang && <option value="SUMBER_DESC">Sumber: Z → A</option>}
+                                {canSeePrivateBarang && <option value="TANGGAL_ASC">Tanggal Masuk: Lama → Baru</option>}
+                                {canSeePrivateBarang && <option value="TANGGAL_DESC">Tanggal Masuk: Baru → Lama</option>}
+                                {canSeePrivateBarang && <option value="AUDIT_DESC">Audit: Sudah Diaudit Dulu</option>}
+                                {canSeePrivateBarang && <option value="AUDIT_ASC">Audit: Belum Diaudit Dulu</option>}
+                                <option value="AKSI_DESC">Aksi/Stok: Banyak Dulu</option>
+                                <option value="AKSI_ASC">Aksi/Stok: Sedikit Dulu</option>
                                 <option value="SN">Urut SN</option>
                             </FilterSelect>
 
@@ -897,7 +955,7 @@ export function LaptopsContent() {
                         )}
                     </div>
 
-                    {/* ── TABLE ────────────────────────────────────────── */}
+                   {/* ── TABLE ────────────────────────────────────────── */}
                     {isLoading ? (
                         <SkeletonTable />
                     ) : filteredLaptops.length === 0 ? (
@@ -911,7 +969,24 @@ export function LaptopsContent() {
                             <p className="text-gray-400 text-sm mt-1.5">Coba ubah filter atau tambah laptop baru</p>
                         </div>
                     ) : (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
+                       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
+
+                            {/* ── TOTAL KESELURUHAN — nempel langsung di atas tabel ── */}
+                            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60 flex flex-wrap items-center gap-3">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                                    Total Keseluruhan
+                                </span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {canSeePrivateBarang && (
+                                        <>
+                                            <TotalPill label="Modal Laptop" value={fmt(totalModalLaptop)} color="text-gray-800" />
+                                            <TotalPill label="Modal Sparepart" value={fmt(totalModalSparepart)} color="text-gray-800" />
+                                        </>
+                                    )}
+                                    <TotalPill label="Harga Jual" value={fmt(totalHargaJual)} color="text-gray-800" />
+                                    <TotalPill label="Total Jual" value={fmt(totalNilaiJual)} color="text-emerald-700" />
+                                </div>
+                            </div>
 
                             {/*  Tabel reusable — struktur kolom sama persis dengan halaman Units:
                                 No | Nama Laptop | CPU | RAM | Storage | Harga Modal | Harga Jual |
@@ -1363,6 +1438,16 @@ function FooterStat({ label, value, dot, color }: { label: string; value: number
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{label}</span>
             <span className={`text-sm font-black tabular-nums ${color}`}>{value}</span>
             <span className="text-[10px] font-medium text-gray-300">unit</span>
+        </div>
+    );
+}
+
+//  Pill nominal Rupiah untuk baris "Total Keseluruhan" di atas tabel Data Barang.
+function TotalPill({ label, value, color }: { label: string; value: string; color: string }) {
+    return (
+        <div className="inline-flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl pl-2.5 pr-3 py-1.5">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{label}</span>
+            <span className={`text-sm font-black tabular-nums ${color}`}>{value}</span>
         </div>
     );
 }

@@ -192,7 +192,7 @@ export default function DataBarangPage() {
         Desktop : top-0  (gak ada topbar)
         Negative margin + padding trick supaya sticky full-width
       */}
-      <div className="sticky top-12 lg:top-0 z-30 -mx-4 lg:-mx-5 px-4 lg:px-5">
+      <div className="-mx-4 lg:-mx-5 px-4 lg:px-5">
         <div className="bg-white/95 backdrop-blur-md border border-gray-200 border-t-0 rounded-b-2xl shadow-sm overflow-hidden">
           <div className="flex overflow-x-auto scrollbar-hide px-4 sm:px-6">
             {visibleTabs.map((tab) => {
@@ -227,7 +227,7 @@ export default function DataBarangPage() {
         {activeTab === "pedagang" && <PriceListPedagangTab />}
       </div>
 
-      <style jsx global>{`
+      <style jsx global>{`  
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
