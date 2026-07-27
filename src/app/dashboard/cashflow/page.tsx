@@ -405,13 +405,6 @@ function AuditCell({ entry, onAudit, busy, canAudit = true }: { entry: Entry; on
             <Ban size={12} /> Dibatalkan
         </span>
     );
-    if (entry.is_audited) return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default whitespace-nowrap"
-            title={entry.audited_by_user?.name ? `Diaudit oleh ${entry.audited_by_user.name}` : "Sudah diaudit"}>
-            <IconCheck /> Sudah Audit
-        </span>
-    );
-    // Entry nominal 0 tidak bisa diaudit (harus dikoreksi dulu lewat Edit)
     if (Number(entry.nominal ?? 0) <= 0) return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
             title="Nominal 0 — edit nominal terlebih dahulu sebelum audit">
@@ -421,13 +414,20 @@ function AuditCell({ entry, onAudit, busy, canAudit = true }: { entry: Entry; on
     if (!canAudit) return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
             title="Role Anda tidak diizinkan mengaudit uang keluar">
-            <Lock size={12} /> Belum Audit
+            <Lock size={12} /> {entry.is_audited ? "Sudah Audit" : "Belum Audit"}
         </span>
+    );
+    if (entry.is_audited) return (
+        <button onClick={(ev) => { ev.stopPropagation(); onAudit(); }} disabled={busy}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border transition disabled:opacity-50 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 whitespace-nowrap active:scale-95 group/audited"
+            title={entry.audited_by_user?.name ? `Diaudit oleh ${entry.audited_by_user.name} — Klik untuk membatalkan audit` : "Sudah diaudit — Klik untuk membatalkan audit"}>
+            <IconCheck /> {busy ? "..." : "Sudah Audit"}
+        </button>
     );
     return (
         <button onClick={(ev) => { ev.stopPropagation(); onAudit(); }} disabled={busy}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border transition disabled:opacity-50 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 whitespace-nowrap"
-            title="Klik untuk audit (tidak bisa dibatalkan)">
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border transition disabled:opacity-50 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 whitespace-nowrap active:scale-95"
+            title="Klik untuk mengaudit">
             <IconClock /> {busy ? "..." : "Belum Audit"}
         </button>
     );
@@ -1479,14 +1479,13 @@ export default function CashflowPage() {
     };
 
     const toggleAudit = async (entry: Entry) => {
-        if (entry.is_audited) return;
         if (entry.direction === "OUT" && !canAuditOut) return;
         setAuditingId(entry.id);
         try {
             const res = await fetch(`/api/cashflow/${entry.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "toggle_audit" }) });
             const json = await res.json();
             if (json.success) fetchData(true);
-            else alert(json.message || "Gagal mengaudit");
+            else alert(json.message || "Gagal mengubah status audit");
         } finally { setAuditingId(null); }
     };
 
