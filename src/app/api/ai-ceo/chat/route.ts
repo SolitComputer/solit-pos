@@ -86,7 +86,9 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
               ? "Kuota/limit AI untuk provider ini sudah habis. Coba pilih provider lain di dropdown kanan atas, atau tunggu beberapa menit sebelum coba lagi."
               : category === "network"
                 ? "Server gagal terhubung ke provider AI (masalah jaringan keluar). Cek Log runtime untuk detail teknis, atau coba lagi sebentar lagi."
-                : "AI CEO sedang bermasalah menghubungi provider AI. Cek Log runtime untuk detail teknis. Coba lagi sebentar lagi.";
+                : category === "tool_glitch"
+                  ? "AI sempat 'salah ngomong' saat mencoba mengambil data (bug model AI, bukan bug sistem). Coba tanya ulang dengan kalimat yang sedikit berbeda."
+                  : "AI CEO sedang bermasalah menghubungi provider AI. Cek Log runtime untuk detail teknis. Coba lagi sebentar lagi.";
         send({ type: "error", message: friendlyMessage });
       } finally {
         controller.close();

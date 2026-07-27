@@ -708,7 +708,7 @@ function toOpenAiHistory(history: ChatTurn[]): OpenAiMessage[] {
     return history.map((h) => ({ role: h.role, content: h.content }));
 }
 
-async function callGroq(messages: OpenAiMessage[]): Promise<any> {
+async function callGroq(messages: OpenAiMessage[], toolsEnabled: boolean = true): Promise<any> {
     let res: Response;
     try {
         res = await fetch(GROQ_ENDPOINT, {
@@ -717,8 +717,7 @@ async function callGroq(messages: OpenAiMessage[]): Promise<any> {
             body: JSON.stringify({
                 model: GROQ_MODEL,
                 messages,
-                tools: toOpenAiTools(),
-                tool_choice: "auto",
+                ...(toolsEnabled ? { tools: toOpenAiTools(), tool_choice: "auto" } : {}),
                 temperature: 0.4,
             }),
         });
@@ -738,15 +737,37 @@ async function callGroq(messages: OpenAiMessage[]): Promise<any> {
     return res.json();
 }
 
+function isMalformedToolCallError(err: any): boolean {
+    return /tool_use_failed|tool call validation failed|not in request\.tools/i.test(String(err?.message ?? ""));
+}
+
 async function runGroqTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback): Promise<string> {
     const messages: OpenAiMessage[] = [
         { role: "system", content: buildAiCeoSystemPrompt() },
         ...toOpenAiHistory(history),
     ];
     const MAX_STEPS = 6;
+    let hasToolData = false;
 
     for (let step = 0; step < MAX_STEPS; step++) {
-        const data = await callGroq(messages);
+        let data: any;
+        try {
+            data = await callGroq(messages);
+        } catch (err: any) {
+            // Bug spesifik Llama/Groq: model kadang menggabungkan nama tool + argumen
+            // jadi satu string rusak saat sebenarnya cuma mau menjawab teks biasa.
+            // Kalau ini terjadi SETELAH minimal 1 tool call berhasil (data sudah ada),
+            // paksa satu panggilan lagi TANPA tools supaya model menulis jawaban akhir
+            // dari data yang sudah dikumpulkan — daripada langsung gagal total.
+            if (isMalformedToolCallError(err) && hasToolData) {
+                console.error("[ai-ceo] Groq tool call rusak, retry tanpa tools:", err?.message ?? err);
+                const recovery = await callGroq(messages, false);
+                const recoveryMsg = recovery?.choices?.[0]?.message;
+                return (recoveryMsg?.content ?? "").trim() || "Maaf, saya belum bisa memproses pertanyaan itu.";
+            }
+            throw err;
+        }
+
         const message = data?.choices?.[0]?.message;
         const toolCalls = message?.tool_calls ?? [];
 
@@ -763,6 +784,7 @@ async function runGroqTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall
             const result = await runToolCall(tc.function.name, args, toolCtx);
             messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
         }
+        hasToolData = true;
     }
 
     return "Maaf, terlalu banyak langkah untuk menjawab ini. Coba pertanyaan yang lebih spesifik.";
@@ -812,10 +834,11 @@ export async function runAiCeoTurn(
     throw lastError ?? new Error("Semua provider AI gagal dipanggil.");
 }
 
-export function classifyAiCeoError(err: any): "missing_key" | "quota" | "network" | "unknown" {
+export function classifyAiCeoError(err: any): "missing_key" | "quota" | "network" | "tool_glitch" | "unknown" {
     const msg = String(err?.message ?? "");
     if (/belum diset di environment variables/i.test(msg)) return "missing_key";
     if (err?.isNetworkError) return "network";
     if (err?.status === 429 || /rate.?limit|quota|RESOURCE_EXHAUSTED/i.test(msg)) return "quota";
+    if (isMalformedToolCallError(err)) return "tool_glitch";
     return "unknown";
 }
