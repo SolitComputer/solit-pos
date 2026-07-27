@@ -316,17 +316,23 @@ function Th({
         <th
             title={title || (isFilterable ? `Klik 1x untuk mengurutkan ${label}` : undefined)}
             onClick={handleClick}
-            className={`px-3 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap select-none transition-colors ${
-                isFilterable ? "cursor-pointer hover:bg-gray-200/70" : ""
-            } ${isActive ? "text-emerald-700 bg-emerald-50/70" : "text-gray-400"} ${
+            className={`px-3 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap select-none group transition-colors ${
+                isFilterable ? "cursor-pointer hover:bg-gray-200/80" : ""
+            } ${isActive ? "text-emerald-800 bg-emerald-50/80" : "text-gray-400"} ${
                 right ? "text-right" : center ? "text-center" : "text-left"
             } ${className || ""}`}
         >
-            <div className={`flex items-center gap-1 ${right ? "justify-end" : center ? "justify-center" : "justify-start"}`}>
+            <div className={`flex items-center gap-1.5 ${right ? "justify-end" : center ? "justify-center" : "justify-start"}`}>
                 <span>{children || label}</span>
 
                 {isFilterable && (
-                    <span className={`inline-flex items-center transition-colors ${isActive ? "text-emerald-600 font-bold" : "text-gray-300"}`}>
+                    <span
+                        className={`p-1 rounded-md transition-all inline-flex items-center justify-center flex-shrink-0 ${
+                            isActive
+                                ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 shadow-2xs"
+                                : "bg-gray-100 text-gray-500 group-hover:bg-gray-200 group-hover:text-gray-800"
+                        }`}
+                    >
                         {isAsc ? (
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
@@ -336,7 +342,7 @@ function Th({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                             </svg>
                         ) : (
-                            <svg className="w-2.5 h-2.5 opacity-40 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                             </svg>
                         )}
