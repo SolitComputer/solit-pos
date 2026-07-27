@@ -51,5 +51,35 @@ async function deleteHandler(_req: NextRequest, ctx: { params: Promise<{ id: str
   return NextResponse.json({ success: true });
 }
 
+async function patchHandler(req: NextRequest, ctx: { params: Promise<{ id: string }> }, user: AuthUser) {
+  const { id } = await ctx.params;
+  const body = await req.json().catch(() => null);
+  const title = String(body?.title ?? "").trim();
+
+  if (!title) {
+    return NextResponse.json({ success: false, message: "Judul tidak boleh kosong." }, { status: 400 });
+  }
+
+  const { data: conv } = await supabaseAdmin
+    .from("ai_ceo_conversations")
+    .select("id, user_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!conv) return NextResponse.json({ success: false, message: "Percakapan tidak ditemukan." }, { status: 404 });
+  if (conv.user_id !== user.id && !isFullAccess(user.role)) {
+    return NextResponse.json({ success: false, message: "Tidak punya akses." }, { status: 403 });
+  }
+
+  const { error } = await supabaseAdmin
+    .from("ai_ceo_conversations")
+    .update({ title: title.slice(0, 80) })
+    .eq("id", id);
+
+  if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}
+
 export const GET = withAuth(getHandler, AI_CEO_ROLES);
+export const PATCH = withAuth(patchHandler, AI_CEO_ROLES);
 export const DELETE = withAuth(deleteHandler, AI_CEO_ROLES);

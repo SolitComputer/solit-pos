@@ -276,11 +276,7 @@ export const CC_REPORT_MANAGE_ROLES: UserRole[] = [
 export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
-export const AI_CEO_ROLES: UserRole[] = [
-  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-  "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_TEKNISI", "KEPALA_MARKETING",
-  "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_PENYEDIA_BARANG", "KEPALA_PENGELOLA_BARANG",
-];
+export const AI_CEO_ROLES: UserRole[] = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER"];
 
 // ─── Notification Sound Settings — atur suara notif pengantaran per akun ─────
 export const NOTIFICATION_SETTINGS_ROLES: UserRole[] = [...FULL_ACCESS];
