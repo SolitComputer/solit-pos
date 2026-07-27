@@ -296,7 +296,7 @@ async function buildServiceDrafts(
   supabase: SupabaseClient,
   period: string
 ): Promise<JournalDraft[]> {
-  const { data: svcs, error } = await supabase
+const { data: svcs, error } = await supabase
     .from("service_orders")
     .select(
       "id, nama, type_laptop, payment_amount, payment_method, status, tanggal_masuk, tanggal_selesai, tanggal_diambil"
@@ -310,9 +310,29 @@ async function buildServiceDrafts(
     throw new Error(`Gagal ambil data service: ${error.message}`);
   }
 
+  // ── Aturan baru, berlaku mulai HARI INI (WIB) ──
+  // Status DONE (selesai dikerjakan, laptop belum diambil customer) TIDAK LAGI
+  // dianggap sumber jurnal. Service baru harus menunggu sampai statusnya
+  // SUDAH_DIAMBIL (masuk Riwayat Servis) baru boleh masuk ke Jurnal Umum.
+  //
+  // Data lama TIDAK diubah/dihapus: service berstatus DONE yang tanggal
+  // selesainya SEBELUM cutoff di bawah tetap lolos pakai aturan lama, supaya
+  // data yang sudah pernah tampil sebagai pending tidak tiba-tiba hilang.
+  //
+  // Cutoff sengaja berupa STRING TANGGAL TETAP (bukan "hari ini" yang dihitung
+  // ulang tiap request) — supaya service yang macet di status DONE sejak
+  // sekarang tidak ikut lolos lagi cuma gara-gara tanggalnya jadi "masa lalu"
+  // seiring waktu berjalan.
+  const SERVICE_STATUS_RULE_CUTOFF = "2026-07-27";
+  const eligibleServices = ((svcs ?? []) as any[]).filter((s) => {
+    if (s.status === "SUDAH_DIAMBIL") return true;
+    const selesaiDate = s.tanggal_selesai ? jakartaDate(s.tanggal_selesai as string) : null;
+    return !!selesaiDate && selesaiDate < SERVICE_STATUS_RULE_CUTOFF;
+  });
+
   // Saring dulu service yang tanggalnya masuk periode ini, supaya query
   // accessory_outflows di bawah tidak perlu ambil semua service sepanjang masa.
-  const relevantServices = ((svcs ?? []) as any[]).filter((s) => {
+  const relevantServices = eligibleServices.filter((s) => {
     const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.tanggal_masuk) as string;
     if (!refDate) return false;
     return periodFromDate(jakartaDate(refDate)) === period;

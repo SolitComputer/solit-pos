@@ -740,6 +740,20 @@ export function LaptopsContent() {
     const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.siap_jual ?? 0), 0);
     const totalMinus = filteredLaptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0);
 
+    //  Total Keseluruhan (grand total) untuk 4 kolom finansial di tabel:
+    //  Modal Laptop, Modal Sparepart, Harga Jual, dan Total Jual — dijumlah dari
+    //  filteredLaptops yang sedang tampil (ikut filter aktif), bukan dari seluruh data.
+    const totalModalLaptop = filteredLaptops.reduce((sum, l) => {
+        const aktif = (l.laptop_units || []).filter(u => u.status !== "SOLD");
+        return sum + aktif.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
+    }, 0);
+    const totalModalSparepart = filteredLaptops.reduce((sum, l) => {
+        const aktif = (l.laptop_units || []).filter(u => u.status !== "SOLD");
+        return sum + aktif.reduce((s, u) => s + (u.sparepart_cost ?? 0), 0);
+    }, 0);
+    const totalHargaJual = filteredLaptops.reduce((s, l) => s + (l.selling_price || 0), 0);
+    const totalNilaiJual = filteredLaptops.reduce((s, l) => s + (l.selling_price || 0) * (l.stok_tersedia ?? 0), 0);
+
     return (
         <>
             <style>{`
@@ -897,7 +911,7 @@ export function LaptopsContent() {
                         )}
                     </div>
 
-                    {/* ── TABLE ────────────────────────────────────────── */}
+                   {/* ── TABLE ────────────────────────────────────────── */}
                     {isLoading ? (
                         <SkeletonTable />
                     ) : filteredLaptops.length === 0 ? (
@@ -911,7 +925,24 @@ export function LaptopsContent() {
                             <p className="text-gray-400 text-sm mt-1.5">Coba ubah filter atau tambah laptop baru</p>
                         </div>
                     ) : (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
+                       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
+
+                            {/* ── TOTAL KESELURUHAN — nempel langsung di atas tabel ── */}
+                            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60 flex flex-wrap items-center gap-3">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                                    Total Keseluruhan
+                                </span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {canSeePrivateBarang && (
+                                        <>
+                                            <TotalPill label="Modal Laptop" value={fmt(totalModalLaptop)} color="text-gray-800" />
+                                            <TotalPill label="Modal Sparepart" value={fmt(totalModalSparepart)} color="text-gray-800" />
+                                        </>
+                                    )}
+                                    <TotalPill label="Harga Jual" value={fmt(totalHargaJual)} color="text-gray-800" />
+                                    <TotalPill label="Total Jual" value={fmt(totalNilaiJual)} color="text-emerald-700" />
+                                </div>
+                            </div>
 
                             {/*  Tabel reusable — struktur kolom sama persis dengan halaman Units:
                                 No | Nama Laptop | CPU | RAM | Storage | Harga Modal | Harga Jual |
@@ -1363,6 +1394,16 @@ function FooterStat({ label, value, dot, color }: { label: string; value: number
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{label}</span>
             <span className={`text-sm font-black tabular-nums ${color}`}>{value}</span>
             <span className="text-[10px] font-medium text-gray-300">unit</span>
+        </div>
+    );
+}
+
+//  Pill nominal Rupiah untuk baris "Total Keseluruhan" di atas tabel Data Barang.
+function TotalPill({ label, value, color }: { label: string; value: string; color: string }) {
+    return (
+        <div className="inline-flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl pl-2.5 pr-3 py-1.5">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{label}</span>
+            <span className={`text-sm font-black tabular-nums ${color}`}>{value}</span>
         </div>
     );
 }
