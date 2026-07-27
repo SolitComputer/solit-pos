@@ -31,7 +31,7 @@ export const createPaymentSchema = z.object({
   customer_type: z.enum(["UMUM", "RESELLER", "MITRA"]),
   seller_type: z.enum(["USER", "PEDAGANG"]).default("USER"),
   company_name: z.string().optional(),
-  customer_phone: z.string().min(10, "Nomor HP tidak valid"),
+  customer_phone: z.string().optional().default(""),
 
   units: z.array(unitItemSchema).default([]),
 
@@ -80,6 +80,16 @@ export const createPaymentSchema = z.object({
       path: ["ecommerce_platform"],
       message: "Pilih platform e-commerce",
     });
+  }
+  // Nomor WA wajib HANYA kalau transaksi BUKAN e-commerce
+  if (!data.is_ecommerce) {
+    if (!data.customer_phone || data.customer_phone.trim().length < 10) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["customer_phone"],
+        message: "Nomor HP tidak valid",
+      });
+    }
   }
   // Trade-in validasi
   if (data.is_trade_in) {
