@@ -353,8 +353,8 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             if (wErr) console.error("[warranty insert]", wErr.message);
         }
 
-        // 10. Seller follow-up (tetap seperti sebelumnya)
-        if (body.customer_phone) {
+        // 10. Seller follow-up — SKIP untuk E-Commerce (PACKING), biar tidak masuk Manajemen Seller
+        if (body.customer_phone && !isEcommerce) {
             const sellerType = body.seller_type === "PEDAGANG" ? "PEDAGANG" : "USER";
             const nowISO = new Date().toISOString();
             const nextISO = nextFollowupISO(sellerType);
