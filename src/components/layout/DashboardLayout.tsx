@@ -100,7 +100,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <main className="flex-1">
             <BirthdayBanner />
-            <div className="p-4 lg:p-5 max-w-[1280px]">
+            <div className="p-4 lg:p-5 w-full">
               {children}
             </div>
           </main>
