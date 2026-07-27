@@ -35,6 +35,14 @@ interface LaptopUnit {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
+// ── Badge "NEW" — Barang Baru Masuk ─────────────────────────────────────────
+// Sama pola dengan LaptopsContent.tsx (Data Barang) — dihitung read-time dari
+// created_at unit, TTL 3 hari, tanpa perlu cron job untuk "matiin" badge-nya.
+const NEW_BADGE_TTL_DAYS = 3;
+const NEW_BADGE_TTL_MS = NEW_BADGE_TTL_DAYS * 24 * 60 * 60 * 1000;
+const isNewArrival = (createdAt?: string | null) =>
+    !!createdAt && Date.now() - new Date(createdAt).getTime() < NEW_BADGE_TTL_MS;
+
 const GRADE_BADGE: Record<string, string> = {
     A: "bg-emerald-50 text-emerald-700 border-emerald-200",
     B: "bg-amber-50 text-amber-700 border-amber-200",
@@ -280,12 +288,18 @@ function ReadyContent() {
             .catch(() => setUserRole(null));
     }, []);
 
-    const fetchUnits = async () => {
+const fetchUnits = async () => {
         setIsLoading(true);
         try {
             const res = await fetch("/api/laptops/ready-units");
             const result = await res.json();
             if (result.success) {
+                console.log("DEBUG ready-units raw:", (result.data || []).map((u: LaptopUnit) => ({
+                    id: u.id,
+                    sn: u.serial_number,
+                    created_at: u.created_at,
+                    is_new_calc: !!u.created_at && Date.now() - new Date(u.created_at).getTime() < 3 * 24 * 60 * 60 * 1000,
+                })));
                 const cleaned = (result.data || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL" || u.status === "RESERVED");
                 setUnits(cleaned.map((u: LaptopUnit) => ({
                     ...u,
@@ -533,6 +547,7 @@ function ReadyContent() {
         stok_tersisa: 0,
         siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
         minus: 0,
+        is_new: isNewArrival(u.created_at),
     }));
 
     return (

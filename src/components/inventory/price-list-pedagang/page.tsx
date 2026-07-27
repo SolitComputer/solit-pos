@@ -8,9 +8,7 @@ import { Tags, Package, Wallet, Download, RefreshCw } from "lucide-react";
 // Disamakan dengan PRICELIST_MODAL_VIEW_ROLES di pricelistPedagang.ts —
 // di-inline di sini supaya tidak import module yang transitif ke server code.
 const MODAL_VIEW_ROLES: UserRole[] = [
-  "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
-  "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
-  "KEPALA_SOTECH", "KEPALA_ONPOINT", "KEPALA_ZENITH",
+  "ADMIN", "PENGELOLA_BARANG",
 ];
 
 interface PedagangUnit {
