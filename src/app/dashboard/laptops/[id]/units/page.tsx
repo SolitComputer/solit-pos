@@ -11,6 +11,7 @@ import { Trash2, Package, CheckCircle2, Wrench, Wallet } from "lucide-react";
 import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
 import UnitFormModal from "@/components/inventory/UnitFormModal";
 import EditablePriceCell from "@/components/inventory/EditablePriceCell";
+import { exportInventoryExcel } from "@/lib/inventoryExport";
 
 interface LaptopUnit {
     id: string;
@@ -22,6 +23,7 @@ interface LaptopUnit {
     purchase_price: number;
     sparepart_cost?: number;
     selling_price: number;
+    official_price?: number;
     status: string;
     notes: string;
     received_at?: string;
@@ -172,6 +174,13 @@ export default function UnitsPage() {
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
     ] as UserRole[]);
+    //  Daftar role sama persis dgn canExport di Data Barang (LaptopsContent.tsx)
+    //  supaya hak akses export Excel konsisten di kedua halaman.
+    const canExport = hasAnyRole(userRoles, [
+        "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
+        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "KEPALA_SOTECH",
+        "MARKETING", "KEPALA_MARKETING",
+    ] as UserRole[]);
     //  Full Access → boleh toggle mode Edit di Pop-up Detail unit
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
     //  Unit yang sedang dibuka di Pop-up Detail
@@ -187,6 +196,11 @@ export default function UnitsPage() {
     const [showSourceModal, setShowSourceModal] = useState(false);
     const [sourceInput, setSourceInput] = useState("");
     const [sourceSaving, setSourceSaving] = useState(false);
+
+   //  Bulk edit "Harga Store", "Harga Sparepart" & "Harga Official" — set 1x untuk semua unit model ini
+    const [showPriceModal, setShowPriceModal] = useState(false);
+    const [priceInput, setPriceInput] = useState({ selling_price: "", sparepart_cost: "", official_price: "" });
+    const [priceSaving, setPriceSaving] = useState(false);
 
 
     const activeUnits = units.filter(u => u.status !== "SOLD");
@@ -228,6 +242,7 @@ export default function UnitsPage() {
                     purchase_price: Math.round(Number(u.purchase_price) || 0),
                     sparepart_cost: Math.round(Number(u.sparepart_cost) || 0),
                     selling_price: Math.round(Number(u.selling_price) || 0),
+                    official_price: Math.round(Number(u.official_price) || 0),
                 }));
                 setUnits(normalized);
             }
@@ -333,6 +348,8 @@ export default function UnitsPage() {
         harga_modal: u.purchase_price ?? 0,
         sparepart_modal: u.sparepart_cost ?? 0,
         harga_jual: u.selling_price ?? 0,
+        official_price: u.official_price ?? 0,
+        gross_profit: (u.selling_price ?? 0) - (u.sparepart_cost ?? 0) - (u.purchase_price ?? 0),
         sumber: u.source ?? null,
         tanggal_masuk: u.created_at ?? null,
         sn: u.serial_number,
@@ -381,6 +398,87 @@ export default function UnitsPage() {
     const resetFilters = () => {
         setSearchSN(""); setFilterPriceMin(""); setFilterPriceMax("");
         setFilterStatus("ALL"); setFilterGradeTab("ALL");
+    };
+
+    // ─── Export Excel ─────────────────────────────────────────────────────────
+    //  Struktur sama persis dgn export di Data Barang (2 sheet: "Data Laptop" &
+    //  "Detail Unit"), bedanya di sini isinya cuma 1 model laptop dgn semua unit
+    //  yang sedang tampil (ikut filter grade/status/SN aktif di halaman ini).
+    const exportToExcel = async () => {
+        if (!laptop) return;
+
+        const filterLabel = [
+            filterGradeTab !== "ALL" && `Grade ${filterGradeTab}`,
+            filterStatus !== "ALL" && (STATUS_STYLE[filterStatus]?.label ?? filterStatus),
+            searchSN.trim() && `Cari SN "${searchSN.trim()}"`,
+        ].filter(Boolean).join(" · ");
+
+        const siapCount = filteredUnits.filter(u => u.status === "SIAP_JUAL").length;
+        const minusCount = filteredUnits.filter(u => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
+
+        await exportInventoryExcel({
+            laptops: [{
+                id: laptop.id,
+                laptop_name: laptop.laptop_name,
+                brand: laptop.brand,
+                cpu: laptop.cpu,
+                ram: laptop.ram,
+                storage: laptop.storage,
+                selling_price: laptop.selling_price,
+                stok_tersedia: siapCount + minusCount,
+                siap_jual: siapCount,
+                stok_minus: minusCount,
+                terjual: filteredUnits.filter(u => u.status === "SOLD").length,
+                laptop_units: filteredUnits,
+            }],
+            canSeePrivate: canSeePriceInfo,
+            filterLabel: filterLabel ? `Filter: ${filterLabel}` : "Tanpa filter",
+            fileSuffix: `_${(laptop.laptop_name || "unit").replace(/\s+/g, "_").toLowerCase()}`,
+        });
+    };
+
+   //  Buka modal set-harga. Prefill kalau semua unit harganya sudah sama.
+    const openPriceModal = () => {
+        const sellPrices = Array.from(new Set(activeUnits.map(u => u.selling_price)));
+        const sparePrices = Array.from(new Set(activeUnits.map(u => u.sparepart_cost ?? 0)));
+        const officialPrices = Array.from(new Set(activeUnits.map(u => u.official_price ?? 0)));
+        setPriceInput({
+            selling_price: sellPrices.length === 1 ? String(sellPrices[0]) : "",
+            sparepart_cost: sparePrices.length === 1 ? String(sparePrices[0]) : "",
+            official_price: officialPrices.length === 1 ? String(officialPrices[0]) : "",
+        });
+        setShowPriceModal(true);
+    };
+
+    //  Update Harga Store, Harga Sparepart & Harga Official SEMUA unit laptop ini
+    //  sekaligus. Field yang dikosongkan tidak ikut diubah (bisa update sebagian saja).
+    const handleBulkPrice = async () => {
+        setPriceSaving(true);
+        try {
+            const body: Record<string, number> = {};
+            if (priceInput.selling_price.trim() !== "") body.selling_price = Number(priceInput.selling_price);
+            if (priceInput.sparepart_cost.trim() !== "") body.sparepart_cost = Number(priceInput.sparepart_cost);
+            if (priceInput.official_price.trim() !== "") body.official_price = Number(priceInput.official_price);
+
+            const res = await fetch(`/api/laptops/${laptopId}/units/price`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal memperbarui harga");
+
+            const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
+            const freshData = await freshRes.json();
+            setUnits(freshData.data || []);
+
+            setShowPriceModal(false);
+            setToast(`Harga ${json.updated ?? 0} unit berhasil diperbarui!`);
+        } catch (e) {
+            setAlertModal(e instanceof Error ? e.message : "Gagal memperbarui harga");
+        } finally {
+            setPriceSaving(false);
+        }
     };
 
     //  Buka modal set-sumber. Kalau semua unit sumbernya sudah sama, prefill.
@@ -445,7 +543,17 @@ export default function UnitsPage() {
                                 {[laptop?.brand, laptop?.cpu, laptop?.ram, laptop?.storage].filter(Boolean).join(" · ") || "Detail laptop"}
                             </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
+
+                            {canExport && (
+                                <button onClick={exportToExcel}
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
+                                    <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Export Excel
+                                </button>
+                            )}
 
                             {canManageUnits && (
                                 <>
@@ -473,6 +581,15 @@ export default function UnitsPage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5a2 2 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
                                     </svg>
                                     Set Sumber
+                                </button>
+                            )}
+                            {canManageUnits && activeUnits.length > 0 && (
+                                <button onClick={openPriceModal}
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition shadow-sm">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m-6 4h6m-6 4h4M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                    Set Harga
                                 </button>
                             )}
                         </div>
@@ -722,6 +839,15 @@ export default function UnitsPage() {
                     onSave={handleBulkSource}
                 />
             )}
+            {showPriceModal && (
+                <PriceBulkModal
+                    value={priceInput}
+                    onChange={setPriceInput}
+                    saving={priceSaving}
+                    onCancel={() => setShowPriceModal(false)}
+                    onSave={handleBulkPrice}
+                />
+            )}
         </DashboardLayout>
     );
 }
@@ -804,6 +930,92 @@ function SourceBulkModal({ value, onChange, saving, onCancel, onSave }: {
                     placeholder="Contoh: Bu Reta, COD Depok, Supplier A..."
                     className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
                 />
+
+                <div className="flex gap-2 mt-4">
+                    <button onClick={onCancel} disabled={saving}
+                        className="flex-1 h-9 bg-gray-100 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                        Batal
+                    </button>
+                    <button onClick={onSave} disabled={!canSave}
+                        className="flex-1 h-9 bg-[#1a1a2e] text-white rounded-lg text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? (<><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>) : "Terapkan ke Semua"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+//  Modal set "Harga Store", "Harga Sparepart" & "Harga Official" untuk SEMUA unit satu model sekaligus.
+function PriceBulkModal({ value, onChange, saving, onCancel, onSave }: {
+    value: { selling_price: string; sparepart_cost: string; official_price: string };
+    onChange: (v: { selling_price: string; sparepart_cost: string; official_price: string }) => void;
+    saving: boolean;
+    onCancel: () => void; onSave: () => void;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel]);
+
+    const canSave = !saving && (
+        value.selling_price.trim() !== "" ||
+        value.sparepart_cost.trim() !== "" ||
+        value.official_price.trim() !== ""
+    );
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-5">
+                <div className="flex items-center gap-2.5 mb-4">
+                    <div className="w-9 h-9 rounded-lg bg-[#1a1a2e] flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m-6 4h6m-6 4h4M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-gray-800">Set Harga Semua Unit</h3>
+                        <p className="text-[11px] text-gray-400">Isi salah satu atau keduanya → langsung berlaku ke semua unit model ini</p>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Store (Rp)</label>
+                        <input
+                            type="number"
+                            min={0}
+                            value={value.selling_price}
+                            onChange={e => onChange({ ...value, selling_price: e.target.value })}
+                            placeholder="Kosongkan kalau tidak diubah"
+                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                        />
+                    </div>
+                  <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Sparepart (Rp)</label>
+                        <input
+                            type="number"
+                            min={0}
+                            value={value.sparepart_cost}
+                            onChange={e => onChange({ ...value, sparepart_cost: e.target.value })}
+                            placeholder="Kosongkan kalau tidak diubah"
+                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Official (Rp)</label>
+                        <input
+                            type="number"
+                            min={0}
+                            value={value.official_price}
+                            onChange={e => onChange({ ...value, official_price: e.target.value })}
+                            placeholder="Kosongkan kalau tidak diubah"
+                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                        />
+                    </div>
+                </div>
 
                 <div className="flex gap-2 mt-4">
                     <button onClick={onCancel} disabled={saving}

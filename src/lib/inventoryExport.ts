@@ -23,6 +23,8 @@ export interface ExportUnit {
     purchase_price?: number;
     sparepart_cost?: number;
     selling_price?: number;
+    /** Harga Official — harga yang sudah di-mark up, terpisah dari Harga Store (selling_price) */
+    official_price?: number;
     created_at?: string;
 }
 
@@ -137,14 +139,16 @@ export async function exportInventoryExcel(opts: {
         pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
     });
 
-    const cols1: Partial<ExcelJS.Column>[] = [
+   const cols1: Partial<ExcelJS.Column>[] = [
         { header: "No", key: "no", width: 5 },
         { header: "Nama Laptop", key: "nama", width: 34 },
         { header: "CPU", key: "cpu", width: 22 },
         { header: "RAM", key: "ram", width: 9 },
         { header: "Storage", key: "storage", width: 14 },
         ...(canSeePrivate ? [{ header: "Harga Modal", key: "modal", width: 15 }] : []),
-        { header: "Harga Jual", key: "jual", width: 15 },
+        { header: "Harga Store", key: "jual", width: 15 },
+        { header: "Harga Official", key: "official", width: 15 },
+        ...(canSeePrivate ? [{ header: "Gross Profit", key: "grossProfit", width: 15 }] : []),
         ...(canSeePrivate ? [{ header: "Sumber", key: "sumber", width: 20 }] : []),
         ...(canSeePrivate ? [{ header: "Tanggal Masuk", key: "tanggal", width: 15 }] : []),
         { header: "SN", key: "sn", width: 22 },
@@ -165,10 +169,21 @@ export async function exportInventoryExcel(opts: {
         const aktif = (l.laptop_units ?? []).filter(u => u.status !== "SOLD");
         const one = aktif.length === 1 ? aktif[0] : null;
 
-        const modals = aktif.map(u => u.purchase_price ?? 0).filter(n => n > 0);
+       const modals = aktif.map(u => u.purchase_price ?? 0).filter(n => n > 0);
         const minM = modals.length ? Math.min(...modals) : 0;
         const maxM = modals.length ? Math.max(...modals) : 0;
         const sumberSet = new Set(aktif.map(u => u.source).filter(Boolean));
+
+        // Harga Official per-unit — pola sama dgn Harga Modal di atas.
+        const officials = aktif.map(u => u.official_price ?? 0).filter(n => n > 0);
+        const minOf = officials.length ? Math.min(...officials) : 0;
+        const maxOf = officials.length ? Math.max(...officials) : 0;
+
+        // Gross Profit per-unit = Harga Store - Harga Sparepart - Harga Modal,
+        // dihitung per-unit dulu baru diagregasi biar akurat (bukan rata-rata model).
+        const grossProfits = aktif.map(u => (u.selling_price ?? 0) - (u.sparepart_cost ?? 0) - (u.purchase_price ?? 0));
+        const minGp = grossProfits.length ? Math.min(...grossProfits) : 0;
+        const maxGp = grossProfits.length ? Math.max(...grossProfits) : 0;
 
         // Kolom per-unit hanya bermakna kalau stok = 1 (sama logikanya dgn di web).
         const modalCell: string | number = one
@@ -177,7 +192,19 @@ export async function exportInventoryExcel(opts: {
                 : minM === maxM ? minM
                     : `${minM.toLocaleString("id-ID")} – ${maxM.toLocaleString("id-ID")}`;
 
-        const row = ws1.addRow({
+        const officialCell: string | number = one
+            ? (one.official_price ?? 0)
+            : officials.length === 0 ? "—"
+                : minOf === maxOf ? minOf
+                    : `${minOf.toLocaleString("id-ID")} – ${maxOf.toLocaleString("id-ID")}`;
+
+        const grossProfitCell: string | number = one
+            ? ((one.selling_price ?? 0) - (one.sparepart_cost ?? 0) - (one.purchase_price ?? 0))
+            : grossProfits.length === 0 ? "—"
+                : minGp === maxGp ? minGp
+                    : `${minGp.toLocaleString("id-ID")} – ${maxGp.toLocaleString("id-ID")}`;
+
+      const row = ws1.addRow({
             no: idx + 1,
             nama: l.laptop_name || "",
             cpu: l.cpu || "",
@@ -185,6 +212,8 @@ export async function exportInventoryExcel(opts: {
             storage: l.storage || "",
             ...(canSeePrivate ? { modal: modalCell } : {}),
             jual: l.selling_price || 0,
+            official: officialCell,
+            ...(canSeePrivate ? { grossProfit: grossProfitCell } : {}),
             ...(canSeePrivate ? {
                 sumber: one ? (one.source || "—")
                     : sumberSet.size === 0 ? "—"
@@ -219,10 +248,24 @@ export async function exportInventoryExcel(opts: {
                 cell.alignment = { horizontal: "right", vertical: "middle" };
                 if (typeof cell.value === "number") cell.numFmt = RP;
                 else cell.font = { size: 9, name: "Calibri", italic: true, color: { argb: C.subFg } };
-            } else if (key === "jual") {
+           } else if (key === "jual") {
                 cell.numFmt = RP;
                 cell.alignment = { horizontal: "right", vertical: "middle" };
                 cell.font = { size: 10, name: "Calibri", bold: true, color: { argb: C.moneyFg } };
+            } else if (key === "official") {
+                cell.alignment = { horizontal: "right", vertical: "middle" };
+                if (typeof cell.value === "number") cell.numFmt = RP;
+                else cell.font = { size: 9, name: "Calibri", italic: true, color: { argb: C.subFg } };
+            } else if (key === "grossProfit") {
+                cell.alignment = { horizontal: "right", vertical: "middle" };
+                if (typeof cell.value === "number") {
+                    cell.numFmt = RP;
+                    const val = Number(cell.value);
+                    cell.font = { size: 10, name: "Calibri", bold: true, color: { argb: val >= 0 ? C.siapFg : C.minusFg } };
+                } else {
+                    cell.font = { size: 9, name: "Calibri", italic: true, color: { argb: C.subFg } };
+                }
+            } else if (key === "tanggal") {
             } else if (key === "tanggal") {
                 cell.alignment = { horizontal: "center", vertical: "middle" };
                 if (cell.value instanceof Date) cell.numFmt = "dd mmm yyyy";
@@ -252,9 +295,15 @@ export async function exportInventoryExcel(opts: {
     });
 
     // Baris TOTAL
+   const totalGrossProfit = laptops.reduce((sum, l) => {
+        const aktif = (l.laptop_units ?? []).filter(u => u.status !== "SOLD");
+        return sum + aktif.reduce((s, u) => s + ((u.selling_price ?? 0) - (u.sparepart_cost ?? 0) - (u.purchase_price ?? 0)), 0);
+    }, 0);
+
     const totalRow = ws1.addRow({
         nama: "TOTAL",
         jual: laptops.reduce((s, l) => s + (l.selling_price || 0), 0),
+        ...(canSeePrivate ? { grossProfit: totalGrossProfit } : {}),
         st: laptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0),
         sj: laptops.reduce((s, l) => s + (l.siap_jual ?? 0), 0),
         m: laptops.reduce((s, l) => s + (l.stok_minus ?? 0), 0),
@@ -271,6 +320,12 @@ export async function exportInventoryExcel(opts: {
         totalRow.getCell(jualCol).numFmt = RP;
         totalRow.getCell(jualCol).alignment = { horizontal: "right", vertical: "middle" };
     }
+    const gpCol = ws1.columns.findIndex(c => c.key === "grossProfit") + 1;
+    if (gpCol > 0) {
+        totalRow.getCell(gpCol).numFmt = RP;
+        totalRow.getCell(gpCol).alignment = { horizontal: "right", vertical: "middle" };
+        totalRow.getCell(gpCol).font = { size: 10, name: "Calibri", bold: true, color: { argb: totalGrossProfit >= 0 ? C.siapFg : C.minusFg } };
+    }
 
     // ══════════════════════════════════════════════════════════════
     // SHEET 2 — Detail Unit (1 baris = 1 unit fisik)
@@ -279,7 +334,7 @@ export async function exportInventoryExcel(opts: {
         pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
     });
 
-    const cols2: Partial<ExcelJS.Column>[] = [
+   const cols2: Partial<ExcelJS.Column>[] = [
         { header: "No", key: "no", width: 5 },
         { header: "Nama Laptop", key: "nama", width: 32 },
         { header: "Brand", key: "brand", width: 12 },
@@ -293,8 +348,9 @@ export async function exportInventoryExcel(opts: {
         ...(canSeePrivate ? [{ header: "Tanggal Masuk", key: "tanggal", width: 15 }] : []),
         ...(canSeePrivate ? [{ header: "Harga Modal", key: "modal", width: 15 }] : []),
         ...(canSeePrivate ? [{ header: "Sparepart", key: "sparepart", width: 13 }] : []),
-        { header: "Harga Jual", key: "jual", width: 15 },
-        ...(canSeePrivate ? [{ header: "Margin", key: "margin", width: 15 }] : []),
+        { header: "Harga Store", key: "jual", width: 15 },
+        { header: "Harga Official", key: "official", width: 15 },
+        ...(canSeePrivate ? [{ header: "Gross Profit", key: "margin", width: 15 }] : []),
         { header: "Status", key: "status", width: 14 },
         { header: "Catatan", key: "catatan", width: 26 },
     ];
@@ -306,13 +362,14 @@ export async function exportInventoryExcel(opts: {
     ws2.views = [{ state: "frozen", ySplit: 4 }];
     ws2.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: cols2.length } };
 
-    let n = 0;
+   let n = 0;
     laptops.forEach(l => {
         (l.laptop_units ?? []).forEach(u => {
             n++;
             const modal = u.purchase_price ?? 0;
             const sparepart = u.sparepart_cost ?? 0;
             const jual = u.selling_price ?? 0;
+            const official = u.official_price ?? 0;
 
             const row = ws2.addRow({
                 no: n,
@@ -329,6 +386,7 @@ export async function exportInventoryExcel(opts: {
                 ...(canSeePrivate ? { modal } : {}),
                 ...(canSeePrivate ? { sparepart } : {}),
                 jual,
+                official,
                 ...(canSeePrivate ? { margin: jual - modal - sparepart } : {}),
                 status: STATUS_LABEL[u.status] ?? u.status,
                 catatan: u.notes || "—",
@@ -359,7 +417,7 @@ export async function exportInventoryExcel(opts: {
                 } else if (key === "tanggal") {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
                     if (cell.value instanceof Date) cell.numFmt = "dd mmm yyyy";
-                } else if (["modal", "sparepart", "jual"].includes(key)) {
+              } else if (["modal", "sparepart", "jual", "official"].includes(key)) {
                     cell.numFmt = RP;
                     cell.alignment = { horizontal: "right", vertical: "middle" };
                     if (key === "jual") cell.font = { size: 10, name: "Calibri", bold: true };
