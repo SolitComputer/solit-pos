@@ -150,10 +150,20 @@ interface ToolContext {
 
 async function fetchInternal(req: NextRequest, path: string): Promise<any> {
     const token = req.cookies.get("token")?.value;
-    const res = await fetch(`${req.nextUrl.origin}${path}`, {
-        headers: token ? { Cookie: `token=${token}` } : {},
-        cache: "no-store",
-    });
+    let res: Response;
+    try {
+        res = await fetch(`${req.nextUrl.origin}${path}`, {
+            headers: {
+                ...(token ? { Cookie: `token=${token}` } : {}),
+                "User-Agent": "solit-pos-ai-ceo-internal/1.0",
+            },
+            cache: "no-store",
+            signal: AbortSignal.timeout(15000),
+        });
+    } catch (err: any) {
+        console.error(`[ai-ceo] fetchInternal gagal konek ke ${path}:`, err?.message ?? err);
+        return { error: `Gagal terhubung ke ${path} (masalah jaringan internal server). Coba tanya ulang sebentar lagi.` };
+    }
 
     const contentType = res.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
