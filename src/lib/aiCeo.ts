@@ -148,29 +148,49 @@ interface ToolContext {
     conversationId: string | null;
 }
 
-function resolveInternalOrigin(req: NextRequest): string {
-    if (process.env.INTERNAL_API_BASE_URL) return process.env.INTERNAL_API_BASE_URL;
-    if (process.env.PORT) return `http://127.0.0.1:${process.env.PORT}`;
-    return req.nextUrl.origin;
+// Beberapa platform hosting mengizinkan self-fetch lewat loopback (cepat,
+// hemat), tapi ada juga (termasuk sandbox Hostinger tertentu) yang memblokir
+// koneksi outbound ke port dirinya sendiri demi keamanan. Daripada nebak satu
+// origin yang "pasti benar", kita coba beberapa kandidat berurutan — origin
+// mana pun yang berhasil duluan langsung dipakai, tanpa perlu tau di muka
+// platform mana yang sedang menjalankan app ini.
+function resolveInternalOriginCandidates(req: NextRequest): string[] {
+    const candidates: string[] = [];
+    if (process.env.INTERNAL_API_BASE_URL) candidates.push(process.env.INTERNAL_API_BASE_URL);
+    if (process.env.PORT) candidates.push(`http://127.0.0.1:${process.env.PORT}`);
+    candidates.push(req.nextUrl.origin);
+    return Array.from(new Set(candidates));
 }
 
 async function fetchInternal(req: NextRequest, path: string): Promise<any> {
     const token = req.cookies.get("token")?.value;
-    const base = resolveInternalOrigin(req);
-    let res: Response;
-    try {
-        res = await fetch(`${base}${path}`, {
-            headers: {
-                ...(token ? { Cookie: `token=${token}` } : {}),
-                "User-Agent": "solit-pos-ai-ceo-internal/1.0",
-                Host: req.headers.get("host") ?? "",
-            },
-            cache: "no-store",
-            signal: AbortSignal.timeout(15000),
-        });
-    } catch (err: any) {
-        console.error(`[ai-ceo] fetchInternal gagal konek ke ${base}${path}:`, err?.message ?? err);
-        return { error: `Gagal terhubung ke ${path} (masalah jaringan internal server). Coba tanya ulang sebentar lagi.` };
+    const candidates = resolveInternalOriginCandidates(req);
+    const headers = {
+        ...(token ? { Cookie: `token=${token}` } : {}),
+        "User-Agent": "solit-pos-ai-ceo-internal/1.0",
+        Host: req.headers.get("host") ?? "",
+    };
+
+    let res: Response | null = null;
+    let lastErr: any = null;
+
+    for (const base of candidates) {
+        try {
+            res = await fetch(`${base}${path}`, {
+                headers,
+                cache: "no-store",
+                signal: AbortSignal.timeout(15000),
+            });
+            lastErr = null;
+            break; // berhasil konek, tidak perlu coba kandidat berikutnya
+        } catch (err: any) {
+            lastErr = err;
+            console.error(`[ai-ceo] fetchInternal gagal konek ke ${base}${path}:`, err?.message ?? err);
+        }
+    }
+
+    if (!res) {
+        return { error: `Gagal terhubung ke ${path} setelah mencoba semua rute jaringan internal (${candidates.length} percobaan). Coba tanya ulang sebentar lagi. Detail: ${lastErr?.message ?? lastErr}` };
     }
 
     const contentType = res.headers.get("content-type") || "";
