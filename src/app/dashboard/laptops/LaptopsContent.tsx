@@ -18,6 +18,7 @@ interface LaptopUnit {
     status: string;
     selling_price: number;
     sparepart_cost?: number;
+    official_price?: number;
     //  Field berikut hanya ada kalau /api/laptops mengirimnya (lihat Tahap A di
     //  api/laptops/route.ts) dan role user termasuk BARANG_PRIVATE_VIEW_ROLES.
     laptop_id?: string;
@@ -367,7 +368,7 @@ export function LaptopsContent() {
     //  Semua permission check sekarang pakai hasAnyRole(userRoles, ...)
     const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP);
     const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP);
-   const canExport = hasAnyRole(userRoles, [
+    const canExport = hasAnyRole(userRoles, [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "KEPALA_SOTECH",
         "MARKETING", "KEPALA_MARKETING",
@@ -386,6 +387,9 @@ export function LaptopsContent() {
     //  Pop-up Detail unit — dipakai saat stok = 1 (tanpa perlu masuk halaman Units)
     const [unitDetail, setUnitDetail] = useState<{ unit: UnitDetailData; laptop: Laptop } | null>(null);
     const [unitDetailLoading, setUnitDetailLoading] = useState(false);
+    //  True kalau Pop-up Unit dibuka DARI Pop-up Detail Laptop — dipakai supaya
+    //  tombol "Kembali" tahu harus reopen Detail Laptop, bukan cuma close.
+    const [unitDetailFromLaptopDetail, setUnitDetailFromLaptopDetail] = useState(false);
 
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -602,6 +606,7 @@ export function LaptopsContent() {
             const res = await fetch(`/api/laptops/${item.id}/units`);
             const result = await res.json();
             const full = (result.data || []).find((u: UnitDetailData) => u.id === activeUnits[0].id);
+            setUnitDetailFromLaptopDetail(false); //  entry langsung dari baris tabel, bukan dari Detail Laptop
             if (full) setUnitDetail({ unit: full, laptop: item });
             else openDetail(item);
         } catch {
@@ -726,6 +731,17 @@ export function LaptopsContent() {
         const spMin = spareparts.length ? Math.min(...spareparts) : 0;
         const spMax = spareparts.length ? Math.max(...spareparts) : 0;
 
+        //  Harga Official per-unit — pola sama dengan Modal Sparepart di atas.
+        const officials = aktif.map(u => u.official_price).filter((n): n is number => n != null && n > 0);
+        const ofMin = officials.length ? Math.min(...officials) : 0;
+        const ofMax = officials.length ? Math.max(...officials) : 0;
+
+        //  Gross Profit per-unit = Harga Store - Harga Sparepart - Harga Modal,
+        //  dihitung per-unit dulu baru diagregasi biar akurat.
+        const grossProfits = aktif.map(u => (u.selling_price || 0) - (u.sparepart_cost || 0) - (u.purchase_price || 0));
+        const gpMin = grossProfits.length ? Math.min(...grossProfits) : 0;
+        const gpMax = grossProfits.length ? Math.max(...grossProfits) : 0;
+
         const sumberSet = new Set(aktif.map(u => u.source).filter(Boolean));
 
         return {
@@ -746,6 +762,16 @@ export function LaptopsContent() {
                     : spMin === spMax ? fmt(spMin) : `${fmt(spMin)} – ${fmt(spMax)}`,
 
             harga_jual: l.selling_price,
+
+            official_price: one ? (one.official_price ?? 0) : null,
+            official_price_note: one ? undefined
+                : officials.length === 0 ? undefined
+                    : ofMin === ofMax ? fmt(ofMin) : `${fmt(ofMin)} – ${fmt(ofMax)}`,
+
+            gross_profit: one ? ((one.selling_price || 0) - (one.sparepart_cost || 0) - (one.purchase_price || 0)) : null,
+            gross_profit_note: one ? undefined
+                : grossProfits.length === 0 ? undefined
+                    : gpMin === gpMax ? fmt(gpMin) : `${fmt(gpMin)} – ${fmt(gpMax)}`,
 
             sumber: one ? (one.source ?? null) : null,
             sumber_note: one ? undefined
@@ -783,6 +809,10 @@ export function LaptopsContent() {
     }, 0);
     const totalHargaJual = filteredLaptops.reduce((s, l) => s + (l.selling_price || 0), 0);
     const totalNilaiJual = filteredLaptops.reduce((s, l) => s + (l.selling_price || 0) * (l.stok_tersedia ?? 0), 0);
+    const totalGrossProfit = filteredLaptops.reduce((sum, l) => {
+        const aktif = (l.laptop_units || []).filter(u => u.status !== "SOLD");
+        return sum + aktif.reduce((s, u) => s + ((u.selling_price || 0) - (u.sparepart_cost || 0) - (u.purchase_price || 0)), 0);
+    }, 0);
 
     return (
         <>
@@ -955,7 +985,7 @@ export function LaptopsContent() {
                         )}
                     </div>
 
-                   {/* ── TABLE ────────────────────────────────────────── */}
+                    {/* ── TABLE ────────────────────────────────────────── */}
                     {isLoading ? (
                         <SkeletonTable />
                     ) : filteredLaptops.length === 0 ? (
@@ -969,7 +999,7 @@ export function LaptopsContent() {
                             <p className="text-gray-400 text-sm mt-1.5">Coba ubah filter atau tambah laptop baru</p>
                         </div>
                     ) : (
-                       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
 
                             {/* ── TOTAL KESELURUHAN — nempel langsung di atas tabel ── */}
                             <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60 flex flex-wrap items-center gap-3">
@@ -981,9 +1011,10 @@ export function LaptopsContent() {
                                         <>
                                             <TotalPill label="Modal Laptop" value={fmt(totalModalLaptop)} color="text-gray-800" />
                                             <TotalPill label="Modal Sparepart" value={fmt(totalModalSparepart)} color="text-gray-800" />
+                                            <TotalPill label="Gross Profit" value={fmt(totalGrossProfit)} color={totalGrossProfit >= 0 ? "text-emerald-700" : "text-red-600"} />
                                         </>
                                     )}
-                                    <TotalPill label="Harga Jual" value={fmt(totalHargaJual)} color="text-gray-800" />
+                                    <TotalPill label="Harga Store" value={fmt(totalHargaJual)} color="text-gray-800" />
                                     <TotalPill label="Total Jual" value={fmt(totalNilaiJual)} color="text-emerald-700" />
                                 </div>
                             </div>
@@ -1121,7 +1152,7 @@ export function LaptopsContent() {
                         <FormField label="Display / Layar">
                             <input name="display" placeholder='14" FHD IPS, 120Hz' value={formData.display} onChange={handleFormChange} className={inputCls} />
                         </FormField>
-                        <FormField label="Harga Official" required>
+                        <FormField label="Harga Store" required>
                             <input name="selling_price" type="number" placeholder="0" value={formData.selling_price} onChange={handleFormChange} required className={inputCls} />
                         </FormField>
                     </div>
@@ -1160,7 +1191,7 @@ export function LaptopsContent() {
                         <FormField label="Display / Layar">
                             <input name="display" value={formData.display} onChange={handleFormChange} className={inputCls} />
                         </FormField>
-                        <FormField label="Harga Official" required>
+                        <FormField label="Harga Store" required>
                             <input name="selling_price" type="number" value={formData.selling_price} onChange={handleFormChange} required className={inputCls} />
                         </FormField>
                     </div>
@@ -1201,7 +1232,7 @@ export function LaptopsContent() {
                                 </div>
                             </div>
                             <div className="sm:text-right flex-shrink-0">
-                                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Harga Official</p>
+                                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Harga Store</p>
                                 <p className="text-2xl font-black text-gray-900 mt-0.5 tabular-nums">{fmt(selectedLaptop.selling_price)}</p>
                                 <p className="text-xs text-gray-400 mt-1.5">Stok:{" "}
                                     <span className={`font-bold ${(selectedLaptop.qty ?? 0) === 0 ? "text-red-500" : "text-gray-700"}`}>{selectedLaptop.qty ?? 0}</span>
@@ -1236,7 +1267,8 @@ export function LaptopsContent() {
                             canSeePrivate={canSeePrivateBarang}
                             onSelectUnit={(u: PreviewUnit) => {
                                 const l = selectedLaptop;
-                                closeModal();
+                                setModalMode(null); //  sembunyikan modal Detail tanpa reset selectedLaptop, biar tombol "Kembali" bisa buka lagi
+                                setUnitDetailFromLaptopDetail(true);
                                 setTimeout(() => setUnitDetail({ unit: u as UnitDetailData, laptop: l }), 60);
                             }}
                         />
@@ -1311,10 +1343,16 @@ export function LaptopsContent() {
                     ]} canEdit={canFullAccessBarang}
                     canSeePrivate={canSeePrivateBarang}
                     defaultSellingPrice={unitDetail.laptop.selling_price}
-                    onClose={() => setUnitDetail(null)}
-                    onSaved={() => { setUnitDetail(null); fetchLaptops(); }}
-                    onCreated={() => { setUnitDetail(null); fetchLaptops(); }}
-                    onEditLaptop={() => { const l = unitDetail.laptop; setUnitDetail(null); setTimeout(() => openEdit(l), 60); }}
+                  onClose={() => { setUnitDetail(null); setUnitDetailFromLaptopDetail(false); }}
+                    onSaved={() => { setUnitDetail(null); setUnitDetailFromLaptopDetail(false); fetchLaptops(); }}
+                    onCreated={() => { setUnitDetail(null); setUnitDetailFromLaptopDetail(false); fetchLaptops(); }}
+                    onEditLaptop={() => { const l = unitDetail.laptop; setUnitDetail(null); setUnitDetailFromLaptopDetail(false); setTimeout(() => openEdit(l), 60); }}
+                    onBack={unitDetailFromLaptopDetail ? () => {
+                        const l = unitDetail.laptop;
+                        setUnitDetail(null);
+                        setUnitDetailFromLaptopDetail(false);
+                        setTimeout(() => { setSelectedLaptop(l); setModalMode("detail"); }, 60);
+                    } : undefined}
                 />
             )}
 
