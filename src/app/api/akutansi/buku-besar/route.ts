@@ -67,30 +67,17 @@ export const GET = withAuth(async (req) => {
         : -Number(openingRow.nominal)
       : 0;
 
-    // ── 1) Saldo awal: jumlahkan semua mutasi akun ini SEBELUM periode ini ──
-    const { data: priorEntries, error: priorEntryErr } = await supabase
-      .from("journal_entries")
-      .select("id")
-      .lt("period", period);
+    const { data: priorLines, error: priorLineErr } = await supabase
+      .from("journal_lines")
+      .select("side, nominal, journal_entries!inner(period)")
+      .eq("account_code", accountCode)
+      .lt("journal_entries.period", period);
 
-    if (priorEntryErr) throw priorEntryErr;
+    if (priorLineErr) throw priorLineErr;
 
-    const priorEntryIds = (priorEntries ?? []).map((e: any) => e.id as string);
-
-    let mutasiSebelumPeriode = 0;
-    if (priorEntryIds.length > 0) {
-      const { data: priorLines, error: priorLineErr } = await supabase
-        .from("journal_lines")
-        .select("side, nominal")
-        .eq("account_code", accountCode)
-        .in("entry_id", priorEntryIds);
-
-      if (priorLineErr) throw priorLineErr;
-
-      mutasiSebelumPeriode = (priorLines ?? []).reduce((s: number, l: any) => {
-        return s + (l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal));
-      }, 0);
-    }
+    const mutasiSebelumPeriode = (priorLines ?? []).reduce((s: number, l: any) => {
+      return s + (l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal));
+    }, 0);
 
     const saldoAwal = openingSigned + mutasiSebelumPeriode;
 
