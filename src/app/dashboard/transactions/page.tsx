@@ -8,31 +8,25 @@ import { createPortal } from "react-dom";
 import {
   ImageIcon, Pencil, CheckCircle2, Receipt, Inbox,
   Store, Building2, User, Landmark, Banknote, QrCode, CreditCard,
-  Lock, AlertTriangle,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 
 // ─── SORTING TYPES ───────────────────────────────────────────────────
-// Key sort harus sama persis dengan whitelist SORTABLE_COLUMNS di /api/transaction/route.ts.
-// "margin" tidak ada di database (hasil hitungan server), jadi diurutkan di client — lihat catatan di bawah.
 export type SortKey =
   | "invoice" | "date" | "customer" | "sales" | "laptop" | "cpu"
   | "sn" | "price" | "margin" | "method" | "source" | "company";
 
 export type SortDir = "asc" | "desc";
 
-// Arah default saat sebuah kolom pertama kali diklik.
-// Angka & tanggal enak-nya mulai dari besar → kecil, teks mulai dari A → Z (persis kebiasaan Excel).
 const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
   invoice: "asc", date: "desc", customer: "asc", sales: "asc", laptop: "asc",
   cpu: "asc", sn: "asc", price: "desc", margin: "desc", method: "asc",
   source: "asc", company: "asc",
 };
 
-// Kolom yang diurutkan di client (bukan lewat query database)
 const CLIENT_SIDE_SORT_KEYS: SortKey[] = ["margin"];
 
-// Urutan awal halaman — dipakai saat klik ketiga (reset sorting)
 const DEFAULT_SORT: { by: SortKey; dir: SortDir } = { by: "date", dir: "desc" };
 
 // ─── Photo Modal ────────────────────────────────────────────────────
@@ -679,13 +673,12 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
                       <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5">{g.unit_count}x</span>
                       <p className="text-xs font-bold text-gray-900 leading-snug min-w-0">{g.laptop_name}</p>
                     </div>
-                  <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1">
                       {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.cpu}</span>}
                       {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.ram}</span>}
                       {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-semibold">{g.storage}</span>}
                     </div>
                     {g.serial_numbers?.length > 0 && <div className="mt-1.5"><SerialNumberList serials={g.serial_numbers} maxVisible={3} size="md" emptyDash={false} /></div>}
-                   {/* Harga satuan per laptop di borongan */}
                     {(() => {
                       const unitCount = Number(g.unit_count ?? 1);
                       const groupTotal = Number(g.allocated_deal_price ?? 0);
@@ -733,8 +726,8 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
           );
         })()}
 
-        {/* Price + Margin */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* ── REVISI: Price box selalu 1 kolom jika canSeeModal false, grid-cols-2 jika true ── */}
+        <div className={`grid gap-2 ${canSeeModal ? "grid-cols-2" : "grid-cols-1"}`}>
           {(() => {
             const priceDisplay = getPrimaryPriceDisplay(item);
             return (
@@ -750,17 +743,14 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
               </div>
             );
           })()}
-          {!canSeeModal ? (
-            <div className="rounded-xl p-2.5 ring-1 bg-gray-50 ring-gray-100">
-              <p className="text-[10px] font-semibold mb-0.5 text-gray-400"><Lock className="inline w-3 h-3 mr-1" />Margin</p>
-              <p className="text-xs font-bold text-gray-400 leading-snug">Dibatasi</p>
-            </div>
-          ) : item.modal_missing ? (
+
+          {/* ── REVISI: Box margin hanya muncul jika canSeeModal true ── */}
+          {canSeeModal && (item.modal_missing ? (
             <div className="rounded-xl p-2.5 ring-1 bg-amber-50 ring-amber-100">
               <p className="text-[10px] font-semibold mb-0.5 text-amber-600"><AlertTriangle className="inline w-3 h-3 mr-1" />Modal</p>
               <p className="text-xs font-bold text-amber-700 leading-snug">Harga modal belum diinput</p>
             </div>
-          ) : item.other !== undefined && item.other !== null && (
+          ) : item.other !== undefined && item.other !== null ? (
             <div className={`rounded-xl p-2.5 ring-1 ${item.other > 0 ? "bg-emerald-50 ring-emerald-100" : item.other < 0 ? "bg-red-50 ring-red-100" : "bg-gray-50 ring-gray-100"}`}>
               <p className={`text-[10px] font-semibold mb-0.5 ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-500" : "text-gray-400"}`}>
                 {item.other > 0 ? " Profit" : item.other < 0 ? " Loss" : " BEP"}
@@ -769,7 +759,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
                 {item.other > 0 ? "+" : ""}Rp{(item.other ?? 0).toLocaleString("id-ID")}
               </p>
             </div>
-          )}
+          ) : null)}
         </div>
 
         {/* Payment method */}
@@ -844,7 +834,8 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
       {showRestoreModal && <RestoreModal item={item} isPending={isPending} restoring={restoring} onConfirm={handleRestore} onClose={() => setShowRestoreModal(false)} />}
-      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}    </div>
+      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
+    </div>
   );
 }
 
@@ -888,7 +879,6 @@ function StatusBadge({ item }: { item: any }) {
 // ─── SORT ICON + SORTABLE HEADER ─────────────────────────────────────
 function SortIcon({ state }: { state: "none" | "asc" | "desc" }) {
   if (state === "none") {
-    // Netral: dua panah samar, muncul lebih jelas saat header di-hover
     return (
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
         className="text-gray-300 opacity-0 group-hover/sort:opacity-100 transition-opacity flex-shrink-0">
@@ -939,7 +929,7 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto" style={{ maxHeight: "calc(100dvh - 200px)", overflowY: "auto" }}>
-        <table className="w-full border-collapse" style={{ minWidth: "1960px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: canSeeModal ? "1960px" : "1835px" }}>
           <thead>
             <tr>
               <th className={`${HEAD} text-center w-[60px]`}>No</th>
@@ -952,7 +942,10 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
               <SortableTh label="CPU" sortKey="cpu" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[155px]`} />
               <SortableTh label="SN" sortKey="sn" sortBy={sortBy} sortDir={sortDir} onSort={onSort} className={`${HEAD} w-[165px]`} />
               <SortableTh label="Harga Jual" sortKey="price" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="right" className={`${HEAD} text-right w-[135px]`} />
-              <SortableTh label="Margin" sortKey="margin" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="right" className={`${HEAD} text-right w-[125px]`} />
+              {/* ── REVISI: Kolom Margin hanya render jika canSeeModal true ── */}
+              {canSeeModal && (
+                <SortableTh label="Margin" sortKey="margin" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="right" className={`${HEAD} text-right w-[125px]`} />
+              )}
               <SortableTh label="Metode" sortKey="method" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[145px]`} />
               <SortableTh label="Sumber" sortKey="source" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[115px]`} />
               <SortableTh label="Toko" sortKey="company" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="center" className={`${HEAD} text-center w-[115px]`} />
@@ -1146,13 +1139,12 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
             return <SerialNumberList serials={sns} maxVisible={3} size="sm" />;
           })()}
         </td>
-       <td className="px-4 py-3.5 text-right">
+        <td className="px-4 py-3.5 text-right">
           {(() => {
             const priceDisplay = getPrimaryPriceDisplay(item);
             const grouped: any[] = item.grouped_items ?? [];
             const isMulti = grouped.length > 1;
 
-            // Transaksi 1 laptop / legacy → tampilan lama, tidak diubah
             if (!isMulti) {
               return (
                 <div className="flex flex-col items-end gap-0.5">
@@ -1168,7 +1160,6 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
               );
             }
 
-            // Borongan → mini-card per laptop: HARGA SATUAN ditonjolkan, subtotal kecil di bawah
             return (
               <div className="flex flex-col items-stretch gap-1.5">
                 {grouped.map((g: any, idx: number) => {
@@ -1192,8 +1183,6 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
                     </div>
                   );
                 })}
-
-                {/* Grand total (jumlah semua satuan × qty) */}
                 <div className="flex items-center justify-between gap-1 border-t-2 border-gray-200 pt-1.5 mt-0.5">
                   <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
                   <span className="text-sm font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">
@@ -1212,21 +1201,22 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
             );
           })()}
         </td>
-        <td className="px-4 py-3.5 text-right">
-          {!canSeeModal ? (
-            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-lg bg-gray-100 text-gray-400 ring-1 ring-gray-200 whitespace-nowrap">
-              <Lock className="inline w-3.5 h-3.5 mr-1" /> Dibatasi
-            </span>
-          ) : item.modal_missing ? (
-            <span className="inline-flex text-[9px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-200 whitespace-nowrap">
-              <AlertTriangle className="inline w-3.5 h-3.5 mr-1" /> Harga modal belum diinput
-            </span>
-          ) : item.other !== undefined && item.other !== null ? (
-            <span className={`text-sm font-bold font-mono tabular-nums whitespace-nowrap ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-500" : "text-gray-300"}`}>
-              {item.other > 0 ? "+" : ""}Rp{(item.other ?? 0).toLocaleString("id-ID")}
-            </span>
-          ) : <span className="text-[10px] text-gray-300">—</span>}
-        </td>
+
+        {/* ── REVISI: Cell Margin hanya render jika canSeeModal true ── */}
+        {canSeeModal && (
+          <td className="px-4 py-3.5 text-right">
+            {item.modal_missing ? (
+              <span className="inline-flex text-[9px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-200 whitespace-nowrap">
+                <AlertTriangle className="inline w-3.5 h-3.5 mr-1" /> Harga modal belum diinput
+              </span>
+            ) : item.other !== undefined && item.other !== null ? (
+              <span className={`text-sm font-bold font-mono tabular-nums whitespace-nowrap ${item.other > 0 ? "text-emerald-600" : item.other < 0 ? "text-red-500" : "text-gray-300"}`}>
+                {item.other > 0 ? "+" : ""}Rp{(item.other ?? 0).toLocaleString("id-ID")}
+              </span>
+            ) : <span className="text-[10px] text-gray-300">—</span>}
+          </td>
+        )}
+
         <td className="px-4 py-3.5 text-center">
           <div className="flex flex-col items-center gap-1">
             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-bold whitespace-nowrap ${paymentBgMap[payStyle.bg] ?? "bg-gray-100 text-gray-600"}`}>
@@ -1288,15 +1278,12 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
   );
 }
 
+// ─── ROLES yang boleh lihat Margin ───────────────────────────────────
+// Hanya ADMIN dan KEPALA_PENGELOLA_BARANG yang bisa lihat kolom/box Margin.
+// Role lain: kolom hilang total di desktop, box hilang total di mobile.
 const MODAL_VISIBLE_ROLES = [
   "ADMIN",
-  "KEPALA_SALES",
-  "PENYEDIA_BARANG",
-  "KEPALA_PENYEDIA_BARANG",
-  "KEPALA_TEKNISI",
-  "ACCOUNTING",
-  "ASISTEN_CEO",
-  "PROGRAMMER",
+  "KEPALA_PENGELOLA_BARANG",
 ];
 
 function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }: { item: any; onClose: () => void; canSeeFinancials: boolean; canSeeModal: boolean }) {
@@ -1391,13 +1378,12 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                       </div>
                     </div>
                   )}
-                  {canSeeFinancials && (
+                  {/* ── REVISI: Baris Modal & Margin di detail modal hanya muncul jika canSeeModal ── */}
+                  {canSeeFinancials && canSeeModal && (
                     <div className="px-3.5 py-2.5 grid grid-cols-4 gap-2">
                       <div>
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Modal</p>
-                        {!canSeeModal ? (
-                          <p className="text-[10px] font-bold text-gray-400"><Lock className="inline w-3.5 h-3.5 mr-1" />Dibatasi</p>
-                        ) : g.modal_missing ? (
+                        {g.modal_missing ? (
                           <p className="text-[10px] font-bold text-amber-600"><AlertTriangle className="inline w-3.5 h-3.5 mr-1" />Harga modal belum diinput</p>
                         ) : (
                           <p className="text-xs font-bold text-gray-700 font-mono tabular-nums">Rp{(g.purchase_price_total ?? 0).toLocaleString("id-ID")}</p>
@@ -1407,9 +1393,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                       <div><p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Deal</p><p className="text-xs font-bold text-blue-700 font-mono tabular-nums">Rp{(g.allocated_deal_price ?? 0).toLocaleString("id-ID")}</p></div>
                       <div>
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wide mb-0.5">Margin</p>
-                        {!canSeeModal ? (
-                          <p className="text-[10px] font-bold text-gray-400"><Lock className="w-3.5 h-3.5" /></p>
-                        ) : g.modal_missing ? (
+                        {g.modal_missing ? (
                           <p className="text-[10px] font-bold text-amber-600">—</p>
                         ) : (
                           <p className={`text-xs font-bold font-mono tabular-nums ${(g.margin ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>{(g.margin ?? 0) >= 0 ? "+" : ""}Rp{Math.abs(g.margin ?? 0).toLocaleString("id-ID")}</p>
@@ -1431,12 +1415,11 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
           <div>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5"> Pembayaran</p>
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2.5">
-              {canSeeFinancials && (
+              {/* ── REVISI: Baris Total Modal hanya muncul jika canSeeModal ── */}
+              {canSeeFinancials && canSeeModal && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Total Harga Modal</span>
-                  {!canSeeModal ? (
-                    <span className="text-xs font-bold text-gray-400"><Lock className="inline w-3.5 h-3.5 mr-1" />Dibatasi</span>
-                  ) : item.modal_missing ? (
+                  {item.modal_missing ? (
                     <span className="text-xs font-bold text-amber-600"><AlertTriangle className="inline w-3.5 h-3.5 mr-1" />Harga modal belum diinput</span>
                   ) : (
                     <span className="text-sm font-bold text-gray-700 font-mono tabular-nums">Rp{totalModal.toLocaleString("id-ID")}</span>
@@ -1466,12 +1449,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                   <span className="text-sm font-bold text-gray-900 font-mono tabular-nums">Rp{totalDeal.toLocaleString("id-ID")}</span>
                 </div>
               )}
-              {canSeeFinancials && !canSeeModal && (
-                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                  <span className="text-xs font-semibold text-gray-700">Total Margin</span>
-                  <span className="text-xs font-bold text-gray-400"><Lock className="inline w-3.5 h-3.5 mr-1" />Dibatasi</span>
-                </div>
-              )}
+              {/* ── REVISI: Baris Total Margin hanya muncul jika canSeeModal ── */}
               {canSeeFinancials && canSeeModal && item.modal_missing && (
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                   <span className="text-xs font-semibold text-gray-700">Total Margin</span>
@@ -1542,9 +1520,6 @@ export default function Page() {
   const [paymentMethod, setPaymentMethod] = useState("ALL");
   const [sourcePlatform, setSourcePlatform] = useState("ALL");
   const [customerType, setCustomerType] = useState("ALL");
-  // Sorting: satu sumber kebenaran buat tombol "Terbaru/Terlama" DAN klik header tabel.
-  // Digabung jadi satu object supaya perubahan kolom + arah selalu terjadi dalam SATU render
-  // (kalau dipisah dua useState, setSortDir di dalam updater setSortBy membaca nilai basi).
   const [sort, setSort] = useState<{ by: SortKey; dir: SortDir }>(DEFAULT_SORT);
   const sortBy = sort.by;
   const sortDir = sort.dir;
@@ -1563,11 +1538,10 @@ export default function Page() {
   const focusInvoiceParam = searchParams.get("invoice") ?? searchParams.get("highlight");
   const focusInvoice = focusInvoiceParam ? focusInvoiceParam.trim() : null;
 
- // Dipertahankan buat kompatibilitas param lama di API (`sortOrder`)
   const sortOrder: "newest" | "oldest" =
     sortBy === "date" && sortDir === "asc" ? "oldest" : "newest";
 
- useEffect(() => {
+  useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener("resize", checkMobile);
@@ -1585,15 +1559,14 @@ export default function Page() {
   const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
   const canSeeFinancials = hasAnyRole(userRoles, PERMISSIONS.VIEW_FINANCIALS);
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
+  // ── Hanya ADMIN dan KEPALA_PENGELOLA_BARANG yang bisa lihat Margin ──
   const canSeeModal = userRoles.some((r) => MODAL_VISIBLE_ROLES.includes(r));
 
-  // ── Debounce search — hindari fetch tiap ketikan huruf ──
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(t);
   }, [search]);
 
-  // ── Isi dropdown filter (payment method / platform) — sekali di awal, bukan dari data yang lagi ditampilkan ──
   useEffect(() => {
     fetch("/api/transaction?meta=1").then(r => r.json()).then(r => {
       if (r.success) {
@@ -1603,10 +1576,6 @@ export default function Page() {
     }).catch(() => { });
   }, []);
 
-  // ── Klik header tabel (siklus 3 langkah, seperti Excel) ────────────
-  // 1x  → urut pakai arah default kolom itu (teks A→Z, angka/tanggal besar→kecil)
-  // 2x  → arah dibalik
-  // 3x  → reset, balik ke urutan awal halaman (tanggal terbaru)
   const handleSort = (key: SortKey) => {
     setSort((prev) => {
       if (prev.by !== key) return { by: key, dir: SORT_DEFAULT_DIR[key] };
@@ -1623,8 +1592,6 @@ export default function Page() {
       const params = new URLSearchParams();
       params.set("status", status);
       params.set("sortOrder", sortOrder);
-      // Margin dihitung server setelah query, jadi tidak bisa jadi ORDER BY.
-      // Untuk key client-side, biarkan server tetap urut created_at.
       if (!CLIENT_SIDE_SORT_KEYS.includes(sortBy)) {
         params.set("sortBy", sortBy);
         params.set("sortDir", sortDir);
@@ -1667,8 +1634,6 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, itemsPerPage, status, sortBy, sortDir, debouncedSearch, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, companyName, itemKind, focusInvoice]);
 
-  // Server sudah filter + paginasi. Khusus kolom Margin, urutkan di client
-  // karena nilainya baru ada setelah server menggabungkan data unit (bukan kolom tabel).
   const paginatedTransactions = useMemo(() => {
     if (!CLIENT_SIDE_SORT_KEYS.includes(sortBy)) return allTransactions;
     const factor = sortDir === "asc" ? 1 : -1;
@@ -1701,7 +1666,6 @@ export default function Page() {
       const { default: ExcelJS } = await import("exceljs");
       setExportProgress(5);
 
-      // Ambil SEMUA baris yang match filter aktif (bukan cuma 1 halaman yang lagi ditampilkan)
       const exportParams = new URLSearchParams({ export: "1", status, sortOrder });
       if (!CLIENT_SIDE_SORT_KEYS.includes(sortBy)) {
         exportParams.set("sortBy", sortBy);
@@ -1762,8 +1726,6 @@ export default function Page() {
             });
           } catch { /* skip */ } finally {
             completedDetail += 1;
-            // Tahap ini yang paling lama (1 request per transaksi), jadi diberi porsi
-            // terbesar dari progress bar: 15% - 80%.
             setExportProgress(15 + Math.round((completedDetail / totalDetail) * 65));
             setExportLabel(`Menghitung harga modal (${completedDetail}/${totalDetail})...`);
           }
@@ -1864,7 +1826,6 @@ export default function Page() {
       {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} />}
       {isExporting && <ExportProgressModal progress={exportProgress} label={exportLabel} />}
 
-      {/* ── Page wrapper ── */}
       <div className={`${isMobile ? "px-4 py-4" : "max-w-[1920px] mx-auto px-6 py-4"} space-y-3`}>
 
         {/* ── Header ── */}
@@ -1906,7 +1867,7 @@ export default function Page() {
               {allTransactions[0]?.customer_name && <> · <b>{allTransactions[0].customer_name}</b></>}
               {allTransactions.length === 0 && !isLoading && <span className="text-amber-500"> — tidak ditemukan</span>}
             </p>
-           <button onClick={() => router.replace("/dashboard/transactions")}
+            <button onClick={() => router.replace("/dashboard/transactions")}
               className="text-[11px] text-amber-600 hover:text-amber-900 font-semibold whitespace-nowrap flex-shrink-0"> Semua</button>
           </div>
         )}
@@ -1914,7 +1875,6 @@ export default function Page() {
         {/* ── Search + Filter bar ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-3">
           <div className="flex gap-2">
-            {/* Search */}
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -1933,7 +1893,6 @@ export default function Page() {
               )}
             </div>
 
-            {/* Sort tanggal (tetap ada, sekarang satu state dengan sorting kolom) */}
             <button
               onClick={() => handleSort("date")}
               title="Urutkan berdasarkan waktu transaksi"
@@ -1947,7 +1906,6 @@ export default function Page() {
               <span className="hidden sm:inline">{sortOrder === "newest" ? "Terbaru" : "Terlama"}</span>
             </button>
 
-            {/* Filter toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
@@ -1965,7 +1923,6 @@ export default function Page() {
           {/* ── Filter Panel ── */}
           {showFilters && (
             <div className="pt-3 border-t border-gray-50 space-y-4">
-              {/* Status */}
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Status</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -1978,7 +1935,6 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Tanggal */}
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Rentang Tanggal</p>
                 <div className="flex items-center gap-2">
@@ -1995,7 +1951,6 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Platform */}
               {uniqueSourcePlatforms.length > 1 && (
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Platform / Sumber</p>
@@ -2013,7 +1968,6 @@ export default function Page() {
                 </div>
               )}
 
-              {/* Metode bayar */}
               {uniquePaymentMethods.length > 1 && (
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Metode Bayar</p>
@@ -2031,7 +1985,6 @@ export default function Page() {
                 </div>
               )}
 
-              {/* Toko */}
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Toko / Perusahaan</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -2051,7 +2004,6 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Jenis Barang */}
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Jenis Barang</p>
                 <div className="flex flex-wrap gap-1.5">

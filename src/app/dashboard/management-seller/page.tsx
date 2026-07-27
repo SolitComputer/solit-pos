@@ -103,7 +103,7 @@ function toWaNumber(phone: string): string {
 function buildWaMessage(f: Followup): string {
   const nama = (f.customer_name || "").split(" ")[0] || "Kak";
   return `Halo ka ${nama}, Kami dari solit 03 😊
-Kami dari Solit Computer. Semoga Kakak sehat dan aktivitasnya lancar ya.
+ Semoga Kakak sehat dan aktivitasnya lancar ya.
 Kami hanya ingin memastikan laptop yang pernah dibeli di Solit masih nyaman digunakan. Kalau ada kendala, mau tanya-tanya, atau butuh bantuan seputar laptop, jangan sungkan untuk chat kami ya.
 Terima kasih sudah mempercayakan pembelian laptop di Solit Computer. Semoga laptopnya selalu awet dan bermanfaat untuk aktivitas Kakak. 🙏`;
 }

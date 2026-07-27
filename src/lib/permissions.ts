@@ -264,8 +264,6 @@ export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", 
 export const ACCESSORY_ONLY_SALES_ROLES: UserRole[] = ["CUSTOMER_SERVICE"];
 export const CASHFLOW_AUDIT_OUT_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 
-// Tidak ada role SUPERADMIN di sistem ini — ADMIN & PROGRAMMER dipakai sebagai
-// pemegang akses penuh yang boleh mengatur whitelist akun audit uang keluar.
 export const CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
 export const CC_REPORT_ROLES: UserRole[] = [
@@ -277,6 +275,12 @@ export const CC_REPORT_MANAGE_ROLES: UserRole[] = [
 
 export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
+
+export const AI_CEO_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_TEKNISI", "KEPALA_MARKETING",
+  "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_PENYEDIA_BARANG", "KEPALA_PENGELOLA_BARANG",
+];
 
 // ─── Notification Sound Settings — atur suara notif pengantaran per akun ─────
 export const NOTIFICATION_SETTINGS_ROLES: UserRole[] = [...FULL_ACCESS];
@@ -494,6 +498,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/admin/notifikasi-pengantaran": [...NOTIFICATION_SETTINGS_ROLES],
   "/api/akutansi": [...AKUNTANSI_ROLES],
   "/api/notification-settings": [...NOTIFICATION_SETTINGS_ROLES],
+  "/dashboard/ai-ceo": [...AI_CEO_ROLES],
+  "/api/ai-ceo": [...AI_CEO_ROLES],
 };
 
 // ─── PERMISSIONS object ───────────────────────────────────────────────────────
@@ -641,6 +647,9 @@ export const PERMISSIONS = {
 
   // ── Notification Sound Settings ─────────────────────────────────────────────
   MANAGE_NOTIFICATION_SETTINGS: [...NOTIFICATION_SETTINGS_ROLES] as UserRole[],
+
+  // ── AI CEO ───────────────────────────────────────────────────────────────────
+  VIEW_AI_CEO: [...AI_CEO_ROLES] as UserRole[],
 } as const;
 
 export function hasPermission(
