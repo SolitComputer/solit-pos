@@ -78,7 +78,11 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         send({ type: "done", conversationId: convId, reply: result.reply, provider: result.providerUsed });
       } catch (err: any) {
         console.error("[ai-ceo/chat] error:", err);
-        send({ type: "error", message: err?.message ?? "AI CEO sedang bermasalah, coba lagi sebentar." });
+        const isQuotaError = /429|quota|rate.?limit/i.test(String(err?.message ?? ""));
+        const friendlyMessage = isQuotaError
+          ? "Kuota AI hari ini sudah habis untuk provider yang dipilih. Coba pilih provider lain di dropdown kanan atas (misal 'Groq saja'), atau tunggu beberapa saat sebelum coba lagi."
+          : "AI CEO sedang bermasalah menghubungi provider AI. Coba lagi sebentar lagi.";
+        send({ type: "error", message: friendlyMessage });
       } finally {
         controller.close();
       }
