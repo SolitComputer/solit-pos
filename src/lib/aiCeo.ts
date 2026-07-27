@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { ALL_STATIC_ROLES, humanizeRoleKey } from "@/lib/permissions";
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -182,15 +183,15 @@ async function fetchInternal(req: NextRequest, path: string): Promise<any> {
                 signal: AbortSignal.timeout(15000),
             });
             lastErr = null;
-            break; // berhasil konek, tidak perlu coba kandidat berikutnya
+            break; 
         } catch (err: any) {
             lastErr = err;
-            console.error(`[ai-ceo] fetchInternal gagal konek ke ${base}${path}:`, err?.message ?? err);
+            console.error(`[ai-ceo] fetchInternal gagal konek ke ${base}${path}:`, err?.message ?? err, "| cause:", err?.cause ?? "(tidak ada info cause)");
         }
     }
 
     if (!res) {
-        return { error: `Gagal terhubung ke ${path} setelah mencoba semua rute jaringan internal (${candidates.length} percobaan). Coba tanya ulang sebentar lagi. Detail: ${lastErr?.message ?? lastErr}` };
+        return { error: `Gagal terhubung ke ${path} setelah mencoba semua rute jaringan internal (${candidates.length} percobaan). Coba tanya ulang sebentar lagi. Detail: ${lastErr?.cause ?? lastErr?.message ?? lastErr}` };
     }
 
     const contentType = res.headers.get("content-type") || "";
@@ -227,9 +228,14 @@ export async function runToolCall(
         }
 
         case "get_ready_stock": {
-            const json = await fetchInternal(ctx.req, "/api/laptops/ready");
-            if (json?.error) return json;
-            const rows = Array.isArray(json?.data) ? json.data : [];
+            const { data, error } = await supabaseAdmin
+                .from("laptops")
+                .select("*")
+                .eq("status", "SIAP_JUAL")
+                .gt("qty", 0)
+                .order("created_at", { ascending: false });
+            if (error) return { error: `Gagal mengambil data laptop ready: ${error.message}` };
+            const rows = data ?? [];
             const q = String(args?.query ?? "").trim().toLowerCase();
             const filtered = q
                 ? rows.filter((r: any) =>
@@ -254,10 +260,15 @@ export async function runToolCall(
         }
 
         case "get_ready_units": {
-            const laptopId = args?.laptop_id ? `?laptop_id=${encodeURIComponent(args.laptop_id)}` : "";
-            const json = await fetchInternal(ctx.req, `/api/laptops/ready-units${laptopId}`);
-            if (json?.error) return json;
-            const rows = Array.isArray(json?.data) ? json.data : [];
+            let unitQuery = supabaseAdmin
+                .from("laptop_units")
+                .select(`*, laptop:laptops (id, laptop_name, brand, cpu, ram, storage, display, selling_price)`)
+                .in("status", ["SIAP_JUAL", "RESERVED", "HELD", "PACKING"])
+                .order("created_at", { ascending: false });
+            if (args?.laptop_id) unitQuery = unitQuery.eq("laptop_id", args.laptop_id);
+            const { data, error } = await unitQuery;
+            if (error) return { error: `Gagal mengambil detail unit: ${error.message}` };
+            const rows = data ?? [];
             const lean = rows.slice(0, 60).map((u: any) => ({
                 serial_number: u.serial_number,
                 status: u.status,
@@ -275,12 +286,18 @@ export async function runToolCall(
             return fetchInternal(ctx.req, "/api/laptops/minus");
 
         case "get_accessory_stock": {
-            const q = args?.query ? `&search=${encodeURIComponent(args.query)}` : "";
-            const json = await fetchInternal(ctx.req, `/api/accessories?limit=200${q}`);
-            if (json?.error) return json;
-            const rows = Array.isArray(json?.data) ? json.data : [];
+            let accQuery = supabaseAdmin
+                .from("accessories")
+                .select("*", { count: "exact" })
+                .order("created_at", { ascending: false })
+                .limit(200);
+            const search = String(args?.query ?? "").trim();
+            if (search) accQuery = accQuery.or(`name.ilike.%${search}%,brand.ilike.%${search}%,spec.ilike.%${search}%`);
+            const { data, error, count } = await accQuery;
+            if (error) return { error: `Gagal mengambil data aksesori: ${error.message}` };
+            const rows = data ?? [];
             return {
-                total: json?.total ?? rows.length,
+                total: count ?? rows.length,
                 data: rows.map((a: any) => ({
                     name: a.name,
                     category: a.category,
@@ -321,12 +338,22 @@ export async function runToolCall(
         }
 
         case "get_daftar_role": {
-            const json = await fetchInternal(ctx.req, "/api/admin/roles");
-            if (json?.error) return json;
-            const customRoles = (json?.roles ?? []).map((r: any) => ({
+            const { data, error } = await supabaseAdmin
+                .from("dynamic_roles")
+                .select("id,key,label,icon,badge_bg,badge_text,badge_border,is_pkl,parent_role,created_at")
+                .order("label");
+            if (error) return { error: `Gagal mengambil daftar role: ${error.message}` };
+            const legacyOverrides: Record<string, string> = {
+                PKL: "PKL (Umum)",
+                ASISTEN_CEO: "Asisten CEO",
+                CC: "Content Creator",
+            };
+            const legacyRoles = ALL_STATIC_ROLES
+                .map((key) => ({ key, label: legacyOverrides[key] ?? humanizeRoleKey(key) }))
+                .sort((a, b) => a.label.localeCompare(b.label));
+            const customRoles = (data ?? []).map((r: any) => ({
                 key: r.key, label: r.label, is_pkl: r.is_pkl, parent_role: r.parent_role,
             }));
-            const legacyRoles = (json?.legacyRoles ?? []).map((r: any) => ({ key: r.key, label: r.label }));
             return {
                 total_role_bawaan: legacyRoles.length,
                 total_role_custom: customRoles.length,
@@ -464,23 +491,29 @@ export interface ChatTurn {
 export type AiProvider = "gemini" | "groq";
 type ToolEventCallback = (toolName: string) => void;
 
-// ─── Provider health / cooldown (biar gak nyoba provider yg baru kena limit) ─
 async function isProviderBlocked(provider: AiProvider): Promise<boolean> {
     const { data, error } = await supabaseAdmin
         .from("ai_ceo_provider_health")
         .select("blocked_until")
         .eq("provider", provider)
         .maybeSingle();
-    if (error || !data?.blocked_until) return false;
+    if (error) {
+        console.error("[ai-ceo] isProviderBlocked gagal query (tabel ai_ceo_provider_health belum dibuat?):", error.message);
+        return false;
+    }
+    if (!data?.blocked_until) return false;
     return new Date(data.blocked_until).getTime() > Date.now();
 }
 
 async function markProviderBlocked(provider: AiProvider): Promise<void> {
-    await supabaseAdmin.from("ai_ceo_provider_health").upsert({
+    const { error } = await supabaseAdmin.from("ai_ceo_provider_health").upsert({
         provider,
         blocked_until: new Date(Date.now() + PROVIDER_COOLDOWN_MS).toISOString(),
         updated_at: new Date().toISOString(),
     });
+    if (error) {
+        console.error("[ai-ceo] markProviderBlocked gagal upsert (tabel ai_ceo_provider_health belum dibuat?):", error.message);
+    }
 }
 
 function isRateLimitError(err: any): boolean {
