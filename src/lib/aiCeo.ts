@@ -28,7 +28,14 @@ function getGroqKey(): string {
     return key;
 }
 
-export const AI_CEO_SYSTEM_PROMPT = `Kamu adalah "AI CEO" — asisten pengambilan keputusan untuk Solit 03, toko reseller laptop & aksesori second-hand.
+function buildAiCeoSystemPrompt(): string {
+    const nowWIB = new Date(Date.now() + WIB_OFFSET_MS);
+    const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const todayLabel = `${dayNames[nowWIB.getUTCDay()]}, ${nowWIB.toISOString().slice(0, 10)} (WIB)`;
+
+    return `Kamu adalah "AI CEO" — asisten pengambilan keputusan untuk Solit 03, toko reseller laptop & aksesori second-hand.
+
+Konteks waktu: HARI INI adalah ${todayLabel}. Kalau user pakai istilah relatif ("kemarin", "besok", "minggu ini", "bulan lalu"), HITUNG SENDIRI tanggal/bulan/tahun konkretnya dari hari ini, lalu kirim sebagai tanggal pasti ke parameter tool (contoh: kirim "2026-07-26", bukan teks "kemarin"). Semua parameter angka pada tool (limit, hari, month, year) WAJIB dikirim sebagai angka murni dalam bentuk teks (contoh "30", "7", "2026") — jangan sertakan kata lain di dalamnya.
 
 Peranmu:
 1. Menjawab pertanyaan tim manajemen tentang stok, penjualan, cashflow, dan operasional — berdasarkan DATA ASLI dari tools yang tersedia, bukan asumsi/karangan.
@@ -36,10 +43,12 @@ Peranmu:
 3. Beberapa data (misalnya cashflow, data aksesori) memang hanya bisa diakses role tertentu. Kalau sebuah tool mengembalikan pesan "tidak punya izin", sampaikan itu apa adanya ke pengguna dengan sopan — jangan coba tool lain untuk mengakalinya, dan jangan mengarang data pengganti.
 4. Kalau mau lihat detail per-serial-number sebuah model laptop, panggil "get_ready_stock" dulu untuk dapat "id" model itu, baru panggil "get_ready_units" dengan id tersebut.
 5. Kalau user tanya soal absensi/keterlambatan SATU ORANG SPESIFIK (misal "Budi pernah telat berapa kali", "kok Moreno bisa telat"), WAJIB panggil "get_attendance_summary" dengan parameter "nama" diisi nama orang itu — supaya kamu dapat riwayat ASLI orang tersebut. JANGAN PERNAH menyimpulkan atau menghitung jawaban untuk satu orang dari ringkasan agregat semua karyawan (itu data yang berbeda dan akan salah).
-6. Kamu juga bisa menjawab pertanyaan soal lembur karyawan lewat tool "get_overtime_summary".
-7. Format jawaban WAJIB dua tahap: (a) mulai dengan penjelasan singkat berbentuk KALIMAT/PARAGRAF biasa yang langsung menjawab inti pertanyaan secara naratif — contoh: "Penjualan bulan ini terlihat naik dibanding bulan lalu, didorong oleh peningkatan transaksi laptop ready stock." — (b) BARU setelah paragraf itu (pisahkan dengan baris kosong), tampilkan ringkasan terstruktur (bullet point, list bernomor, atau tabel Markdown) kalau datanya berbentuk daftar/angka rinci. Jangan langsung mulai dengan bullet point atau tabel tanpa kalimat pembuka. Tetap pakai **bold** untuk angka/istilah penting, dan pecah paragraf pendek-pendek.
+6. Kalau user tanya soal absensi umum di TANGGAL TERTENTU (misal "cek absensi kemarin", "siapa yang absen tanggal 20"), panggil "get_attendance_summary" TANPA parameter "nama", isi parameter "tanggal" dengan tanggal konkret (YYYY-MM-DD) hasil hitunganmu dari konteks waktu di atas.
+7. Kamu juga bisa menjawab pertanyaan soal lembur karyawan lewat tool "get_overtime_summary".
+8. Format jawaban WAJIB dua tahap: (a) mulai dengan penjelasan singkat berbentuk KALIMAT/PARAGRAF biasa yang langsung menjawab inti pertanyaan secara naratif — contoh: "Penjualan bulan ini terlihat naik dibanding bulan lalu, didorong oleh peningkatan transaksi laptop ready stock." — (b) BARU setelah paragraf itu (pisahkan dengan baris kosong), tampilkan ringkasan terstruktur (bullet point, list bernomor, atau tabel Markdown) kalau datanya berbentuk daftar/angka rinci. Jangan langsung mulai dengan bullet point atau tabel tanpa kalimat pembuka. Tetap pakai **bold** untuk angka/istilah penting, dan pecah paragraf pendek-pendek.
 
 Gaya jawaban: Bahasa Indonesia, singkat, langsung ke inti, pakai angka nyata dari data. Jangan pernah mengklaim sudah "melakukan" perubahan apapun ke sistem.`;
+}
 
 export const AI_CEO_TOOLS = [
     {
@@ -91,7 +100,7 @@ export const AI_CEO_TOOLS = [
                 description: "Ambil daftar transaksi terbaru (invoice, customer, laptop, harga deal, status, sales, tanggal).",
                 parameters: {
                     type: "OBJECT",
-                    properties: { limit: { type: "INTEGER", description: "Jumlah transaksi terbaru, default 10, maksimal 50." } },
+                    properties: { limit: { type: "STRING", description: "Jumlah transaksi terbaru sebagai angka (contoh '10'), default 10, maksimal 50." } },
                     required: [],
                 },
             },
@@ -102,12 +111,13 @@ export const AI_CEO_TOOLS = [
             },
             {
                 name: "get_attendance_summary",
-                description: "Ambil data absensi wajah karyawan. Kosongkan 'nama' untuk ringkasan HARI INI semua karyawan (siapa hadir/telat) + tren 7 hari. Isi 'nama' untuk riwayat kehadiran SATU orang spesifik (wajib dipakai kalau user tanya soal orang tertentu).",
+                description: "Ambil data absensi wajah karyawan. Kosongkan 'nama' untuk ringkasan SATU TANGGAL (default hari ini, bisa diganti lewat 'tanggal') semua karyawan (siapa hadir/telat) + tren 7 hari sebelumnya. Isi 'nama' untuk riwayat kehadiran SATU orang spesifik dalam N hari terakhir (wajib dipakai kalau user tanya soal orang tertentu).",
                 parameters: {
                     type: "OBJECT",
                     properties: {
-                        nama: { type: "STRING", description: "Nama karyawan spesifik yang mau dicek riwayatnya. Kosongkan untuk ringkasan umum hari ini." },
-                        hari: { type: "INTEGER", description: "Dipakai bareng 'nama' — berapa hari ke belakang yang mau dicek, default 30, maksimal 60." },
+                        nama: { type: "STRING", description: "Nama karyawan spesifik yang mau dicek riwayatnya. Kosongkan untuk mode ringkasan umum per tanggal." },
+                        hari: { type: "STRING", description: "Dipakai BARENG 'nama' — berapa hari ke belakang yang mau dicek, sebagai angka (contoh '30'), default 30, maksimal 60." },
+                        tanggal: { type: "STRING", description: "Dipakai TANPA 'nama' — tanggal spesifik untuk ringkasan umum, format YYYY-MM-DD (hitung sendiri dari 'hari ini' kalau user bilang 'kemarin'/'besok'/dll). Kosongkan untuk hari ini." },
                     },
                     required: [],
                 },
@@ -118,8 +128,8 @@ export const AI_CEO_TOOLS = [
                 parameters: {
                     type: "OBJECT",
                     properties: {
-                        month: { type: "INTEGER", description: "Bulan 1-12, kosongkan untuk bulan berjalan." },
-                        year: { type: "INTEGER", description: "Tahun, kosongkan untuk tahun berjalan." },
+                        month: { type: "STRING", description: "Bulan sebagai angka 1-12 (contoh '7'), kosongkan untuk bulan berjalan." },
+                        year: { type: "STRING", description: "Tahun sebagai angka (contoh '2026'), kosongkan untuk tahun berjalan." },
                         status: { type: "STRING", description: "Filter status dipisah koma, misal 'PENDING,ONGOING'. Kosongkan untuk semua status." },
                     },
                     required: [],
@@ -214,6 +224,12 @@ async function fetchInternal(req: NextRequest, path: string): Promise<any> {
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 const toWibDate = (iso: string) => new Date(new Date(iso).getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 const toWibTime = (iso: string) => new Date(new Date(iso).getTime() + WIB_OFFSET_MS).toISOString().slice(11, 19) + " WIB";
+
+function toIntSafe(value: any, fallback: number, max?: number): number {
+    const parsed = typeof value === "number" ? value : parseInt(String(value ?? "").replace(/[^0-9-]/g, ""), 10);
+    const result = Number.isFinite(parsed) ? parsed : fallback;
+    return max !== undefined ? Math.min(result, max) : result;
+}
 
 export async function runToolCall(
     name: string,
@@ -316,7 +332,7 @@ export async function runToolCall(
         }
 
         case "get_recent_transactions": {
-            const limit = Math.min(Number(args?.limit) || 10, 50);
+            const limit = toIntSafe(args?.limit, 10, 50);
             const json = await fetchInternal(ctx.req, `/api/transaction?limit=${limit}&sortOrder=newest`);
             if (json?.error) return json;
             const rows = Array.isArray(json?.data) ? json.data : [];
@@ -399,7 +415,7 @@ export async function runToolCall(
             const namaFilter = String(args?.nama ?? "").trim().toLowerCase();
 
             if (namaFilter) {
-                const hari = Math.min(Number(args?.hari) || 30, 60);
+                const hari = toIntSafe(args?.hari, 30, 60);
                 const cutoffDate = new Date(Date.now() + WIB_OFFSET_MS - (hari - 1) * 86400000).toISOString().slice(0, 10);
 
                 const personRows = rows.filter(
@@ -426,12 +442,17 @@ export async function runToolCall(
                 };
             }
 
-            // ── Mode: ringkasan umum hari ini + tren ─────────────────────────
-            const todayWIB = new Date(Date.now() + WIB_OFFSET_MS).toISOString().slice(0, 10);
-            const sevenDaysAgoWIB = new Date(Date.now() + WIB_OFFSET_MS - 6 * 86400000).toISOString().slice(0, 10);
+            // ── Mode: ringkasan umum SATU TANGGAL (default hari ini) + tren ──
+            const requestedDate = String(args?.tanggal ?? "").trim();
+            const targetDateWIB = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)
+                ? requestedDate
+                : new Date(Date.now() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+            const sevenDaysAgoWIB = new Date(new Date(`${targetDateWIB}T00:00:00Z`).getTime() - 6 * 86400000).toISOString().slice(0, 10);
 
-            const todays = rows.filter((r) => r.check_in_time && toWibDate(r.check_in_time) === todayWIB);
-            const recent = rows.filter((r) => r.check_in_time && toWibDate(r.check_in_time) >= sevenDaysAgoWIB);
+            const todays = rows.filter((r) => r.check_in_time && toWibDate(r.check_in_time) === targetDateWIB);
+            const recent = rows.filter(
+                (r) => r.check_in_time && toWibDate(r.check_in_time) >= sevenDaysAgoWIB && toWibDate(r.check_in_time) <= targetDateWIB
+            );
 
             const trend: Record<string, { hadir: number; terlambat: number }> = {};
             for (const r of recent) {
@@ -442,7 +463,7 @@ export async function runToolCall(
             }
 
             return {
-                tanggal: todayWIB,
+                tanggal: targetDateWIB,
                 total_hadir_hari_ini: todays.length,
                 total_terlambat_hari_ini: todays.filter((r) => r.late_weight === 0.5).length,
                 total_di_luar_jadwal_hari_ini: todays.filter((r) => r.late_weight === 0).length,
@@ -459,12 +480,9 @@ export async function runToolCall(
         }
 
         case "get_overtime_summary": {
-            // Konversi ke direct-Supabase. Sama seperti absensi: karena AI_CEO_ROLES
-            // sekarang cuma ADMIN & ASISTEN_CEO (full-access, boleh lihat gaji/bayar),
-            // scoping per-divisi & strip-bayaran di route aslinya di-skip di sini.
             const nowWIB = new Date(Date.now() + WIB_OFFSET_MS);
-            const month = args?.month ?? nowWIB.getUTCMonth() + 1;
-            const year = args?.year ?? nowWIB.getUTCFullYear();
+            const month = toIntSafe(args?.month, nowWIB.getUTCMonth() + 1, 12);
+            const year = toIntSafe(args?.year, nowWIB.getUTCFullYear());
             const paddedMonth = String(month).padStart(2, "0");
             const startDate = `${year}-${paddedMonth}-01`;
             const lastDay = new Date(Number(year), Number(month), 0).getDate();
@@ -601,7 +619,7 @@ async function callGemini(contents: GeminiContent[]): Promise<any> {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-goog-api-key": getGeminiKey() },
             body: JSON.stringify({
-                system_instruction: { parts: [{ text: AI_CEO_SYSTEM_PROMPT }] },
+                system_instruction: { parts: [{ text: buildAiCeoSystemPrompt() }] },
                 contents,
                 tools: AI_CEO_TOOLS,
                 generationConfig: { temperature: 0.4 },
@@ -722,7 +740,7 @@ async function callGroq(messages: OpenAiMessage[]): Promise<any> {
 
 async function runGroqTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback): Promise<string> {
     const messages: OpenAiMessage[] = [
-        { role: "system", content: AI_CEO_SYSTEM_PROMPT },
+        { role: "system", content: buildAiCeoSystemPrompt() },
         ...toOpenAiHistory(history),
     ];
     const MAX_STEPS = 6;
