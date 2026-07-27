@@ -101,6 +101,20 @@ const SORT_LABELS: Record<string, string> = {
     STORAGE_DESC: "Storage ↓",
     PRICE_ASC: "Harga: Rendah → Tinggi",
     PRICE_DESC: "Harga: Tinggi → Rendah",
+    MODAL_ASC: "Modal Laptop: Rendah → Tinggi",
+    MODAL_DESC: "Modal Laptop: Tinggi → Rendah",
+    SPAREPART_ASC: "Modal Sparepart: Rendah → Tinggi",
+    SPAREPART_DESC: "Modal Sparepart: Tinggi → Rendah",
+    TOTAL_JUAL_ASC: "Total Jual: Rendah → Tinggi",
+    TOTAL_JUAL_DESC: "Total Jual: Tinggi → Rendah",
+    SUMBER_ASC: "Sumber: A → Z",
+    SUMBER_DESC: "Sumber: Z → A",
+    TANGGAL_ASC: "Tanggal: Lama → Baru",
+    TANGGAL_DESC: "Tanggal: Baru → Lama",
+    AUDIT_ASC: "Audit: Belum → Sudah",
+    AUDIT_DESC: "Audit: Sudah → Belum",
+    AKSI_ASC: "Aksi: Sedikit → Banyak",
+    AKSI_DESC: "Aksi: Banyak → Sedikit",
     STOK_ASC: "Stok ↑",
     STOK_DESC: "Stok ↓",
     SIAP_ASC: "Siap ↑",
@@ -521,6 +535,20 @@ export function LaptopsContent() {
             case "STORAGE_DESC": list.sort((a, b) => (b.storage || "").localeCompare(a.storage || "")); break;
             case "PRICE_ASC": list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0)); break;
             case "PRICE_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
+            case "MODAL_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0) - (b.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0)); break;
+            case "MODAL_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0) - (a.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0)); break;
+            case "SPAREPART_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0) - (b.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0)); break;
+            case "SPAREPART_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0) - (a.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0)); break;
+            case "TOTAL_JUAL_ASC": list.sort((a, b) => ((a.selling_price || 0) * (a.stok_tersedia || 0)) - ((b.selling_price || 0) * (b.stok_tersedia || 0))); break;
+            case "TOTAL_JUAL_DESC": list.sort((a, b) => ((b.selling_price || 0) * (b.stok_tersedia || 0)) - ((a.selling_price || 0) * (a.stok_tersedia || 0))); break;
+            case "SUMBER_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.source || "").localeCompare(b.laptop_units?.find(u => u.status !== "SOLD")?.source || "", "id")); break;
+            case "SUMBER_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.source || "").localeCompare(a.laptop_units?.find(u => u.status !== "SOLD")?.source || "", "id")); break;
+            case "TANGGAL_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.created_at || a.created_at || "").localeCompare(b.laptop_units?.find(u => u.status !== "SOLD")?.created_at || b.created_at || "")); break;
+            case "TANGGAL_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.created_at || b.created_at || "").localeCompare(a.laptop_units?.find(u => u.status !== "SOLD")?.created_at || a.created_at || "")); break;
+            case "AUDIT_ASC": list.sort((a, b) => (isAuditActive(a.audited_at) ? 1 : 0) - (isAuditActive(b.audited_at) ? 1 : 0)); break;
+            case "AUDIT_DESC": list.sort((a, b) => (isAuditActive(b.audited_at) ? 1 : 0) - (isAuditActive(a.audited_at) ? 1 : 0)); break;
+            case "AKSI_ASC": list.sort((a, b) => (a.stok_tersedia ?? 0) - (b.stok_tersedia ?? 0)); break;
+            case "AKSI_DESC": list.sort((a, b) => (b.stok_tersedia ?? 0) - (a.stok_tersedia ?? 0)); break;
             case "STOK_ASC": list.sort((a, b) => (a.stok_tersedia ?? 0) - (b.stok_tersedia ?? 0)); break;
             case "STOK_DESC": list.sort((a, b) => (b.stok_tersedia ?? 0) - (a.stok_tersedia ?? 0)); break;
             case "SIAP_ASC": list.sort((a, b) => (a.siap_jual ?? 0) - (b.siap_jual ?? 0)); break;
@@ -733,6 +761,8 @@ export function LaptopsContent() {
             stok_tersisa: l.stok_tersedia ?? 0,
             siap_jual: l.siap_jual ?? 0,
             minus: l.stok_minus ?? 0,
+            is_audited: isAuditActive(l.audited_at),
+            audited_at: l.audited_at ?? null,
         };
     }), [filteredLaptops]);
 
@@ -885,8 +915,22 @@ export function LaptopsContent() {
                                 <option value="DEFAULT">Urutan Default</option>
                                 <option value="AZ">Nama: A → Z</option>
                                 <option value="ZA">Nama: Z → A</option>
-                                <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
-                                <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
+                                <option value="PRICE_ASC">Harga Jual: Rendah → Tinggi</option>
+                                <option value="PRICE_DESC">Harga Jual: Tinggi → Rendah</option>
+                                {canSeePrivateBarang && <option value="MODAL_ASC">Modal Laptop: Rendah → Tinggi</option>}
+                                {canSeePrivateBarang && <option value="MODAL_DESC">Modal Laptop: Tinggi → Rendah</option>}
+                                {canSeePrivateBarang && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
+                                {canSeePrivateBarang && <option value="SPAREPART_DESC">Modal Sparepart: Tinggi → Rendah</option>}
+                                <option value="TOTAL_JUAL_ASC">Total Jual: Rendah → Tinggi</option>
+                                <option value="TOTAL_JUAL_DESC">Total Jual: Tinggi → Rendah</option>
+                                {canSeePrivateBarang && <option value="SUMBER_ASC">Sumber: A → Z</option>}
+                                {canSeePrivateBarang && <option value="SUMBER_DESC">Sumber: Z → A</option>}
+                                {canSeePrivateBarang && <option value="TANGGAL_ASC">Tanggal Masuk: Lama → Baru</option>}
+                                {canSeePrivateBarang && <option value="TANGGAL_DESC">Tanggal Masuk: Baru → Lama</option>}
+                                {canSeePrivateBarang && <option value="AUDIT_DESC">Audit: Sudah Diaudit Dulu</option>}
+                                {canSeePrivateBarang && <option value="AUDIT_ASC">Audit: Belum Diaudit Dulu</option>}
+                                <option value="AKSI_DESC">Aksi/Stok: Banyak Dulu</option>
+                                <option value="AKSI_ASC">Aksi/Stok: Sedikit Dulu</option>
                                 <option value="SN">Urut SN</option>
                             </FilterSelect>
 
