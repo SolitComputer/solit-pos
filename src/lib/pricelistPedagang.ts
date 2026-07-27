@@ -74,9 +74,9 @@ export const PRICELIST_PEDAGANG_ROLES: UserRole[] = [
 ];
 
 // Role yang boleh lihat harga MODAL di tabel dashboard (bukan di Excel —
-// Excel tidak pernah menampilkan harga modal). Disamakan dengan
-// `canSeePriceInfo` di halaman Units.
+// Excel tidak pernah menampilkan harga modal). HANYA Admin & Pengelola
+// Barang — role lain (termasuk Kepala Pengelola Barang, Accounting, dll)
+// TIDAK bisa lihat kolom ini sama sekali.
 export const PRICELIST_MODAL_VIEW_ROLES: UserRole[] = [
-  "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
-  "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING", "KEPALA_SOTECH", "KEPALA_ONPOINT", "KEPALA_ZENITH"
+  "ADMIN", "PENGELOLA_BARANG",
 ];

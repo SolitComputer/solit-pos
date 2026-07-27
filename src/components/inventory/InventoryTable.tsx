@@ -42,6 +42,9 @@ export interface InventoryRow {
 
     is_audited?: boolean;
     audited_at?: string | null;
+
+    /** Badge "NEW" — true kalau ada unit yang masuk dalam 3 hari terakhir */
+    is_new?: boolean;
 }
 
 interface Props {
@@ -73,6 +76,18 @@ const fmtDate = (iso: string | null) =>
 const Dash = () => <span className="text-gray-200">—</span>;
 const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
+);
+
+//  Badge "NEW" — dipakai di kolom Nama Laptop saat row.is_new === true.
+//  Nilai is_new sudah dihitung di pemanggil (LaptopsContent.tsx / ready/page.tsx),
+//  jadi komponen ini murni presentasional, tidak menghitung TTL sendiri.
+const NewBadge = () => (
+    <span
+        title="Barang baru masuk (≤ 3 hari)"
+        className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide bg-emerald-500 text-white shrink-0 shadow-sm shadow-emerald-500/30"
+    >
+        New
+    </span>
 );
 
 type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "PRICE" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "AKSI";
@@ -173,9 +188,12 @@ export default function InventoryTable({
                             </td>
 
                             <td className="px-3.5 py-3.5 min-w-[200px]">
-                                <span className="block font-semibold text-gray-800 text-[13px]" title={row.laptop_name}>
-                                    {row.laptop_name}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-gray-800 text-[13px] truncate" title={row.laptop_name}>
+                                        {row.laptop_name}
+                                    </span>
+                                    {row.is_new && <NewBadge />}
+                                </div>
                             </td>
 
                             <td className="px-3.5 py-3.5 max-w-[150px]">
