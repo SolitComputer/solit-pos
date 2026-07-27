@@ -451,26 +451,29 @@ export const GET = withAuth(async (req) => {
     for (const o of (openingData ?? []) as OpeningRow[]) {
       openingMap.set(o.account_code, { side: o.side, nominal: Number(o.nominal) });
     }
-
-    // 3) Mutasi sebelum periode — semua akun, di-batch supaya .in() nggak
-    //    kepanjangan (lihat catatan IN_CLAUSE_CHUNK_SIZE di atas).
-    const { data: priorEntries, error: priorEntryErr } = await supabase
-      .from("journal_entries")
-      .select("id")
-      .lt("period", period);
-    if (priorEntryErr) throw priorEntryErr;
-    const priorEntryIds = (priorEntries ?? []).map((e: { id: string }) => e.id);
-
+    
     const mutasiSebelumMap = new Map<string, number>();
-    for (const idChunk of chunkArray(priorEntryIds, IN_CLAUSE_CHUNK_SIZE)) {
-      const { data: priorLines, error: priorLineErr } = await supabase
-        .from("journal_lines")
-        .select("account_code, side, nominal")
-        .in("entry_id", idChunk);
-      if (priorLineErr) throw priorLineErr;
-      for (const l of (priorLines ?? []) as { account_code: string; side: "DEBIT" | "KREDIT"; nominal: number }[]) {
-        const signed = l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal);
-        mutasiSebelumMap.set(l.account_code, (mutasiSebelumMap.get(l.account_code) ?? 0) + signed);
+    {
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: page, error: priorLineErr } = await supabase
+          .from("journal_lines")
+          .select("account_code, side, nominal, journal_entries!inner(period)")
+          .lt("journal_entries.period", period)
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (priorLineErr) throw priorLineErr;
+        if (!page || page.length === 0) break;
+
+        for (const l of page as any[]) {
+          const signed = l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal);
+          mutasiSebelumMap.set(l.account_code, (mutasiSebelumMap.get(l.account_code) ?? 0) + signed);
+        }
+
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
       }
     }
 
