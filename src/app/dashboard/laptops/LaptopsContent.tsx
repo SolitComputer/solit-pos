@@ -333,6 +333,8 @@ export function LaptopsContent() {
     const [filterSN, setFilterSN] = useState("");
     // ── Filter stok: default TERSEDIA supaya laptop stok 0 otomatis "hilang" ──
     const [filterStock, setFilterStock] = useState<"ALL" | "TERSEDIA" | "HABIS">("TERSEDIA");
+    // ── Filter status audit (pakai isAuditActive supaya konsisten dgn badge tabel) ──
+    const [filterAudit, setFilterAudit] = useState<"" | "audited" | "unaudited">("");
 
     const handleSort = (asc: string, desc: string) => {
         setSortBy(prev => prev === asc ? desc : asc);
@@ -376,6 +378,8 @@ export function LaptopsContent() {
     const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ laptop: Laptop; unitCount: number } | null>(null);
     //  Audit: id laptop yang lagi diproses (biar tombolnya loading & tidak dobel klik)
     const [auditingId, setAuditingId] = useState<string | null>(null);
+    //  Riwayat audit — laptop yang sedang dibuka riwayatnya di AuditHistoryModal
+    const [historyTarget, setHistoryTarget] = useState<{ id: string; name: string } | null>(null);
 
     const showAlert = (msg: string) => setAlertModal(msg);
 
@@ -496,6 +500,13 @@ export function LaptopsContent() {
             list = list.filter(x => (x.stok_tersedia ?? 0) === 0);
         }
 
+        // ── Filter status audit ───────────────────────────────────────────────
+        if (filterAudit === "audited") {
+            list = list.filter(x => isAuditActive(x.audited_at));
+        } else if (filterAudit === "unaudited") {
+            list = list.filter(x => !isAuditActive(x.audited_at));
+        }
+
         switch (sortBy) {
             case "AZ": list.sort((a, b) => (a.laptop_name || "").localeCompare(b.laptop_name || "")); break;
             case "ZA": list.sort((a, b) => (b.laptop_name || "").localeCompare(a.laptop_name || "")); break;
@@ -521,7 +532,7 @@ export function LaptopsContent() {
             case "SN": list.sort((a, b) => a.id.localeCompare(b.id)); break;
         }
         return list;
-    }, [laptops, search, filterSN, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, filterStock, sortBy]);
+    }, [laptops, search, filterSN, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, filterStock, filterAudit, sortBy]);
 
     const uniqueRams = useMemo(() => {
         const r = new Set(laptops.map(x => x.ram).filter(Boolean));
@@ -834,7 +845,7 @@ export function LaptopsContent() {
                                 {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
                             </FilterSelect>
                             <button
-                                onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setFilterStock("TERSEDIA"); setSortBy("DEFAULT"); }}
+                                onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setFilterStock("TERSEDIA"); setFilterAudit(""); setSortBy("DEFAULT"); }}
                                 className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all duration-150 flex items-center justify-center gap-1.5"
                             >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -864,14 +875,23 @@ export function LaptopsContent() {
                                 <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
                                 <option value="SN">Urut SN</option>
                             </FilterSelect>
+
+                            {canSeePrivateBarang && (
+                                <FilterSelect value={filterAudit} onChange={e => setFilterAudit(e.target.value as typeof filterAudit)}>
+                                    <option value="">Semua Audit</option>
+                                    <option value="audited">Sudah Diaudit</option>
+                                    <option value="unaudited">Belum Diaudit</option>
+                                </FilterSelect>
+                            )}
                         </div>
 
-                        {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || filterStock !== "TERSEDIA" || sortBy !== "DEFAULT") && (
+                        {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || filterStock !== "TERSEDIA" || filterAudit !== "" || sortBy !== "DEFAULT") && (
                             <div className="flex flex-wrap gap-1.5 pt-0.5">
                                 {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
                                 {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
                                 {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
                                 {filterStock !== "TERSEDIA" && <FilterChip label={filterStock === "ALL" ? "Semua Stok" : "Stok Habis"} onRemove={() => setFilterStock("TERSEDIA")} />}
+                                {filterAudit !== "" && <FilterChip label={filterAudit === "audited" ? "Sudah Diaudit" : "Belum Diaudit"} onRemove={() => setFilterAudit("")} />}
                                 {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${SORT_LABELS[sortBy] ?? sortBy}`} onRemove={() => setSortBy("DEFAULT")} />}
                             </div>
                         )}
@@ -912,13 +932,25 @@ export function LaptopsContent() {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (!l) return null;
                                     return (
-                                        <AuditButton
-                                            active={isAuditActive(l.audited_at)}
-                                            loading={auditingId === l.id}
-                                            auditedBy={l.audited_by}
-                                            auditedAt={l.audited_at}
-                                            onClick={() => toggleAudit(l.id)}
-                                        />
+                                        <div className="flex items-center justify-center gap-1">
+                                            <AuditButton
+                                                active={isAuditActive(l.audited_at)}
+                                                loading={auditingId === l.id}
+                                                auditedBy={l.audited_by}
+                                                auditedAt={l.audited_at}
+                                                onClick={() => toggleAudit(l.id)}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setHistoryTarget({ id: l.id, name: l.laptop_name })}
+                                                title="Lihat riwayat audit"
+                                                className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     );
                                 } : undefined}
                                 renderActions={(row) => {
@@ -1218,6 +1250,13 @@ export function LaptopsContent() {
             {confirmModal && (
                 <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />
             )}
+            {historyTarget && (
+                <AuditHistoryModal
+                    laptopId={historyTarget.id}
+                    laptopName={historyTarget.name}
+                    onClose={() => setHistoryTarget(null)}
+                />
+            )}
             {deleteConfirmModal && (
                 <DeleteConfirmModal
                     laptop={deleteConfirmModal.laptop}
@@ -1336,9 +1375,14 @@ function AuditButton({ active, loading, auditedBy, auditedAt, onClick }: {
     auditedBy?: string | null; auditedAt?: string | null;
     onClick: () => void;
 }) {
+    const expiredButOnceAudited = !active && !!auditedAt;
+
     const title = active
         ? `Diaudit oleh ${auditedBy ?? "—"}${auditedAt ? " · " + new Date(auditedAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}\nKlik untuk batalkan audit`
-        : "Klik untuk tandai sudah diaudit";
+        : expiredButOnceAudited
+            ? `Terakhir diaudit oleh ${auditedBy ?? "—"} · ${new Date(auditedAt as string).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} (sudah lewat ${AUDIT_TTL_DAYS} hari)\nKlik untuk tandai sudah diaudit lagi`
+            : "Klik untuk tandai sudah diaudit";
+
     return (
         <button
             type="button"
@@ -1349,7 +1393,9 @@ function AuditButton({ active, loading, auditedBy, auditedAt, onClick }: {
                 ${loading ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}
                 ${active
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                    : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}
+                    : expiredButOnceAudited
+                        ? "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100"
+                        : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}
         >
             {active ? (
                 <>
@@ -1363,10 +1409,100 @@ function AuditButton({ active, loading, auditedBy, auditedAt, onClick }: {
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <circle cx="12" cy="12" r="10" />
                     </svg>
-                    Audit
+                    {expiredButOnceAudited ? "Audit Ulang" : "Audit"}
                 </>
             )}
         </button>
+    );
+}
+
+//  Riwayat semua audit sebuah model laptop — dibaca dari tabel laptop_audit_logs
+//  lewat GET /api/laptops/[id]/audit, supaya histori tetap ada walau status
+//  "aktif"-nya sudah auto-reset lewat 2 hari.
+interface AuditHistoryEntry {
+    id: string;
+    action: "AUDIT" | "UNAUDIT";
+    audited_by: string;
+    audited_at: string;
+}
+
+function AuditHistoryModal({ laptopId, laptopName, onClose }: {
+    laptopId: string; laptopName: string; onClose: () => void;
+}) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [history, setHistory] = useState<AuditHistoryEntry[]>([]);
+
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            try {
+                const res = await fetch(`/api/laptops/${laptopId}/audit`);
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat riwayat");
+                if (active) setHistory(json.data?.history ?? []);
+            } catch (e) {
+                if (active) setError(e instanceof Error ? e.message : "Terjadi kesalahan");
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+        return () => { active = false; };
+    }, [laptopId]);
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    const fmtWhen = (iso: string) =>
+        new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn max-h-[80vh] flex flex-col">
+                <div className="h-1 w-full bg-gradient-to-r from-gray-400 via-gray-600 to-gray-800 flex-shrink-0" />
+                <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Riwayat Audit</p>
+                    <h3 className="text-sm font-bold text-gray-900 truncate">{laptopName}</h3>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    {loading ? (
+                        <div className="space-y-2">
+                            {[...Array(3)].map((_, i) => <div key={i} className="h-10 rounded-xl bg-gray-100 animate-pulse" />)}
+                        </div>
+                    ) : error ? (
+                        <p className="text-sm text-red-600">{error}</p>
+                    ) : history.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-6">Belum pernah diaudit</p>
+                    ) : (
+                        <ul className="space-y-2">
+                            {history.map(h => (
+                                <li key={h.id} className="flex items-start gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+                                    <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${h.action === "AUDIT" ? "bg-emerald-500" : "bg-gray-300"}`} />
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-gray-700">
+                                            {h.action === "AUDIT" ? "Ditandai sudah diaudit" : "Audit dibatalkan"}
+                                        </p>
+                                        <p className="text-[11px] text-gray-400 mt-0.5">
+                                            {h.audited_by} · {fmtWhen(h.audited_at)}
+                                        </p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose}
+                        className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }
 
