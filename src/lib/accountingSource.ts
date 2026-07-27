@@ -40,6 +40,16 @@ export interface TransactionMeta {
   storage: string | null;
 }
 
+// (fix) Supabase/PostgREST encode filter .in() ke query string URL — array yang
+// kepanjangan (200+ item) bikin request overflow (>16KB header). Helper ini
+// pecah array jadi batch kecil supaya query tetap aman berapa pun banyak
+// invoice/unit yang di-lookup.
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 /**
  * Ambil company_name & spek laptop (CPU/RAM/Storage) untuk daftar invoice_number.
  * Dipakai untuk menampilkan badge toko + spek di Jurnal Umum (entry yang SUDAH
@@ -54,16 +64,20 @@ export async function getTransactionMetaByInvoices(
   const map = new Map<string, TransactionMeta>();
   if (invoiceNumbers.length === 0) return map;
 
-  const { data: trxs, error } = await supabase
-    .from("transactions")
-    .select("invoice_number, company_name, laptop_id, unit_id, unit_ids")
-    .in("invoice_number", invoiceNumbers);
+  const trxs: any[] = [];
+  for (const batch of chunkArray(invoiceNumbers, 150)) {
+    const { data, error } = await supabase
+      .from("transactions")
+      .select("invoice_number, company_name, laptop_id, unit_id, unit_ids")
+      .in("invoice_number", batch);
 
-  if (error) {
-    console.error("[akuntansi] fetch transaction meta:", error.message);
-    return map;
+    if (error) {
+      console.error("[akuntansi] fetch transaction meta:", error.message);
+      return map;
+    }
+    if (data) trxs.push(...data);
   }
-  if (!trxs || trxs.length === 0) return map;
+  if (trxs.length === 0) return map;
 
   const unitIds = new Set<string>();
   for (const t of trxs as any[]) {
@@ -73,12 +87,14 @@ export async function getTransactionMetaByInvoices(
 
   const unitLaptopMap = new Map<string, string>(); // unit_id -> laptop_id
   if (unitIds.size > 0) {
-    const { data: units } = await supabase
-      .from("laptop_units")
-      .select("id, laptop_id")
-      .in("id", Array.from(unitIds));
-    for (const u of units ?? []) {
-      if (u.laptop_id) unitLaptopMap.set(u.id as string, u.laptop_id as string);
+    for (const batch of chunkArray(Array.from(unitIds), 150)) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, laptop_id")
+        .in("id", batch);
+      for (const u of units ?? []) {
+        if (u.laptop_id) unitLaptopMap.set(u.id as string, u.laptop_id as string);
+      }
     }
   }
 
@@ -296,7 +312,7 @@ async function buildServiceDrafts(
   supabase: SupabaseClient,
   period: string
 ): Promise<JournalDraft[]> {
-const { data: svcs, error } = await supabase
+  const { data: svcs, error } = await supabase
     .from("service_orders")
     .select(
       "id, nama, type_laptop, payment_amount, payment_method, status, tanggal_masuk, tanggal_selesai, tanggal_diambil"
