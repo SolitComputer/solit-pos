@@ -13,6 +13,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const body = await req.json().catch(() => null);
   const message: string = body?.message?.trim();
   let conversationId: string | null = body?.conversationId ?? null;
+  const requestedProvider = (body?.provider ?? "auto") as "auto" | "gemini" | "groq";
 
   if (!message) {
     return NextResponse.json({ success: false, message: "Pesan tidak boleh kosong." }, { status: 400 });
@@ -29,17 +30,18 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     }
     conversationId = conv.id;
   }
+  const convId = conversationId;
 
   await supabaseAdmin.from("ai_ceo_messages").insert({
-    conversation_id: conversationId,
+    conversation_id: convId,
     role: "user",
     content: message,
   });
 
- const { data: historyRows } = await supabaseAdmin
+  const { data: historyRows } = await supabaseAdmin
     .from("ai_ceo_messages")
     .select("role, content")
-    .eq("conversation_id", conversationId)
+    .eq("conversation_id", convId)
     .order("created_at", { ascending: true })
     .limit(20);
 
@@ -48,34 +50,44 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     content: row.content as string,
   }));
 
-  const requestedProvider = (body?.provider ?? "auto") as "auto" | "gemini" | "groq";
+  const encoder = new TextEncoder();
 
-  let reply: string;
-  let providerUsed: string;
-  try {
-    const result = await runAiCeoTurn(history, { req, userId: user.id, conversationId }, requestedProvider);
-    reply = result.reply;
-    providerUsed = result.providerUsed;
-  } catch (err: any) {
-    console.error("[ai-ceo/chat] error:", err);
-    return NextResponse.json(
-      { success: false, message: err?.message ?? "AI CEO sedang bermasalah, coba lagi sebentar." },
-      { status: 500 }
-    );
-  }
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (obj: any) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+      try {
+        const result = await runAiCeoTurn(
+          history,
+          { req, userId: user.id, conversationId: convId },
+          requestedProvider,
+          (toolName) => send({ type: "tool", tool: toolName })
+        );
 
-  await supabaseAdmin.from("ai_ceo_messages").insert({
-    conversation_id: conversationId,
-    role: "assistant",
-    content: reply,
+        await supabaseAdmin.from("ai_ceo_messages").insert({
+          conversation_id: convId,
+          role: "assistant",
+          content: result.reply,
+          provider: result.providerUsed,
+        });
+
+        await supabaseAdmin
+          .from("ai_ceo_conversations")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", convId);
+
+        send({ type: "done", conversationId: convId, reply: result.reply, provider: result.providerUsed });
+      } catch (err: any) {
+        console.error("[ai-ceo/chat] error:", err);
+        send({ type: "error", message: err?.message ?? "AI CEO sedang bermasalah, coba lagi sebentar." });
+      } finally {
+        controller.close();
+      }
+    },
   });
 
-  await supabaseAdmin
-    .from("ai_ceo_conversations")
-    .update({ updated_at: new Date().toISOString() })
-    .eq("id", conversationId);
-
-  return NextResponse.json({ success: true, conversationId, reply, provider: providerUsed });
+  return new NextResponse(stream, {
+    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+  });
 }
 
 export const POST = withAuth(postHandler, AI_CEO_ROLES);

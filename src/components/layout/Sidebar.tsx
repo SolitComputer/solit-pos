@@ -711,13 +711,9 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   if (!(AI_CEO_ROLES as string[]).includes(role)) return;
-  const utamaIdx = ROLE_MENUS[role].findIndex((g) => g.label === "Utama");
-  if (utamaIdx >= 0) {
-    const already = ROLE_MENUS[role][utamaIdx].items.some((it) => it.href === ITEM_AI_CEO.href);
-    if (!already) ROLE_MENUS[role][utamaIdx].items.push(ITEM_AI_CEO);
-  } else {
-    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_AI_CEO] }, ...ROLE_MENUS[role]];
-  }
+  // Grup terpisah, ditambahkan paling akhir → otomatis tampil di paling bawah
+  // sidebar, karena ini transformasi terakhir yang menyentuh urutan ROLE_MENUS.
+  ROLE_MENUS[role].push({ label: "AI", items: [ITEM_AI_CEO] });
 });
 
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
