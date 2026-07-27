@@ -9,7 +9,7 @@
 //   1. Data Barang (LaptopsContent) — 1 baris = 1 model laptop
 //   2. Halaman Units                — 1 baris = 1 unit
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 
 export interface InventoryRow {
     id: string;
@@ -141,7 +141,7 @@ export default function InventoryTable({
                         {showTotalJual && canSeeStock && <Th right>Total Jual</Th>}
                         {canSeePrivate && <Th>Sumber</Th>}
                         {canSeePrivate && <Th>Tanggal Masuk</Th>}
-                        <Th>SN</Th>
+                        <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
                         <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
@@ -276,7 +276,7 @@ export default function InventoryTable({
 }
 
 function Th({
-    children, titleName, right, center, title, sortKey, isNumeric, activeSort, onSort, className,
+    children, titleName, right, center, title, sortKey, activeSort, onSort, className,
 }: {
     children?: React.ReactNode;
     titleName?: string;
@@ -289,83 +289,58 @@ function Th({
     onSort?: (asc: string, desc: string) => void;
     className?: string;
 }) {
-    const [open, setOpen] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
-
     const ascCode = sortKey ? `${sortKey}_ASC` : "";
     const descCode = sortKey ? `${sortKey}_DESC` : "";
-    const isCurrent = !!sortKey && (activeSort === ascCode || activeSort === descCode);
-    const currentDir: "asc" | "desc" | undefined =
-        activeSort === ascCode ? "asc" : activeSort === descCode ? "desc" : undefined;
 
-    useEffect(() => {
-        if (!open) return;
-        const handleClickOutside = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                setOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [open]);
+    const isAsc = !!sortKey && (
+        activeSort === ascCode ||
+        (sortKey === "NAMA" && activeSort === "AZ") ||
+        (sortKey === "SN" && activeSort === "SN")
+    );
+    const isDesc = !!sortKey && (
+        activeSort === descCode ||
+        (sortKey === "NAMA" && activeSort === "ZA")
+    );
+    const isActive = isAsc || isDesc;
 
     const isFilterable = !!sortKey && !!onSort;
     const label = titleName || (typeof children === "string" ? children : "");
 
+    const handleClick = () => {
+        if (isFilterable && onSort) {
+            onSort(ascCode, descCode);
+        }
+    };
+
     return (
         <th
-            title={title}
-            className={`px-3 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap relative ${right ? "text-right" : center ? "text-center" : "text-left"} ${className || ""}`}
+            title={title || (isFilterable ? `Klik 1x untuk mengurutkan ${label}` : undefined)}
+            onClick={handleClick}
+            className={`px-3 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap select-none transition-colors ${
+                isFilterable ? "cursor-pointer hover:bg-gray-200/70" : ""
+            } ${isActive ? "text-emerald-700 bg-emerald-50/70" : "text-gray-400"} ${
+                right ? "text-right" : center ? "text-center" : "text-left"
+            } ${className || ""}`}
         >
             <div className={`flex items-center gap-1 ${right ? "justify-end" : center ? "justify-center" : "justify-start"}`}>
                 <span>{children || label}</span>
 
                 {isFilterable && (
-                    <div className="relative inline-block text-left" ref={menuRef} onClick={(e) => e.stopPropagation()}>
-                        <button
-                            type="button"
-                            onClick={() => setOpen(!open)}
-                            className={`p-0.5 rounded hover:bg-gray-200 transition-colors flex items-center ${isCurrent ? "text-emerald-600 font-bold bg-emerald-50" : "text-gray-400 hover:text-gray-700"}`}
-                            title={`Filter / Sort ${label}`}
-                        >
-                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span className={`inline-flex items-center transition-colors ${isActive ? "text-emerald-600 font-bold" : "text-gray-300"}`}>
+                        {isAsc ? (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+                            </svg>
+                        ) : isDesc ? (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                             </svg>
-                        </button>
-
-                        {open && (
-                            <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-50 text-left normal-case text-xs animate-fadeIn font-normal">
-                                <div className="px-3 py-1.5 border-b border-gray-100 font-bold text-gray-700 text-[11px] bg-gray-50 flex items-center justify-between">
-                                    <span>Sort {label}</span>
-                                    {isCurrent && (
-                                        <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                                            {currentDir?.toUpperCase()}
-                                        </span>
-                                    )}
-                                </div>
-
-                                <button
-                                    onClick={() => { onSort!(ascCode, descCode); setOpen(false); }}
-                                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors text-xs ${isCurrent && currentDir === "asc" ? "font-bold text-emerald-600 bg-emerald-50/50" : "text-gray-700"}`}
-                                >
-                                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                                    </svg>
-                                    {isNumeric ? "Sort Terendah → Tertinggi" : "Sort A → Z"}
-                                </button>
-
-                                <button
-                                    onClick={() => { onSort!(ascCode, descCode); setOpen(false); }}
-                                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors text-xs ${isCurrent && currentDir === "desc" ? "font-bold text-emerald-600 bg-emerald-50/50" : "text-gray-700"}`}
-                                >
-                                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m-4 0l4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    {isNumeric ? "Sort Tertinggi → Terendah" : "Sort Z → A"}
-                                </button>
-                            </div>
+                        ) : (
+                            <svg className="w-2.5 h-2.5 opacity-40 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
                         )}
-                    </div>
+                    </span>
                 )}
             </div>
         </th>

@@ -212,6 +212,40 @@ function TotalBar({ totalSelling, count }: { totalSelling: number; count: number
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
+const SORT_LABELS: Record<string, string> = {
+    DEFAULT: "Urutan Default",
+    AZ: "Nama: A → Z",
+    ZA: "Nama: Z → A",
+    NAMA_ASC: "Nama: A → Z",
+    NAMA_DESC: "Nama: Z → A",
+    CPU_ASC: "CPU: A → Z",
+    CPU_DESC: "CPU: Z → A",
+    RAM_ASC: "RAM ↑",
+    RAM_DESC: "RAM ↓",
+    STORAGE_ASC: "Storage ↑",
+    STORAGE_DESC: "Storage ↓",
+    PRICE_ASC: "Harga: Rendah → Tinggi",
+    PRICE_DESC: "Harga: Tinggi → Rendah",
+    SN: "Urut SN",
+    SN_ASC: "SN ↑",
+    SN_DESC: "SN ↓",
+    SIAP_ASC: "Status: Siap Jual Pertama",
+    SIAP_DESC: "Status: Dipesan Pertama",
+};
+
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+    return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200 shadow-sm animate-fadeIn">
+            {label}
+            <button onClick={onRemove} className="hover:text-gray-900 rounded p-0.5 transition">
+                <svg className="w-3 h-3 text-gray-400 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </span>
+    );
+}
+
 function ReadyContent() {
     const [units, setUnits] = useState<LaptopUnit[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -221,6 +255,7 @@ function ReadyContent() {
     // ── Filter — disamakan dengan filter di Data Barang ────────────────────────
     const [search, setSearch] = useState("");
     const [filterSN, setFilterSN] = useState("");
+    const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterBrand, setFilterBrand] = useState("ALL");
     const [filterRam, setFilterRam] = useState("ALL");
     const [filterPriceRange, setFilterPriceRange] = useState("ALL");
@@ -272,6 +307,10 @@ function ReadyContent() {
         return ["ALL", ...Array.from(r).sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0))];
     }, [units]);
 
+    const handleSort = (asc: string, desc: string) => {
+        setSortBy(prev => (prev === asc ? desc : asc));
+    };
+
     const filtered = useMemo(() => {
         let list = [...units];
         if (search.trim()) {
@@ -279,12 +318,17 @@ function ReadyContent() {
             list = list.filter(u =>
                 u.laptop?.laptop_name?.toLowerCase().includes(t) ||
                 u.laptop?.brand?.toLowerCase().includes(t) ||
-                u.laptop?.cpu?.toLowerCase().includes(t)
+                u.laptop?.cpu?.toLowerCase().includes(t) ||
+                u.laptop?.ram?.toLowerCase().includes(t) ||
+                u.laptop?.storage?.toLowerCase().includes(t)
             );
         }
         if (filterSN.trim()) {
             const snQ = filterSN.trim().toLowerCase();
             list = list.filter(u => u.serial_number?.toLowerCase().includes(snQ));
+        }
+        if (filterStatus !== "ALL") {
+            list = list.filter(u => u.status === filterStatus);
         }
         if (filterBrand !== "ALL") list = list.filter(u => u.laptop?.brand === filterBrand);
         if (filterRam !== "ALL") list = list.filter(u => u.laptop?.ram === filterRam);
@@ -300,11 +344,51 @@ function ReadyContent() {
         }
 
         switch (sortBy) {
-            case "AZ": list.sort((a, b) => (a.laptop?.laptop_name || "").localeCompare(b.laptop?.laptop_name || "", "id")); break;
-            case "ZA": list.sort((a, b) => (b.laptop?.laptop_name || "").localeCompare(a.laptop?.laptop_name || "", "id")); break;
-            case "PRICE_ASC": list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0)); break;
-            case "PRICE_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
-            case "SN": list.sort((a, b) => (a.serial_number || "").localeCompare(b.serial_number || "", undefined, { numeric: true })); break;
+            case "AZ":
+            case "NAMA_ASC":
+                list.sort((a, b) => (a.laptop?.laptop_name || "").localeCompare(b.laptop?.laptop_name || "", "id"));
+                break;
+            case "ZA":
+            case "NAMA_DESC":
+                list.sort((a, b) => (b.laptop?.laptop_name || "").localeCompare(a.laptop?.laptop_name || "", "id"));
+                break;
+            case "CPU_ASC":
+                list.sort((a, b) => (a.laptop?.cpu || "").localeCompare(b.laptop?.cpu || "", "id"));
+                break;
+            case "CPU_DESC":
+                list.sort((a, b) => (b.laptop?.cpu || "").localeCompare(a.laptop?.cpu || "", "id"));
+                break;
+            case "RAM_ASC":
+                list.sort((a, b) => (a.laptop?.ram || "").localeCompare(b.laptop?.ram || "", "id", { numeric: true }));
+                break;
+            case "RAM_DESC":
+                list.sort((a, b) => (b.laptop?.ram || "").localeCompare(a.laptop?.ram || "", "id", { numeric: true }));
+                break;
+            case "STORAGE_ASC":
+                list.sort((a, b) => (a.laptop?.storage || "").localeCompare(b.laptop?.storage || "", "id", { numeric: true }));
+                break;
+            case "STORAGE_DESC":
+                list.sort((a, b) => (b.laptop?.storage || "").localeCompare(a.laptop?.storage || "", "id", { numeric: true }));
+                break;
+            case "PRICE_ASC":
+                list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0));
+                break;
+            case "PRICE_DESC":
+                list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0));
+                break;
+            case "SN":
+            case "SN_ASC":
+                list.sort((a, b) => (a.serial_number || "").localeCompare(b.serial_number || "", undefined, { numeric: true }));
+                break;
+            case "SN_DESC":
+                list.sort((a, b) => (b.serial_number || "").localeCompare(a.serial_number || "", undefined, { numeric: true }));
+                break;
+            case "SIAP_ASC":
+                list.sort((a, b) => (a.status === "SIAP_JUAL" ? 1 : 0) - (b.status === "SIAP_JUAL" ? 1 : 0));
+                break;
+            case "SIAP_DESC":
+                list.sort((a, b) => (b.status === "SIAP_JUAL" ? 1 : 0) - (a.status === "SIAP_JUAL" ? 1 : 0));
+                break;
             default: {
                 const order: Record<string, number> = { SIAP_JUAL: 0, RESERVED: 1 };
                 list.sort((a, b) => {
@@ -315,7 +399,7 @@ function ReadyContent() {
             }
         }
         return list;
-    }, [units, search, filterSN, filterBrand, filterRam, filterPriceRange, sortBy]);
+    }, [units, search, filterSN, filterStatus, filterBrand, filterRam, filterPriceRange, sortBy]);
 
     const counts = {
         all: units.length,
@@ -414,9 +498,23 @@ function ReadyContent() {
         }
     };
 
-    const hasActiveFilter = search || filterSN || filterBrand !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || sortBy !== "DEFAULT";
+    const hasActiveFilter =
+        search.trim() !== "" ||
+        filterSN.trim() !== "" ||
+        filterStatus !== "ALL" ||
+        filterBrand !== "ALL" ||
+        filterRam !== "ALL" ||
+        filterPriceRange !== "ALL" ||
+        sortBy !== "DEFAULT";
+
     const resetFilters = () => {
-        setSearch(""); setFilterSN(""); setFilterBrand("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setSortBy("DEFAULT");
+        setSearch("");
+        setFilterSN("");
+        setFilterStatus("ALL");
+        setFilterBrand("ALL");
+        setFilterRam("ALL");
+        setFilterPriceRange("ALL");
+        setSortBy("DEFAULT");
     };
 
     // ── Mapping unit → baris InventoryTable. Struktur kolom sama seperti Data
@@ -533,15 +631,15 @@ function ReadyContent() {
                     </div>
 
                     {/* ── Filter — disamakan dengan Data Barang ───────────── */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2.5">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                            <div className="relative">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
+                            <div className="relative col-span-1 sm:col-span-2 lg:col-span-2">
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                                 <input
                                     type="text"
-                                    placeholder="Cari nama, brand, CPU..."
+                                    placeholder="Cari nama, brand, CPU, RAM, storage..."
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
                                     className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition"
@@ -559,39 +657,59 @@ function ReadyContent() {
                                     className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition"
                                 />
                             </div>
+                            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectCls}>
+                                <option value="ALL">Semua Status</option>
+                                <option value="SIAP_JUAL">Siap Jual</option>
+                                <option value="RESERVED">Dipesan (DP)</option>
+                            </select>
                             <select value={filterBrand} onChange={e => setFilterBrand(e.target.value)} className={selectCls}>
                                 {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
                             </select>
                             <select value={filterRam} onChange={e => setFilterRam(e.target.value)} className={selectCls}>
                                 {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
                             </select>
-                            <select value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)} className={selectCls}>
-                                <option value="ALL">Semua Harga</option>
-                                <option value="1-2">Rp 1 jt – 2 jt</option>
-                                <option value="2-3">Rp 2 jt – 3 jt</option>
-                                <option value="3-4">Rp 3 jt – 4 jt</option>
-                                <option value="4+">Rp 4 jt ke atas</option>
-                            </select>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            <select value={sortBy} onChange={e => setSortBy(e.target.value)} className={selectCls}>
-                                <option value="DEFAULT">Urutan Default</option>
-                                <option value="AZ">Nama: A → Z</option>
-                                <option value="ZA">Nama: Z → A</option>
-                                <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
-                                <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
-                                <option value="SN">Urut SN</option>
-                            </select>
+                        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 border-t border-gray-50">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                                <select value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)} className={selectCls}>
+                                    <option value="ALL">Semua Harga</option>
+                                    <option value="1-2">Rp 1 jt – 2 jt</option>
+                                    <option value="2-3">Rp 2 jt – 3 jt</option>
+                                    <option value="3-4">Rp 3 jt – 4 jt</option>
+                                    <option value="4+">Rp 4 jt ke atas</option>
+                                </select>
+                                <select value={sortBy} onChange={e => setSortBy(e.target.value)} className={selectCls}>
+                                    <option value="DEFAULT">Urutan Default</option>
+                                    <option value="AZ">Nama: A → Z</option>
+                                    <option value="ZA">Nama: Z → A</option>
+                                    <option value="PRICE_ASC">Harga: Rendah → Tinggi</option>
+                                    <option value="PRICE_DESC">Harga: Tinggi → Rendah</option>
+                                    <option value="SN">Urut SN</option>
+                                </select>
+                            </div>
                             {hasActiveFilter && (
                                 <button
                                     onClick={resetFilters}
                                     className="h-9 px-3 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1.5 active:scale-[0.98]"
                                 >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                                    Reset
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    Reset Filter
                                 </button>
                             )}
                         </div>
+
+                        {/* Filter Chips */}
+                        {hasActiveFilter && (
+                            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-50">
+                                {search && <FilterChip label={`Cari: "${search}"`} onRemove={() => setSearch("")} />}
+                                {filterSN && <FilterChip label={`SN: "${filterSN}"`} onRemove={() => setFilterSN("")} />}
+                                {filterStatus !== "ALL" && <FilterChip label={`Status: ${STATUS_CONFIG[filterStatus]?.label ?? filterStatus}`} onRemove={() => setFilterStatus("ALL")} />}
+                                {filterBrand !== "ALL" && <FilterChip label={`Brand: ${filterBrand}`} onRemove={() => setFilterBrand("ALL")} />}
+                                {filterRam !== "ALL" && <FilterChip label={`RAM: ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
+                                {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
+                                {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${SORT_LABELS[sortBy] ?? sortBy}`} onRemove={() => setSortBy("DEFAULT")} />}
+                            </div>
+                        )}
                     </div>
 
                     {/* ── Table ──────────────────────────────────────────── */}
@@ -621,6 +739,8 @@ function ReadyContent() {
                                 rows={tableRows}
                                 canSeePrivate={false}
                                 canSeeStock={false}
+                                sortBy={sortBy}
+                                onSort={handleSort}
                                 onRowClick={(row) => {
                                     const u = filtered.find(x => x.id === row.id);
                                     if (u) setDetailUnit(u);
