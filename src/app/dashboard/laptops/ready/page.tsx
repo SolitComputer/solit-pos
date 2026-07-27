@@ -48,7 +48,7 @@ const STATUS_CONFIG: Record<string, { badge: string; dot: string; label: string 
     RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)" },
 };
 
-const selectCls = "h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer font-medium";
+const selectCls = "h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer font-medium w-full";
 
 // ─── AlertModal ───────────────────────────────────────────────────────────────
 function AlertModal({ message, onClose }: { message: string; onClose: () => void }) {
@@ -108,7 +108,7 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                             <h3 className="font-bold text-white truncate">{unit.laptop?.laptop_name || "—"}</h3>
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 <code className="font-mono text-[11px] text-gray-200 bg-white/10 px-2 py-0.5 rounded-md">{unit.serial_number}</code>
                                 {st && (
                                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${st.badge}`}>
@@ -126,7 +126,7 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
                 <div className="overflow-y-auto flex-1 px-5 py-4">
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
                         {rows.map(row => (
-                            <div key={row.label} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                            <div key={row.label} className="flex items-center justify-between gap-3 px-4 py-3">
                                 <span className="text-xs text-gray-400 flex-shrink-0">{row.label}</span>
                                 <span className="text-xs font-medium text-gray-700 text-right">{row.value}</span>
                             </div>
@@ -173,20 +173,24 @@ function SkeletonRows() {
 }
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
+// RESPONSIVE FIX: scale down padding, font, icon size di mobile (< sm)
 function StatCard({ label, value, icon, color, bg, bar }: {
     label: string; value: number; icon: React.ReactNode;
     color: string; bg: string; bar: string;
 }) {
     return (
-        <div className={`${bg} rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 p-4 sm:p-5 relative overflow-hidden group hover:-translate-y-0.5`}>
+        <div className={`${bg} rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 p-3 sm:p-5 relative overflow-hidden group hover:-translate-y-0.5`}>
             <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${bar} opacity-50 group-hover:opacity-100 transition-opacity`} />
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-1.5 sm:gap-3">
                 <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-2">{label}</p>
-                    <p className={`text-2xl sm:text-3xl font-black tracking-tight leading-none ${color}`}>{value}</p>
+                    {/* Label lebih kecil di HP agar tidak truncate */}
+                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1.5 sm:mb-2 truncate">{label}</p>
+                    {/* Angka scale down: text-xl di HP, text-3xl di desktop */}
+                    <p className={`text-xl sm:text-3xl font-black tracking-tight leading-none ${color}`}>{value}</p>
                 </div>
-                <div className={`w-10 h-10 rounded-2xl ${bar} flex items-center justify-center text-lg flex-shrink-0 shadow-sm opacity-80 group-hover:opacity-100 transition-opacity`}>
-                    {icon}
+                {/* Icon container scale down di HP */}
+                <div className={`w-7 h-7 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl ${bar} flex items-center justify-center flex-shrink-0 shadow-sm opacity-80 group-hover:opacity-100 transition-opacity`}>
+                    <span className="scale-75 sm:scale-100 flex items-center justify-center">{icon}</span>
                 </div>
             </div>
         </div>
@@ -194,18 +198,18 @@ function StatCard({ label, value, icon, color, bg, bar }: {
 }
 
 // ─── TotalBar ─────────────────────────────────────────────────────────────────
-// Harga Beli / Margin sengaja tidak ditampilkan di sini — turunan dari Harga
-// Modal yang memang disembunyikan di halaman Barang Siap Jual.
+// Harga Beli / Margin sengaja tidak ditampilkan di sini.
+// RESPONSIVE FIX: hapus flex-wrap + min-w, pakai divide-x konsisten, scale font
 function TotalBar({ totalSelling, count }: { totalSelling: number; count: number }) {
     return (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex flex-wrap gap-4 sm:gap-0 sm:divide-x sm:divide-gray-100 animate-fadeUp">
-            <div className="flex-1 min-w-[140px] sm:pr-6">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Unit (difilter)</p>
-                <p className="text-2xl font-black text-gray-900 tabular-nums">{count}</p>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 sm:px-5 py-3.5 sm:py-4 flex divide-x divide-gray-100 animate-fadeUp">
+            <div className="flex-1 pr-4 sm:pr-6">
+                <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Unit (difilter)</p>
+                <p className="text-xl sm:text-2xl font-black text-gray-900 tabular-nums">{count}</p>
             </div>
-            <div className="flex-1 min-w-[160px] sm:pl-6">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Jual</p>
-                <p className="text-xl font-black text-gray-800 tabular-nums">{fmt(totalSelling)}</p>
+            <div className="flex-1 pl-4 sm:pl-6">
+                <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Jual</p>
+                <p className="text-lg sm:text-xl font-black text-gray-800 tabular-nums">{fmt(totalSelling)}</p>
             </div>
         </div>
     );
@@ -218,7 +222,7 @@ function ReadyContent() {
     const [isExporting, setIsExporting] = useState(false);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
 
-    // ── Filter — disamakan dengan filter di Data Barang ────────────────────────
+    // ── Filter ────────────────────────────────────────────────────────────────
     const [search, setSearch] = useState("");
     const [filterSN, setFilterSN] = useState("");
     const [filterBrand, setFilterBrand] = useState("ALL");
@@ -247,8 +251,6 @@ function ReadyContent() {
             const res = await fetch("/api/laptops/ready-units");
             const result = await res.json();
             if (result.success) {
-                // Status HELD/PACKING dihilangkan dari halaman ini — sudah bisa
-                // dilihat lewat halaman Transaksi.
                 const cleaned = (result.data || []).filter((u: LaptopUnit) => u.status === "SIAP_JUAL" || u.status === "RESERVED");
                 setUnits(cleaned.map((u: LaptopUnit) => ({
                     ...u,
@@ -419,10 +421,6 @@ function ReadyContent() {
         setSearch(""); setFilterSN(""); setFilterBrand("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setSortBy("DEFAULT");
     };
 
-    // ── Mapping unit → baris InventoryTable. Struktur kolom sama seperti Data
-    //    Barang, tapi Harga Modal/Sumber/Tanggal Masuk selalu disembunyikan
-    //    (canSeePrivate=false) dan ST/M ikut disembunyikan (canSeeStock=false)
-    //    sehingga hanya SN dan SJ yang tampil.
     const tableRows: InventoryRow[] = filtered.map(u => ({
         id: u.id,
         laptop_name: u.laptop?.laptop_name ?? "—",
@@ -462,57 +460,65 @@ function ReadyContent() {
                 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
-            <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
-                <div className="max-w-full mx-auto space-y-5 sm:space-y-6">
+            {/*
+             * RESPONSIVE FIX (main container):
+             * - p-3 di HP (naik dari p-4) supaya tabel punya lebih banyak ruang horizontal
+             * - space-y-3 di HP (naik dari space-y-5) supaya konten lebih compact
+             */}
+            <main className="min-h-screen bg-[#F7F7F8] p-3 sm:p-6 lg:p-8">
+                <div className="max-w-full mx-auto space-y-3 sm:space-y-5 lg:space-y-6">
 
-                    {/* ── Header ─────────────────────────────────────────── */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 animate-slideIn">
-                        <div className="flex items-center gap-3">
-                            <div className="w-1 h-8 rounded-full bg-gray-800 flex-shrink-0" />
-                            <div className="w-9 h-9 bg-gray-800 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                    {/* ── Header ──────────────────────────────────────────────────────────────
+                     * RESPONSIVE FIX:
+                     * - Hapus flex-wrap dari container utama — biar header selalu 1 baris
+                     * - Tombol di HP: ikon saja (teks hidden), h-8 lebih compact
+                     * - gap dikurangi di mobile
+                     */}
+                    <div className="flex items-center justify-between gap-2 sm:gap-3 animate-slideIn">
+                        {/* Kiri: ikon + judul */}
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <div className="w-1 h-7 sm:h-8 rounded-full bg-gray-800 flex-shrink-0" />
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gray-800 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                                     <path d="M9 12l2 2 4-4" />
                                     <rect x="2" y="3" width="20" height="14" rx="2" />
                                     <line x1="8" y1="21" x2="16" y2="21" />
                                     <line x1="12" y1="17" x2="12" y2="21" />
                                 </svg>
                             </div>
-                            <div>
-                                <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Barang Siap Jual</h1>
-                                <p className="text-xs text-gray-400 font-medium mt-0.5">
+                            <div className="min-w-0">
+                                <h1 className="text-lg sm:text-2xl font-black text-gray-900 tracking-tight truncate">Barang Siap Jual</h1>
+                                <p className="text-[11px] sm:text-xs text-gray-400 font-medium mt-0.5">
                                     {isLoading ? "Memuat data..." : `${units.length} unit terdaftar`}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Kanan: tombol aksi */}
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                            {/* Export: teks hanya tampil di ≥ sm */}
                             <button
                                 onClick={exportToExcel}
                                 disabled={isExporting || filtered.length === 0}
                                 title={filtered.length === 0 ? "Tidak ada data untuk di-export" : `Export ${filtered.length} unit ke Excel`}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-900 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 h-9 px-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-900 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 {isExporting ? (
-                                    <>
-                                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                        <span className="hidden sm:inline">Mengexport...</span>
-                                    </>
+                                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
                                 ) : (
-                                    <>
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                        <span className="hidden sm:inline">Export Excel</span>
-                                        <span className="sm:hidden">Excel</span>
-                                    </>
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
                                 )}
+                                <span className="hidden sm:inline">{isExporting ? "Mengexport..." : "Export Excel"}</span>
                             </button>
 
+                            {/* Refresh: teks hanya tampil di ≥ sm */}
                             <button
                                 onClick={fetchUnits}
-                                className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-white hover:bg-gray-50 h-9 px-3.5 rounded-xl transition-all active:scale-[0.98] group"
+                                className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-white hover:bg-gray-50 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-xl transition-all active:scale-[0.98] group"
                             >
                                 <svg
                                     className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`}
@@ -520,22 +526,34 @@ function ReadyContent() {
                                 >
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
-                                Refresh
+                                <span className="hidden sm:inline">Refresh</span>
                             </button>
                         </div>
                     </div>
 
-                    {/* ── Stat Cards ─────────────────────────────────────── */}
-                    <div className="grid grid-cols-3 gap-3 animate-fadeUp">
+                    {/* ── Stat Cards ───────────────────────────────────────────────────────────
+                     * RESPONSIVE FIX:
+                     * - gap-2 di HP (lebih rapat), gap-3 di ≥ sm
+                     * - StatCard sendiri sudah di-scale via komponen di atas
+                     */}
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3 animate-fadeUp">
                         <StatCard label="Total Unit" value={counts.all} icon={<Laptop size={18} className="text-white" />} color="text-gray-900" bg="bg-white" bar="bg-gray-800" />
                         <StatCard label="Siap Jual" value={counts.siap} icon={<CheckCircle2 size={18} className="text-white" />} color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
                         <StatCard label="Dipesan" value={counts.reserved} icon={<Lock size={18} className="text-white" />} color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
                     </div>
 
-                    {/* ── Filter — disamakan dengan Data Barang ───────────── */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2.5">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                            <div className="relative">
+                    {/* ── Filter ───────────────────────────────────────────────────────────────
+                     * RESPONSIVE FIX:
+                     * - grid-cols-2 di HP (bukan grid-cols-1) → 2 search bar full-width,
+                     *   lalu 3 select tersusun 2+1 per baris — lebih compact
+                     * - Select Harga col-span-2 di HP supaya tidak orphan sendirian
+                     * - Sort bar: flex-1 di HP supaya select stretch full-width
+                     * - p-3 di HP (dikurangi dari p-4)
+                     */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 space-y-2.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                            {/* Search nama — full width di mobile (col-span-2) */}
+                            <div className="relative col-span-2 sm:col-span-1">
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
@@ -547,7 +565,8 @@ function ReadyContent() {
                                     className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition"
                                 />
                             </div>
-                            <div className="relative">
+                            {/* Search SN — full width di mobile (col-span-2) */}
+                            <div className="relative col-span-2 sm:col-span-1">
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                                 </svg>
@@ -559,13 +578,15 @@ function ReadyContent() {
                                     className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition"
                                 />
                             </div>
+                            {/* Brand & RAM — 2 kolom berdampingan di HP */}
                             <select value={filterBrand} onChange={e => setFilterBrand(e.target.value)} className={selectCls}>
                                 {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
                             </select>
                             <select value={filterRam} onChange={e => setFilterRam(e.target.value)} className={selectCls}>
                                 {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
                             </select>
-                            <select value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)} className={selectCls}>
+                            {/* Harga — full width di HP supaya tidak orphan */}
+                            <select value={filterPriceRange} onChange={e => setFilterPriceRange(e.target.value)} className={`${selectCls} col-span-2 sm:col-span-1`}>
                                 <option value="ALL">Semua Harga</option>
                                 <option value="1-2">Rp 1 jt – 2 jt</option>
                                 <option value="2-3">Rp 2 jt – 3 jt</option>
@@ -573,8 +594,10 @@ function ReadyContent() {
                                 <option value="4+">Rp 4 jt ke atas</option>
                             </select>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            <select value={sortBy} onChange={e => setSortBy(e.target.value)} className={selectCls}>
+                        {/* Baris sort + reset */}
+                        <div className="flex items-center gap-2">
+                            {/* flex-1 di HP supaya select stretch mengisi lebar */}
+                            <select value={sortBy} onChange={e => setSortBy(e.target.value)} className={`${selectCls} flex-1 sm:flex-none sm:w-auto`}>
                                 <option value="DEFAULT">Urutan Default</option>
                                 <option value="AZ">Nama: A → Z</option>
                                 <option value="ZA">Nama: Z → A</option>
@@ -585,22 +608,26 @@ function ReadyContent() {
                             {hasActiveFilter && (
                                 <button
                                     onClick={resetFilters}
-                                    className="h-9 px-3 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1.5 active:scale-[0.98]"
+                                    className="h-9 px-3 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1.5 active:scale-[0.98] flex-shrink-0"
                                 >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
                                     Reset
                                 </button>
                             )}
                         </div>
                     </div>
 
-                    {/* ── Table ──────────────────────────────────────────── */}
+                    {/* ── Table ────────────────────────────────────────────────────────────── */}
                     {isLoading ? (
                         <SkeletonRows />
                     ) : filtered.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-20 gap-3">
-                            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center"><Laptop size={30} className="text-gray-300" /></div>
-                            <div className="text-center">
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-16 sm:py-20 gap-3">
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gray-100 flex items-center justify-center">
+                                <Laptop size={28} className="text-gray-300" />
+                            </div>
+                            <div className="text-center px-4">
                                 <p className="text-gray-600 font-bold text-sm">Tidak ada unit ditemukan</p>
                                 <p className="text-gray-400 text-xs mt-1">
                                     {hasActiveFilter ? "Coba ubah atau reset filter di atas" : "Belum ada unit yang terdaftar"}
@@ -659,21 +686,25 @@ function ReadyContent() {
                                 }}
                             />
 
-                            {/* Footer tabel */}
-                            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/60 flex items-center justify-between gap-3">
-                                <p className="text-[11px] text-gray-400">
+                            {/*
+                             * RESPONSIVE FIX (footer tabel):
+                             * - px-3 di HP (dikurangi dari px-4)
+                             * - text-xs (naik dari text-[11px]) — lebih mudah dibaca di HP
+                             */}
+                            <div className="px-3 sm:px-4 py-2.5 border-t border-gray-100 bg-gray-50/60 flex items-center justify-between gap-3">
+                                <p className="text-xs text-gray-400">
                                     Menampilkan{" "}
-                                    <span className="font-bold text-gray-600">{filtered.length}</span>{" "}
-                                    dari{" "}
-                                    <span className="font-bold text-gray-600">{units.length}</span>{" "}
-                                    unit
+                                    <span className="font-bold text-gray-600">{filtered.length}</span>
+                                    {" "}dari{" "}
+                                    <span className="font-bold text-gray-600">{units.length}</span>
+                                    {" "}unit
                                     {hasActiveFilter && <span className="ml-1 text-gray-400">(difilter)</span>}
                                 </p>
                             </div>
                         </div>
                     )}
 
-                    {/* ── Total Nominal ───────────────────────────────────── */}
+                    {/* ── Total Nominal ──────────────────────────────────────────────────────── */}
                     {!isLoading && filtered.length > 0 && (
                         <TotalBar totalSelling={totalSelling} count={filtered.length} />
                     )}
@@ -681,7 +712,7 @@ function ReadyContent() {
                 </div>
             </main>
 
-            {/* ── Modals ─────────────────────────────────────────────────── */}
+            {/* ── Modals ──────────────────────────────────────────────────────────────── */}
             {alertMsg && <AlertModal message={alertMsg} onClose={() => setAlertMsg(null)} />}
 
             {detailUnit && <UnitInfoModal unit={detailUnit} onClose={() => setDetailUnit(null)} />}
@@ -771,7 +802,9 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
                             </div>
                             <div>
                                 <h3 className="font-bold text-white">Konfirmasi Lunas</h3>
@@ -779,7 +812,9 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                             </div>
                         </div>
                         <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                         </button>
                     </div>
                 </div>
@@ -787,7 +822,15 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
                         {[
-                            { label: "Status", value: <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-violet-50 text-violet-700 border-violet-200"><span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />DP</span> },
+                            {
+                                label: "Status",
+                                value: (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-violet-50 text-violet-700 border-violet-200">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+                                        DP
+                                    </span>
+                                )
+                            },
                             { label: "Invoice", value: <span className="text-xs font-mono font-semibold text-gray-700">{unit.reserved_invoice || "—"}</span> },
                             { label: "Dipesan oleh", value: <span className="text-xs font-semibold text-gray-800">{unit.reserved_by || "—"}</span> },
                             { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800">{unit.laptop?.laptop_name || "—"}</span> },
@@ -802,45 +845,62 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Bukti Pembayaran <span className="text-gray-400 font-normal">(opsional)</span></label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                            Bukti Pembayaran <span className="text-gray-400 font-normal">(opsional)</span>
+                        </label>
                         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleProofUpload} className="hidden" />
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={uploadingProof}
-                            className={`w-full h-10 border-2 border-dashed rounded-xl text-xs font-medium transition flex items-center justify-center gap-2 ${paymentProof ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300 hover:bg-gray-100"}`}
+                            className={`w-full h-10 border-2 border-dashed rounded-xl text-xs font-medium transition flex items-center justify-center gap-2 ${paymentProof
+                                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                : "border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300 hover:bg-gray-100"
+                                }`}
                         >
-                            {uploadingProof
-                                ? <><div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />Mengupload...</>
-                                : paymentProof ? <><CheckCircle2 size={14} /> Foto terupload — klik untuk ganti</> : <><Camera size={14} /> Upload foto bukti bayar</>
-                            }
+                            {uploadingProof ? (
+                                <><div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />Mengupload...</>
+                            ) : paymentProof ? (
+                                <><CheckCircle2 size={14} /> Foto terupload — klik untuk ganti</>
+                            ) : (
+                                <><Camera size={14} /> Upload foto bukti bayar</>
+                            )}
                         </button>
                     </div>
 
                     <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 flex gap-2">
-                        <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
-                        <p className="text-xs text-amber-700">Konfirmasi akan mengubah status menjadi <strong>PAID</strong> dan unit menjadi <strong>SOLD</strong>. Tidak dapat dibatalkan.</p>
+                        <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                        </svg>
+                        <p className="text-xs text-amber-700">
+                            Konfirmasi akan mengubah status menjadi <strong>PAID</strong> dan unit menjadi <strong>SOLD</strong>. Tidak dapat dibatalkan.
+                        </p>
                     </div>
 
                     {error && (
                         <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" /></svg>
+                            <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
+                            </svg>
                             <p className="text-xs text-red-700">{error}</p>
                         </div>
                     )}
                 </div>
 
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
-                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">
+                        Batal
+                    </button>
                     <button
                         onClick={handleConfirm}
                         disabled={loading || uploadingProof}
                         className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
                     >
-                        {loading
-                            ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
-                            : <><CheckCircle2 size={16} /> Konfirmasi Lunas</>
-                        }
+                        {loading ? (
+                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
+                        ) : (
+                            <><CheckCircle2 size={16} /> Konfirmasi Lunas</>
+                        )}
                     </button>
                 </div>
             </div>
