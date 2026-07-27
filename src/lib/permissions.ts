@@ -331,7 +331,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
   "/dashboard/users": ALL_ROLES.filter(r => !r.startsWith("PKL")),
   "/dashboard/attendance": [...ALL_ROLES],
-  "/dashboard/attendance/overtime": [...ALL_ROLES],
+  "/dashboard/attendance/overtime": ALL_ROLES.filter(r => r !== "KEPALA_SALES"),
 
   "/dashboard/service": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
@@ -424,7 +424,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/attendance/users": [...ALL_ROLES],
   "/api/attendance/overtime": [...ALL_ROLES],
   "/api/attendance/overtime/rates": [
-    ...FULL_ACCESS, "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    ...FULL_ACCESS, "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
     "KEPALA_PENGELOLA_BARANG",
   ],
@@ -434,19 +434,19 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // AFTER
   "/dashboard/pkl-reports": [
     ...FULL_ACCESS,
-    "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG", // ditambahkan
+    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
   ],
   "/api/pkl-reports": [
     ...FULL_ACCESS,
-    "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
     "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG", // ditambahkan
+    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
   ],
 
   "/dashboard/management-seller": [...SELLER_FOLLOWUP_VIEW_ROLES],

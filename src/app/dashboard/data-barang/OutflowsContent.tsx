@@ -337,19 +337,19 @@ export default function OutflowsContent() {
                 </div>
             ) : (
                 <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto max-h-[calc(100dvh-220px)] overflow-y-auto">
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 border-b border-gray-200">
-                                    <th className="text-left font-semibold px-4 py-3">No</th>
-                                    <th className="text-left font-semibold px-4 py-3">Tipe</th>
-                                    <th className="text-left font-semibold px-4 py-3">Nama</th>
-                                    <th className="text-left font-semibold px-4 py-3">Barang</th>
-                                    <th className="text-left font-semibold px-4 py-3">Kebutuhan</th>
-                                    <th className="text-right font-semibold px-4 py-3">Nominal</th>
-                                    <th className="text-center font-semibold px-4 py-3">Audit</th>
-                                    <th className="text-left font-semibold px-4 py-3">Tanggal</th>
-                                    <th className="text-center font-semibold px-4 py-3">Stok</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">No</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Tipe</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Nama</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Barang</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Kebutuhan</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-right font-semibold px-4 py-3">Nominal</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-center font-semibold px-4 py-3">Audit</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-left font-semibold px-4 py-3">Tanggal</th>
+                                    <th className="sticky top-0 z-20 bg-gray-50 text-center font-semibold px-4 py-3">Stok</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">

@@ -9,7 +9,7 @@
 //   1. Data Barang (LaptopsContent) — 1 baris = 1 model laptop
 //   2. Halaman Units                — 1 baris = 1 unit
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 
 export interface InventoryRow {
     id: string;
@@ -39,6 +39,9 @@ export interface InventoryRow {
     stok_tersisa: number;
     siap_jual: number;
     minus: number;
+
+    is_audited?: boolean;
+    audited_at?: string | null;
 }
 
 interface Props {
@@ -72,7 +75,7 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
 );
 
-type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "PRICE" | "SN" | "STOK" | "SIAP" | "MINUS";
+type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "PRICE" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "AKSI";
 
 export default function InventoryTable({
     rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual,
@@ -96,10 +99,17 @@ export default function InventoryTable({
                 case "RAM": valA = a.ram || ""; valB = b.ram || ""; break;
                 case "STORAGE": valA = a.storage || ""; valB = b.storage || ""; break;
                 case "MODAL": valA = a.harga_modal ?? 0; valB = b.harga_modal ?? 0; break;
+                case "SPAREPART": valA = a.sparepart_modal ?? 0; valB = b.sparepart_modal ?? 0; break;
                 case "PRICE": valA = a.harga_jual ?? 0; valB = b.harga_jual ?? 0; break;
-                case "SN": valA = a.sn || ""; valB = b.sn || ""; break;
+                case "TOTAL_JUAL": valA = (a.harga_jual ?? 0) * (a.stok_tersisa ?? 0); valB = (b.harga_jual ?? 0) * (b.stok_tersisa ?? 0); break;
+                case "SUMBER": valA = a.sumber || a.sumber_note || ""; valB = b.sumber || b.sumber_note || ""; break;
+                case "TANGGAL": valA = a.tanggal_masuk || a.tanggal_note || ""; valB = b.tanggal_masuk || b.tanggal_note || ""; break;
+                case "SN": valA = a.sn || a.sn_note || ""; valB = b.sn || b.sn_note || ""; break;
                 case "STOK": valA = a.stok_tersisa ?? 0; valB = b.stok_tersisa ?? 0; break;
                 case "SIAP": valA = a.siap_jual ?? 0; valB = b.siap_jual ?? 0; break;
+                case "MINUS": valA = a.minus ?? 0; valB = b.minus ?? 0; break;
+                case "AUDIT": valA = a.is_audited ? 1 : 0; valB = b.is_audited ? 1 : 0; break;
+                case "AKSI": valA = a.stok_tersisa ?? 0; valB = b.stok_tersisa ?? 0; break;
             }
 
             if (typeof valA === "number" && typeof valB === "number") {
@@ -126,7 +136,7 @@ export default function InventoryTable({
     };
 
     return (
-        <div className="overflow-x-auto table-scroll">
+        <div className="overflow-x-auto table-scroll max-h-[calc(100dvh-220px)] overflow-y-auto">
             <table className="w-full text-sm border-collapse">
                 <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
@@ -135,18 +145,18 @@ export default function InventoryTable({
                         <Th sortKey="CPU" activeSort={sortBy} onSort={onSort}>CPU</Th>
                         <Th sortKey="RAM" activeSort={sortBy} onSort={onSort}>RAM</Th>
                         <Th sortKey="STORAGE" activeSort={sortBy} onSort={onSort}>Storage</Th>
-                        {canSeePrivate && <Th right>Modal Laptop</Th>}
-                        {canSeePrivate && showSparepart && <Th right>Modal Sparepart</Th>}
+                        {canSeePrivate && <Th right sortKey="MODAL" activeSort={sortBy} onSort={onSort}>Modal Laptop</Th>}
+                        {canSeePrivate && showSparepart && <Th right sortKey="SPAREPART" activeSort={sortBy} onSort={onSort}>Modal Sparepart</Th>}
                         <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Jual</Th>
-                        {showTotalJual && canSeeStock && <Th right>Total Jual</Th>}
-                        {canSeePrivate && <Th>Sumber</Th>}
-                        {canSeePrivate && <Th>Tanggal Masuk</Th>}
-                        <Th>SN</Th>
+                        {showTotalJual && canSeeStock && <Th right sortKey="TOTAL_JUAL" activeSort={sortBy} onSort={onSort}>Total Jual</Th>}
+                        {canSeePrivate && <Th sortKey="SUMBER" activeSort={sortBy} onSort={onSort}>Sumber</Th>}
+                        {canSeePrivate && <Th sortKey="TANGGAL" activeSort={sortBy} onSort={onSort}>Tanggal Masuk</Th>}
+                        <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
                         <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
-                        {renderAudit && <Th center>Audit</Th>}
-                        {renderActions && <Th right>Aksi</Th>}
+                        {renderAudit && <Th center sortKey="AUDIT" activeSort={sortBy} onSort={onSort}>Audit</Th>}
+                        {renderActions && <Th right sortKey="AKSI" activeSort={sortBy} onSort={onSort}>Aksi</Th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -276,7 +286,7 @@ export default function InventoryTable({
 }
 
 function Th({
-    children, titleName, right, center, title, sortKey, isNumeric, activeSort, onSort, className,
+    children, titleName, right, center, title, sortKey, activeSort, onSort, className,
 }: {
     children?: React.ReactNode;
     titleName?: string;
@@ -289,83 +299,64 @@ function Th({
     onSort?: (asc: string, desc: string) => void;
     className?: string;
 }) {
-    const [open, setOpen] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
-
     const ascCode = sortKey ? `${sortKey}_ASC` : "";
     const descCode = sortKey ? `${sortKey}_DESC` : "";
-    const isCurrent = !!sortKey && (activeSort === ascCode || activeSort === descCode);
-    const currentDir: "asc" | "desc" | undefined =
-        activeSort === ascCode ? "asc" : activeSort === descCode ? "desc" : undefined;
 
-    useEffect(() => {
-        if (!open) return;
-        const handleClickOutside = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                setOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [open]);
+    const isAsc = !!sortKey && (
+        activeSort === ascCode ||
+        (sortKey === "NAMA" && activeSort === "AZ") ||
+        (sortKey === "SN" && activeSort === "SN")
+    );
+    const isDesc = !!sortKey && (
+        activeSort === descCode ||
+        (sortKey === "NAMA" && activeSort === "ZA")
+    );
+    const isActive = isAsc || isDesc;
 
     const isFilterable = !!sortKey && !!onSort;
     const label = titleName || (typeof children === "string" ? children : "");
 
+    const handleClick = () => {
+        if (isFilterable && onSort) {
+            onSort(ascCode, descCode);
+        }
+    };
+
     return (
         <th
-            title={title}
-            className={`px-3 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap relative ${right ? "text-right" : center ? "text-center" : "text-left"} ${className || ""}`}
+            title={title || (isFilterable ? `Klik 1x untuk mengurutkan ${label}` : undefined)}
+            onClick={handleClick}
+            className={`sticky top-0 z-20 px-3 py-3 text-[9px] font-black uppercase tracking-widest whitespace-nowrap select-none group transition-colors shadow-2xs ${
+                isFilterable ? "cursor-pointer hover:bg-gray-200" : ""
+            } ${isActive ? "text-emerald-800 bg-emerald-50" : "text-gray-400 bg-gray-50"} ${
+                right ? "text-right" : center ? "text-center" : "text-left"
+            } ${className || ""}`}
         >
-            <div className={`flex items-center gap-1 ${right ? "justify-end" : center ? "justify-center" : "justify-start"}`}>
+            <div className={`flex items-center gap-1.5 ${right ? "justify-end" : center ? "justify-center" : "justify-start"}`}>
                 <span>{children || label}</span>
 
                 {isFilterable && (
-                    <div className="relative inline-block text-left" ref={menuRef} onClick={(e) => e.stopPropagation()}>
-                        <button
-                            type="button"
-                            onClick={() => setOpen(!open)}
-                            className={`p-0.5 rounded hover:bg-gray-200 transition-colors flex items-center ${isCurrent ? "text-emerald-600 font-bold bg-emerald-50" : "text-gray-400 hover:text-gray-700"}`}
-                            title={`Filter / Sort ${label}`}
-                        >
-                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span
+                        className={`p-1 rounded-md transition-all inline-flex items-center justify-center flex-shrink-0 ${
+                            isActive
+                                ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300 shadow-2xs"
+                                : "bg-gray-100 text-gray-500 group-hover:bg-gray-200 group-hover:text-gray-800"
+                        }`}
+                    >
+                        {isAsc ? (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+                            </svg>
+                        ) : isDesc ? (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                             </svg>
-                        </button>
-
-                        {open && (
-                            <div className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-50 text-left normal-case text-xs animate-fadeIn font-normal">
-                                <div className="px-3 py-1.5 border-b border-gray-100 font-bold text-gray-700 text-[11px] bg-gray-50 flex items-center justify-between">
-                                    <span>Sort {label}</span>
-                                    {isCurrent && (
-                                        <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                                            {currentDir?.toUpperCase()}
-                                        </span>
-                                    )}
-                                </div>
-
-                                <button
-                                    onClick={() => { onSort!(ascCode, descCode); setOpen(false); }}
-                                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors text-xs ${isCurrent && currentDir === "asc" ? "font-bold text-emerald-600 bg-emerald-50/50" : "text-gray-700"}`}
-                                >
-                                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                                    </svg>
-                                    {isNumeric ? "Sort Terendah → Tertinggi" : "Sort A → Z"}
-                                </button>
-
-                                <button
-                                    onClick={() => { onSort!(ascCode, descCode); setOpen(false); }}
-                                    className={`w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors text-xs ${isCurrent && currentDir === "desc" ? "font-bold text-emerald-600 bg-emerald-50/50" : "text-gray-700"}`}
-                                >
-                                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m-4 0l4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                    {isNumeric ? "Sort Tertinggi → Terendah" : "Sort Z → A"}
-                                </button>
-                            </div>
+                        ) : (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
                         )}
-                    </div>
+                    </span>
                 )}
             </div>
         </th>
