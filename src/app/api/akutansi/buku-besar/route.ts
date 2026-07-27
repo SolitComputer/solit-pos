@@ -67,13 +67,26 @@ export const GET = withAuth(async (req) => {
         : -Number(openingRow.nominal)
       : 0;
 
-    const { data: priorLines, error: priorLineErr } = await supabase
-      .from("journal_lines")
-      .select("side, nominal, journal_entries!inner(period)")
-      .eq("account_code", accountCode)
-      .lt("journal_entries.period", period);
+    const priorLines: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: page, error: priorLineErr } = await supabase
+          .from("journal_lines")
+          .select("side, nominal, journal_entries!inner(period)")
+          .eq("account_code", accountCode)
+          .lt("journal_entries.period", period)
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
 
-    if (priorLineErr) throw priorLineErr;
+        if (priorLineErr) throw priorLineErr;
+        if (!page || page.length === 0) break;
+        priorLines.push(...page);
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+    }
 
     const mutasiSebelumPeriode = (priorLines ?? []).reduce((s: number, l: any) => {
       return s + (l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal));
@@ -99,13 +112,25 @@ export const GET = withAuth(async (req) => {
 
     const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
 
-    const { data: linesData, error: lineErr } = await supabase
-      .from("journal_lines")
-      .select("id, entry_id, account_code, side, nominal, journal_entries!inner(period)")
-      .eq("journal_entries.period", period);
+    const allLines: LineRow[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: page, error: lineErr } = await supabase
+          .from("journal_lines")
+          .select("id, entry_id, account_code, side, nominal, journal_entries!inner(period)")
+          .eq("journal_entries.period", period)
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
 
-    if (lineErr) throw lineErr;
-    const allLines: LineRow[] = (linesData ?? []) as LineRow[];
+        if (lineErr) throw lineErr;
+        if (!page || page.length === 0) break;
+        allLines.push(...(page as LineRow[]));
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+    }
 
     const counterMap = new Map<string, string[]>();
     for (const l of allLines) {
