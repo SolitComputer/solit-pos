@@ -183,7 +183,7 @@ async function fetchInternal(req: NextRequest, path: string): Promise<any> {
                 signal: AbortSignal.timeout(15000),
             });
             lastErr = null;
-            break; 
+            break;
         } catch (err: any) {
             lastErr = err;
             console.error(`[ai-ceo] fetchInternal gagal konek ke ${base}${path}:`, err?.message ?? err, "| cause:", err?.cause ?? "(tidak ada info cause)");
@@ -363,13 +363,41 @@ export async function runToolCall(
         }
 
         case "get_attendance_summary": {
-            const json = await fetchInternal(ctx.req, "/api/attendance");
-            if (json?.error) return json;
-            const rows: any[] = Array.isArray(json?.data) ? json.data : [];
+            const PAGE_SIZE = 1000;
+            let allAbsenRows: any[] = [];
+            let absenFrom = 0;
+            while (true) {
+                const { data: pageData, error: pageErr } = await supabaseAdmin
+                    .from("face_verifications")
+                    .select(`*, users!inner (id, name, role, shift)`)
+                    .in("status", ["SUCCESS"])
+                    .order("created_at", { ascending: true })
+                    .range(absenFrom, absenFrom + PAGE_SIZE - 1);
+                if (pageErr) return { error: `Gagal mengambil data absensi: ${pageErr.message}` };
+                if (!pageData || pageData.length === 0) break;
+                allAbsenRows = allAbsenRows.concat(pageData);
+                if (pageData.length < PAGE_SIZE) break;
+                absenFrom += PAGE_SIZE;
+            }
+
+            const seenAbsen = new Set<string>();
+            const rows = allAbsenRows
+                .filter((item: any) => {
+                    const wibDate = toWibDate(item.created_at);
+                    const key = `${item.user_id}_${wibDate}`;
+                    if (seenAbsen.has(key)) return false;
+                    seenAbsen.add(key);
+                    return true;
+                })
+                .map((item: any) => ({
+                    check_in_time: item.created_at,
+                    user_name: item.users?.name ?? "Unknown",
+                    user_role: item.users?.role ?? "STAFF",
+                    late_weight: item.late_weight != null ? Number(item.late_weight) : null,
+                }));
 
             const namaFilter = String(args?.nama ?? "").trim().toLowerCase();
 
-            // ── Mode: riwayat SATU orang spesifik ────────────────────────────
             if (namaFilter) {
                 const hari = Math.min(Number(args?.hari) || 30, 60);
                 const cutoffDate = new Date(Date.now() + WIB_OFFSET_MS - (hari - 1) * 86400000).toISOString().slice(0, 10);
@@ -431,13 +459,41 @@ export async function runToolCall(
         }
 
         case "get_overtime_summary": {
+            // Konversi ke direct-Supabase. Sama seperti absensi: karena AI_CEO_ROLES
+            // sekarang cuma ADMIN & ASISTEN_CEO (full-access, boleh lihat gaji/bayar),
+            // scoping per-divisi & strip-bayaran di route aslinya di-skip di sini.
             const nowWIB = new Date(Date.now() + WIB_OFFSET_MS);
             const month = args?.month ?? nowWIB.getUTCMonth() + 1;
             const year = args?.year ?? nowWIB.getUTCFullYear();
-            const statusParam = args?.status ? `&status=${encodeURIComponent(args.status)}` : "";
-            const json = await fetchInternal(ctx.req, `/api/attendance/overtime?year=${year}&month=${month}${statusParam}`);
-            if (json?.error) return json;
-            const rows: any[] = Array.isArray(json?.data) ? json.data : [];
+            const paddedMonth = String(month).padStart(2, "0");
+            const startDate = `${year}-${paddedMonth}-01`;
+            const lastDay = new Date(Number(year), Number(month), 0).getDate();
+            const endDate = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
+
+            let otQuery = supabaseAdmin
+                .from("overtime_requests")
+                .select("id, user_id, request_date, status, duration_minutes, total_pay, is_late, is_holiday")
+                .gte("request_date", startDate)
+                .lte("request_date", endDate)
+                .order("request_date", { ascending: false });
+
+            if (args?.status) {
+                const statusList = String(args.status).split(",").map((s: string) => s.trim()).filter(Boolean);
+                otQuery = statusList.length > 1 ? otQuery.in("status", statusList) : otQuery.eq("status", statusList[0]);
+            }
+
+            const { data: otRowsRaw, error: otErr } = await otQuery;
+            if (otErr) return { error: `Gagal mengambil data lembur: ${otErr.message}` };
+            const otRows = otRowsRaw ?? [];
+
+            const otUserIds = Array.from(new Set(otRows.map((r: any) => r.user_id).filter(Boolean)));
+            const otUsersMap = new Map<string, { name: string; role: string }>();
+            if (otUserIds.length > 0) {
+                const { data: otUsersData } = await supabaseAdmin.from("users").select("id, name, role").in("id", otUserIds);
+                for (const u of otUsersData ?? []) otUsersMap.set(u.id, { name: u.name, role: u.role });
+            }
+
+            const rows = otRows.map((r: any) => ({ ...r, users: otUsersMap.get(r.user_id) ?? null }));
 
             const ringkasanStatus: Record<string, number> = {};
             let totalBayar = 0;
@@ -448,11 +504,11 @@ export async function runToolCall(
             }
 
             return {
-                periode: `${year}-${String(month).padStart(2, "0")}`,
+                periode: `${year}-${paddedMonth}`,
                 total_pengajuan: rows.length,
                 ringkasan_status: ringkasanStatus,
                 total_bayar_lembur: adaInfoBayar ? totalBayar : null,
-                daftar: rows.slice(0, 60).map((r) => ({
+                daftar: rows.slice(0, 60).map((r: any) => ({
                     nama: r.users?.name,
                     role: r.users?.role,
                     tanggal: r.request_date,
@@ -539,16 +595,24 @@ function toGeminiHistory(history: ChatTurn[]): GeminiContent[] {
 }
 
 async function callGemini(contents: GeminiContent[]): Promise<any> {
-    const res = await fetch(GEMINI_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": getGeminiKey() },
-        body: JSON.stringify({
-            system_instruction: { parts: [{ text: AI_CEO_SYSTEM_PROMPT }] },
-            contents,
-            tools: AI_CEO_TOOLS,
-            generationConfig: { temperature: 0.4 },
-        }),
-    });
+    let res: Response;
+    try {
+        res = await fetch(GEMINI_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": getGeminiKey() },
+            body: JSON.stringify({
+                system_instruction: { parts: [{ text: AI_CEO_SYSTEM_PROMPT }] },
+                contents,
+                tools: AI_CEO_TOOLS,
+                generationConfig: { temperature: 0.4 },
+            }),
+        });
+    } catch (err: any) {
+        console.error("[ai-ceo] callGemini gagal konek ke Gemini API:", err?.message ?? err, "| cause:", err?.cause ?? "(tidak ada info cause)");
+        const netErr: any = new Error("NETWORK_ERROR: Gagal terhubung ke server Gemini.");
+        netErr.isNetworkError = true;
+        throw netErr;
+    }
 
     if (!res.ok) {
         const errText = await res.text().catch(() => "");
@@ -627,17 +691,25 @@ function toOpenAiHistory(history: ChatTurn[]): OpenAiMessage[] {
 }
 
 async function callGroq(messages: OpenAiMessage[]): Promise<any> {
-    const res = await fetch(GROQ_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getGroqKey()}` },
-        body: JSON.stringify({
-            model: GROQ_MODEL,
-            messages,
-            tools: toOpenAiTools(),
-            tool_choice: "auto",
-            temperature: 0.4,
-        }),
-    });
+    let res: Response;
+    try {
+        res = await fetch(GROQ_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${getGroqKey()}` },
+            body: JSON.stringify({
+                model: GROQ_MODEL,
+                messages,
+                tools: toOpenAiTools(),
+                tool_choice: "auto",
+                temperature: 0.4,
+            }),
+        });
+    } catch (err: any) {
+        console.error("[ai-ceo] callGroq gagal konek ke Groq API:", err?.message ?? err, "| cause:", err?.cause ?? "(tidak ada info cause)");
+        const netErr: any = new Error("NETWORK_ERROR: Gagal terhubung ke server Groq.");
+        netErr.isNetworkError = true;
+        throw netErr;
+    }
 
     if (!res.ok) {
         const errText = await res.text().catch(() => "");
@@ -720,4 +792,12 @@ export async function runAiCeoTurn(
         }
     }
     throw lastError ?? new Error("Semua provider AI gagal dipanggil.");
+}
+
+export function classifyAiCeoError(err: any): "missing_key" | "quota" | "network" | "unknown" {
+    const msg = String(err?.message ?? "");
+    if (/belum diset di environment variables/i.test(msg)) return "missing_key";
+    if (err?.isNetworkError) return "network";
+    if (err?.status === 429 || /rate.?limit|quota|RESOURCE_EXHAUSTED/i.test(msg)) return "quota";
+    return "unknown";
 }
