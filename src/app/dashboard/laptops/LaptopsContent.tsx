@@ -353,9 +353,9 @@ export function LaptopsContent() {
     //  Semua permission check sekarang pakai hasAnyRole(userRoles, ...)
     const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP);
     const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP);
-    const canExport = hasAnyRole(userRoles, [
+   const canExport = hasAnyRole(userRoles, [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
-        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
+        "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "KEPALA_SOTECH",
         "MARKETING", "KEPALA_MARKETING",
     ] as UserRole[]);
     const canViewUnits = hasAnyRole(userRoles, PERMISSIONS.VIEW_UNITS);
