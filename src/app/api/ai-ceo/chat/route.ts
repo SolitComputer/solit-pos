@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { AI_CEO_ROLES } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
-import { runAiCeoTurn } from "@/lib/aiCeo";
+import { runAiCeoTurn, classifyAiCeoError } from "@/lib/aiCeo";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -77,11 +77,16 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
         send({ type: "done", conversationId: convId, reply: result.reply, provider: result.providerUsed });
       } catch (err: any) {
-        console.error("[ai-ceo/chat] error:", err);
-        const isQuotaError = /429|quota|rate.?limit/i.test(String(err?.message ?? ""));
-        const friendlyMessage = isQuotaError
-          ? "Kuota AI hari ini sudah habis untuk provider yang dipilih. Coba pilih provider lain di dropdown kanan atas (misal 'Groq saja'), atau tunggu beberapa saat sebelum coba lagi."
-          : "AI CEO sedang bermasalah menghubungi provider AI. Coba lagi sebentar lagi.";
+        console.error("[ai-ceo/chat] error:", err?.message ?? err, "| cause:", err?.cause ?? "(tidak ada)");
+        const category = classifyAiCeoError(err);
+        const friendlyMessage =
+          category === "missing_key"
+            ? "Provider AI belum dikonfigurasi di server (API key kosong). Cek Variabel Environment di panel hosting kamu (GEMINI_API_KEY / GROQ_API_KEY)."
+            : category === "quota"
+              ? "Kuota/limit AI untuk provider ini sudah habis. Coba pilih provider lain di dropdown kanan atas, atau tunggu beberapa menit sebelum coba lagi."
+              : category === "network"
+                ? "Server gagal terhubung ke provider AI (masalah jaringan keluar). Cek Log runtime untuk detail teknis, atau coba lagi sebentar lagi."
+                : "AI CEO sedang bermasalah menghubungi provider AI. Cek Log runtime untuk detail teknis. Coba lagi sebentar lagi.";
         send({ type: "error", message: friendlyMessage });
       } finally {
         controller.close();
