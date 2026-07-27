@@ -20,6 +20,7 @@ interface LaptopUnit {
     condition_note: string;
     source?: string | null;
     purchase_price: number;
+    sparepart_cost?: number;
     selling_price: number;
     status: string;
     notes: string;
@@ -225,6 +226,7 @@ export default function UnitsPage() {
                 const normalized: LaptopUnit[] = (unitsData.data).map((u: LaptopUnit) => ({
                     ...u,
                     purchase_price: Math.round(Number(u.purchase_price) || 0),
+                    sparepart_cost: Math.round(Number(u.sparepart_cost) || 0),
                     selling_price: Math.round(Number(u.selling_price) || 0),
                 }));
                 setUnits(normalized);
@@ -329,6 +331,7 @@ export default function UnitsPage() {
         ram: laptop?.ram ?? "",
         storage: laptop?.storage ?? "",
         harga_modal: u.purchase_price ?? 0,
+        sparepart_modal: u.sparepart_cost ?? 0,
         harga_jual: u.selling_price ?? 0,
         sumber: u.source ?? null,
         tanggal_masuk: u.created_at ?? null,
@@ -640,6 +643,7 @@ export default function UnitsPage() {
                                 rows={tableRows}
                                 canSeePrivate={canSeePriceInfo}
                                 canSeeStock={canSeePriceInfo}
+                                showSparepart
                                 onRowClick={(row) => {
                                     const u = filteredUnits.find(x => x.id === row.id);
                                     if (u) setDetailUnit(u);
@@ -708,7 +712,7 @@ export default function UnitsPage() {
                     onSuccess={handleFormSuccess}
                 />
             )}
-           {toast && <Toast message={toast} onDone={() => setToast("")} />}
+            {toast && <Toast message={toast} onDone={() => setToast("")} />}
             {showSourceModal && (
                 <SourceBulkModal
                     value={sourceInput}
