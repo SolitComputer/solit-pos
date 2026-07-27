@@ -31,10 +31,6 @@ interface LabaRugiRow {
   nominal: number;
 }
 
-// Supabase .in() punya batas panjang URL — dipecah supaya aman kalau
-// entry jurnal sudah ribuan.
-const CHUNK = 500;
-
 export const GET = withAuth(async (req) => {
   const period = new URL(req.url).searchParams.get("period") ?? "";
   if (!isValidPeriod(period))
@@ -51,41 +47,42 @@ export const GET = withAuth(async (req) => {
     if (accErr) throw accErr;
     const accounts = (accountsData ?? []) as AccountRow[];
 
-    // ── 2) Entry s/d periode ini, sekalian tandai mana yang periode berjalan ──
-    const { data: entries, error: entryErr } = await supabase
-      .from("journal_entries")
-      .select("id, period")
-      .lte("period", period);
-    if (entryErr) throw entryErr;
-
-    const allIds: string[] = [];
-    const currentIds = new Set<string>();
-    for (const e of (entries ?? []) as { id: string; period: string }[]) {
-      allIds.push(e.id);
-      if (e.period === period) currentIds.add(e.id);
-    }
-
-    // ── 3) Agregasi journal_lines ──
-    //  mutasiPeriode  = HANYA periode berjalan  -> dipakai Pendapatan & Beban
-    //  mutasiKumulatif = s/d periode ini        -> dipakai akun Laba (ditahan)
+   // ── 2 & 3) Entry + lines s/d periode ini, JOIN langsung — (fix) sebelumnya
+    // 2 langkah terpisah: ambil semua entry_id dulu (ALL-TIME, bisa ribuan),
+    // lalu chunk .in() per 500 id. Itu aman dari overflow URL, tapi TIDAK aman
+    // dari cap default Supabase (1000 baris per RESPONSE query) — 500 entry
+    // dalam 1 chunk gampang punya >1000 baris jurnal gabungan, sisanya diam-diam
+    // hilang tanpa error. Sekarang di-page pakai .range() langsung di
+    // journal_lines (join ke journal_entries buat filter & baca period-nya),
+    // jadi dijamin lengkap berapa pun banyaknya histori.
     const mutasiPeriode = new Map<string, number>();
     const mutasiKumulatif = new Map<string, number>();
 
-    for (let i = 0; i < allIds.length; i += CHUNK) {
-      const chunk = allIds.slice(i, i + CHUNK);
-      const { data: lines, error: lineErr } = await supabase
-        .from("journal_lines")
-        .select("entry_id, account_code, side, nominal")
-        .in("entry_id", chunk);
-      if (lineErr) throw lineErr;
+    {
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: page, error: lineErr } = await supabase
+          .from("journal_lines")
+          .select("account_code, side, nominal, journal_entries!inner(period)")
+          .lte("journal_entries.period", period)
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
 
-      for (const l of (lines ?? []) as any[]) {
-        const signed = l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal);
-        const code = l.account_code as string;
-        mutasiKumulatif.set(code, (mutasiKumulatif.get(code) ?? 0) + signed);
-        if (currentIds.has(l.entry_id)) {
-          mutasiPeriode.set(code, (mutasiPeriode.get(code) ?? 0) + signed);
+        if (lineErr) throw lineErr;
+        if (!page || page.length === 0) break;
+
+        for (const l of page as any[]) {
+          const signed = l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal);
+          const code = l.account_code as string;
+          mutasiKumulatif.set(code, (mutasiKumulatif.get(code) ?? 0) + signed);
+          if (l.journal_entries?.period === period) {
+            mutasiPeriode.set(code, (mutasiPeriode.get(code) ?? 0) + signed);
+          }
         }
+
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
       }
     }
 

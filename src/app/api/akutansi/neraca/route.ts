@@ -43,17 +43,35 @@ export const GET = withAuth(async (req) => {
   const supabase = getAdmin();
 
   try {
-   // ── 1 & 2) Ambil entry + lines dalam SATU query via JOIN — supaya tidak ada
+    // ── 1 & 2) Ambil entry + lines dalam SATU query via JOIN — supaya tidak ada
     // celah waktu antara "ambil daftar entry_id" dan "ambil lines-nya". Celah itu
     // sebelumnya bisa membuat Neraca menangkap kondisi transisi kalau ada proses
     // confirm/delete journal_lines yang sedang berjalan bersamaan (race condition),
     // menyebabkan salah satu sisi Debit/Kredit dari sebuah entry hilang sesaat.
-    const { data: entriesWithLines, error: entryErr } = await supabase
-      .from("journal_entries")
-      .select("id, period, lines:journal_lines(account_code, side, nominal)")
-      .lte("period", period);
+    // (fix) Supabase/PostgREST cap jumlah baris per request (default 1000)
+    // kalau tidak di-page pakai .range() — dan query ini ALL-TIME
+    // (.lte("period", period), bukan cuma 1 bulan), jadi paling rawan kena
+    // limit ini di antara semua laporan akuntansi. Loop di bawah memastikan
+    // SEMUA entry + lines-nya kebaca, berapa pun banyaknya histori.
+    const entriesWithLines: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: page, error: entryErr } = await supabase
+          .from("journal_entries")
+          .select("id, period, lines:journal_lines(account_code, side, nominal)")
+          .lte("period", period)
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
 
-    if (entryErr) throw entryErr;
+        if (entryErr) throw entryErr;
+        if (!page || page.length === 0) break;
+        entriesWithLines.push(...page);
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+    }
 
     const balanceMap = new Map<string, number>();
     const currentPeriodBalanceMap = new Map<string, number>();
