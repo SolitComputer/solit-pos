@@ -326,22 +326,22 @@ function PodiumCard({ entry, rank }: { entry: RankingEntry; rank: number }) {
   const bg = avBg(entry.name);
   const disiplinPct = (entry.disiplin * 100).toFixed(1);
   return (
-    <div className={`flex-1 ${style.order} ${style.height}`}>
-      <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 text-center ring-2 ${style.ring} relative`}>
-        <div className={`absolute -top-3 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full ${style.badge} flex items-center justify-center text-white text-[10px] font-black shadow-sm`}>
+    <div className={`flex-1 min-w-0 ${style.order} ${style.height}`}>
+      <div className={`bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm p-2.5 sm:p-5 text-center ring-2 ${style.ring} relative`}>
+        <div className={`absolute -top-2.5 sm:-top-3 left-1/2 -translate-x-1/2 w-6 h-6 sm:w-7 sm:h-7 rounded-full ${style.badge} flex items-center justify-center text-white text-[9px] sm:text-[10px] font-black shadow-sm`}>
           {rank + 1}
         </div>
-        <Icon className={`w-5 h-5 mx-auto mt-2 mb-1.5 ${style.iconColor}`} />
-        <div className={`w-12 h-12 mx-auto rounded-xl flex items-center justify-center text-sm font-bold mb-2 ${bg}`}>{initials(entry.name)}</div>
-        <p className="font-bold text-gray-900 text-xs leading-tight truncate">{entry.name}</p>
-        <p className="text-[9px] text-gray-400 mt-0.5 mb-2 truncate">{entry.role.replace(/_/g, " ")}</p>
-        <p className="text-lg font-black text-violet-600 leading-none">
-          {entry.bayesianScore.toFixed(1)}<span className="text-[10px] font-semibold text-gray-400 ml-1">poin</span>
+        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 mx-auto mt-1 sm:mt-2 mb-1 sm:mb-1.5 ${style.iconColor}`} />
+        <div className={`w-9 h-9 sm:w-12 sm:h-12 mx-auto rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold mb-1.5 sm:mb-2 ${bg}`}>{initials(entry.name)}</div>
+        <p className="font-bold text-gray-900 text-[11px] sm:text-xs leading-tight truncate">{entry.name}</p>
+        <p className="text-[8px] sm:text-[9px] text-gray-400 mt-0.5 mb-1.5 sm:mb-2 truncate">{entry.role.replace(/_/g, " ")}</p>
+        <p className="text-sm sm:text-lg font-black text-violet-600 leading-none">
+          {entry.bayesianScore.toFixed(1)}<span className="text-[9px] sm:text-[10px] font-semibold text-gray-400 ml-0.5 sm:ml-1">poin</span>
         </p>
-        <div className="flex items-center justify-center gap-2 mt-1.5 flex-wrap">
-          <span className="text-[9px] font-bold text-emerald-600">{disiplinPct}% disiplin</span>
-          <span className="text-[9px] text-gray-300">·</span>
-          <span className="text-[9px] text-gray-400">{entry.tepat} tepat · {entry.telat} telat</span>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 mt-1 sm:mt-1.5">
+          <span className="text-[8px] sm:text-[9px] font-bold text-emerald-600">{disiplinPct}% disiplin</span>
+          <span className="hidden sm:inline text-[9px] text-gray-300">·</span>
+          <span className="text-[8px] sm:text-[9px] text-gray-400 truncate">{entry.tepat} tepat · {entry.telat} telat</span>
         </div>
       </div>
     </div>
@@ -354,20 +354,20 @@ function RankingRow({ entry, idx }: { entry: RankingEntry; idx: number }) {
   const disiplinPct = (entry.disiplin * 100).toFixed(1);
   const kehadiranPct = (entry.kehadiran * 100).toFixed(0);
   return (
-    <div className="px-5 py-3.5 flex items-center gap-3.5 hover:bg-gray-50/60 transition-colors">
-      <span className={`w-6 text-center text-xs font-black flex-shrink-0 ${idx < 3 ? "text-violet-600" : "text-gray-300"}`}>{idx + 1}</span>
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${bg}`}>{initials(entry.name)}</div>
+    <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center gap-2.5 sm:gap-3.5 hover:bg-gray-50/60 transition-colors">
+      <span className={`w-5 sm:w-6 text-center text-xs font-black flex-shrink-0 ${idx < 3 ? "text-violet-600" : "text-gray-300"}`}>{idx + 1}</span>
+      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center text-[10px] sm:text-[11px] font-bold flex-shrink-0 ${bg}`}>{initials(entry.name)}</div>
       <div className="flex-1 min-w-0">
-        <p className="font-bold text-gray-900 text-sm leading-tight truncate">{entry.name}</p>
-        <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wide">
+        <p className="font-bold text-gray-900 text-xs sm:text-sm leading-tight truncate">{entry.name}</p>
+        <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5 uppercase tracking-wide truncate">
           {entry.role.replace(/_/g, " ")} · {entry.hadir} hadir · {entry.tepat} tepat · {entry.telat} telat
           {entry.leave > 0 ? ` · ${entry.leave} cuti` : ""}
         </p>
       </div>
       <div className="text-right flex-shrink-0">
-        <p className="text-sm font-black text-violet-700">{entry.bayesianScore.toFixed(1)} <span className="text-[10px] font-semibold text-gray-400">poin</span></p>
-        <p className="text-[10px] text-gray-400 mt-0.5">
-          <span className="text-emerald-600 font-bold">{disiplinPct}%</span> disiplin · <span className="font-semibold text-gray-500">{kehadiranPct}%</span> hadir
+        <p className="text-xs sm:text-sm font-black text-violet-700">{entry.bayesianScore.toFixed(1)} <span className="text-[9px] sm:text-[10px] font-semibold text-gray-400">poin</span></p>
+        <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5">
+          <span className="text-emerald-600 font-bold">{disiplinPct}%</span> <span className="hidden sm:inline">disiplin</span> · <span className="font-semibold text-gray-500">{kehadiranPct}%</span> <span className="hidden sm:inline">hadir</span>
         </p>
       </div>
     </div>
@@ -378,8 +378,8 @@ function RankingRow({ entry, idx }: { entry: RankingEntry; idx: number }) {
 function RankingTable({ title, ranking, loading }: { title: string; ranking: RankingEntry[]; loading: boolean }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-        <p className="font-bold text-gray-900 text-sm">{title}</p>
+      <div className="px-3.5 sm:px-5 py-3 sm:py-4 border-b border-gray-100 flex items-center justify-between">
+        <p className="font-bold text-gray-900 text-xs sm:text-sm">{title}</p>
         {!loading && ranking.length > 0 && (
           <span className="text-[10px] font-bold text-gray-400">{ranking.length} orang</span>
         )}
@@ -387,12 +387,12 @@ function RankingTable({ title, ranking, loading }: { title: string; ranking: Ran
       {loading ? (
         <div className="divide-y divide-gray-50">
           {Array(4).fill(0).map((_, i) => (
-            <div key={i} className="px-5 py-4 flex items-center gap-3.5">
-              <div className="w-6 h-4 bg-gray-100 rounded animate-pulse" />
-              <div className="w-10 h-10 rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
+            <div key={i} className="px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center gap-2.5 sm:gap-3.5">
+              <div className="w-5 sm:w-6 h-4 bg-gray-100 rounded animate-pulse" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
               <div className="flex-1 space-y-2">
-                <div className="h-3 bg-gray-100 rounded-lg animate-pulse w-36" />
-                <div className="h-2.5 bg-gray-100 rounded-lg animate-pulse w-24" />
+                <div className="h-3 bg-gray-100 rounded-lg animate-pulse w-28 sm:w-36" />
+                <div className="h-2.5 bg-gray-100 rounded-lg animate-pulse w-20 sm:w-24" />
               </div>
             </div>
           ))}
@@ -527,56 +527,56 @@ export default function AttendanceLeaderboardPage() {
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-[#F7F7F8]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-5">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-5">
 
           {/* ── Header ── */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-2.5 sm:gap-3">
               <button onClick={() => router.push("/dashboard/attendance")}
-                className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all flex-shrink-0 active:scale-95 bg-white">
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all flex-shrink-0 active:scale-95 bg-white">
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div>
-                <div className="flex items-center gap-2.5 mb-1">
-                  <div className="w-1 h-6 rounded-full bg-violet-600 flex-shrink-0" />
-                  <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Leaderboard Absensi</h1>
+                <div className="flex items-center gap-2 sm:gap-2.5 mb-0.5 sm:mb-1">
+                  <div className="w-1 h-5 sm:h-6 rounded-full bg-violet-600 flex-shrink-0" />
+                  <h1 className="text-lg sm:text-2xl font-black text-gray-900 tracking-tight">Leaderboard Absensi</h1>
                 </div>
-                <p className="text-xs text-gray-400 pl-4">{headerSubtitle}</p>
+                <p className="text-[11px] sm:text-xs text-gray-400 pl-3 sm:pl-4">{headerSubtitle}</p>
               </div>
             </div>
 
             {/* ── Filter Periode ── */}
-            <div className="flex items-center gap-1.5 flex-wrap flex-shrink-0">
-              <div className="flex gap-1 p-1 bg-white rounded-xl border border-gray-100 shadow-sm">
+            <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap flex-shrink-0 overflow-x-auto pb-1 sm:pb-0 max-w-full">
+              <div className="flex gap-1 p-1 bg-white rounded-xl border border-gray-100 shadow-sm flex-shrink-0">
                 {SCOPE_OPTIONS.map(opt => (
                   <button key={opt.value} onClick={() => setScope(opt.value)}
-                    className={`h-8 px-3 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap ${scope === opt.value ? "bg-[#1a1a2e] text-white shadow-sm" : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"}`}>
+                    className={`h-7 sm:h-8 px-2.5 sm:px-3 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap ${scope === opt.value ? "bg-[#1a1a2e] text-white shadow-sm" : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"}`}>
                     {opt.label}
                   </button>
                 ))}
               </div>
 
               {scope === "day" && (
-                <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-100 shadow-sm px-1">
+                <div className="flex items-center gap-0.5 sm:gap-1 bg-white rounded-xl border border-gray-100 shadow-sm px-1 flex-shrink-0">
                   <button onClick={() => setSelectedDate(d => addDaysToDateStr(d, -1))}
-                    className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all font-bold text-base">‹</button>
-                  <span className="text-[10px] font-semibold text-gray-600 px-1.5 whitespace-nowrap">
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all font-bold text-sm sm:text-base">‹</button>
+                  <span className="text-[10px] font-semibold text-gray-600 px-1 sm:px-1.5 whitespace-nowrap">
                     {new Date(selectedDate + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
                   </span>
                   <button onClick={() => setSelectedDate(d => addDaysToDateStr(d, 1))}
-                    className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all font-bold text-base">›</button>
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all font-bold text-sm sm:text-base">›</button>
                   <button onClick={() => setSelectedDate(todayWIB())}
-                    className="h-8 px-2.5 rounded-lg hover:bg-gray-100 text-[10px] font-semibold text-gray-500 hover:text-gray-800 transition-all whitespace-nowrap">Hari ini</button>
+                    className="h-7 sm:h-8 px-2 sm:px-2.5 rounded-lg hover:bg-gray-100 text-[10px] font-semibold text-gray-500 hover:text-gray-800 transition-all whitespace-nowrap">Hari ini</button>
                 </div>
               )}
 
               {scope === "month" && (
-                <div className="flex items-center gap-1 bg-white rounded-xl border border-gray-100 shadow-sm px-1">
+                <div className="flex items-center gap-0.5 sm:gap-1 bg-white rounded-xl border border-gray-100 shadow-sm px-1 flex-shrink-0">
                   <button onClick={() => setPeriod(p => ({ month: p.month === 0 ? 11 : p.month - 1, year: p.month === 0 ? p.year - 1 : p.year }))}
-                    className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all font-bold text-base">‹</button>
-                  <span className="text-[10px] font-semibold text-gray-600 px-1.5 whitespace-nowrap">{MONTH_NAMES[period.month].substring(0, 3)} {period.year}</span>
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all font-bold text-sm sm:text-base">‹</button>
+                  <span className="text-[10px] font-semibold text-gray-600 px-1 sm:px-1.5 whitespace-nowrap">{MONTH_NAMES[period.month].substring(0, 3)} {period.year}</span>
                   <button onClick={() => setPeriod(p => ({ month: p.month === 11 ? 0 : p.month + 1, year: p.month === 11 ? p.year + 1 : p.year }))}
-                    className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all font-bold text-base">›</button>
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-all font-bold text-sm sm:text-base">›</button>
                 </div>
               )}
             </div>
@@ -584,14 +584,14 @@ export default function AttendanceLeaderboardPage() {
 
           {/* ── Info banners ── */}
           {scope === "all" && (
-            <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 text-blue-700 text-[11px] px-3.5 py-2.5 rounded-xl">
+            <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 text-blue-700 text-[10px] sm:text-[11px] px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl">
               Mode Semua Waktu hanya menghitung absen otomatis (wajah) — absen manual & cuti tidak disertakan.
             </div>
           )}
           {!loading && scope !== "day" && (
-            <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 text-[11px] px-3.5 py-2.5 rounded-xl">
+            <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 text-[10px] sm:text-[11px] px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl">
               <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-              Skor menggunakan <strong className="mx-1">Bayesian smoothing</strong> untuk menghindari bias data kecil. Prior global = {data.globalOnTimeRate}% · Min sesi ranking = {MIN_SESI} hari.
+              <span>Skor menggunakan <strong className="mx-0.5">Bayesian smoothing</strong>. Prior global = {data.globalOnTimeRate}% · Min sesi = {MIN_SESI} hari.</span>
             </div>
           )}
           {error && (
@@ -599,19 +599,19 @@ export default function AttendanceLeaderboardPage() {
           )}
 
           {/* ── Summary Cards ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
             {[
-              { label: "Tepat Waktu", value: loading ? null : `${data.summary.totalPresent}`, icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />, accent: "from-emerald-50 to-emerald-100/30" },
-              { label: "Terlambat", value: loading ? null : `${data.summary.totalLate}`, icon: <Clock className="w-5 h-5 text-amber-500" />, accent: "from-amber-50 to-amber-100/30" },
-              { label: "Karyawan Aktif", value: loading ? null : `${data.summary.activeEmployees}`, icon: <Users className="w-5 h-5 text-blue-500" />, accent: "from-blue-50 to-blue-100/30" },
-              { label: "Rata² Ketepatan", value: loading ? null : `${data.summary.avgOnTimeRate}%`, icon: <TrendingUp className="w-5 h-5 text-violet-500" />, accent: "from-violet-50 to-violet-100/30" },
+              { label: "Tepat Waktu", value: loading ? null : `${data.summary.totalPresent}`, icon: <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />, accent: "from-emerald-50 to-emerald-100/30" },
+              { label: "Terlambat", value: loading ? null : `${data.summary.totalLate}`, icon: <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />, accent: "from-amber-50 to-amber-100/30" },
+              { label: "Karyawan Aktif", value: loading ? null : `${data.summary.activeEmployees}`, icon: <Users className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />, accent: "from-blue-50 to-blue-100/30" },
+              { label: "Rata² Ketepatan", value: loading ? null : `${data.summary.avgOnTimeRate}%`, icon: <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-violet-500" />, accent: "from-violet-50 to-violet-100/30" },
             ].map(c => (
-              <div key={c.label} className={`bg-gradient-to-br ${c.accent} rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3`}>
-                <div className="w-9 h-9 rounded-xl bg-white/80 border border-white shadow-sm flex items-center justify-center flex-shrink-0">{c.icon}</div>
+              <div key={c.label} className={`bg-gradient-to-br ${c.accent} rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3`}>
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-white/80 border border-white shadow-sm flex items-center justify-center flex-shrink-0">{c.icon}</div>
                 <div className="min-w-0">
-                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1.5">{c.label}</p>
-                  <p className="text-base font-black leading-none text-gray-800 truncate">
-                    {c.value === null ? <span className="inline-block w-14 h-4 bg-white/60 rounded-lg animate-pulse" /> : c.value}
+                  <p className="text-[8px] sm:text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1 sm:mb-1.5 truncate">{c.label}</p>
+                  <p className="text-sm sm:text-base font-black leading-none text-gray-800 truncate">
+                    {c.value === null ? <span className="inline-block w-10 sm:w-14 h-4 bg-white/60 rounded-lg animate-pulse" /> : c.value}
                   </p>
                 </div>
               </div>
@@ -620,9 +620,9 @@ export default function AttendanceLeaderboardPage() {
 
           {/* ── Podium Karyawan ── */}
           {!loading && top3.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
-              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Top Performer{hasBothSections ? " · Karyawan" : ""}</p>
-              <div className="flex items-end gap-3">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-6">
+              <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">Top Performer{hasBothSections ? " · Karyawan" : ""}</p>
+              <div className="flex items-end gap-1.5 sm:gap-3">
                 {podiumOrder.map(({ entry, rank }) => (
                   <PodiumCard key={entry.userId} entry={entry} rank={rank} />
                 ))}
@@ -632,27 +632,27 @@ export default function AttendanceLeaderboardPage() {
 
           {/* ── Charts ── */}
           {!loading && data.allRanking.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
               {/* Bar ranking */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Skor Bayesian Top 10</p>
-                <ResponsiveContainer width="100%" height={Math.max(220, barData.length * 34)}>
-                  <BarChart data={barData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
+                <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">Skor Bayesian Top 10</p>
+                <ResponsiveContainer width="100%" height={Math.max(200, barData.length * 32)}>
+                  <BarChart data={barData} layout="vertical" margin={{ left: -10, right: 10, top: 4, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f1f3" />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#4b5563" }} axisLine={false} tickLine={false} width={70} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 9, fill: "#4b5563" }} axisLine={false} tickLine={false} width={55} />
                     <Tooltip content={<BarTooltip />} cursor={{ fill: "#f5f3ff" }} />
-                    <Bar dataKey="bayesianScore" fill="#7c3aed" radius={[0, 6, 6, 0]} barSize={16} />
+                    <Bar dataKey="bayesianScore" fill="#7c3aed" radius={[0, 6, 6, 0]} barSize={14} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
 
               {/* Status distribution */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">Distribusi Status</p>
-                <ResponsiveContainer width="100%" height={240}>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
+                <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">Distribusi Status</p>
+                <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2}>
+                    <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={70} paddingAngle={2}>
                       {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
                     <Tooltip formatter={(value, name) => [`${value ?? 0} hari`, name]} />
@@ -662,12 +662,12 @@ export default function AttendanceLeaderboardPage() {
               </div>
 
               {/* Trend */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 lg:col-span-2">
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 lg:col-span-2">
+                <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">
                   Tren Kehadiran {trendLabel}
                 </p>
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={data.trend} margin={{ left: -16, right: 16, top: 4, bottom: 4 }}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <AreaChart data={data.trend} margin={{ left: -20, right: 10, top: 4, bottom: 4 }}>
                     <defs>
                       <linearGradient id="trendFillAbsen" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#7c3aed" stopOpacity={0.35} />
@@ -677,7 +677,7 @@ export default function AttendanceLeaderboardPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f3" />
                     <XAxis dataKey="key" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false}
                       tickFormatter={trendTickFormatter} />
-                    <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} allowDecimals={false} />
                     <Tooltip content={<TrendTooltip />} />
                     <Area type="monotone" dataKey="count" stroke="#7c3aed" strokeWidth={2} fill="url(#trendFillAbsen)" />
                   </AreaChart>
@@ -702,18 +702,18 @@ export default function AttendanceLeaderboardPage() {
           {!loading && data.insufficientEntries.length > 0 && (
             <div className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden">
               <button
-                className="w-full px-5 py-4 border-b border-amber-100 flex items-center justify-between text-left"
+                className="w-full px-3.5 sm:px-5 py-3 sm:py-4 border-b border-amber-100 flex items-center justify-between text-left"
                 onClick={() => setShowInsufficient(v => !v)}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                  <p className="font-bold text-gray-700 text-sm">Data Belum Cukup</p>
-                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                  <p className="font-bold text-gray-700 text-xs sm:text-sm">Data Belum Cukup</p>
+                  <span className="text-[9px] sm:text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
                     {data.insufficientEntries.length} orang
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 text-gray-400">
-                  <span className="text-[10px]">Min. {MIN_SESI} hari hadir untuk masuk ranking</span>
+                <div className="flex items-center gap-1 sm:gap-1.5 text-gray-400">
+                  <span className="text-[9px] sm:text-[10px] hidden sm:inline">Min. {MIN_SESI} hari hadir untuk masuk ranking</span>
                   {showInsufficient ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </div>
               </button>
@@ -722,15 +722,15 @@ export default function AttendanceLeaderboardPage() {
                   {data.insufficientEntries.map(e => {
                     const bg = avBg(e.name);
                     return (
-                      <div key={e.userId} className="px-5 py-3 flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${bg}`}>{initials(e.name)}</div>
+                      <div key={e.userId} className="px-3.5 sm:px-5 py-2.5 sm:py-3 flex items-center gap-2.5 sm:gap-3">
+                        <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center text-[9px] sm:text-[10px] font-bold flex-shrink-0 ${bg}`}>{initials(e.name)}</div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-800 text-xs truncate">{e.name}</p>
-                          <p className="text-[9px] text-gray-400">{e.role.replace(/_/g, " ")} {e.isPkl ? "· PKL" : ""}</p>
+                          <p className="text-[9px] text-gray-400 truncate">{e.role.replace(/_/g, " ")} {e.isPkl ? "· PKL" : ""}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="text-[10px] font-bold text-amber-600">{e.hadir} / {MIN_SESI} hari</p>
-                          <p className="text-[9px] text-gray-400">{e.tepat} tepat waktu</p>
+                          <p className="text-[9px] sm:text-[10px] font-bold text-amber-600">{e.hadir} / {MIN_SESI} hari</p>
+                          <p className="text-[8px] sm:text-[9px] text-gray-400">{e.tepat} tepat waktu</p>
                         </div>
                       </div>
                     );
