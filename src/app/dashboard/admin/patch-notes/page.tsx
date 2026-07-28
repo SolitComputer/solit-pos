@@ -10,7 +10,16 @@ import {
   type PatchNoteCategory,
 } from "@/lib/patchNotes";
 import { ALL_STATIC_ROLES, DIVISION_MAP, hasAnyRole, humanizeRoleKey } from "@/lib/permissions";
-import { Megaphone, Send, Edit3, Trash2, X, Plus, Search } from "lucide-react";
+import { Megaphone, Send, Edit3, Trash2, X, Plus, Search, Eye, CheckCircle2 } from "lucide-react";
+
+interface PatchNoteReader {
+  read_at: string;
+  user: {
+    id: string;
+    name: string;
+    role: string;
+  } | null;
+}
 
 interface PatchNoteRow {
   id: string;
@@ -20,6 +29,7 @@ interface PatchNoteRow {
   target_roles: string[];
   created_at: string;
   author?: { id: string; name: string } | null;
+  reads?: PatchNoteReader[];
 }
 
 export default function PatchNotesAdminPage() {
@@ -36,6 +46,10 @@ export default function PatchNotesAdminPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
+
+  // Modal pembaca patch note
+  const [selectedReadersNote, setSelectedReadersNote] = useState<PatchNoteRow | null>(null);
+  const [readerSearchQuery, setReaderSearchQuery] = useState("");
 
   const canPublish = hasAnyRole(user?.roles ?? [], PATCH_NOTES_PUBLISH_ROLES);
 
@@ -172,7 +186,7 @@ export default function PatchNotesAdminPage() {
               <div>
                 <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-none">Patch Notes</h1>
                 <p className="text-xs text-gray-400 mt-1 font-medium">
-                  Kelola update aplikasi — publish, edit, atau hapus pengumuman
+                  Kelola update aplikasi — publish, edit, hapus, & cek pembaca
                 </p>
               </div>
             </div>
@@ -341,6 +355,7 @@ export default function PatchNotesAdminPage() {
                   const meta = PATCH_NOTE_CATEGORY_META[note.category];
                   const isEditing = editingId === note.id;
                   const isDeleting = deletingId === note.id;
+                  const readerCount = note.reads?.length ?? 0;
 
                   return (
                     <div
@@ -369,7 +384,21 @@ export default function PatchNotesAdminPage() {
                         </div>
                         
                         {/* Action buttons */}
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                          {/* Reader Button Badge */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReadersNote(note);
+                              setReaderSearchQuery("");
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition border border-indigo-100"
+                            title="Lihat Siapa Saja Yang Sudah Membaca"
+                          >
+                            <Eye size={14} />
+                            <span>{readerCount} Membaca</span>
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => startEdit(note)}
@@ -395,7 +424,7 @@ export default function PatchNotesAdminPage() {
                         {note.description}
                       </p>
                       
-                      <div className="mt-3 pt-2.5 border-t border-gray-50 flex items-center justify-between text-[11px] text-gray-400">
+                      <div className="mt-3 pt-2.5 border-t border-gray-50 flex items-center justify-between text-[11px] text-gray-400 flex-wrap gap-2">
                         <span>
                           Target:{" "}
                           <strong className="text-gray-600">
@@ -414,6 +443,112 @@ export default function PatchNotesAdminPage() {
           </div>
         </div>
       </main>
+
+      {/* ── MODAL: Daftar Pengguna Yang Sudah Membaca ── */}
+      {selectedReadersNote && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full shadow-2xl border border-gray-100 flex flex-col max-h-[80dvh] overflow-hidden">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 bg-gray-50/80 flex-shrink-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-indigo-600" />
+                  <h3 className="font-extrabold text-sm text-gray-900 tracking-tight">Daftar Pembaca</h3>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                    {selectedReadersNote.reads?.length ?? 0} Pengguna
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 font-medium truncate mt-0.5">
+                  {selectedReadersNote.title}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedReadersNote(null)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-200 transition flex-shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Search Filter */}
+            <div className="p-3 border-b border-gray-100 bg-white flex-shrink-0">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Cari nama atau role pengguna..."
+                  value={readerSearchQuery}
+                  onChange={(e) => setReaderSearchQuery(e.target.value)}
+                  className="w-full h-9 pl-8 pr-3 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition"
+                />
+              </div>
+            </div>
+
+            {/* Readers List */}
+            <div className="p-4 overflow-y-auto flex-1 space-y-2">
+              {(() => {
+                const allReads = selectedReadersNote.reads ?? [];
+                const filtered = allReads.filter((r) => {
+                  if (!readerSearchQuery.trim()) return true;
+                  const q = readerSearchQuery.toLowerCase();
+                  const name = (r.user?.name ?? "").toLowerCase();
+                  const role = (r.user?.role ?? "").toLowerCase();
+                  const humanRole = humanizeRoleKey(r.user?.role ?? "").toLowerCase();
+                  return name.includes(q) || role.includes(q) || humanRole.includes(q);
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="py-10 text-center text-gray-400 text-xs">
+                      {allReads.length === 0
+                        ? "Belum ada pengguna yang membaca patch note ini."
+                        : "Tidak ada pengguna yang cocok dengan pencarian."}
+                    </div>
+                  );
+                }
+
+                return filtered.map((r, idx) => {
+                  const uName = r.user?.name || "Pengguna";
+                  const uRole = r.user?.role ? humanizeRoleKey(r.user.role) : "Role Kosong";
+                  const readTime = new Date(r.read_at).toLocaleDateString("id-ID", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+
+                  return (
+                    <div
+                      key={r.user?.id || idx}
+                      className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition gap-3"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0 shadow-sm">
+                          {uName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-800 truncate">{uName}</p>
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 inline-block mt-0.5">
+                            {uRole}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <span className="text-[10px] text-gray-400 font-mono flex items-center gap-1">
+                          <CheckCircle2 size={12} className="text-emerald-500" />
+                          {readTime}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

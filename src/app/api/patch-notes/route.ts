@@ -8,7 +8,7 @@ async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
   const { data, error } = await supabaseAdmin
     .from("patch_notes")
     .select(
-      "id, title, description, category, target_roles, created_by, created_at, updated_at, author:users!patch_notes_created_by_fkey(id, name)"
+      "id, title, description, category, target_roles, created_by, created_at, updated_at, author:users!patch_notes_created_by_fkey(id, name), reads:patch_note_reads(read_at, user:users(id, name, role))"
     )
     .order("created_at", { ascending: false });
 
