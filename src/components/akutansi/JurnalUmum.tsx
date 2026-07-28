@@ -271,12 +271,20 @@ export default function JurnalUmum({ period }: { period: string }) {
         const q = search.trim().toLowerCase();
         let result = entries;
 
-        if (q) {
+       if (q) {
+            // Angka murni dari query (buang "Rp", titik, koma, spasi) supaya "3.600.000",
+            // "Rp3.600.000", atau "3600000" semuanya bisa nemuin baris Debit/Kredit yang cocok.
+            const qDigits = q.replace(/[^0-9]/g, "");
             result = result.filter(
                 (e) =>
                     e.keterangan.toLowerCase().includes(q) ||
                     (e.ref ?? "").toLowerCase().includes(q) ||
-                    e.lines.some((l) => l.account_code.includes(q) || l.account_name.toLowerCase().includes(q))
+                    e.lines.some(
+                        (l) =>
+                            l.account_code.includes(q) ||
+                            l.account_name.toLowerCase().includes(q) ||
+                           (qDigits !== "" && String(Math.round(Number(l.nominal))).startsWith(qDigits))
+                    )
             );
         }
 
@@ -490,7 +498,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                     <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Cari keterangan, akun, ref..."
+                       placeholder="Cari keterangan, akun, ref, nominal..."
                         className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                     />
                 </div>
