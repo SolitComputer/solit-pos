@@ -37,14 +37,15 @@ async function getHandler(req: NextRequest) {
   }
 }
 
-// ── POST — simpan lagu terpilih ke profil ────────────────────────────────────
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const body = await req.json().catch(() => ({}));
-  const { title, artist, artwork_url, preview_url } = body;
+  const { title, artist, artwork_url, preview_url, clip_start } = body;
 
   if (!title || !artist) {
     return NextResponse.json({ success: false, message: "Judul dan artis wajib diisi" }, { status: 400 });
   }
+
+  const safeClipStart = Number.isFinite(clip_start) ? Math.max(0, Math.floor(clip_start)) : 0;
 
   const { error } = await supabase
     .from("users")
@@ -53,6 +54,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       song_artist: artist,
       song_artwork_url: artwork_url ?? null,
       song_preview_url: preview_url ?? null,
+      song_clip_start: safeClipStart,
       song_updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);
@@ -72,6 +74,7 @@ async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       song_artist: null,
       song_artwork_url: null,
       song_preview_url: null,
+      song_clip_start: 0,
       song_updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);
