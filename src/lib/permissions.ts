@@ -494,11 +494,14 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/admin/notifikasi-pengantaran": [...NOTIFICATION_SETTINGS_ROLES],
   "/api/akutansi": [...AKUNTANSI_ROLES],
   "/api/notification-settings": [...NOTIFICATION_SETTINGS_ROLES],
-  "/dashboard/ai-ceo": [...AI_CEO_ROLES],
+ "/dashboard/ai-ceo": [...AI_CEO_ROLES],
   "/api/ai-ceo": [...AI_CEO_ROLES],
+
+  "/dashboard/profile": [...ALL_ROLES],
+  "/api/profile": [...ALL_ROLES],
+  "/api/achievements": [...ALL_ROLES],
 };
 
-// ─── PERMISSIONS object ───────────────────────────────────────────────────────
 export const PERMISSIONS = {
   VIEW_DASHBOARD: [...ALL_ROLES] as UserRole[],
 

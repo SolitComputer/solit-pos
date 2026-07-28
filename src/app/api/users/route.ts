@@ -31,10 +31,10 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const isKepala = !isAdmin && userRoles.some(r => KEPALA_SET.has(r));
 
   const selectFields = isAdmin
-    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date"
+    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio"
     : isKepala
-      ? "id, name, phone_number, role, roles, shift, birth_date"
-      : "id, name, role, roles, birth_date";
+      ? "id, name, phone_number, role, roles, shift, birth_date, profile_photo_url, bio"
+      : "id, name, role, roles, birth_date, profile_photo_url, bio";
 
   const { data, error } = await supabaseAdmin
     .from("users")

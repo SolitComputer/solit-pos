@@ -74,7 +74,7 @@ export async function GET() {
     const [usersResult, presenceResult] = await Promise.all([
       supabase
         .from("users")
-        .select("id, name, role")
+        .select("id, name, role, profile_photo_url")
         .order("name"),
       supabase
         .from("user_presence")
@@ -114,6 +114,7 @@ export async function GET() {
         last_seen,
         is_online,
         seconds_ago,
+        profile_photo_url: u.profile_photo_url ?? null,
       };
     });
 

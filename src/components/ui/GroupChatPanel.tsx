@@ -44,6 +44,7 @@ interface UserOption {
     id: string;
     name: string;
     role: string;
+    profile_photo_url?: string | null;
 }
 
 interface CurrentUser {
@@ -193,22 +194,23 @@ function SolitLogo({ size = 44, radius = 12 }: { size?: number; radius?: number 
     );
 }
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
-function Avatar({ name, role, size = 32 }: { name: string; role: string; size?: number }) {
+function Avatar({ name, role, size = 32, photoUrl }: { name: string; role: string; size?: number; photoUrl?: string | null }) {
     return (
         <div style={{
             width: size, height: size,
             backgroundColor: getAvatarColor(role),
-            borderRadius: Math.round(size * 0.35),
+            borderRadius: "50%",
             display: "flex", alignItems: "center", justifyContent: "center",
             color: "white", fontSize: size * 0.33, fontWeight: 800, flexShrink: 0,
             boxShadow: `0 2px 8px ${getAvatarColor(role)}55`,
+            overflow: "hidden",
         }}>
-            {getInitials(name)}
+            {photoUrl
+                ? <img src={photoUrl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : getInitials(name)}
         </div>
     );
 }
-
 // ─── Image Lightbox ───────────────────────────────────────────────────────────
 function ImageLightbox({ url, name, onClose }: { url: string; name: string | null; onClose: () => void }) {
     useEffect(() => {
@@ -314,19 +316,19 @@ function AttachmentDisplay({ url, type, name, size, isMine }: {
     );
 }
 
-// ─── MessageBubble ────────────────────────────────────────────────────────────
 interface BubbleProps {
     msg: GroupMessage;
     isMine: boolean;
     isAdmin: boolean;
     currentUserName: string;
+    senderPhotoUrl?: string | null;
     onReply: (msg: GroupMessage) => void;
     onDelete: (id: string) => void;
     onEdit: (id: string, newContent: string) => Promise<boolean>;
     onScrollToReply: (id: string) => void;
 }
 
-const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, currentUserName, onReply, onDelete, onEdit, onScrollToReply }: BubbleProps) {
+const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, currentUserName, senderPhotoUrl, onReply, onDelete, onEdit, onScrollToReply }: BubbleProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(msg.content);
@@ -379,7 +381,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
             <div className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
                 {!isMine && (
                     <div className="flex-shrink-0 self-end mb-1">
-                        <Avatar name={msg.sender_name} role={msg.sender_role} size={30} />
+                        <Avatar name={msg.sender_name} role={msg.sender_role} size={30} photoUrl={senderPhotoUrl} />
                     </div>
                 )}
                 <div className={`flex flex-col max-w-[72%] ${isMine ? "items-end" : "items-start"}`}>
@@ -406,7 +408,7 @@ const MessageBubble = memo(function MessageBubble({ msg, isMine, isAdmin, curren
         <div id={`msg-${msg.id}`} className={`flex gap-2.5 group ${isMine ? "justify-end" : "justify-start"}`}>
             {!isMine && (
                 <div className="flex-shrink-0 self-end mb-1">
-                    <Avatar name={msg.sender_name} role={msg.sender_role} size={30} />
+                    <Avatar name={msg.sender_name} role={msg.sender_role} size={30} photoUrl={senderPhotoUrl} />
                 </div>
             )}
 
@@ -801,9 +803,9 @@ function CameraCaptureModal({ onCapture, onClose }: CameraCaptureModalProps) {
     );
 }
 
-// ─── InputArea ────────────────────────────────────────────────────────────────
 interface InputAreaProps {
     currentUser: CurrentUser;
+    currentUserPhotoUrl?: string | null;
     replyTo: GroupMessage | null;
     users: UserOption[];
     onCancelReply: () => void;
@@ -812,7 +814,7 @@ interface InputAreaProps {
     onSendVoice: (blob: Blob) => Promise<void>;   // ← BARU
 }
 
-function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendAttachment, onSendVoice }: InputAreaProps) {
+function InputArea({ currentUser, currentUserPhotoUrl, replyTo, users, onCancelReply, onSend, onSendAttachment, onSendVoice }: InputAreaProps) {
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -961,7 +963,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
         e.target.value = "";
     };
 
-   const cancelPreview = () => {
+    const cancelPreview = () => {
         if (preview?.url) URL.revokeObjectURL(preview.url);
         setPreview(null);
         setSelectedFile(null);
@@ -1041,7 +1043,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
             {/* Input row */}
             <div className="flex items-end gap-3 px-4 py-3.5 relative">
                 <div className="flex-shrink-0 self-end mb-1">
-                    <Avatar name={currentUser.name} role={currentUser.role} size={32} />
+                    <Avatar name={currentUser.name} role={currentUser.role} size={32} photoUrl={currentUserPhotoUrl} />
                 </div>
 
                 <div className="flex-1 flex items-end gap-2 relative"
@@ -1083,7 +1085,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                                     border: "1px solid #e5e7eb",
                                     boxShadow: "0 16px 48px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.05)",
                                 }}>
-                               <button
+                                <button
                                     onClick={() => { setShowCameraModal(true); setShowAttachMenu(false); }}
                                     className="w-full flex items-center gap-3 px-3.5 py-2.5 text-left hover:bg-slate-50 transition-colors">
                                     <div className="w-8 h-8 flex items-center justify-center flex-shrink-0"
@@ -1151,7 +1153,7 @@ function InputArea({ currentUser, replyTo, users, onCancelReply, onSend, onSendA
                     </div>
                 )}
 
-              <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange} accept="image/*,video/*" />
+                <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange} accept="image/*,video/*" />
                 <input ref={docRef} type="file" className="hidden" onChange={handleFileChange} accept="*/*" />
             </div>
 
@@ -1431,7 +1433,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
     useEffect(() => { usersRef.current = users; }, [users]);
     useEffect(() => { messagesDataRef.current = messages; }, [messages]);
 
-    // ── Presence: status online + terakhir online per user ──
+    const [allUsersById, setAllUsersById] = useState<Record<string, UserOption>>({});
+
+    const photoByUserId = useMemo(() => {
+        const map: Record<string, string | null | undefined> = {};
+        for (const id of Object.keys(allUsersById)) map[id] = allUsersById[id].profile_photo_url;
+        return map;
+    }, [allUsersById]);
+
     const [presenceMap, setPresenceMap] = useState<Record<string, PresenceInfo>>({});
     const [memberFilter, setMemberFilter] = useState<"all" | "online">("all");
 
@@ -1471,8 +1480,11 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    const others = (data.users as UserOption[]).filter(u => u.id !== currentUser.id);
-                    setUsers(others);
+                    const all = data.users as UserOption[];
+                    const map: Record<string, UserOption> = {};
+                    for (const u of all) map[u.id] = u;
+                    setAllUsersById(map);
+                    setUsers(all.filter(u => u.id !== currentUser.id));
                 }
             })
             .catch(() => { });
@@ -2028,14 +2040,16 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                     {/* Avatar + status dot */}
                                     <div className="relative flex-shrink-0">
                                         <div
-                                            className="flex items-center justify-center text-white font-bold text-[10px]"
+                                            className="flex items-center justify-center text-white font-bold text-[10px] overflow-hidden"
                                             style={{
                                                 width: 32, height: 32,
-                                                borderRadius: 10,
+                                                borderRadius: "50%",
                                                 backgroundColor: getAvatarColor(user.role),
                                                 opacity: isOnline ? 1 : 0.5,
                                             }}>
-                                            {getInitials(user.name)}
+                                            {user.profile_photo_url
+                                                ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
+                                                : getInitials(user.name)}
                                         </div>
                                         <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#fafafa] ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-gray-300"
                                             }`} />
@@ -2079,13 +2093,15 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                     <div className="flex-shrink-0 px-3 py-3 flex items-center gap-2.5"
                         style={{ borderTop: "1px solid #e5e7eb", background: "#f8fafc" }}>
                         <div
-                            className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[10px]"
+                            className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[10px] overflow-hidden"
                             style={{
                                 width: 30, height: 30,
-                                borderRadius: 9,
+                                borderRadius: "50%",
                                 backgroundColor: getAvatarColor(currentUser.role),
                             }}>
-                            {getInitials(currentUser.name)}
+                            {allUsersById[currentUser.id]?.profile_photo_url
+                                ? <img src={allUsersById[currentUser.id].profile_photo_url!} alt={currentUser.name} className="w-full h-full object-cover" />
+                                : getInitials(currentUser.name)}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-[11px] font-bold text-slate-700 truncate">{currentUser.name}</p>
@@ -2246,6 +2262,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                                                     isMine={isMine}
                                                     isAdmin={isAdmin}
                                                     currentUserName={currentUser.name}
+                                                    senderPhotoUrl={photoByUserId[msg.sender_id]}
                                                     onReply={setReplyTo}
                                                     onDelete={deleteMessage}
                                                     onEdit={editMessage}
@@ -2294,6 +2311,7 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
 
                     <InputArea
                         currentUser={currentUser}
+                        currentUserPhotoUrl={allUsersById[currentUser.id]?.profile_photo_url}
                         replyTo={replyTo}
                         users={users}
                         onCancelReply={() => setReplyTo(null)}
@@ -2316,15 +2334,17 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
                             }}
                         >
                             <div
-                                className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[11px]"
+                                className="flex-shrink-0 flex items-center justify-center text-white font-bold text-[11px] overflow-hidden"
                                 style={{
                                     width: 34, height: 34,
-                                    borderRadius: 10,
+                                    borderRadius: "50%",
                                     backgroundColor: getAvatarColor(embeddedDMUser.role),
                                     boxShadow: `0 2px 6px ${getAvatarColor(embeddedDMUser.role)}44`,
                                 }}
                             >
-                                {getInitials(embeddedDMUser.name)}
+                                {embeddedDMUser.profile_photo_url
+                                    ? <img src={embeddedDMUser.profile_photo_url} alt={embeddedDMUser.name} className="w-full h-full object-cover" />
+                                    : getInitials(embeddedDMUser.name)}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-[12px] font-semibold text-slate-800 truncate leading-tight">
