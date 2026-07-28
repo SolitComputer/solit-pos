@@ -100,6 +100,7 @@ interface MenuGroup {
 const Icons = {
   dashboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="8" height="8" rx="2" /><rect x="13" y="3" width="8" height="8" rx="2" /><rect x="3" y="13" width="8" height="8" rx="2" /><rect x="13" y="13" width="8" height="8" rx="2" /></svg>),
   attendance: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /><path d="M9 14.5l2 2 4-4.5" /></svg>),
+  daftarHadir: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4h9a1 1 0 011 1v14a1 1 0 01-1 1H9" /><path d="M4 5h3v3H4z" /><path d="M4 10.5h3v3H4z" /><path d="M4 16h3v3H4z" /><path d="M12 6.5h5M12 12h5M12 17.5h5" /></svg>),
   overtime: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>),
   riwayat: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z" /><path d="M14 3v5h5" /><path d="M8.5 13h7M8.5 17h7" /></svg>),
   laptop: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M2 20h20" /></svg>),
@@ -146,6 +147,7 @@ const Icons = {
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
 const ITEM_ABSENSI: MenuItem = { name: "Absensi", href: "/dashboard/attendance", icon: Icons.attendance };
+const ITEM_DAFTAR_HADIR: MenuItem = { name: "Daftar Hadir", href: "/dashboard/daftar-hadir", icon: Icons.daftarHadir };
 const ITEM_LEMBUR: MenuItem = { name: "Lembur", href: "/dashboard/attendance/overtime", icon: Icons.overtime };
 const ITEM_USERS: MenuItem = { name: "Management User", href: "/dashboard/users", icon: Icons.users };
 const ITEM_PKL_REPORT: MenuItem = { name: "Laporan Kerja PKL", href: "/dashboard/pkl-reports", icon: Icons.pklReport };
@@ -176,9 +178,9 @@ const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Barang Siap Jual", href: "/dash
 const ITEM_LAPTOP_MINUS: MenuItem = { name: "Barang Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LEADERBOARD_PEKERJAAN: MenuItem = { name: "Leaderboard Pekerjaan", href: "/dashboard/missions/leaderboard", icon: Icons.leaderboard };
 
-const GROUP_ABSENSI_SIMPLE: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI] };
-const GROUP_ABSENSI: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_LEMBUR] };
-const GROUP_ABSENSI_WITH_PKL: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_LEMBUR, ITEM_PKL_REPORT] };
+const GROUP_ABSENSI_SIMPLE: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_DAFTAR_HADIR] };
+const GROUP_ABSENSI: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_DAFTAR_HADIR, ITEM_LEMBUR] };
+const GROUP_ABSENSI_WITH_PKL: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_DAFTAR_HADIR, ITEM_LEMBUR, ITEM_PKL_REPORT] };
 const GROUP_LOG: MenuGroup = { label: "Log", items: [ITEM_LOG_LOGIN, ITEM_LOG_AKTIVITAS] };
 const GROUP_KEUANGAN: MenuGroup = { label: "Keuangan", items: [ITEM_LAPORAN_KEUANGAN, ITEM_CASHFLOW, ITEM_AKUNTANSI] };
 const GROUP_MANAGEMENT: MenuGroup = { label: "Management", items: [ITEM_USERS, ITEM_MANAGEMENT_SELLER, ITEM_MONITOR_CHAT] };
@@ -335,7 +337,7 @@ const PKL_INVENTARIS_BASIC: MenuGroup = {
 
 const PKL_MENU: MenuGroup[] = [
   { label: "Utama", items: [ITEM_DASHBOARD] },
-  { label: "Absensi", items: [ITEM_ABSENSI, ITEM_PKL_REPORT] },
+  { label: "Absensi", items: [ITEM_ABSENSI, ITEM_DAFTAR_HADIR, ITEM_PKL_REPORT] },
   PKL_INVENTARIS_BASIC,
   { label: "Transaksi", items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }] },
   { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
@@ -358,7 +360,7 @@ const PKL_SALES_MENU: MenuGroup[] = [
 
 const PKL_PENYEDIA_MENU: MenuGroup[] = [
   { label: "Utama", items: [ITEM_DASHBOARD] },
-  { label: "Absensi", items: [ITEM_ABSENSI, ITEM_PKL_REPORT] },
+  { label: "Absensi", items: [ITEM_ABSENSI, ITEM_DAFTAR_HADIR, ITEM_PKL_REPORT] },
   PKL_INVENTARIS_BASIC,
   PREPARATION_PENYEDIA_MENU,
   { label: "Transaksi", items: [{ name: "Buat Payment", href: "/payment/create", icon: Icons.payment }] },
