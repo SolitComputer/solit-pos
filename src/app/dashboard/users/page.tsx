@@ -31,6 +31,10 @@ interface User {
   birth_date: string | null;
   profile_photo_url: string | null;
   bio: string | null;
+  status_note: string | null;
+  song_title: string | null;
+  song_artist: string | null;
+  song_artwork_url: string | null;
 }
 
 interface CustomRoleRow {
@@ -1295,9 +1299,9 @@ export default function UsersPage() {
                                   )}
                                 </div>
 
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/dashboard/profile/${user.id}`)} title={`Lihat profil ${user.name}`}>
                                   <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                    <span className="text-sm font-bold truncate max-w-full" style={{ color: "#0f172a" }}>
+                                    <span className="text-sm font-bold truncate max-w-full hover:underline" style={{ color: "#0f172a" }}>
                                       {user.name}
                                     </span>
                                     {(user.roles?.length > 0 ? user.roles : [user.role]).map((r, i) => {
@@ -1332,6 +1336,21 @@ export default function UsersPage() {
                                       </span>
                                     )}
                                   </div>
+                                  {user.status_note && (
+                                    <p className="text-[11px] mt-0.5 truncate font-semibold" style={{ color: "#7c3aed" }}>
+                                      {user.status_note}
+                                    </p>
+                                  )}
+                                  {user.song_title && (
+                                    <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                                      {user.song_artwork_url && (
+                                        <img src={user.song_artwork_url} alt={user.song_title} className="w-4 h-4 rounded flex-shrink-0 object-cover" />
+                                      )}
+                                      <p className="text-[11px] truncate" style={{ color: "#16a34a" }}>
+                                        {user.song_title} · {user.song_artist}
+                                      </p>
+                                    </div>
+                                  )}
                                   {user.bio && (
                                     <p className="text-[11px] text-gray-400 mt-0.5 truncate italic">"{user.bio}"</p>
                                   )}

@@ -1,10 +1,10 @@
 "use client";
 // src/app/dashboard/akuntansi/page.tsx
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Fraunces } from "next/font/google";
-import Image from "next/image";
+import { Camera, Loader2 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { MONTH_LABELS } from "@/lib/accounting";
 
@@ -35,7 +35,78 @@ export default function AkuntansiPeriodPickerPage() {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
-  const [year, setYear] = useState(currentYear);
+const [year, setYear] = useState(currentYear);
+
+  // Foto companion custom — bisa diganti langsung dari web (upload), tanpa perlu edit kode.
+  // Kalau belum pernah di-upload, fallback ke foto default di /public/images.
+  const [companionPhotoUrl, setCompanionPhotoUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/api/settings/photo?key=akutansi_companion_photo")
+      .then((r) => r.json())
+      .then((j) => { if (j.success && j.url) setCompanionPhotoUrl(j.url); })
+      .catch(() => { });
+  }, []);
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset supaya bisa pilih file yang sama lagi kalau perlu
+    if (!file) return;
+
+    setPhotoError(null);
+    setUploadingPhoto(true);
+    try {
+      const form = new FormData();
+      form.append("key", "akutansi_companion_photo");
+      form.append("file", file);
+      const res = await fetch("/api/settings/photo", { method: "POST", body: form });
+      const json = await res.json();
+      if (!json.success) { setPhotoError(json.message ?? "Gagal upload foto"); return; }
+      setCompanionPhotoUrl(json.url);
+    } catch {
+      setPhotoError("Koneksi bermasalah");
+    } finally {
+      setUploadingPhoto(false);
+    }
+ };
+
+  // Motif/watermark background di kartu bulan — sama seperti foto companion, bisa diganti dari web.
+  const [cardWatermarkUrl, setCardWatermarkUrl] = useState<string | null>(null);
+  const [uploadingWatermark, setUploadingWatermark] = useState(false);
+  const [watermarkError, setWatermarkError] = useState<string | null>(null);
+  const watermarkInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/api/settings/photo?key=akutansi_card_watermark")
+      .then((r) => r.json())
+      .then((j) => { if (j.success && j.url) setCardWatermarkUrl(j.url); })
+      .catch(() => { });
+  }, []);
+
+  const handleWatermarkChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setWatermarkError(null);
+    setUploadingWatermark(true);
+    try {
+      const form = new FormData();
+      form.append("key", "akutansi_card_watermark");
+      form.append("file", file);
+      const res = await fetch("/api/settings/photo", { method: "POST", body: form });
+      const json = await res.json();
+      if (!json.success) { setWatermarkError(json.message ?? "Gagal upload motif"); return; }
+      setCardWatermarkUrl(json.url);
+    } catch {
+      setWatermarkError("Koneksi bermasalah");
+    } finally {
+      setUploadingWatermark(false);
+    }
+  };
 
   const open = (
     month: number,
@@ -124,24 +195,49 @@ export default function AkuntansiPeriodPickerPage() {
 
             {/* Companion frame (foto) + Year switcher — satu grup, tidak lagi tabrakan */}
             <div className="relative flex flex-col items-center gap-3">
-              <div className="nahida-float relative w-20 h-20 sm:w-28 sm:h-28">
+             <div className="nahida-float group relative w-20 h-20 sm:w-28 sm:h-28">
                 <div className="absolute -inset-3 rounded-full bg-gradient-to-br from-[#BFE8CE] via-[#E7D9F5] to-[#F6E3B4] opacity-70 blur-xl" />
                 <div className="absolute inset-0 rounded-full p-[3px] bg-gradient-to-br from-[#9FD8B5] via-[#F6E3B4] to-[#E7D9F5] shadow-[0_6px_18px_rgba(150,120,80,0.25)]">
                   <div className="w-full h-full rounded-full overflow-hidden bg-white">
-                    <Image
-                      src="/images/nahida-akutansi.png"
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={companionPhotoUrl || "/images/nahida-akutansi.png"}
                       alt=""
                       aria-hidden="true"
-                      width={220}
-                      height={220}
                       className="w-full h-full object-cover"
                     />
                   </div>
                 </div>
+
+                {/* Tombol ganti foto — muncul saat hover/tap, upload langsung dari web */}
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  title="Ganti foto"
+                  className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all duration-200 disabled:cursor-wait"
+                >
+                  {uploadingPhoto ? (
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-5 h-5 text-white" />
+                  )}
+                </button>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="hidden"
+                />
+
                 <span className="sparkle sparkle-a" />
                 <span className="sparkle sparkle-b" />
                 <span className="sparkle sparkle-c" />
               </div>
+              {photoError && (
+                <p className="text-[10px] text-red-500 font-semibold -mt-1">{photoError}</p>
+              )}
 
               <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-full p-1 shadow-sm">
                 <button
@@ -193,11 +289,10 @@ export default function AkuntansiPeriodPickerPage() {
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-0 z-[-1] flex items-center justify-center opacity-[0.07]"
                   >
-                    <Image
-                      src="/images/nahida-wle.png"
+                   {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={cardWatermarkUrl || "/images/nahida-wle.png"}
                       alt=""
-                      width={160}
-                      height={160}
                       className="w-full h-full object-contain scale-125"
                     />
                   </div>
@@ -261,11 +356,31 @@ export default function AkuntansiPeriodPickerPage() {
             })}
           </div>
 
-          {/* Footer note */}
+        {/* Footer note */}
           <div className="relative rounded-2xl border border-white/70 bg-white/50 backdrop-blur-sm px-5 py-3.5 shadow-[0_4px_16px_rgba(150,120,80,0.06)]">
-            <p className="text-xs text-gray-500 font-mono">
-              Data jurnal dipisah per bulan. Bulan yang belum lewat tetap bisa dibuka untuk input berjalan.
-            </p>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-xs text-gray-500 font-mono">
+                Data jurnal dipisah per bulan. Bulan yang belum lewat tetap bisa dibuka untuk input berjalan.
+              </p>
+              <button
+                type="button"
+                onClick={() => watermarkInputRef.current?.click()}
+                disabled={uploadingWatermark}
+                className="text-[11px] font-semibold text-[#9C7420] hover:underline disabled:opacity-50 disabled:cursor-wait shrink-0"
+              >
+                {uploadingWatermark ? "Mengupload..." : "Ganti motif kartu"}
+              </button>
+            </div>
+            {watermarkError && (
+              <p className="text-[10px] text-red-500 font-semibold mt-1">{watermarkError}</p>
+            )}
+            <input
+              ref={watermarkInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleWatermarkChange}
+              className="hidden"
+            />
           </div>
         </div>
       </div>
