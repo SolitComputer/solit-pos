@@ -11,11 +11,11 @@ import { Check, CheckCheck, MessageCircle } from "lucide-react";
 
 const supabase = getSupabaseClient();
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 export interface ChatUser {
     id: string;
     name: string;
     role: string;
+    profile_photo_url?: string | null;
 }
 
 interface Message {
@@ -75,20 +75,21 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// ─── UserAvatar ───────────────────────────────────────────────────────────────
-function UserAvatar({ name, role, size = 28 }: { name: string; role: string; size?: number }) {
+function UserAvatar({ name, role, size = 28, photoUrl }: { name: string; role: string; size?: number; photoUrl?: string | null }) {
     const color = getRoleColor(role);
     return (
         <div
-            className="flex items-center justify-center text-white font-bold flex-shrink-0 select-none"
+            className="flex items-center justify-center text-white font-bold flex-shrink-0 select-none overflow-hidden"
             style={{
                 width: size, height: size,
-                borderRadius: Math.round(size * 0.3),
+                borderRadius: "50%",
                 background: `linear-gradient(135deg, ${color}cc, ${color})`,
                 fontSize: Math.round(size * 0.36),
             }}
         >
-            {getInitials(name)}
+            {photoUrl
+                ? <img src={photoUrl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : getInitials(name)}
         </div>
     );
 }
@@ -579,7 +580,7 @@ export function ChatPanel({ currentUser, targetUser, isMinimized, onToggleMinimi
                 style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)", borderRadius: "14px 14px 0 0" }}
                 onClick={onToggleMinimize}>
                 <div className="relative flex-shrink-0">
-                    <UserAvatar name={targetUser.name} role={targetUser.role} size={30} />
+                    <UserAvatar name={targetUser.name} role={targetUser.role} size={30} photoUrl={targetUser.profile_photo_url} />
                     <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400"
                         style={{ border: "1.5px solid #1a1a2e" }} />
                 </div>
@@ -780,7 +781,7 @@ export function ChatManager({ currentUser, activeChats, onClose }: ChatManagerPr
                                     : { color: "rgba(255,255,255,0.5)", border: "1px solid transparent" }
                                 }
                             >
-                                <UserAvatar name={chat.user.name} role={chat.user.role} size={16} />
+                                <UserAvatar name={chat.user.name} role={chat.user.role} size={16} photoUrl={chat.user.profile_photo_url} />
                                 <span className="truncate">{chat.user.name.split(" ")[0]}</span>
                                 {unread > 0 && (
                                     <span className="w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[7px] font-black flex items-center justify-center flex-shrink-0">

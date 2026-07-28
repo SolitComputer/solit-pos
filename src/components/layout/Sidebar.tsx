@@ -24,6 +24,7 @@ function isItemActive(href: string, pathname: string): boolean {
   if (pathname === href) return true;
   if (href === "/dashboard") return false;
   if (href === "/dashboard/attendance") return pathname === "/dashboard/attendance";
+  if (href === "/dashboard/profile") return pathname === "/dashboard/profile";
 
   if (href.startsWith("/dashboard/data-barang")) {
     return (
@@ -142,6 +143,7 @@ const Icons = {
   accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4.5c2.5-1 5.5-1 8 .3v14c-2.5-1.3-5.5-1.3-8-.3z" /><path d="M22 4.5c-2.5-1-5.5-1-8 .3v14c2.5-1.3 5.5-1.3 8-.3z" /></svg>),
   patchNotes: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>),
   aiCeo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8z" /><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" /></svg>),
+  profile: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -160,6 +162,7 @@ const ITEM_TODOS: MenuItem = { name: "To-Do List", href: "/dashboard/todos", ico
 const ITEM_PATCH_NOTES: MenuItem = { name: "Patch Notes", href: "/dashboard/admin/patch-notes", icon: Icons.patchNotes };
 const ITEM_AI_CEO: MenuItem = { name: "AI CEO", href: "/dashboard/ai-ceo", icon: Icons.aiCeo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
+const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
@@ -718,9 +721,18 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   if (!(AI_CEO_ROLES as string[]).includes(role)) return;
-  // Grup terpisah, ditambahkan paling akhir → otomatis tampil di paling bawah
-  // sidebar, karena ini transformasi terakhir yang menyentuh urutan ROLE_MENUS.
   ROLE_MENUS[role].push({ label: "AI", items: [ITEM_AI_CEO] });
+});
+
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  const utama = ROLE_MENUS[role].find((g) => g.label === "Utama");
+  if (utama) {
+    if (!utama.items.some((it) => it.href === ITEM_PROFILE.href)) {
+      utama.items.push(ITEM_PROFILE);
+    }
+  } else {
+    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_PROFILE] }, ...ROLE_MENUS[role]];
+  }
 });
 
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
@@ -864,7 +876,7 @@ function SidebarContent({
 
         {loading || !user ? (
           <div className={`flex items-center gap-3 ${rail ? "justify-center" : ""}`}>
-            <div className="w-9 h-9 rounded-xl bg-gray-100 animate-pulse flex-shrink-0" />
+            <div className="w-9 h-9 rounded-full bg-gray-100 animate-pulse flex-shrink-0" />
             {!rail && (
               <div className="flex-1 space-y-1.5">
                 <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
@@ -873,21 +885,26 @@ function SidebarContent({
             )}
           </div>
         ) : rail ? (
-          <div className="flex justify-center">
-            <div className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold" title={user?.name || ""}>
-              {initials}
+          <Link href="/dashboard/profile" className="flex justify-center" title="Profil saya">
+            <div className="w-9 h-9 rounded-full bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold overflow-hidden" title={user?.name || ""}>
+              {user?.profile_photo_url
+                ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
+                : initials}
             </div>
-          </div>
+          </Link>
         ) : (
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{initials}</div>
+          <Link href="/dashboard/profile" className="flex items-center gap-3 group/profile" title="Profil saya">
+            <div className="w-9 h-9 rounded-full bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+              {user?.profile_photo_url
+                ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
+                : initials}
+            </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-800 truncate">{user?.name || "—"}</p>
+              <p className="text-sm font-semibold text-gray-800 truncate group-hover/profile:underline">{user?.name || "—"}</p>
               <RoleBadges user={user} />
             </div>
-          </div>
-        )}
-      </div>
+          </Link>
+        )}      </div>
 
       <div className={`h-px bg-gray-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
 
@@ -1021,6 +1038,21 @@ export default function Sidebar() {
     fetchUser();
   }, []);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      setUser((prev: any) => {
+        if (!prev) return prev;
+        const next = { ...prev, ...detail };
+        setCachedUser(next);
+        return next;
+      });
+    };
+    window.addEventListener("solit:profile-updated", handler);
+    return () => window.removeEventListener("solit:profile-updated", handler);
+  }, []);
+
   useEffect(() => { setOpen(false); }, [pathname]);
 
   const handleLogout = async () => {
@@ -1136,8 +1168,16 @@ export default function Sidebar() {
     "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
   };
 
+  const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
+  const displayGroups: MenuGroup[] = groups.map((g) => ({
+    ...g,
+    items: g.items.map((it) =>
+      it.href === "/dashboard/users" && !isUserMgmtAdmin ? { ...it, name: "Akun" } : it
+    ),
+  }));
+
   const sharedContentProps = {
-    user, loading, groups, pathname,
+    user, loading, groups: displayGroups, pathname,
     onLogout: handleLogout, badges, openMap, onToggleGroup: toggleGroup,
   };
 
