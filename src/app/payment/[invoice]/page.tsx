@@ -64,6 +64,17 @@ interface ActiveUnit {
   deal_price: number;
 }
 
+interface ActiveAccessory {
+  accessory_id: string;
+  name: string;
+  category?: string;
+  quantity: number;
+  deal_price: number;
+  selling_price: number; // modal
+  is_bonus: boolean;
+  stock?: number;
+}
+
 const inputCls =
   "w-full border border-gray-200 rounded-xl h-11 px-4 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition placeholder:text-gray-300";
 const selectCls =
@@ -86,6 +97,11 @@ export default function EditTransactionPage() {
   const [allReadyUnits, setAllReadyUnits] = useState<ReadyUnit[]>([]);
   const [isFetchingUnits, setIsFetchingUnits] = useState(false);
   const [snSearch, setSnSearch] = useState("");
+
+  const [activeAccessories, setActiveAccessories] = useState<ActiveAccessory[]>([]);
+  const [accSearch, setAccSearch] = useState("");
+  const [accResults, setAccResults] = useState<any[]>([]);
+  const [isFetchingAccs, setIsFetchingAccs] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -159,6 +175,18 @@ export default function EditTransactionPage() {
                 }))
               );
             }
+          }
+          if (Array.isArray((tx as any).accessory_items)) {
+            const accs: ActiveAccessory[] = (tx as any).accessory_items.map((a: any) => ({
+              accessory_id: a.accessory_id,
+              name: a.name || a.item_name || "Aksesori",
+              category: a.category,
+              quantity: Number(a.quantity) || 1,
+              deal_price: Number(a.deal_price ?? 0),
+              selling_price: Number(a.selling_price ?? 0),
+              is_bonus: Boolean(a.is_bonus || Number(a.deal_price) === 0),
+            }));
+            setActiveAccessories(accs);
           }
         }
       } catch {
@@ -338,6 +366,53 @@ export default function EditTransactionPage() {
     );
   });
 
+  const handleAccSearch = async (q: string) => {
+    setAccSearch(q);
+    if (q.trim().length < 2) { setAccResults([]); return; }
+    setIsFetchingAccs(true);
+    try {
+      const res = await fetch(`/api/accessories/search?q=${encodeURIComponent(q)}`);
+      const json = await res.json();
+      if (json.success) {
+        const selectedIds = new Set(activeAccessories.map((a) => a.accessory_id));
+        setAccResults((json.data || []).filter((a: any) => !selectedIds.has(a.id)));
+      }
+    } catch {
+      setAccResults([]);
+    } finally {
+      setIsFetchingAccs(false);
+    }
+  };
+
+  const handleAddAccessory = (a: any) => {
+    const newAcc: ActiveAccessory = {
+      accessory_id: a.id,
+      name: a.name,
+      category: a.category,
+      quantity: 1,
+      deal_price: Number(a.sell_price ?? 0),
+      selling_price: Number(a.buy_price ?? 0),
+      is_bonus: false,
+      stock: a.stock,
+    };
+    setActiveAccessories((prev) => [...prev, newAcc]);
+    setAccSearch("");
+    setAccResults([]);
+    setHasChanges(true);
+  };
+
+  const handleUpdateAccessory = (idx: number, patch: Partial<ActiveAccessory>) => {
+    setActiveAccessories((prev) =>
+      prev.map((a, i) => (i === idx ? { ...a, ...patch } : a))
+    );
+    setHasChanges(true);
+  };
+
+  const handleRemoveAccessory = (idx: number) => {
+    setActiveAccessories((prev) => prev.filter((_, i) => i !== idx));
+    setHasChanges(true);
+  };
+
   const handleSave = async () => {
     setShowConfirm(false);
     setIsSaving(true);
@@ -364,10 +439,16 @@ export default function EditTransactionPage() {
           deal_price: u.deal_price,
         }));
 
-      // Total deal: sum dari unit yang ada deal_price,
-      // fallback ke nilai original dari DB jika semua unit deal_price = 0
+      const totalAccDeal = activeAccessories.reduce(
+        (s, a) => s + (a.is_bonus ? 0 : (a.deal_price || 0)),
+        0
+      );
+      const totalLaptopDeal = activeUnits.reduce(
+        (s, u) => s + (u.deal_price || 0),
+        0
+      );
       const totalDeal =
-        activeUnits.reduce((s, u) => s + (u.deal_price || 0), 0) ||
+        (totalLaptopDeal + totalAccDeal) ||
         Number(formData.deal_price || formData.amount || 0);
 
       const res = await fetch(`/api/transaction/${invoice}`, {
@@ -383,6 +464,7 @@ export default function EditTransactionPage() {
           unit_id: unitIds[0] ?? null,
           laptop_name: laptopNames.join(" + "),
           laptop_id: activeUnits[0]?.laptop_id ?? null,
+          accessories: activeAccessories,
           // Hanya include key-nya kalau ada data yang valid
           ...(purchasePricesPerUnit.length > 0 && {
             purchase_prices_per_unit: purchasePricesPerUnit,
@@ -898,6 +980,164 @@ export default function EditTransactionPage() {
                 placeholder="-"
               />
             </Field>
+          </div>
+
+          <div className="section-divider" />
+
+          {/* ─ Section: Aksesori Tambahan ─ */}
+          <SectionHeader icon={Package} title="Aksesori Tambahan" color="#ECFDF5" />
+          <div className="px-5 pb-5 space-y-3">
+            {activeAccessories.length > 0 && (
+              <div className="space-y-2">
+                {activeAccessories.map((acc, idx) => (
+                  <div
+                    key={acc.accessory_id + idx}
+                    className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100/80 text-emerald-700 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                        {acc.quantity}x
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-gray-800 truncate">{acc.name}</p>
+                        {acc.category && (
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/60 px-1.5 py-0.5 rounded-md inline-block mt-0.5">
+                            {acc.category}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
+                      {/* Toggle Bonus */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateAccessory(idx, {
+                            is_bonus: !acc.is_bonus,
+                            deal_price: !acc.is_bonus ? 0 : acc.deal_price,
+                          })
+                        }
+                        className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition ${
+                          acc.is_bonus
+                            ? "bg-amber-50 border-amber-200 text-amber-700 shadow-sm"
+                            : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+                        }`}
+                      >
+                        {acc.is_bonus ? "🎁 Bonus (Rp0)" : "Berbayar"}
+                      </button>
+
+                      {/* Qty Counter */}
+                      <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleUpdateAccessory(idx, {
+                              quantity: Math.max(1, acc.quantity - 1),
+                            })
+                          }
+                          className="px-2 py-1 text-gray-500 hover:bg-gray-100 text-xs font-bold"
+                        >
+                          -
+                        </button>
+                        <span className="px-2.5 text-xs font-bold text-gray-700 font-mono">
+                          {acc.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleUpdateAccessory(idx, {
+                              quantity: acc.quantity + 1,
+                            })
+                          }
+                          className="px-2 py-1 text-gray-500 hover:bg-gray-100 text-xs font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* Harga Deal Input */}
+                      {!acc.is_bonus && (
+                        <div className="relative w-32">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
+                            Rp
+                          </span>
+                          <input
+                            type="number"
+                            className="w-full border border-gray-200 rounded-lg h-8 pl-7 pr-2 text-xs font-bold text-gray-800 font-mono bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            value={acc.deal_price || ""}
+                            onChange={(e) =>
+                              handleUpdateAccessory(idx, {
+                                deal_price: Math.max(0, Number(e.target.value) || 0),
+                              })
+                            }
+                            placeholder="0"
+                          />
+                        </div>
+                      )}
+
+                      {/* Remove Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAccessory(idx)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add Accessory Input */}
+            <div>
+              <label className="text-xs font-medium text-gray-400 mb-1.5 flex items-center gap-2">
+                Tambah Aksesori
+                {isFetchingAccs && (
+                  <span className="flex items-center gap-1 text-emerald-600 text-[10px]">
+                    <div className="w-3 h-3 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" />
+                    Mencari...
+                  </span>
+                )}
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Ketik nama aksesori..."
+                  className="w-full border border-gray-200 rounded-xl h-10 px-3.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition placeholder:text-gray-300"
+                  value={accSearch}
+                  onChange={(e) => handleAccSearch(e.target.value)}
+                />
+                {accSearch.trim().length >= 2 && accResults.length > 0 && (
+                  <div className="unit-dropdown absolute top-full left-0 right-0 z-20 mt-1.5 max-h-48 overflow-y-auto">
+                    {accResults.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => handleAddAccessory(a)}
+                        className="unit-dropdown-item w-full px-4 py-2.5 text-left border-b border-gray-50 last:border-0 flex items-center justify-between"
+                      >
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">{a.name}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            {a.category ? `${a.category} · ` : ""}Stok: {a.stock ?? 0}
+                          </p>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-emerald-700">
+                          {fmt(a.sell_price || 0)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {accSearch.trim().length >= 2 && accResults.length === 0 && !isFetchingAccs && (
+                  <p className="absolute top-full left-0 mt-1 text-[11px] text-gray-400 px-1">
+                    Tidak ada aksesori cocok
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="section-divider" />
