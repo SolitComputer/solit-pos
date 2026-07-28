@@ -9,6 +9,14 @@ function isFullAccess(roles: string[]): boolean {
   return roles.some(r => FULL_ACCESS_ROLES.has(r));
 }
 
+// ── Helper hapus foto profil dari storage saat akun dihapus total ──────────
+const AVATAR_BUCKET = "avatars";
+function extractAvatarPath(publicUrl: string): string | null {
+  const marker = `/${AVATAR_BUCKET}/`;
+  const idx = publicUrl.indexOf(marker);
+  return idx === -1 ? null : publicUrl.slice(idx + marker.length);
+}
+
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (digits.startsWith("62")) return digits;
@@ -30,11 +38,15 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const isAdmin = userRoles.some(r => FULL_ACCESS_SET.has(r));
   const isKepala = !isAdmin && userRoles.some(r => KEPALA_SET.has(r));
 
-  const selectFields = isAdmin
-    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio"
+  // Anotasi ": string" WAJIB ada di sini — tanpa ini TypeScript menganggap
+  // selectFields sebagai union 3 string literal raksasa, dan supabase-js coba
+  // parsing tiap literalnya untuk infer bentuk hasil query. Untuk select-string
+  // sepanjang ini, compiler jadi "meledak" — persis error build tadi.
+  const selectFields: string = isAdmin
+    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url"
     : isKepala
-      ? "id, name, phone_number, role, roles, shift, birth_date, profile_photo_url, bio"
-      : "id, name, role, roles, birth_date, profile_photo_url, bio";
+      ? "id, name, phone_number, role, roles, shift, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url"
+      : "id, name, role, roles, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url";
 
   const { data, error } = await supabaseAdmin
     .from("users")
@@ -48,7 +60,6 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
   const users = (data ?? []).map((u: any) => ({
     ...u,
-    // Normalize roles: pastikan selalu array
     roles: Array.isArray(u.roles) && u.roles.length > 0
       ? u.roles
       : [u.role].filter(Boolean),
@@ -61,6 +72,9 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     phone_number: (isAdmin || isKepala) ? (u.phone_number ?? null) : null,
     email: isAdmin ? (u.email ?? null) : null,
     birth_date: u.birth_date ?? null,
+    status_note: (u.status_note_expires_at && new Date(u.status_note_expires_at) < new Date())
+      ? null
+      : (u.status_note ?? null),
   }));
 
   return NextResponse.json({ success: true, users });
@@ -262,10 +276,21 @@ async function deleteHandler(req: NextRequest, ctx: any, currentUser: AuthUser) 
     );
   }
 
+  const { data: existingUser } = await supabaseAdmin
+    .from("users")
+    .select("profile_photo_url")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabaseAdmin.from("users").delete().eq("id", id);
 
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+
+  const oldAvatarPath = existingUser?.profile_photo_url ? extractAvatarPath(existingUser.profile_photo_url) : null;
+  if (oldAvatarPath) {
+    await supabaseAdmin.storage.from(AVATAR_BUCKET).remove([oldAvatarPath]);
   }
 
   return NextResponse.json({ success: true });
