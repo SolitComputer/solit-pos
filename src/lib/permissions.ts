@@ -157,6 +157,7 @@ export const ITEM_OUTFLOW_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "TEKNISI", "KEPALA_TEKNISI",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "KEPALA_ZENITH",
 ];
 
 // ─── Preparation Roles ────────────────────────────────────────────────────────
@@ -911,4 +912,5 @@ export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
   "TEKNISI",
   "KEPALA_TEKNISI",
   "PKL_TEKNISI",
+  "KEPALA_ZENITH",
 ];
