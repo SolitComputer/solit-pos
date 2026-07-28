@@ -86,6 +86,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         ...(purchase_price !== undefined && { purchase_price: Math.round(Number(purchase_price)) }),
         ...(selling_price !== undefined && { selling_price: Math.round(Number(selling_price)) }),
         ...(body.sparepart_cost !== undefined && { sparepart_cost: Math.round(Number(body.sparepart_cost)) }),
+        ...(body.official_price !== undefined && { official_price: Math.round(Number(body.official_price)) }),
         ...(status !== undefined && { status }),
         ...(notes !== undefined && { notes }),
         ...(body.received_at !== undefined && body.received_at !== "" && {

@@ -328,34 +328,38 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
         )}
       </div>
       <ModalFoot>
-        <div className="flex-1 flex gap-2 flex-wrap">
+        <div className="flex-1 flex flex-col gap-2">
+          {/* ── Baris 1: aksi utama sesuai status — 1 tombol dominan, full-width ── */}
           {currentUser?.id === o.user_id && o.status === "NEED_PROOF" && (
-            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="flex-1 h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Upload Foto</button>
+            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="w-full h-10 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Upload Foto</button>
           )}
           {currentUser?.id === o.user_id && o.status === "ONGOING" && !o.actual_end && (
-            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Selesai</button>
+            <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Selesai</button>
           )}
           {canApproveTarget(currentUser?.role, o.users?.role) && o.status === "PENDING" && (
-            <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Setujui</button>
+            <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="w-full h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Setujui</button>
           )}
           {/* Bayaran hanya boleh diatur kalau lembur selesai DAN foto bukti sudah ada */}
           {canSetPay(currentUser?.role) && o.status === "COMPLETED" && !!o.proof_photo_url && (
-            <button onClick={() => { onClose(); setTimeout(onSetPay, 100); }} className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> {o.rate_per_hour ? "Edit Bayaran" : "Set Bayaran"}</button>
+            <button onClick={() => { onClose(); setTimeout(onSetPay, 100); }} className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> {o.rate_per_hour ? "Edit Bayaran" : "Set Bayaran"}</button>
           )}
           {/* Placeholder informatif: admin tahu kenapa tombol Set Bayaran belum muncul */}
           {canSetPay(currentUser?.role) && !o.proof_photo_url && (o.status === "NEED_PROOF" || o.status === "COMPLETED") && (
-            <div className="flex-1 h-10 rounded-xl border border-dashed border-gray-200 bg-gray-50 text-gray-400 text-[10px] font-semibold flex items-center justify-center gap-1.5 px-3 text-center">
+            <div className="w-full h-10 rounded-xl border border-dashed border-gray-200 bg-gray-50 text-gray-400 text-[10px] font-semibold flex items-center justify-center gap-1.5 px-3 text-center">
               <Camera size={13} className="flex-shrink-0" />
               <span>Menunggu foto bukti</span>
             </div>
           )}
-          {isAdminRole(currentUser?.role) && (
-            <>
-              <button onClick={() => { onClose(); setTimeout(onEdit, 100); }} className="h-10 px-3.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 flex items-center gap-1.5 transition-all"> Edit</button>
-              <button onClick={() => { onClose(); setTimeout(onDelete, 100); }} className="h-10 px-3.5 bg-white border border-red-100 text-red-500 rounded-xl text-xs font-semibold hover:bg-red-50 flex items-center transition-all"></button>
-            </>
-          )}
-          <button onClick={onClose} className="h-10 px-4 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition-all">Tutup</button>
+          {/* ── Baris 2: aksi sekunder — semua rata kanan (satu sisi) ── */}
+          <div className="flex items-center justify-end gap-2">
+            {isAdminRole(currentUser?.role) && (
+              <>
+                <button onClick={() => { onClose(); setTimeout(onEdit, 100); }} className="h-10 px-3.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 flex items-center gap-1.5 transition-all"> Edit</button>
+                <button onClick={() => { onClose(); setTimeout(onDelete, 100); }} className="h-10 px-3.5 bg-white border border-red-100 text-red-500 rounded-xl text-xs font-semibold hover:bg-red-50 flex items-center transition-all"></button>
+              </>
+            )}
+            <button onClick={onClose} className="h-10 px-4 bg-gray-100 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-200 transition-all">Tutup</button>
+          </div>
         </div>
       </ModalFoot>
     </ModalWrapper>
@@ -1394,6 +1398,20 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
   filterStatus: string; setFilterStatus: (v: string) => void;
   statuses: string[]; onSelectUser: (uid: string) => void;
 }) {
+  // ── Urutan daftar karyawan (default A–Z). Sort lokal di panel biar
+  //    nggak ganggu sort punya parent. Wajib salin array dulu ([...]) karena
+  //    .sort() itu mutasi — nyort prop langsung = efek samping ke data parent.
+  const [sortBy, setSortBy] = useState<"NAMA_ASC" | "NAMA_DESC" | "LEMBUR_DESC" | "LEMBUR_ASC">("NAMA_ASC");
+  const sortedGroups = useMemo(() => {
+    const arr = [...groupedByUser];
+    switch (sortBy) {
+      case "NAMA_DESC": return arr.sort((a, b) => b.user.name.localeCompare(a.user.name, "id-ID"));
+      case "LEMBUR_DESC": return arr.sort((a, b) => b.items.length - a.items.length);
+      case "LEMBUR_ASC": return arr.sort((a, b) => a.items.length - b.items.length);
+      default: return arr.sort((a, b) => a.user.name.localeCompare(b.user.name, "id-ID"));
+    }
+  }, [groupedByUser, sortBy]);
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-100 space-y-3">
@@ -1407,6 +1425,17 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
             <input type="text" placeholder="Cari nama karyawan..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               className="w-full h-9 pl-9 pr-3.5 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all placeholder:text-gray-300" />
           </div>
+          {/* ── Urutan / sort daftar karyawan ── */}
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as typeof sortBy)}
+            className="h-9 px-3 border border-gray-200 rounded-xl text-[10px] font-semibold text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all cursor-pointer flex-shrink-0"
+          >
+            <option value="NAMA_ASC">Nama A–Z</option>
+            <option value="NAMA_DESC">Nama Z–A</option>
+            <option value="LEMBUR_DESC">Lembur terbanyak</option>
+            <option value="LEMBUR_ASC">Lembur tersedikit</option>
+          </select>
           {statuses.length > 0 && (
             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
               {["Semua", ...statuses].map(s => {
@@ -1445,7 +1474,7 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
         </div>
       ) : (
         <div className="divide-y divide-gray-50">
-          {groupedByUser.map(({ user, items }) => {
+          {sortedGroups.map(({ user, items }) => {
             const bg = avBg(user.name);
             const hasUrgent = items.some(o => o.status === "NEED_PROOF" || (o.status === "PENDING" && canApproveTarget(currentUser?.role, user.role)));
             const hasOngoing = items.some(o => o.status === "ONGOING");
