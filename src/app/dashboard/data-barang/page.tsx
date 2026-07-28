@@ -2,11 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { UserRole, hasAnyRole } from "@/lib/permissions";
+import { UserRole, hasAnyRole, ITEM_OUTFLOW_ROLES, DATA_BARANG_LAPTOP_ROLES } from "@/lib/permissions";
 import { LaptopsContent } from "../laptops/LaptopsContent";
 import AccessoriesContent from "../accessories/AccessoriesContent";
 import OutflowsContent from "./OutflowsContent";
-import { ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
 import PriceListPedagangTab from "@/components/inventory/price-list-pedagang/page";
 import { PRICELIST_PEDAGANG_ROLES } from "@/lib/pricelistPedagang";
 
@@ -24,13 +23,13 @@ const TABS: TabDef[] = [
   {
     key: "laptops",
     label: "Data Laptop",
-    roles: [],
+    roles: DATA_BARANG_LAPTOP_ROLES,
     icon: "ti-device-laptop",
   },
   {
     key: "accessories",
     label: "Aksesoris",
-    roles: [],
+    roles: DATA_BARANG_LAPTOP_ROLES,
     icon: "ti-devices",
   },
   {
@@ -130,7 +129,7 @@ export default function DataBarangPage() {
   const visibleTabs = useMemo(
     () =>
       TABS.filter(
-        (t) => t.roles.length === 0 || !rolesLoaded || hasAnyRole(userRoles, t.roles)
+        (t) => rolesLoaded && hasAnyRole(userRoles, t.roles)
       ),
     [userRoles, rolesLoaded]
   );
@@ -221,10 +220,26 @@ export default function DataBarangPage() {
 
       {/* ── KONTEN TAB ────────────────────────────────────────── */}
       <div className="mt-5">
-        {activeTab === "laptops" && <LaptopsContent />}
-        {activeTab === "accessories" && <AccessoriesContent />}
-        {activeTab === "outflows" && <OutflowsContent />}
-        {activeTab === "pedagang" && <PriceListPedagangTab />}
+        {!rolesLoaded ? (
+          <div className="p-8 text-center text-sm text-gray-400">Memuat data...</div>
+        ) : visibleTabs.length === 0 ? (
+          <div className="p-12 text-center bg-white rounded-2xl border border-gray-200 shadow-sm">
+            <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-sm font-semibold text-gray-900">Akses Dibatasi</h3>
+            <p className="text-xs text-gray-500 mt-1">Anda tidak memiliki akses untuk melihat data di halaman ini.</p>
+          </div>
+        ) : (
+          <>
+            {activeTab === "laptops" && visibleTabs.some((t) => t.key === "laptops") && <LaptopsContent />}
+            {activeTab === "accessories" && visibleTabs.some((t) => t.key === "accessories") && <AccessoriesContent />}
+            {activeTab === "outflows" && visibleTabs.some((t) => t.key === "outflows") && <OutflowsContent />}
+            {activeTab === "pedagang" && visibleTabs.some((t) => t.key === "pedagang") && <PriceListPedagangTab />}
+          </>
+        )}
       </div>
 
       <style jsx global>{`  

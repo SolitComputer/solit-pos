@@ -899,3 +899,16 @@ export const BARANG_PRIVATE_VIEW_ROLES: UserRole[] = [
   "ACCOUNTING",
   "KEPALA_TEKNISI",
 ];
+
+// ── Data Barang: Role yang boleh melihat tab Data Laptop & Aksesoris ──────────
+// Kepala Sales, Kepala Zenith, Kepala Onpoint, Kepala Sotech, Crew Sales, dan Sales tidak diperbolehkan.
+export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
+  ...FULL_ACCESS,
+  "PURCHASING",
+  "PENGELOLA_BARANG",
+  "KEPALA_PENGELOLA_BARANG",
+  "PKL_PENGELOLA_BARANG",
+  "TEKNISI",
+  "KEPALA_TEKNISI",
+  "PKL_TEKNISI",
+];
