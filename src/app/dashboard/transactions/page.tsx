@@ -726,6 +726,35 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
           );
         })()}
 
+        {/* Accessories in Mobile Card */}
+        {(() => {
+          const accs: any[] = item.accessory_items ?? (Array.isArray(item.transaction_items) ? item.transaction_items.filter((it: any) => it.item_type === "accessory" || it.accessory_id) : []);
+          if (accs.length === 0) return null;
+
+          return (
+            <div className="bg-emerald-50/60 rounded-xl p-2.5 border border-emerald-100 space-y-1.5">
+              <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wide">Detail Aksesori ({accs.length})</p>
+              <div className="space-y-1">
+                {accs.map((a: any, idx: number) => {
+                  const name = a.name || a.item_name || a.laptop_name || "Aksesori";
+                  const qty = Number(a.quantity) || 1;
+                  const deal = Number(a.deal_price || 0);
+                  const isBonus = Boolean(a.is_bonus || deal === 0);
+
+                  return (
+                    <div key={idx} className="flex items-center justify-between text-xs text-gray-800">
+                      <span className="truncate pr-2">• {name} <strong className="text-emerald-700">({qty}x)</strong></span>
+                      <span className="font-mono font-bold text-[11px] flex-shrink-0">
+                        {isBonus ? <span className="text-amber-700 font-bold">BONUS</span> : `Rp${deal.toLocaleString("id-ID")}`}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── REVISI: Price box selalu 1 kolom jika canSeeModal false, grid-cols-2 jika true ── */}
         <div className={`grid gap-2 ${canSeeModal ? "grid-cols-2" : "grid-cols-1"}`}>
           {(() => {
@@ -1287,6 +1316,8 @@ const MODAL_VISIBLE_ROLES = [
 ];
 
 function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }: { item: any; onClose: () => void; canSeeFinancials: boolean; canSeeModal: boolean }) {
+  const [fullItem, setFullItem] = useState<any>(null);
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
@@ -1294,12 +1325,28 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
     return () => { window.removeEventListener("keydown", h); document.body.style.overflow = ""; };
   }, [onClose]);
 
-  const payStyle = getPaymentStyle(item.payment_method ?? "");
-  const platformBadge = getSourcePlatformBadge(item.source_platform ?? "");
-  const grouped: any[] = item.grouped_items ?? [];
+  useEffect(() => {
+    let active = true;
+    if (item?.invoice_number) {
+      fetch(`/api/transaction/${item.invoice_number}`)
+        .then((res) => res.json())
+        .then((res) => {
+          if (active && res.success && res.data) {
+            setFullItem(res.data);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => { active = false; };
+  }, [item?.invoice_number]);
+
+  const activeItem = fullItem || item;
+  const payStyle = getPaymentStyle(activeItem.payment_method ?? "");
+  const platformBadge = getSourcePlatformBadge(activeItem.source_platform ?? "");
+  const grouped: any[] = activeItem.grouped_items ?? [];
   const isMulti = grouped.length > 1;
-  const totalDeal = Number(item.deal_price ?? item.amount ?? 0);
-  const totalMargin = Number(item.other ?? 0);
+  const totalDeal = Number(activeItem.deal_price ?? activeItem.amount ?? 0);
+  const totalMargin = Number(activeItem.other ?? 0);
   const totalModal = grouped.reduce((s, g) => s + Number(g.purchase_price_total ?? 0), 0);
   const totalJual = grouped.reduce((s, g) => s + Number(g.selling_price_total ?? 0), 0);
 
@@ -1311,15 +1358,15 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
         <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 flex-shrink-0">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${statusDot[item.status] ?? "bg-gray-400"}`} />
-                {STATUS_LABEL[item.status] ?? item.status}
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 ${statusMap[activeItem.status] ?? "bg-gray-100 text-gray-600"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${statusDot[activeItem.status] ?? "bg-gray-400"}`} />
+                {STATUS_LABEL[activeItem.status] ?? activeItem.status}
               </span>
-              {isMulti && <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700">{grouped.length} Laptop</span>}
+              {isMulti && <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700">{grouped.length} Barang</span>}
             </div>
-            <h2 className="font-bold text-gray-900 text-base leading-snug">{item.customer_name}</h2>
-            <p className="text-xs text-gray-400 font-mono mt-0.5">{item.invoice_number}</p>
-            <p className="text-xs text-gray-400 mt-0.5"> {formatDateShort(item.created_at)}</p>
+            <h2 className="font-bold text-gray-900 text-base leading-snug">{activeItem.customer_name}</h2>
+            <p className="text-xs text-gray-400 font-mono mt-0.5">{activeItem.invoice_number}</p>
+            <p className="text-xs text-gray-400 mt-0.5"> {formatDateShort(activeItem.created_at)}</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition flex-shrink-0">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1331,28 +1378,28 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">Customer</p>
-              <p className="text-sm font-bold text-gray-800">{item.customer_name}</p>
-              {item.customer_phone && <p className="text-xs text-gray-500 mt-0.5"> {item.customer_phone}</p>}
-              {item.customer_type && item.customer_type !== "UMUM" && (
+              <p className="text-sm font-bold text-gray-800">{activeItem.customer_name}</p>
+              {activeItem.customer_phone && <p className="text-xs text-gray-500 mt-0.5"> {activeItem.customer_phone}</p>}
+              {activeItem.customer_type && activeItem.customer_type !== "UMUM" && (
                 <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
-                  {(() => { const ct = getCustomerTypeBadge(item.customer_type); const CtIcon = ct.icon; return <><CtIcon className="w-3 h-3" /> {ct.text}</>; })()}
+                  {(() => { const ct = getCustomerTypeBadge(activeItem.customer_type); const CtIcon = ct.icon; return <><CtIcon className="w-3 h-3" /> {ct.text}</>; })()}
                 </span>
               )}
             </div>
             <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">Sales</p>
-              {item.sales_name ? (
+              {activeItem.sales_name ? (
                 <>
-                  <p className="text-sm font-bold text-gray-800">{item.sales_name}</p>
-                  {item.employee_role && <span className="inline-flex items-center mt-2 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">{item.employee_role}</span>}
+                  <p className="text-sm font-bold text-gray-800">{activeItem.sales_name}</p>
+                  {activeItem.employee_role && <span className="inline-flex items-center mt-2 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">{activeItem.employee_role}</span>}
                 </>
               ) : <p className="text-sm text-gray-300">—</p>}
             </div>
           </div>
 
-          {/* Laptop details */}
+          {/* Goods details */}
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5"> {isMulti ? `Laptop (${grouped.length} item)` : "Detail Laptop"}</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5"> {isMulti ? `Barang (${grouped.length} item)` : "Detail Barang"}</p>
             <div className="space-y-2">
               {grouped.length > 0 ? grouped.map((g: any, idx: number) => (
                 <div key={idx} className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
@@ -1404,12 +1451,78 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                 </div>
               )) : (
                 <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
-                  <p className="text-sm font-bold text-gray-800">{item.laptop_name || "—"}</p>
-                  {item.serial_number && <span className="font-mono text-[10px] font-bold bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md mt-1.5 inline-block">{item.serial_number}</span>}
+                  <p className="text-sm font-bold text-gray-800">{activeItem.laptop_name || "—"}</p>
+                  {activeItem.serial_number && <span className="font-mono text-[10px] font-bold bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md mt-1.5 inline-block">{activeItem.serial_number}</span>}
                 </div>
               )}
             </div>
           </div>
+
+          {/* Aksesori details */}
+          {(() => {
+            const accs: any[] = activeItem.accessory_items ?? (
+              Array.isArray(activeItem.transaction_items)
+                ? activeItem.transaction_items.filter((it: any) => it.item_type === "accessory" || Boolean(it.accessory_id) || (!it.unit_id && !it.laptop_id))
+                : []
+            );
+
+            const isMixedOrAcc = activeItem.item_kind === "mixed" || activeItem.item_kind === "accessory" || (typeof activeItem.laptop_name === "string" && activeItem.laptop_name.toLowerCase().includes("aksesori"));
+
+            if (accs.length === 0 && !isMixedOrAcc) return null;
+
+            return (
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">Detail Aksesori {accs.length > 0 ? `(${accs.length} item)` : ""}</p>
+                {accs.length > 0 ? (
+                  <div className="space-y-2">
+                    {accs.map((a: any, idx: number) => {
+                      const name = a.name || a.item_name || a.laptop_name || "Aksesori";
+                      const qty = Number(a.quantity) || 1;
+                      const deal = Number(a.deal_price ?? 0);
+                      const modalPrice = Number(a.selling_price ?? 0);
+                      const isBonus = Boolean(a.is_bonus || deal === 0);
+
+                      return (
+                        <div key={idx} className="bg-white border border-emerald-100 rounded-xl p-3 shadow-sm flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 flex-shrink-0">
+                              {qty}x
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-gray-800 truncate">{name}</p>
+                              {isBonus ? (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 inline-block mt-0.5">
+                                  BONUS
+                                </span>
+                              ) : (
+                                <p className="text-[10px] text-gray-400 font-mono">
+                                  Rp{Math.round(deal / qty).toLocaleString("id-ID")}/unit
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            {isBonus ? (
+                              <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">Bonus (Rp0)</span>
+                            ) : (
+                              <span className="text-xs font-bold text-gray-900 font-mono tabular-nums">Rp{deal.toLocaleString("id-ID")}</span>
+                            )}
+                            {canSeeFinancials && canSeeModal && modalPrice > 0 && (
+                              <p className="text-[9px] text-gray-400 font-mono mt-0.5">Modal: Rp{(modalPrice * qty).toLocaleString("id-ID")}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-emerald-50/80 border border-emerald-100 rounded-xl p-3 text-xs font-medium text-emerald-900">
+                    Aksesori disertakan dalam paket transaksi ini.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Payment */}
           <div>
@@ -1419,7 +1532,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
               {canSeeFinancials && canSeeModal && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Total Harga Modal</span>
-                  {item.modal_missing ? (
+                  {activeItem.modal_missing ? (
                     <span className="text-xs font-bold text-amber-600"><AlertTriangle className="inline w-3.5 h-3.5 mr-1" />Harga modal belum diinput</span>
                   ) : (
                     <span className="text-sm font-bold text-gray-700 font-mono tabular-nums">Rp{totalModal.toLocaleString("id-ID")}</span>
@@ -1432,11 +1545,11 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                   <span className="text-sm font-bold text-violet-700 font-mono tabular-nums">Rp{totalJual.toLocaleString("id-ID")}</span>
                 </div>
               )}
-              {item.status === "RESERVED" && Number(item.dp_amount) > 0 ? (
+              {activeItem.status === "RESERVED" && Number(activeItem.dp_amount) > 0 ? (
                 <>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-500">DP Diterima</span>
-                    <span className="text-sm font-bold text-blue-700 font-mono tabular-nums">Rp{Number(item.dp_amount).toLocaleString("id-ID")}</span>
+                    <span className="text-sm font-bold text-blue-700 font-mono tabular-nums">Rp{Number(activeItem.dp_amount).toLocaleString("id-ID")}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-500">Total Harga Deal</span>
@@ -1450,13 +1563,13 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                 </div>
               )}
               {/* ── REVISI: Baris Total Margin hanya muncul jika canSeeModal ── */}
-              {canSeeFinancials && canSeeModal && item.modal_missing && (
+              {canSeeFinancials && canSeeModal && activeItem.modal_missing && (
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                   <span className="text-xs font-semibold text-gray-700">Total Margin</span>
                   <span className="text-xs font-bold text-amber-600"><AlertTriangle className="inline w-3.5 h-3.5 mr-1" />Harga modal belum diinput</span>
                 </div>
               )}
-              {canSeeFinancials && canSeeModal && !item.modal_missing && totalMargin !== 0 && (
+              {canSeeFinancials && canSeeModal && !activeItem.modal_missing && totalMargin !== 0 && (
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                   <span className="text-xs font-semibold text-gray-700">Total Margin</span>
                   <span className={`text-sm font-bold font-mono tabular-nums ${totalMargin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
@@ -1469,9 +1582,9 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
                   <span className="text-xs text-gray-500">Metode</span>
                   <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg ${paymentBgMap[payStyle.bg] ?? "bg-gray-100 text-gray-700"}`}>{payStyle.icon} {payStyle.text}</span>
                 </div>
-                <PaymentBreakdown item={item} size="md" />
+                <PaymentBreakdown item={activeItem} size="md" />
               </div>
-              {item.source_platform && (
+              {activeItem.source_platform && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Platform</span>
                   <span className={`text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap ${platformBadge.color}`}>{platformBadge.text}</span>
@@ -1480,18 +1593,18 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
             </div>
           </div>
 
-          {item.notes && (
+          {activeItem.notes && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5">
               <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-1.5">Catatan</p>
-              <p className="text-xs text-amber-900 leading-relaxed">{item.notes}</p>
+              <p className="text-xs text-amber-900 leading-relaxed">{activeItem.notes}</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-2.5 flex-shrink-0">
-          <a href={`/receipt/${item.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"> Receipt</a>
-          <a href={`/payment/${item.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition"> Edit</a>
+          <a href={`/receipt/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"> Receipt</a>
+          <a href={`/payment/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition"> Edit</a>
         </div>
       </div>
     </div>

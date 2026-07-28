@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
+import { recordOutflow, cancelOutflowByInvoice } from "@/lib/accessoryOutflow";
 
 interface Props {
   params: Promise<{ invoice: string }>;
@@ -389,11 +390,43 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    const { data: txItems } = await supabase
+    const { data: txItems, error: txItemsErr } = await supabase
       .from("transaction_items")
-      .select("unit_id, serial_number, deal_price")
+      .select("*")
       .eq("invoice_number", invoice);
+    if (txItemsErr) console.error("[GET /api/transaction/[invoice]] txItems error:", txItemsErr.message);
     const itemsPayload = txItems ?? [];
+
+    // ── Accessory items: try transaction_items first, then fallback to accessory_outflows ──
+    let accessory_items = itemsPayload
+      .filter((it: any) => it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id))
+      .map((it: any) => ({
+        accessory_id: it.accessory_id,
+        name: it.item_name || it.laptop_name || "Aksesori",
+        quantity: Number(it.quantity) || 1,
+        deal_price: Number(it.deal_price ?? 0),
+        selling_price: Number(it.selling_price ?? 0),
+        is_bonus: Boolean(it.is_bonus || Number(it.deal_price) === 0),
+      }));
+
+    // Enrich names from accessories table if missing or generic
+    const accIdsInTx = [...new Set(accessory_items.map((a: any) => a.accessory_id).filter(Boolean))];
+    if (accIdsInTx.length > 0) {
+      const { data: accLookup } = await supabase
+        .from("accessories")
+        .select("id, name, buy_price, category")
+        .in("id", accIdsInTx);
+      const accMap = new Map((accLookup ?? []).map((a: any) => [a.id, a]));
+      accessory_items = accessory_items.map((a: any) => {
+        const acc = accMap.get(a.accessory_id);
+        return {
+          ...a,
+          name: acc?.name || a.name || "Aksesori",
+          category: acc?.category || a.category,
+          selling_price: a.selling_price || Number(acc?.buy_price ?? 0),
+        };
+      });
+    }
 
     const unitIds: string[] = Array.isArray(tx.unit_ids)
       ? tx.unit_ids.filter(Boolean)
@@ -444,6 +477,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
             data: {
               ...tx,
               transaction_items: itemsPayload,
+              accessory_items,
               purchase_price_total: totalModalFromUnits,
               inventory_price: totalModalFromUnits,
               other: Number(tx.deal_price ?? tx.amount ?? 0) - totalModalFromUnits,
@@ -461,6 +495,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
           data: {
             ...tx,
             transaction_items: itemsPayload,
+            accessory_items,
             grouped_items: enriched,
             purchase_price_total: enrichedTotal,
             inventory_price: enrichedTotal,
@@ -474,6 +509,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
       data: {
         ...tx,
         transaction_items: itemsPayload,
+        accessory_items,
         purchase_price_total: Number(tx.inventory_price ?? 0),
       },
     });
@@ -681,6 +717,80 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
           0
         );
       }
+    }
+
+    // ── Handle update accessories ────────────────────────────────────
+    if (Array.isArray(body.accessories) && !isCancelling) {
+      // 1. Hapus row aksesori lama dari transaction_items
+      await supabase
+        .from("transaction_items")
+        .delete()
+        .eq("invoice_number", invoice)
+        .eq("item_type", "accessory");
+
+      // 2. Fallback laptop_id untuk constraint DB
+      const fallbackLaptopId =
+        finalNewUnitIds[0] ||
+        before?.laptop_id ||
+        (Array.isArray(before?.unit_ids) ? before.unit_ids[0] : null) ||
+        "5029ed37-6f81-4b13-a447-19e3df29c298";
+
+      const newAccItems = body.accessories.map((a: any) => ({
+        transaction_id: before?.id,
+        invoice_number: invoice,
+        item_type: "accessory",
+        unit_id: null,
+        accessory_id: a.accessory_id,
+        laptop_id: fallbackLaptopId,
+        serial_number: "-",
+        laptop_name: a.name || "Aksesori",
+        item_name: a.name || "Aksesori",
+        quantity: Number(a.quantity) || 1,
+        is_bonus: Boolean(a.is_bonus),
+        selling_price: Number(a.selling_price ?? 0),
+        deal_price: a.is_bonus ? 0 : Number(a.deal_price ?? 0),
+      }));
+
+      if (newAccItems.length > 0) {
+        const { error: accInsertErr } = await supabase
+          .from("transaction_items")
+          .insert(newAccItems);
+        if (accInsertErr) console.error("[PUT /api/transaction] insert accessory_items error:", accInsertErr.message);
+      }
+
+      // 3. Reconcile accessory_outflows & stok aksesori
+      await cancelOutflowByInvoice(invoice);
+      for (const a of body.accessories) {
+        if (a.accessory_id && Number(a.quantity) > 0) {
+          await recordOutflow({
+            accessory_id: a.accessory_id,
+            source_type: "transaction",
+            transaction_invoice: invoice,
+            qty: Number(a.quantity),
+            notes: `Penjualan (Edit) ${invoice}`,
+            taken_by_role: "SALES",
+          });
+          const { data: acc } = await supabase
+            .from("accessories")
+            .select("stock")
+            .eq("id", a.accessory_id)
+            .maybeSingle();
+          if (acc) {
+            await supabase
+              .from("accessories")
+              .update({ stock: Math.max(0, (Number(acc.stock) || 0) - Number(a.quantity)) })
+              .eq("id", a.accessory_id);
+          }
+        }
+      }
+
+      // 4. Update item_kind
+      const currentUnitIds = unitFieldsProvided
+        ? finalNewUnitIds
+        : (Array.isArray(before?.unit_ids) ? before.unit_ids : before?.unit_id ? [before.unit_id] : []).filter(Boolean);
+      const hasLaptops = currentUnitIds.length > 0;
+      const hasAccs = body.accessories.length > 0;
+      allowedFields.item_kind = hasLaptops && hasAccs ? "mixed" : hasLaptops ? "laptop" : "accessory";
     }
 
     // ── Hitung field other (profit) ──────────────────────────────────
