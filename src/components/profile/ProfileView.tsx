@@ -23,6 +23,7 @@ interface ProfileData {
     song_artist: string | null;
     song_artwork_url: string | null;
     song_preview_url: string | null;
+    song_clip_start: number;
 }
 
 interface SongResult {
@@ -51,6 +52,7 @@ interface AchievementsData {
 }
 
 const ADMIN_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
+const CLIP_LENGTH = 10;
 
 function getInitials(name: string) {
     return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
@@ -106,6 +108,12 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [removingSong, setRemovingSong] = useState(false);
     const [playingPreview, setPlayingPreview] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
+
+    const [pendingSong, setPendingSong] = useState<SongResult | null>(null);
+    const [clipStart, setClipStart] = useState(0);
+    const [clipDuration, setClipDuration] = useState(30);
+    const [cropPlaying, setCropPlaying] = useState(false);
+    const cropAudioRef = useRef<HTMLAudioElement>(null);
 
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
@@ -190,28 +198,76 @@ export default function ProfileView({ userId }: { userId: string }) {
         }
     };
 
-    const handleSelectSong = async (song: SongResult) => {
+    const handlePickSearchResult = (song: SongResult) => {
+        setPendingSong(song);
+        setClipStart(0);
+        setClipDuration(30);
+        setCropPlaying(false);
+    };
+
+    const handleCancelCrop = () => {
+        cropAudioRef.current?.pause();
+        setCropPlaying(false);
+        setPendingSong(null);
+    };
+
+    const toggleCropPlay = () => {
+        const audio = cropAudioRef.current;
+        if (!audio) return;
+        if (cropPlaying) {
+            audio.pause();
+            setCropPlaying(false);
+        } else {
+            audio.currentTime = clipStart;
+            audio.play().catch(() => { });
+            setCropPlaying(true);
+        }
+    };
+
+    // Otomatis stop tepat CLIP_LENGTH detik setelah titik awal yang dipilih
+    const handleCropTimeUpdate = () => {
+        const audio = cropAudioRef.current;
+        if (!audio) return;
+        if (audio.currentTime >= clipStart + CLIP_LENGTH) {
+            audio.pause();
+            setCropPlaying(false);
+        }
+    };
+
+    const handleCropSliderChange = (value: number) => {
+        setClipStart(value);
+        if (cropAudioRef.current) {
+            cropAudioRef.current.currentTime = value;
+        }
+    };
+
+    const handleConfirmSong = async () => {
+        if (!pendingSong) return;
         setSavingSong(true);
         try {
             const res = await fetch("/api/profile/song", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    title: song.trackName,
-                    artist: song.artistName,
-                    artwork_url: song.artworkUrl,
-                    preview_url: song.previewUrl,
+                    title: pendingSong.trackName,
+                    artist: pendingSong.artistName,
+                    artwork_url: pendingSong.artworkUrl,
+                    preview_url: pendingSong.previewUrl,
+                    clip_start: clipStart,
                 }),
             });
             const data = await res.json();
             if (data.success) {
                 setProfile((p) => (p ? {
                     ...p,
-                    song_title: song.trackName,
-                    song_artist: song.artistName,
-                    song_artwork_url: song.artworkUrl,
-                    song_preview_url: song.previewUrl,
+                    song_title: pendingSong.trackName,
+                    song_artist: pendingSong.artistName,
+                    song_artwork_url: pendingSong.artworkUrl,
+                    song_preview_url: pendingSong.previewUrl,
+                    song_clip_start: clipStart,
                 } : p));
+                cropAudioRef.current?.pause();
+                setPendingSong(null);
                 setShowSongSearch(false);
                 setSongQuery("");
                 setSongResults([]);
@@ -233,7 +289,7 @@ export default function ProfileView({ userId }: { userId: string }) {
             const res = await fetch("/api/profile/song", { method: "DELETE" });
             const data = await res.json();
             if (data.success) {
-                setProfile((p) => (p ? { ...p, song_title: null, song_artist: null, song_artwork_url: null, song_preview_url: null } : p));
+                setProfile((p) => (p ? { ...p, song_title: null, song_artist: null, song_artwork_url: null, song_preview_url: null, song_clip_start: 0 } : p));
                 setPlayingPreview(false);
                 showToast("Lagu dihapus", "ok");
             }
@@ -246,13 +302,24 @@ export default function ProfileView({ userId }: { userId: string }) {
 
     const togglePreview = () => {
         const audio = audioRef.current;
-        if (!audio) return;
+        if (!audio || !profile) return;
         if (playingPreview) {
             audio.pause();
             setPlayingPreview(false);
         } else {
+            audio.currentTime = profile.song_clip_start ?? 0;
             audio.play().catch(() => { });
             setPlayingPreview(true);
+        }
+    };
+
+    const handleMainTimeUpdate = () => {
+        const audio = audioRef.current;
+        if (!audio || !profile) return;
+        const start = profile.song_clip_start ?? 0;
+        if (audio.currentTime >= start + CLIP_LENGTH) {
+            audio.pause();
+            setPlayingPreview(false);
         }
     };
 
@@ -508,7 +575,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                 <div className="flex items-center gap-1.5 mb-3">
                     <Music className="w-4 h-4" style={{ color: "#1db954" }} />
                     <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>
@@ -517,32 +584,47 @@ export default function ProfileView({ userId }: { userId: string }) {
                 </div>
 
                 {profile.song_title ? (
-                    <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: "#f8fafc", border: "1px solid #f1f5f9" }}>
-                        <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
-                            {profile.song_artwork_url && (
-                                <img src={profile.song_artwork_url} alt={profile.song_title} className="w-full h-full object-cover" />
-                            )}
-                            {profile.song_preview_url && (
-                                <button onClick={togglePreview}
-                                    className="absolute inset-0 flex items-center justify-center transition-all hover:bg-black/40"
-                                    style={{ background: playingPreview ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.15)" }}>
-                                    {playingPreview ? <Pause className="w-5 h-5 text-white" /> : <Play className="w-5 h-5 text-white" />}
-                                </button>
-                            )}
+                    <div className="flex items-center gap-3">
+                        <button onClick={togglePreview} disabled={!profile.song_preview_url}
+                            className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 shadow-md disabled:cursor-default"
+                            style={{ animation: playingPreview ? "solitSongSpin 3s linear infinite" : "none" }}>
+                            {profile.song_artwork_url
+                                ? <img src={profile.song_artwork_url} alt={profile.song_title} className="w-full h-full object-cover" />
+                                : (
+                                    <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,#1db954,#159c46)" }}>
+                                        <Music className="w-5 h-5 text-white" />
+                                    </div>
+                                )}
+                            <div className="absolute inset-0 rounded-full" style={{ boxShadow: "inset 0 0 0 3px rgba(255,255,255,0.85)" }} />
+                            <div className="absolute rounded-full bg-white" style={{ inset: "38%" }} />
+                        </button>
+
+                        <div className="flex-1 min-w-0 rounded-full pl-4 pr-1.5 py-1.5 flex items-center justify-between gap-2"
+                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                            <div className="min-w-0 overflow-hidden">
+                                <p className="text-xs font-bold text-white truncate">{profile.song_title}</p>
+                                <p className="text-[10.5px] truncate" style={{ color: "rgba(255,255,255,0.55)" }}>{profile.song_artist}</p>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                                {profile.song_preview_url && (
+                                    <button onClick={togglePreview}
+                                        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                                        style={{ background: "rgba(255,255,255,0.15)" }}>
+                                        {playingPreview ? <Pause className="w-3.5 h-3.5 text-white" /> : <Play className="w-3.5 h-3.5 text-white ml-0.5" />}
+                                    </button>
+                                )}
+                                {isSelf && (
+                                    <button onClick={handleRemoveSong} disabled={removingSong}
+                                        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                                        style={{ background: "rgba(255,255,255,0.15)" }}>
+                                        {removingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin text-white" /> : <X className="w-3.5 h-3.5 text-white" />}
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>{profile.song_title}</p>
-                            <p className="text-xs truncate" style={{ color: "#94a3b8" }}>{profile.song_artist}</p>
-                        </div>
-                        {isSelf && (
-                            <button onClick={handleRemoveSong} disabled={removingSong}
-                                className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                                style={{ background: "#fff1f2", color: "#dc2626" }}>
-                                {removingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                            </button>
-                        )}
+
                         {profile.song_preview_url && (
-                            <audio ref={audioRef} src={profile.song_preview_url} onEnded={() => setPlayingPreview(false)} />
+                            <audio ref={audioRef} src={profile.song_preview_url} onEnded={() => setPlayingPreview(false)} onTimeUpdate={handleMainTimeUpdate} />
                         )}
                     </div>
                 ) : isSelf ? (
@@ -552,6 +634,66 @@ export default function ProfileView({ userId }: { userId: string }) {
                             style={{ background: "#f8fafc", color: "#64748b", border: "1px dashed #cbd5e1" }}>
                             <Music className="w-4 h-4" /> Tambahkan lagu
                         </button>
+                    ) : pendingSong ? (
+                        <div className="space-y-3 p-3 rounded-2xl border border-slate-100" style={{ background: "#fafafa" }}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
+                                    {pendingSong.artworkUrl && <img src={pendingSong.artworkUrl} alt={pendingSong.trackName} className="w-full h-full object-cover" />}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>{pendingSong.trackName}</p>
+                                    <p className="text-xs truncate" style={{ color: "#94a3b8" }}>{pendingSong.artistName}</p>
+                                </div>
+                                {pendingSong.previewUrl && (
+                                    <button onClick={toggleCropPlay}
+                                        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                                        style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                                        {cropPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
+                                    </button>
+                                )}
+                            </div>
+
+                            {pendingSong.previewUrl ? (
+                                <div>
+                                    <p className="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "#94a3b8" }}>
+                                        Pilih potongan {CLIP_LENGTH} detik yang ditampilkan
+                                    </p>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={Math.max(0, Math.floor(clipDuration - CLIP_LENGTH))}
+                                        value={clipStart}
+                                        onChange={(e) => handleCropSliderChange(Number(e.target.value))}
+                                        className="w-full accent-violet-600"
+                                    />
+                                    <div className="flex justify-between text-[9px] mt-1" style={{ color: "#cbd5e1" }}>
+                                        <span>0:{String(Math.floor(clipStart)).padStart(2, "0")}</span>
+                                        <span>0:{String(Math.min(Math.floor(clipDuration), Math.floor(clipStart + CLIP_LENGTH))).padStart(2, "0")}</span>
+                                    </div>
+                                    <audio
+                                        ref={cropAudioRef}
+                                        src={pendingSong.previewUrl}
+                                        onLoadedMetadata={(e) => setClipDuration(e.currentTarget.duration || 30)}
+                                        onTimeUpdate={handleCropTimeUpdate}
+                                        onEnded={() => setCropPlaying(false)}
+                                    />
+                                </div>
+                            ) : (
+                                <p className="text-[10.5px] italic" style={{ color: "#cbd5e1" }}>Preview audio tidak tersedia untuk lagu ini</p>
+                            )}
+
+                            <div className="flex gap-2">
+                                <button onClick={handleCancelCrop}
+                                    className="flex-1 h-9 rounded-xl text-xs font-semibold" style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                    Batal
+                                </button>
+                                <button onClick={handleConfirmSong} disabled={savingSong}
+                                    className="flex-1 h-9 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5"
+                                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                                    {savingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Gunakan Potongan Ini
+                                </button>
+                            </div>
+                        </div>
                     ) : (
                         <div className="space-y-2">
                             <div className="relative">
@@ -571,8 +713,8 @@ export default function ProfileView({ userId }: { userId: string }) {
                             {songResults.length > 0 && (
                                 <div className="max-h-56 overflow-y-auto space-y-1 rounded-xl border border-slate-100 p-1.5">
                                     {songResults.map((song) => (
-                                        <button key={song.trackId} onClick={() => handleSelectSong(song)} disabled={savingSong}
-                                            className="w-full flex items-center gap-2.5 p-1.5 rounded-lg text-left hover:bg-slate-50 disabled:opacity-50">
+                                        <button key={song.trackId} onClick={() => handlePickSearchResult(song)}
+                                            className="w-full flex items-center gap-2.5 p-1.5 rounded-lg text-left hover:bg-slate-50">
                                             <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100">
                                                 {song.artworkUrl && <img src={song.artworkUrl} alt={song.trackName} className="w-full h-full object-cover" />}
                                             </div>
@@ -589,6 +731,13 @@ export default function ProfileView({ userId }: { userId: string }) {
                 ) : (
                     <p className="text-xs italic" style={{ color: "#cbd5e1" }}>Belum ada lagu favorit</p>
                 )}
+
+                <style jsx>{`
+                    @keyframes solitSongSpin {
+                        from { transform: rotate(0deg); }
+                        to   { transform: rotate(360deg); }
+                    }
+                `}</style>
             </div>
 
             {achievements && (
