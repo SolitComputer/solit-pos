@@ -16,7 +16,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, name, role, roles, shift, bio, profile_photo_url, photo_updated_at, bio_created_at")
+    .select("id, name, role, roles, shift, bio, profile_photo_url, photo_updated_at, bio_created_at, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url")
     .eq("id", targetId)
     .maybeSingle();
 
@@ -27,7 +27,19 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: "User tidak ditemukan" }, { status: 404 });
   }
 
-  return NextResponse.json({ success: true, data, isSelf: targetId === user.id });
+  const noteExpired = data.status_note_expires_at
+    ? new Date(data.status_note_expires_at) < new Date()
+    : false;
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      ...data,
+      status_note: noteExpired ? null : data.status_note,
+      status_note_expires_at: noteExpired ? null : data.status_note_expires_at,
+    },
+    isSelf: targetId === user.id,
+  });
 }
 
 async function putHandler(req: NextRequest, _ctx: any, user: AuthUser) {

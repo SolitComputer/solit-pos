@@ -5,7 +5,8 @@ import imageCompression from "browser-image-compression";
 import { humanizeRoleKey } from "@/lib/permissions";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
-    Loader2, Pencil, Check, X,
+    Loader2, Pencil, Check, X, Music, Search, Play, Pause,
+    MessageCircle,
 } from "lucide-react";
 
 interface ProfileData {
@@ -16,6 +17,20 @@ interface ProfileData {
     bio: string | null;
     bio_created_at: string | null;
     profile_photo_url: string | null;
+    status_note: string | null;
+    status_note_expires_at: string | null;
+    song_title: string | null;
+    song_artist: string | null;
+    song_artwork_url: string | null;
+    song_preview_url: string | null;
+}
+
+interface SongResult {
+    trackId: number;
+    trackName: string;
+    artistName: string;
+    artworkUrl: string | null;
+    previewUrl: string | null;
 }
 
 interface AchievementBlock {
@@ -47,6 +62,14 @@ function monthLabel(key: string) {
 function formatBioDate(iso: string) {
     return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }
+function noteTimeLeft(expiresAtIso: string): string {
+    const diffMs = new Date(expiresAtIso).getTime() - Date.now();
+    if (diffMs <= 0) return "Kadaluarsa";
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (hours >= 1) return `${hours} jam lagi`;
+    const minutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+    return `${minutes} menit lagi`;
+}
 
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
     useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
@@ -70,6 +93,19 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [savingBio, setSavingBio] = useState(false);
     const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [editingNote, setEditingNote] = useState(false);
+    const [noteDraft, setNoteDraft] = useState("");
+    const [savingNote, setSavingNote] = useState(false);
+
+    const [showSongSearch, setShowSongSearch] = useState(false);
+    const [songQuery, setSongQuery] = useState("");
+    const [songResults, setSongResults] = useState<SongResult[]>([]);
+    const [searchingSong, setSearchingSong] = useState(false);
+    const [savingSong, setSavingSong] = useState(false);
+    const [removingSong, setRemovingSong] = useState(false);
+    const [playingPreview, setPlayingPreview] = useState(false);
+    const audioRef = useRef<HTMLAudioElement>(null);
 
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
@@ -98,6 +134,127 @@ export default function ProfileView({ userId }: { userId: string }) {
     }, [userId]);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (!showSongSearch || songQuery.trim().length < 2) { setSongResults([]); return; }
+        const t = setTimeout(async () => {
+            setSearchingSong(true);
+            try {
+                const res = await fetch(`/api/profile/song?q=${encodeURIComponent(songQuery.trim())}`);
+                const data = await res.json();
+                if (data.success) setSongResults(data.data);
+            } catch {
+                // diam-diam gagal, biarkan hasil pencarian sebelumnya
+            } finally {
+                setSearchingSong(false);
+            }
+        }, 400);
+        return () => clearTimeout(t);
+    }, [songQuery, showSongSearch]);
+
+    const handleSaveNote = async () => {
+        const trimmed = noteDraft.trim();
+        if (!trimmed) { setEditingNote(false); return; }
+        setSavingNote(true);
+        try {
+            const res = await fetch("/api/profile/note", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ note: trimmed }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setProfile((p) => (p ? { ...p, status_note: trimmed, status_note_expires_at: data.data.expires_at } : p));
+                setEditingNote(false);
+                setNoteDraft("");
+                showToast("Catatan berhasil dibuat", "ok");
+            } else {
+                showToast(data.message ?? "Gagal membuat catatan", "err");
+            }
+        } catch {
+            showToast("Terjadi kesalahan", "err");
+        } finally {
+            setSavingNote(false);
+        }
+    };
+
+    const handleRemoveNote = async () => {
+        try {
+            const res = await fetch("/api/profile/note", { method: "DELETE" });
+            const data = await res.json();
+            if (data.success) {
+                setProfile((p) => (p ? { ...p, status_note: null, status_note_expires_at: null } : p));
+            }
+        } catch {
+            // diam-diam gagal
+        }
+    };
+
+    const handleSelectSong = async (song: SongResult) => {
+        setSavingSong(true);
+        try {
+            const res = await fetch("/api/profile/song", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: song.trackName,
+                    artist: song.artistName,
+                    artwork_url: song.artworkUrl,
+                    preview_url: song.previewUrl,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setProfile((p) => (p ? {
+                    ...p,
+                    song_title: song.trackName,
+                    song_artist: song.artistName,
+                    song_artwork_url: song.artworkUrl,
+                    song_preview_url: song.previewUrl,
+                } : p));
+                setShowSongSearch(false);
+                setSongQuery("");
+                setSongResults([]);
+                setPlayingPreview(false);
+                showToast("Lagu berhasil ditambahkan", "ok");
+            } else {
+                showToast(data.message ?? "Gagal menyimpan lagu", "err");
+            }
+        } catch {
+            showToast("Terjadi kesalahan", "err");
+        } finally {
+            setSavingSong(false);
+        }
+    };
+
+    const handleRemoveSong = async () => {
+        setRemovingSong(true);
+        try {
+            const res = await fetch("/api/profile/song", { method: "DELETE" });
+            const data = await res.json();
+            if (data.success) {
+                setProfile((p) => (p ? { ...p, song_title: null, song_artist: null, song_artwork_url: null, song_preview_url: null } : p));
+                setPlayingPreview(false);
+                showToast("Lagu dihapus", "ok");
+            }
+        } catch {
+            showToast("Terjadi kesalahan", "err");
+        } finally {
+            setRemovingSong(false);
+        }
+    };
+
+    const togglePreview = () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        if (playingPreview) {
+            audio.pause();
+            setPlayingPreview(false);
+        } else {
+            audio.play().catch(() => { });
+            setPlayingPreview(true);
+        }
+    };
 
     const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -260,6 +417,54 @@ export default function ProfileView({ userId }: { userId: string }) {
                         </div>
                     </div>
 
+                    <div className="mt-3">
+                        {editingNote ? (
+                            <div className="flex items-center gap-2">
+                                <input value={noteDraft} onChange={(e) => setNoteDraft(e.target.value.slice(0, 60))}
+                                    placeholder="Tulis catatan singkat... (hilang dalam 24 jam)"
+                                    autoFocus
+                                    onKeyDown={(e) => { if (e.key === "Enter") handleSaveNote(); if (e.key === "Escape") setEditingNote(false); }}
+                                    className="flex-1 h-9 rounded-full px-3.5 text-xs font-medium border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                                    style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#334155" }} />
+                                <span className="text-[9px] text-slate-300 flex-shrink-0">{noteDraft.length}/60</span>
+                                <button onClick={handleSaveNote} disabled={savingNote}
+                                    className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0"
+                                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                                    {savingNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                </button>
+                                <button onClick={() => setEditingNote(false)}
+                                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                                    style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        ) : profile.status_note ? (
+                            <div className="inline-flex items-center gap-2 pl-1 pr-3 py-1 rounded-full max-w-full"
+                                style={{ background: "#f5f3ff", border: "1px solid #ddd6fe" }}>
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#ede9fe" }}>
+                                    <MessageCircle className="w-3 h-3" style={{ color: "#7c3aed" }} />
+                                </div>
+                                <p className="text-xs font-semibold truncate" style={{ color: "#5b21b6" }}>{profile.status_note}</p>
+                                {isSelf && (
+                                    <>
+                                        <span className="text-[9px] flex-shrink-0" style={{ color: "#a78bfa" }}>
+                                            · {profile.status_note_expires_at ? noteTimeLeft(profile.status_note_expires_at) : ""}
+                                        </span>
+                                        <button onClick={handleRemoveNote} className="flex-shrink-0 opacity-50 hover:opacity-100">
+                                            <X className="w-3 h-3" style={{ color: "#7c3aed" }} />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        ) : isSelf ? (
+                            <button onClick={() => { setEditingNote(true); setNoteDraft(""); }}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+                                style={{ background: "#f8fafc", color: "#94a3b8", border: "1px dashed #cbd5e1" }}>
+                                <MessageCircle className="w-3.5 h-3.5" /> Tulis catatan
+                            </button>
+                        ) : null}
+                    </div>
+
                     <div className="mt-4">
                         {editingBio ? (
                             <div className="space-y-2">
@@ -301,6 +506,89 @@ export default function ProfileView({ userId }: { userId: string }) {
                         )}
                     </div>
                 </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                <div className="flex items-center gap-1.5 mb-3">
+                    <Music className="w-4 h-4" style={{ color: "#1db954" }} />
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>
+                        {isSelf ? "Lagu Favorit" : `Lagu Favorit ${profile.name.split(" ")[0]}`}
+                    </p>
+                </div>
+
+                {profile.song_title ? (
+                    <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: "#f8fafc", border: "1px solid #f1f5f9" }}>
+                        <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
+                            {profile.song_artwork_url && (
+                                <img src={profile.song_artwork_url} alt={profile.song_title} className="w-full h-full object-cover" />
+                            )}
+                            {profile.song_preview_url && (
+                                <button onClick={togglePreview}
+                                    className="absolute inset-0 flex items-center justify-center transition-all hover:bg-black/40"
+                                    style={{ background: playingPreview ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.15)" }}>
+                                    {playingPreview ? <Pause className="w-5 h-5 text-white" /> : <Play className="w-5 h-5 text-white" />}
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>{profile.song_title}</p>
+                            <p className="text-xs truncate" style={{ color: "#94a3b8" }}>{profile.song_artist}</p>
+                        </div>
+                        {isSelf && (
+                            <button onClick={handleRemoveSong} disabled={removingSong}
+                                className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                                style={{ background: "#fff1f2", color: "#dc2626" }}>
+                                {removingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                            </button>
+                        )}
+                        {profile.song_preview_url && (
+                            <audio ref={audioRef} src={profile.song_preview_url} onEnded={() => setPlayingPreview(false)} />
+                        )}
+                    </div>
+                ) : isSelf ? (
+                    !showSongSearch ? (
+                        <button onClick={() => setShowSongSearch(true)}
+                            className="w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                            style={{ background: "#f8fafc", color: "#64748b", border: "1px dashed #cbd5e1" }}>
+                            <Music className="w-4 h-4" /> Tambahkan lagu
+                        </button>
+                    ) : (
+                        <div className="space-y-2">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+                                <input value={songQuery} onChange={(e) => setSongQuery(e.target.value)} autoFocus
+                                    placeholder="Cari judul lagu atau artis..."
+                                    className="w-full h-10 rounded-xl pl-9 pr-8 text-sm border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                                    style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#334155" }} />
+                                <button onClick={() => { setShowSongSearch(false); setSongQuery(""); setSongResults([]); }}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                                    <X className="w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+                                </button>
+                            </div>
+                            {searchingSong && (
+                                <p className="text-xs text-slate-400 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Mencari...</p>
+                            )}
+                            {songResults.length > 0 && (
+                                <div className="max-h-56 overflow-y-auto space-y-1 rounded-xl border border-slate-100 p-1.5">
+                                    {songResults.map((song) => (
+                                        <button key={song.trackId} onClick={() => handleSelectSong(song)} disabled={savingSong}
+                                            className="w-full flex items-center gap-2.5 p-1.5 rounded-lg text-left hover:bg-slate-50 disabled:opacity-50">
+                                            <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100">
+                                                {song.artworkUrl && <img src={song.artworkUrl} alt={song.trackName} className="w-full h-full object-cover" />}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs font-semibold truncate" style={{ color: "#0f172a" }}>{song.trackName}</p>
+                                                <p className="text-[10.5px] truncate" style={{ color: "#94a3b8" }}>{song.artistName}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )
+                ) : (
+                    <p className="text-xs italic" style={{ color: "#cbd5e1" }}>Belum ada lagu favorit</p>
+                )}
             </div>
 
             {achievements && (
