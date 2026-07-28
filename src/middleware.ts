@@ -390,5 +390,8 @@ export const config = {
     "/api/akutansi/:path*",
     "/dashboard/ai-ceo/:path*",
     "/api/ai-ceo/:path*",
+    "/dashboard/profile/:path*",
+    "/api/profile/:path*",
+    "/api/achievements/:path*",
   ],
 };
