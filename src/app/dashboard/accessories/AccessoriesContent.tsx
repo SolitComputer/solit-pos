@@ -24,6 +24,8 @@ interface Accessory {
     created_at: string;
     stock_tersedia?: number;
     stock_total?: number;
+    audited_at?: string | null;
+    audited_by?: string | null;
 }
 
 type AccessoryForm = {
@@ -59,6 +61,16 @@ function fmtInput(val: number): string {
     return new Intl.NumberFormat("id-ID").format(val);
 }
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
+
+// ── Audit ──────────────────────────────────────────────────────────────────
+// Harus SAMA dengan AUDIT_TTL_MS di api/accessories/[id]/audit/route.ts.
+// Audit auto-reset (dianggap "belum diaudit") setelah 3 hari.
+const AUDIT_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+function isAuditActive(auditedAt?: string | null): boolean {
+    if (!auditedAt) return false;
+    return Date.now() - new Date(auditedAt).getTime() < AUDIT_TTL_MS;
+}
+interface AuditLog { id: string; action: "AUDIT" | "UNAUDIT"; audited_by: string; audited_at: string; }
 
 // ─── Excel Style Helpers ─────────────────────────────────────────────────────
 type XlsxCellStyle = {
@@ -205,6 +217,77 @@ function DeleteConfirm({ open, title, name, onClose, onConfirm, loading }: { ope
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// MODAL: Riwayat Audit
+// ═══════════════════════════════════════════════════════════════════════════
+function AuditHistoryModal({ accessory, onClose }: { accessory: Accessory | null; onClose: () => void }) {
+    const [loading, setLoading] = useState(true);
+    const [history, setHistory] = useState<AuditLog[]>([]);
+    const [current, setCurrent] = useState<{ audited_at: string | null; audited_by: string | null } | null>(null);
+
+    useEffect(() => {
+        if (!accessory) return;
+        let alive = true; // guard biar nggak setState setelah modal ditutup
+        setLoading(true);
+        (async () => {
+            try {
+                const res = await fetch(`/api/accessories/${accessory.id}/audit`);
+                const json = await res.json();
+                if (alive && json.success) { setHistory(json.data.history ?? []); setCurrent(json.data.current ?? null); }
+            } finally { if (alive) setLoading(false); }
+        })();
+        return () => { alive = false; };
+    }, [accessory]);
+
+    useEffect(() => { if (!accessory) return; const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [accessory, onClose]);
+
+    if (!accessory) return null;
+    const active = isAuditActive(current?.audited_at);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl overflow-hidden animate-popIn max-h-[85dvh]">
+                <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div><h2 className="font-bold text-gray-900 text-[15px] tracking-tight">Riwayat Audit</h2><p className="text-[11px] text-gray-400 mt-0.5 truncate max-w-[260px]">{accessory.name}</p></div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                </div>
+                <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
+                        {active ? `Sudah diaudit — ${current?.audited_by ?? "—"}` : "Belum diaudit"}
+                    </span>
+                    {active && current?.audited_at && (<p className="text-[11px] text-gray-400 mt-1.5">Terakhir: {new Date(current.audited_at).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} · auto-reset 3 hari</p>)}
+                </div>
+                <div className="overflow-y-auto flex-1 px-6 py-4">
+                    {loading ? (
+                        <div className="space-y-2">{[1, 2, 3].map(i => <Shimmer key={i} h={44} r="10px" />)}</div>
+                    ) : history.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Belum ada riwayat audit</p>
+                    ) : (
+                        <ol className="space-y-2">
+                            {history.map(h => (
+                                <li key={h.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${h.action === "AUDIT" ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-500"}`}>
+                                        {h.action === "AUDIT"
+                                            ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                            : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>}
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">{h.action === "AUDIT" ? "Ditandai diaudit" : "Audit dibatalkan"}</p>
+                                        <p className="text-[11px] text-gray-400">oleh {h.audited_by}</p>
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 tabular-nums flex-shrink-0 text-right">{new Date(h.audited_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })}<br />{new Date(h.audited_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</p>
+                                </li>
+                            ))}
+                        </ol>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN CONTENT
 // ═══════════════════════════════════════════════════════════════════════════
 function AccessoriesContent() {
@@ -215,6 +298,8 @@ function AccessoriesContent() {
     const [deleteAcc, setDeleteAcc] = useState<Accessory | null>(null); const [savingAcc, setSavingAcc] = useState(false);
     const [deletingAcc, setDeletingAcc] = useState(false); const [selectedAcc, setSelectedAcc] = useState<Accessory | null>(null);
     const [view, setView] = useState<"detail" | null>(null);
+    const [auditingId, setAuditingId] = useState<string | null>(null);
+    const [historyAcc, setHistoryAcc] = useState<Accessory | null>(null);
 
     const LIMIT = 9999;
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -230,11 +315,44 @@ function AccessoriesContent() {
 
     useEffect(() => { if (selectedAcc) { const fresh = items.find(i => i.id === selectedAcc.id); if (fresh) setSelectedAcc(fresh); } }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const stats = useMemo(() => ({ jenis: total, tersedia: items.reduce((s, i) => s + (i.stock ?? 0), 0), habis: items.filter(i => (i.stock ?? 0) === 0).length, nilai: items.reduce((s, i) => s + (i.sell_price ?? 0) * (i.stock ?? 0), 0) }), [items, total]);
+    const stats = useMemo(() => {
+        const nilai = items.reduce((s, i) => s + (i.sell_price ?? 0) * (i.stock ?? 0), 0);      // nilai jual stok
+        const nilaiModal = items.reduce((s, i) => s + (i.buy_price ?? 0) * (i.stock ?? 0), 0);   // modal tertanam
+        const labaKotor = nilai - nilaiModal;                                                    // gross profit (Rp)
+        // GP% = laba kotor / nilai jual (gross margin, basis harga jual).
+        // Guard bagi-0: kalau belum ada stok/harga jual, nilai = 0 → JANGAN dibagi (NaN/Infinity).
+        const gpPersen = nilai > 0 ? (labaKotor / nilai) * 100 : 0;
+        return {
+            jenis: total,
+            tersedia: items.reduce((s, i) => s + (i.stock ?? 0), 0),
+            habis: items.filter(i => (i.stock ?? 0) === 0).length,
+            nilai,
+            nilaiModal,
+            labaKotor,
+            gpPersen,
+        };
+    }, [items, total]);
 
     const handleSaveAcc = async (data: AccessoryForm) => { setSavingAcc(true); try { const isEdit = !!editAcc; const url = isEdit ? `/api/accessories/${editAcc!.id}` : "/api/accessories"; const res = await fetch(url, { method: isEdit ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); const json = await res.json(); if (!json.success) throw new Error(json.error ?? "Gagal menyimpan"); toast.success(isEdit ? "Aksesori diperbarui" : "Aksesori ditambahkan"); setAccModalOpen(false); setEditAcc(null); fetchItems(page); } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Terjadi kesalahan"); } finally { setSavingAcc(false); } };
 
     const handleDeleteAcc = async () => { if (!deleteAcc) return; setDeletingAcc(true); try { const res = await fetch(`/api/accessories/${deleteAcc.id}`, { method: "DELETE" }); const json = await res.json(); if (!json.success) throw new Error(json.error ?? "Gagal menghapus"); toast.success("Aksesori dihapus"); if (selectedAcc?.id === deleteAcc.id) { setSelectedAcc(null); setView(null); } setDeleteAcc(null); fetchItems(page); } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Terjadi kesalahan"); } finally { setDeletingAcc(false); } };
+
+    const handleToggleAudit = async (acc: Accessory) => {
+        const wasActive = isAuditActive(acc.audited_at); // status SEBELUM toggle → nentuin pesan
+        setAuditingId(acc.id);
+        try {
+            const res = await fetch(`/api/accessories/${acc.id}/audit`, { method: "PATCH" });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message ?? "Gagal audit");
+            // Update lokal aja — nggak perlu refetch seluruh tabel
+            setItems(prev => prev.map(i => i.id === acc.id ? { ...i, audited_at: json.data.audited_at, audited_by: json.data.audited_by } : i));
+            toast.success(wasActive ? "Audit dibatalkan" : "Aksesori ditandai sudah diaudit");
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : "Gagal audit");
+        } finally {
+            setAuditingId(null);
+        }
+    };
 
     const exportToExcel = async () => {
         setIsExporting(true);
@@ -310,10 +428,12 @@ function AccessoriesContent() {
                     </div>
 
                     {/* STAT CARDS */}
-                    <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 animate-slideDown">
+                    <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 animate-slideDown">
                         <StatCard label="Total Jenis" value={`${stats.jenis} jenis`} accent="bg-gray-700" icon={<svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>} />
                         <StatCard label="Total Stok" value={`${stats.tersedia} unit`} accent="bg-emerald-500" icon={<svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
                         <StatCard label="Nilai Stok" value={fmt(stats.nilai)} accent="bg-blue-500" icon={<svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>} />
+                        {/* ── Kartu baru: Laba Kotor + badge GP% ── */}
+                        <StatCard label="Laba Kotor" value={fmt(stats.labaKotor)} accent="bg-violet-500" badge={{ text: `${Math.round(stats.gpPersen)}%`, positive: stats.labaKotor >= 0 }} icon={<svg className="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l6-6 4 4 8-8m0 0h-5m5 0v5" /></svg>} />
                         <StatCard label="Stok Habis" value={`${stats.habis} jenis`} accent="bg-red-500" icon={<svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>} />
                     </div>
 
@@ -333,7 +453,7 @@ function AccessoriesContent() {
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
                             <div className="overflow-x-auto table-scroll">
                                 <table className="w-full text-sm border-collapse">
-                                    <thead><tr className="bg-gray-50 border-b-2 border-gray-100"><Th center>No</Th><Th>Nama Aksesori</Th><Th>Kategori</Th><Th>Merk</Th><Th>Spek</Th><Th right>Harga Modal</Th><Th right>Harga Jual</Th><Th right>Stok</Th><Th right>Aksi</Th></tr></thead>
+                                    <thead><tr className="bg-gray-50 border-b-2 border-gray-100"><Th center>No</Th><Th>Nama Aksesori</Th><Th>Kategori</Th><Th>Merk</Th><Th>Spek</Th><Th right>Harga Modal</Th><Th right>Harga Jual</Th><Th right>Stok</Th><Th center>Audit</Th><Th right>Aksi</Th></tr></thead>
                                     <tbody>
                                         {items.map((item, idx) => (
                                             <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0" onClick={() => { setSelectedAcc(item); setView("detail"); }}>
@@ -345,6 +465,20 @@ function AccessoriesContent() {
                                                 <td className="px-4 py-3.5 text-right whitespace-nowrap"><span className="text-xs text-gray-500 tabular-nums">{item.buy_price > 0 ? fmt(item.buy_price) : <span className="text-gray-200">—</span>}</span></td>
                                                 <td className="px-4 py-3.5 text-right whitespace-nowrap"><span className="text-[13px] font-bold text-gray-800 tabular-nums">{item.sell_price > 0 ? fmt(item.sell_price) : <span className="text-gray-200 font-medium">—</span>}</span></td>
                                                 <td className="px-4 py-3.5 text-right whitespace-nowrap"><span className={`inline-flex items-center justify-center min-w-[26px] px-2 py-0.5 rounded-lg text-xs font-bold tabular-nums ${(item.stock ?? 0) === 0 ? "bg-red-50 text-red-500 ring-1 ring-red-200" : (item.stock ?? 0) <= 2 ? "bg-amber-50 text-amber-600 ring-1 ring-amber-200" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"}`}>{item.stock ?? 0}</span></td>
+                                                <td className="px-4 py-3.5 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button onClick={() => handleToggleAudit(item)} disabled={auditingId === item.id}
+                                                            title={isAuditActive(item.audited_at) ? `Diaudit oleh ${item.audited_by ?? "—"} · klik untuk batalkan` : "Tandai sudah diaudit"}
+                                                            className={`h-7 px-2.5 inline-flex items-center gap-1 text-[11px] font-semibold rounded-lg transition disabled:opacity-40 ${isAuditActive(item.audited_at) ? "text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 hover:bg-emerald-100" : "text-gray-500 bg-gray-100 hover:bg-gray-200"}`}>
+                                                            {isAuditActive(item.audited_at) && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                                            {isAuditActive(item.audited_at) ? "Diaudit" : "Audit"}
+                                                        </button>
+                                                        <button onClick={() => setHistoryAcc(item)} title="Riwayat audit"
+                                                            className="w-7 h-7 inline-flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
                                                 <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}><div className="flex items-center justify-end gap-1"><button onClick={() => { setEditAcc(item); setAccModalOpen(true); }} className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button><button onClick={() => setDeleteAcc(item)} className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button></div></td>
                                             </tr>
                                         ))}
@@ -362,6 +496,7 @@ function AccessoriesContent() {
             <AccessoryModal open={accModalOpen} onClose={() => { setAccModalOpen(false); setEditAcc(null); }} onSave={handleSaveAcc} initial={editAcc} loading={savingAcc} />
             {view === "detail" && (<AccessoryDetailModal accessory={selectedAcc} onClose={() => { setView(null); setSelectedAcc(null); }} onEdit={() => { setEditAcc(selectedAcc); setView(null); setAccModalOpen(true); }} onDelete={() => setDeleteAcc(selectedAcc)} />)}
             <DeleteConfirm open={!!deleteAcc} title="Hapus Aksesori" name={deleteAcc?.name ?? ""} onClose={() => setDeleteAcc(null)} onConfirm={handleDeleteAcc} loading={deletingAcc} />
+            <AuditHistoryModal accessory={historyAcc} onClose={() => setHistoryAcc(null)} />
         </>
     );
 }
@@ -379,8 +514,8 @@ const labelCls = "block text-[10px] font-bold text-gray-500 uppercase tracking-w
 
 function Spinner() { return (<svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>); }
 
-function StatCard({ label, value, accent, icon }: { label: string; value: string; accent: string; icon: React.ReactNode }) {
-    return (<div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3.5 hover:shadow-md transition-all duration-200"><div className={`w-1 h-10 rounded-full ${accent} flex-shrink-0`} /><div className="flex items-center gap-2.5 flex-1 min-w-0"><div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-100">{icon}</div><div className="min-w-0"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">{label}</p><p className="text-sm font-black text-gray-800 tabular-nums truncate">{value}</p></div></div></div>);
+function StatCard({ label, value, accent, icon, badge }: { label: string; value: string; accent: string; icon: React.ReactNode; badge?: { text: string; positive: boolean } }) {
+    return (<div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3.5 hover:shadow-md transition-all duration-200"><div className={`w-1 h-10 rounded-full ${accent} flex-shrink-0`} /><div className="flex items-center gap-2.5 flex-1 min-w-0"><div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-100">{icon}</div><div className="min-w-0"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">{label}</p><div className="flex items-center gap-1.5"><p className="text-sm font-black text-gray-800 tabular-nums truncate">{value}</p>{badge && (<span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums flex-shrink-0 ${badge.positive ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>{badge.text}</span>)}</div></div></div></div>);
 }
 
 function FilterSelect({ value, onChange, children }: { value: string; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void; children: React.ReactNode }) {
@@ -392,5 +527,5 @@ function Th({ children, right, center }: { children: React.ReactNode; right?: bo
 }
 
 function SkeletonTable() {
-    return (<div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b-2 border-gray-100">{["No", "Nama Aksesori", "Kategori", "Merk", "Spek", "Modal", "Jual", "Stok", "Aksi"].map(h => (<th key={h} className="px-4 py-3"><Shimmer h={10} /></th>))}</tr></thead><tbody>{[1, 2, 3, 4, 5, 6].map(r => (<tr key={r} className="border-b border-gray-50"><td className="px-4 py-3.5"><Shimmer w={24} h={12} /></td><td className="px-4 py-3.5"><Shimmer w={150} h={13} /></td><td className="px-4 py-3.5"><Shimmer w={60} h={18} r="6px" /></td><td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td><td className="px-4 py-3.5"><Shimmer w={90} h={12} /></td><td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td><td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td><td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={26} h={22} r="8px" /></div></td><td className="px-4 py-3.5"><div className="flex justify-end gap-1.5"><Shimmer w={40} h={28} r="8px" /><Shimmer w={44} h={28} r="8px" /></div></td></tr>))}</tbody></table></div><div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60"><Shimmer w={180} h={10} /></div></div>);
+    return (<div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b-2 border-gray-100">{["No", "Nama Aksesori", "Kategori", "Merk", "Spek", "Modal", "Jual", "Stok", "Audit", "Aksi"].map(h => (<th key={h} className="px-4 py-3"><Shimmer h={10} /></th>))}</tr></thead><tbody>{[1, 2, 3, 4, 5, 6].map(r => (<tr key={r} className="border-b border-gray-50"><td className="px-4 py-3.5"><Shimmer w={24} h={12} /></td><td className="px-4 py-3.5"><Shimmer w={150} h={13} /></td><td className="px-4 py-3.5"><Shimmer w={60} h={18} r="6px" /></td><td className="px-4 py-3.5"><Shimmer w={60} h={12} /></td><td className="px-4 py-3.5"><Shimmer w={90} h={12} /></td><td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td><td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={80} h={13} /></div></td><td className="px-4 py-3.5"><div className="flex justify-end"><Shimmer w={26} h={22} r="8px" /></div></td><td className="px-4 py-3.5"><div className="flex justify-center"><Shimmer w={64} h={28} r="8px" /></div></td><td className="px-4 py-3.5"><div className="flex justify-end gap-1.5"><Shimmer w={40} h={28} r="8px" /><Shimmer w={44} h={28} r="8px" /></div></td></tr>))}</tbody></table></div><div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60"><Shimmer w={180} h={10} /></div></div>);
 }
