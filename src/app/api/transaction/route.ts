@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth } from "@/lib/auth";
 
 function splitSerials(raw: any): string[] {
@@ -185,11 +185,12 @@ async function handler(req: NextRequest) {
       if (trx.laptop_id) allLaptopIds.add(trx.laptop_id);
     }
 
-    // ── Fetch transaction_items — sumber deal_price aktual per unit ─────────
-    const { data: txItems } = await supabase
+    // ── Fetch transaction_items — sumber deal_price & detail aksesori per item ──
+    const { data: txItems, error: txItemsErr } = await supabase
       .from("transaction_items")
-      .select("invoice_number, unit_id, laptop_id, laptop_name, deal_price, selling_price, serial_number, item_type")
+      .select("*")
       .in("invoice_number", allInvoiceNumbers);
+    if (txItemsErr) console.error("[GET /api/transaction] txItems error:", txItemsErr.message);
 
     const txItemsMap = new Map<string, any[]>();
     const itemKindMap = new Map<string, { hasLaptop: boolean; hasAccessory: boolean }>();
@@ -203,6 +204,46 @@ async function handler(req: NextRequest) {
       const kindFlags = itemKindMap.get(item.invoice_number)!;
       if (item.item_type === "accessory") kindFlags.hasAccessory = true;
       else kindFlags.hasLaptop = true;
+    }
+
+    // ── Fetch accessory_outflows fallback — for when transaction_items has no accessory rows ──
+    const outflowAccMap = new Map<string, Array<{ accessory_id: string; name: string; qty: number; buy_price: number }>>();
+    {
+      // Find invoices that are mixed/accessory but have no accessory rows in transaction_items
+      const mixedInvoices = allInvoiceNumbers.filter(inv => {
+        const txItemsForInv = txItemsMap.get(inv) ?? [];
+        const hasAccInTxItems = txItemsForInv.some((it: any) => it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id));
+        return !hasAccInTxItems; // need fallback
+      });
+
+      if (mixedInvoices.length > 0) {
+        const { data: outflows } = await supabase
+          .from("accessory_outflows")
+          .select("accessory_id, transaction_invoice, qty, status")
+          .in("transaction_invoice", mixedInvoices)
+          .eq("status", "active");
+
+        if (outflows && outflows.length > 0) {
+          const accIds = [...new Set(outflows.map((o: any) => o.accessory_id).filter(Boolean))];
+          const { data: accData } = await supabase
+            .from("accessories")
+            .select("id, name, buy_price")
+            .in("id", accIds);
+          const accLookup = new Map((accData ?? []).map((a: any) => [a.id, a]));
+
+          for (const o of outflows) {
+            const inv = o.transaction_invoice;
+            if (!outflowAccMap.has(inv)) outflowAccMap.set(inv, []);
+            const acc = accLookup.get(o.accessory_id);
+            outflowAccMap.get(inv)!.push({
+              accessory_id: o.accessory_id,
+              name: acc?.name || "Aksesori",
+              qty: Number(o.qty) || 1,
+              buy_price: Number(acc?.buy_price ?? 0),
+            });
+          }
+        }
+      }
     }
 
     // ── Fetch purchase_price dari laptop_units ───────────────────────────────
@@ -439,6 +480,31 @@ async function handler(req: NextRequest) {
         modal_missing: modalMissing,
         purchase_price_current: finalInventoryPrice,
         grouped_items: grouped_items_with_margin,
+        accessory_items: (() => {
+          // Try transaction_items first
+          const fromTxItems = items
+            .filter((it: any) => it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id))
+            .map((it: any) => ({
+              accessory_id: it.accessory_id,
+              name: it.item_name || it.laptop_name || "Aksesori",
+              quantity: Number(it.quantity) || 1,
+              deal_price: Number(it.deal_price ?? 0),
+              selling_price: Number(it.selling_price ?? 0),
+              is_bonus: Boolean(it.is_bonus || Number(it.deal_price) === 0),
+            }));
+          if (fromTxItems.length > 0) return fromTxItems;
+
+          // Fallback to accessory_outflows
+          const fromOutflows = outflowAccMap.get(trx.invoice_number) ?? [];
+          return fromOutflows.map(o => ({
+            accessory_id: o.accessory_id,
+            name: o.name,
+            quantity: o.qty,
+            deal_price: 0,
+            selling_price: o.buy_price,
+            is_bonus: false,
+          }));
+        })(),
         is_multi_laptop: grouped_items.length > 1,
         item_kind: trx.item_kind ?? (() => {
           const flags = itemKindMap.get(trx.invoice_number);
