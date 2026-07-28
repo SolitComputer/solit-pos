@@ -31,10 +31,10 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const isKepala = !isAdmin && userRoles.some(r => KEPALA_SET.has(r));
 
   const selectFields = isAdmin
-    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio"
+    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url"
     : isKepala
-      ? "id, name, phone_number, role, roles, shift, birth_date, profile_photo_url, bio"
-      : "id, name, role, roles, birth_date, profile_photo_url, bio";
+      ? "id, name, phone_number, role, roles, shift, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url"
+      : "id, name, role, roles, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url";
 
   const { data, error } = await supabaseAdmin
     .from("users")
@@ -48,7 +48,6 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
   const users = (data ?? []).map((u: any) => ({
     ...u,
-    // Normalize roles: pastikan selalu array
     roles: Array.isArray(u.roles) && u.roles.length > 0
       ? u.roles
       : [u.role].filter(Boolean),
@@ -61,6 +60,9 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     phone_number: (isAdmin || isKepala) ? (u.phone_number ?? null) : null,
     email: isAdmin ? (u.email ?? null) : null,
     birth_date: u.birth_date ?? null,
+    status_note: (u.status_note_expires_at && new Date(u.status_note_expires_at) < new Date())
+      ? null
+      : (u.status_note ?? null),
   }));
 
   return NextResponse.json({ success: true, users });
