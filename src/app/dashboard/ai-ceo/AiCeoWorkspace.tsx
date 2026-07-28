@@ -2,6 +2,26 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useRef, useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
+import {
+    Sparkles,
+    Plus,
+    MessageSquare,
+    Trash2,
+    Edit3,
+    ChevronDown,
+    Check,
+    Copy,
+    PanelLeft,
+    PanelLeftClose,
+    Package,
+    Wallet,
+    AlertTriangle,
+    Users,
+    Activity,
+    X,
+    ArrowUp,
+    Info
+} from "lucide-react";
 
 interface ConversationSummary { id: string; title: string; updated_at: string; }
 interface ChatMessage { id?: string; role: "user" | "assistant"; content: string; provider?: string; }
@@ -12,20 +32,22 @@ interface Suggestion {
 
 type AiProviderChoice = "auto" | "gemini" | "groq";
 const PROVIDER_KEY = "solit_ai_ceo_provider";
+
 const PROVIDER_LABEL: Record<AiProviderChoice, string> = {
-    auto: "Otomatis",
-    gemini: "Gemini",
-    groq: "Groq (Llama)",
-};
-const PROVIDER_COLOR: Record<string, string> = {
-    gemini: "#4285f4",
-    groq: "#f97316",
+    auto: "Otomatis (Gemini → Groq)",
+    gemini: "Gemini 2.0 Flash",
+    groq: "Groq (Llama 3.3 70B)",
 };
 
-const SEVERITY_STYLE: Record<string, string> = {
-    info: "bg-blue-50 text-blue-700",
-    warning: "bg-amber-50 text-amber-700",
-    critical: "bg-red-50 text-red-700",
+const PROVIDER_COLOR: Record<string, string> = {
+    gemini: "#2563eb", // blue-600
+    groq: "#ea580c",   // orange-600
+};
+
+const SEVERITY_STYLE: Record<string, { bg: string; text: string; border: string }> = {
+    info: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
+    warning: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
+    critical: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
 };
 
 const TOOL_THINKING_LABEL: Record<string, string> = {
@@ -34,100 +56,130 @@ const TOOL_THINKING_LABEL: Record<string, string> = {
     get_ready_units: "Mengecek detail unit & serial number...",
     get_minus_stock: "Mengecek stok minus...",
     get_accessory_stock: "Mengecek stok aksesori...",
-    get_cashflow_summary: "Menghitung cashflow...",
+    get_cashflow_summary: "Menghitung cashflow & keuangan...",
     get_recent_transactions: "Mengecek transaksi terbaru...",
-    get_daftar_role: "Mengecek daftar role...",
-    get_attendance_summary: "Mengecek data absensi...",
-    get_overtime_summary: "Mengecek data lembur...",
-    catat_saran_koreksi: "Mencatat catatan untuk direview...",
+    get_daftar_role: "Mengecek daftar role pengguna...",
+    get_attendance_summary: "Mengecek data absensi tim...",
+    get_overtime_summary: "Mengecek data lembur karyawan...",
+    catat_saran_koreksi: "Mencatat masukan untuk direview...",
 };
 const DEFAULT_THINKING_LABEL = "Memikirkan jawaban...";
 
 function ThinkingIndicator({ label }: { label: string }) {
     return (
-        <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-2.5 w-fit" style={{ animation: "aiCeoFadeIn 0.2s ease-out both" }}>
-            <span className="flex gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: "aiCeoDot 1.1s ease-in-out infinite", animationDelay: "0ms" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: "aiCeoDot 1.1s ease-in-out infinite", animationDelay: "150ms" }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" style={{ animation: "aiCeoDot 1.1s ease-in-out infinite", animationDelay: "300ms" }} />
-            </span>
-            <span key={label} className="text-xs text-gray-400" style={{ animation: "aiCeoFadeIn 0.3s ease-out both" }}>
-                {label}
-            </span>
+        <div className="flex items-center gap-2.5 bg-gray-100/80 border border-gray-200/80 rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 w-fit shadow-xs">
+            <div className="w-5 h-5 rounded-lg bg-[#1a1a2e]/10 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-3 h-3 text-[#1a1a2e] animate-pulse" />
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e]" style={{ animation: "aiCeoDot 1.1s ease-in-out infinite", animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e]" style={{ animation: "aiCeoDot 1.1s ease-in-out infinite", animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e]" style={{ animation: "aiCeoDot 1.1s ease-in-out infinite", animationDelay: "300ms" }} />
+                </span>
+                <span key={label} className="text-[11px] sm:text-xs font-medium text-gray-700">
+                    {label}
+                </span>
+            </div>
         </div>
     );
-}
-
-function splitIntro(content: string): { intro: string; rest: string } {
-    const trimmed = content.trim();
-    const idx = trimmed.indexOf("\n\n");
-    if (idx === -1) return { intro: trimmed, rest: "" };
-    return { intro: trimmed.slice(0, idx).trim(), rest: trimmed.slice(idx + 2).trim() };
 }
 
 function MarkdownMessage({ content }: { content: string }) {
-    const { intro, rest } = splitIntro(content);
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(content);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     return (
-        <div className="space-y-2.5">
-            {intro && (
-                <div className="text-[15px] leading-relaxed text-gray-800 [&_p]:m-0 [&_strong]:font-semibold">
-                    <ReactMarkdown>{intro}</ReactMarkdown>
-                </div>
-            )}
-            {rest && (
-                <div className="text-sm leading-relaxed space-y-2
-                    [&_p]:m-0
-                    [&_strong]:font-semibold
-                    [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5
-                    [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-0.5
-                    [&_li]:mt-0.5
-                    [&_h1]:text-sm [&_h1]:font-bold [&_h1]:mt-2
-                    [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mt-2
-                    [&_h3]:text-sm [&_h3]:font-bold [&_h3]:mt-2
-                    [&_code]:bg-black/5 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[13px]
-                    [&_table]:w-full [&_table]:text-xs [&_table]:border-collapse [&_table]:my-2
-                    [&_th]:text-left [&_th]:border-b [&_th]:border-gray-200 [&_th]:py-1 [&_th]:pr-3 [&_th]:font-semibold
-                    [&_td]:border-b [&_td]:border-gray-100 [&_td]:py-1 [&_td]:pr-3
-                ">
-                    <ReactMarkdown>{rest}</ReactMarkdown>
-                </div>
-            )}
+        <div className="relative group/msg space-y-2">
+            <div className="text-xs sm:text-[15px] leading-relaxed text-gray-800 font-normal
+                [&_p]:mb-2.5 [&_p:last-child]:mb-0
+                [&_strong]:font-semibold [&_strong]:text-gray-900
+                [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-2 [&_ul]:space-y-0.5
+                [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-2 [&_ol]:space-y-0.5
+                [&_li]:leading-relaxed
+                [&_h1]:text-base [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:mt-3 [&_h1]:mb-1.5
+                [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:mt-2.5 [&_h2]:mb-1
+                [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-gray-900 [&_h3]:mt-2 [&_h3]:mb-1
+                [&_code]:bg-gray-100 [&_code]:text-[#1a1a2e] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:text-[12px] [&_code]:font-mono
+                [&_blockquote]:border-l-2 [&_blockquote]:border-[#1a1a2e]/40 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-gray-600
+                [&_table]:w-full [&_table]:text-[11px] sm:[&_table]:text-xs [&_table]:border-collapse [&_table]:my-2 [&_table]:rounded-xl [&_table]:overflow-hidden [&_table]:shadow-xs
+                [&_th]:bg-gray-100 [&_th]:text-gray-800 [&_th]:text-left [&_th]:border-b [&_th]:border-gray-200 [&_th]:p-2 [&_th]:font-semibold
+                [&_td]:border-b [&_td]:border-gray-100 [&_td]:p-2 [&_td]:text-gray-700
+                [&_tr:hover]:bg-gray-50/80
+            ">
+                <ReactMarkdown>{content}</ReactMarkdown>
+            </div>
+            <div className="flex items-center gap-2 pt-1 opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 transition-opacity duration-200">
+                <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-1 text-[11px] sm:text-xs text-gray-400 hover:text-gray-700 transition px-2 py-0.5 rounded-md hover:bg-gray-100"
+                >
+                    {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                    <span>{copied ? "Tersalin" : "Salin"}</span>
+                </button>
+            </div>
         </div>
     );
 }
 
-function UsageBar({ counts, blocked }: { counts: Record<string, number>; blocked: Record<string, boolean> }) {
+function UsagePopover({ counts, blocked }: { counts: Record<string, number>; blocked: Record<string, boolean> }) {
+    const [open, setOpen] = useState(false);
     const gemini = counts.gemini ?? 0;
     const groq = counts.groq ?? 0;
     const total = gemini + groq;
 
-    if (total === 0) {
-        return <p className="text-[11px] text-gray-300 whitespace-nowrap">Belum ada pemakaian hari ini</p>;
-    }
-
-    const geminiPct = Math.round((gemini / total) * 100);
-    const groqPct = 100 - geminiPct;
+    const geminiPct = total > 0 ? Math.round((gemini / total) * 100) : 0;
+    const groqPct = total > 0 ? 100 - geminiPct : 0;
 
     return (
-        <div className="flex flex-col gap-1 w-full sm:w-60">
-            <div className="flex items-center justify-between text-[10px] text-gray-400">
-                <span>Pemakaian hari ini</span>
-                <span>{total} pesan</span>
-            </div>
-            <div className="flex h-1.5 rounded-full overflow-hidden bg-gray-100">
-                {gemini > 0 && <div style={{ width: `${geminiPct}%`, backgroundColor: PROVIDER_COLOR.gemini }} />}
-                {groq > 0 && <div style={{ width: `${groqPct}%`, backgroundColor: PROVIDER_COLOR.groq }} />}
-            </div>
-            <div className="flex items-center gap-3 text-[10px] text-gray-400 flex-wrap">
-                <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: PROVIDER_COLOR.gemini }} />
-                    Gemini {gemini} ({geminiPct}%){blocked?.gemini && <span className="text-amber-500 font-medium"> · cooldown</span>}
-                </span>
-                <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: PROVIDER_COLOR.groq }} />
-                    Groq {groq} ({groqPct}%){blocked?.groq && <span className="text-amber-500 font-medium"> · cooldown</span>}
-                </span>
-            </div>
+        <div className="relative">
+            <button
+                onClick={() => setOpen((v) => !v)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200/70 text-[11px] sm:text-xs font-medium text-gray-700 border border-gray-200 transition whitespace-nowrap"
+            >
+                <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#1a1a2e]" />
+                <span>{total} <span className="hidden sm:inline">Pesan</span></span>
+            </button>
+
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+                    <div className="absolute right-0 mt-2 z-40 w-60 sm:w-64 p-3 rounded-2xl bg-white border border-gray-200 shadow-xl space-y-2">
+                        <div className="flex items-center justify-between text-xs font-semibold text-gray-800">
+                            <span>Statistik AI</span>
+                            <span className="text-gray-500 text-[10px]">{total} pesan</span>
+                        </div>
+                        <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
+                            {gemini > 0 && <div style={{ width: `${geminiPct}%`, backgroundColor: PROVIDER_COLOR.gemini }} />}
+                            {groq > 0 && <div style={{ width: `${groqPct}%`, backgroundColor: PROVIDER_COLOR.groq }} />}
+                        </div>
+                        <div className="space-y-1 text-[11px] text-gray-600 pt-0.5">
+                            <div className="flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.gemini }} />
+                                    Gemini 2.0
+                                </span>
+                                <span className="font-semibold">{gemini} ({geminiPct}%)</span>
+                            </div>
+                            {blocked?.gemini && <p className="text-[10px] text-amber-600 pl-3.5">Status: Cooldown</p>}
+
+                            <div className="flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.groq }} />
+                                    Groq Llama 70B
+                                </span>
+                                <span className="font-semibold">{groq} ({groqPct}%)</span>
+                            </div>
+                            {blocked?.groq && <p className="text-[10px] text-amber-600 pl-3.5">Status: Cooldown</p>}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
@@ -147,22 +199,10 @@ export default function AiCeoWorkspace() {
     const [providerBlocked, setProviderBlocked] = useState<Record<string, boolean>>({});
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState("");
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
     const bottomRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const cardRef = useRef<HTMLDivElement>(null);
-    const [cardHeight, setCardHeight] = useState<number | null>(null);
-
-    useEffect(() => {
-        function updateHeight() {
-            if (!cardRef.current) return;
-            const top = cardRef.current.getBoundingClientRect().top;
-            const available = window.innerHeight - top - 16;
-            setCardHeight(Math.max(available, 420));
-        }
-        updateHeight();
-        window.addEventListener("resize", updateHeight);
-        return () => window.removeEventListener("resize", updateHeight);
-    }, []);
 
     useEffect(() => {
         try {
@@ -186,6 +226,7 @@ export default function AiCeoWorkspace() {
 
     const loadConversation = useCallback(async (id: string) => {
         setLoadingConv(true);
+        setShowSuggestions(false);
         try {
             const res = await fetch(`/api/ai-ceo/conversations/${id}`);
             const json = await res.json();
@@ -220,7 +261,12 @@ export default function AiCeoWorkspace() {
     useEffect(() => { loadConversations(); loadSuggestions(); loadUsage(); }, [loadConversations, loadSuggestions, loadUsage]);
     useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, sending]);
 
-    const handleNewChat = () => { setActiveId(null); setMessages([]); };
+    const handleNewChat = () => {
+        setActiveId(null);
+        setMessages([]);
+        setShowSuggestions(false);
+        setSidebarOpen(false);
+    };
 
     const autoGrow = () => {
         const el = textareaRef.current;
@@ -229,11 +275,13 @@ export default function AiCeoWorkspace() {
         el.style.height = Math.min(el.scrollHeight, 140) + "px";
     };
 
-    const handleSend = async () => {
-        const text = input.trim();
+    const handleSend = async (customPrompt?: string) => {
+        const text = (customPrompt ?? input).trim();
         if (!text || sending) return;
-        setInput("");
+
+        if (!customPrompt) setInput("");
         if (textareaRef.current) textareaRef.current.style.height = "auto";
+
         setMessages((prev) => [...prev, { role: "user", content: text }]);
         setSending(true);
         setThinkingLabel(DEFAULT_THINKING_LABEL);
@@ -272,25 +320,27 @@ export default function AiCeoWorkspace() {
                         loadUsage();
                         finished = true;
                     } else if (evt.type === "error") {
-                        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${evt.message}` }]);
+                        setMessages((prev) => [...prev, { role: "assistant", content: `Gagal: ${evt.message}` }]);
                         finished = true;
                     }
                 }
             }
         } catch {
-            setMessages((prev) => [...prev, { role: "assistant", content: "⚠️ Gagal menghubungi AI CEO, coba lagi." }]);
+            setMessages((prev) => [...prev, { role: "assistant", content: "Gagal menghubungi AI CEO, silakan coba lagi." }]);
         } finally {
             setSending(false);
         }
     };
 
-    const handleDeleteConversation = async (id: string) => {
+    const handleDeleteConversation = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
         await fetch(`/api/ai-ceo/conversations/${id}`, { method: "DELETE" });
         if (activeId === id) handleNewChat();
         loadConversations();
     };
 
-    const startRename = (c: ConversationSummary) => {
+    const startRename = (c: ConversationSummary, e: React.MouseEvent) => {
+        e.stopPropagation();
         setRenamingId(c.id);
         setRenameValue(c.title);
     };
@@ -318,29 +368,93 @@ export default function AiCeoWorkspace() {
         setSuggestions((prev) => prev.filter((s) => s.id !== id));
     };
 
+    const quickPrompts = [
+        {
+            icon: Package,
+            title: "Stok Ready",
+            desc: "Laptop & unit siap jual hari ini",
+            prompt: "Stok laptop apa saja yang ready sekarang beserta jumlah dan kondisinya?"
+        },
+        {
+            icon: Wallet,
+            title: "Cashflow Toko",
+            desc: "Ringkasan pemasukan & profit",
+            prompt: "Beri saya ringkasan cashflow dan transaksi toko terkini."
+        },
+        {
+            icon: AlertTriangle,
+            title: "Stok Restock",
+            desc: "Cek stok minus atau menipis",
+            prompt: "Apakah ada stok laptop atau aksesori yang minus atau perlu di-restock?"
+        },
+        {
+            icon: Users,
+            title: "Absensi & Lembur",
+            desc: "Rekap Kehadiran karyawan",
+            prompt: "Bagaimana ringkasan absensi dan lembur karyawan minggu ini?"
+        }
+    ];
+
     return (
         <DashboardLayout>
             <style dangerouslySetInnerHTML={{
                 __html: `
-                @keyframes aiCeoDot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.35; } 30% { transform: translateY(-4px); opacity: 1; } }
-                @keyframes aiCeoFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes aiCeoDot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.3; } 30% { transform: translateY(-4px); opacity: 1; } }
             `}} />
 
-            <div className="w-full max-w-[1400px] mx-auto p-3 md:p-5">
-                <div
-                    ref={cardRef}
-                    style={{ height: cardHeight ? `${cardHeight}px` : undefined }}
-                    className="flex flex-col lg:flex-row min-h-[420px] rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden"
+            {/* Layout container optimized for both Mobile and Desktop */}
+            <div className="flex h-[calc(100vh-6rem)] sm:h-[calc(100vh-3.5rem)] -mx-4 -my-4 lg:mx-0 lg:my-0 w-[calc(100%+2rem)] lg:w-full bg-white text-gray-800 overflow-hidden font-sans rounded-none sm:rounded-2xl border-0 sm:border border-gray-200 shadow-xs">
+
+                {/* Sidebar Overlay on Mobile */}
+                {sidebarOpen && (
+                    <div
+                        onClick={() => setSidebarOpen(false)}
+                        className="fixed inset-0 z-40 bg-black/30 lg:hidden backdrop-blur-xs transition-opacity"
+                    />
+                )}
+
+                {/* Left Navigation Sidebar */}
+                <aside
+                    className={`fixed inset-y-0 left-0 z-50 w-72 lg:static lg:z-auto lg:w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out ${
+                        sidebarOpen ? "translate-x-0" : "-translate-x-full lg:-ml-64"
+                    }`}
                 >
-                    <aside className="w-full lg:w-64 flex-shrink-0 border-b lg:border-b-0 lg:border-r border-gray-100 bg-gray-50/60 flex flex-col max-h-40 lg:max-h-none">
-                        <div className="p-3 border-b border-gray-100">
-                            <button onClick={handleNewChat} className="w-full rounded-xl bg-[#1a1a2e] text-white text-sm font-semibold py-2.5 hover:bg-[#2d2d4a] transition">
-                                + Percakapan Baru
-                            </button>
+                    {/* Sidebar Header */}
+                    <div className="p-3 flex items-center justify-between border-b border-gray-200">
+                        <button
+                            onClick={handleNewChat}
+                            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#1a1a2e] text-white px-3 py-2 text-xs font-semibold hover:bg-[#2d2d4a] shadow-xs transition"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Percakapan Baru</span>
+                        </button>
+                        <button
+                            onClick={() => setSidebarOpen(false)}
+                            className="lg:hidden ml-2 p-1.5 rounded-lg text-gray-400 hover:text-gray-600"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {/* Conversation List */}
+                    <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1 scrollbar-thin">
+                        <div className="px-2 pb-1 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                            Riwayat Chat
                         </div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1 min-h-0">
-                            {conversations.map((c) => (
-                                <div key={c.id} className={`group flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm ${activeId === c.id ? "bg-white shadow-sm font-semibold text-[#1a1a2e]" : "text-gray-600 hover:bg-white/70"}`}>
+                        {conversations.map((c) => {
+                            const isActive = activeId === c.id && !showSuggestions;
+                            return (
+                                <div
+                                    key={c.id}
+                                    onClick={() => { loadConversation(c.id); setSidebarOpen(false); }}
+                                    className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium cursor-pointer transition ${
+                                        isActive
+                                            ? "bg-white text-[#1a1a2e] shadow-xs border border-gray-200 font-semibold"
+                                            : "text-gray-600 hover:bg-gray-200/60"
+                                    }`}
+                                >
+                                    <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? "text-[#1a1a2e]" : "text-gray-400"}`} />
+
                                     {renamingId === c.id ? (
                                         <input
                                             autoFocus
@@ -351,121 +465,287 @@ export default function AiCeoWorkspace() {
                                                 if (e.key === "Escape") setRenamingId(null);
                                             }}
                                             onBlur={() => commitRename(c.id)}
-                                            className="flex-1 min-w-0 text-sm bg-white border border-gray-200 rounded-md px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]/30"
+                                            className="flex-1 min-w-0 bg-white border border-[#1a1a2e] rounded px-1.5 py-0.5 text-xs focus:outline-none"
                                         />
                                     ) : (
-                                        <span onClick={() => loadConversation(c.id)} className="flex-1 truncate cursor-pointer">{c.title}</span>
+                                        <span className="flex-1 truncate">{c.title}</span>
                                     )}
+
                                     {renamingId !== c.id && (
-                                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 flex-shrink-0">
-                                            <button onClick={() => startRename(c)} className="text-gray-300 hover:text-[#1a1a2e] text-xs" title="Ganti nama">✎</button>
-                                            <button onClick={() => handleDeleteConversation(c.id)} className="text-gray-300 hover:text-red-500 text-xs" title="Hapus">✕</button>
+                                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
+                                            <button
+                                                onClick={(e) => startRename(c, e)}
+                                                className="p-1 text-gray-400 hover:text-gray-700 rounded"
+                                                title="Ganti nama"
+                                            >
+                                                <Edit3 className="w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDeleteConversation(c.id, e)}
+                                                className="p-1 text-gray-400 hover:text-rose-600 rounded"
+                                                title="Hapus"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
                                         </div>
                                     )}
                                 </div>
-                            ))}
-                            {conversations.length === 0 && <p className="text-xs text-gray-400 px-3 py-2">Belum ada percakapan.</p>}
-                        </div>
-                        <div className="p-3 border-t border-gray-100">
-                            <button onClick={() => setShowSuggestions((v) => !v)} className="w-full text-left text-xs font-semibold text-gray-500 hover:text-[#1a1a2e] flex items-center justify-between">
-                                <span>Catatan/Koreksi AI</span>
-                                {suggestions.length > 0 && <span className="bg-red-500 text-white rounded-full px-1.5 py-0.5 text-[10px]">{suggestions.length}</span>}
+                            );
+                        })}
+                        {conversations.length === 0 && (
+                            <p className="text-xs text-gray-400 px-3 py-4 italic">Belum ada riwayat percakapan.</p>
+                        )}
+                    </div>
+
+                    {/* Sidebar Footer */}
+                    <div className="p-3 border-t border-gray-200">
+                        <button
+                            onClick={() => { setShowSuggestions((v) => !v); setSidebarOpen(false); }}
+                            className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                                showSuggestions
+                                    ? "bg-[#1a1a2e] text-white shadow-xs"
+                                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                            }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                <Info className="w-3.5 h-3.5" />
+                                <span>Review & Koreksi AI</span>
+                            </span>
+                            {suggestions.length > 0 && (
+                                <span className="bg-rose-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.2">
+                                    {suggestions.length}
+                                </span>
+                            )}
+                        </button>
+                    </div>
+                </aside>
+
+                {/* Main Workspace Workspace */}
+                <main className="flex-1 flex flex-col min-w-0 bg-white h-full">
+                    {/* Top Workspace Header */}
+                    <header className="h-12 sm:h-13 px-3 sm:px-6 border-b border-gray-200 bg-white flex items-center justify-between gap-2 z-10 flex-shrink-0">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <button
+                                onClick={() => setSidebarOpen((v) => !v)}
+                                className="p-1.5 rounded-xl text-gray-600 hover:bg-gray-100 transition"
+                                title="Buka/Tutup Sidebar"
+                            >
+                                {sidebarOpen ? <PanelLeftClose className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" /> : <PanelLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />}
                             </button>
-                        </div>
-                    </aside>
 
-                    <div className="flex-1 flex flex-col min-w-0 min-h-0">
-                        <div className="border-b border-gray-100 bg-white px-4 md:px-6 py-3 flex items-start justify-between gap-4 flex-wrap">
-                            <div>
-                                <h1 className="text-sm font-bold text-[#1a1a2e]">AI CEO</h1>
-                                <p className="text-xs text-gray-400">Tanya stok, penjualan, cashflow, atau minta AI mencatat koreksi untuk direview.</p>
-                            </div>
-                            <div className="flex items-center gap-3 flex-wrap">
-                                <UsageBar counts={usage} blocked={providerBlocked} />
-                                <select
-                                    value={provider}
-                                    onChange={(e) => handleProviderChange(e.target.value as AiProviderChoice)}
-                                    className="text-xs font-medium text-gray-600 border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 flex-shrink-0"
-                                    title="Pilih provider AI"
-                                >
-                                    <option value="auto">Otomatis (Gemini → Groq)</option>
-                                    <option value="gemini">Gemini saja</option>
-                                    <option value="groq">Groq saja</option>
-                                </select>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[#1a1a2e] flex items-center justify-center text-white shadow-xs flex-shrink-0">
+                                    <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                </div>
+                                <h1 className="text-xs sm:text-sm font-bold text-[#1a1a2e] truncate">AI CEO Workspace</h1>
                             </div>
                         </div>
 
+                        {/* Right Header Controls */}
+                        <div className="flex items-center gap-2">
+                            <UsagePopover counts={usage} blocked={providerBlocked} />
+                        </div>
+                    </header>
+
+                    {/* Chat Content Body */}
+                    <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
                         {showSuggestions ? (
-                            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 min-h-0">
-                                {suggestions.length === 0 && <p className="text-sm text-gray-400">Tidak ada catatan/koreksi pending saat ini.</p>}
-                                {suggestions.map((s) => (
-                                    <div key={s.id} className="rounded-xl border border-gray-100 bg-white p-4 space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${SEVERITY_STYLE[s.severity] ?? SEVERITY_STYLE.info}`}>{s.severity.toUpperCase()}</span>
-                                            <span className="text-[10px] text-gray-400 uppercase">{s.category}</span>
-                                        </div>
-                                        <p className="text-sm font-semibold text-gray-800">{s.title}</p>
-                                        <p className="text-sm text-gray-500">{s.description}</p>
-                                        <div className="flex gap-2 pt-1">
-                                            <button onClick={() => handleReviewSuggestion(s.id, "reviewed")} className="text-xs font-semibold text-emerald-600 hover:underline">Tandai sudah ditinjau</button>
-                                            <button onClick={() => handleReviewSuggestion(s.id, "dismissed")} className="text-xs font-semibold text-gray-400 hover:underline">Abaikan</button>
-                                        </div>
+                            /* Review Suggestions Panel */
+                            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4 max-w-5xl mx-auto w-full">
+                                <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                                    <h2 className="text-xs sm:text-base font-bold text-gray-900 flex items-center gap-2">
+                                        <Info className="w-4 h-4 sm:w-5 sm:h-5 text-[#1a1a2e]" />
+                                        <span>Catatan & Koreksi Pengetahuan AI</span>
+                                    </h2>
+                                    <span className="text-[11px] sm:text-xs text-gray-500">{suggestions.length} pending</span>
+                                </div>
+
+                                {suggestions.length === 0 && (
+                                    <div className="text-center py-12 text-gray-400 text-xs sm:text-sm">
+                                        Tidak ada catatan atau koreksi AI yang perlu ditinjau saat ini.
                                     </div>
-                                ))}
+                                )}
+
+                                {suggestions.map((s) => {
+                                    const style = SEVERITY_STYLE[s.severity] ?? SEVERITY_STYLE.info;
+                                    return (
+                                        <div key={s.id} className={`rounded-2xl border ${style.border} ${style.bg} p-3 sm:p-4 space-y-2 shadow-xs`}>
+                                            <div className="flex items-center justify-between">
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${style.text} bg-white uppercase`}>
+                                                    {s.severity}
+                                                </span>
+                                                <span className="text-[10px] text-gray-400 uppercase font-medium">{s.category}</span>
+                                            </div>
+                                            <h3 className="text-xs sm:text-sm font-bold text-gray-800">{s.title}</h3>
+                                            <p className="text-xs text-gray-600 leading-relaxed">{s.description}</p>
+                                            <div className="flex items-center gap-2 pt-1">
+                                                <button
+                                                    onClick={() => handleReviewSuggestion(s.id, "reviewed")}
+                                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 transition"
+                                                >
+                                                    Tandai Sudah Ditinjau
+                                                </button>
+                                                <button
+                                                    onClick={() => handleReviewSuggestion(s.id, "dismissed")}
+                                                    className="px-2.5 py-1 rounded-lg bg-gray-200 text-gray-700 text-[11px] font-semibold hover:bg-gray-300 transition"
+                                                >
+                                                    Abaikan
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         ) : (
-                            <>
-                                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 min-h-0">
-                                    {messages.length === 0 && !loadingConv && (
-                                        <div className="text-sm text-gray-400 text-center mt-10">
-                                            Coba tanya: <span className="italic">&quot;Stok laptop apa yang ready sekarang?&quot;</span>
+                            /* Chat Messages Stream */
+                            <div className="flex-1 overflow-y-auto scrollbar-thin px-3 sm:px-6 py-3 sm:py-5 space-y-4 max-w-5xl mx-auto w-full">
+                                {messages.length === 0 && !loadingConv && (
+                                    /* Compact Mobile Welcome Screen */
+                                    <div className="flex flex-col items-center justify-center min-h-[80%] text-center px-2 py-2 sm:py-6">
+                                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-[#1a1a2e] flex items-center justify-center text-white shadow-md mb-2 sm:mb-3">
+                                            <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
                                         </div>
-                                    )}
-                                    {messages.map((m, i) => (
+                                        <h2 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+                                            Bagaimana AI CEO bisa membantu Anda?
+                                        </h2>
+                                        <p className="text-xs sm:text-sm text-gray-500 mt-1 max-w-lg leading-relaxed line-clamp-2 sm:line-clamp-none">
+                                            Asisten bisnis real-time untuk memantau stok unit POS, analisa penjualan, absensi tim, & cashflow toko Anda.
+                                        </p>
+
+                                        {/* Starter Suggestions Cards */}
+                                        <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-4 sm:mt-6 w-full max-w-3xl text-left">
+                                            {quickPrompts.map((item, idx) => {
+                                                const Icon = item.icon;
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => handleSend(item.prompt)}
+                                                        className="group flex flex-col p-2.5 sm:p-3.5 rounded-2xl bg-white border border-gray-200 hover:border-[#1a1a2e] shadow-xs hover:shadow-md transition-all duration-200 text-left"
+                                                    >
+                                                        <div className="flex items-center gap-1.5 sm:gap-2.5 mb-1">
+                                                            <div className="p-1 rounded-lg bg-gray-100 text-[#1a1a2e] flex-shrink-0">
+                                                                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                                            </div>
+                                                            <span className="text-[11px] sm:text-xs font-bold text-gray-900 truncate">{item.title}</span>
+                                                        </div>
+                                                        <p className="text-[10px] sm:text-xs text-gray-500 line-clamp-2 leading-tight sm:leading-relaxed">
+                                                            {item.desc}
+                                                        </p>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Message Items */}
+                                {messages.map((m, i) => {
+                                    const isUser = m.role === "user";
+                                    return (
                                         <div
                                             key={m.id ?? i}
-                                            className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
-                                            style={{ animation: "aiCeoFadeIn 0.25s ease-out both" }}
+                                            className={`flex gap-2 sm:gap-4 ${isUser ? "justify-end" : "justify-start"}`}
                                         >
-                                            <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-2.5 ${m.role === "user" ? "bg-[#1a1a2e] text-white text-sm" : "bg-gray-50 border border-gray-100 text-gray-700"}`}>
-                                                {m.role === "assistant" ? <MarkdownMessage content={m.content} /> : m.content}
-                                            </div>
-                                            {m.role === "assistant" && m.provider && (
-                                                <span className="text-[10px] text-gray-300 mt-1 px-1 flex items-center gap-1">
-                                                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: PROVIDER_COLOR[m.provider] ?? "#9ca3af" }} />
-                                                    dijawab via {PROVIDER_LABEL[m.provider as AiProviderChoice] ?? m.provider}
-                                                </span>
+                                            {!isUser && (
+                                                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white shadow-xs flex-shrink-0 mt-0.5">
+                                                    <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                                </div>
                                             )}
-                                        </div>
-                                    ))}
-                                    {sending && <ThinkingIndicator label={thinkingLabel} />}
-                                    <div ref={bottomRef} />
-                                </div>
 
-                                <div className="border-t border-gray-100 bg-white p-3 md:p-4">
-                                    <div className="flex items-end gap-2">
+                                            <div className={`flex flex-col max-w-[92%] sm:max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
+                                                <div
+                                                    className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
+                                                        isUser
+                                                            ? "bg-[#1a1a2e] text-white rounded-tr-xs shadow-xs font-normal"
+                                                            : "bg-transparent text-gray-800"
+                                                    }`}
+                                                >
+                                                    {isUser ? (
+                                                        <span className="whitespace-pre-wrap">{m.content}</span>
+                                                    ) : (
+                                                        <MarkdownMessage content={m.content} />
+                                                    )}
+                                                </div>
+
+                                                {!isUser && m.provider && (
+                                                    <div className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-400 mt-0.5 px-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: PROVIDER_COLOR[m.provider] ?? "#9CA3AF" }} />
+                                                        <span>via {PROVIDER_LABEL[m.provider as AiProviderChoice] ?? m.provider}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {sending && (
+                                    <div className="flex gap-2 sm:gap-4 items-start">
+                                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#1a1a2e] flex items-center justify-center text-white shadow-xs flex-shrink-0">
+                                            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                                        </div>
+                                        <ThinkingIndicator label={thinkingLabel} />
+                                    </div>
+                                )}
+
+                                <div ref={bottomRef} />
+                            </div>
+                        )}
+
+                        {/* Bottom Prompt Input Card - Mobile Responsive */}
+                        {!showSuggestions && (
+                            <div className="px-3 sm:px-6 py-2 bg-white border-t border-gray-100 flex-shrink-0">
+                                <div className="max-w-5xl mx-auto">
+                                    <div className="relative rounded-2xl bg-white border border-gray-200 focus-within:border-[#1a1a2e] shadow-xs focus-within:shadow-md transition-all duration-200 p-2 sm:p-2.5">
                                         <textarea
                                             ref={textareaRef}
                                             value={input}
                                             onChange={(e) => { setInput(e.target.value); autoGrow(); }}
-                                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    handleSend();
+                                                }
+                                            }}
                                             rows={1}
-                                            placeholder="Tanya sesuatu ke AI CEO..."
-                                            className="flex-1 resize-none rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/30 max-h-[140px]"
+                                            placeholder="Tanya AI CEO..."
+                                            className="w-full resize-none bg-transparent border-0 text-xs sm:text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 max-h-28 sm:max-h-36 px-1 py-0.5"
                                         />
-                                        <button
-                                            onClick={handleSend}
-                                            disabled={sending || !input.trim()}
-                                            className="rounded-xl bg-[#1a1a2e] text-white text-sm font-semibold px-4 py-2.5 disabled:opacity-40 hover:bg-[#2d2d4a] transition flex-shrink-0"
-                                        >
-                                            Kirim
-                                        </button>
+
+                                        {/* Bottom Action Toolbar inside Input Box */}
+                                        <div className="flex items-center justify-between pt-1.5 mt-0.5 border-t border-gray-100">
+                                            {/* Provider Selector Right Next to Chat Input */}
+                                            <div className="relative flex items-center">
+                                                <select
+                                                    value={provider}
+                                                    onChange={(e) => handleProviderChange(e.target.value as AiProviderChoice)}
+                                                    className="appearance-none text-[10px] sm:text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg pl-2 pr-6 py-0.5 sm:py-1 focus:outline-none cursor-pointer transition shadow-xs max-w-[130px] sm:max-w-none truncate"
+                                                    title="Pilih Model AI"
+                                                >
+                                                    <option value="auto">Otomatis (Gemini → Groq)</option>
+                                                    <option value="gemini">Gemini 2.0 Flash</option>
+                                                    <option value="groq">Groq (Llama 3.3 70B)</option>
+                                                </select>
+                                                <ChevronDown className="w-3 h-3 text-gray-400 absolute right-1.5 pointer-events-none" />
+                                            </div>
+
+                                            <button
+                                                onClick={() => handleSend()}
+                                                disabled={sending || !input.trim()}
+                                                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#1a1a2e] hover:bg-[#2d2d4a] disabled:bg-gray-200 text-white disabled:text-gray-400 flex items-center justify-center transition-all duration-150 shadow-xs flex-shrink-0"
+                                                title="Kirim pesan"
+                                            >
+                                                <ArrowUp className="w-4 h-4 sm:w-5 sm:h-5" />
+                                            </button>
+                                        </div>
                                     </div>
+                                    <p className="hidden sm:block text-[10px] text-center text-gray-400 mt-1">
+                                        AI CEO terhubung langsung ke database POS Solit real-time.
+                                    </p>
                                 </div>
-                            </>
+                            </div>
                         )}
                     </div>
-                </div>
+                </main>
             </div>
         </DashboardLayout>
     );
