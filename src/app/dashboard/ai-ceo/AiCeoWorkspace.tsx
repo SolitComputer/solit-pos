@@ -20,7 +20,9 @@ import {
     Activity,
     X,
     ArrowUp,
-    Info
+    Info,
+    Cpu,
+    Bot
 } from "lucide-react";
 
 interface ConversationSummary { id: string; title: string; updated_at: string; }
@@ -127,8 +129,7 @@ function MarkdownMessage({ content }: { content: string }) {
     );
 }
 
-function UsagePopover({ counts, blocked }: { counts: Record<string, number>; blocked: Record<string, boolean> }) {
-    const [open, setOpen] = useState(false);
+function UsageBar({ counts, blocked }: { counts: Record<string, number>; blocked: Record<string, boolean> }) {
     const gemini = counts.gemini ?? 0;
     const groq = counts.groq ?? 0;
     const total = gemini + groq;
@@ -137,49 +138,33 @@ function UsagePopover({ counts, blocked }: { counts: Record<string, number>; blo
     const groqPct = total > 0 ? 100 - geminiPct : 0;
 
     return (
-        <div className="relative">
-            <button
-                onClick={() => setOpen((v) => !v)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200/70 text-[11px] sm:text-xs font-medium text-gray-700 border border-gray-200 transition whitespace-nowrap"
-            >
-                <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#1a1a2e]" />
-                <span>{total} <span className="hidden sm:inline">Pesan</span></span>
-            </button>
+        <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-700">
+            <div className="flex flex-col gap-0.5 min-w-[110px] sm:min-w-[150px]">
+                <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-gray-600">
+                    <span className="flex items-center gap-1">
+                        <Activity className="w-3 h-3 text-[#1a1a2e]" />
+                        <span>Pemakaian Token</span>
+                    </span>
+                    <span className="text-[#1a1a2e] font-bold">{total} pesan</span>
+                </div>
+                <div className="flex h-1.5 rounded-full overflow-hidden bg-gray-200">
+                    {gemini > 0 && <div style={{ width: `${geminiPct}%`, backgroundColor: PROVIDER_COLOR.gemini }} />}
+                    {groq > 0 && <div style={{ width: `${groqPct}%`, backgroundColor: PROVIDER_COLOR.groq }} />}
+                </div>
+            </div>
 
-            {open && (
-                <>
-                    <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-                    <div className="absolute right-0 mt-2 z-40 w-60 sm:w-64 p-3 rounded-2xl bg-white border border-gray-200 shadow-xl space-y-2">
-                        <div className="flex items-center justify-between text-xs font-semibold text-gray-800">
-                            <span>Statistik AI</span>
-                            <span className="text-gray-500 text-[10px]">{total} pesan</span>
-                        </div>
-                        <div className="flex h-2 rounded-full overflow-hidden bg-gray-100">
-                            {gemini > 0 && <div style={{ width: `${geminiPct}%`, backgroundColor: PROVIDER_COLOR.gemini }} />}
-                            {groq > 0 && <div style={{ width: `${groqPct}%`, backgroundColor: PROVIDER_COLOR.groq }} />}
-                        </div>
-                        <div className="space-y-1 text-[11px] text-gray-600 pt-0.5">
-                            <div className="flex items-center justify-between">
-                                <span className="flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.gemini }} />
-                                    Gemini 2.0
-                                </span>
-                                <span className="font-semibold">{gemini} ({geminiPct}%)</span>
-                            </div>
-                            {blocked?.gemini && <p className="text-[10px] text-amber-600 pl-3.5">Status: Cooldown</p>}
-
-                            <div className="flex items-center justify-between">
-                                <span className="flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.groq }} />
-                                    Groq Llama 70B
-                                </span>
-                                <span className="font-semibold">{groq} ({groqPct}%)</span>
-                            </div>
-                            {blocked?.groq && <p className="text-[10px] text-amber-600 pl-3.5">Status: Cooldown</p>}
-                        </div>
-                    </div>
-                </>
-            )}
+            <div className="hidden sm:flex items-center gap-2 text-[10px] text-gray-500 font-medium pl-2 border-l border-gray-200">
+                <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.gemini }} />
+                    Gemini: <strong className="text-gray-800">{gemini}</strong> ({geminiPct}%)
+                    {blocked?.gemini && <span className="text-amber-600 font-bold">· Cooldown</span>}
+                </span>
+                <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.groq }} />
+                    Groq: <strong className="text-gray-800">{groq}</strong> ({groqPct}%)
+                    {blocked?.groq && <span className="text-amber-600 font-bold">· Cooldown</span>}
+                </span>
+            </div>
         </div>
     );
 }
@@ -522,8 +507,8 @@ export default function AiCeoWorkspace() {
 
                 {/* Main Workspace Workspace */}
                 <main className="flex-1 flex flex-col min-w-0 bg-white h-full">
-                    {/* Top Workspace Header */}
-                    <header className="h-12 sm:h-13 px-3 sm:px-6 border-b border-gray-200 bg-white flex items-center justify-between gap-2 z-10 flex-shrink-0">
+                    {/* Top Workspace Header with Directly Visible Usage Bar */}
+                    <header className="h-12 sm:h-14 px-3 sm:px-6 border-b border-gray-200 bg-white flex items-center justify-between gap-2 z-10 flex-shrink-0">
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                             <button
                                 onClick={() => setSidebarOpen((v) => !v)}
@@ -537,13 +522,13 @@ export default function AiCeoWorkspace() {
                                 <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[#1a1a2e] flex items-center justify-center text-white shadow-xs flex-shrink-0">
                                     <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </div>
-                                <h1 className="text-xs sm:text-sm font-bold text-[#1a1a2e] truncate">AI CEO Workspace</h1>
+                                <h1 className="text-xs sm:text-sm font-bold text-[#1a1a2e] truncate">AI CEO</h1>
                             </div>
                         </div>
 
-                        {/* Right Header Controls */}
+                        {/* Directly Visible Pemakaian Token / Message Usage Bar */}
                         <div className="flex items-center gap-2">
-                            <UsagePopover counts={usage} blocked={providerBlocked} />
+                            <UsageBar counts={usage} blocked={providerBlocked} />
                         </div>
                     </header>
 
@@ -691,7 +676,7 @@ export default function AiCeoWorkspace() {
                             </div>
                         )}
 
-                        {/* Bottom Prompt Input Card - Mobile Responsive */}
+                        {/* Bottom Prompt Input Card */}
                         {!showSuggestions && (
                             <div className="px-3 sm:px-6 py-2 bg-white border-t border-gray-100 flex-shrink-0">
                                 <div className="max-w-5xl mx-auto">
