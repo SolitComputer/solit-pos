@@ -106,6 +106,7 @@ export default function JurnalUmum({ period }: { period: string }) {
     } | null>(null); const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [search, setSearch] = useState("");
+    const [pendingSearch, setPendingSearch] = useState(""); // search khusus untuk daftar pending (325 data belum konfirmasi)
     // Filter berdasarkan akun yang dipilih lewat dropdown "Ref" — bisa lebih dari satu (OR).
     const [accountCodeFilter, setAccountCodeFilter] = useState<Set<string>>(new Set());
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
@@ -288,6 +289,24 @@ export default function JurnalUmum({ period }: { period: string }) {
         return result;
     }, [entries, search, accountCodeFilter]);
 
+    // Search untuk daftar PENDING (data yang belum dikonfirmasi ke jurnal umum) —
+    // terpisah dari `filtered` di atas karena sumber datanya beda (PendingDraft, bukan JournalEntry).
+    const filteredPending = useMemo(() => {
+        const q = pendingSearch.trim().toLowerCase();
+        if (!q) return pending;
+        return pending.filter((d) => {
+            const badge = SOURCE_BADGE[d.source_type];
+            const companyBadge = d.source_type === "TRANSACTION" ? getCompanyBadge(d.meta?.company_name) : null;
+            const specParts = [d.meta?.cpu, d.meta?.ram, d.meta?.storage].filter(Boolean) as string[];
+            return (
+                d.keterangan.toLowerCase().includes(q) ||
+                badge.label.toLowerCase().includes(q) ||
+                (companyBadge?.label.toLowerCase().includes(q) ?? false) ||
+                specParts.some((s) => s.toLowerCase().includes(q))
+            );
+        });
+    }, [pending, pendingSearch]);
+
     // Buka/tutup dropdown filter akun. Posisinya dihitung dari posisi tombol "Ref" di layar
     // (pakai position: fixed) supaya dropdown tidak terpotong oleh area scroll tabel.
     const openAccountFilterDropdown = () => {
@@ -375,8 +394,24 @@ export default function JurnalUmum({ period }: { period: string }) {
 
                     {showPending && (
                         <>
+                            <div className="px-3 sm:px-4 py-2.5 border-b border-amber-100 bg-amber-50/40">
+                                <div className="relative">
+                                    <Search className="w-3.5 h-3.5 text-amber-400/70 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                    <input
+                                        value={pendingSearch}
+                                        onChange={(e) => setPendingSearch(e.target.value)}
+                                        placeholder="Cari data pending (keterangan, toko, spek)..."
+                                        className="w-full h-9 border border-amber-200 rounded-lg pl-8 pr-3 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition"
+                                    />
+                                </div>
+                                {pendingSearch.trim() !== "" && (
+                                    <p className="text-[10px] text-amber-700/70 font-semibold mt-1">
+                                        {filteredPending.length} dari {pending.length} data cocok
+                                    </p>
+                                )}
+                            </div>
                             <div className="max-h-[320px] overflow-y-auto divide-y divide-gray-100">
-                                {pending.map((d) => {
+                                {filteredPending.map((d) => {
                                     const k = key(d);
                                     const checked = selected.has(k);
                                     const badge = SOURCE_BADGE[d.source_type];
@@ -768,11 +803,10 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                         {/* Ref = kode akun (post reference). Filternya sekarang lewat dropdown di header "Ref". */}
                                                                         <td className="px-4 py-2 text-center align-bottom">
                                                                             <span
-                                                                                className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${
-                                                                                    accountCodeFilter.has(line.account_code)
+                                                                                className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${accountCodeFilter.has(line.account_code)
                                                                                         ? "bg-blue-50 text-blue-700"
                                                                                         : "text-gray-400"
-                                                                                }`}
+                                                                                    }`}
                                                                             >
                                                                                 {line.account_code}
                                                                             </span>
