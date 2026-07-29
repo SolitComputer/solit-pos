@@ -740,7 +740,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         invoice_number: invoice,
         item_type: "accessory",
         unit_id: null,
-        accessory_id: a.accessory_id,
+        accessory_id: a.accessory_id && String(a.accessory_id).trim() ? a.accessory_id : null,
         laptop_id: fallbackLaptopId,
         serial_number: "-",
         laptop_name: a.name || "Aksesori",
