@@ -180,8 +180,11 @@ const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
 ];
 
 const PREPARATION_PENYEDIA_EXTRA_ROLES: UserRole[] = [
-  "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "KEPALA_MARKETING",
-  "KEPALA_SOTECH", "KEPALA_ONPOINT", "KONTEN", "PKL_SALES",
+  // KEPALA_SALES, KEPALA_ZENITH, KEPALA_SOTECH, KEPALA_ONPOINT sengaja TIDAK dimasukkan
+  // lagi di sini, supaya mereka tidak dapat akses "Selesai Disiapkan" (terima & cek unit).
+  // Terima/cek unit hanya untuk PREPARATION_PENYEDIA_ROLES (Penyedia Barang, Kepala
+  // Penyedia Barang, PKL Penyedia Barang).
+  "CREW_SALES", "KEPALA_MARKETING", "KONTEN", "PKL_SALES",
 ];
 
 export const PREPARATION_CREATE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
