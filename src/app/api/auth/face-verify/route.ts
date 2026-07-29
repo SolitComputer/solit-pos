@@ -195,12 +195,21 @@ export async function POST(request: Request) {
       .from("face_verifications")
       .insert(insertPayload);
 
-    if (insertError) console.error("INSERT GAGAL:", insertError.message, insertError);
+    if (insertError) {
+      console.error("INSERT GAGAL:", insertError.message, insertError);
+    }
 
     if (!matched) {
       return NextResponse.json(
         { success: false, message: "Wajah tidak dikenali", distance },
         { status: 400 }
+      );
+    }
+
+    if (insertError) {
+      return NextResponse.json(
+        { success: false, message: "Wajah cocok tapi gagal menyimpan ke database. Hubungi admin/programmer." },
+        { status: 500 }
       );
     }
 
