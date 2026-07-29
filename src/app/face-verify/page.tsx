@@ -633,7 +633,12 @@ export default function FaceVerifyPage() {
     if (!biometricEligible) return null;
     const supported = biometricDeviceSupported === true;
     return (
-      <div style={{ marginTop: 12 }}>
+      <div style={{ marginTop: 12, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", letterSpacing: 0.5 }}>ATAU</span>
+          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+        </div>
         <button
           className="btn-main"
           disabled={!supported || bioBusy}
@@ -1151,6 +1156,8 @@ export default function FaceVerifyPage() {
               </div>
             )}
 
+            {!isProcessing && renderBiometricOption()}
+
             {attempts > 0 && !isProcessing && (
               <div className="fail-badge">
                 <div className="fail-badge-dot" />
@@ -1215,7 +1222,6 @@ export default function FaceVerifyPage() {
                 Wajah tidak dikenali? Daftar ulang →
               </button>
             )}
-            {attempts >= 2 && !isProcessing && renderBiometricOption()}
           </>
         )}
 
