@@ -43,7 +43,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   // parsing tiap literalnya untuk infer bentuk hasil query. Untuk select-string
   // sepanjang ini, compiler jadi "meledak" — persis error build tadi.
   const selectFields: string = isAdmin
-    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url"
+    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, biometric_enabled"
     : isKepala
       ? "id, name, phone_number, role, roles, shift, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url"
       : "id, name, role, roles, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url";
@@ -58,6 +58,16 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 
+  // Set user_id yang sudah punya kredensial WebAuthn tersimpan — buat bedain
+  // "diaktifkan tapi belum daftar" vs "sudah terdaftar beneran"
+  let enrolledBiometricIds = new Set<string>();
+  if (isAdmin) {
+    const { data: credRows } = await supabaseAdmin
+      .from("user_webauthn_credentials")
+      .select("user_id");
+    enrolledBiometricIds = new Set((credRows ?? []).map((c: any) => c.user_id));
+  }
+
   const users = (data ?? []).map((u: any) => ({
     ...u,
     roles: Array.isArray(u.roles) && u.roles.length > 0
@@ -69,6 +79,8 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
       ? (u.face_embedding !== null && u.face_embedding !== undefined)
       : false,
     force_logout_at: isAdmin ? (u.force_logout_at ?? null) : null,
+    biometric_enabled: isAdmin ? (u.biometric_enabled ?? false) : false,
+    biometric_enrolled: isAdmin ? enrolledBiometricIds.has(u.id) : false,
     phone_number: (isAdmin || isKepala) ? (u.phone_number ?? null) : null,
     email: isAdmin ? (u.email ?? null) : null,
     birth_date: u.birth_date ?? null,
@@ -169,6 +181,8 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     birth_date,
     _resetPassword,
     _forceLogout,
+    _toggleBiometric,
+    _resetBiometric,
   } = body;
 
   if (!id) {
@@ -195,6 +209,37 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
       success: true,
       message: "Session user berhasil di-logout.",
     });
+  }
+
+  // ── Handle toggle eligibility sidik jari/biometrik ─────────────────────────
+  if (typeof _toggleBiometric === "boolean") {
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update({ biometric_enabled: _toggleBiometric })
+      .eq("id", id);
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+    return NextResponse.json({
+      success: true,
+      message: _toggleBiometric
+        ? "Sidik jari diaktifkan — user akan diminta daftar di HP-nya"
+        : "Sidik jari dinonaktifkan",
+    });
+  }
+
+  // ── Handle reset kredensial sidik jari/biometrik ───────────────────────────
+  if (_resetBiometric === true) {
+    const { error } = await supabaseAdmin
+      .from("user_webauthn_credentials")
+      .delete()
+      .eq("user_id", id);
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ success: true, message: "Kredensial sidik jari berhasil direset" });
   }
 
   // ── Handle reset password ──────────────────────────────────────────────────

@@ -76,7 +76,7 @@ export async function GET() {
         .lte("created_at", `${todayDate}T23:59:59+07:00`)
         .order("created_at", { ascending: false })
         .limit(1),
-      supabase.from("users").select("face_embedding, shift").eq("id", user.id).single(),
+      supabase.from("users").select("face_embedding, shift, biometric_enabled").eq("id", user.id).single(),
     ]);
 
     const userShift = ((userData as any)?.shift ?? (user as any).shift ?? "PAGI") as "PAGI" | "SORE";
@@ -194,6 +194,11 @@ export async function GET() {
       nowWIB.getUTCDate() + 1, 17, 0, 0
     ));
 
+    const { count: biometricCredCount } = await supabase
+      .from("user_webauthn_credentials")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+
     const response = NextResponse.json({
       success: true,
       alreadyAttended,
@@ -215,6 +220,8 @@ export async function GET() {
         source: override ? "SHIFT_SCHEDULE" : schedule.source,
       },
       manualAlreadyExists: false,
+      biometricEligible: (userData as any)?.biometric_enabled ?? false,
+      biometricEnrolled: (biometricCredCount ?? 0) > 0,
     });
 
     if (isTodayDayOff && dayOffCookie !== user.id) {

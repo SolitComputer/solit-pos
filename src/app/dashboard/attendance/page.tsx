@@ -4150,8 +4150,8 @@ export default function AttendanceDashboardPage() {
                                                                 )}
                                                             </td>
                                                             <td className="px-4 py-4">
-                                                                <span className={`inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border w-fit ${a.source === "MANUAL" ? "bg-blue-100 text-blue-700 border-blue-200" : a.method === "FACE" ? "bg-indigo-100 text-indigo-600 border-indigo-200" : "bg-gray-100 text-gray-400 border-gray-200"}`}>
-                                                                    {a.source === "MANUAL" ? "Manual" : a.method === "FACE" ? "Wajah" : "Skip"}
+                                                                <span className={`inline-flex items-center text-[10px] font-bold px-3 py-1.5 rounded-full border w-fit ${a.source === "MANUAL" ? "bg-blue-100 text-blue-700 border-blue-200" : a.method === "FACE" ? "bg-indigo-100 text-indigo-600 border-indigo-200" : a.method === "BIOMETRIC" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-400 border-gray-200"}`}>
+                                                                    {a.source === "MANUAL" ? "Manual" : a.method === "FACE" ? "Wajah" : a.method === "BIOMETRIC" ? "Sidik Jari" : "Skip"}
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-4">

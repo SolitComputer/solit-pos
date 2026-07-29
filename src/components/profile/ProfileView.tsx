@@ -17,6 +17,7 @@ interface ProfileData {
     bio: string | null;
     bio_created_at: string | null;
     profile_photo_url: string | null;
+    banner_url: string | null;
     status_note: string | null;
     status_note_expires_at: string | null;
     song_title: string | null;
@@ -95,6 +96,9 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [savingBio, setSavingBio] = useState(false);
     const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploadingBanner, setUploadingBanner] = useState(false);
+    const bannerInputRef = useRef<HTMLInputElement>(null);
+    const [showPhotoModal, setShowPhotoModal] = useState(false);
 
     const [editingNote, setEditingNote] = useState(false);
     const [noteDraft, setNoteDraft] = useState("");
@@ -353,6 +357,32 @@ export default function ProfileView({ userId }: { userId: string }) {
         }
     };
 
+    const handleBannerFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file) return;
+        setUploadingBanner(true);
+        try {
+            const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1600, useWebWorker: true });
+            const form = new FormData();
+            form.append("file", compressed, compressed.name || "banner.jpg");
+            form.append("type", "banner");
+            if (!isSelf) form.append("user_id", userId);
+            const res = await fetch("/api/profile/photo", { method: "POST", body: form });
+            const data = await res.json();
+            if (data.success) {
+                setProfile((p) => (p ? { ...p, banner_url: data.data.banner_url } : p));
+                showToast("Banner berhasil diperbarui", "ok");
+            } else {
+                showToast(data.message ?? "Gagal upload banner", "err");
+            }
+        } catch {
+            showToast("Terjadi kesalahan saat memproses banner", "err");
+        } finally {
+            setUploadingBanner(false);
+        }
+    };
+
     const handleDeletePhoto = async () => {
         setDeleting(true);
         try {
@@ -421,6 +451,18 @@ export default function ProfileView({ userId }: { userId: string }) {
         <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8 space-y-4 sm:space-y-5">
             {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
+            {showPhotoModal && profile.profile_photo_url && (
+                <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" onClick={() => setShowPhotoModal(false)}>
+                    <div className="absolute inset-0 bg-black/80" style={{ backdropFilter: "blur(4px)" }} />
+                    <button onClick={() => setShowPhotoModal(false)}
+                        className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center z-10">
+                        <X className="w-5 h-5 text-white" />
+                    </button>
+                    <img src={profile.profile_photo_url} alt={profile.name} onClick={(e) => e.stopPropagation()}
+                        className="relative max-w-full max-h-[85vh] rounded-2xl object-contain" />
+                </div>
+            )}
+
             {confirmDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => setConfirmDelete(false)} />
@@ -446,11 +488,22 @@ export default function ProfileView({ userId }: { userId: string }) {
             )}
 
             <div className="bg-white rounded-3xl overflow-hidden border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                <div className="h-24 sm:h-28" style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }} />
-                <div className="px-5 sm:px-7 pb-6">
+                <div className="relative h-24 sm:h-28 overflow-hidden" style={{ background: profile.banner_url ? undefined : "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
+                    {profile.banner_url && (
+                        <img src={profile.banner_url} alt="Banner" className="absolute inset-0 w-full h-full object-cover" />
+                    )}
+                    {(isSelf || isAdmin) && (
+                        <button onClick={() => bannerInputRef.current?.click()} disabled={uploadingBanner} title="Ganti banner"
+                            className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/30 hover:bg-black/45 backdrop-blur-sm flex items-center justify-center transition-all disabled:opacity-50">
+                            {uploadingBanner ? <Loader2 className="w-3.5 h-3.5 animate-spin text-white" /> : <Camera className="w-3.5 h-3.5 text-white" />}
+                        </button>
+                    )}
+                    <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBannerFileSelected} />
+                </div>                <div className="px-5 sm:px-7 pb-6">
                     <div className="flex items-end justify-between -mt-10 sm:-mt-12">
                         <div className="relative">
-                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-2xl font-black"
+                           <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
+                                className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-2xl font-black ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
                                 style={{ background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
                                 {profile.profile_photo_url
                                     ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
@@ -575,7 +628,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 </div>
             </div>
 
-          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                 <div className="flex items-center gap-1.5 mb-3">
                     <Music className="w-4 h-4" style={{ color: "#1db954" }} />
                     <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>
