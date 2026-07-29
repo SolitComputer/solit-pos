@@ -82,6 +82,10 @@ interface Props {
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
+// Harga Official selalu dihitung dari Harga Setor + markup ini,
+// TIDAK dibaca dari kolom official_price di DB (biar data lama yang masih 0 tetap benar di layar).
+const OFFICIAL_PRICE_MARKUP = 300_000;
+
 const fmtDate = (iso: string | null) =>
     iso
         ? new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
@@ -131,7 +135,7 @@ export default function InventoryTable({
                 case "MODAL": valA = a.harga_modal ?? 0; valB = b.harga_modal ?? 0; break;
                 case "SPAREPART": valA = a.sparepart_modal ?? 0; valB = b.sparepart_modal ?? 0; break;
                 case "PRICE": valA = a.harga_jual ?? 0; valB = b.harga_jual ?? 0; break;
-                case "OFFICIAL": valA = a.official_price ?? 0; valB = b.official_price ?? 0; break;
+                case "OFFICIAL": valA = (a.harga_jual ?? 0) + OFFICIAL_PRICE_MARKUP; valB = (b.harga_jual ?? 0) + OFFICIAL_PRICE_MARKUP; break;
                 case "GROSS_PROFIT": valA = a.gross_profit ?? 0; valB = b.gross_profit ?? 0; break;
                 case "TOTAL_JUAL": valA = (a.harga_jual ?? 0) * (a.stok_tersisa ?? 0); valB = (b.harga_jual ?? 0) * (b.stok_tersisa ?? 0); break;
                 case "SUMBER": valA = a.sumber || a.sumber_note || ""; valB = b.sumber || b.sumber_note || ""; break;
@@ -180,7 +184,7 @@ export default function InventoryTable({
                         <Th sortKey="STORAGE" activeSort={sortBy} onSort={onSort}>Storage</Th>
                         {canSeePrivate && <Th right sortKey="MODAL" activeSort={sortBy} onSort={onSort}>Modal Laptop</Th>}
                         {canSeePrivate && showSparepart && <Th right sortKey="SPAREPART" activeSort={sortBy} onSort={onSort}>Modal Sparepart</Th>}
-                        <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Store</Th>
+                        <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Setor</Th>
                         <Th right sortKey="OFFICIAL" activeSort={sortBy} onSort={onSort}>Harga Official</Th>
                         {canSeePrivate && <Th right sortKey="GROSS_PROFIT" activeSort={sortBy} onSort={onSort}>Gross Profit</Th>}
                         {showTotalJual && canSeeStock && <Th right sortKey="TOTAL_JUAL" activeSort={sortBy} onSort={onSort}>Total Jual</Th>}
@@ -190,7 +194,7 @@ export default function InventoryTable({
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
                         <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
-                      {renderSo && <Th center sortKey="SO" activeSort={sortBy} onSort={onSort}>SO</Th>}
+                        {renderSo && <Th center sortKey="SO" activeSort={sortBy} onSort={onSort}>SO</Th>}
                         {renderAudit && <Th center sortKey="AUDIT" activeSort={sortBy} onSort={onSort}>Audit</Th>}
                         {renderActions && <Th right sortKey="AKSI" activeSort={sortBy} onSort={onSort}>Aksi</Th>}
                     </tr>
@@ -256,11 +260,9 @@ export default function InventoryTable({
                             </td>
 
                             <td className="px-3 py-3.5 text-right whitespace-nowrap">
-                                {row.official_price != null ? (
-                                    <span className="text-xs font-semibold text-gray-600 tabular-nums">{fmt(row.official_price)}</span>
-                                ) : row.official_price_note ? (
-                                    <Note>{row.official_price_note}</Note>
-                                ) : <Dash />}
+                                <span className="text-xs font-semibold text-gray-600 tabular-nums">
+                                    {fmt((row.harga_jual ?? 0) + OFFICIAL_PRICE_MARKUP)}
+                                </span>
                             </td>
 
                             {canSeePrivate && (
@@ -325,7 +327,7 @@ export default function InventoryTable({
                                 </td>
                             )}
 
-                          {renderSo && (
+                            {renderSo && (
                                 <td className="px-3 py-3.5 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                     {renderSo(row)}
                                 </td>
