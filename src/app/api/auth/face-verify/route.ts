@@ -185,6 +185,7 @@ export async function POST(request: Request) {
       ip_address: ip,
       shift: userShift,
       late_weight: matched ? weight : null,
+      method: "FACE",
     };
     if (latitude != null) insertPayload.latitude = latitude;
     if (longitude != null) insertPayload.longitude = longitude;

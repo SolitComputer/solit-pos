@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET(request: Request) { 
+export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) {
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
       date: item.created_at,
       check_in_time: item.created_at,
       status: item.status,
-      method: item.status === "SUCCESS" ? "FACE" : "SKIP",
+      method: item.method ?? (item.status === "SUCCESS" ? "FACE" : "SKIP"),
       latitude: item.latitude,
       longitude: item.longitude,
       accuracy: item.accuracy,
