@@ -1336,7 +1336,7 @@ export default function UsersPage() {
                       </div>
 
                     ) : (
-                      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 340px)" }}>
+                     <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 260px)", minHeight: "420px" }}>
                         {filtered.map((user, idx) => {
                           const avatarColor = getAvatarColor(user.role);
                           const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
@@ -1351,8 +1351,18 @@ export default function UsersPage() {
                                 <div
                                   className="relative flex-shrink-0 cursor-pointer"
                                   onClick={() => router.push(`/dashboard/profile/${user.id}`)}
-                                  title={`Lihat profil ${user.name}`}
+                                title={`Lihat profil ${user.name}`}
                                 >
+                                 {user.status_note && (
+                                    <div className="absolute -top-2.5 left-0 z-10 max-w-[150px] sm:max-w-[190px]">
+                                      <div className="px-2 py-1 rounded-xl text-[9px] font-semibold truncate shadow-sm"
+                                        style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#5b21b6" }}>
+                                        {user.status_note}
+                                      </div>
+                                      <div className="absolute left-5 -translate-x-1/2 -bottom-[3px] w-2 h-2 rotate-45"
+                                        style={{ background: "#f5f3ff", borderRight: "1px solid #ddd6fe", borderBottom: "1px solid #ddd6fe" }} />
+                                    </div>
+                                  )}
                                   <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-black overflow-hidden"
                                     style={{
                                       background: isFullAccess
@@ -1417,12 +1427,7 @@ export default function UsersPage() {
                                       </span>
                                     )}
                                   </div>
-                                  {user.status_note && (
-                                    <p className="text-[11px] mt-0.5 truncate font-semibold" style={{ color: "#7c3aed" }}>
-                                      {user.status_note}
-                                    </p>
-                                  )}
-                                  {user.song_title && (
+                                 {user.song_title && (
                                     <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                                       {user.song_artwork_url && (
                                         <img src={user.song_artwork_url} alt={user.song_title} className="w-4 h-4 rounded flex-shrink-0 object-cover" />
