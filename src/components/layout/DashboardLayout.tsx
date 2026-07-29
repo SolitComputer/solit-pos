@@ -1,4 +1,4 @@
-// src/components/layout/DashboardLayout.tsx
+
 "use client";
 
 import Sidebar from "./Sidebar";
@@ -14,6 +14,7 @@ import { useMissionSound } from "@/hooks/useMissionSound";
 import { SellerReminderNotifier } from "@/components/layout/SellerReminderNotifier";
 import { unlockReminderAudio } from "@/lib/reminderSound";
 import PatchNoteFab from "@/components/ui/PatchNoteFab";
+import BackButton from "@/components/ui/BackButton";
 
 function ScrollRestorer() {
   const pathname = usePathname();
@@ -43,6 +44,10 @@ function ScrollRestorer() {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   usePresence();
+
+  // ── Back button: disembunyikan di halaman utama dashboard ──────────────────
+  const pathname = usePathname();
+  const isDashboardHome = pathname === "/dashboard";
 
   // ── userId untuk sound notifier ────────────────────────────────────────────
   // Ikuti pola MissionQuestTracker yang sudah proven: fetch /api/auth/me
@@ -91,14 +96,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile topbar */}
           <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center px-4 flex-shrink-0 sticky top-0 z-30">
-            <div className="w-9" />
+            {isDashboardHome ? <div className="w-9" /> : <BackButton />}
             <span className="text-sm font-bold text-[#1a1a2e] tracking-tight mx-auto">
               Solit POS
             </span>
             <div className="w-9" />
           </div>
 
-          <main className="flex-1">
+<main className="flex-1">
+            {!isDashboardHome && (
+              <div className="hidden lg:flex items-center px-5 pt-3">
+                <BackButton />
+              </div>
+            )}
             <BirthdayBanner />
             <div className="p-4 lg:p-5 w-full">
               {children}

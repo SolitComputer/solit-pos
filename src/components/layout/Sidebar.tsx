@@ -506,7 +506,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Utama", items: [ITEM_DASHBOARD] },
     GROUP_ABSENSI,
     { label: "Management", items: [ITEM_USERS] },
-    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS] },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_ALL_UNITS] },
     { label: "Transaksi", items: [{ name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat }] },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
