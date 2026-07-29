@@ -334,11 +334,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard": [...ALL_ROLES],
   "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
   "/dashboard/users": ALL_ROLES.filter(r => !r.startsWith("PKL")),
- "/dashboard/attendance": [...ALL_ROLES],
+  "/dashboard/attendance": [...ALL_ROLES],
   "/dashboard/daftar-hadir": [...ALL_ROLES],
   "/dashboard/attendance/overtime": ALL_ROLES.filter(r => r !== "KEPALA_SALES"),
   "/api/attendance/today": [...ALL_ROLES],
-  
+
   "/dashboard/service": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
   "/dashboard/service/done": [...SERVICE_VIEW_ROLES],
@@ -500,11 +500,14 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/admin/notifikasi-pengantaran": [...NOTIFICATION_SETTINGS_ROLES],
   "/api/akutansi": [...AKUNTANSI_ROLES],
   "/api/notification-settings": [...NOTIFICATION_SETTINGS_ROLES],
- "/dashboard/ai-ceo": [...AI_CEO_ROLES],
+  "/dashboard/ai-ceo": [...AI_CEO_ROLES],
   "/api/ai-ceo": [...AI_CEO_ROLES],
 
   "/dashboard/profile": [...ALL_ROLES],
+  "/dashboard/social": [...ALL_ROLES],
   "/api/profile": [...ALL_ROLES],
+  "/api/profile/note": [...ALL_ROLES],
+  "/api/profile/song": [...ALL_ROLES],
   "/api/achievements": [...ALL_ROLES],
 };
 

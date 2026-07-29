@@ -1,0 +1,366 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getCurrentUserClient } from "@/lib/auth-client";
+import { useChatContext } from "@/contexts/ChatContext";
+import { humanizeRoleKey } from "@/lib/permissions";
+import { Search, MessageCircle, Music, Play, Pause, X, Plus } from "lucide-react";
+
+interface SocialUser {
+    id: string;
+    name: string;
+    role: string;
+    roles: string[];
+    profile_photo_url: string | null;
+    bio: string | null;
+    status_note: string | null;
+    status_note_expires_at: string | null;
+    song_title: string | null;
+    song_artist: string | null;
+    song_artwork_url: string | null;
+    song_preview_url: string | null;
+    song_clip_start: number;
+    song_expires_at: string | null;
+}
+const CLIP_LENGTH = 30; // durasi klip lagu — 30 detik
+
+function getInitials(name: string) {
+    return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+}
+
+function hasActiveStory(u: SocialUser): boolean {
+    return !!u.status_note || !!u.song_title;
+}
+
+function timeLeft(expiresAtIso: string): string {
+    const diffMs = new Date(expiresAtIso).getTime() - Date.now();
+    if (diffMs <= 0) return "Kadaluarsa";
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (hours >= 1) return `${hours} jam lagi`;
+    const minutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+    return `${minutes} menit lagi`;
+}
+
+export default function SocialFeed() {
+    const router = useRouter();
+    const { openChat } = useChatContext();
+    const [me, setMe] = useState<{ id: string; name: string } | null>(null);
+    const [users, setUsers] = useState<SocialUser[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState("");
+    const [viewingUser, setViewingUser] = useState<SocialUser | null>(null);
+
+    useEffect(() => {
+        getCurrentUserClient().then((u) => { if (u) setMe({ id: u.id, name: u.name }); });
+    }, []);
+
+    const fetchUsers = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch("/api/users");
+            const data = await res.json();
+            if (data.success) setUsers(data.users);
+        } catch {
+            // diam-diam gagal, list lama tetap ditampilkan
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchUsers(); }, []);
+
+    // Refresh berkala biar catatan/lagu yang kadaluarsa (24 jam) langsung hilang dari tampilan
+    useEffect(() => {
+        const t = setInterval(fetchUsers, 60000);
+        return () => clearInterval(t);
+    }, []);
+
+    const storyUsers = useMemo(
+        () => users.filter((u) => me && u.id !== me.id && hasActiveStory(u)),
+        [users, me]
+    );
+
+    const myUser = useMemo(() => users.find((u) => u.id === me?.id) ?? null, [users, me]);
+
+    const directoryUsers = useMemo(() => {
+        let list = users.filter((u) => !me || u.id !== me.id);
+        if (search.trim()) {
+            const q = search.trim().toLowerCase();
+            list = list.filter((u) => u.name.toLowerCase().includes(q));
+        }
+        return [...list].sort((a, b) => a.name.localeCompare(b.name));
+    }, [users, me, search]);
+
+    const handleChat = (u: SocialUser) => {
+        openChat({ id: u.id, name: u.name, role: u.role, profile_photo_url: u.profile_photo_url });
+    };
+
+    return (
+        <div className="min-h-screen bg-[#F7F7F8]">
+            <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-5">
+
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.35)" }}>
+                        <svg width="18" height="18" fill="none" stroke="white" viewBox="0 0 24 24">
+                            <rect x="3" y="3" width="18" height="18" rx="5" />
+                            <circle cx="12" cy="12" r="4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Sosial</h1>
+                        <p className="text-[11px] text-slate-400">Catatan & obrolan seluruh tim</p>
+                    </div>
+                </div>
+
+                {/* ── Notes bar ─────────────────────────────────────────────────── */}
+                <div className="bg-white rounded-2xl border border-slate-100 py-4 px-1" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="flex gap-4 lg:gap-6 overflow-x-auto px-3 lg:px-5 pb-1 scrollbar-hide">
+                        {myUser && (
+                            <StoryBubble user={myUser} isSelf onClick={() => router.push("/dashboard/profile")} />
+                        )}
+                        {loading && !myUser && (
+                            <div className="w-16 h-16 rounded-full bg-slate-100 animate-pulse flex-shrink-0" />
+                        )}
+                        {storyUsers.map((u) => (
+                            <StoryBubble key={u.id} user={u} onClick={() => setViewingUser(u)} />
+                        ))}
+                        {!loading && storyUsers.length === 0 && (
+                            <p className="text-xs text-slate-300 italic py-4 px-2 whitespace-nowrap">
+                                Belum ada catatan aktif dari tim
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                {/* ── Search ────────────────────────────────────────────────────── */}
+                <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Cari nama rekan kerja..."
+                        className="w-full h-11 rounded-2xl pl-9 pr-4 text-sm font-medium border focus:outline-none focus:ring-2 focus:ring-violet-400/30 bg-white"
+                        style={{ borderColor: "#e8ecf5", color: "#334155" }}
+                    />
+                </div>
+
+                {/* ── Directory list ────────────────────────────────────────────── */}
+                <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-4" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    {loading ? (
+                        <div className="flex flex-col gap-2">
+                            {Array(6).fill(0).map((_, i) => (
+                                <div key={i} className="rounded-2xl px-4 py-3 flex items-center gap-3 animate-pulse bg-slate-50/60">
+                                    <div className="w-11 h-11 rounded-full bg-slate-100 flex-shrink-0" />
+                                    <div className="flex-1 space-y-2">
+                                        <div className="h-3 w-32 bg-slate-100 rounded-full" />
+                                        <div className="h-2.5 w-20 bg-slate-50 rounded-full" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : directoryUsers.length === 0 ? (
+                        <div className="text-center py-14 px-4">
+                            <p className="text-sm font-bold text-slate-400">Tidak ada user ditemukan</p>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            {directoryUsers.map((u) => (
+                                <div
+                                    key={u.id}
+                                    className="px-4 py-3 flex items-center gap-3 rounded-2xl border border-slate-100 hover:border-violet-200 hover:bg-slate-50/70 transition-colors cursor-pointer"
+                                    onClick={() => (hasActiveStory(u) ? setViewingUser(u) : handleChat(u))}
+                                >
+                                    <div className="relative flex-shrink-0">
+                                        <div
+                                            className="w-11 h-11 rounded-full flex items-center justify-center text-white text-xs font-black overflow-hidden"
+                                            style={{
+                                                background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                                                boxShadow: hasActiveStory(u) ? "0 0 0 2px #fff, 0 0 0 4px #a78bfa" : "none",
+                                            }}
+                                        >
+                                            {u.profile_photo_url
+                                                ? <img src={u.profile_photo_url} alt={u.name} className="w-full h-full object-cover" />
+                                                : getInitials(u.name)}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-slate-800 truncate">{u.name}</p>
+                                        <p className="text-[11px] text-slate-400 truncate">
+                                            {u.status_note
+                                                ? u.status_note
+                                                : u.song_title
+                                                    ? `🎵 ${u.song_title} · ${u.song_artist}${u.song_expires_at ? ` · ${timeLeft(u.song_expires_at)}` : ""}`
+                                                    : humanizeRoleKey(u.roles?.[0] ?? u.role)}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleChat(u); }}
+                                        title={`Chat dengan ${u.name}`}
+                                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 active:scale-95"
+                                        style={{ background: "#eff6ff", color: "#3b82f6" }}
+                                    >
+                                        <MessageCircle className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {viewingUser && (
+                <StoryModal
+                    user={viewingUser}
+                    onClose={() => setViewingUser(null)}
+                    onChat={() => { handleChat(viewingUser); setViewingUser(null); }}
+                />
+            )}
+
+            <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+        </div>
+    );
+}
+
+function StoryBubble({ user, isSelf, onClick }: { user: SocialUser; isSelf?: boolean; onClick: () => void }) {
+    const active = hasActiveStory(user);
+    return (
+        <button onClick={onClick} className="flex flex-col items-center gap-1.5 flex-shrink-0 w-16 group">
+            <div className="relative">
+                {user.status_note && (
+                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 max-w-[100px]">
+                        <div className="px-2 py-1 rounded-xl text-[8.5px] font-semibold truncate shadow-sm bg-white border border-slate-100 text-slate-600">
+                            {user.status_note}
+                        </div>
+                    </div>
+                )}
+                <div
+                    className="w-16 h-16 rounded-full p-[2.5px] transition-transform group-active:scale-95"
+                    style={{ background: active ? "linear-gradient(135deg, #f59e0b, #ec4899, #8b5cf6)" : "#e2e8f0" }}
+                >
+                    <div className="w-full h-full rounded-full border-2 border-white overflow-hidden flex items-center justify-center text-white text-lg font-black"
+                        style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                        {user.profile_photo_url
+                            ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
+                            : getInitials(user.name)}
+                    </div>
+                </div>
+                {isSelf && !active && (
+                    <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center border-2 border-white">
+                        <Plus className="w-3 h-3" />
+                    </div>
+                )}
+            </div>
+            <p className="text-[10.5px] font-semibold text-slate-600 truncate w-full text-center">
+                {isSelf ? "Catatan Anda" : user.name.split(" ")[0]}
+            </p>
+        </button>
+    );
+}
+
+function StoryModal({ user, onClose, onChat }: { user: SocialUser; onClose: () => void; onChat: () => void }) {
+    const [playing, setPlaying] = useState(false);
+    const audioRef = useRef<HTMLAudioElement>(null);
+
+    useEffect(() => {
+        if (user.song_preview_url && audioRef.current) {
+            audioRef.current.currentTime = user.song_clip_start ?? 0;
+            audioRef.current.play().then(() => setPlaying(true)).catch(() => { });
+        }
+        return () => { audioRef.current?.pause(); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user.id]);
+
+    const handleTimeUpdate = () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        const start = user.song_clip_start ?? 0;
+        if (audio.currentTime >= start + CLIP_LENGTH) {
+            audio.pause();
+            setPlaying(false);
+        }
+    };
+
+    const togglePlay = () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        if (playing) {
+            audio.pause();
+            setPlaying(false);
+        } else {
+            audio.currentTime = user.song_clip_start ?? 0;
+            audio.play().catch(() => { });
+            setPlaying(true);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+                <div className="p-5 flex items-center justify-between" style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-white text-sm font-black"
+                            style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                            {user.profile_photo_url
+                                ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
+                                : getInitials(user.name)}
+                        </div>
+                        <p className="text-sm font-bold text-white truncate">{user.name}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: "rgba(255,255,255,0.1)" }}>
+                        <X className="w-4 h-4 text-white" />
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                    {user.status_note && (
+                        <p className="text-base font-semibold text-slate-700 text-center leading-relaxed">"{user.status_note}"</p>
+                    )}
+
+                    {user.song_title && (
+                        <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: "#f8fafc" }}>
+                            <button onClick={togglePlay} disabled={!user.song_preview_url}
+                                className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 shadow-md disabled:cursor-default"
+                                style={{ animation: playing ? "solitSongSpin 3s linear infinite" : "none" }}>
+                                {user.song_artwork_url
+                                    ? <img src={user.song_artwork_url} alt={user.song_title} className="w-full h-full object-cover" />
+                                    : <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,#1db954,#159c46)" }}><Music className="w-5 h-5 text-white" /></div>}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold truncate text-slate-800">{user.song_title}</p>
+                                <p className="text-[10.5px] truncate text-slate-400">
+                                    {user.song_artist}
+                                    {user.song_expires_at && ` · ${timeLeft(user.song_expires_at)}`}
+                                </p>
+                            </div>
+                            {user.song_preview_url && (
+                                <button onClick={togglePlay} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-slate-100">
+                                    {playing ? <Pause className="w-3.5 h-3.5 text-slate-600" /> : <Play className="w-3.5 h-3.5 text-slate-600 ml-0.5" />}
+                                </button>
+                            )}
+                            {user.song_preview_url && (
+                                <audio ref={audioRef} src={user.song_preview_url} onTimeUpdate={handleTimeUpdate} onEnded={() => setPlaying(false)} />
+                            )}
+                        </div>
+                    )}
+
+                    <button onClick={onChat}
+                        className="w-full h-11 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                        style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                        <MessageCircle className="w-4 h-4" /> Chat dengan {user.name.split(" ")[0]}
+                    </button>
+                </div>
+            </div>
+
+            <style jsx>{`
+        @keyframes solitSongSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
+        </div>
+    );
+}

@@ -145,6 +145,7 @@ const Icons = {
   patchNotes: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>),
   aiCeo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8z" /><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" /></svg>),
   profile: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" /></svg>),
+  social: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -165,6 +166,7 @@ const ITEM_PATCH_NOTES: MenuItem = { name: "Patch Notes", href: "/dashboard/admi
 const ITEM_AI_CEO: MenuItem = { name: "AI CEO", href: "/dashboard/ai-ceo", icon: Icons.aiCeo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
+const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
@@ -741,11 +743,14 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   const utama = ROLE_MENUS[role].find((g) => g.label === "Utama");
   if (utama) {
+    if (!utama.items.some((it) => it.href === ITEM_SOCIAL.href)) {
+      utama.items.push(ITEM_SOCIAL);
+    }
     if (!utama.items.some((it) => it.href === ITEM_PROFILE.href)) {
       utama.items.push(ITEM_PROFILE);
     }
   } else {
-    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_PROFILE] }, ...ROLE_MENUS[role]];
+    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE] }, ...ROLE_MENUS[role]];
   }
 });
 

@@ -571,7 +571,7 @@ export default function EditTransactionPage() {
     (s, u) => s + (u.purchase_price || 0),
     0
   );
-  // Fallback ke inventory_price dari DB jika belum ada input modal
+
   const effectiveModal =
     totalInventoryPrice > 0
       ? totalInventoryPrice

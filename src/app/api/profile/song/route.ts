@@ -47,6 +47,9 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
   const safeClipStart = Number.isFinite(clip_start) ? Math.max(0, Math.floor(clip_start)) : 0;
 
+  const SONG_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 jam — sama seperti catatan (Instagram Notes)
+  const songExpiresAt = new Date(Date.now() + SONG_LIFETIME_MS).toISOString();
+
   const { error } = await supabase
     .from("users")
     .update({
@@ -56,13 +59,14 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       song_preview_url: preview_url ?? null,
       song_clip_start: safeClipStart,
       song_updated_at: new Date().toISOString(),
+      song_expires_at: songExpiresAt,
     })
     .eq("id", user.id);
 
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, data: { expires_at: songExpiresAt } });
 }
 
 // ── DELETE — hapus lagu dari profil ──────────────────────────────────────────
@@ -76,6 +80,7 @@ async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       song_preview_url: null,
       song_clip_start: 0,
       song_updated_at: new Date().toISOString(),
+      song_expires_at: null,
     })
     .eq("id", user.id);
 

@@ -53,7 +53,7 @@ interface AchievementsData {
 }
 
 const ADMIN_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
-const CLIP_LENGTH = 10;
+const CLIP_LENGTH = 30; 
 
 function getInitials(name: string) {
     return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
