@@ -588,8 +588,15 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.laptop_name !== undefined) allowedFields.laptop_name = body.laptop_name;
     if (body.laptop_id !== undefined) allowedFields.laptop_id = body.laptop_id;
     if (body.serial_number !== undefined) allowedFields.serial_number = body.serial_number;
-    if (body.unit_id !== undefined) allowedFields.unit_id = body.unit_id;
-    if (body.unit_ids !== undefined) allowedFields.unit_ids = body.unit_ids;
+    if (body.unit_id !== undefined) {
+      const cleanUnitId = typeof body.unit_id === "string" ? body.unit_id.trim() : body.unit_id;
+      allowedFields.unit_id = cleanUnitId ? cleanUnitId : null;
+    }
+    if (body.unit_ids !== undefined) {
+      allowedFields.unit_ids = Array.isArray(body.unit_ids)
+        ? body.unit_ids.filter((id: any) => typeof id === "string" && id.trim().length > 0)
+        : body.unit_ids;
+    }
     if (body.serial_numbers !== undefined) allowedFields.serial_numbers = body.serial_numbers;
     if (body.pickup_method !== undefined) allowedFields.pickup_method = body.pickup_method;
     if (body.pickup_date !== undefined) allowedFields.pickup_date = body.pickup_date;
@@ -784,13 +791,28 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         }
       }
 
-      // 4. Update item_kind
       const currentUnitIds = unitFieldsProvided
         ? finalNewUnitIds
         : (Array.isArray(before?.unit_ids) ? before.unit_ids : before?.unit_id ? [before.unit_id] : []).filter(Boolean);
       const hasLaptops = currentUnitIds.length > 0;
       const hasAccs = body.accessories.length > 0;
       allowedFields.item_kind = hasLaptops && hasAccs ? "mixed" : hasLaptops ? "laptop" : "accessory";
+
+      // Hitung ulang total deal dari SELURUH transaction_items (laptop + aksesori)
+      // SETELAH baris aksesori di atas selesai di-update. Tanpa ini, edit nominal
+      // aksesori saja (tanpa ikut kirim deal_prices_per_unit) tidak pernah mengubah
+      // transactions.deal_price/amount — jadi halaman Riwayat Transaksi (yang baca
+      // langsung dari kolom itu) tetap nunjukin harga lama.
+      const { data: allItemsAfterAcc } = await supabase
+        .from("transaction_items")
+        .select("deal_price")
+        .eq("invoice_number", invoice);
+      if (allItemsAfterAcc && allItemsAfterAcc.length > 0) {
+        newDealTotal = allItemsAfterAcc.reduce(
+          (s, it) => s + (Number(it.deal_price) || 0),
+          0
+        );
+      }
     }
 
     // ── Hitung field other (profit) ──────────────────────────────────
