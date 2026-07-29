@@ -77,10 +77,11 @@ function getManualAllowedRoles(roles?: string | string[]): string[] | null {
   return merged.size > 0 ? Array.from(merged) : [];
 }
 
-function canApproveTarget(approverRole?: string, targetRole?: string): boolean {
-  if (!approverRole || !targetRole) return false;
-  if (isAdminRole(approverRole)) return true;
-  return DIVISION_HEAD_MAP[approverRole]?.includes(targetRole) ?? false;
+function canApproveTarget(approverRoles?: string | string[], targetRole?: string): boolean {
+  const arr = Array.isArray(approverRoles) ? approverRoles : approverRoles ? [approverRoles] : [];
+  if (arr.length === 0 || !targetRole) return false;
+  if (isAdminRole(arr)) return true;
+  return arr.some(r => DIVISION_HEAD_MAP[r]?.includes(targetRole));
 }
 
 function formatRupiah(n: number) { return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n); }
@@ -336,7 +337,7 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
           {currentUser?.id === o.user_id && o.status === "ONGOING" && !o.actual_end && (
             <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Selesai</button>
           )}
-          {canApproveTarget(currentUser?.role, o.users?.role) && o.status === "PENDING" && (
+          {canApproveTarget(currentUser?.roles ?? currentUser?.role, o.users?.role) && o.status === "PENDING" && (
             <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="w-full h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Setujui</button>
           )}
           {/* Bayaran hanya boleh diatur kalau lembur selesai DAN foto bukti sudah ada */}
@@ -1476,7 +1477,7 @@ function EmployeeListPanel({ groupedByUser, loading, userCanViewPay, currentUser
         <div className="divide-y divide-gray-50">
           {sortedGroups.map(({ user, items }) => {
             const bg = avBg(user.name);
-            const hasUrgent = items.some(o => o.status === "NEED_PROOF" || (o.status === "PENDING" && canApproveTarget(currentUser?.role, user.role)));
+            const hasUrgent = items.some(o => o.status === "NEED_PROOF" || (o.status === "PENDING" && canApproveTarget(currentUser?.roles ?? currentUser?.role, user.role)));
             const hasOngoing = items.some(o => o.status === "ONGOING");
             const totalPay = items.reduce((s, o) => s + (o.total_pay ?? 0), 0);
             const statusCounts: Record<string, number> = {};

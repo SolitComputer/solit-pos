@@ -11,12 +11,8 @@ interface Props {
 // Harus SAMA dengan AUDIT_TTL_MS di AccessoriesContent.tsx (auto-reset 3 hari).
 const AUDIT_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
-// Boleh melakukan / membatalkan audit (samain dgn CREATE_ROLES di route accessories)
-const AUDIT_ROLES: UserRole[] = [
-  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
-  "TEKNISI", "KEPALA_TEKNISI",
-];
+// Audit HANYA boleh dilakukan/dibatalkan oleh ADMIN (dibatasi — sebelumnya ikut CREATE_ROLES)
+const AUDIT_ROLES: UserRole[] = ["ADMIN"];
 
 // Boleh lihat riwayat audit (samain dgn ALLOWED_ROLES di route accessories)
 const AUDIT_VIEW_ROLES: UserRole[] = [

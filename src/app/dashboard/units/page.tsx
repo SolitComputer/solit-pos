@@ -20,11 +20,15 @@ interface GlobalUnit extends BaseLaptopUnit {
     ram: string;
     storage: string;
     sparepart_cost: number;
+    sold_at?: string | null;
+    sold_price?: number | null;
 }
 
 interface RawGlobalUnit extends BaseLaptopUnit {
     laptops?: { laptop_name: string; brand: string; cpu: string; ram: string; storage: string } | null;
     sparepart_cost?: number;
+    sold_at?: string | null;
+    sold_price?: number | null;
 }
 
 type SortOrder = "asc" | "desc";
@@ -46,17 +50,22 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
     SOLD: { badge: "bg-gray-100 text-gray-500 border-gray-200", dot: "bg-gray-400", label: "Terjual" },
 };
 
-const GRADE_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 };
-
-function sortUnits(units: GlobalUnit[], snOrder: SortOrder): GlobalUnit[] {
+// Urutan sekarang ngikutin Riwayat Transaksi: berdasarkan tanggal transaksi
+// (sold_at / "Tgl Keluar"), BUKAN Serial Number lagi. dateOrder "desc" =
+// Terbaru dulu — sama seperti default sort "date" (desc) di Riwayat Transaksi.
+// Fallback ke created_at kalau sold_at null (unit SOLD tanpa transaksi ke-link).
+function sortUnits(units: GlobalUnit[], dateOrder: SortOrder): GlobalUnit[] {
     return [...units].sort((a, b) => {
-        const snCmp = a.serial_number.localeCompare(b.serial_number, undefined, { numeric: true });
-        if (snCmp !== 0) return snOrder === "asc" ? snCmp : -snCmp;
-        return GRADE_ORDER[a.grade] - GRADE_ORDER[b.grade];
+        const dateA = new Date(a.sold_at || a.created_at).getTime();
+        const dateB = new Date(b.sold_at || b.created_at).getTime();
+        const diff = dateA - dateB;
+        if (diff !== 0) return dateOrder === "asc" ? diff : -diff;
+        // Tie-break — kalau tanggalnya persis sama, urutan tetap stabil
+        return a.serial_number.localeCompare(b.serial_number, undefined, { numeric: true });
     });
 }
 
-function fmtDate(iso?: string) {
+function fmtDate(iso?: string | null) {
     if (!iso) return "—";
     return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
 }
@@ -160,7 +169,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50/80 border-b border-gray-100">
-                            {["Serial Number", "Laptop", "Grade", "Tgl Masuk", "Harga Modal", "Harga Sparepart", "Total Modal", "Harga Jual", "Status", "Aksi"].map(h => (
+                            {["Serial Number", "Laptop", "Grade", "Tgl Masuk", "Tgl Keluar", "Harga Modal", "Harga Sparepart", "Total Modal", "Harga Jual", "Harga Terjual", "Status", "Aksi"].map(h => (
                                 <th key={h} className="px-4 py-3 text-left">
                                     <div className="h-2.5 bg-gray-200 rounded w-16 animate-pulse" />
                                 </th>
@@ -170,7 +179,7 @@ function SkeletonTable() {
                     <tbody className="divide-y divide-gray-50">
                         {[...Array(5)].map((_, i) => (
                             <tr key={i}>
-                                {[90, 140, 50, 70, 80, 80, 80, 70, 60, 50].map((w, j) => (
+                                {[90, 140, 50, 70, 70, 80, 80, 80, 70, 70, 60, 50].map((w, j) => (
                                     <td key={j} className="px-4 py-3.5">
                                         <div className="h-3 bg-gray-100 rounded animate-pulse" style={{ width: w }} />
                                     </td>
@@ -211,17 +220,17 @@ function SkeletonCards() {
 
 // ─── SN Sort Button ───────────────────────────────────────────────────────────
 
-function SnSortButton({ order, onToggle }: { order: SortOrder; onToggle: () => void }) {
+function DateSortButton({ order, onToggle }: { order: SortOrder; onToggle: () => void }) {
     return (
         <button
             onClick={onToggle}
-            title={order === "asc" ? "Urutan: SN Terkecil → Terbesar (klik untuk balik)" : "Urutan: SN Terbesar → Terkecil (klik untuk balik)"}
+            title={order === "desc" ? "Urutan: Terbaru → Terlama (klik untuk balik)" : "Urutan: Terlama → Terbaru (klik untuk balik)"}
             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:border-gray-300 active:scale-95"
         >
-            {order === "asc" ? (
-                <><ArrowUp className="w-3 h-3" /> A→Z</>
+            {order === "desc" ? (
+                <><ArrowDown className="w-3 h-3" /> Terbaru</>
             ) : (
-                <><ArrowDown className="w-3 h-3" /> Z→A</>
+                <><ArrowUp className="w-3 h-3" /> Terlama</>
             )}
         </button>
     );
@@ -485,13 +494,16 @@ function UnitCard({
             </p>
 
             {/* Grade + tanggal */}
-            <div className="flex items-center gap-2 mt-2.5">
+            <div className="flex items-center gap-2 mt-2.5 flex-wrap">
                 {g && (
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${g.badge}`}>
                         {g.label}
                     </span>
                 )}
                 <span className="text-[11px] text-gray-400">Masuk: {fmtDate(unit.created_at)}</span>
+                {unit.sold_at && (
+                    <span className="text-[11px] text-gray-400">· Keluar: {fmtDate(unit.sold_at)}</span>
+                )}
             </div>
 
             {/* Harga */}
@@ -534,6 +546,12 @@ function UnitCard({
                     <span className="text-[11px] text-gray-400 flex-shrink-0">Harga Jual</span>
                     <span className="text-sm font-bold text-gray-800 tabular-nums">{fmt(unit.selling_price)}</span>
                 </div>
+                {unit.sold_price != null && (
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-[11px] text-gray-400 flex-shrink-0">Harga Terjual</span>
+                        <span className="text-sm font-bold text-emerald-700 tabular-nums">{fmt(unit.sold_price)}</span>
+                    </div>
+                )}
             </div>
 
             {/* Aksi */}
@@ -572,8 +590,11 @@ export default function AllUnitsPage() {
     const [searchLaptop, setSearchLaptop] = useState("");
     const [filterPriceMin, setFilterPriceMin] = useState("");
     const [filterPriceMax, setFilterPriceMax] = useState("");
+    const [filterDateFrom, setFilterDateFrom] = useState("");
+    const [filterDateTo, setFilterDateTo] = useState("");
     const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
-    const [snSortOrder, setSnSortOrder] = useState<SortOrder>("asc");
+    // Default "desc" = Terbaru dulu, biar sama dengan default sort di Riwayat Transaksi
+    const [dateSortOrder, setDateSortOrder] = useState<SortOrder>("desc");
 
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
@@ -622,6 +643,8 @@ export default function AllUnitsPage() {
                 cpu: u.laptops?.cpu ?? "",
                 ram: u.laptops?.ram ?? "",
                 storage: u.laptops?.storage ?? "",
+                sold_at: u.sold_at ?? null,
+                sold_price: u.sold_price != null ? Math.round(Number(u.sold_price)) : null,
             }));
             setUnits(normalized);
         } catch {
@@ -663,16 +686,19 @@ export default function AllUnitsPage() {
             if (searchLaptop && !u.laptop_name.toLowerCase().includes(searchLaptop.toLowerCase())) return false;
             if (filterPriceMin && u.selling_price < Number(filterPriceMin)) return false;
             if (filterPriceMax && u.selling_price > Number(filterPriceMax)) return false;
+            if (filterDateFrom && new Date(u.created_at) < new Date(`${filterDateFrom}T00:00:00`)) return false;
+            if (filterDateTo && new Date(u.created_at) > new Date(`${filterDateTo}T23:59:59.999`)) return false;
             return true;
         }),
-        snSortOrder
+        dateSortOrder
     );
 
-    const hasActiveFilter = searchSN || searchLaptop || filterPriceMin || filterPriceMax;
+    const hasActiveFilter = searchSN || searchLaptop || filterPriceMin || filterPriceMax || filterDateFrom || filterDateTo;
 
     const resetFilters = () => {
         setSearchSN(""); setSearchLaptop("");
         setFilterPriceMin(""); setFilterPriceMax("");
+        setFilterDateFrom(""); setFilterDateTo("");
         setFilterGradeTab("ALL");
     };
 
@@ -731,17 +757,19 @@ export default function AllUnitsPage() {
                 { header: "Grade", key: "grade", width: 10 },
                 { header: "Status", key: "status", width: 14 },
                 { header: "Tgl Masuk", key: "tanggal", width: 14 },
+                { header: "Tgl Keluar", key: "tanggal_keluar", width: 14 },
                 { header: "Harga Modal", key: "modal", width: 18 },
                 { header: "Harga Sparepart", key: "sparepart", width: 18 },
                 { header: "Total Modal", key: "total_modal", width: 18 },
                 { header: "Harga Jual", key: "jual", width: 18 },
+                { header: "Harga Terjual", key: "terjual", width: 18 },
                 { header: "Kondisi", key: "kondisi", width: 28 },
             ];
 
             ws.columns = COL_DEFS;
 
-            const LEFT_KEYS = new Set(["sn", "laptop", "kondisi", "tanggal"]);
-            const CURR_KEYS = new Set(["sparepart", "modal", "total_modal", "jual"]);
+            const LEFT_KEYS = new Set(["sn", "laptop", "kondisi", "tanggal", "tanggal_keluar"]);
+            const CURR_KEYS = new Set(["sparepart", "modal", "total_modal", "jual", "terjual"]);
 
             // tableRows — urutan nilai: modal dulu, lalu sparepart
             const tableRows = filteredUnits.map(u => {
@@ -752,9 +780,11 @@ export default function AllUnitsPage() {
                     u.serial_number, u.laptop_name, u.brand, u.cpu, u.ram, u.storage,
                     u.grade, STATUS_STYLE[u.status]?.label ?? u.status,
                     fmtDate(u.created_at),
+                    fmtDate(u.sold_at),
                     modal,
                     sparepart,
                     totalMod, u.selling_price,
+                    u.sold_price ?? 0,
                     u.condition_note || "",
                 ];
             });
@@ -1030,12 +1060,12 @@ export default function AllUnitsPage() {
                             {/* Baris tombol filter — sejajar di HP */}
                             <div className="flex gap-2">
                                 <button onClick={() => setShowAdvancedFilter(v => !v)}
-                                    className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 h-10 sm:h-9 rounded-lg text-xs font-medium border transition active:scale-[0.98] ${showAdvancedFilter || filterPriceMin || filterPriceMax ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                                    className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 h-10 sm:h-9 rounded-lg text-xs font-medium border transition active:scale-[0.98] ${showAdvancedFilter || filterPriceMin || filterPriceMax || filterDateFrom || filterDateTo ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                                     <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                                     </svg>
                                     Filter
-                                    {(filterPriceMin || filterPriceMax) && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                                    {(filterPriceMin || filterPriceMax || filterDateFrom || filterDateTo) && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                                 </button>
 
                                 {hasActiveFilter && (
@@ -1059,6 +1089,16 @@ export default function AllUnitsPage() {
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Jual Max (Rp)</label>
                                     <input type="number" inputMode="numeric" placeholder="Contoh: 5000000" value={filterPriceMax} onChange={e => setFilterPriceMax(e.target.value)}
+                                        className="w-full h-10 sm:h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Tgl Masuk Dari</label>
+                                    <input type="date" value={filterDateFrom} max={filterDateTo || undefined} onChange={e => setFilterDateFrom(e.target.value)}
+                                        className="w-full h-10 sm:h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Tgl Masuk Sampai</label>
+                                    <input type="date" value={filterDateTo} min={filterDateFrom || undefined} onChange={e => setFilterDateTo(e.target.value)}
                                         className="w-full h-10 sm:h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
                                 </div>
                             </div>
@@ -1100,19 +1140,20 @@ export default function AllUnitsPage() {
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="bg-gray-50/80 border-b border-gray-100">
-                                                {/* SN kolom PERTAMA dengan sort button */}
-                                                <th className="px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap text-left">
-                                                    <div className="flex items-center gap-2">
-                                                        <span>Serial Number</span>
-                                                        <SnSortButton
-                                                            order={snSortOrder}
-                                                            onToggle={() => setSnSortOrder(o => o === "asc" ? "desc" : "asc")}
-                                                        />
-                                                    </div>
-                                                </th>
+                                                <Th>Serial Number</Th>
                                                 <Th>Laptop</Th>
                                                 <Th>Grade</Th>
                                                 <Th>Tgl Masuk</Th>
+                                                {/* Tgl Keluar = acuan urutan sekarang, samain kayak Riwayat Transaksi */}
+                                                <th className="px-4 py-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap text-left">
+                                                    <div className="flex items-center gap-2">
+                                                        <span>Tgl Keluar</span>
+                                                        <DateSortButton
+                                                            order={dateSortOrder}
+                                                            onToggle={() => setDateSortOrder(o => o === "asc" ? "desc" : "asc")}
+                                                        />
+                                                    </div>
+                                                </th>
                                                 {canSeePriceInfo && (
                                                     <>
                                                         <Th right>
@@ -1135,6 +1176,7 @@ export default function AllUnitsPage() {
                                                     </>
                                                 )}
                                                 <Th right>Harga Jual</Th>
+                                                <Th right>Harga Terjual</Th>
                                                 <Th>Status</Th>
                                                 <Th right>Aksi</Th>
                                             </tr>
@@ -1169,6 +1211,9 @@ export default function AllUnitsPage() {
                                                         </td>
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
                                                             <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
+                                                        </td>
+                                                        <td className="px-4 py-3.5 whitespace-nowrap">
+                                                            <span className="text-xs text-gray-500">{fmtDate(unit.sold_at)}</span>
                                                         </td>
                                                         {canSeePriceInfo && (
                                                             <>
@@ -1210,7 +1255,7 @@ export default function AllUnitsPage() {
                                                                     </span>
                                                                     {isLoss && (
                                                                         <p className="text-[9px] text-red-500 font-semibold leading-tight mt-0.5">
-                                                                             Rugi
+                                                                            Rugi
                                                                         </p>
                                                                     )}
                                                                 </td>
@@ -1218,6 +1263,13 @@ export default function AllUnitsPage() {
                                                         )}
                                                         <td className="px-4 py-3.5 text-right font-semibold text-gray-800 whitespace-nowrap tabular-nums">
                                                             {fmt(unit.selling_price)}
+                                                        </td>
+                                                        <td className="px-4 py-3.5 text-right whitespace-nowrap tabular-nums">
+                                                            {unit.sold_price != null ? (
+                                                                <span className="text-xs font-semibold text-emerald-700">{fmt(unit.sold_price)}</span>
+                                                            ) : (
+                                                                <span className="text-[10px] text-gray-300">—</span>
+                                                            )}
                                                         </td>
                                                         <td className="px-4 py-3.5 whitespace-nowrap">
                                                             {s && (
@@ -1270,9 +1322,9 @@ export default function AllUnitsPage() {
                                         <span className="font-semibold text-gray-600">{filteredUnits.length}</span> dari{" "}
                                         <span className="font-semibold text-gray-600">{soldUnits.length}</span> unit terjual
                                     </span>
-                                    <SnSortButton
-                                        order={snSortOrder}
-                                        onToggle={() => setSnSortOrder(o => o === "asc" ? "desc" : "asc")}
+                                    <DateSortButton
+                                        order={dateSortOrder}
+                                        onToggle={() => setDateSortOrder(o => o === "asc" ? "desc" : "asc")}
                                     />
                                 </div>
 
