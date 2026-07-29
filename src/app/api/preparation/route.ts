@@ -58,7 +58,7 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     let query = supabase
       .from("preparation_orders")
       .select(
-        `*, preparation_items ( id, serial_number, laptop_name, is_checked, check_note )`,
+        `*, preparation_items ( id, serial_number, laptop_name, is_checked, check_note, is_cancelled, cancel_reason )`,
         { count: "exact" }
       )
       .order("created_at", { ascending: false });

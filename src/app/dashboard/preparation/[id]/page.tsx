@@ -21,6 +21,8 @@ import { CheckCircle2, FileText, Clock, Inbox, AlertCircle, User, Bike, Package 
 interface PrepItem {
     id: string; serial_number: string; laptop_name: string | null;
     is_checked: boolean; check_note: string | null;
+    is_cancelled: boolean; cancel_reason: string | null;
+    cancelled_at: string | null; cancelled_by_name: string | null;
 }
 interface PrepOrder {
     id: string; order_number: string; customer_name: string; customer_phone: string | null;
@@ -98,7 +100,7 @@ function AddressDisplay({ address, className }: { address: string; className?: s
                 onClick={(e) => e.stopPropagation()
                 }
             >
-                 Buka Maps →
+                Buka Maps →
             </a >
         );
     }
@@ -194,14 +196,14 @@ function DispatchModal({ order, onClose, onDispatched }: {
                     {OPTIONS.map(opt => {
                         const Icon = opt.icon;
                         return (
-                        <button key={opt.value} type="button" onClick={() => setMethod(opt.value)}
-                            className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition ${method === opt.value ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
-                            <span className="flex-shrink-0"><Icon className="w-6 h-6 text-gray-500" /></span>
-                            <div>
-                                <p className={`text-sm font-bold ${method === opt.value ? "text-orange-700" : "text-gray-700"}`}>{opt.title}</p>
-                                <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
-                            </div>
-                        </button>
+                            <button key={opt.value} type="button" onClick={() => setMethod(opt.value)}
+                                className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition ${method === opt.value ? "border-orange-500 bg-orange-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                                <span className="flex-shrink-0"><Icon className="w-6 h-6 text-gray-500" /></span>
+                                <div>
+                                    <p className={`text-sm font-bold ${method === opt.value ? "text-orange-700" : "text-gray-700"}`}>{opt.title}</p>
+                                    <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                                </div>
+                            </button>
                         );
                     })}
 
@@ -242,7 +244,7 @@ function DispatchModal({ order, onClose, onDispatched }: {
                                     className={inputCls}
                                 />
                                 <p className="text-[11px] text-violet-500 mt-1">
-                                     Bisa isi alamat biasa atau paste link Google Maps / Waze
+                                    Bisa isi alamat biasa atau paste link Google Maps / Waze
                                 </p>
                             </div>
                             <div>
@@ -250,11 +252,11 @@ function DispatchModal({ order, onClose, onDispatched }: {
                                 <div className="grid grid-cols-2 gap-2">
                                     <button type="button" onClick={() => setSchedule("TODAY")}
                                         className={`h-11 rounded-xl border-2 text-sm font-bold transition ${schedule === "TODAY" ? "border-violet-500 bg-violet-100 text-violet-700" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
-                                         Antar Hari Ini
+                                        Antar Hari Ini
                                     </button>
                                     <button type="button" onClick={() => setSchedule("TOMORROW")}
                                         className={`h-11 rounded-xl border-2 text-sm font-bold transition ${schedule === "TOMORROW" ? "border-violet-500 bg-violet-100 text-violet-700" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
-                                         Antar Besok
+                                        Antar Besok
                                     </button>
                                 </div>
                                 <p className="text-[11px] text-violet-500 mt-1">
@@ -271,7 +273,7 @@ function DispatchModal({ order, onClose, onDispatched }: {
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-1 text-[11px] text-blue-600 underline mt-1"
                                 >
-                                     Preview Maps →
+                                    Preview Maps →
                                 </a>
                             )}
                             <p className="text-[11px] text-violet-600"> Pengantar yang dipilih akan menerima notifikasi dan harus menyetujui tugas sebelum mulai antar.</p>
@@ -416,6 +418,64 @@ function CancelModal({ order, onClose, onCancelled }: {
     );
 }
 
+// ── CancelItemModal: batalkan 1 SN/unit di dalam penyiapan ──────────────────
+function CancelItemModal({ order, item, onClose, onCancelled }: {
+    order: PrepOrder; item: PrepItem; onClose: () => void; onCancelled: () => void;
+}) {
+    const [reason, setReason] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const submit = async () => {
+        setSaving(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/preparation/${order.id}/items/${item.id}/cancel`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason: reason.trim() || null }),
+            });
+            const result = await res.json();
+            if (!result.success) { setError(result.message || "Gagal membatalkan unit"); return; }
+            onCancelled();
+            onClose();
+        } catch { setError("Terjadi kesalahan koneksi"); } finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
+                <div className="bg-red-600 px-5 py-4">
+                    <p className="font-bold text-white text-sm"> Batalkan Unit</p>
+                    <p className="text-xs text-red-100 mt-0.5">
+                        SN <span className="font-mono font-bold">{item.serial_number}</span> akan dibatalkan dan tidak ikut masuk ke pembayaran.
+                    </p>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">Alasan (opsional)</label>
+                        <textarea
+                            value={reason}
+                            onChange={e => setReason(e.target.value)}
+                            rows={3}
+                            placeholder="Contoh: Unit rusak, salah kirim SN, dll."
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 focus:bg-white transition resize-none"
+                        />
+                    </div>
+                    {error && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700">{error}</div>}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition">Batal</button>
+                    <button onClick={submit} disabled={saving} className="flex-1 h-11 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50">
+                        {saving ? "Membatalkan..." : "Ya, Batalkan Unit"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function PreparationDetailPage() {
     const params = useParams();
     const id = params.id as string;
@@ -448,6 +508,7 @@ export default function PreparationDetailPage() {
     const canForceComplete = hasAnyRole(userRoles, PERMISSIONS.FORCE_COMPLETE_PREPARATION);
 
     const [showCancel, setShowCancel] = useState(false);
+    const [cancelItemTarget, setCancelItemTarget] = useState<PrepItem | null>(null);
 
     useEffect(() => {
         fetch("/api/auth/me").then(r => r.json())
@@ -544,7 +605,7 @@ export default function PreparationDetailPage() {
     });
 
     const toggleItem = async (item: PrepItem) => {
-        if (!order || order.status !== "DIPROSES" || !canDone) return;
+        if (!order || order.status !== "DIPROSES" || !canDone || item.is_cancelled) return;
         setOrder(prev => prev ? {
             ...prev,
             preparation_items: prev.preparation_items.map(it => it.id === item.id ? { ...it, is_checked: !it.is_checked } : it)
@@ -727,8 +788,11 @@ export default function PreparationDetailPage() {
     );
 
     const sm = STATUS_META[order.status] ?? STATUS_META.MENUNGGU;
-    const checked = order.preparation_items.filter(it => it.is_checked).length;
-    const allChecked = order.preparation_items.length > 0 && checked === order.preparation_items.length;
+    const activeItems = order.preparation_items.filter(it => !it.is_cancelled);
+    const cancelledItems = order.preparation_items.filter(it => it.is_cancelled);
+    const checked = activeItems.filter(it => it.is_checked).length;
+    const allChecked = activeItems.length > 0 && checked === activeItems.length;
+    const canCancelItem = canCancel && !order.transaction_invoice && order.status !== "DIBATALKAN";
     const dest = order.dest_lat != null && order.dest_lng != null ? { lat: order.dest_lat, lng: order.dest_lng } : null;
     const isAssignedDriver = !!userId && order.delivery_user_id === userId;
     const routeLine: [number, number][] | null = (() => {
@@ -820,7 +884,7 @@ export default function PreparationDetailPage() {
                                     const dur = fmtDuration(order.created_at, order.received_at);
                                     return dur ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-lg">
-                                             Tunggu diterima: <span className="font-black">{dur}</span>
+                                            Tunggu diterima: <span className="font-black">{dur}</span>
                                         </span>
                                     ) : null;
                                 })()}
@@ -830,7 +894,7 @@ export default function PreparationDetailPage() {
                                     const dur = fmtDuration(order.received_at, order.done_at);
                                     return dur ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg">
-                                             Durasi penyiapan: <span className="font-black">{dur}</span>
+                                            Durasi penyiapan: <span className="font-black">{dur}</span>
                                         </span>
                                     ) : null;
                                 })()}
@@ -840,7 +904,7 @@ export default function PreparationDetailPage() {
                                     const dur = fmtDuration(order.done_at, order.dispatched_at ?? null);
                                     return dur ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-lg">
-                                             Siap → dispatch: <span className="font-black">{dur}</span>
+                                            Siap → dispatch: <span className="font-black">{dur}</span>
                                         </span>
                                     ) : null;
                                 })()}
@@ -850,7 +914,7 @@ export default function PreparationDetailPage() {
                                     const dur = fmtDuration(order.created_at, order.done_at);
                                     return dur ? (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg">
-                                             Total hingga siap: <span className="font-black">{dur}</span>
+                                            Total hingga siap: <span className="font-black">{dur}</span>
                                         </span>
                                     ) : null;
                                 })()}
@@ -903,7 +967,7 @@ export default function PreparationDetailPage() {
                             {canDispatch && (
                                 <button onClick={() => setShowDispatch(true)}
                                     className="w-full h-11 bg-orange-500 text-white rounded-xl text-sm font-bold hover:bg-orange-600 transition">
-                                     Pilih Metode Pengiriman
+                                    Pilih Metode Pengiriman
                                 </button>
                             )}
                         </div>
@@ -951,25 +1015,48 @@ export default function PreparationDetailPage() {
                     {/* Checklist unit */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                         <div className="flex items-center justify-between mb-3">
-                            <h2 className="text-sm font-bold text-gray-800">Daftar Unit ({order.preparation_items.length})</h2>
+                            <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                                Daftar Unit ({activeItems.length})
+                                {cancelledItems.length > 0 && (
+                                    <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                                        {cancelledItems.length} dibatalkan
+                                    </span>
+                                )}
+                            </h2>
                             {order.status === "DIPROSES" && (
-                                <span className="text-xs font-semibold text-blue-600">{checked}/{order.preparation_items.length} dicek</span>
+                                <span className="text-xs font-semibold text-blue-600">{checked}/{activeItems.length} dicek</span>
                             )}
                         </div>
                         <div className="space-y-2">
                             {order.preparation_items.map(it => {
-                                const interactive = order.status === "DIPROSES" && canDone;
+                                const interactive = order.status === "DIPROSES" && canDone && !it.is_cancelled;
                                 return (
-                                    <button key={it.id} type="button" disabled={!interactive} onClick={() => toggleItem(it)}
-                                        className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition ${it.is_checked ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-white"} ${interactive ? "hover:border-gray-300 cursor-pointer" : "cursor-default"}`}>
-                                        <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${it.is_checked ? "bg-emerald-500 border-emerald-500" : "bg-white border-gray-300"}`}>
-                                            {it.is_checked && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                                        </span>
-                                        <div className="min-w-0">
-                                            <p className="font-mono text-sm font-bold text-gray-800">{it.serial_number}</p>
-                                            {it.laptop_name && <p className="text-xs text-gray-500 truncate">{it.laptop_name}</p>}
-                                        </div>
-                                    </button>
+                                    <div key={it.id}
+                                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition ${it.is_cancelled ? "border-gray-200 bg-gray-50 opacity-60" : it.is_checked ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-white"}`}>
+                                        <button type="button" disabled={!interactive} onClick={() => toggleItem(it)}
+                                            className={`flex items-center gap-3 flex-1 min-w-0 text-left ${interactive ? "cursor-pointer" : "cursor-default"}`}>
+                                            <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${it.is_checked && !it.is_cancelled ? "bg-emerald-500 border-emerald-500" : "bg-white border-gray-300"}`}>
+                                                {it.is_checked && !it.is_cancelled && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                            </span>
+                                            <div className="min-w-0">
+                                                <p className={`font-mono text-sm font-bold text-gray-800 ${it.is_cancelled ? "line-through" : ""}`}>{it.serial_number}</p>
+                                                {it.laptop_name && <p className="text-xs text-gray-500 truncate">{it.laptop_name}</p>}
+                                                {it.is_cancelled && (
+                                                    <p className="text-[10px] text-red-500 mt-0.5">
+                                                        Dibatalkan{it.cancelled_by_name ? ` oleh ${it.cancelled_by_name}` : ""}{it.cancel_reason ? ` — ${it.cancel_reason}` : ""}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </button>
+                                        {it.is_cancelled ? (
+                                            <span className="flex-shrink-0 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Batal</span>
+                                        ) : canCancelItem ? (
+                                            <button type="button" onClick={() => setCancelItemTarget(it)}
+                                                className="flex-shrink-0 text-[11px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition">
+                                                Batalkan
+                                            </button>
+                                        ) : null}
+                                    </div>
                                 );
                             })}
                         </div>
@@ -978,7 +1065,7 @@ export default function PreparationDetailPage() {
                         {order.status === "DIPROSES" && canDone && (
                             <button onClick={() => setShowDone(true)} disabled={!allChecked}
                                 className="w-full mt-4 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                                {allChecked ? " Tandai Siap Kirim" : `Cek semua unit dulu (${checked}/${order.preparation_items.length})`}
+                                {allChecked ? " Tandai Siap Kirim" : `Cek semua unit dulu (${checked}/${activeItems.length})`}
                             </button>
                         )}
                     </div>
@@ -1069,7 +1156,7 @@ export default function PreparationDetailPage() {
                                                 setShowStart(true);
                                             }}
                                             className="w-full h-11 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition">
-                                             Atur Tujuan & Mulai Antar
+                                            Atur Tujuan & Mulai Antar
                                         </button>
                                     )}
                                     {isDeliveringGo && order.delivery_started_at && (
@@ -1137,10 +1224,10 @@ export default function PreparationDetailPage() {
                             <div className="mt-4">
                                 {order.transaction_invoice
                                     ? <Link href={`/receipt/${order.transaction_invoice}`} className="inline-flex items-center gap-2 h-10 px-5 bg-emerald-700 text-white rounded-xl text-sm font-bold hover:bg-emerald-800 transition">
-                                         Lihat Transaksi →
+                                        Lihat Transaksi →
                                     </Link>
                                     : <Link href={`/payment/create?prep_id=${order.id}`} className="inline-flex items-center gap-2 h-10 px-5 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition">
-                                         Lanjut ke Pembayaran →
+                                        Lanjut ke Pembayaran →
                                     </Link>}
                             </div>
                         </div>
@@ -1225,6 +1312,14 @@ export default function PreparationDetailPage() {
                 />
             )}
             {showCancel && <CancelModal order={order} onClose={() => setShowCancel(false)} onCancelled={fetchOrder} />}
+            {cancelItemTarget && (
+                <CancelItemModal
+                    order={order}
+                    item={cancelItemTarget}
+                    onClose={() => setCancelItemTarget(null)}
+                    onCancelled={fetchOrder}
+                />
+            )}
         </DashboardLayout>
     );
 }
