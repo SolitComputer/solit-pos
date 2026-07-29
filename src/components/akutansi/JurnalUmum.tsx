@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -66,6 +66,13 @@ interface PendingDraft {
         modal_missing?: boolean;
         [key: string]: unknown;
     };
+}
+
+interface CustomTemplate {
+    id: string;
+    name: string;
+    lines: DraftLine[];
+    created_by_user?: { id: string; name: string } | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1079,6 +1086,24 @@ function EntryFormModal({
     const [ref, setRef] = useState(entry?.ref ?? "");
     const [template, setTemplate] = useState("CUSTOM");
 
+    // Template custom buatan role accounting sendiri (beda dari MANUAL_TEMPLATES yang hardcode di lib/accounting.ts)
+    const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>([]);
+    const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+    const [showSaveTemplateForm, setShowSaveTemplateForm] = useState(false);
+    const [newTemplateName, setNewTemplateName] = useState("");
+    const [savingTemplate, setSavingTemplate] = useState(false);
+
+    const loadTemplates = useCallback(async () => {
+        try {
+            const res = await fetch("/api/akutansi/jurnal-templates");
+            const json = await res.json();
+            setCustomTemplates(json.success ? json.data ?? [] : []);
+        } catch {
+            setCustomTemplates([]);
+        }
+    }, []);
+    useEffect(() => { loadTemplates(); }, [loadTemplates]);
+
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     useEffect(() => {
         fetch("/api/akutansi/accounts")
@@ -1124,9 +1149,81 @@ function EntryFormModal({
 
     const applyTemplate = (key: string) => {
         setTemplate(key);
+        setEditingTemplateId(null); // pilih template bawaan → keluar dari mode "sedang pakai template custom"
         const t = MANUAL_TEMPLATES.find((x) => x.key === key);
         if (!t || t.lines.length === 0) return;
         setLines(t.lines.map((l) => ({ ...l, nominal: 0, keterangan: "", _id: crypto.randomUUID() })));
+    };
+
+    // Terapkan template custom ke form. Beda dengan applyTemplate di atas, nominal &
+    // keterangan per baris IKUT ke-copy (tidak direset ke 0) — karena template custom
+    // sering dipakai untuk entri berulang dengan nominal sama (mis. sewa bulanan), dan
+    // isinya memang yang diisi sendiri oleh role accounting.
+    const applyCustomTemplate = (t: CustomTemplate) => {
+        setTemplate("CUSTOM");
+        setEditingTemplateId(t.id);
+        setLines(t.lines.map((l) => ({ ...l, _id: crypto.randomUUID() })));
+    };
+
+    // Simpan baris jurnal yang sedang diisi sebagai template custom baru.
+    const saveAsTemplate = async () => {
+        if (!newTemplateName.trim()) return setError("Nama template wajib diisi");
+        setSavingTemplate(true);
+        setError("");
+        try {
+            const res = await fetch("/api/akutansi/jurnal-templates", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: newTemplateName.trim(),
+                    lines: lines.map(({ _id, ...rest }) => rest),
+                }),
+            });
+            const json = await res.json();
+            if (!json.success) { setError(json.message ?? "Gagal menyimpan template"); return; }
+            setNewTemplateName("");
+            setShowSaveTemplateForm(false);
+            await loadTemplates();
+        } catch {
+            setError("Koneksi bermasalah saat menyimpan template");
+        } finally {
+            setSavingTemplate(false);
+        }
+    };
+
+    // Timpa template yang sedang aktif dengan baris jurnal yang sekarang diisi di form.
+    const updateTemplate = async () => {
+        if (!editingTemplateId) return;
+        setSavingTemplate(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/akutansi/jurnal-templates/${editingTemplateId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ lines: lines.map(({ _id, ...rest }) => rest) }),
+            });
+            const json = await res.json();
+            if (!json.success) { setError(json.message ?? "Gagal memperbarui template"); return; }
+            await loadTemplates();
+        } catch {
+            setError("Koneksi bermasalah saat memperbarui template");
+        } finally {
+            setSavingTemplate(false);
+        }
+    };
+
+    // Hapus template custom. Tidak mempengaruhi jurnal yang sudah pernah dibuat dari template ini.
+    const deleteTemplate = async (t: CustomTemplate) => {
+        if (!confirm(`Hapus template "${t.name}"?`)) return;
+        try {
+            const res = await fetch(`/api/akutansi/jurnal-templates/${t.id}`, { method: "DELETE" });
+            const json = await res.json();
+            if (!json.success) { setError(json.message ?? "Gagal menghapus template"); return; }
+            if (editingTemplateId === t.id) setEditingTemplateId(null);
+            await loadTemplates();
+        } catch {
+            setError("Koneksi bermasalah saat menghapus template");
+        }
     };
 
     const patch = (i: number, p: Partial<DraftLine>) =>
@@ -1212,7 +1309,84 @@ function EntryFormModal({
                                         {t.label}
                                     </button>
                                 ))}
+
+                                {/* Template custom buatan role accounting sendiri */}
+                                {customTemplates.map((t) => (
+                                    <div
+                                        key={t.id}
+                                        className={`group relative h-8 rounded-lg border active:scale-[0.96] transition-all duration-150 flex items-stretch overflow-hidden ${editingTemplateId === t.id
+                                            ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] border-transparent"
+                                            : "bg-white border-gray-200 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() => applyCustomTemplate(t)}
+                                            title={t.created_by_user?.name ? `Dibuat oleh ${t.created_by_user.name}` : undefined}
+                                            className={`px-3 text-xs font-semibold whitespace-nowrap ${editingTemplateId === t.id ? "text-white" : "text-gray-500"}`}
+                                        >
+                                            {t.name}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => deleteTemplate(t)}
+                                            title="Hapus template"
+                                            className={`px-1.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${editingTemplateId === t.id ? "text-white/70 hover:text-white" : "text-gray-300 hover:text-red-500"}`}
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ))}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSaveTemplateForm((v) => !v)}
+                                    title="Simpan baris saat ini sebagai template baru"
+                                    className="h-8 w-8 rounded-lg border border-dashed border-gray-300 text-gray-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 active:scale-[0.96] transition-all duration-150 flex items-center justify-center"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                </button>
                             </div>
+
+                            {/* Form kecil: simpan baris jurnal saat ini sebagai template custom baru */}
+                            {showSaveTemplateForm && (
+                                <div className="mt-2 flex items-center gap-2">
+                                    <input
+                                        autoFocus
+                                        value={newTemplateName}
+                                        onChange={(e) => setNewTemplateName(e.target.value)}
+                                        placeholder="Nama template baru (mis. Sewa Gudang Bulanan)"
+                                        className="flex-1 h-9 border border-gray-200 rounded-lg px-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={saveAsTemplate}
+                                        disabled={savingTemplate}
+                                        className="h-9 px-3 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-bold hover:opacity-90 active:scale-95 transition-all duration-150 disabled:opacity-40 whitespace-nowrap"
+                                    >
+                                        {savingTemplate ? "Menyimpan..." : "Simpan Template"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowSaveTemplateForm(false); setNewTemplateName(""); }}
+                                        className="h-9 px-2 text-xs font-semibold text-gray-400 hover:text-gray-600"
+                                    >
+                                        Batal
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Muncul kalau sedang pakai template custom — untuk update isi template itu sendiri */}
+                            {editingTemplateId && (
+                                <button
+                                    type="button"
+                                    onClick={updateTemplate}
+                                    disabled={savingTemplate}
+                                    className="mt-2 text-[11px] font-bold text-blue-600 hover:underline disabled:opacity-40"
+                                >
+                                    {savingTemplate ? "Memperbarui..." : "Update isi template ini dengan baris saat ini"}
+                                </button>
+                            )}
                         </div>
                     )}
 
