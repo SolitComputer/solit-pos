@@ -12,10 +12,13 @@ async function patchHandler(req: NextRequest, props: Props, _user: AuthUser) {
     if (!item_id) return NextResponse.json({ success: false, message: "item_id wajib diisi" }, { status: 400 });
 
     const { data: item } = await supabase
-      .from("preparation_items").select("id, preparation_id").eq("id", item_id).single();
+      .from("preparation_items").select("id, preparation_id, is_cancelled").eq("id", item_id).single();
 
     if (!item || item.preparation_id !== id) {
       return NextResponse.json({ success: false, message: "Item tidak ditemukan" }, { status: 404 });
+    }
+    if (item.is_cancelled) {
+      return NextResponse.json({ success: false, message: "Unit ini sudah dibatalkan, tidak bisa dicek" }, { status: 400 });
     }
 
     const { data, error } = await supabase
