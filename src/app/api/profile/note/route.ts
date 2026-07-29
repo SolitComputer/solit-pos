@@ -31,6 +31,10 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
+
+  // Catatan baru dibuat — reset daftar "dilihat oleh" dari catatan sebelumnya
+  await supabase.from("note_views").delete().eq("owner_id", user.id);
+
   return NextResponse.json({ success: true, data: { expires_at: expiresAt } });
 }
 
@@ -43,6 +47,9 @@ async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
+
+  await supabase.from("note_views").delete().eq("owner_id", user.id);
+
   return NextResponse.json({ success: true });
 }
 
