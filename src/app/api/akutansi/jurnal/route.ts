@@ -84,11 +84,12 @@ export const GET = withAuth(async (req) => {
     // sudah tersimpan, supaya selalu konsisten dengan apa yang benar-benar diposting —
     // bukan query terpisah ke kolom transactions.inventory_price yang bisa berbeda.
     const hasModalLine = (e.lines ?? []).some((l: any) => l.account_code === AKUN.HPP);
+    const modalAddressed = hasModalLine || e.is_edited === true;
     return {
       ...e,
       trx_meta: {
         ...(baseMeta ?? {}),
-        modal_missing: !hasModalLine,
+        modal_missing: !modalAddressed,
       },
     };
   });
@@ -143,8 +144,8 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       return NextResponse.json({ success: false, message: `Akun ${l.account_code} tidak dikenal` }, { status: 400 });
     if (l.side !== "DEBIT" && l.side !== "KREDIT")
       return NextResponse.json({ success: false, message: "Side harus DEBIT/KREDIT" }, { status: 400 });
-    if (!Number.isFinite(Number(l.nominal)) || Number(l.nominal) <= 0)
-      return NextResponse.json({ success: false, message: "Nominal harus > 0" }, { status: 400 });
+    if (!Number.isFinite(Number(l.nominal)) || Number(l.nominal) < 0)
+      return NextResponse.json({ success: false, message: "Nominal tidak boleh negatif" }, { status: 400 });
   }
 
   const merged = cleanManualLines(lines);
