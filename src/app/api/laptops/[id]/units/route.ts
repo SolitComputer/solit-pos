@@ -4,6 +4,9 @@ import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
 
+// Markup tetap untuk Harga Official = Harga Setor + markup ini.
+const OFFICIAL_PRICE_MARKUP = 300_000;
+
 interface Props {
   params: Promise<{ id: string }>;
 }
@@ -37,7 +40,7 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { id } = await props.params;
     const body = await req.json();
 
-  const {
+    const {
       serial_number,
       grade,
       condition_note,
@@ -73,10 +76,10 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         serial_number,
         grade,
         condition_note,
-       purchase_price: purchase_price != null ? Math.round(Number(purchase_price)) : 0,
+        purchase_price: purchase_price != null ? Math.round(Number(purchase_price)) : 0,
         selling_price: selling_price != null ? Math.round(Number(selling_price)) : 0,
         sparepart_cost: sparepart_cost != null ? Math.round(Number(sparepart_cost)) : 0,
-        official_price: official_price != null ? Math.round(Number(official_price)) : 0, // ← kolom baru
+        official_price: selling_price != null ? Math.round(Number(selling_price)) + OFFICIAL_PRICE_MARKUP : 0, // ← auto: Harga Setor + markup
         status,
         notes,
         ...(received_at ? { created_at: received_at } : {}),
