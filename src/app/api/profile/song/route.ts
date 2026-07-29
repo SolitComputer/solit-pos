@@ -7,6 +7,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const SONG_ADMIN_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
+function canManageSong(user: AuthUser): boolean {
+  const roles: string[] = (user as any).roles ?? [user.role];
+  return roles.some((r) => SONG_ADMIN_ROLES.has(r));
+}
+
 // ── GET — cari lagu lewat iTunes Search API (publik, gratis, tanpa API key) ─
 async function getHandler(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -69,8 +75,14 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   return NextResponse.json({ success: true, data: { expires_at: songExpiresAt } });
 }
 
-// ── DELETE — hapus lagu dari profil ──────────────────────────────────────────
 async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
+  const body = await req.json().catch(() => ({}));
+  const targetId: string = body.user_id ?? user.id;
+
+  if (targetId !== user.id && !canManageSong(user)) {
+    return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
+  }
+
   const { error } = await supabase
     .from("users")
     .update({
@@ -82,7 +94,7 @@ async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       song_updated_at: new Date().toISOString(),
       song_expires_at: null,
     })
-    .eq("id", user.id);
+    .eq("id", targetId);
 
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });

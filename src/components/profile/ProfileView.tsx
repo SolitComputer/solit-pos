@@ -6,7 +6,7 @@ import { humanizeRoleKey } from "@/lib/permissions";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
     Loader2, Pencil, Check, X, Music, Search, Play, Pause,
-    MessageCircle,
+    MessageCircle, Eye,
 } from "lucide-react";
 
 interface ProfileData {
@@ -25,6 +25,7 @@ interface ProfileData {
     song_artwork_url: string | null;
     song_preview_url: string | null;
     song_clip_start: number;
+    song_expires_at: string | null;
 }
 
 interface SongResult {
@@ -53,7 +54,7 @@ interface AchievementsData {
 }
 
 const ADMIN_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
-const CLIP_LENGTH = 30; 
+const CLIP_LENGTH = 30;
 
 function getInitials(name: string) {
     return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
@@ -104,6 +105,9 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [noteDraft, setNoteDraft] = useState("");
     const [savingNote, setSavingNote] = useState(false);
 
+    const [viewers, setViewers] = useState<{ id: string; name: string; profile_photo_url: string | null; viewed_at: string }[]>([]);
+    const [showViewers, setShowViewers] = useState(false);
+
     const [showSongSearch, setShowSongSearch] = useState(false);
     const [songQuery, setSongQuery] = useState("");
     const [songResults, setSongResults] = useState<SongResult[]>([]);
@@ -146,6 +150,14 @@ export default function ProfileView({ userId }: { userId: string }) {
     }, [userId]);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (!isSelf || !profile?.status_note) { setViewers([]); return; }
+        fetch(`/api/profile/note/views?ownerId=${userId}`)
+            .then((r) => r.json())
+            .then((d) => { if (d.success) setViewers(d.data); })
+            .catch(() => { });
+    }, [isSelf, profile?.status_note, userId]);
 
     useEffect(() => {
         if (!showSongSearch || songQuery.trim().length < 2) { setSongResults([]); return; }
@@ -290,12 +302,18 @@ export default function ProfileView({ userId }: { userId: string }) {
     const handleRemoveSong = async () => {
         setRemovingSong(true);
         try {
-            const res = await fetch("/api/profile/song", { method: "DELETE" });
+            const res = await fetch("/api/profile/song", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(isSelf ? {} : { user_id: userId }),
+            });
             const data = await res.json();
             if (data.success) {
-                setProfile((p) => (p ? { ...p, song_title: null, song_artist: null, song_artwork_url: null, song_preview_url: null, song_clip_start: 0 } : p));
+                setProfile((p) => (p ? { ...p, song_title: null, song_artist: null, song_artwork_url: null, song_preview_url: null, song_clip_start: 0, song_expires_at: null } : p));
                 setPlayingPreview(false);
                 showToast("Lagu dihapus", "ok");
+            } else {
+                showToast(data.message ?? "Gagal menghapus lagu", "err");
             }
         } catch {
             showToast("Terjadi kesalahan", "err");
@@ -479,10 +497,41 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 Batal
                             </button>
                             <button onClick={handleDeletePhoto} disabled={deleting}
-                                className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                                className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
                                 style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)" }}>
                                 {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" /> Ya, Hapus</>}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showViewers && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => setShowViewers(false)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-5 sm:p-6 max-h-[70vh] flex flex-col">
+                        <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                            <h3 className="font-black text-slate-800 text-sm">Dilihat oleh</h3>
+                            <button onClick={() => setShowViewers(false)} className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-slate-100">
+                                <X className="w-4 h-4 text-slate-500" />
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto space-y-1 flex-1">
+                            {viewers.length === 0 ? (
+                                <p className="text-xs text-slate-400 italic text-center py-6">Belum ada yang melihat catatan ini</p>
+                            ) : (
+                                viewers.map((v) => (
+                                    <div key={v.id} className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-slate-50">
+                                        <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-white text-xs font-black"
+                                            style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                                            {v.profile_photo_url
+                                                ? <img src={v.profile_photo_url} alt={v.name} className="w-full h-full object-cover" />
+                                                : getInitials(v.name)}
+                                        </div>
+                                        <p className="text-xs font-semibold text-slate-700 truncate flex-1">{v.name}</p>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>
@@ -562,21 +611,31 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 </button>
                             </div>
                         ) : profile.status_note ? (
-                            <div className="inline-flex items-center gap-2 pl-1 pr-3 py-1 rounded-full max-w-full"
-                                style={{ background: "#f5f3ff", border: "1px solid #ddd6fe" }}>
-                                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#ede9fe" }}>
-                                    <MessageCircle className="w-3 h-3" style={{ color: "#7c3aed" }} />
+                            <div className="space-y-1.5">
+                                <div className="inline-flex items-center gap-2 pl-1 pr-3 py-1 rounded-full max-w-full"
+                                    style={{ background: "#f5f3ff", border: "1px solid #ddd6fe" }}>
+                                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#ede9fe" }}>
+                                        <MessageCircle className="w-3 h-3" style={{ color: "#7c3aed" }} />
+                                    </div>
+                                    <p className="text-xs font-semibold truncate" style={{ color: "#5b21b6" }}>{profile.status_note}</p>
+                                    {isSelf && (
+                                        <>
+                                            <span className="text-[9px] flex-shrink-0" style={{ color: "#a78bfa" }}>
+                                                · {profile.status_note_expires_at ? noteTimeLeft(profile.status_note_expires_at) : ""}
+                                            </span>
+                                            <button onClick={handleRemoveNote} className="flex-shrink-0 opacity-50 hover:opacity-100">
+                                                <X className="w-3 h-3" style={{ color: "#7c3aed" }} />
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
-                                <p className="text-xs font-semibold truncate" style={{ color: "#5b21b6" }}>{profile.status_note}</p>
                                 {isSelf && (
-                                    <>
-                                        <span className="text-[9px] flex-shrink-0" style={{ color: "#a78bfa" }}>
-                                            · {profile.status_note_expires_at ? noteTimeLeft(profile.status_note_expires_at) : ""}
-                                        </span>
-                                        <button onClick={handleRemoveNote} className="flex-shrink-0 opacity-50 hover:opacity-100">
-                                            <X className="w-3 h-3" style={{ color: "#7c3aed" }} />
-                                        </button>
-                                    </>
+                                    <button onClick={() => setShowViewers(true)}
+                                        className="flex items-center gap-1 text-[10.5px] font-semibold pl-1"
+                                        style={{ color: "#94a3b8" }}>
+                                        <Eye className="w-3 h-3" />
+                                        {viewers.length > 0 ? `Dilihat ${viewers.length} orang` : "Belum ada yang melihat"}
+                                    </button>
                                 )}
                             </div>
                         ) : isSelf ? (
@@ -659,7 +718,10 @@ export default function ProfileView({ userId }: { userId: string }) {
                             style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
                             <div className="min-w-0 overflow-hidden">
                                 <p className="text-xs font-bold text-white truncate">{profile.song_title}</p>
-                                <p className="text-[10.5px] truncate" style={{ color: "rgba(255,255,255,0.55)" }}>{profile.song_artist}</p>
+                                <p className="text-[10.5px] truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
+                                    {profile.song_artist}
+                                    {profile.song_expires_at && ` · ${noteTimeLeft(profile.song_expires_at)}`}
+                                </p>
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
                                 {profile.song_preview_url && (
@@ -669,8 +731,8 @@ export default function ProfileView({ userId }: { userId: string }) {
                                         {playingPreview ? <Pause className="w-3.5 h-3.5 text-white" /> : <Play className="w-3.5 h-3.5 text-white ml-0.5" />}
                                     </button>
                                 )}
-                                {isSelf && (
-                                    <button onClick={handleRemoveSong} disabled={removingSong}
+                                {(isSelf || isAdmin) && (
+                                    <button onClick={handleRemoveSong} disabled={removingSong} title={isSelf ? "Hapus lagu" : `Hapus lagu ${profile.name}`}
                                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                                         style={{ background: "rgba(255,255,255,0.15)" }}>
                                         {removingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin text-white" /> : <X className="w-3.5 h-3.5 text-white" />}

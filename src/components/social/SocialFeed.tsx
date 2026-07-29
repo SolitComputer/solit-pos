@@ -42,6 +42,19 @@ function timeLeft(expiresAtIso: string): string {
     return `${minutes} menit lagi`;
 }
 
+// Gabungkan catatan + lagu + sisa waktu jadi satu deskripsi untuk baris user
+function describeUser(u: SocialUser): string {
+    const parts: string[] = [];
+    if (u.status_note) {
+        parts.push(u.status_note_expires_at ? `${u.status_note} · ${timeLeft(u.status_note_expires_at)}` : u.status_note);
+    }
+    if (u.song_title) {
+        const songLabel = `🎵 ${u.song_title} · ${u.song_artist}`;
+        parts.push(u.song_expires_at ? `${songLabel} · ${timeLeft(u.song_expires_at)}` : songLabel);
+    }
+    return parts.length > 0 ? parts.join(" · ") : humanizeRoleKey(u.roles?.[0] ?? u.role);
+}
+
 export default function SocialFeed() {
     const router = useRouter();
     const { openChat } = useChatContext();
@@ -188,11 +201,7 @@ export default function SocialFeed() {
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-bold text-slate-800 truncate">{u.name}</p>
                                         <p className="text-[11px] text-slate-400 truncate">
-                                            {u.status_note
-                                                ? u.status_note
-                                                : u.song_title
-                                                    ? `🎵 ${u.song_title} · ${u.song_artist}${u.song_expires_at ? ` · ${timeLeft(u.song_expires_at)}` : ""}`
-                                                    : humanizeRoleKey(u.roles?.[0] ?? u.role)}
+                                            {describeUser(u)}
                                         </p>
                                     </div>
                                     <button
@@ -230,30 +239,42 @@ function StoryBubble({ user, isSelf, onClick }: { user: SocialUser; isSelf?: boo
     const active = hasActiveStory(user);
     return (
         <button onClick={onClick} className="flex flex-col items-center gap-1.5 flex-shrink-0 w-16 group">
-            <div className="relative">
-                {user.status_note && (
-                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 max-w-[100px]">
-                        <div className="px-2 py-1 rounded-xl text-[8.5px] font-semibold truncate shadow-sm bg-white border border-slate-100 text-slate-600">
-                            {user.status_note}
+            {/* minHeight dicadangkan buat 2 baris pill (catatan + lagu) + avatar,
+                 supaya avatar SELALU nempel di bawah dan tidak pernah tertutup */}
+            <div className="flex flex-col items-center justify-end" style={{ minHeight: 112 }}>
+                {(user.status_note || user.song_title) && (
+                    <div className="flex flex-col items-center gap-0.5 mb-2 max-w-[110px]">
+                        {user.status_note && (
+                            <div className="px-2 py-1 rounded-xl text-[8.5px] font-semibold truncate shadow-sm bg-white border border-slate-100 text-slate-600 max-w-full">
+                                {user.status_note}
+                            </div>
+                        )}
+                        {user.song_title && (
+                            <div className="px-2 py-1 rounded-xl text-[8.5px] font-semibold truncate shadow-sm bg-white border border-slate-100 text-slate-600 max-w-full flex items-center gap-1">
+                                <Music className="w-2.5 h-2.5 flex-shrink-0" style={{ color: "#1db954" }} />
+                                <span className="truncate">{user.song_title}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+                <div className="relative flex-shrink-0">
+                    <div
+                        className="w-16 h-16 rounded-full p-[2.5px] transition-transform group-active:scale-95"
+                        style={{ background: active ? "linear-gradient(135deg, #f59e0b, #ec4899, #8b5cf6)" : "#e2e8f0" }}
+                    >
+                        <div className="w-full h-full rounded-full border-2 border-white overflow-hidden flex items-center justify-center text-white text-lg font-black"
+                            style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                            {user.profile_photo_url
+                                ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
+                                : getInitials(user.name)}
                         </div>
                     </div>
-                )}
-                <div
-                    className="w-16 h-16 rounded-full p-[2.5px] transition-transform group-active:scale-95"
-                    style={{ background: active ? "linear-gradient(135deg, #f59e0b, #ec4899, #8b5cf6)" : "#e2e8f0" }}
-                >
-                    <div className="w-full h-full rounded-full border-2 border-white overflow-hidden flex items-center justify-center text-white text-lg font-black"
-                        style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
-                        {user.profile_photo_url
-                            ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
-                            : getInitials(user.name)}
-                    </div>
+                    {isSelf && !active && (
+                        <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center border-2 border-white">
+                            <Plus className="w-3 h-3" />
+                        </div>
+                    )}
                 </div>
-                {isSelf && !active && (
-                    <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center border-2 border-white">
-                        <Plus className="w-3 h-3" />
-                    </div>
-                )}
             </div>
             <p className="text-[10.5px] font-semibold text-slate-600 truncate w-full text-center">
                 {isSelf ? "Catatan Anda" : user.name.split(" ")[0]}
@@ -272,6 +293,16 @@ function StoryModal({ user, onClose, onChat }: { user: SocialUser; onClose: () =
             audioRef.current.play().then(() => setPlaying(true)).catch(() => { });
         }
         return () => { audioRef.current?.pause(); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user.id]);
+
+    // Catat bahwa user ini sudah melihat catatan/lagu milik pemiliknya
+    useEffect(() => {
+        fetch("/api/profile/note/views", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ owner_id: user.id }),
+        }).catch(() => { });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user.id]);
 
@@ -320,7 +351,12 @@ function StoryModal({ user, onClose, onChat }: { user: SocialUser; onClose: () =
 
                 <div className="p-6 space-y-4">
                     {user.status_note && (
-                        <p className="text-base font-semibold text-slate-700 text-center leading-relaxed">"{user.status_note}"</p>
+                        <div className="text-center">
+                            <p className="text-base font-semibold text-slate-700 leading-relaxed">"{user.status_note}"</p>
+                            {user.status_note_expires_at && (
+                                <p className="text-[10.5px] text-slate-400 mt-1">{timeLeft(user.status_note_expires_at)}</p>
+                            )}
+                        </div>
                     )}
 
                     {user.song_title && (
