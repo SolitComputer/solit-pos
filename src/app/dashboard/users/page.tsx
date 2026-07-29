@@ -13,7 +13,7 @@ import {
   Package, Truck, Smartphone, Sparkles, Factory, Building2, FileText, MapPin,
   Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
   Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
-  ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock,
+  ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint,
 } from "lucide-react";
 
 interface User {
@@ -28,6 +28,8 @@ interface User {
   face_enrolled_at: string | null;
   face_embedding: boolean;
   force_logout_at: string | null;
+  biometric_enabled: boolean;
+  biometric_enrolled: boolean;
   birth_date: string | null;
   profile_photo_url: string | null;
   bio: string | null;
@@ -752,6 +754,40 @@ function ConfirmResetPasswordModal({ user, onClose, onConfirm, loading }: {
   );
 }
 
+// ── ConfirmResetBiometricModal ────────────────────────────────────────────────
+function ConfirmResetBiometricModal({ user, onClose, onConfirm, loading }: {
+  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
+        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><Fingerprint className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">Reset Sidik Jari {user.name}?</h3>
+        <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">
+          Kredensial di device lama akan dihapus. User perlu daftar ulang di HP-nya untuk pakai absen biometrik lagi.
+        </p>
+        <div className="flex gap-2.5">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            Batal
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+              : <><Fingerprint className="w-4 h-4" /> Ya, Reset</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ActionBtn ─────────────────────────────────────────────────────────────────
 function ActionBtn({ onClick, title, bg, color, children }: {
   onClick: () => void; title: string; bg: string; color: string; children: React.ReactNode;
@@ -803,6 +839,9 @@ export default function UsersPage() {
   const [deleting, setDeleting] = useState(false);
   const [confirmResetPwUser, setConfirmResetPwUser] = useState<User | null>(null);
   const [resettingPw, setResettingPw] = useState(false);
+  const [togglingBiometric, setTogglingBiometric] = useState<string | null>(null);
+  const [confirmResetBiometricUser, setConfirmResetBiometricUser] = useState<User | null>(null);
+  const [resettingBiometric, setResettingBiometric] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRoleManager, setIsRoleManager] = useState(false);
   const [mainTab, setMainTab] = useState<"users" | "roles">("users");
@@ -945,6 +984,37 @@ export default function UsersPage() {
     }
   };
 
+  const handleToggleBiometric = async (user: User) => {
+    setTogglingBiometric(user.id);
+    try {
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: user.id, _toggleBiometric: !user.biometric_enabled }),
+      });
+      const data = await res.json();
+      if (data.success) { showToast(data.message ?? "Berhasil diperbarui", "ok"); fetchUsers(); }
+      else showToast(data.message ?? "Gagal memperbarui", "err");
+    } catch { showToast("Terjadi kesalahan", "err"); }
+    finally { setTogglingBiometric(null); }
+  };
+
+  const handleResetBiometric = async () => {
+    if (!confirmResetBiometricUser) return;
+    setResettingBiometric(true);
+    try {
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: confirmResetBiometricUser.id, _resetBiometric: true }),
+      });
+      const data = await res.json();
+      if (data.success) { showToast(`Sidik jari ${confirmResetBiometricUser.name} berhasil direset`, "ok"); fetchUsers(); }
+      else showToast(data.message ?? "Gagal reset sidik jari", "err");
+    } catch { showToast("Terjadi kesalahan", "err"); }
+    finally { setResettingBiometric(false); setConfirmResetBiometricUser(null); }
+  };
+
   const filtered = useMemo(() => {
     let result = users.filter(u => {
       const matchSearch = !search
@@ -1023,6 +1093,9 @@ export default function UsersPage() {
       )}
       {isAdmin && confirmResetPwUser && (
         <ConfirmResetPasswordModal user={confirmResetPwUser} onClose={() => setConfirmResetPwUser(null)} onConfirm={handleResetPassword} loading={resettingPw} />
+      )}
+      {isAdmin && confirmResetBiometricUser && (
+        <ConfirmResetBiometricModal user={confirmResetBiometricUser} onClose={() => setConfirmResetBiometricUser(null)} onConfirm={handleResetBiometric} loading={resettingBiometric} />
       )}
       {isAdmin && showCreate && (
         <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />
@@ -1323,6 +1396,14 @@ export default function UsersPage() {
                                         <KeyRound className="w-2.5 h-2.5" /> Belum PW
                                       </span>
                                     )}
+                                    {isAdmin && user.biometric_enabled && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                        style={user.biometric_enrolled
+                                          ? { background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" }
+                                          : { background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a" }}>
+                                        <Fingerprint className="w-2.5 h-2.5" /> {user.biometric_enrolled ? "Sidik Jari Aktif" : "Menunggu Didaftarkan"}
+                                      </span>
+                                    )}
                                     {isAdmin && user.force_logout_at && (
                                       <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                                         style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}>
@@ -1394,6 +1475,22 @@ export default function UsersPage() {
                                       </svg>
                                     </ActionBtn>
                                   )}
+                                  {isAdmin && user.biometric_enrolled && (
+                                    <ActionBtn onClick={() => setConfirmResetBiometricUser(user)} title="Reset sidik jari" bg="#fff1f2" color="#dc2626">
+                                      <Fingerprint className="w-3.5 h-3.5" />
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && !user.biometric_enrolled && (
+                                    <ActionBtn
+                                      onClick={() => handleToggleBiometric(user)}
+                                      title={user.biometric_enabled ? "Nonaktifkan sidik jari" : "Aktifkan sidik jari (Daftar Sidik Jari)"}
+                                      bg={user.biometric_enabled ? "#fffbeb" : "#f8fafc"}
+                                      color={user.biometric_enabled ? "#d97706" : "#94a3b8"}>
+                                      {togglingBiometric === user.id
+                                        ? <div className="w-3 h-3 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(0,0,0,0.1)", borderTopColor: "currentColor" }} />
+                                        : <Fingerprint className="w-3.5 h-3.5" />}
+                                    </ActionBtn>
+                                  )}
                                   {isAdmin && (
                                     <ActionBtn onClick={() => setConfirmLogoutUser(user)} title={`Paksa logout ${user.name}`} bg="#fff7ed" color="#ea580c">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1426,7 +1523,7 @@ export default function UsersPage() {
                                   {canChat && (
                                     <ActionBtn
                                       onClick={() => openChat({ id: user.id, name: user.name, role: user.role, profile_photo_url: user.profile_photo_url })}
-                                     title={`Chat dengan ${user.name}`}
+                                      title={`Chat dengan ${user.name}`}
                                       bg="#eff6ff" color="#3b82f6">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

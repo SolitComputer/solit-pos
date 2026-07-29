@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import * as faceapi from "face-api.js";
+import { startRegistration, startAuthentication, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from "@simplewebauthn/browser";
 
 type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
@@ -91,6 +92,12 @@ export default function FaceVerifyPage() {
   const [scheduleInfo, setScheduleInfo] = useState<{
     openAt: string; closeAt: string; lateAt: string;
   } | null>(null);
+
+  const [biometricEligible, setBiometricEligible] = useState(false);
+  const [biometricEnrolled, setBiometricEnrolled] = useState(false);
+  const [biometricDeviceSupported, setBiometricDeviceSupported] = useState<boolean | null>(null);
+  const [bioBusy, setBioBusy] = useState(false);
+  const [bioError, setBioError] = useState<string | null>(null);
 
   const addLog = useCallback((msg: string, type: LogType = "info") => {
     setLogs(p => [...p.slice(-30), { time: ts(), msg, type }]);
@@ -233,13 +240,20 @@ export default function FaceVerifyPage() {
         setUserShift(shift);
         setNeedEnrollState(statusResult.needEnroll ?? false);
 
-        //  NEW: simpan jadwal per-akun dari server untuk dipakai di UI
         if (statusResult.scheduleToday) {
           setScheduleInfo({
             openAt: statusResult.scheduleToday.openAt,
             closeAt: statusResult.scheduleToday.closeAt,
             lateAt: statusResult.scheduleToday.lateAt,
           });
+        }
+
+        setBiometricEligible(Boolean(statusResult.biometricEligible));
+        setBiometricEnrolled(Boolean(statusResult.biometricEnrolled));
+        if (statusResult.biometricEligible && browserSupportsWebAuthn()) {
+          platformAuthenticatorIsAvailable().then(setBiometricDeviceSupported).catch(() => setBiometricDeviceSupported(false));
+        } else {
+          setBiometricDeviceSupported(false);
         }
 
         if (statusResult.alreadyAttended) {
@@ -509,7 +523,7 @@ export default function FaceVerifyPage() {
       }
     }, 150);
   }, [addLog, captureEmbedding, captureAveragedEmbedding, doVerify, redirectTo, userShift]);
-  
+
   useEffect(() => {
     if (stage === "enroll" || stage === "verify") {
       startCamera().then(result => {
@@ -561,6 +575,86 @@ export default function FaceVerifyPage() {
     } catch { /* tetap lanjut */ }
     window.location.href = redirectTo;
   }, [redirectTo, gpsCoords]);
+
+  const handleBiometricAttendance = useCallback(async () => {
+    setBioBusy(true); setBioError(null);
+    try {
+      if (!biometricEnrolled) {
+        const optRes = await fetch("/api/auth/webauthn/register-options", { method: "POST" });
+        const optData = await optRes.json();
+        if (!optData.success) { setBioError(optData.message ?? "Gagal memulai pendaftaran"); return; }
+        const attResp = await startRegistration({ optionsJSON: optData.options });
+        const verifyRes = await fetch("/api/auth/webauthn/register-verify", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(attResp),
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyData.success) { setBioError(verifyData.message ?? "Gagal mendaftarkan sidik jari"); return; }
+        setBiometricEnrolled(true);
+        addLog("sidik jari berhasil didaftarkan di device ini", "ok");
+      }
+
+      const optRes2 = await fetch("/api/auth/webauthn/auth-options", { method: "POST" });
+      const optData2 = await optRes2.json();
+      if (!optData2.success) { setBioError(optData2.message ?? "Gagal memulai autentikasi"); return; }
+
+      const assertion = await startAuthentication({ optionsJSON: optData2.options });
+
+      const verifyRes2 = await fetch("/api/auth/webauthn/auth-verify", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          credential: assertion,
+          latitude: gpsCoords?.latitude ?? null,
+          longitude: gpsCoords?.longitude ?? null,
+          accuracy: gpsCoords?.accuracy ?? null,
+        }),
+      });
+      const verifyData2 = await verifyRes2.json();
+      if (verifyData2.success) {
+        setStage("success");
+        setMessage(verifyData2.alreadyAttended ? "Sudah absen hari ini" : "Absen sidik jari berhasil");
+        setTimeout(() => (window.location.href = redirectTo), 1500);
+      } else if (verifyData2.outOfTime) {
+        setTimeInfo({
+          reason: verifyData2.reason === "TOO_EARLY" ? "TOO_EARLY" : "TOO_LATE",
+          openAt: scheduleInfo?.openAt ?? "", closeAt: scheduleInfo?.closeAt ?? "",
+        });
+        setStage("out-of-time");
+      } else {
+        setBioError(verifyData2.message ?? "Autentikasi sidik jari gagal");
+      }
+    } catch (err: any) {
+      setBioError(err?.name === "NotAllowedError" ? "Dibatalkan atau ditolak oleh device" : "Gagal memproses sidik jari");
+    } finally {
+      setBioBusy(false);
+    }
+  }, [biometricEnrolled, gpsCoords, scheduleInfo, redirectTo, addLog]);
+
+  const renderBiometricOption = () => {
+    if (!biometricEligible) return null;
+    const supported = biometricDeviceSupported === true;
+    return (
+      <div style={{ marginTop: 12 }}>
+        <button
+          className="btn-main"
+          disabled={!supported || bioBusy}
+          onClick={handleBiometricAttendance}
+          style={!supported ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+        >
+          {bioBusy ? (
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid rgba(255,255,255,0.7)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+              Memproses sidik jari...
+            </span>
+          ) : supported ? (
+            biometricEnrolled ? "Absen dengan Sidik Jari" : "Daftar & Absen Sidik Jari"
+          ) : (
+            "Sidik Jari (device tidak mendukung)"
+          )}
+        </button>
+        {bioError && <div style={{ fontSize: 11, color: "#f87171", textAlign: "center", marginTop: 8 }}>{bioError}</div>}
+      </div>
+    );
+  };
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -798,6 +892,7 @@ export default function FaceVerifyPage() {
             </div>
             <div style={{ fontSize: 13, color: "#f87171", textAlign: "center" }}>{message}</div>
             <button className="btn-main" onClick={() => window.location.reload()} style={{ maxWidth: 180 }}>Refresh halaman</button>
+            {renderBiometricOption()}
           </div>
         )}
 
@@ -887,6 +982,7 @@ export default function FaceVerifyPage() {
               )}
             </button>
 
+            {renderBiometricOption()}
             <div style={{ marginTop: 10, textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.2)" }}>
               Kehadiran akan tercatat sebagai <span style={{ color: "rgba(251,191,36,0.6)" }}>SKIPPED</span>
             </div>
@@ -1119,6 +1215,7 @@ export default function FaceVerifyPage() {
                 Wajah tidak dikenali? Daftar ulang →
               </button>
             )}
+            {attempts >= 2 && !isProcessing && renderBiometricOption()}
           </>
         )}
 
