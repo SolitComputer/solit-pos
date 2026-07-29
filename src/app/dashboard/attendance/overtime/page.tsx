@@ -1554,8 +1554,22 @@ export default function OvertimePage() {
   const [deleteData, setDeleteData] = useState<OvertimeRequest | null>(null);
   const [activeTab, setActiveTab] = useState<"KARYAWAN" | "PKL">("KARYAWAN");
   const autoCompletingIds = useRef<Set<string>>(new Set());
+  // FIX: simpan posisi scroll window sebelum user buka detail karyawan,
+  // supaya pas back, halaman balik ke posisi semula (bukan ke paling atas)
+  const listScrollPositionRef = useRef<number>(0);
 
   useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); }, []);
+
+  // FIX: setiap kali selectedUserId balik jadi null (user pencet back dari
+  // EmployeeDetailView), scroll window dikembalikan ke posisi sebelum dia
+  // buka detail — bukan direset ke atas
+  useEffect(() => {
+    if (selectedUserId) return; // lagi buka detail, jangan diapa-apain
+    const raf = requestAnimationFrame(() => {
+      window.scrollTo({ top: listScrollPositionRef.current, behavior: "auto" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [selectedUserId]);
 
   //  FIX: fetchOvertimes sekarang terima year & month sebagai param
   // Sebelumnya selalu fetch bulan ini saja, jadi input manual bulan lalu tidak muncul
@@ -1843,7 +1857,11 @@ export default function OvertimePage() {
               filterStatus={filterStatus}
               setFilterStatus={setFilterStatus}
               statuses={statuses}
-              onSelectUser={uid => setSelectedUserId(uid)}
+              onSelectUser={uid => {
+                // FIX: rekam posisi scroll saat ini sebelum pindah ke detail karyawan
+                listScrollPositionRef.current = window.scrollY;
+                setSelectedUserId(uid);
+              }}
             />
           )}
 
