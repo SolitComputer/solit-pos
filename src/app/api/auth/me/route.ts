@@ -1,8 +1,13 @@
-// src/app/api/auth/me/route.ts
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function GET() {
   try {
@@ -22,6 +27,12 @@ export async function GET() {
         ? raw.roles
         : [raw.role].filter(Boolean);
 
+    const { data: dbUser } = await supabase
+      .from("users")
+      .select("profile_photo_url")
+      .eq("id", raw.id)
+      .maybeSingle();
+
     return NextResponse.json({
       success: true,
       user: {
@@ -30,6 +41,7 @@ export async function GET() {
         role: roles[0] ?? raw.role,  // primary role — backward compat
         roles,                          // ✅ semua roles — NEW
         shift: raw.shift ?? "PAGI",
+        profile_photo_url: dbUser?.profile_photo_url ?? null,
         iat: raw.iat,
         exp: raw.exp,
       },

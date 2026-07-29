@@ -269,11 +269,17 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             grade: u.grade ?? null,
         }));
 
+        let fallbackLaptopId = laptopUnits[0]?.laptop_id || body.laptop_id || null;
+        if (!fallbackLaptopId && accessoriesInput.length > 0) {
+            const { data: anyLaptop } = await supabase.from("laptops").select("id").limit(1).maybeSingle();
+            if (anyLaptop?.id) fallbackLaptopId = anyLaptop.id;
+        }
+
         const accessoryItems = accessoriesInput.map(a => ({
             transaction_id: transaction.id, invoice_number,
             item_type: "accessory",
-            unit_id: null, accessory_id: a.accessory_id, laptop_id: null,
-            serial_number: null, laptop_name: a.name, item_name: a.name,
+            unit_id: null, accessory_id: a.accessory_id, laptop_id: fallbackLaptopId,
+            serial_number: "-", laptop_name: a.name, item_name: a.name,
             quantity: a.quantity, is_bonus: a.is_bonus,
             selling_price: accMap.get(a.accessory_id)?.buy_price ?? 0, // modal
             deal_price: a.unit_price * a.quantity,                     // 0 kalau bonus

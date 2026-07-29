@@ -8,7 +8,7 @@ import { GroupChatPanel } from "@/components/ui/GroupChatPanel";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import { useIncomingChat } from "@/hooks/useIncomingChat";
 
-interface ChatUser { id: string; name: string; role: string; }
+interface ChatUser { id: string; name: string; role: string; profile_photo_url?: string | null; }
 
 const ROLE_COLOR: Record<string, string> = {
     ADMIN: "#7c3aed", PROGRAMMER: "#4f46e5", ASISTEN_CEO: "#9333ea",
@@ -27,9 +27,11 @@ function MinimizedHead({ user, onOpen, onClose }: { user: ChatUser; onOpen: () =
         <div className="group relative flex items-center"
             style={{ animation: "headSlideIn .22s cubic-bezier(0.22,1,0.36,1)" }}>
             <button onClick={onOpen} title={`Buka chat ${user.name}`}
-                className="relative flex items-center justify-center text-white font-bold select-none transition hover:scale-105"
-                style={{ width: 48, height: 48, borderRadius: 16, background: `linear-gradient(135deg, ${getColor(user.role)}cc, ${getColor(user.role)})`, boxShadow: "0 4px 14px rgba(0,0,0,.22)", fontSize: 15 }}>
-                {getInitials(user.name)}
+                className="relative flex items-center justify-center text-white font-bold select-none transition hover:scale-105 overflow-hidden"
+                style={{ width: 48, height: 48, borderRadius: "50%", background: `linear-gradient(135deg, ${getColor(user.role)}cc, ${getColor(user.role)})`, boxShadow: "0 4px 14px rgba(0,0,0,.22)", fontSize: 15 }}>
+                {user.profile_photo_url
+                    ? <img src={user.profile_photo_url} alt={user.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : getInitials(user.name)}
                 <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400" style={{ border: "2px solid #fff" }} />
             </button>
             {/* Nama muncul saat hover */}

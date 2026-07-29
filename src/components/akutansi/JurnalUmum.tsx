@@ -226,8 +226,8 @@ export default function JurnalUmum({ period }: { period: string }) {
         const destinationIndex = result.destination.index;
         if (sourceIndex === destinationIndex) return;
 
-        if (search.trim() !== "") {
-            setToast("Harap kosongkan pencarian sebelum mengubah urutan.");
+        if (search.trim() !== "" || accountCodeFilter.size > 0) {
+            setToast("Harap kosongkan pencarian dan filter akun sebelum mengubah urutan.");
             return;
         }
 
@@ -291,7 +291,13 @@ export default function JurnalUmum({ period }: { period: string }) {
         // Filter kode akun: OR — entry lolos kalau salah satu baris akunnya
         // ada di dalam accountCodeFilter (jadi bisa pilih 110 saja, atau 110 + 440 sekaligus).
         if (accountCodeFilter.size > 0) {
-            result = result.filter((e) => e.lines.some((l) => accountCodeFilter.has(l.account_code)));
+            result = result.filter((e) => {
+                const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
+                const allCodes = modalMissing
+                    ? [...e.lines.map((l) => l.account_code), AKUN.MODAL_KELUAR, AKUN.HPP]
+                    : e.lines.map((l) => l.account_code);
+                return allCodes.some((code) => accountCodeFilter.has(code));
+            });
         }
 
         return result;
@@ -342,8 +348,101 @@ export default function JurnalUmum({ period }: { period: string }) {
         return allAccounts.filter((a) => a.code.includes(q) || a.name.toLowerCase().includes(q));
     }, [allAccounts, accountFilterSearch]);
 
-    const totalDebit = filtered.reduce((s, e) => s + sumSide(e.lines, "DEBIT"), 0);
-    const totalKredit = filtered.reduce((s, e) => s + sumSide(e.lines, "KREDIT"), 0);
+    const totalDebit = useMemo(() => {
+        return filtered.reduce((s, e) => {
+            const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
+            const displayLines: JournalLine[] = modalMissing
+                ? [
+                    ...e.lines,
+                    {
+                        id: `${e.id}-modal-keluar-missing`,
+                        account_code: AKUN.MODAL_KELUAR,
+                        account_name: accountName(AKUN.MODAL_KELUAR),
+                        side: "DEBIT",
+                        nominal: 0,
+                        keterangan: "Harga modal belum diinput",
+                        line_order: 999,
+                    },
+                    {
+                        id: `${e.id}-hpp-missing`,
+                        account_code: AKUN.HPP,
+                        account_name: accountName(AKUN.HPP),
+                        side: "KREDIT",
+                        nominal: 0,
+                        keterangan: null,
+                        line_order: 1000,
+                    },
+                ]
+                : e.lines;
+
+            const lines = accountCodeFilter.size > 0
+                ? displayLines.filter((l) => accountCodeFilter.has(l.account_code))
+                : displayLines;
+
+            return s + sumSide(lines, "DEBIT");
+        }, 0);
+    }, [filtered, accountCodeFilter]);
+
+    const totalKredit = useMemo(() => {
+        return filtered.reduce((s, e) => {
+            const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
+            const displayLines: JournalLine[] = modalMissing
+                ? [
+                    ...e.lines,
+                    {
+                        id: `${e.id}-modal-keluar-missing`,
+                        account_code: AKUN.MODAL_KELUAR,
+                        account_name: accountName(AKUN.MODAL_KELUAR),
+                        side: "DEBIT",
+                        nominal: 0,
+                        keterangan: "Harga modal belum diinput",
+                        line_order: 999,
+                    },
+                    {
+                        id: `${e.id}-hpp-missing`,
+                        account_code: AKUN.HPP,
+                        account_name: accountName(AKUN.HPP),
+                        side: "KREDIT",
+                        nominal: 0,
+                        keterangan: null,
+                        line_order: 1000,
+                    },
+                ]
+                : e.lines;
+
+            const lines = accountCodeFilter.size > 0
+                ? displayLines.filter((l) => accountCodeFilter.has(l.account_code))
+                : displayLines;
+
+            return s + sumSide(lines, "KREDIT");
+        }, 0);
+    }, [filtered, accountCodeFilter]);
+
+    const totalLinesAll = useMemo(() => {
+        return entries.reduce((s, e) => {
+            const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
+            return s + (modalMissing ? e.lines.length + 2 : e.lines.length);
+        }, 0);
+    }, [entries]);
+
+    const totalLinesFiltered = useMemo(() => {
+        return filtered.reduce((s, e) => {
+            const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
+            const displayLines = modalMissing
+                ? [
+                    ...e.lines,
+                    { account_code: AKUN.MODAL_KELUAR },
+                    { account_code: AKUN.HPP },
+                ]
+                : e.lines;
+            const linesToRender = accountCodeFilter.size > 0
+                ? displayLines.filter((l) => accountCodeFilter.has(l.account_code))
+                : displayLines;
+            return s + linesToRender.length;
+        }, 0);
+    }, [filtered, accountCodeFilter]);
+
+    const isFiltered = search.trim() !== "" || accountCodeFilter.size > 0;
 
     useEffect(() => {
         if (!toast) return;
@@ -361,7 +460,12 @@ export default function JurnalUmum({ period }: { period: string }) {
 
             {/* ── Summary ── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                <Stat label="Total Entry" value={String(filtered.length)} tone="gray" />
+                <Stat
+                    label={isFiltered ? "Total Entry (Filtered)" : "Total Entry"}
+                    value={isFiltered ? `${filtered.length} / ${entries.length}` : String(entries.length)}
+                    subvalue={isFiltered ? `${totalLinesFiltered} / ${totalLinesAll} baris` : `${totalLinesAll} total baris`}
+                    tone="gray"
+                />
                 <Stat label="Total Debit" value={rp(totalDebit)} tone="blue" />
                 <Stat label="Total Kredit" value={rp(totalKredit)} tone="emerald" />
                 <Stat
@@ -538,36 +642,48 @@ export default function JurnalUmum({ period }: { period: string }) {
 
             {/* ── Filter akun aktif — muncul kalau ada kode akun yang diklik di kolom Ref ── */}
             {accountCodeFilter.size > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 -mt-1">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Filter akun:</span>
-                    {Array.from(accountCodeFilter).map((code) => (
+                <div className="flex flex-wrap items-center justify-between gap-2 -mt-1 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Filter akun:</span>
+                        {Array.from(accountCodeFilter).map((code) => (
+                            <button
+                                key={code}
+                                onClick={() => toggleAccountCodeFilter(code)}
+                                className="inline-flex items-center gap-1 text-[11px] font-mono font-bold bg-blue-600 text-white px-2.5 py-0.5 rounded-full hover:bg-blue-700 active:scale-95 transition-all duration-150 shadow-sm"
+                            >
+                                {code} <X className="w-3 h-3" />
+                            </button>
+                        ))}
                         <button
-                            key={code}
-                            onClick={() => toggleAccountCodeFilter(code)}
-                            className="inline-flex items-center gap-1 text-[11px] font-mono font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full hover:bg-blue-700 active:scale-95 transition-all duration-150"
+                            onClick={() => setAccountCodeFilter(new Set())}
+                            className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 underline ml-1"
                         >
-                            {code} <X className="w-3 h-3" />
+                            Hapus semua
                         </button>
-                    ))}
-                    <button
-                        onClick={() => setAccountCodeFilter(new Set())}
-                        className="text-[10px] font-semibold text-gray-400 hover:text-gray-600 underline ml-1"
-                    >
-                        Hapus semua
-                    </button>
+                    </div>
+                    <span className="text-[11px] font-semibold text-blue-900 bg-white border border-blue-200 rounded-lg px-2.5 py-1 shadow-2xs">
+                        Tampil <b>{filtered.length}</b> dari <b>{entries.length}</b> entry ({totalLinesFiltered} baris)
+                    </span>
                 </div>
             )}
 
             {/* ── Total — di ATAS, di luar tabel (bar ringkasan) ── */}
             {!loading && filtered.length > 0 && (
-                <div className="bg-gray-100 border border-gray-300 border-t-2 border-t-[#D9A94A]/50 rounded-xl px-4 py-3 flex flex-wrap items-center justify-end gap-x-6 gap-y-1">
-                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total</span>
-                    <span className="text-sm font-black text-gray-900 font-mono">
-                        Debit&nbsp; {rp(totalDebit)}
+                <div className="bg-gray-100 border border-gray-300 border-t-2 border-t-[#D9A94A]/50 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
+                    <span className="text-xs font-semibold text-gray-600">
+                        {isFiltered
+                            ? `Menampilkan ${filtered.length} dari ${entries.length} entry (${totalLinesFiltered} / ${totalLinesAll} baris)`
+                            : `Menampilkan semua ${entries.length} entry (${totalLinesAll} total baris)`}
                     </span>
-                    <span className="text-sm font-black text-gray-900 font-mono">
-                        Kredit&nbsp; {rp(totalKredit)}
-                    </span>
+                    <div className="flex items-center gap-x-6">
+                        <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total</span>
+                        <span className="text-sm font-black text-gray-900 font-mono">
+                            Debit&nbsp; {rp(totalDebit)}
+                        </span>
+                        <span className="text-sm font-black text-gray-900 font-mono">
+                            Kredit&nbsp; {rp(totalKredit)}
+                        </span>
+                    </div>
                 </div>
             )}
 
@@ -746,6 +862,10 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                     },
                                                 ]
                                                 : entry.lines;
+                                            const linesToRender = accountCodeFilter.size > 0
+                                                ? displayLines.filter((l) => accountCodeFilter.has(l.account_code))
+                                                : displayLines;
+
                                             return (
                                                 <Draggable key={entry.id} draggableId={entry.id} index={index}>
                                                     {(provided, snapshot) => (
@@ -756,7 +876,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                             className={snapshot.isDragging ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400" : ""}
                                                             style={provided.draggableProps.style}
                                                         >
-                                                            {displayLines.map((line, i) => {
+                                                            {linesToRender.map((line, i) => {
                                                                 const first = i === 0;
                                                                 const isKredit = line.side === "KREDIT";
                                                                 return (
@@ -919,7 +1039,7 @@ export default function JurnalUmum({ period }: { period: string }) {
 }
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
-function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone: "gray" | "blue" | "emerald" | "red" }) {
+function Stat({ label, value, subvalue, tone }: { label: string; value: React.ReactNode; subvalue?: React.ReactNode; tone: "gray" | "blue" | "emerald" | "red" }) {
     const map = {
         gray: "border-gray-200 border-t-[#0f0c29]/70 text-gray-900",
         blue: "border-gray-200 border-t-blue-400 text-blue-800",
@@ -927,9 +1047,10 @@ function Stat({ label, value, tone }: { label: string; value: React.ReactNode; t
         red: "border-gray-200 border-t-red-400 text-red-700",
     };
     return (
-        <div className={`bg-white rounded-xl border border-t-2 p-4 ${map[tone]}`}>
+        <div className={`bg-white rounded-xl border border-t-2 p-3.5 sm:p-4 ${map[tone]}`}>
             <p className="text-[10px] font-semibold uppercase tracking-wide opacity-50 mb-1">{label}</p>
             <p className="text-base font-black font-mono truncate">{value}</p>
+            {subvalue && <p className="text-[10.5px] font-semibold text-gray-400 truncate mt-0.5">{subvalue}</p>}
         </div>
     );
 }
