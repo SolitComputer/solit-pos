@@ -211,7 +211,7 @@ export interface DraftLine {
   account_code: string;
   side: JournalSide;
   nominal: number;
-  keterangan?: string | null; // catatan khusus untuk baris akun ini (opsional)
+  keterangan?: string | null; 
 }
 
 export function sumSide(lines: DraftLine[], side: JournalSide): number {
