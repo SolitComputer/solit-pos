@@ -16,7 +16,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     const { data, error } = await supabase
         .from("users")
-        .select("id, name, role, roles, shift, bio, profile_photo_url, photo_updated_at, banner_url, banner_updated_at, bio_created_at, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start").eq("id", targetId)
+        .select("id, name, role, roles, shift, bio, profile_photo_url, photo_updated_at, banner_url, banner_updated_at, bio_created_at, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at").eq("id", targetId)
         .maybeSingle();
 
     if (error) {
@@ -30,12 +30,21 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         ? new Date(data.status_note_expires_at) < new Date()
         : false;
 
+    const songExpired = data.song_expires_at
+        ? new Date(data.song_expires_at) < new Date()
+        : false;
+
     return NextResponse.json({
         success: true,
         data: {
             ...data,
             status_note: noteExpired ? null : data.status_note,
             status_note_expires_at: noteExpired ? null : data.status_note_expires_at,
+            song_title: songExpired ? null : data.song_title,
+            song_artist: songExpired ? null : data.song_artist,
+            song_artwork_url: songExpired ? null : data.song_artwork_url,
+            song_preview_url: songExpired ? null : data.song_preview_url,
+            song_clip_start: songExpired ? 0 : data.song_clip_start,
         },
         isSelf: targetId === user.id,
     });
