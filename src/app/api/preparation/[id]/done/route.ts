@@ -1,7 +1,3 @@
-// src/app/api/preparation/[id]/done/route.ts
-// Penyedia barang menyelesaikan pengecekan semua unit → status SIAP_KIRIM
-// Sales yang nanti tentukan metode pengiriman via /dispatch
-
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
