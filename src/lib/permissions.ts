@@ -131,7 +131,7 @@ export const SELLER_PIC_CANDIDATE_ROLES: UserRole[] = ["CREW_SALES", "KEPALA_MAR
 
 /** Role yang bisa akses halaman "Semua Unit" (global inventory view lintas laptop) */
 export const ALL_UNITS_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
+  ...FULL_ACCESS, "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "PENGELOLA_BARANG",
 ];
 // ─── Akuntansi ────────────────────────────────────────────────────────────────
 export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
