@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import ExcelJS from "exceljs";
 import Link from "next/link";
 import BarcodeModal from "@/components/ui/BarcodeModal";
-import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES } from "@/lib/permissions";
 import { Laptop } from "lucide-react";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
@@ -392,6 +392,9 @@ export function LaptopsContent() {
     //  terpisah yang harus diedit bersamaan tiap ada perubahan.
     const canSeePrivateBarang = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canViewTotalStok = canSeePrivateBarang;
+    //  SO (Stock Opname) pakai whitelist sendiri, lebih sempit dari
+    //  canSeePrivateBarang — khusus tim Pengelola Barang saja.
+    const canManageSo = hasAnyRole(userRoles, SO_ROLES);
 
     //  Pop-up Detail unit — dipakai saat stok = 1 (tanpa perlu masuk halaman Units)
     const [unitDetail, setUnitDetail] = useState<{ unit: UnitDetailData; laptop: Laptop } | null>(null);
@@ -1094,7 +1097,7 @@ export function LaptopsContent() {
                                         </div>
                                     );
                                 } : undefined}
-                                renderSo={canSeePrivateBarang ? (row) => {
+                                renderSo={canManageSo ? (row) => {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (!l) return null;
                                     return (

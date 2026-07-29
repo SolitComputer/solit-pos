@@ -18,6 +18,13 @@ const BUCKET = "avatars";
 const MAX_SIZE_BYTES = 3 * 1024 * 1024; // 3MB — client wajib kompres dulu
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+type PhotoKind = "avatar" | "banner";
+function columnsFor(kind: PhotoKind) {
+  return kind === "banner"
+    ? { urlCol: "banner_url" as const, updatedCol: "banner_updated_at" as const }
+    : { urlCol: "profile_photo_url" as const, updatedCol: "photo_updated_at" as const };
+}
+
 function extractPath(publicUrl: string): string | null {
   const marker = `/${BUCKET}/`;
   const idx = publicUrl.indexOf(marker);
@@ -25,8 +32,10 @@ function extractPath(publicUrl: string): string | null {
 }
 
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
-  const form = await req.formData();
+const form = await req.formData();
   const targetId = (form.get("user_id") as string | null) ?? user.id;
+  const kind = ((form.get("type") as string | null) ?? "avatar") as PhotoKind;
+  const { urlCol, updatedCol } = columnsFor(kind);
 
   // Admin boleh ganti foto siapa saja; user biasa hanya boleh foto sendiri.
   if (targetId !== user.id && !canManagePhoto(user)) {
@@ -46,12 +55,12 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
   const { data: existing } = await supabase
     .from("users")
-    .select("profile_photo_url")
+    .select(urlCol)
     .eq("id", targetId)
     .maybeSingle();
 
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const path = `${targetId}/${randomUUID()}.${ext}`;
+  const path = `${targetId}/${kind}-${randomUUID()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { error: uploadError } = await supabase.storage
@@ -67,7 +76,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
   const { error: updateError } = await supabase
     .from("users")
-    .update({ profile_photo_url: photoUrl, photo_updated_at: new Date().toISOString() })
+  .update({ [urlCol]: photoUrl, [updatedCol]: new Date().toISOString() })
     .eq("id", targetId);
 
   if (updateError) {
@@ -76,15 +85,17 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   }
 
   // Bersihkan foto lama supaya storage tidak menumpuk
-  const oldPath = existing?.profile_photo_url ? extractPath(existing.profile_photo_url) : null;
+  const oldPath = existing?.[urlCol] ? extractPath(existing[urlCol] as string) : null;
   if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
 
-  return NextResponse.json({ success: true, data: { profile_photo_url: photoUrl } });
+  return NextResponse.json({ success: true, data: { [urlCol]: photoUrl } });
 }
 
 async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const body = await req.json().catch(() => ({}));
   const targetId: string = body.user_id ?? user.id;
+  const kind = ((body.type as string | undefined) ?? "avatar") as PhotoKind;
+  const { urlCol, updatedCol } = columnsFor(kind);
 
   if (targetId !== user.id && !canManagePhoto(user)) {
     return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
@@ -92,16 +103,16 @@ async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
   const { data: existing } = await supabase
     .from("users")
-    .select("profile_photo_url")
+    .select(urlCol)
     .eq("id", targetId)
     .maybeSingle();
 
-  const oldPath = existing?.profile_photo_url ? extractPath(existing.profile_photo_url) : null;
+  const oldPath = existing?.[urlCol] ? extractPath(existing[urlCol] as string) : null;
   if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
 
   const { error } = await supabase
     .from("users")
-    .update({ profile_photo_url: null, photo_updated_at: new Date().toISOString() })
+    .update({ [urlCol]: null, [updatedCol]: new Date().toISOString() })
     .eq("id", targetId);
 
   if (error) {
