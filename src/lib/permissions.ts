@@ -336,7 +336,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/users": ALL_ROLES.filter(r => !r.startsWith("PKL")),
   "/dashboard/attendance": [...ALL_ROLES],
   "/dashboard/daftar-hadir": [...ALL_ROLES],
-  "/dashboard/attendance/overtime": ALL_ROLES.filter(r => r !== "KEPALA_SALES"),
+"/dashboard/attendance/overtime": [...ALL_ROLES],
   "/api/attendance/today": [...ALL_ROLES],
 
   "/dashboard/service": [...SERVICE_VIEW_ROLES],

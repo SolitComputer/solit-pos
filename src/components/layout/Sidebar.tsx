@@ -413,7 +413,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   ],
   KEPALA_SALES: [
     { label: "Utama", items: [ITEM_DASHBOARD, ITEM_USERS] },
-    GROUP_ABSENSI_SIMPLE,
+    GROUP_ABSENSI,
     { label: "Ultah", items: [ITEM_CUSTOMER_BIRTHDAY, ITEM_ULTAH_KARYAWAN] },
     SALES_INVENTARIS,
     SALES_TRANSAKSI,
