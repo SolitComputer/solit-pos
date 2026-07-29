@@ -545,6 +545,11 @@ export default function CreatePaymentPage() {
     };
 
     const onSubmit = async (data: CreatePaymentType) => {
+        if (!customerBirthDate) {
+            alert("Tanggal lahir customer wajib diisi");
+            setStep(1);
+            return;
+        }
         const paidAcc = selectedAccessories.filter(a => !a.is_bonus).length;
         if (!selectedUnits.length && selectedAccessories.length === 0) {
             alert("Pilih minimal 1 unit atau aksesori"); return;
@@ -833,8 +838,8 @@ export default function CreatePaymentPage() {
                     {step === 1 && (paymentFlow === "DIRECT" || pendingSubType) && (
                         <>
                             <input type="text" placeholder="Atas Nama *" className={inputClass} {...register("customer_name")} />
-                            <div>
-                                <label className="text-xs text-gray-500 mb-1.5 block">Tanggal Lahir Customer (opsional)</label>
+                           <div>
+                                <label className="text-xs text-gray-500 mb-1.5 block">Tanggal Lahir Customer *</label>
                                 <input type="date" className={inputClass}
                                     value={customerBirthDate}
                                     onChange={e => setCustomerBirthDate(e.target.value)} />
@@ -916,6 +921,7 @@ export default function CreatePaymentPage() {
                             <button type="button" onClick={() => {
                                 if (!watch("customer_name")) { alert("Isi nama customer dulu"); return; }
                                 if (!isEcommerce && !watch("customer_phone")) { alert("Isi nomor WhatsApp dulu"); return; }
+                                if (!customerBirthDate) { alert("Isi tanggal lahir customer dulu"); return; }
                                 fromScan ? setStep(3) : setStep(2);
                             }} className={`w-full ${btnPrimary} inline-flex items-center justify-center gap-1.5`}>
                                 Lanjut <ChevronRight size={16} />
