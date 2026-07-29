@@ -485,18 +485,26 @@ export function LaptopsContent() {
         try {
             const res = await fetch("/api/laptops");
             const result = await res.json();
-            const normalized = (result.data || []).map((l: Laptop) => {
+           const normalized = (result.data || []).map((l: Laptop) => {
                 const units = l.laptop_units || [];
                 const siapJual = units.filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
                 const stokMinus = units.filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
+                // Unit yang sedang di antrian penyiapan (belum lunas, dipindah oleh
+                // sales ke penyedia barang) TETAP dihitung sebagai stok Data Barang.
+                // Hanya "Siap Jual" yang berkurang di tahap ini — lihat
+                // api/preparation/route.ts (POST) untuk transisi SIAP_JUAL → DALAM_PENYIAPAN.
+                const dalamPenyiapan = units.filter((u: LaptopUnit) => u.status === "DALAM_PENYIAPAN").length;
                 return {
                     ...l,
                     selling_price: Math.round(Number(l.selling_price) || 0),
                     qty: units.length,
-                    // Stok Tersisa = Siap Jual + Minus saja.
-                    // Unit RESERVED/HELD/PACKING sengaja TIDAK dihitung sebagai stok tersedia
-                    // karena statusnya sudah "diproses" (dipesan/ditahan/dikemas), bukan stok bebas.
-                    stok_tersedia: siapJual + stokMinus,
+                    // Stok Tersisa = Siap Jual + Minus + Dalam Penyiapan.
+                    // Unit RESERVED/HELD/PACKING (dipesan via DP transaksi customer) sengaja
+                    // TIDAK dihitung — statusnya sudah "diproses" via jalur transaksi.
+                    // Unit DALAM_PENYIAPAN (antrian penyiapan internal, BELUM lunas) beda
+                    // dari RESERVED — sengaja TETAP dihitung supaya Data Barang tidak
+                    // berkurang saat order baru masuk antrian penyiapan (business rule).
+                    stok_tersedia: siapJual + stokMinus + dalamPenyiapan,
                     siap_jual: siapJual,
                     stok_minus: stokMinus,
                     terjual: units.filter((u: LaptopUnit) => u.status === "SOLD").length,

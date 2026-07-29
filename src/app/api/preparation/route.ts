@@ -138,6 +138,32 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       schedDate = scheduled_delivery_date;
     }
 
+    // ── Validasi ketersediaan unit (cegah double-booking) ──
+    // Unit yang statusnya sudah bukan SIAP_JUAL (misal sudah dipakai di
+    // penyiapan lain / sudah terjual) tidak boleh dimasukkan ke order baru.
+    const unitIds = cleanItems.map((it) => it.unit_id).filter(Boolean) as string[];
+    let unitsToReserve: { id: string; serial_number: string }[] = [];
+
+    if (unitIds.length > 0) {
+      const { data: existingUnits, error: unitsCheckError } = await supabase
+        .from("laptop_units")
+        .select("id, status, serial_number")
+        .in("id", unitIds);
+      if (unitsCheckError) throw unitsCheckError;
+
+      const notAvailable = (existingUnits ?? []).filter((u) => u.status !== "SIAP_JUAL");
+      if (notAvailable.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `SN ${notAvailable.map((u) => u.serial_number).join(", ")} sudah tidak tersedia (status: ${notAvailable[0].status})`,
+          },
+          { status: 409 }
+        );
+      }
+      unitsToReserve = (existingUnits ?? []).map((u) => ({ id: u.id, serial_number: u.serial_number }));
+    }
+
     const order_number = await generateOrderNumber();
 
     const { data: order, error: orderError } = await supabase
@@ -166,6 +192,28 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     if (itemsError) {
       await supabase.from("preparation_orders").delete().eq("id", order.id);
       throw itemsError;
+    }
+
+   // ── Kurangi stok "Siap Jual" — BUKAN "Data Barang" ──
+    // Unit pindah SIAP_JUAL → DALAM_PENYIAPAN begitu masuk antrian penyiapan.
+    // SENGAJA BUKAN "RESERVED" — status itu sudah dipakai untuk unit yang
+    // di-DP oleh customer (lihat units/reserve & confirm-payment), dan
+    // LaptopsContent.tsx sengaja MENGECUALIKAN "RESERVED" dari stok_tersedia
+    // (Data Barang). Kalau kita reuse "RESERVED" di sini, Data Barang akan
+    // ikut berkurang saat antrian penyiapan dibuat — melanggar business rule.
+    // "DALAM_PENYIAPAN" TETAP dihitung sebagai stok_tersedia di LaptopsContent.
+    if (unitsToReserve.length > 0) {
+      const { error: reserveError } = await supabase
+        .from("laptop_units")
+        .update({ status: "DALAM_PENYIAPAN" })
+        .in("id", unitsToReserve.map((u) => u.id))
+        .eq("status", "SIAP_JUAL"); // guard tambahan terhadap race condition
+
+      if (reserveError) {
+        await supabase.from("preparation_items").delete().eq("preparation_id", order.id);
+        await supabase.from("preparation_orders").delete().eq("id", order.id);
+        throw reserveError;
+      }
     }
 
     await logActivity({
