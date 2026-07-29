@@ -157,6 +157,7 @@ export const ITEM_OUTFLOW_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "TEKNISI", "KEPALA_TEKNISI",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "KEPALA_ZENITH",
 ];
 
 // ─── Preparation Roles ────────────────────────────────────────────────────────
@@ -496,11 +497,14 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/admin/notifikasi-pengantaran": [...NOTIFICATION_SETTINGS_ROLES],
   "/api/akutansi": [...AKUNTANSI_ROLES],
   "/api/notification-settings": [...NOTIFICATION_SETTINGS_ROLES],
-  "/dashboard/ai-ceo": [...AI_CEO_ROLES],
+ "/dashboard/ai-ceo": [...AI_CEO_ROLES],
   "/api/ai-ceo": [...AI_CEO_ROLES],
+
+  "/dashboard/profile": [...ALL_ROLES],
+  "/api/profile": [...ALL_ROLES],
+  "/api/achievements": [...ALL_ROLES],
 };
 
-// ─── PERMISSIONS object ───────────────────────────────────────────────────────
 export const PERMISSIONS = {
   VIEW_DASHBOARD: [...ALL_ROLES] as UserRole[],
 
@@ -895,4 +899,18 @@ export const BARANG_PRIVATE_VIEW_ROLES: UserRole[] = [
   "ASISTEN_CEO",
   "ACCOUNTING",
   "KEPALA_TEKNISI",
+];
+
+// ── Data Barang: Role yang boleh melihat tab Data Laptop & Aksesoris ──────────
+// Kepala Sales, Kepala Zenith, Kepala Onpoint, Kepala Sotech, Crew Sales, dan Sales tidak diperbolehkan.
+export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
+  ...FULL_ACCESS,
+  "PURCHASING",
+  "PENGELOLA_BARANG",
+  "KEPALA_PENGELOLA_BARANG",
+  "PKL_PENGELOLA_BARANG",
+  "TEKNISI",
+  "KEPALA_TEKNISI",
+  "PKL_TEKNISI",
+  "KEPALA_ZENITH",
 ];

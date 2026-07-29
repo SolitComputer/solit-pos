@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { OnlineUsersPanel } from "@/components/layout/OnlineUsersPanel";
 import { getCurrentUserClient } from "@/lib/auth-client";
@@ -28,6 +29,12 @@ interface User {
   face_embedding: boolean;
   force_logout_at: string | null;
   birth_date: string | null;
+  profile_photo_url: string | null;
+  bio: string | null;
+  status_note: string | null;
+  song_title: string | null;
+  song_artist: string | null;
+  song_artwork_url: string | null;
 }
 
 interface CustomRoleRow {
@@ -129,6 +136,7 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"]);
 const ROLE_MANAGER_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
+const USER_ACTION_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
 
 const KEPALA_ROLES = new Set([
   "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI", "KEPALA_ZENITH",
@@ -777,8 +785,8 @@ function StatCard({ icon, value, label, sub, accent }: {
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function UsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState<string | null>(null);
@@ -816,7 +824,7 @@ export default function UsersPage() {
           ? u.roles
           : [u.role];
 
-      const admin = userRoles.some(r => FULL_ACCESS_ROLES.has(r));
+      const admin = userRoles.some(r => USER_ACTION_ROLES.has(r));
       const kepala = !admin && userRoles.some(r => KEPALA_ROLES.has(r));
 
       setIsAdmin(admin);
@@ -1267,15 +1275,21 @@ export default function UsersPage() {
                               style={{ borderBottom: idx < filtered.length - 1 ? "1px solid #f5f5fb" : "none" }}>
                               <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
 
-                                <div className="relative flex-shrink-0">
-                                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-black"
+                                <div
+                                  className="relative flex-shrink-0 cursor-pointer"
+                                  onClick={() => router.push(`/dashboard/profile/${user.id}`)}
+                                  title={`Lihat profil ${user.name}`}
+                                >
+                                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-black overflow-hidden"
                                     style={{
                                       background: isFullAccess
                                         ? "linear-gradient(135deg, #7c3aed, #6d28d9)"
                                         : `linear-gradient(135deg, ${avatarColor}dd, ${avatarColor})`,
                                       boxShadow: `0 2px 8px ${avatarColor}30`,
                                     }}>
-                                    {getInitials(user.name)}
+                                    {user.profile_photo_url
+                                      ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
+                                      : getInitials(user.name)}
                                   </div>
                                   {isAdmin && user.face_embedding && (
                                     <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-white flex items-center justify-center"
@@ -1285,9 +1299,9 @@ export default function UsersPage() {
                                   )}
                                 </div>
 
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/dashboard/profile/${user.id}`)} title={`Lihat profil ${user.name}`}>
                                   <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                    <span className="text-sm font-bold truncate max-w-full" style={{ color: "#0f172a" }}>
+                                    <span className="text-sm font-bold truncate max-w-full hover:underline" style={{ color: "#0f172a" }}>
                                       {user.name}
                                     </span>
                                     {(user.roles?.length > 0 ? user.roles : [user.role]).map((r, i) => {
@@ -1322,6 +1336,24 @@ export default function UsersPage() {
                                       </span>
                                     )}
                                   </div>
+                                  {user.status_note && (
+                                    <p className="text-[11px] mt-0.5 truncate font-semibold" style={{ color: "#7c3aed" }}>
+                                      {user.status_note}
+                                    </p>
+                                  )}
+                                  {user.song_title && (
+                                    <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                                      {user.song_artwork_url && (
+                                        <img src={user.song_artwork_url} alt={user.song_title} className="w-4 h-4 rounded flex-shrink-0 object-cover" />
+                                      )}
+                                      <p className="text-[11px] truncate" style={{ color: "#16a34a" }}>
+                                        {user.song_title} · {user.song_artist}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {user.bio && (
+                                    <p className="text-[11px] text-gray-400 mt-0.5 truncate italic">"{user.bio}"</p>
+                                  )}
                                   {(isAdmin || isKepala) && user.phone_number && (
                                     <p className="text-[11px] text-gray-400 font-medium mt-0.5 truncate">{user.phone_number}</p>
                                   )}
@@ -1338,7 +1370,7 @@ export default function UsersPage() {
                                 <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
                                   {canChat && (
                                     <ActionBtn
-                                      onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
+                                      onClick={() => openChat({ id: user.id, name: user.name, role: user.role, profile_photo_url: user.profile_photo_url })}
                                       title={`Chat dengan ${user.name}`}
                                       bg="#eff6ff" color="#3b82f6">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1393,8 +1425,8 @@ export default function UsersPage() {
                                 <div className="flex sm:hidden items-center gap-1.5 mt-2.5 pl-[52px] flex-wrap">
                                   {canChat && (
                                     <ActionBtn
-                                      onClick={() => openChat({ id: user.id, name: user.name, role: user.role })}
-                                      title={`Chat dengan ${user.name}`}
+                                      onClick={() => openChat({ id: user.id, name: user.name, role: user.role, profile_photo_url: user.profile_photo_url })}
+                                     title={`Chat dengan ${user.name}`}
                                       bg="#eff6ff" color="#3b82f6">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

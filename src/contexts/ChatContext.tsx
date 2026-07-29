@@ -7,6 +7,7 @@ export interface ChatUser {
     id: string;
     name: string;
     role: string;
+    profile_photo_url?: string | null;
 }
 
 interface ChatContextType {
