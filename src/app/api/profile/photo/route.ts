@@ -19,10 +19,10 @@ const MAX_SIZE_BYTES = 3 * 1024 * 1024; // 3MB — client wajib kompres dulu
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 type PhotoKind = "avatar" | "banner";
-function columnsFor(kind: PhotoKind) {
+function columnsFor(kind: PhotoKind): { urlCol: string; updatedCol: string } {
   return kind === "banner"
-    ? { urlCol: "banner_url" as const, updatedCol: "banner_updated_at" as const }
-    : { urlCol: "profile_photo_url" as const, updatedCol: "photo_updated_at" as const };
+    ? { urlCol: "banner_url", updatedCol: "banner_updated_at" }
+    : { urlCol: "profile_photo_url", updatedCol: "photo_updated_at" };
 }
 
 function extractPath(publicUrl: string): string | null {
@@ -85,7 +85,7 @@ const form = await req.formData();
   }
 
   // Bersihkan foto lama supaya storage tidak menumpuk
-  const oldPath = existing?.[urlCol] ? extractPath(existing[urlCol] as string) : null;
+const oldPath = (existing as any)?.[urlCol] ? extractPath((existing as any)[urlCol] as string) : null;
   if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
 
   return NextResponse.json({ success: true, data: { [urlCol]: photoUrl } });
@@ -107,7 +107,7 @@ async function deleteHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     .eq("id", targetId)
     .maybeSingle();
 
-  const oldPath = existing?.[urlCol] ? extractPath(existing[urlCol] as string) : null;
+const oldPath = (existing as any)?.[urlCol] ? extractPath((existing as any)[urlCol] as string) : null;
   if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath]);
 
   const { error } = await supabase
