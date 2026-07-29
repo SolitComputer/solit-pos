@@ -51,6 +51,10 @@ export interface InventoryRow {
     is_audited?: boolean;
     audited_at?: string | null;
 
+    /** Status SO (Stock Opname) — independen dari Audit, TTL 1 hari */
+    is_so_active?: boolean;
+    so_at?: string | null;
+
     /** Badge "NEW" — true kalau ada unit yang masuk dalam 3 hari terakhir */
     is_new?: boolean;
 }
@@ -69,6 +73,8 @@ interface Props {
     renderActions?: (row: InventoryRow) => React.ReactNode;
     /** Render kolom Audit di samping Aksi (opt-in — Data Barang) */
     renderAudit?: (row: InventoryRow) => React.ReactNode;
+    /** Render kolom SO (Stock Opname) — independen dari Audit (opt-in — Data Barang) */
+    renderSo?: (row: InventoryRow) => React.ReactNode;
     /** Header sortable — opsional, dipakai Data Barang */
     sortBy?: string;
     onSort?: (asc: string, desc: string) => void;
@@ -86,7 +92,7 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
 );
 
-type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "AKSI";
+type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "SO" | "AKSI";
 //  Badge "NEW" — dipakai di kolom Nama Laptop saat row.is_new === true.
 //  Nilai is_new sudah dihitung di pemanggil (LaptopsContent.tsx / ready/page.tsx),
 //  jadi komponen ini murni presentasional, tidak menghitung TTL sendiri.
@@ -103,7 +109,7 @@ const NewBadge = () => (
 
 export default function InventoryTable({
     rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual,
-    onRowClick, renderActions, renderAudit, sortBy, onSort,
+    onRowClick, renderActions, renderAudit, renderSo, sortBy, onSort,
 }: Props) {
     const [localSort, setLocalSort] = useState<{ col: SortKey; dir: "asc" | "desc" } | null>(null);
 
@@ -135,6 +141,7 @@ export default function InventoryTable({
                 case "SIAP": valA = a.siap_jual ?? 0; valB = b.siap_jual ?? 0; break;
                 case "MINUS": valA = a.minus ?? 0; valB = b.minus ?? 0; break;
                 case "AUDIT": valA = a.is_audited ? 1 : 0; valB = b.is_audited ? 1 : 0; break;
+                case "SO": valA = a.is_so_active ? 1 : 0; valB = b.is_so_active ? 1 : 0; break;
                 case "AKSI": valA = a.stok_tersisa ?? 0; valB = b.stok_tersisa ?? 0; break;
             }
 
@@ -183,6 +190,7 @@ export default function InventoryTable({
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
                         <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
+                      {renderSo && <Th center sortKey="SO" activeSort={sortBy} onSort={onSort}>SO</Th>}
                         {renderAudit && <Th center sortKey="AUDIT" activeSort={sortBy} onSort={onSort}>Audit</Th>}
                         {renderActions && <Th right sortKey="AKSI" activeSort={sortBy} onSort={onSort}>Aksi</Th>}
                     </tr>
@@ -314,6 +322,12 @@ export default function InventoryTable({
                                     <span className={`text-sm font-semibold tabular-nums ${row.minus > 0 ? "text-red-500" : "text-gray-200"}`}>
                                         {row.minus > 0 ? `-${row.minus}` : "—"}
                                     </span>
+                                </td>
+                            )}
+
+                          {renderSo && (
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                    {renderSo(row)}
                                 </td>
                             )}
 

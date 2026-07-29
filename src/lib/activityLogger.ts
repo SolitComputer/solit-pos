@@ -6,7 +6,7 @@ const supabaseAdmin = createClient(
 );
 
 // ✅ ADD: "AUDIT" & "UNAUDIT" untuk aksi verifikasi audit di cashflow
-export type LogAction = "CREATE" | "EDIT" | "DELETE" | "RESTORE" | "AUDIT" | "UNAUDIT";
+export type LogAction = "CREATE" | "EDIT" | "DELETE" | "RESTORE" | "AUDIT" | "UNAUDIT" | "SO" | "UNSO";
 
 export type LogEntity =
   | "laptop"
