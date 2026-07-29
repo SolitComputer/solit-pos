@@ -31,7 +31,28 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
             );
         }
 
-        // ── Kembalikan stok sesuai jenis barang ─────────────────────────────
+        // ── Tandai restored DULU (guard is_restored=false) — kalau ini gagal,
+        // proses berhenti SEBELUM stok disentuh, jadi gak ada resiko dobel-nambah ──
+        const { data, error } = await supabase
+            .from("item_outflows")
+            .update({
+                is_restored: true,
+                restored_by: user.name,
+                restored_at: new Date().toISOString(),
+            })
+            .eq("id", id)
+            .eq("is_restored", false)
+            .select()
+            .single();
+
+        if (error || !data) {
+            return NextResponse.json(
+                { success: false, message: error?.message || "Barang ini sudah dikembalikan ke stok" },
+                { status: 400 }
+            );
+        }
+
+        // ── Baru kembalikan stok sesuai jenis barang ────────────────────────
         if (outflow.item_ref_id) {
             if (outflow.item_kind === "ACCESSORY") {
                 const { data: acc } = await supabaseAdmin
@@ -60,24 +81,6 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
                         .eq("id", outflow.item_ref_id);
                 }
             }
-        }
-
-        const { data, error } = await supabase
-            .from("item_outflows")
-            .update({
-                is_restored: true,
-                restored_by: user.name,
-                restored_at: new Date().toISOString(),
-            })
-            .eq("id", id)
-            .select()
-            .single();
-
-        if (error) {
-            return NextResponse.json(
-                { success: false, message: error.message },
-                { status: 400 }
-            );
         }
 
         await logActivity({
