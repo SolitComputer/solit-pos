@@ -61,6 +61,19 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     if (error) throw error;
 
+    // ── Kembalikan stok "Siap Jual" untuk unit ini saja ──
+    // Order tetap jalan (unit lain masih RESERVED), cuma unit yang dibatalkan
+    // ini yang dikembalikan ke SIAP_JUAL. Guard status RESERVED mencegah unit
+    // yang sudah SOLD (race dengan pembayaran) ikut ter-restore.
+    if (target.unit_id) {
+      const { error: restoreError } = await supabase
+        .from("laptop_units")
+        .update({ status: "SIAP_JUAL" })
+        .eq("id", target.unit_id)
+        .eq("status", "DALAM_PENYIAPAN");
+      if (restoreError) throw restoreError;
+    }
+
     await logActivity({
       userId: user.id, userName: user.name, userRole: user.role,
       action: "EDIT", entity: "preparation", entityId: id,
