@@ -271,7 +271,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         const q = search.trim().toLowerCase();
         let result = entries;
 
-       if (q) {
+        if (q) {
             // Angka murni dari query (buang "Rp", titik, koma, spasi) supaya "3.600.000",
             // "Rp3.600.000", atau "3600000" semuanya bisa nemuin baris Debit/Kredit yang cocok.
             const qDigits = q.replace(/[^0-9]/g, "");
@@ -283,7 +283,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                         (l) =>
                             l.account_code.includes(q) ||
                             l.account_name.toLowerCase().includes(q) ||
-                           (qDigits !== "" && String(Math.round(Number(l.nominal))).startsWith(qDigits))
+                            (qDigits !== "" && String(Math.round(Number(l.nominal))).startsWith(qDigits))
                     )
             );
         }
@@ -602,7 +602,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                     <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                       placeholder="Cari keterangan, akun, ref, nominal..."
+                        placeholder="Cari keterangan, akun, ref, nominal..."
                         className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                     />
                 </div>
@@ -932,8 +932,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                         <td className="px-4 py-2 text-center align-bottom">
                                                                             <span
                                                                                 className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${accountCodeFilter.has(line.account_code)
-                                                                                        ? "bg-blue-50 text-blue-700"
-                                                                                        : "text-gray-400"
+                                                                                    ? "bg-blue-50 text-blue-700"
+                                                                                    : "text-gray-400"
                                                                                     }`}
                                                                             >
                                                                                 {line.account_code}
@@ -1067,6 +1067,13 @@ function EntryFormModal({
     onSaved: () => void;
 }) {
     const isEdit = !!entry;
+    // Entry TRANSACTION yang modalnya belum diinput (trx_meta.modal_missing) cuma
+    // menampilkan baris Modal Keluar (440) / HPP (130) sebagai baris SINTETIS Rp0 di
+    // tabel utama (bukan data journal_lines asli). Supaya baris ini bisa diedit/dihapus
+    // nominalnya lewat form, kita ikut sisipkan sebagai baris beneran saat form dibuka.
+    const modalMissing =
+        isEdit && entry!.source_type === "TRANSACTION" && entry!.trx_meta?.modal_missing === true;
+
     const [tanggal, setTanggal] = useState(entry?.tanggal ?? `${period}-01`);
     const [keterangan, setKeterangan] = useState(entry?.keterangan ?? "");
     const [ref, setRef] = useState(entry?.ref ?? "");
@@ -1080,18 +1087,38 @@ function EntryFormModal({
             .catch(() => { });
     }, []);
 
-    const [lines, setLines] = useState<(DraftLine & { _id: string })[]>(
-        entry?.lines.map((l) => ({
+    const [lines, setLines] = useState<(DraftLine & { _id: string })[]>(() => {
+        const baseLines = entry?.lines.map((l) => ({
             account_code: l.account_code,
             side: l.side,
             nominal: Number(l.nominal),
             keterangan: l.keterangan ?? "",
             _id: crypto.randomUUID(),
         })) ?? [
-            { account_code: "110", side: "DEBIT", nominal: 0, keterangan: "", _id: crypto.randomUUID() },
-            { account_code: "410", side: "KREDIT", nominal: 0, keterangan: "", _id: crypto.randomUUID() },
-        ]
-    );
+                { account_code: "110", side: "DEBIT", nominal: 0, keterangan: "", _id: crypto.randomUUID() },
+                { account_code: "410", side: "KREDIT", nominal: 0, keterangan: "", _id: crypto.randomUUID() },
+            ];
+
+        if (!modalMissing) return baseLines;
+
+        return [
+            ...baseLines,
+            {
+                account_code: AKUN.MODAL_KELUAR,
+                side: "DEBIT",
+                nominal: 0,
+                keterangan: "Harga modal belum diinput",
+                _id: crypto.randomUUID(),
+            },
+            {
+                account_code: AKUN.HPP,
+                side: "KREDIT",
+                nominal: 0,
+                keterangan: "",
+                _id: crypto.randomUUID(),
+            },
+        ];
+    });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -1138,7 +1165,7 @@ function EntryFormModal({
                     keterangan: keterangan.trim(),
                     ref: ref.trim() || null,
                     source_category: isEdit ? undefined : template,
-                    lines: lines.filter((l) => Number(l.nominal) > 0).map(({ _id, ...rest }) => rest),
+                    lines: lines.map(({ _id, ...rest }) => rest),
                 }),
             });
             const json = await res.json();

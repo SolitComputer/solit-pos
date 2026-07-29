@@ -65,12 +65,12 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
   for (const l of lines) {
     if (!(await isValidAccountAnywhere(supabaseCheck, l.account_code)))
       return NextResponse.json({ success: false, message: `Akun ${l.account_code} tidak dikenal` }, { status: 400 });
-    if (!Number.isFinite(Number(l.nominal)) || Number(l.nominal) <= 0)
-      return NextResponse.json({ success: false, message: "Nominal harus > 0" }, { status: 400 });
+    if (!Number.isFinite(Number(l.nominal)) || Number(l.nominal) < 0)
+      return NextResponse.json({ success: false, message: "Nominal tidak boleh negatif" }, { status: 400 });
   }
 
   const merged = cleanManualLines(lines);
-   if (!isBalanced(merged))
+  if (!isBalanced(merged))
     return NextResponse.json(
       { success: false, message: "Jurnal tidak balance — total debit harus sama dengan total kredit" },
       { status: 400 }
