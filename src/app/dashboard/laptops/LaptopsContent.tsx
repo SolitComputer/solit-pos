@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import ExcelJS from "exceljs";
 import Link from "next/link";
 import BarcodeModal from "@/components/ui/BarcodeModal";
-import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES } from "@/lib/permissions";
 import { Laptop } from "lucide-react";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
@@ -51,6 +51,8 @@ interface Laptop {
     created_at: string;
     audited_at?: string | null;
     audited_by?: string | null;
+    so_at?: string | null;
+    so_by?: string | null;
     laptop_units?: LaptopUnit[];
 }
 
@@ -79,6 +81,13 @@ const AUDIT_TTL_MS = AUDIT_TTL_DAYS * 24 * 60 * 60 * 1000;
 // Auto-reset via read-time: audit dianggap "aktif" hanya jika belum lewat TTL.
 const isAuditActive = (auditedAt?: string | null) =>
     !!auditedAt && Date.now() - new Date(auditedAt).getTime() < AUDIT_TTL_MS;
+
+// ── SO (Stock Opname) ────────────────────────────────────────────────────────
+// State terpisah total dari Audit — TTL 1 hari (bukan 2 hari seperti Audit).
+const SO_TTL_DAYS = 1;
+const SO_TTL_MS = SO_TTL_DAYS * 24 * 60 * 60 * 1000;
+const isSoActive = (soAt?: string | null) =>
+    !!soAt && Date.now() - new Date(soAt).getTime() < SO_TTL_MS;
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-green-500", label: "Siap Jual" },
@@ -383,6 +392,9 @@ export function LaptopsContent() {
     //  terpisah yang harus diedit bersamaan tiap ada perubahan.
     const canSeePrivateBarang = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canViewTotalStok = canSeePrivateBarang;
+    //  SO (Stock Opname) pakai whitelist sendiri, lebih sempit dari
+    //  canSeePrivateBarang — khusus tim Pengelola Barang saja.
+    const canManageSo = hasAnyRole(userRoles, SO_ROLES);
 
     //  Pop-up Detail unit — dipakai saat stok = 1 (tanpa perlu masuk halaman Units)
     const [unitDetail, setUnitDetail] = useState<{ unit: UnitDetailData; laptop: Laptop } | null>(null);
@@ -394,10 +406,15 @@ export function LaptopsContent() {
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ laptop: Laptop; unitCount: number } | null>(null);
-    //  Audit: id laptop yang lagi diproses (biar tombolnya loading & tidak dobel klik)
+   //  Audit: id laptop yang lagi diproses (biar tombolnya loading & tidak dobel klik)
     const [auditingId, setAuditingId] = useState<string | null>(null);
     //  Riwayat audit — laptop yang sedang dibuka riwayatnya di AuditHistoryModal
     const [historyTarget, setHistoryTarget] = useState<{ id: string; name: string } | null>(null);
+
+    //  SO (Stock Opname): id laptop yang lagi diproses — state terpisah dari Audit
+    const [soingId, setSoingId] = useState<string | null>(null);
+    //  Riwayat SO — laptop yang sedang dibuka riwayatnya di SoHistoryModal
+    const [soHistoryTarget, setSoHistoryTarget] = useState<{ id: string; name: string } | null>(null);
 
     const showAlert = (msg: string) => setAlertModal(msg);
 
@@ -418,6 +435,25 @@ export function LaptopsContent() {
             showAlert(e instanceof Error ? e.message : "Gagal memperbarui audit");
         } finally {
             setAuditingId(null);
+        }
+    };
+
+    //  Toggle SO 1 model laptop — server yang menentukan set/clear, sama pola dgn toggleAudit
+    const toggleSo = async (id: string) => {
+        setSoingId(id);
+        try {
+            const res = await fetch(`/api/laptops/${id}/so`, { method: "PATCH" });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal memperbarui SO");
+            setLaptops(prev => prev.map(l =>
+                l.id === id
+                    ? { ...l, so_at: json.data.so_at, so_by: json.data.so_by }
+                    : l
+            ));
+        } catch (e) {
+            showAlert(e instanceof Error ? e.message : "Gagal memperbarui SO");
+        } finally {
+            setSoingId(null);
         }
     };
 
@@ -789,6 +825,8 @@ export function LaptopsContent() {
             minus: l.stok_minus ?? 0,
             is_audited: isAuditActive(l.audited_at),
             audited_at: l.audited_at ?? null,
+            is_so_active: isSoActive(l.so_at),
+            so_at: l.so_at ?? null,
         };
     }), [filteredLaptops]);
 
@@ -1034,7 +1072,7 @@ export function LaptopsContent() {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (l) handleRowClick(l);
                                 }}
-                                renderAudit={canSeePrivateBarang ? (row) => {
+                               renderAudit={canSeePrivateBarang ? (row) => {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (!l) return null;
                                     return (
@@ -1050,6 +1088,31 @@ export function LaptopsContent() {
                                                 type="button"
                                                 onClick={() => setHistoryTarget({ id: l.id, name: l.laptop_name })}
                                                 title="Lihat riwayat audit"
+                                                className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    );
+                                } : undefined}
+                                renderSo={canManageSo ? (row) => {
+                                    const l = filteredLaptops.find(x => x.id === row.id);
+                                    if (!l) return null;
+                                    return (
+                                        <div className="flex items-center justify-center gap-1">
+                                            <SoButton
+                                                active={isSoActive(l.so_at)}
+                                                loading={soingId === l.id}
+                                                soBy={l.so_by}
+                                                soAt={l.so_at}
+                                                onClick={() => toggleSo(l.id)}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setSoHistoryTarget({ id: l.id, name: l.laptop_name })}
+                                                title="Lihat riwayat SO"
                                                 className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
                                             >
                                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1363,11 +1426,18 @@ export function LaptopsContent() {
             {confirmModal && (
                 <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />
             )}
-            {historyTarget && (
+           {historyTarget && (
                 <AuditHistoryModal
                     laptopId={historyTarget.id}
                     laptopName={historyTarget.name}
                     onClose={() => setHistoryTarget(null)}
+                />
+            )}
+            {soHistoryTarget && (
+                <SoHistoryModal
+                    laptopId={soHistoryTarget.id}
+                    laptopName={soHistoryTarget.name}
+                    onClose={() => setSoHistoryTarget(null)}
                 />
             )}
             {deleteConfirmModal && (
@@ -1539,6 +1609,54 @@ function AuditButton({ active, loading, auditedBy, auditedAt, onClick }: {
     );
 }
 
+//  Tombol SO (Stock Opname) — independen dari Audit. Biru = baru di-SO &
+//  masih dalam masa berlaku (1 hari); abu = belum / sudah auto-reset.
+function SoButton({ active, loading, soBy, soAt, onClick }: {
+    active: boolean; loading: boolean;
+    soBy?: string | null; soAt?: string | null;
+    onClick: () => void;
+}) {
+    const expiredButOnceSo = !active && !!soAt;
+
+    const title = active
+        ? `SO oleh ${soBy ?? "—"}${soAt ? " · " + new Date(soAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}\nKlik untuk batalkan SO`
+        : expiredButOnceSo
+            ? `Terakhir SO oleh ${soBy ?? "—"} · ${new Date(soAt as string).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} (sudah lewat ${SO_TTL_DAYS} hari)\nKlik untuk SO lagi`
+            : "Klik untuk tandai sudah SO";
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={loading}
+            title={title}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition
+                ${loading ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}
+                ${active
+                    ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                    : expiredButOnceSo
+                        ? "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100"
+                        : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}
+        >
+            {active ? (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    SO
+                </>
+            ) : (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" />
+                    </svg>
+                    {expiredButOnceSo ? "SO Ulang" : "SO"}
+                </>
+            )}
+        </button>
+    );
+}
+
 //  Riwayat semua audit sebuah model laptop — dibaca dari tabel laptop_audit_logs
 //  lewat GET /api/laptops/[id]/audit, supaya histori tetap ada walau status
 //  "aktif"-nya sudah auto-reset lewat 2 hari.
@@ -1618,6 +1736,94 @@ function AuditHistoryModal({ laptopId, laptopName, onClose }: {
                         </ul>
                     )}
                 </div>
+               <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose}
+                        className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+interface SoHistoryEntry {
+    id: string;
+    action: "SO" | "UNSO";
+    so_by: string;
+    so_at: string;
+}
+
+//  Riwayat SO — dibaca dari tabel laptop_so_logs lewat GET /api/laptops/[id]/so
+function SoHistoryModal({ laptopId, laptopName, onClose }: {
+    laptopId: string; laptopName: string; onClose: () => void;
+}) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [history, setHistory] = useState<SoHistoryEntry[]>([]);
+
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            try {
+                const res = await fetch(`/api/laptops/${laptopId}/so`);
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat riwayat");
+                if (active) setHistory(json.data?.history ?? []);
+            } catch (e) {
+                if (active) setError(e instanceof Error ? e.message : "Terjadi kesalahan");
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+        return () => { active = false; };
+    }, [laptopId]);
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    const fmtWhen = (iso: string) =>
+        new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn max-h-[80vh] flex flex-col">
+                <div className="h-1 w-full bg-gradient-to-r from-gray-400 via-gray-600 to-gray-800 flex-shrink-0" />
+                <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Riwayat SO (Stock Opname)</p>
+                    <h3 className="text-sm font-bold text-gray-900 truncate">{laptopName}</h3>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    {loading ? (
+                        <div className="space-y-2">
+                            {[...Array(3)].map((_, i) => <div key={i} className="h-10 rounded-xl bg-gray-100 animate-pulse" />)}
+                        </div>
+                    ) : error ? (
+                        <p className="text-sm text-red-600">{error}</p>
+                    ) : history.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-6">Belum pernah di-SO</p>
+                    ) : (
+                        <ul className="space-y-2">
+                            {history.map(h => (
+                                <li key={h.id} className="flex items-start gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+                                    <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${h.action === "SO" ? "bg-blue-500" : "bg-gray-300"}`} />
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-gray-700">
+                                            {h.action === "SO" ? "Ditandai sudah SO" : "SO dibatalkan"}
+                                        </p>
+                                        <p className="text-[11px] text-gray-400 mt-0.5">
+                                            {h.so_by} · {fmtWhen(h.so_at)}
+                                        </p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
                     <button onClick={onClose}
                         className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
@@ -1660,7 +1866,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "CPU", "RAM", "Storage", "Modal Laptop", "Modal Sparepart", "Harga Jual", "Total Jual", "Sumber", "Tanggal Masuk", "SN", "ST", "SJ", "M", "Audit", "Aksi"].map(h => (
+                            {["No", "Nama Laptop", "CPU", "RAM", "Storage", "Modal Laptop", "Modal Sparepart", "Harga Jual", "Total Jual", "Sumber", "Tanggal Masuk", "SN", "ST", "SJ", "M", "SO", "Audit", "Aksi"].map(h => (
                                 <th key={h} className="px-3 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>

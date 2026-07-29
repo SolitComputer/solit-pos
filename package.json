@@ -19,6 +19,8 @@
     "@ducanh2912/next-pwa": "^10.2.9",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^5.2.2",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.2",
     "@supabase/supabase-js": "^2.105.4",
     "@zxing/browser": "^0.2.0",
     "@zxing/library": "^0.22.0",

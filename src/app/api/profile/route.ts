@@ -16,7 +16,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     const { data, error } = await supabase
         .from("users")
-        .select("id, name, role, roles, shift, bio, profile_photo_url, photo_updated_at, bio_created_at, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start").eq("id", targetId)
+        .select("id, name, role, roles, shift, bio, profile_photo_url, photo_updated_at, banner_url, banner_updated_at, bio_created_at, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start").eq("id", targetId)
         .maybeSingle();
 
     if (error) {

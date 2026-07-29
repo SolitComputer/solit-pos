@@ -223,7 +223,7 @@ export function totalOf(lines: DraftLine[]): number {
 export function isBalanced(lines: DraftLine[]): boolean {
   const d = sumSide(lines, "DEBIT");
   const k = sumSide(lines, "KREDIT");
-  return d > 0 && d === k;
+  return d === k;
 }
 
 /** Gabung baris dengan akun + side yang sama supaya jurnal rapi */
@@ -239,11 +239,10 @@ export function mergeLines(lines: DraftLine[]): DraftLine[] {
   return Array.from(map.values());
 }
 
-/** Bersihkan baris jurnal MANUAL tanpa menggabungkan akun+side yang sama.
- *  Beda dengan mergeLines(): di jurnal manual, 2 baris dengan akun & side yang
- *  sama tetap 2 transaksi terpisah — tidak boleh dijumlahkan jadi satu baris. */
 export function cleanManualLines(lines: DraftLine[]): DraftLine[] {
-  return lines.filter((l) => Number(l.nominal) > 0).map((l) => ({ ...l }));
+  // Nominal 0 kini valid (baris modal yang sengaja dikonfirmasi Rp0, atau baris
+  // manual yang belum diisi) — cuma buang yang nilainya tidak valid/negatif.
+  return lines.filter((l) => Number.isFinite(Number(l.nominal)) && Number(l.nominal) >= 0).map((l) => ({ ...l }));
 }
 
 // ─── Template jurnal manual ───────────────────────────────────────────────────
