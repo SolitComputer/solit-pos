@@ -647,6 +647,175 @@ export default function ProfileView({ userId }: { userId: string }) {
                         ) : null}
                     </div>
 
+                    {/* ── Lagu Favorit — dipindah ke atas, sejajar dengan catatan ─────── */}
+                    <div className="mt-4 rounded-2xl p-3.5 sm:p-4" style={{ background: "#f8fafc", border: "1px solid #eef2f7" }}>
+                        <div className="flex items-center gap-1.5 mb-3">
+                            <Music className="w-4 h-4" style={{ color: "#1db954" }} />
+                            <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>
+                                {isSelf ? "Lagu Favorit" : `Lagu Favorit ${profile.name.split(" ")[0]}`}
+                            </p>
+                        </div>
+
+                        {profile.song_title ? (
+                            <div className="flex items-center gap-3">
+                                <button onClick={togglePreview} disabled={!profile.song_preview_url}
+                                    className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden flex-shrink-0 shadow-md disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
+                                    style={{ animation: playingPreview ? "solitSongSpin 3s linear infinite" : "none" }}>
+                                    {profile.song_artwork_url
+                                        ? <img src={profile.song_artwork_url} alt={profile.song_title} className="w-full h-full object-cover" />
+                                        : (
+                                            <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,#1db954,#159c46)" }}>
+                                                <Music className="w-5 h-5 text-white" />
+                                            </div>
+                                        )}
+                                    <div className="absolute inset-0 rounded-full" style={{ boxShadow: "inset 0 0 0 3px rgba(255,255,255,0.85)" }} />
+                                    <div className="absolute rounded-full bg-white" style={{ inset: "38%" }} />
+                                </button>
+
+                                <div className="flex-1 min-w-0 rounded-full pl-4 pr-1.5 py-1.5 flex items-center justify-between gap-2"
+                                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                                    <div className="min-w-0 overflow-hidden">
+                                        <p className="text-xs font-bold text-white truncate">{profile.song_title}</p>
+                                        <p className="text-[10.5px] truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
+                                            {profile.song_artist}
+                                            {profile.song_expires_at && ` · ${noteTimeLeft(profile.song_expires_at)}`}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                        {profile.song_preview_url && (
+                                            <button onClick={togglePreview}
+                                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                                                style={{ background: "rgba(255,255,255,0.15)" }}>
+                                                {playingPreview ? <Pause className="w-3.5 h-3.5 text-white" /> : <Play className="w-3.5 h-3.5 text-white ml-0.5" />}
+                                            </button>
+                                        )}
+                                        {(isSelf || isAdmin) && (
+                                            <button onClick={handleRemoveSong} disabled={removingSong} title={isSelf ? "Hapus lagu" : `Hapus lagu ${profile.name}`}
+                                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                                                style={{ background: "rgba(255,255,255,0.15)" }}>
+                                                {removingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin text-white" /> : <X className="w-3.5 h-3.5 text-white" />}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {profile.song_preview_url && (
+                                    <audio ref={audioRef} src={profile.song_preview_url} onEnded={() => setPlayingPreview(false)} onTimeUpdate={handleMainTimeUpdate} />
+                                )}
+                            </div>
+                        ) : isSelf ? (
+                            !showSongSearch ? (
+                                <button onClick={() => setShowSongSearch(true)}
+                                    className="w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+                                    style={{ background: "#ffffff", color: "#64748b", border: "1px dashed #cbd5e1" }}>
+                                    <Music className="w-4 h-4" /> Tambahkan lagu
+                                </button>
+                            ) : pendingSong ? (
+                                <div className="space-y-3 p-3 rounded-2xl border border-slate-100" style={{ background: "#fafafa" }}>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
+                                            {pendingSong.artworkUrl && <img src={pendingSong.artworkUrl} alt={pendingSong.trackName} className="w-full h-full object-cover" />}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>{pendingSong.trackName}</p>
+                                            <p className="text-xs truncate" style={{ color: "#94a3b8" }}>{pendingSong.artistName}</p>
+                                        </div>
+                                        {pendingSong.previewUrl && (
+                                            <button onClick={toggleCropPlay}
+                                                className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
+                                                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                                                {cropPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {pendingSong.previewUrl ? (
+                                        <div>
+                                            <p className="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "#94a3b8" }}>
+                                                Pilih potongan {CLIP_LENGTH} detik yang ditampilkan
+                                            </p>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={Math.max(0, Math.floor(clipDuration - CLIP_LENGTH))}
+                                                value={clipStart}
+                                                onChange={(e) => handleCropSliderChange(Number(e.target.value))}
+                                                className="w-full accent-violet-600"
+                                            />
+                                            <div className="flex justify-between text-[9px] mt-1" style={{ color: "#cbd5e1" }}>
+                                                <span>0:{String(Math.floor(clipStart)).padStart(2, "0")}</span>
+                                                <span>0:{String(Math.min(Math.floor(clipDuration), Math.floor(clipStart + CLIP_LENGTH))).padStart(2, "0")}</span>
+                                            </div>
+                                            <audio
+                                                ref={cropAudioRef}
+                                                src={pendingSong.previewUrl}
+                                                onLoadedMetadata={(e) => setClipDuration(e.currentTarget.duration || 30)}
+                                                onTimeUpdate={handleCropTimeUpdate}
+                                                onEnded={() => setCropPlaying(false)}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <p className="text-[10.5px] italic" style={{ color: "#cbd5e1" }}>Preview audio tidak tersedia untuk lagu ini</p>
+                                    )}
+
+                                    <div className="flex gap-2">
+                                        <button onClick={handleCancelCrop}
+                                            className="flex-1 h-9 sm:h-10 rounded-xl text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300" style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                            Batal
+                                        </button>
+                                        <button onClick={handleConfirmSong} disabled={savingSong}
+                                            className="flex-1 h-9 sm:h-10 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
+                                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                                            {savingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Gunakan Potongan Ini
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+                                        <input value={songQuery} onChange={(e) => setSongQuery(e.target.value)} autoFocus
+                                            placeholder="Cari judul lagu atau artis..."
+                                            className="w-full h-10 rounded-xl pl-9 pr-8 text-sm border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                                            style={{ borderColor: "#e2e8f0", background: "#ffffff", color: "#334155" }} />
+                                        <button onClick={() => { setShowSongSearch(false); setSongQuery(""); setSongResults([]); }}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                                            <X className="w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+                                        </button>
+                                    </div>
+                                    {searchingSong && (
+                                        <p className="text-xs text-slate-400 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Mencari...</p>
+                                    )}
+                                    {songResults.length > 0 && (
+                                        <div className="max-h-56 overflow-y-auto space-y-1 rounded-xl border border-slate-100 p-1.5 bg-white">
+                                            {songResults.map((song) => (
+                                                <button key={song.trackId} onClick={() => handlePickSearchResult(song)}
+                                                    className="w-full flex items-center gap-2.5 p-1.5 rounded-lg text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
+                                                    <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100">
+                                                        {song.artworkUrl && <img src={song.artworkUrl} alt={song.trackName} className="w-full h-full object-cover" />}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-xs font-semibold truncate" style={{ color: "#0f172a" }}>{song.trackName}</p>
+                                                        <p className="text-[10.5px] truncate" style={{ color: "#94a3b8" }}>{song.artistName}</p>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        ) : (
+                            <p className="text-xs italic" style={{ color: "#cbd5e1" }}>Belum ada lagu favorit</p>
+                        )}
+
+                        <style jsx>{`
+                            @keyframes solitSongSpin {
+                                from { transform: rotate(0deg); }
+                                to   { transform: rotate(360deg); }
+                            }
+                        `}</style>
+                    </div>
+
                     <div className="mt-4">
                         {editingBio ? (
                             <div className="space-y-2">
@@ -688,174 +857,6 @@ export default function ProfileView({ userId }: { userId: string }) {
                         )}
                     </div>
                 </div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-4 sm:p-5 lg:p-6 border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                <div className="flex items-center gap-1.5 mb-3">
-                    <Music className="w-4 h-4" style={{ color: "#1db954" }} />
-                    <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>
-                        {isSelf ? "Lagu Favorit" : `Lagu Favorit ${profile.name.split(" ")[0]}`}
-                    </p>
-                </div>
-
-                {profile.song_title ? (
-                    <div className="flex items-center gap-3">
-                        <button onClick={togglePreview} disabled={!profile.song_preview_url}
-                            className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden flex-shrink-0 shadow-md disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                            style={{ animation: playingPreview ? "solitSongSpin 3s linear infinite" : "none" }}>
-                            {profile.song_artwork_url
-                                ? <img src={profile.song_artwork_url} alt={profile.song_title} className="w-full h-full object-cover" />
-                                : (
-                                    <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,#1db954,#159c46)" }}>
-                                        <Music className="w-5 h-5 text-white" />
-                                    </div>
-                                )}
-                            <div className="absolute inset-0 rounded-full" style={{ boxShadow: "inset 0 0 0 3px rgba(255,255,255,0.85)" }} />
-                            <div className="absolute rounded-full bg-white" style={{ inset: "38%" }} />
-                        </button>
-
-                        <div className="flex-1 min-w-0 rounded-full pl-4 pr-1.5 py-1.5 flex items-center justify-between gap-2"
-                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                            <div className="min-w-0 overflow-hidden">
-                                <p className="text-xs font-bold text-white truncate">{profile.song_title}</p>
-                                <p className="text-[10.5px] truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
-                                    {profile.song_artist}
-                                    {profile.song_expires_at && ` · ${noteTimeLeft(profile.song_expires_at)}`}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                                {profile.song_preview_url && (
-                                    <button onClick={togglePreview}
-                                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-                                        style={{ background: "rgba(255,255,255,0.15)" }}>
-                                        {playingPreview ? <Pause className="w-3.5 h-3.5 text-white" /> : <Play className="w-3.5 h-3.5 text-white ml-0.5" />}
-                                    </button>
-                                )}
-                                {(isSelf || isAdmin) && (
-                                    <button onClick={handleRemoveSong} disabled={removingSong} title={isSelf ? "Hapus lagu" : `Hapus lagu ${profile.name}`}
-                                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-                                        style={{ background: "rgba(255,255,255,0.15)" }}>
-                                        {removingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin text-white" /> : <X className="w-3.5 h-3.5 text-white" />}
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {profile.song_preview_url && (
-                            <audio ref={audioRef} src={profile.song_preview_url} onEnded={() => setPlayingPreview(false)} onTimeUpdate={handleMainTimeUpdate} />
-                        )}
-                    </div>
-                ) : isSelf ? (
-                    !showSongSearch ? (
-                        <button onClick={() => setShowSongSearch(true)}
-                            className="w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
-                            style={{ background: "#f8fafc", color: "#64748b", border: "1px dashed #cbd5e1" }}>
-                            <Music className="w-4 h-4" /> Tambahkan lagu
-                        </button>
-                    ) : pendingSong ? (
-                        <div className="space-y-3 p-3 rounded-2xl border border-slate-100" style={{ background: "#fafafa" }}>
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
-                                    {pendingSong.artworkUrl && <img src={pendingSong.artworkUrl} alt={pendingSong.trackName} className="w-full h-full object-cover" />}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>{pendingSong.trackName}</p>
-                                    <p className="text-xs truncate" style={{ color: "#94a3b8" }}>{pendingSong.artistName}</p>
-                                </div>
-                                {pendingSong.previewUrl && (
-                                    <button onClick={toggleCropPlay}
-                                        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                                        style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                                        {cropPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
-                                    </button>
-                                )}
-                            </div>
-
-                            {pendingSong.previewUrl ? (
-                                <div>
-                                    <p className="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "#94a3b8" }}>
-                                        Pilih potongan {CLIP_LENGTH} detik yang ditampilkan
-                                    </p>
-                                    <input
-                                        type="range"
-                                        min={0}
-                                        max={Math.max(0, Math.floor(clipDuration - CLIP_LENGTH))}
-                                        value={clipStart}
-                                        onChange={(e) => handleCropSliderChange(Number(e.target.value))}
-                                        className="w-full accent-violet-600"
-                                    />
-                                    <div className="flex justify-between text-[9px] mt-1" style={{ color: "#cbd5e1" }}>
-                                        <span>0:{String(Math.floor(clipStart)).padStart(2, "0")}</span>
-                                        <span>0:{String(Math.min(Math.floor(clipDuration), Math.floor(clipStart + CLIP_LENGTH))).padStart(2, "0")}</span>
-                                    </div>
-                                    <audio
-                                        ref={cropAudioRef}
-                                        src={pendingSong.previewUrl}
-                                        onLoadedMetadata={(e) => setClipDuration(e.currentTarget.duration || 30)}
-                                        onTimeUpdate={handleCropTimeUpdate}
-                                        onEnded={() => setCropPlaying(false)}
-                                    />
-                                </div>
-                            ) : (
-                                <p className="text-[10.5px] italic" style={{ color: "#cbd5e1" }}>Preview audio tidak tersedia untuk lagu ini</p>
-                            )}
-
-                            <div className="flex gap-2">
-                                <button onClick={handleCancelCrop}
-                                    className="flex-1 h-9 sm:h-10 rounded-xl text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300" style={{ background: "#f1f5f9", color: "#64748b" }}>
-                                    Batal
-                                </button>
-                                <button onClick={handleConfirmSong} disabled={savingSong}
-                                    className="flex-1 h-9 sm:h-10 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                                    {savingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Gunakan Potongan Ini
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
-                                <input value={songQuery} onChange={(e) => setSongQuery(e.target.value)} autoFocus
-                                    placeholder="Cari judul lagu atau artis..."
-                                    className="w-full h-10 rounded-xl pl-9 pr-8 text-sm border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                                    style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#334155" }} />
-                                <button onClick={() => { setShowSongSearch(false); setSongQuery(""); setSongResults([]); }}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                                    <X className="w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
-                                </button>
-                            </div>
-                            {searchingSong && (
-                                <p className="text-xs text-slate-400 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Mencari...</p>
-                            )}
-                            {songResults.length > 0 && (
-                                <div className="max-h-56 overflow-y-auto space-y-1 rounded-xl border border-slate-100 p-1.5">
-                                    {songResults.map((song) => (
-                                        <button key={song.trackId} onClick={() => handlePickSearchResult(song)}
-                                            className="w-full flex items-center gap-2.5 p-1.5 rounded-lg text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
-                                            <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100">
-                                                {song.artworkUrl && <img src={song.artworkUrl} alt={song.trackName} className="w-full h-full object-cover" />}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="text-xs font-semibold truncate" style={{ color: "#0f172a" }}>{song.trackName}</p>
-                                                <p className="text-[10.5px] truncate" style={{ color: "#94a3b8" }}>{song.artistName}</p>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )
-                ) : (
-                    <p className="text-xs italic" style={{ color: "#cbd5e1" }}>Belum ada lagu favorit</p>
-                )}
-
-                <style jsx>{`
-                    @keyframes solitSongSpin {
-                        from { transform: rotate(0deg); }
-                        to   { transform: rotate(360deg); }
-                    }
-                `}</style>
             </div>
 
             {achievements && (
