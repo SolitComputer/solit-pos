@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import { useChatContext } from "@/contexts/ChatContext";
 import { humanizeRoleKey } from "@/lib/permissions";
-import { Search, MessageCircle, Music, Play, Pause, X, Plus } from "lucide-react";
+import { Search, MessageCircle, Music, Play, Pause, X, Plus, Eye } from "lucide-react";
 
 interface SocialUser {
     id: string;
@@ -127,11 +127,19 @@ export default function SocialFeed() {
                     </div>
                 </div>
 
-                {/* ── Notes bar ─────────────────────────────────────────────────── */}
-                <div className="bg-white rounded-2xl border border-slate-100 py-4 px-1" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                    <div className="flex gap-4 lg:gap-6 overflow-x-auto px-3 lg:px-5 pb-1 scrollbar-hide">
+
+                <div className="bg-white rounded-2xl border border-slate-100 pb-4 px-1" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto pt-9 sm:pt-10 px-3 lg:px-5 pb-1 snap-x snap-mandatory scrollbar-hide">
                         {myUser && (
-                            <StoryBubble user={myUser} isSelf onClick={() => router.push("/dashboard/profile")} />
+                            <StoryBubble
+                                user={myUser}
+                                isSelf
+                                onClick={() =>
+                                    hasActiveStory(myUser)
+                                        ? setViewingUser(myUser)
+                                        : router.push("/dashboard/profile")
+                                }
+                            />
                         )}
                         {loading && !myUser && (
                             <div className="w-16 h-16 rounded-full bg-slate-100 animate-pulse flex-shrink-0" />
@@ -222,6 +230,7 @@ export default function SocialFeed() {
             {viewingUser && (
                 <StoryModal
                     user={viewingUser}
+                    isSelf={me?.id === viewingUser.id}
                     onClose={() => setViewingUser(null)}
                     onChat={() => { handleChat(viewingUser); setViewingUser(null); }}
                 />
@@ -237,44 +246,55 @@ export default function SocialFeed() {
 
 function StoryBubble({ user, isSelf, onClick }: { user: SocialUser; isSelf?: boolean; onClick: () => void }) {
     const active = hasActiveStory(user);
+    const hasNote = !!user.status_note;
+    const hasSong = !!user.song_title;
+
     return (
-        <button onClick={onClick} className="flex flex-col items-center gap-1.5 flex-shrink-0 w-16 group">
-            {/* minHeight dicadangkan buat 2 baris pill (catatan + lagu) + avatar,
-                 supaya avatar SELALU nempel di bawah dan tidak pernah tertutup */}
-            <div className="flex flex-col items-center justify-end" style={{ minHeight: 112 }}>
-                {(user.status_note || user.song_title) && (
-                    <div className="flex flex-col items-center gap-0.5 mb-2 max-w-[110px]">
-                        {user.status_note && (
-                            <div className="px-2 py-1 rounded-xl text-[8.5px] font-semibold truncate shadow-sm bg-white border border-slate-100 text-slate-600 max-w-full">
-                                {user.status_note}
-                            </div>
-                        )}
-                        {user.song_title && (
-                            <div className="px-2 py-1 rounded-xl text-[8.5px] font-semibold truncate shadow-sm bg-white border border-slate-100 text-slate-600 max-w-full flex items-center gap-1">
-                                <Music className="w-2.5 h-2.5 flex-shrink-0" style={{ color: "#1db954" }} />
-                                <span className="truncate">{user.song_title}</span>
-                            </div>
-                        )}
+        <button onClick={onClick} className="relative flex flex-col items-center gap-2 flex-shrink-0 w-20 snap-start group">
+            <div className="relative">
+                {/* Sticker gelap menumpuk di atas foto — gaya Instagram Music/Notes.
+                     Sekarang SATU kotak (bukan dua kotak terpisah): lagu selalu di baris
+                     atas, catatan di baris bawah, dipisah garis tipis kalau dua-duanya ada.
+                     Lebar dikunci w-20 (80px) supaya tidak pernah nyerempet ke bubble tetangga. */}
+                {(hasNote || hasSong) && (
+                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20 w-20">
+                        <div className="rounded-2xl shadow-lg overflow-hidden" style={{ background: "rgba(15,15,20,0.9)" }}>
+                            {hasSong && (
+                                <div className="px-2 py-1 text-left">
+                                    <div className="flex items-center gap-1">
+                                        <Music className="w-2.5 h-2.5 flex-shrink-0" style={{ color: "#1db954" }} />
+                                        <span className="text-[8.5px] font-bold text-white truncate">{user.song_title}</span>
+                                    </div>
+                                    <p className="text-[7.5px] truncate" style={{ color: "rgba(255,255,255,0.6)" }}>{user.song_artist}</p>
+                                </div>
+                            )}
+                            {hasNote && (
+                                <div
+                                    className="px-2 py-1 text-center"
+                                    style={hasSong ? { borderTop: "1px solid rgba(255,255,255,0.12)" } : undefined}
+                                >
+                                    <p className="text-[8.5px] font-semibold text-white truncate">{user.status_note}</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
-                <div className="relative flex-shrink-0">
-                    <div
-                        className="w-16 h-16 rounded-full p-[2.5px] transition-transform group-active:scale-95"
-                        style={{ background: active ? "linear-gradient(135deg, #f59e0b, #ec4899, #8b5cf6)" : "#e2e8f0" }}
-                    >
-                        <div className="w-full h-full rounded-full border-2 border-white overflow-hidden flex items-center justify-center text-white text-lg font-black"
-                            style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
-                            {user.profile_photo_url
-                                ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
-                                : getInitials(user.name)}
-                        </div>
+                <div
+                    className="w-16 h-16 mx-auto rounded-full p-[2.5px] transition-transform group-active:scale-95"
+                    style={{ background: active ? "linear-gradient(135deg, #f59e0b, #ec4899, #8b5cf6)" : "#e2e8f0" }}
+                >
+                    <div className="w-full h-full rounded-full border-2 border-white overflow-hidden flex items-center justify-center text-white text-lg font-black"
+                        style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                        {user.profile_photo_url
+                            ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
+                            : getInitials(user.name)}
                     </div>
-                    {isSelf && !active && (
-                        <div className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center border-2 border-white">
-                            <Plus className="w-3 h-3" />
-                        </div>
-                    )}
                 </div>
+                {isSelf && !active && (
+                    <div className="absolute bottom-0 right-1 w-5 h-5 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center border-2 border-white">
+                        <Plus className="w-3 h-3" />
+                    </div>
+                )}
             </div>
             <p className="text-[10.5px] font-semibold text-slate-600 truncate w-full text-center">
                 {isSelf ? "Catatan Anda" : user.name.split(" ")[0]}
@@ -283,9 +303,11 @@ function StoryBubble({ user, isSelf, onClick }: { user: SocialUser; isSelf?: boo
     );
 }
 
-function StoryModal({ user, onClose, onChat }: { user: SocialUser; onClose: () => void; onChat: () => void }) {
+function StoryModal({ user, isSelf, onClose, onChat }: { user: SocialUser; isSelf?: boolean; onClose: () => void; onChat: () => void }) {
     const [playing, setPlaying] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
+    const [viewers, setViewers] = useState<{ id: string; name: string; profile_photo_url: string | null; viewed_at: string }[]>([]);
+    const [showViewers, setShowViewers] = useState(false);
 
     useEffect(() => {
         if (user.song_preview_url && audioRef.current) {
@@ -296,15 +318,25 @@ function StoryModal({ user, onClose, onChat }: { user: SocialUser; onClose: () =
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user.id]);
 
-    // Catat bahwa user ini sudah melihat catatan/lagu milik pemiliknya
+    // Catat bahwa user LAIN sudah melihat catatan/lagu kita — dilewati untuk cerita sendiri
     useEffect(() => {
+        if (isSelf) return;
         fetch("/api/profile/note/views", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ owner_id: user.id }),
         }).catch(() => { });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user.id]);
+    }, [user.id, isSelf]);
+
+    // Kalau ini catatan/lagu milik sendiri — ambil daftar siapa saja yang sudah melihat
+    useEffect(() => {
+        if (!isSelf) { setViewers([]); return; }
+        fetch(`/api/profile/note/views?ownerId=${user.id}`)
+            .then((r) => r.json())
+            .then((d) => { if (d.success) setViewers(d.data); })
+            .catch(() => { });
+    }, [isSelf, user.id]);
 
     const handleTimeUpdate = () => {
         const audio = audioRef.current;
@@ -386,11 +418,42 @@ function StoryModal({ user, onClose, onChat }: { user: SocialUser; onClose: () =
                         </div>
                     )}
 
-                    <button onClick={onChat}
-                        className="w-full h-11 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2"
-                        style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                        <MessageCircle className="w-4 h-4" /> Chat dengan {user.name.split(" ")[0]}
-                    </button>
+                    {isSelf && (
+                        <div>
+                            <button onClick={() => setShowViewers((v) => !v)}
+                                className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors">
+                                <Eye className="w-3.5 h-3.5" />
+                                {viewers.length > 0 ? `Dilihat ${viewers.length} orang` : "Belum ada yang melihat"}
+                            </button>
+                            {showViewers && (
+                                <div className="mt-2 max-h-40 overflow-y-auto space-y-1 rounded-xl border border-slate-100 p-1.5">
+                                    {viewers.length === 0 ? (
+                                        <p className="text-xs text-slate-400 italic text-center py-3">Belum ada yang melihat</p>
+                                    ) : (
+                                        viewers.map((v) => (
+                                            <div key={v.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50">
+                                                <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-white text-[10px] font-black"
+                                                    style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                                                    {v.profile_photo_url
+                                                        ? <img src={v.profile_photo_url} alt={v.name} className="w-full h-full object-cover" />
+                                                        : getInitials(v.name)}
+                                                </div>
+                                                <p className="text-xs font-semibold text-slate-700 truncate flex-1">{v.name}</p>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {!isSelf && (
+                        <button onClick={onChat}
+                            className="w-full h-11 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                            <MessageCircle className="w-4 h-4" /> Chat dengan {user.name.split(" ")[0]}
+                        </button>
+                    )}
                 </div>
             </div>
 
