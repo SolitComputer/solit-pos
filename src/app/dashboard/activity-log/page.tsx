@@ -19,24 +19,24 @@ type Log = {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ACTION_STYLE: Record<string, string> = {
-    CREATE:  "bg-emerald-50 text-emerald-700 border-emerald-200",
-    EDIT:    "bg-blue-50 text-blue-700 border-blue-200",
-    DELETE:  "bg-red-50 text-red-700 border-red-200",
+    CREATE: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    EDIT: "bg-blue-50 text-blue-700 border-blue-200",
+    DELETE: "bg-red-50 text-red-700 border-red-200",
     RESTORE: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
 // Warna hex murni dipakai untuk efek glow pada titik timeline (LED indicator)
 const ACTION_HEX: Record<string, string> = {
-    CREATE:  "#10b981",
-    EDIT:    "#3b82f6",
-    DELETE:  "#ef4444",
+    CREATE: "#10b981",
+    EDIT: "#3b82f6",
+    DELETE: "#ef4444",
     RESTORE: "#f59e0b",
 };
 
 const ACTION_BORDER_EXPANDED: Record<string, string> = {
-    CREATE:  "border-emerald-200",
-    EDIT:    "border-blue-200",
-    DELETE:  "border-red-200",
+    CREATE: "border-emerald-200",
+    EDIT: "border-blue-200",
+    DELETE: "border-red-200",
     RESTORE: "border-amber-200",
 };
 
@@ -65,17 +65,17 @@ const ACTION_ICON: Record<string, React.ReactNode> = {
 };
 
 const ACTION_VERB: Record<string, string> = {
-    CREATE:  "Menambahkan",
-    EDIT:    "Mengubah",
-    DELETE:  "Menghapus",
+    CREATE: "Menambahkan",
+    EDIT: "Mengubah",
+    DELETE: "Menghapus",
     RESTORE: "Memulihkan",
 };
 
 const ENTITY_LABEL: Record<string, string> = {
-    laptop:      "Laptop",
-    unit:        "Unit",
+    laptop: "Laptop",
+    unit: "Unit",
     transaction: "Transaksi",
-    warranty:    "Garansi",
+    warranty: "Garansi",
 };
 
 const ENTITY_ICON: Record<string, React.ReactNode> = {
@@ -106,18 +106,18 @@ const ENTITY_ICON: Record<string, React.ReactNode> = {
 };
 
 const ENTITY_FILTER_OPTIONS = [
-    { value: "",            label: "Semua Entitas" },
-    { value: "laptop",      label: "Laptop" },
-    { value: "unit",        label: "Unit" },
+    { value: "", label: "Semua Entitas" },
+    { value: "laptop", label: "Laptop" },
+    { value: "unit", label: "Unit" },
     { value: "transaction", label: "Transaksi" },
-    { value: "warranty",    label: "Garansi" },
+    { value: "warranty", label: "Garansi" },
 ];
 
 const ACTION_FILTER_OPTIONS = [
-    { value: "",        label: "Semua Aksi" },
-    { value: "CREATE",  label: "Tambah" },
-    { value: "EDIT",    label: "Edit" },
-    { value: "DELETE",  label: "Hapus" },
+    { value: "", label: "Semua Aksi" },
+    { value: "CREATE", label: "Tambah" },
+    { value: "EDIT", label: "Edit" },
+    { value: "DELETE", label: "Hapus" },
     { value: "RESTORE", label: "Kembalikan" },
 ];
 
@@ -148,23 +148,23 @@ function formatDate(iso: string) {
 
 function formatRelativeTime(iso: string) {
     const diff = Date.now() - new Date(iso).getTime();
-    const mins  = Math.floor(diff / 60000);
+    const mins = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
-    const days  = Math.floor(diff / 86400000);
-    if (mins < 1)   return "Baru saja";
-    if (mins < 60)  return `${mins}m lalu`;
+    const days = Math.floor(diff / 86400000);
+    if (mins < 1) return "Baru saja";
+    if (mins < 60) return `${mins}m lalu`;
     if (hours < 24) return `${hours}j lalu`;
     if (days === 1) return "Kemarin";
-    if (days < 7)   return `${days}h lalu`;
+    if (days < 7) return `${days}h lalu`;
     return formatDate(iso);
 }
 
 function formatDayLabel(iso: string): string {
-    const d         = new Date(iso);
-    const today     = new Date();
+    const d = new Date(iso);
+    const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    if (d.toDateString() === today.toDateString())     return "Hari ini";
+    if (d.toDateString() === today.toDateString()) return "Hari ini";
     if (d.toDateString() === yesterday.toDateString()) return "Kemarin";
     return new Intl.DateTimeFormat("id-ID", {
         weekday: "long", day: "numeric", month: "long",
@@ -175,7 +175,7 @@ function diffKeys(before: Record<string, any> | null, after: Record<string, any>
     const skip = ["id", "created_at", "updated_at", "last_edited_at"];
     const keys = Array.from(new Set([
         ...Object.keys(before ?? {}),
-        ...Object.keys(after  ?? {}),
+        ...Object.keys(after ?? {}),
     ]));
     return keys.filter((k) => {
         if (skip.includes(k)) return false;
@@ -259,11 +259,10 @@ function LogCard({
                 }}
             />
 
-            <div className={`bg-white rounded-2xl transition-all duration-200 overflow-hidden border ${
-                isExpanded
-                    ? (ACTION_BORDER_EXPANDED[log.action] ?? "border-gray-200")
-                    : "hover:shadow-md"
-            }`}
+            <div className={`bg-white rounded-2xl transition-all duration-200 overflow-hidden border ${isExpanded
+                ? (ACTION_BORDER_EXPANDED[log.action] ?? "border-gray-200")
+                : "hover:shadow-md"
+                }`}
                 style={!isExpanded ? { borderColor: "#f0f0f8" } : undefined}>
                 <div className="p-4 sm:p-5">
 
@@ -426,22 +425,24 @@ function FilterChips({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ActivityLogPage() {
-    const [logs, setLogs]                       = useState<Log[]>([]);
-    const [total, setTotal]                     = useState(0);
-    const [page, setPage]                       = useState(1);
-    const [loading, setLoading]                 = useState(true);
-    const [expanded, setExpanded]               = useState<string | null>(null);
-    const [filterEntity, setFilterEntity]       = useState("");
-    const [filterAction, setFilterAction]       = useState("");
+    const [logs, setLogs] = useState<Log[]>([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(true);
+    const [expanded, setExpanded] = useState<string | null>(null);
+    const [filterEntity, setFilterEntity] = useState("");
+    const [filterAction, setFilterAction] = useState("");
+    const [filterDateFrom, setFilterDateFrom] = useState("");
+    const [filterDateTo, setFilterDateTo] = useState("");
     const [showMobileFilters, setShowMobileFilters] = useState(false);
-    const [searchName, setSearchName]           = useState("");
+    const [searchName, setSearchName] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const limit      = 20;
+    const limit = 20;
     const totalPages = Math.ceil(total / limit);
-    const hasFilters = filterEntity !== "" || filterAction !== "" || debouncedSearch !== "";
-    const activeFilterCount = [filterEntity, filterAction, debouncedSearch].filter(Boolean).length;
+    const hasFilters = filterEntity !== "" || filterAction !== "" || debouncedSearch !== "" || filterDateFrom !== "" || filterDateTo !== "";
+    const activeFilterCount = [filterEntity, filterAction, debouncedSearch, filterDateFrom, filterDateTo].filter(Boolean).length;
 
     // Debounce search 400ms
     useEffect(() => {
@@ -456,27 +457,29 @@ export default function ActivityLogPage() {
     const fetchLogs = async () => {
         setLoading(true);
         const params = new URLSearchParams({
-            page:  String(page),
+            page: String(page),
             limit: String(limit),
-            ...(filterEntity    ? { entity:    filterEntity    } : {}),
-            ...(filterAction    ? { action:    filterAction    } : {}),
+            ...(filterEntity ? { entity: filterEntity } : {}),
+            ...(filterAction ? { action: filterAction } : {}),
             ...(debouncedSearch ? { user_name: debouncedSearch } : {}),
+            ...(filterDateFrom ? { date_from: filterDateFrom } : {}),
+            ...(filterDateTo ? { date_to: filterDateTo } : {}),
         });
-        const res  = await fetch(`/api/activity-logs?${params}`);
+        const res = await fetch(`/api/activity-logs?${params}`);
         const data = await res.json();
         setLogs(data.logs ?? []);
         setTotal(data.total ?? 0);
         setLoading(false);
     };
 
-    useEffect(() => { fetchLogs(); }, [page, filterEntity, filterAction, debouncedSearch]);
-    useEffect(() => { setPage(1); }, [filterEntity, filterAction]);
+    useEffect(() => { fetchLogs(); }, [page, filterEntity, filterAction, debouncedSearch, filterDateFrom, filterDateTo]);
+    useEffect(() => { setPage(1); }, [filterEntity, filterAction, filterDateFrom, filterDateTo]);
 
     // ── Group logs by day label ──────────────────────────────────────────────
     const groupedLogs: Array<{ dayLabel: string; items: Log[] }> = [];
     logs.forEach((log) => {
         const label = formatDayLabel(log.created_at);
-        const last  = groupedLogs[groupedLogs.length - 1];
+        const last = groupedLogs[groupedLogs.length - 1];
         if (last && last.dayLabel === label) {
             last.items.push(log);
         } else {
@@ -487,7 +490,7 @@ export default function ActivityLogPage() {
     // ── Pagination pages array ───────────────────────────────────────────────
     const pageNumbers: (number | "...")[] = [];
     const start = Math.max(1, page - 2);
-    const end   = Math.min(totalPages, page + 2);
+    const end = Math.min(totalPages, page + 2);
     if (start > 1) { pageNumbers.push(1); if (start > 2) pageNumbers.push("..."); }
     for (let i = start; i <= end; i++) pageNumbers.push(i);
     if (end < totalPages) { if (end < totalPages - 1) pageNumbers.push("..."); pageNumbers.push(totalPages); }
@@ -523,8 +526,8 @@ export default function ActivityLogPage() {
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2">
                                 <rect x="3" y="4" width="18" height="18" rx="2" />
                                 <line x1="16" y1="2" x2="16" y2="6" />
-                                <line x1="8"  y1="2" x2="8"  y2="6" />
-                                <line x1="3"  y1="10" x2="21" y2="10" />
+                                <line x1="8" y1="2" x2="8" y2="6" />
+                                <line x1="3" y1="10" x2="21" y2="10" />
                             </svg>
                             <span className="text-sm font-black tabular-nums font-mono" style={{ color: "#0f172a" }}>{total}</span>
                             <span className="text-xs" style={{ color: "#94a3b8" }}>logs</span>
@@ -612,11 +615,35 @@ export default function ActivityLogPage() {
                                 <FilterChips options={ACTION_FILTER_OPTIONS} value={filterAction} onChange={setFilterAction} />
                             </div>
 
+                            {/* Filter tanggal */}
+                            <div>
+                                <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5" style={{ color: "#94a3b8" }}>Tanggal</p>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="date"
+                                        value={filterDateFrom}
+                                        onChange={(e) => setFilterDateFrom(e.target.value)}
+                                        max={filterDateTo || undefined}
+                                        className="flex-1 h-10 px-3 rounded-xl text-sm font-medium outline-none focus:ring-2 transition-all"
+                                        style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
+                                    />
+                                    <span className="text-xs font-semibold flex-shrink-0" style={{ color: "#cbd5e1" }}>s/d</span>
+                                    <input
+                                        type="date"
+                                        value={filterDateTo}
+                                        onChange={(e) => setFilterDateTo(e.target.value)}
+                                        min={filterDateFrom || undefined}
+                                        className="flex-1 h-10 px-3 rounded-xl text-sm font-medium outline-none focus:ring-2 transition-all"
+                                        style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
+                                    />
+                                </div>
+                            </div>
+
                             {/* Filter footer */}
                             <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid #f5f5fb" }}>
                                 {hasFilters ? (
                                     <button
-                                        onClick={() => { setFilterEntity(""); setFilterAction(""); setSearchName(""); }}
+                                        onClick={() => { setFilterEntity(""); setFilterAction(""); setSearchName(""); setFilterDateFrom(""); setFilterDateTo(""); }}
                                         className="text-xs font-semibold flex items-center gap-1.5 transition-colors"
                                         style={{ color: "#94a3b8" }}
                                     >
