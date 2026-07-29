@@ -141,8 +141,10 @@ export default function EditTransactionPage() {
                 ? [tx.unit_id]
                 : [];
 
-          if (sns.length > 0) {
-            const { data: unitDetails } = await fetchUnitDetailsBySNs(sns);
+          const realSns = sns.filter((sn) => sn && sn.trim() && sn.trim() !== "-");
+
+          if (realSns.length > 0) {
+            const { data: unitDetails } = await fetchUnitDetailsBySNs(realSns);
             if (unitDetails) {
               // ← BARU: tempel deal_price per unit dari dealMap
               const withDeal = unitDetails.map((u) => ({
@@ -163,7 +165,7 @@ export default function EditTransactionPage() {
                   ? Math.round((tx.deal_price ?? tx.amount ?? 0) / unitIds.length)
                   : (tx.deal_price ?? 0);
               setActiveUnits(
-                sns.map((sn, i) => ({
+                realSns.map((sn, i) => ({
                   unit_id: unitIds[i] ?? "",
                   serial_number: sn,
                   laptop_name: tx.laptop_name,
@@ -219,12 +221,15 @@ export default function EditTransactionPage() {
   ): Promise<{ data: ActiveUnit[] | null }> {
     try {
       const results = await Promise.all(
-        sns.map((sn) =>
-          fetch(`/api/units/check-sn?sn=${encodeURIComponent(sn)}`)
+        sns.map((sn) => {
+          const clean = (sn ?? "").trim();
+          if (!clean || clean === "-") return Promise.resolve(null);
+
+          return fetch(`/api/units/check-sn?sn=${encodeURIComponent(clean)}`)
             .then((r) => r.json())
             .then((r) => (r.success ? r.data : null))
-            .catch(() => null)
-        )
+            .catch(() => null);
+        })
       );
       const units: ActiveUnit[] = results
         .map((r, i) => {
@@ -553,11 +558,15 @@ export default function EditTransactionPage() {
 
   const fmt = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
   const totalDealFromUnits = activeUnits.reduce((s, u) => s + (u.deal_price || 0), 0);
+  const totalAccDealPreview = activeAccessories.reduce(
+    (s, a) => s + (a.is_bonus ? 0 : (a.deal_price || 0)),
+    0
+  );
+  const totalDealFromItems = totalDealFromUnits + totalAccDealPreview;
   const dealPrice =
-    totalDealFromUnits > 0
-      ? totalDealFromUnits
+    totalDealFromItems > 0
+      ? totalDealFromItems
       : Number(formData.deal_price || formData.amount || 0);
-  // ← BARU: hitung total modal realtime dari activeUnits
   const totalInventoryPrice = activeUnits.reduce(
     (s, u) => s + (u.purchase_price || 0),
     0
@@ -791,24 +800,24 @@ export default function EditTransactionPage() {
               ].map((opt) => {
                 const Icon = opt.icon;
                 return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      customer_type: opt.value,
-                    }));
-                    setHasChanges(true);
-                  }}
-                  className={`ctype-btn ${(formData.customer_type ?? "UMUM") === opt.value
-                    ? "active"
-                    : ""
-                    }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {opt.label}
-                </button>
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        customer_type: opt.value,
+                      }));
+                      setHasChanges(true);
+                    }}
+                    className={`ctype-btn ${(formData.customer_type ?? "UMUM") === opt.value
+                      ? "active"
+                      : ""
+                      }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {opt.label}
+                  </button>
                 );
               })}
             </div>
@@ -1018,11 +1027,10 @@ export default function EditTransactionPage() {
                             deal_price: !acc.is_bonus ? 0 : acc.deal_price,
                           })
                         }
-                        className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition ${
-                          acc.is_bonus
-                            ? "bg-amber-50 border-amber-200 text-amber-700 shadow-sm"
-                            : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
-                        }`}
+                        className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition ${acc.is_bonus
+                          ? "bg-amber-50 border-amber-200 text-amber-700 shadow-sm"
+                          : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+                          }`}
                       >
                         {acc.is_bonus ? "🎁 Bonus (Rp0)" : "Berbayar"}
                       </button>
