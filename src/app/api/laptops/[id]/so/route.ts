@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
-import { BARANG_PRIVATE_VIEW_ROLES } from "@/lib/permissions";
+import { SO_ROLES } from "@/lib/permissions";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -117,5 +117,5 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const GET = withAuth(getHandler, BARANG_PRIVATE_VIEW_ROLES);
-export const PATCH = withAuth(patchHandler, BARANG_PRIVATE_VIEW_ROLES);
+export const GET = withAuth(getHandler, SO_ROLES);
+export const PATCH = withAuth(patchHandler, SO_ROLES);

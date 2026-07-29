@@ -901,6 +901,18 @@ export const BARANG_PRIVATE_VIEW_ROLES: UserRole[] = [
   "KEPALA_TEKNISI",
 ];
 
+// ── Data Barang: Role yang boleh akses fitur SO (Stock Opname) ───────────────
+// Sengaja whitelist TERPISAH dari BARANG_PRIVATE_VIEW_ROLES — SO khusus tim
+// Pengelola Barang saja (termasuk PKL-nya), tidak ikut Asisten CEO/Accounting/
+// Kepala Teknisi yang tetap bisa lihat data privat Data Barang lainnya.
+export const SO_ROLES: UserRole[] = [
+  "ADMIN",
+  "PROGRAMMER",
+  "KEPALA_PENGELOLA_BARANG",
+  "PENGELOLA_BARANG",
+  "PKL_PENGELOLA_BARANG",
+];
+
 // ── Data Barang: Role yang boleh melihat tab Data Laptop & Aksesoris ──────────
 // Kepala Sales, Kepala Zenith, Kepala Onpoint, Kepala Sotech, Crew Sales, dan Sales tidak diperbolehkan.
 export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
