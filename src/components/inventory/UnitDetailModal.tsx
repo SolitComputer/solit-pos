@@ -87,6 +87,9 @@ function umurStok(iso: string): string {
 const inputCls =
     "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition";
 
+// Markup tetap untuk Harga Official = Harga Setor + markup ini.
+const OFFICIAL_PRICE_MARKUP = 300_000;
+
 export default function UnitDetailModal({
     unit, laptopName, laptopMeta, laptopSpecs, canEdit, canSeePrivate, onClose, onSaved, onEditLaptop,
     defaultSellingPrice, onCreated, onBack,
@@ -142,7 +145,7 @@ export default function UnitDetailModal({
     const modalNow = isEditing ? Number(form.purchase_price) || 0 : (unit.purchase_price ?? 0);
     const sparepartNow = isEditing ? Number(form.sparepart_cost) || 0 : (unit.sparepart_cost ?? 0);
     const jualNow = isEditing ? Number(form.selling_price) || 0 : (unit.selling_price ?? 0);
-    const officialNow = isEditing ? Number(form.official_price) || 0 : (unit.official_price ?? 0);
+   const officialNow = isEditing ? jualNow + OFFICIAL_PRICE_MARKUP : (unit.official_price ?? 0);
     const totalModal = modalNow + sparepartNow;
     const margin = jualNow - totalModal;
     const marginPct = totalModal > 0 ? (margin / totalModal) * 100 : 0;
@@ -162,7 +165,7 @@ export default function UnitDetailModal({
                     purchase_price: Number(form.purchase_price) || 0,
                     sparepart_cost: Number(form.sparepart_cost) || 0,
                     selling_price: Number(form.selling_price) || 0,
-                    official_price: Number(form.official_price) || 0,
+                    official_price: (Number(form.selling_price) || 0) + OFFICIAL_PRICE_MARKUP,
                     status: form.status,
                     notes: form.notes,
                     received_at: form.received_at ? new Date(form.received_at).toISOString() : undefined,
@@ -196,7 +199,7 @@ export default function UnitDetailModal({
                     purchase_price: Number(addForm.purchase_price) || 0,
                     sparepart_cost: Number(addForm.sparepart_cost) || 0,
                     selling_price: Number(addForm.selling_price) || 0,
-                    official_price: Number(addForm.official_price) || 0,
+                    official_price: (Number(addForm.selling_price) || 0) + OFFICIAL_PRICE_MARKUP,
                     status: addForm.status,
                     notes: addForm.notes,
                 }),
@@ -307,13 +310,14 @@ export default function UnitDetailModal({
                                                 <input type="number" min={0} value={addForm.sparepart_cost}
                                                     onChange={e => setAdd("sparepart_cost", e.target.value)} className={`${inputCls} tabular-nums`} />
                                             </Field>
-                                            <Field label="Harga Store">
+                                            <Field label="Harga Setor">
                                                 <input type="number" min={0} value={addForm.selling_price}
                                                     onChange={e => setAdd("selling_price", e.target.value)} className={`${inputCls} tabular-nums`} />
                                             </Field>
                                             <Field label="Harga Official">
-                                                <input type="number" min={0} value={addForm.official_price}
-                                                    onChange={e => setAdd("official_price", e.target.value)} className={`${inputCls} tabular-nums`} />
+                                                <input type="number" value={(Number(addForm.selling_price) || 0) + OFFICIAL_PRICE_MARKUP} disabled
+                                                    className={`${inputCls} tabular-nums bg-gray-100 text-gray-500 cursor-not-allowed`} />
+                                                <p className="text-[10px] text-gray-400 mt-1">Otomatis: Harga Setor + Rp 300.000</p>
                                             </Field>
                                         </div>
                                     </div>
@@ -452,7 +456,7 @@ export default function UnitDetailModal({
                                                     <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(sparepartNow)}</p>
                                                 )}
                                             </Field>
-                                            <Field label="Harga Store">
+                                           <Field label="Harga Setor">
                                                 {isEditing ? (
                                                     <input type="number" min={0} value={form.selling_price}
                                                         onChange={e => set("selling_price", e.target.value)} className={`${inputCls} tabular-nums`} />
@@ -461,11 +465,9 @@ export default function UnitDetailModal({
                                                 )}
                                             </Field>
                                             <Field label="Harga Official">
-                                                {isEditing ? (
-                                                    <input type="number" min={0} value={form.official_price}
-                                                        onChange={e => set("official_price", e.target.value)} className={`${inputCls} tabular-nums`} />
-                                                ) : (
-                                                    <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(officialNow)}</p>
+                                                <p className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(officialNow)}</p>
+                                                {isEditing && (
+                                                    <p className="text-[10px] text-gray-400 mt-1">Otomatis: Harga Setor + Rp 300.000</p>
                                                 )}
                                             </Field>
                                         </div>
