@@ -104,6 +104,30 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       await recalcLaptopParentQty(supabase, data?.laptop_id ?? before?.laptop_id);
     }
 
+    //  Kalau model laptop ini cuma punya 1 unit aktif (stok = 1) dan Harga
+    //  Store unit ini diubah, sync juga ke laptops.selling_price — supaya
+    //  kolom "Harga Store" di tabel Data Barang (yang baca laptops.selling_price,
+    //  BUKAN laptop_units.selling_price) tetap konsisten dengan satu-satunya
+    //  unit yang ada. Kalau stok > 1, TIDAK di-sync (harga model tetap
+    //  independen dari harga per-unit individual).
+    if (selling_price !== undefined) {
+      const laptopId = data?.laptop_id ?? before?.laptop_id;
+      if (laptopId) {
+        const { count: activeUnitCount } = await supabase
+          .from("laptop_units")
+          .select("id", { count: "exact", head: true })
+          .eq("laptop_id", laptopId)
+          .neq("status", "SOLD");
+
+        if (activeUnitCount === 1) {
+          await supabase
+            .from("laptops")
+            .update({ selling_price: Math.round(Number(selling_price)) })
+            .eq("id", laptopId);
+        }
+      }
+    }
+
     await logActivity({
       userId: user.id,
       userName: user.name,
