@@ -690,15 +690,18 @@ export default function ProfileView({ userId }: { userId: string }) {
                         }
                     `}</style>
 
-                    <div className="mt-3">
-                        <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900">{profile.name}</h1>
-                        <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-1.5">
-                            {roles.map((r) => (
-                                <span key={r} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
-                                    {humanizeRoleKey(r)}
-                                </span>
-                            ))}
+                   <div className="mt-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5 sm:gap-3">
+                        <div className="min-w-0">
+                            <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900">{profile.name}</h1>
+                            <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-1.5">
+                                {roles.map((r) => (
+                                    <span key={r} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
+                                        {humanizeRoleKey(r)}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
+                        {achievements && <AchievementTitles achievements={achievements} />}
                     </div>
 
                     <div className="mt-3">
@@ -975,6 +978,57 @@ function RankBadge({ rank }: { rank: number }) {
                     {rank}
                 </text>
             </svg>
+        </div>
+    );
+}
+
+// ── Title achievement ala Mobile Legends: menampilkan "TOP {rank}" untuk kategori yang masuk 5 besar ───
+function AchievementTitles({ achievements }: { achievements: AchievementsData }) {
+    const titles: { rank: number; label: string }[] = [];
+    if (achievements.attendance.rankThisMonth !== null && achievements.attendance.rankThisMonth <= 10) {
+        titles.push({ rank: achievements.attendance.rankThisMonth, label: "Kehadiran" });
+    }
+    if (achievements.overtime.rankThisMonth !== null && achievements.overtime.rankThisMonth <= 10) {
+        titles.push({ rank: achievements.overtime.rankThisMonth, label: "Lembur" });
+    }
+    if (titles.length === 0) return null;
+    titles.sort((a, b) => a.rank - b.rank);
+
+    return (
+        <div className="flex flex-row sm:flex-col flex-wrap justify-end sm:justify-start items-end gap-2 flex-shrink-0">
+            {titles.map((t) => (
+                <AchievementTitleBadge key={t.label} rank={t.rank} label={t.label} />
+            ))}
+        </div>
+    );
+}
+
+function AchievementTitleBadge({ rank, label }: { rank: number; label: string }) {
+    const tier: "gold" | "silver" | "bronze" = rank === 1 ? "gold" : rank <= 3 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #fde047, #f59e0b, #b45309)",
+        silver: "linear-gradient(135deg, #f8fafc, #94a3b8, #475569)",
+        bronze: "linear-gradient(135deg, #fdba74, #c2410c, #7c2d12)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(245,158,11,0.35)",
+        silver: "rgba(148,163,184,0.35)",
+        bronze: "rgba(194,65,12,0.35)",
+    };
+
+    return (
+        <div
+            className="flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full"
+            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
+            title={`Top ${rank} ${label} bulan ini`}
+        >
+            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            </div>
+            <div className="leading-tight">
+                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">TOP {rank}</p>
+                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>{label}</p>
+            </div>
         </div>
     );
 }
