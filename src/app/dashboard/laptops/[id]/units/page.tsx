@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
-import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES } from "@/lib/permissions";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
 import { Trash2, Package, CheckCircle2, Wrench, Wallet } from "lucide-react";
@@ -28,6 +28,10 @@ interface LaptopUnit {
     notes: string;
     received_at?: string;
     created_at: string;
+    audited_at?: string | null;
+    audited_by?: string | null;
+    so_at?: string | null;
+    so_by?: string | null;
 }
 
 interface Laptop {
@@ -56,6 +60,19 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
 };
 
 const GRADE_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 };
+
+//  Harus sama dengan AUDIT_TTL_MS / SO_TTL_MS di /api/units/[id]/audit & /so
+const AUDIT_TTL_DAYS = 2;
+const AUDIT_TTL_MS = AUDIT_TTL_DAYS * 24 * 60 * 60 * 1000;
+const SO_TTL_DAYS = 1;
+const SO_TTL_MS = SO_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+function isUnitAuditActive(u: LaptopUnit): boolean {
+    return !!u.audited_at && Date.now() - new Date(u.audited_at).getTime() < AUDIT_TTL_MS;
+}
+function isUnitSOActive(u: LaptopUnit): boolean {
+    return !!u.so_at && Date.now() - new Date(u.so_at).getTime() < SO_TTL_MS;
+}
 
 function sortUnits(units: LaptopUnit[]): LaptopUnit[] {
     return [...units].sort((a, b) => {
@@ -170,6 +187,8 @@ export default function UnitsPage() {
 
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
+    const canAuditUnits = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
+    const canSOUnits = hasAnyRole(userRoles, SO_ROLES);
     const canSeePriceInfo = hasAnyRole(userRoles, [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
@@ -192,12 +211,19 @@ export default function UnitsPage() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [toast, setToast] = useState("");
+    const [auditingUnitId, setAuditingUnitId] = useState<string | null>(null);
+    const [soUnitId, setSoUnitId] = useState<string | null>(null);
+   const [filterAudit, setFilterAudit] = useState<"ALL" | "AUDITED" | "UNAUDITED">("ALL");
+    const [filterSO, setFilterSO] = useState<"ALL" | "SO" | "BELUM_SO">("ALL");
+    //  Riwayat audit/SO per unit — dibuka lewat tombol jam di kolom Audit/SO
+    const [historyTarget, setHistoryTarget] = useState<{ id: string; name: string } | null>(null);
+    const [soHistoryTarget, setSoHistoryTarget] = useState<{ id: string; name: string } | null>(null);
     //  Bulk edit "Sumber Barang" — set 1x untuk semua unit model ini
     const [showSourceModal, setShowSourceModal] = useState(false);
     const [sourceInput, setSourceInput] = useState("");
     const [sourceSaving, setSourceSaving] = useState(false);
 
-   //  Bulk edit "Harga Store", "Harga Sparepart" & "Harga Official" — set 1x untuk semua unit model ini
+    //  Bulk edit "Harga Store", "Harga Sparepart" & "Harga Official" — set 1x untuk semua unit model ini
     const [showPriceModal, setShowPriceModal] = useState(false);
     const [priceInput, setPriceInput] = useState({ selling_price: "", sparepart_cost: "", official_price: "" });
     const [priceSaving, setPriceSaving] = useState(false);
@@ -274,6 +300,38 @@ export default function UnitsPage() {
         setToast("Harga modal berhasil diperbarui!");
     }, []);
 
+    const toggleUnitAudit = async (unit: LaptopUnit) => {
+        setAuditingUnitId(unit.id);
+        try {
+            const res = await fetch(`/api/units/${unit.id}/audit`, { method: "PATCH" });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal update audit");
+            const wasActive = isUnitAuditActive(unit);
+            setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, ...json.data } : u));
+            setToast(wasActive ? "Audit unit dibatalkan" : "Unit ditandai sudah diaudit");
+        } catch (e) {
+            setAlertModal(e instanceof Error ? e.message : "Gagal update audit");
+        } finally {
+            setAuditingUnitId(null);
+        }
+    };
+
+    const toggleUnitSO = async (unit: LaptopUnit) => {
+        setSoUnitId(unit.id);
+        try {
+            const res = await fetch(`/api/units/${unit.id}/so`, { method: "PATCH" });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal update SO");
+            const wasActive = isUnitSOActive(unit);
+            setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, ...json.data } : u));
+            setToast(wasActive ? "SO unit dibatalkan" : "Unit ditandai sudah SO");
+        } catch (e) {
+            setAlertModal(e instanceof Error ? e.message : "Gagal update SO");
+        } finally {
+            setSoUnitId(null);
+        }
+    };
+
     const filteredUnits = sortUnits(
         activeUnits.filter(u => {
             if (filterStatus !== "ALL" && u.status !== filterStatus) return false;
@@ -281,11 +339,15 @@ export default function UnitsPage() {
             if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;
             if (filterPriceMin && u.selling_price < Number(filterPriceMin)) return false;
             if (filterPriceMax && u.selling_price > Number(filterPriceMax)) return false;
+            if (filterAudit === "AUDITED" && !isUnitAuditActive(u)) return false;
+            if (filterAudit === "UNAUDITED" && isUnitAuditActive(u)) return false;
+            if (filterSO === "SO" && !isUnitSOActive(u)) return false;
+            if (filterSO === "BELUM_SO" && isUnitSOActive(u)) return false;
             return true;
         })
     );
 
-    const hasActiveFilter = searchSN || filterPriceMin || filterPriceMax;
+    const hasActiveFilter = searchSN || filterPriceMin || filterPriceMax || filterAudit !== "ALL" || filterSO !== "ALL";
     const isAllSelected = filteredUnits.length > 0 && filteredUnits.every(u => selectedIds.has(u.id));
     const isIndeterminate = filteredUnits.some(u => selectedIds.has(u.id)) && !isAllSelected;
 
@@ -356,6 +418,10 @@ export default function UnitsPage() {
         stok_tersisa: u.status !== "SOLD" ? 1 : 0,
         siap_jual: u.status === "SIAP_JUAL" ? 1 : 0,
         minus: (u.status === "SERVICE" || u.status === "BELUM_SIAP") ? 1 : 0,
+        is_audited: isUnitAuditActive(u),
+        audited_at: u.audited_at ?? null,
+        is_so_active: isUnitSOActive(u),
+        so_at: u.so_at ?? null,
     }));
 
     const openCreate = () => {
@@ -398,6 +464,7 @@ export default function UnitsPage() {
     const resetFilters = () => {
         setSearchSN(""); setFilterPriceMin(""); setFilterPriceMax("");
         setFilterStatus("ALL"); setFilterGradeTab("ALL");
+        setFilterAudit("ALL"); setFilterSO("ALL");
     };
 
     // ─── Export Excel ─────────────────────────────────────────────────────────
@@ -437,7 +504,7 @@ export default function UnitsPage() {
         });
     };
 
-   //  Buka modal set-harga. Prefill kalau semua unit harganya sudah sama.
+    //  Buka modal set-harga. Prefill kalau semua unit harganya sudah sama.
     const openPriceModal = () => {
         const sellPrices = Array.from(new Set(activeUnits.map(u => u.selling_price)));
         const sparePrices = Array.from(new Set(activeUnits.map(u => u.sparepart_cost ?? 0)));
@@ -543,7 +610,7 @@ export default function UnitsPage() {
                                 {[laptop?.brand, laptop?.cpu, laptop?.ram, laptop?.storage].filter(Boolean).join(" · ") || "Detail laptop"}
                             </p>
                         </div>
-                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
 
                             {canExport && (
                                 <button onClick={exportToExcel}
@@ -676,6 +743,28 @@ export default function UnitsPage() {
                                     </button>
                                 )}
                             </div>
+                          {canAuditUnits && (
+                                <select
+                                    value={filterAudit}
+                                    onChange={e => setFilterAudit(e.target.value as typeof filterAudit)}
+                                    className="px-3 h-9 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+                                >
+                                    <option value="ALL">Semua Audit</option>
+                                    <option value="AUDITED">Sudah Audit</option>
+                                    <option value="UNAUDITED">Belum Audit</option>
+                                </select>
+                            )}
+                            {canSOUnits && (
+                                <select
+                                    value={filterSO}
+                                    onChange={e => setFilterSO(e.target.value as typeof filterSO)}
+                                    className="px-3 h-9 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+                                >
+                                    <option value="ALL">Semua SO</option>
+                                    <option value="SO">Sudah SO</option>
+                                    <option value="BELUM_SO">Belum SO</option>
+                                </select>
+                            )}
                             <button onClick={() => setShowAdvancedFilter(v => !v)}
                                 className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium border transition ${showAdvancedFilter || filterPriceMin || filterPriceMax ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -765,6 +854,56 @@ export default function UnitsPage() {
                                     const u = filteredUnits.find(x => x.id === row.id);
                                     if (u) setDetailUnit(u);
                                 }}
+                               renderAudit={canAuditUnits ? (row) => {
+                                    const u = filteredUnits.find(x => x.id === row.id);
+                                    if (!u) return null;
+                                    return (
+                                        <div className="flex items-center justify-center gap-1">
+                                            <AuditButton
+                                                active={isUnitAuditActive(u)}
+                                                loading={auditingUnitId === u.id}
+                                                auditedBy={u.audited_by}
+                                                auditedAt={u.audited_at}
+                                                onClick={() => toggleUnitAudit(u)}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setHistoryTarget({ id: u.id, name: `SN: ${u.serial_number}` })}
+                                                title="Lihat riwayat audit"
+                                                className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    );
+                                } : undefined}
+                                renderSo={canSOUnits ? (row) => {
+                                    const u = filteredUnits.find(x => x.id === row.id);
+                                    if (!u) return null;
+                                    return (
+                                        <div className="flex items-center justify-center gap-1">
+                                            <SoButton
+                                                active={isUnitSOActive(u)}
+                                                loading={soUnitId === u.id}
+                                                soBy={u.so_by}
+                                                soAt={u.so_at}
+                                                onClick={() => toggleUnitSO(u)}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setSoHistoryTarget({ id: u.id, name: `SN: ${u.serial_number}` })}
+                                                title="Lihat riwayat SO"
+                                                className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    );
+                                } : undefined}
                                 renderActions={(row) => {
                                     const u = filteredUnits.find(x => x.id === row.id);
                                     if (!u || !canManageUnits) return null;
@@ -776,9 +915,21 @@ export default function UnitsPage() {
                                     );
                                 }}
                             />
-                            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between">
+                            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between flex-wrap gap-1">
                                 <span className="text-xs text-gray-400">
                                     Menampilkan <span className="font-medium text-gray-600">{filteredUnits.length}</span> dari <span className="font-medium text-gray-600">{units.length}</span> unit
+                                    {(canAuditUnits || canSOUnits) && (
+                                        <>
+                                            {" · "}
+                                            <span className="text-emerald-600 font-medium">
+                                                {activeUnits.filter(isUnitAuditActive).length} teraudit
+                                            </span>
+                                            {" · "}
+                                            <span className="text-sky-600 font-medium">
+                                                {activeUnits.filter(isUnitSOActive).length} sudah SO
+                                            </span>
+                                        </>
+                                    )}
                                 </span>
                                 {(hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL") && (
                                     <span className="text-xs text-amber-600 font-medium">Filter aktif</span>
@@ -817,9 +968,23 @@ export default function UnitsPage() {
                 />
             )}
 
-            {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
+           {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
             {confirmModal && (
                 <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />
+            )}
+            {historyTarget && (
+                <AuditHistoryModal
+                    unitId={historyTarget.id}
+                    unitLabel={historyTarget.name}
+                    onClose={() => setHistoryTarget(null)}
+                />
+            )}
+            {soHistoryTarget && (
+                <SoHistoryModal
+                    unitId={soHistoryTarget.id}
+                    unitLabel={soHistoryTarget.name}
+                    onClose={() => setSoHistoryTarget(null)}
+                />
             )}
             {showBulkModal && (
                 <BulkAddUnitModal
@@ -993,7 +1158,7 @@ function PriceBulkModal({ value, onChange, saving, onCancel, onSave }: {
                             className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
                         />
                     </div>
-                  <div>
+                    <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Sparepart (Rp)</label>
                         <input
                             type="number"
@@ -1025,6 +1190,274 @@ function PriceBulkModal({ value, onChange, saving, onCancel, onSave }: {
                     <button onClick={onSave} disabled={!canSave}
                         className="flex-1 h-9 bg-[#1a1a2e] text-white rounded-lg text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 flex items-center justify-center gap-2">
                         {saving ? (<><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>) : "Terapkan ke Semua"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+//  Tombol Audit per unit — identik gaya AuditButton di LaptopsContent.tsx.
+function AuditButton({ active, loading, auditedBy, auditedAt, onClick }: {
+    active: boolean; loading: boolean;
+    auditedBy?: string | null; auditedAt?: string | null;
+    onClick: () => void;
+}) {
+    const expiredButOnceAudited = !active && !!auditedAt;
+
+    const title = active
+        ? `Diaudit oleh ${auditedBy ?? "—"}${auditedAt ? " · " + new Date(auditedAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}\nKlik untuk batalkan audit`
+        : expiredButOnceAudited
+            ? `Terakhir diaudit oleh ${auditedBy ?? "—"} · ${new Date(auditedAt as string).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} (sudah lewat ${AUDIT_TTL_DAYS} hari)\nKlik untuk tandai sudah diaudit lagi`
+            : "Klik untuk tandai sudah diaudit";
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={loading}
+            title={title}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition
+                ${loading ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}
+                ${active
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                    : expiredButOnceAudited
+                        ? "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100"
+                        : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}
+        >
+            {active ? (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Teraudit
+                </>
+            ) : (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" />
+                    </svg>
+                    {expiredButOnceAudited ? "Audit Ulang" : "Audit"}
+                </>
+            )}
+        </button>
+    );
+}
+
+//  Tombol SO per unit — identik gaya SoButton di LaptopsContent.tsx.
+function SoButton({ active, loading, soBy, soAt, onClick }: {
+    active: boolean; loading: boolean;
+    soBy?: string | null; soAt?: string | null;
+    onClick: () => void;
+}) {
+    const expiredButOnceSo = !active && !!soAt;
+
+    const title = active
+        ? `SO oleh ${soBy ?? "—"}${soAt ? " · " + new Date(soAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}\nKlik untuk batalkan SO`
+        : expiredButOnceSo
+            ? `Terakhir SO oleh ${soBy ?? "—"} · ${new Date(soAt as string).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} (sudah lewat ${SO_TTL_DAYS} hari)\nKlik untuk SO lagi`
+            : "Klik untuk tandai sudah SO";
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={loading}
+            title={title}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition
+                ${loading ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}
+                ${active
+                    ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                    : expiredButOnceSo
+                        ? "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100"
+                        : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}
+        >
+            {active ? (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    SO
+                </>
+            ) : (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" />
+                    </svg>
+                    {expiredButOnceSo ? "SO Ulang" : "SO"}
+                </>
+            )}
+        </button>
+    );
+}
+
+interface AuditHistoryEntry {
+    id: string;
+    action: "AUDIT" | "UNAUDIT";
+    audited_by: string;
+    audited_at: string;
+}
+
+function AuditHistoryModal({ unitId, unitLabel, onClose }: {
+    unitId: string; unitLabel: string; onClose: () => void;
+}) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [history, setHistory] = useState<AuditHistoryEntry[]>([]);
+
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            try {
+                const res = await fetch(`/api/units/${unitId}/audit`);
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat riwayat");
+                if (active) setHistory(json.data?.history ?? []);
+            } catch (e) {
+                if (active) setError(e instanceof Error ? e.message : "Terjadi kesalahan");
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+        return () => { active = false; };
+    }, [unitId]);
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    const fmtWhen = (iso: string) =>
+        new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[80vh] flex flex-col">
+                <div className="h-1 w-full bg-gradient-to-r from-gray-400 via-gray-600 to-gray-800 flex-shrink-0" />
+                <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Riwayat Audit</p>
+                    <h3 className="text-sm font-bold text-gray-900 truncate">{unitLabel}</h3>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    {loading ? (
+                        <div className="space-y-2">
+                            {[...Array(3)].map((_, i) => <div key={i} className="h-10 rounded-xl bg-gray-100 animate-pulse" />)}
+                        </div>
+                    ) : error ? (
+                        <p className="text-sm text-red-600">{error}</p>
+                    ) : history.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-6">Belum pernah diaudit</p>
+                    ) : (
+                        <ul className="space-y-2">
+                            {history.map(h => (
+                                <li key={h.id} className="flex items-start gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+                                    <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${h.action === "AUDIT" ? "bg-emerald-500" : "bg-gray-300"}`} />
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-gray-700">
+                                            {h.action === "AUDIT" ? "Ditandai sudah diaudit" : "Audit dibatalkan"}
+                                        </p>
+                                        <p className="text-[11px] text-gray-400 mt-0.5">
+                                            {h.audited_by} · {fmtWhen(h.audited_at)}
+                                        </p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose}
+                        className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+interface SoHistoryEntry {
+    id: string;
+    action: "SO" | "UNSO";
+    so_by: string;
+    so_at: string;
+}
+
+function SoHistoryModal({ unitId, unitLabel, onClose }: {
+    unitId: string; unitLabel: string; onClose: () => void;
+}) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [history, setHistory] = useState<SoHistoryEntry[]>([]);
+
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            try {
+                const res = await fetch(`/api/units/${unitId}/so`);
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat riwayat");
+                if (active) setHistory(json.data?.history ?? []);
+            } catch (e) {
+                if (active) setError(e instanceof Error ? e.message : "Terjadi kesalahan");
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+        return () => { active = false; };
+    }, [unitId]);
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    const fmtWhen = (iso: string) =>
+        new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[80vh] flex flex-col">
+                <div className="h-1 w-full bg-gradient-to-r from-gray-400 via-gray-600 to-gray-800 flex-shrink-0" />
+                <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Riwayat SO (Stock Opname)</p>
+                    <h3 className="text-sm font-bold text-gray-900 truncate">{unitLabel}</h3>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    {loading ? (
+                        <div className="space-y-2">
+                            {[...Array(3)].map((_, i) => <div key={i} className="h-10 rounded-xl bg-gray-100 animate-pulse" />)}
+                        </div>
+                    ) : error ? (
+                        <p className="text-sm text-red-600">{error}</p>
+                    ) : history.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-6">Belum pernah di-SO</p>
+                    ) : (
+                        <ul className="space-y-2">
+                            {history.map(h => (
+                                <li key={h.id} className="flex items-start gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+                                    <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${h.action === "SO" ? "bg-blue-500" : "bg-gray-300"}`} />
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-gray-700">
+                                            {h.action === "SO" ? "Ditandai sudah SO" : "SO dibatalkan"}
+                                        </p>
+                                        <p className="text-[11px] text-gray-400 mt-0.5">
+                                            {h.so_by} · {fmtWhen(h.so_at)}
+                                        </p>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose}
+                        className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Tutup
                     </button>
                 </div>
             </div>
