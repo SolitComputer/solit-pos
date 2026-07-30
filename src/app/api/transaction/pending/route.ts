@@ -37,7 +37,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
         last_edited_by,
         last_edited_at
       `)
-      .in("status", status ? [status] : ["RESERVED", "HELD"])
+      .in("status", status ? [status] : ["RESERVED", "HELD", "PENDING"])
       .order("created_at", { ascending: false });
 
     const { data, error } = await query;

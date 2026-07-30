@@ -9,7 +9,7 @@ interface Props {
   params: Promise<{ invoice: string }>;
 }
 
-const RESTORABLE_STATUSES = ["PAID", "RESERVED", "HELD", "PACKING"] as const;
+const RESTORABLE_STATUSES = ["PAID", "RESERVED", "HELD", "PACKING", "PENDING"] as const;
 type RestorableStatus = (typeof RESTORABLE_STATUSES)[number];
 
 async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
@@ -200,12 +200,12 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
       beforeData: transaction,
     });
 
-    // ── 8. Response ───────────────────────────────────────────────────────
     const statusLabel: Record<string, string> = {
       PAID: "Lunas",
       RESERVED: "DP",
       HELD: "Ambil Dulu",
       PACKING: "Packing",
+      PENDING: "Pending",
     };
 
     return NextResponse.json({

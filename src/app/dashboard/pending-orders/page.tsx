@@ -5,11 +5,10 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban } from "lucide-react";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface PendingTransaction {
     id: string;
     invoice_number: string;
-    status: "RESERVED" | "HELD" | "PAID";
+    status: "RESERVED" | "HELD" | "PENDING" | "PAID";
     sales_id: string;
     customer_name: string;
     customer_phone: string | null;
@@ -435,12 +434,18 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
     );
 }
 
-// ─── Row badges ───────────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: "RESERVED" | "HELD" }) {
+function StatusBadge({ status }: { status: "RESERVED" | "HELD" | "PENDING" }) {
     if (status === "RESERVED") {
         return (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
                 <CreditCard size={12} /> DP
+            </span>
+        );
+    }
+    if (status === "PENDING") {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                <Clock size={12} /> Pending
             </span>
         );
     }
@@ -475,7 +480,7 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
             {/* Invoice + status */}
             <td className="px-3 py-2.5 min-w-[140px]">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                    <StatusBadge status={tx.status as "RESERVED" | "HELD"} />
+                    <StatusBadge status={tx.status as "RESERVED" | "HELD" | "PENDING"} />
                     {isOld && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-50 text-red-500 border border-red-200">
                             <AlertTriangle size={12} /> {age}
@@ -723,7 +728,7 @@ function TableHead({ isHistory }: { isHistory?: boolean }) {
 export default function PendingOrdersPage() {
     const [transactions, setTransactions] = useState<PendingTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [filterStatus, setFilterStatus] = useState<"ALL" | "RESERVED" | "HELD">("ALL");
+    const [filterStatus, setFilterStatus] = useState<"ALL" | "RESERVED" | "HELD" | "PENDING">("ALL");
     const [searchQuery, setSearchQuery] = useState("");
     const [minSisa, setMinSisa] = useState("");
     const [maxSisa, setMaxSisa] = useState("");
@@ -849,6 +854,7 @@ export default function PendingOrdersPage() {
         all: transactions.length,
         reserved: transactions.filter(t => t.status === "RESERVED").length,
         held: transactions.filter(t => t.status === "HELD").length,
+        pending: transactions.filter(t => t.status === "PENDING").length,
     };
 
     const totalValue = filtered.reduce((sum, tx) => sum + (tx.deal_price || tx.amount || 0), 0);
@@ -958,13 +964,14 @@ export default function PendingOrdersPage() {
                                 )}
                             </div>
 
-                          {/* Filter pills — only for pending tab */}
+                            {/* Filter pills — only for pending tab */}
                             {activeTab === "pending" && (
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                     {([
                                         { value: "ALL", label: "Semua", count: counts.all },
                                         { value: "RESERVED", label: <><CreditCard size={12} /> DP</>, count: counts.reserved },
                                         { value: "HELD", label: <><Package size={12} /> Ambil</>, count: counts.held },
+                                        { value: "PENDING", label: <><Clock size={12} /> Pending</>, count: counts.pending },
                                     ] as const).map(opt => (
                                         <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                                             className={`h-7 px-2.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${filterStatus === opt.value ? "bg-gray-800 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>

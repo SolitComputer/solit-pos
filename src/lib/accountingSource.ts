@@ -152,7 +152,7 @@ async function buildTransactionDrafts(
     .select(
       "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, dp_amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, created_at, company_name, laptop_id"
     )
-    .in("status", ["PAID", "HELD", "PACKING", "RESERVED"])
+    .in("status", ["PAID", "HELD", "PACKING", "RESERVED", "PENDING"])
     .gte("created_at", startISO)
     .lt("created_at", endISO)
     .order("created_at", { ascending: true });
@@ -260,8 +260,7 @@ async function buildTransactionDrafts(
     } else if (t.status === "HELD") {
       // "Ambil Dulu" → belum bayar = Piutang
       lines.push({ account_code: AKUN.PIUTANG, side: "DEBIT", nominal: deal });
-    } else if (t.status === "PACKING") {
-      // Pesanan e-commerce yang masih packing
+    } else if (t.status === "PACKING" || t.status === "PENDING") {
       lines.push({ account_code: AKUN.ECOMMERS, side: "DEBIT", nominal: deal });
     } else if (t.status === "RESERVED") {
       // DP: kas masuk sebesar DP, sisanya piutang
