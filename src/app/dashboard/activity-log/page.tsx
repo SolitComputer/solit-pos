@@ -461,7 +461,7 @@ export default function ActivityLogPage() {
             limit: String(limit),
             ...(filterEntity ? { entity: filterEntity } : {}),
             ...(filterAction ? { action: filterAction } : {}),
-            ...(debouncedSearch ? { user_name: debouncedSearch } : {}),
+            ...(debouncedSearch ? { search: debouncedSearch } : {}),
             ...(filterDateFrom ? { date_from: filterDateFrom } : {}),
             ...(filterDateTo ? { date_to: filterDateTo } : {}),
         });
@@ -586,7 +586,7 @@ export default function ActivityLogPage() {
                                     type="text"
                                     value={searchName}
                                     onChange={(e) => setSearchName(e.target.value)}
-                                    placeholder="Cari nama karyawan..."
+                                    placeholder="Cari invoice, nama, atau SN..."
                                     className="w-full pl-9 pr-8 h-10 rounded-xl text-sm font-medium outline-none focus:ring-2 transition-all"
                                     style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }}
                                 />

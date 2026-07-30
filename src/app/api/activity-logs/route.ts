@@ -14,7 +14,7 @@ export const GET = withAuth(
     const limit = parseInt(searchParams.get("limit") ?? "20");
     const entity = searchParams.get("entity");
     const action = searchParams.get("action");
-    const userName = searchParams.get("user_name");
+    const search = searchParams.get("search");
     const dateFrom = searchParams.get("date_from"); // format: YYYY-MM-DD
     const dateTo = searchParams.get("date_to");     // format: YYYY-MM-DD
     const from = (page - 1) * limit;
@@ -27,9 +27,13 @@ export const GET = withAuth(
       .range(from, to);
 
     if (entity) query = query.eq("entity", entity);
-    if (entity) query = query.eq("entity", entity);
     if (action) query = query.eq("action", action);
-    if (userName) query = query.ilike("user_name", `%${userName}%`);
+    if (search) {
+      const term = `%${search}%`;
+      query = query.or(
+        `user_name.ilike."${term}",entity_label.ilike."${term}",before_data::text.ilike."${term}",after_data::text.ilike."${term}"`
+      );
+    }
     if (dateFrom) query = query.gte("created_at", `${dateFrom}T00:00:00+07:00`);
     if (dateTo) query = query.lte("created_at", `${dateTo}T23:59:59+07:00`);
 

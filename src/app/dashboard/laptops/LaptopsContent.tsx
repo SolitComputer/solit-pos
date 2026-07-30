@@ -19,8 +19,6 @@ interface LaptopUnit {
     selling_price: number;
     sparepart_cost?: number;
     official_price?: number;
-    //  Field berikut hanya ada kalau /api/laptops mengirimnya (lihat Tahap A di
-    //  api/laptops/route.ts) dan role user termasuk BARANG_PRIVATE_VIEW_ROLES.
     laptop_id?: string;
     condition_note?: string;
     source?: string | null;
