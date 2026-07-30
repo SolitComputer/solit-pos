@@ -241,7 +241,7 @@ function getPrimaryPriceDisplay(item: any) {
 function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
   item: any; isPending: boolean; restoring: boolean; onConfirm: () => void; onClose: () => void;
 }) {
-  const statusLabelMap: Record<string, string> = { RESERVED: "DP", HELD: "Ambil Dulu", PACKING: "Packing", PAID: "Lunas" };
+  const statusLabelMap: Record<string, string> = { RESERVED: "DP", HELD: "Ambil Dulu", PACKING: "Packing", PENDING: "Pending", PAID: "Lunas" };
   const currentLabel = statusLabelMap[item.status] ?? item.status;
 
   return (
@@ -563,7 +563,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
   const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
   const [cicilanAmount, setCicilanAmount] = useState("");
 
-  const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
+  const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING" || item.status === "PENDING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
@@ -1018,7 +1018,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
   const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
   const [cicilanAmount, setCicilanAmount] = useState("");
 
-  const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING";
+  const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING" || item.status === "PENDING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
@@ -1335,7 +1335,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
             setFullItem(res.data);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
     return () => { active = false; };
   }, [item?.invoice_number]);

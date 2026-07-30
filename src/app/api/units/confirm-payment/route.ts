@@ -50,7 +50,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    if (!["RESERVED", "HELD", "PACKING"].includes(transaction.status)) {
+    if (!["RESERVED", "HELD", "PACKING", "PENDING"].includes(transaction.status)) {
       return NextResponse.json(
         { success: false, message: `Status "${transaction.status}" tidak bisa dikonfirmasi` },
         { status: 400 }
