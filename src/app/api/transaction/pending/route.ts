@@ -37,7 +37,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
         last_edited_by,
         last_edited_at
       `)
-      .in("status", status ? [status] : ["RESERVED", "HELD", "PENDING"])
+      .in("status", status ? [status] : ["RESERVED", "HELD", "PACKING", "PENDING"])
       .order("created_at", { ascending: false });
 
     const { data, error } = await query;
@@ -62,7 +62,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
           ...t,
           sisa_pembayaran,
           can_fu: t.sales_id === user.id,
-          pending_type: t.status === "RESERVED" ? "DP" : t.status === "HELD" ? "AMBIL_DULU" : t.status,
+          pending_type: t.status === "RESERVED" ? "DP" : t.status === "HELD" ? "AMBIL_DULU" : t.status === "PACKING" ? "PACKING" : t.status,
         };
       })
       .filter((t) => {
