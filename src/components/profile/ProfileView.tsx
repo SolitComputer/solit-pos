@@ -115,6 +115,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [savingSong, setSavingSong] = useState(false);
     const [removingSong, setRemovingSong] = useState(false);
     const [playingPreview, setPlayingPreview] = useState(false);
+    const [showInfoPopup, setShowInfoPopup] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
 
     const [pendingSong, setPendingSong] = useState<SongResult | null>(null);
@@ -335,6 +336,12 @@ export default function ProfileView({ userId }: { userId: string }) {
         }
     };
 
+    const handleClosePopup = () => {
+        audioRef.current?.pause();
+        setPlayingPreview(false);
+        setShowInfoPopup(false);
+    };
+
     const handleMainTimeUpdate = () => {
         const audio = audioRef.current;
         if (!audio || !profile) return;
@@ -469,6 +476,77 @@ export default function ProfileView({ userId }: { userId: string }) {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-0 py-6 sm:py-8 lg:py-10 space-y-4 sm:space-y-5 lg:space-y-6">
             {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
+            {showInfoPopup && (profile.song_title || profile.status_note) && (
+                <div className="fixed inset-0 z-[9997] flex items-center justify-center p-4" onClick={handleClosePopup}>
+                    <div className="absolute inset-0 bg-black/60" style={{ backdropFilter: "blur(8px)" }} />
+                    <div className="relative w-full max-w-xs rounded-3xl shadow-2xl overflow-hidden p-6 text-center"
+                        style={{ background: "linear-gradient(160deg, #0f0c29, #1a1545)" }}
+                        onClick={(e) => e.stopPropagation()}>
+                        <button onClick={handleClosePopup}
+                            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
+                            <X className="w-4 h-4 text-white" />
+                        </button>
+
+                        {profile.song_title && (
+                            <>
+                                <div className="w-36 h-36 mx-auto rounded-full overflow-hidden shadow-lg mb-5"
+                                    style={{ animation: playingPreview ? "solitAvatarSpin 8s linear infinite" : "none" }}>
+                                    {profile.song_artwork_url
+                                        ? <img src={profile.song_artwork_url} alt={profile.song_title} className="w-full h-full object-cover" />
+                                        : (
+                                            <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,#1db954,#159c46)" }}>
+                                                <Music className="w-10 h-10 text-white" />
+                                            </div>
+                                        )}
+                                </div>
+
+                                <p className="text-base font-bold text-white truncate">{profile.song_title}</p>
+                                <p className="text-sm truncate mb-5" style={{ color: "rgba(255,255,255,0.55)" }}>{profile.song_artist}</p>
+
+                                {profile.song_preview_url ? (
+                                    <button onClick={togglePreview}
+                                        className="w-16 h-16 rounded-full mx-auto flex items-center justify-center shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                        style={{ background: "rgba(255,255,255,0.14)" }}>
+                                        {playingPreview ? <Pause className="w-6 h-6 text-white" /> : <Play className="w-6 h-6 text-white ml-1" />}
+                                    </button>
+                                ) : (
+                                    <p className="text-xs italic" style={{ color: "rgba(255,255,255,0.4)" }}>Preview tidak tersedia untuk lagu ini</p>
+                                )}
+
+                                {(isSelf || isAdmin) && (
+                                    <button onClick={() => { handleRemoveSong(); handleClosePopup(); }} disabled={removingSong}
+                                        className="mt-4 text-xs font-semibold hover:text-red-400 disabled:opacity-50"
+                                        style={{ color: "rgba(255,255,255,0.5)" }}>
+                                        {removingSong ? "Menghapus..." : "Hapus lagu"}
+                                    </button>
+                                )}
+                            </>
+                        )}
+
+                        {profile.status_note && (
+                            <div className={profile.song_title ? "mt-6 pt-5 border-t border-white/10" : ""}>
+                                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(139,92,246,0.15)" }}>
+                                    <MessageCircle className="w-6 h-6" style={{ color: "#c4b5fd" }} />
+                                </div>
+                                <p className="text-sm font-semibold leading-relaxed text-white mb-1">{profile.status_note}</p>
+                                {profile.status_note_expires_at && (
+                                    <p className="text-[10.5px] mb-3" style={{ color: "rgba(255,255,255,0.45)" }}>{noteTimeLeft(profile.status_note_expires_at)}</p>
+                                )}
+                                {isSelf && (
+                                    <div className="flex items-center justify-center gap-4 text-xs font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>
+                                        <button onClick={() => { handleClosePopup(); setShowViewers(true); }} className="flex items-center gap-1 hover:text-white">
+                                            <Eye className="w-3.5 h-3.5" />
+                                            {viewers.length > 0 ? `Dilihat ${viewers.length} orang` : "Belum ada yang melihat"}
+                                        </button>
+                                        <button onClick={() => { handleRemoveNote(); handleClosePopup(); }} className="hover:text-red-400">Hapus catatan</button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {showPhotoModal && profile.profile_photo_url && (
                 <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" onClick={() => setShowPhotoModal(false)}>
                     <div className="absolute inset-0 bg-black/80" style={{ backdropFilter: "blur(4px)" }} />
@@ -554,13 +632,37 @@ export default function ProfileView({ userId }: { userId: string }) {
                 <div className="px-5 sm:px-7 lg:px-8 pb-6 lg:pb-8">
                     <div className="flex items-end justify-between -mt-10 sm:-mt-12 lg:-mt-14">
                         <div className="relative">
-                            <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
-                                className={`w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-2xl lg:text-3xl font-black ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
-                                style={{ background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
-                                {profile.profile_photo_url
-                                    ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
-                                    : getInitials(profile.name)}
+                            {(profile.song_title || profile.status_note) && (
+                                <button onClick={() => setShowInfoPopup(true)}
+                                    className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full w-max max-w-[180px] px-3 py-2 rounded-2xl shadow-lg text-center z-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                    style={{ background: "rgba(15,12,41,0.94)" }}>
+                                    {profile.song_title && (
+                                        <div className="flex items-center justify-center gap-1">
+                                            <Music className="w-3 h-3 flex-shrink-0" style={{ color: "#1db954" }} />
+                                            <p className="text-[11px] font-bold text-white truncate max-w-[150px]">{profile.song_title}</p>
+                                        </div>
+                                    )}
+                                    {profile.song_artist && <p className="text-[9.5px] truncate" style={{ color: "rgba(255,255,255,0.6)" }}>{profile.song_artist}</p>}
+                                    {profile.status_note && (
+                                        <div className={`flex items-center justify-center gap-1 ${profile.song_title ? "mt-1.5 pt-1.5 border-t border-white/10" : ""}`}>
+                                            <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: "#c4b5fd" }} />
+                                            <p className="text-[10.5px] font-semibold text-white truncate max-w-[150px]">{profile.status_note}</p>
+                                        </div>
+                                    )}
+                                    <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 rotate-45" style={{ background: "rgba(15,12,41,0.94)" }} />
+                                </button>
+                            )}
+
+                            <div className="rounded-full p-[3px]" style={{ background: (profile.song_title || profile.status_note) ? "linear-gradient(135deg, #1db954, #6366f1, #8b5cf6)" : "transparent" }}>
+                                <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
+                                    className={`relative w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-2xl lg:text-3xl font-black ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
+                                    style={{ background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)", animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none" }}>
+                                    {profile.profile_photo_url
+                                        ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
+                                        : getInitials(profile.name)}
+                                </div>
                             </div>
+
                             {(isSelf || isAdmin) && (
                                 <button onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Ganti foto profil"
                                     className="absolute -bottom-1 -right-1 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center hover:scale-110 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
@@ -568,6 +670,9 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 </button>
                             )}
                             <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileSelected} />
+                            {profile.song_preview_url && (
+                                <audio ref={audioRef} src={profile.song_preview_url} onEnded={() => setPlayingPreview(false)} onTimeUpdate={handleMainTimeUpdate} />
+                            )}
                         </div>
                         {isAdmin && !isSelf && profile.profile_photo_url && (
                             <button onClick={() => setConfirmDelete(true)}
@@ -577,6 +682,13 @@ export default function ProfileView({ userId }: { userId: string }) {
                             </button>
                         )}
                     </div>
+
+                    <style jsx>{`
+                        @keyframes solitAvatarSpin {
+                            from { transform: rotate(0deg); }
+                            to   { transform: rotate(360deg); }
+                        }
+                    `}</style>
 
                     <div className="mt-3">
                         <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900">{profile.name}</h1>
@@ -610,35 +722,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                                     <X className="w-3.5 h-3.5" />
                                 </button>
                             </div>
-                        ) : profile.status_note ? (
-                            <div className="space-y-1.5">
-                                <div className="inline-flex items-center gap-2 pl-1 pr-3 py-1 rounded-full max-w-full"
-                                    style={{ background: "#f5f3ff", border: "1px solid #ddd6fe" }}>
-                                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#ede9fe" }}>
-                                        <MessageCircle className="w-3 h-3" style={{ color: "#7c3aed" }} />
-                                    </div>
-                                    <p className="text-xs font-semibold truncate" style={{ color: "#5b21b6" }}>{profile.status_note}</p>
-                                    {isSelf && (
-                                        <>
-                                            <span className="text-[9px] flex-shrink-0" style={{ color: "#a78bfa" }}>
-                                                · {profile.status_note_expires_at ? noteTimeLeft(profile.status_note_expires_at) : ""}
-                                            </span>
-                                            <button onClick={handleRemoveNote} className="flex-shrink-0 opacity-50 hover:opacity-100">
-                                                <X className="w-3 h-3" style={{ color: "#7c3aed" }} />
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                                {isSelf && (
-                                    <button onClick={() => setShowViewers(true)}
-                                        className="flex items-center gap-1 text-[10.5px] font-semibold pl-1"
-                                        style={{ color: "#94a3b8" }}>
-                                        <Eye className="w-3 h-3" />
-                                        {viewers.length > 0 ? `Dilihat ${viewers.length} orang` : "Belum ada yang melihat"}
-                                    </button>
-                                )}
-                            </div>
-                        ) : isSelf ? (
+                        ) : isSelf && !profile.status_note ? (
                             <button onClick={() => { setEditingNote(true); setNoteDraft(""); }}
                                 className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
                                 style={{ background: "#f8fafc", color: "#94a3b8", border: "1px dashed #cbd5e1" }}>
@@ -647,7 +731,8 @@ export default function ProfileView({ userId }: { userId: string }) {
                         ) : null}
                     </div>
 
-                    {/* ── Lagu Favorit — dipindah ke atas, sejajar dengan catatan ─────── */}
+                    {/* ── Lagu Favorit — hanya tampil kalau BELUM ada lagu; kalau sudah ada, tampil sebagai bubble di atas card ─────── */}
+                    {!profile.song_title && (
                     <div className="mt-4 rounded-2xl p-3.5 sm:p-4" style={{ background: "#f8fafc", border: "1px solid #eef2f7" }}>
                         <div className="flex items-center gap-1.5 mb-3">
                             <Music className="w-4 h-4" style={{ color: "#1db954" }} />
@@ -656,54 +741,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                             </p>
                         </div>
 
-                        {profile.song_title ? (
-                            <div className="flex items-center gap-3">
-                                <button onClick={togglePreview} disabled={!profile.song_preview_url}
-                                    className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden flex-shrink-0 shadow-md disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                                    style={{ animation: playingPreview ? "solitSongSpin 3s linear infinite" : "none" }}>
-                                    {profile.song_artwork_url
-                                        ? <img src={profile.song_artwork_url} alt={profile.song_title} className="w-full h-full object-cover" />
-                                        : (
-                                            <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,#1db954,#159c46)" }}>
-                                                <Music className="w-5 h-5 text-white" />
-                                            </div>
-                                        )}
-                                    <div className="absolute inset-0 rounded-full" style={{ boxShadow: "inset 0 0 0 3px rgba(255,255,255,0.85)" }} />
-                                    <div className="absolute rounded-full bg-white" style={{ inset: "38%" }} />
-                                </button>
-
-                                <div className="flex-1 min-w-0 rounded-full pl-4 pr-1.5 py-1.5 flex items-center justify-between gap-2"
-                                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                                    <div className="min-w-0 overflow-hidden">
-                                        <p className="text-xs font-bold text-white truncate">{profile.song_title}</p>
-                                        <p className="text-[10.5px] truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
-                                            {profile.song_artist}
-                                            {profile.song_expires_at && ` · ${noteTimeLeft(profile.song_expires_at)}`}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-1 flex-shrink-0">
-                                        {profile.song_preview_url && (
-                                            <button onClick={togglePreview}
-                                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-                                                style={{ background: "rgba(255,255,255,0.15)" }}>
-                                                {playingPreview ? <Pause className="w-3.5 h-3.5 text-white" /> : <Play className="w-3.5 h-3.5 text-white ml-0.5" />}
-                                            </button>
-                                        )}
-                                        {(isSelf || isAdmin) && (
-                                            <button onClick={handleRemoveSong} disabled={removingSong} title={isSelf ? "Hapus lagu" : `Hapus lagu ${profile.name}`}
-                                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-                                                style={{ background: "rgba(255,255,255,0.15)" }}>
-                                                {removingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin text-white" /> : <X className="w-3.5 h-3.5 text-white" />}
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {profile.song_preview_url && (
-                                    <audio ref={audioRef} src={profile.song_preview_url} onEnded={() => setPlayingPreview(false)} onTimeUpdate={handleMainTimeUpdate} />
-                                )}
-                            </div>
-                        ) : isSelf ? (
+                        {isSelf ? (
                             !showSongSearch ? (
                                 <button onClick={() => setShowSongSearch(true)}
                                     className="w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
@@ -807,14 +845,8 @@ export default function ProfileView({ userId }: { userId: string }) {
                         ) : (
                             <p className="text-xs italic" style={{ color: "#cbd5e1" }}>Belum ada lagu favorit</p>
                         )}
-
-                        <style jsx>{`
-                            @keyframes solitSongSpin {
-                                from { transform: rotate(0deg); }
-                                to   { transform: rotate(360deg); }
-                            }
-                        `}</style>
                     </div>
+                    )}
 
                     <div className="mt-4">
                         {editingBio ? (
@@ -890,8 +922,6 @@ function AchievementCard({
     rank: number | null; totalRanked: number; isRecord: boolean;
     personalBest: string | null; accent: string;
 }) {
-    // Achievement (lencana peringkat) hanya untuk yang masuk 5 besar bulan ini.
-    // Statistik mentah (hari/jam) tetap tampil untuk semua orang.
     const hasAchievement = rank !== null && rank <= 5;
 
     return (
