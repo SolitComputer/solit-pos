@@ -631,7 +631,9 @@ export default function AllUnitsPage() {
     const fetchUnits = useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await fetch("/api/units");
+            // Halaman ini cuma butuh unit SOLD → filter langsung di query string
+            // biar backend gak perlu narik & proses seluruh inventory tiap request.
+            const res = await fetch("/api/units?status=SOLD");
             const result = await res.json();
             const normalized: GlobalUnit[] = (result.data || []).map((u: RawGlobalUnit) => ({
                 ...u,
@@ -675,7 +677,8 @@ export default function AllUnitsPage() {
 
     // ── Computed data ─────────────────────────────────────────────────────────
     // Sumber data halaman ini SELALU unit berstatus SOLD — unit Siap Jual,
-    // Belum Siap, dan Service tidak pernah masuk ke sini.
+    // Belum Siap, dan Service tidak pernah masuk ke sini. Filter di bawah
+    // dipertahankan sebagai jaga-jaga kalau API dipanggil tanpa query filter.
 
     const soldUnits = units.filter(u => u.status === "SOLD");
 
@@ -1136,10 +1139,10 @@ export default function AllUnitsPage() {
                         <>
                             {/* ── Tabel (desktop / laptop, lg ke atas) ── */}
                             <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                <div className="overflow-x-auto">
+                                <div className="overflow-auto" style={{ maxHeight: "calc(100dvh - 280px)" }}>
                                     <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="bg-gray-50/80 border-b border-gray-100">
+                                        <thead className="sticky top-0 z-10">
+                                            <tr className="bg-gray-50 border-b border-gray-100">
                                                 <Th>Serial Number</Th>
                                                 <Th>Laptop</Th>
                                                 <Th>Grade</Th>
