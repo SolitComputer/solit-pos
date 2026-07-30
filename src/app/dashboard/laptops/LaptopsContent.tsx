@@ -45,6 +45,7 @@ interface Laptop {
     siap_jual: number;
     stok_minus: number;
     terjual: number;
+    belum_lunas?: number;
     status: string;
     ready_to_sell: boolean;
     notes: string;
@@ -406,7 +407,7 @@ export function LaptopsContent() {
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ laptop: Laptop; unitCount: number } | null>(null);
-   //  Audit: id laptop yang lagi diproses (biar tombolnya loading & tidak dobel klik)
+    //  Audit: id laptop yang lagi diproses (biar tombolnya loading & tidak dobel klik)
     const [auditingId, setAuditingId] = useState<string | null>(null);
     //  Riwayat audit — laptop yang sedang dibuka riwayatnya di AuditHistoryModal
     const [historyTarget, setHistoryTarget] = useState<{ id: string; name: string } | null>(null);
@@ -485,7 +486,7 @@ export function LaptopsContent() {
         try {
             const res = await fetch("/api/laptops");
             const result = await res.json();
-           const normalized = (result.data || []).map((l: Laptop) => {
+            const normalized = (result.data || []).map((l: Laptop) => {
                 const units = l.laptop_units || [];
                 const siapJual = units.filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
                 const stokMinus = units.filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
@@ -494,6 +495,13 @@ export function LaptopsContent() {
                 // Hanya "Siap Jual" yang berkurang di tahap ini — lihat
                 // api/preparation/route.ts (POST) untuk transisi SIAP_JUAL → DALAM_PENYIAPAN.
                 const dalamPenyiapan = units.filter((u: LaptopUnit) => u.status === "DALAM_PENYIAPAN").length;
+                // Unit "terjual tapi belum lunas": RESERVED (DP), HELD (Ambil Dulu),
+                // PACKING (ecommerce, dana belum cair). Beda dari SOLD (transaksi
+                // "PAID" — benar-benar lunas). Dipakai buat badge "Belum Lunas" di
+                // tabel, dan supaya model ini TIDAK ikut hilang dari filter TERSEDIA.
+                const belumLunas = units.filter((u: LaptopUnit) =>
+                    u.status === "RESERVED" || u.status === "HELD" || u.status === "PACKING"
+                ).length;
                 return {
                     ...l,
                     selling_price: Math.round(Number(l.selling_price) || 0),
@@ -508,6 +516,7 @@ export function LaptopsContent() {
                     siap_jual: siapJual,
                     stok_minus: stokMinus,
                     terjual: units.filter((u: LaptopUnit) => u.status === "SOLD").length,
+                    belum_lunas: belumLunas,
                 };
             });
             setLaptops(normalized);
@@ -556,10 +565,13 @@ export function LaptopsContent() {
         }
 
         // ── Filter stok tersisa ──────────────────────────────────────────────
+        // Model yang punya unit RESERVED/HELD/PACKING (terjual belum lunas) HARUS
+        // tetap tampil di sini walau stok_tersedia = 0 (rule "Terjual tapi Belum
+        // Lunas tetap tampil di Data Barang").
         if (filterStock === "TERSEDIA") {
-            list = list.filter(x => (x.laptop_units?.length ?? 0) === 0 || (x.stok_tersedia ?? 0) > 0);
+            list = list.filter(x => (x.laptop_units?.length ?? 0) === 0 || (x.stok_tersedia ?? 0) > 0 || (x.belum_lunas ?? 0) > 0);
         } else if (filterStock === "HABIS") {
-            list = list.filter(x => (x.stok_tersedia ?? 0) === 0);
+            list = list.filter(x => (x.stok_tersedia ?? 0) === 0 && (x.belum_lunas ?? 0) === 0);
         }
 
         // ── Filter status audit ───────────────────────────────────────────────
@@ -760,9 +772,19 @@ export function LaptopsContent() {
     //  Mapping model laptop → baris tabel (layout papan tulis).
     //  Kolom per-unit (Harga Modal / Sumber / Tgl Masuk / SN) hanya punya nilai
     //  tunggal kalau stok = 1. Kalau >1, diisi ringkasan abu-abu + arahkan ke Units.
-    const tableRows: InventoryRow[] = useMemo(() => filteredLaptops.map(l => {
+   const tableRows: InventoryRow[] = useMemo(() => filteredLaptops.map(l => {
         const aktif = (l.laptop_units || []).filter(u => u.status !== "SOLD");
         const one = aktif.length === 1 ? aktif[0] : null;
+
+        // Breakdown "terjual belum lunas" per model, buat tooltip badge.
+        const reservedCount = aktif.filter(u => u.status === "RESERVED").length;
+        const heldCount = aktif.filter(u => u.status === "HELD").length;
+        const packingCount = aktif.filter(u => u.status === "PACKING").length;
+        const belumLunasLabel = [
+            reservedCount > 0 && `${reservedCount} DP`,
+            heldCount > 0 && `${heldCount} Ambil Dulu`,
+            packingCount > 0 && `${packingCount} Packing`,
+        ].filter(Boolean).join(" · ") || undefined;
 
         const modals = aktif.map(u => u.purchase_price).filter((n): n is number => n != null && n > 0);
         const min = modals.length ? Math.min(...modals) : 0;
@@ -835,6 +857,8 @@ export function LaptopsContent() {
             audited_at: l.audited_at ?? null,
             is_so_active: isSoActive(l.so_at),
             so_at: l.so_at ?? null,
+            belum_lunas: l.belum_lunas ?? 0,
+            belum_lunas_label: belumLunasLabel,
         };
     }), [filteredLaptops]);
 
@@ -1080,7 +1104,7 @@ export function LaptopsContent() {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (l) handleRowClick(l);
                                 }}
-                               renderAudit={canSeePrivateBarang ? (row) => {
+                                renderAudit={canSeePrivateBarang ? (row) => {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (!l) return null;
                                     return (
@@ -1414,7 +1438,7 @@ export function LaptopsContent() {
                     ]} canEdit={canFullAccessBarang}
                     canSeePrivate={canSeePrivateBarang}
                     defaultSellingPrice={unitDetail.laptop.selling_price}
-                  onClose={() => { setUnitDetail(null); setUnitDetailFromLaptopDetail(false); }}
+                    onClose={() => { setUnitDetail(null); setUnitDetailFromLaptopDetail(false); }}
                     onSaved={() => { setUnitDetail(null); setUnitDetailFromLaptopDetail(false); fetchLaptops(); }}
                     onCreated={() => { setUnitDetail(null); setUnitDetailFromLaptopDetail(false); fetchLaptops(); }}
                     onEditLaptop={() => { const l = unitDetail.laptop; setUnitDetail(null); setUnitDetailFromLaptopDetail(false); setTimeout(() => openEdit(l), 60); }}
@@ -1434,7 +1458,7 @@ export function LaptopsContent() {
             {confirmModal && (
                 <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />
             )}
-           {historyTarget && (
+            {historyTarget && (
                 <AuditHistoryModal
                     laptopId={historyTarget.id}
                     laptopName={historyTarget.name}
@@ -1744,7 +1768,7 @@ function AuditHistoryModal({ laptopId, laptopName, onClose }: {
                         </ul>
                     )}
                 </div>
-               <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
                     <button onClick={onClose}
                         className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
                         Tutup
