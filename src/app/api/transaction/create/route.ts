@@ -26,9 +26,6 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
     try {
         const body = await req.json();
 
-        // ─────────────────────────────────────────────────────────────────────
-        // 1. Normalisasi LAPTOP units (aksesori dipisah — lihat step 2)
-        // ─────────────────────────────────────────────────────────────────────
         let laptopUnits: Array<{
             unit_id: string; laptop_id: string; laptop_name: string;
             serial_number: string; grade?: string | null;
