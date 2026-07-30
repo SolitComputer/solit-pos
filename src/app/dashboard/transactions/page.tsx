@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
+import DateRangeCalendarPicker from "@/components/ui/DateRangeCalendarPicker";
 import { createPortal } from "react-dom";
 import {
   ImageIcon, Pencil, CheckCircle2, Receipt, Inbox,
@@ -474,7 +475,7 @@ function MobileCardSkeleton() {
   );
 }
 
-function TableRowSkeleton() {
+function TableRowSkeleton({ canSeeModal }: { canSeeModal: boolean }) {
   return (
     <tr className="border-b border-gray-50">
       <td className="px-4 py-3 text-center"><SkeletonPulse className="h-3 w-5 mx-auto" /></td>
@@ -487,7 +488,9 @@ function TableRowSkeleton() {
       <td className="px-4 py-3"><SkeletonPulse className="h-3 w-24" /></td>
       <td className="px-4 py-3"><SkeletonPulse className="h-3 w-16" /></td>
       <td className="px-4 py-3 text-right"><SkeletonPulse className="h-3 w-20 ml-auto" /></td>
-      <td className="px-4 py-3 text-right"><SkeletonPulse className="h-3 w-20 ml-auto" /></td>
+      {canSeeModal && (
+        <td className="px-4 py-3 text-right"><SkeletonPulse className="h-3 w-20 ml-auto" /></td>
+      )}
       <td className="px-4 py-3 text-center"><SkeletonPulse className="h-6 w-20 rounded-lg mx-auto" /></td>
       <td className="px-4 py-3 text-center"><SkeletonPulse className="h-5 w-16 rounded-lg mx-auto" /></td>
       <td className="px-4 py-3 text-center"><SkeletonPulse className="h-5 w-16 rounded-lg mx-auto" /></td>
@@ -500,19 +503,20 @@ function MobileSkeletonList() {
   return <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <MobileCardSkeleton key={i} />)}</div>;
 }
 
-function DesktopSkeletonTable() {
+function DesktopSkeletonTable({ canSeeModal }: { canSeeModal: boolean }) {
+  const headers = ["No", "Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "CPU", "SN", "Harga", ...(canSeeModal ? ["Margin"] : []), "Metode", "Sumber", "Toko", "Aksi"];
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ minWidth: "1960px" }}>
+        <table className="w-full border-collapse" style={{ minWidth: canSeeModal ? "1960px" : "1835px" }}>
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
-              {["No", "Status", "Nota", "Customer", "Kontak", "Sales", "Laptop", "CPU", "SN", "Harga", "Margin", "Metode", "Sumber", "Toko", "Aksi"].map((h) => (
+              {headers.map((h) => (
                 <th key={h} className="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody>{Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} />)}</tbody>
+          <tbody>{Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} canSeeModal={canSeeModal} />)}</tbody>
         </table>
       </div>
     </div>
@@ -1656,6 +1660,9 @@ export default function Page() {
   const [isMobile, setIsMobile] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showBulkSN, setShowBulkSN] = useState(false);
+  const [bulkSNInput, setBulkSNInput] = useState("");
+  const [debouncedBulkSN, setDebouncedBulkSN] = useState("");
   const [status, setStatus] = useState("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -1710,6 +1717,16 @@ export default function Page() {
   }, [search]);
 
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedBulkSN(bulkSNInput), 400);
+    return () => clearTimeout(t);
+  }, [bulkSNInput]);
+  const bulkSNList = useMemo(() => Array.from(new Set(
+    debouncedBulkSN
+      .split(/[\s,;]+/)
+      .map(s => s.trim().toUpperCase())
+      .filter(Boolean)
+  )), [debouncedBulkSN]);
+  useEffect(() => {
     fetch("/api/transaction?meta=1").then(r => r.json()).then(r => {
       if (r.success) {
         setPaymentMethodOptions(r.paymentMethods ?? []);
@@ -1744,7 +1761,11 @@ export default function Page() {
       } else {
         params.set("page", String(currentPage));
         params.set("limit", String(itemsPerPage));
-        if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+        if (bulkSNList.length > 0) {
+          params.set("snList", bulkSNList.join(","));
+        } else if (debouncedSearch.trim()) {
+          params.set("search", debouncedSearch.trim());
+        }
         if (customerType !== "ALL") params.set("customerType", customerType);
         if (dateFrom) params.set("dateFrom", dateFrom);
         if (dateTo) params.set("dateTo", dateTo);
@@ -1769,12 +1790,12 @@ export default function Page() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortBy, sortDir, companyName, itemKind, itemsPerPage]);
+  }, [debouncedSearch, bulkSNList, status, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, sortBy, sortDir, companyName, itemKind, itemsPerPage]);
 
   useEffect(() => {
     fetchTransactions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, itemsPerPage, status, sortBy, sortDir, debouncedSearch, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, companyName, itemKind, focusInvoice]);
+  }, [currentPage, itemsPerPage, status, sortBy, sortDir, debouncedSearch, bulkSNList, customerType, dateFrom, dateTo, paymentMethod, sourcePlatform, companyName, itemKind, focusInvoice]);
 
   const paginatedTransactions = useMemo(() => {
     if (!CLIENT_SIDE_SORT_KEYS.includes(sortBy)) return allTransactions;
@@ -1794,7 +1815,8 @@ export default function Page() {
   const activeFilterCount = [status !== "ALL", customerType !== "ALL", !!dateFrom, !!dateTo, paymentMethod !== "ALL", sourcePlatform !== "ALL", companyName !== "ALL", itemKind !== "ALL"].filter(Boolean).length;
 
   const resetFilters = () => {
-    setSearch(""); setDebouncedSearch(""); setStatus("ALL"); setCustomerType("ALL"); setDateFrom(""); setDateTo("");
+    setSearch(""); setDebouncedSearch(""); setBulkSNInput(""); setDebouncedBulkSN("");
+    setStatus("ALL"); setCustomerType("ALL"); setDateFrom(""); setDateTo("");
     setPaymentMethod("ALL"); setSourcePlatform("ALL"); setCompanyName("ALL"); setItemKind("ALL");
   };
 
@@ -1813,7 +1835,8 @@ export default function Page() {
         exportParams.set("sortBy", sortBy);
         exportParams.set("sortDir", sortDir);
       }
-      if (debouncedSearch.trim()) exportParams.set("search", debouncedSearch.trim());
+      if (bulkSNList.length > 0) exportParams.set("snList", bulkSNList.join(","));
+      else if (debouncedSearch.trim()) exportParams.set("search", debouncedSearch.trim());
       if (customerType !== "ALL") exportParams.set("customerType", customerType);
       if (dateFrom) exportParams.set("dateFrom", dateFrom);
       if (dateTo) exportParams.set("dateTo", dateTo);
@@ -2024,7 +2047,8 @@ export default function Page() {
               <input
                 type="text"
                 placeholder="Cari nota, customer, laptop, CPU, SN..."
-                className="w-full border border-gray-200 rounded-xl h-9 pl-9 pr-8 text-sm text-gray-800 placeholder-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition"
+                disabled={bulkSNList.length > 0}
+                className="w-full border border-gray-200 rounded-xl h-9 pl-9 pr-8 text-sm text-gray-800 placeholder-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -2060,7 +2084,44 @@ export default function Page() {
                 <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] font-bold">{activeFilterCount}</span>
               )}
             </button>
+
+            <button
+              onClick={() => setShowBulkSN(!showBulkSN)}
+              title="Cari banyak Serial Number sekaligus"
+              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${showBulkSN || bulkSNInput ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" />
+              </svg>
+              <span className="hidden sm:inline">Cari Banyak SN</span>
+              {bulkSNInput && <span className="inline-flex w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+            </button>
           </div>
+
+          {/* ── Panel Cari Banyak SN ── */}
+          {showBulkSN && (
+            <div className="pt-3 border-t border-gray-50">
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                Tempel banyak Serial Number (pisahkan dengan baris baru, koma, atau spasi)
+              </label>
+              <textarea
+                value={bulkSNInput}
+                onChange={(e) => setBulkSNInput(e.target.value)}
+                rows={4}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition resize-y"
+              />
+              {bulkSNList.length > 0 && (
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[11px] text-gray-400">
+                    {isLoading ? "Mencari..." : <><span className="font-bold text-gray-600">{totalCount}</span> transaksi cocok dengan {bulkSNList.length} SN yang dicari</>}
+                  </span>
+                  <button onClick={() => { setBulkSNInput(""); setDebouncedBulkSN(""); }} className="text-[11px] font-semibold text-red-500 hover:underline">
+                    Hapus daftar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Filter Panel ── */}
           {showFilters && (
@@ -2079,18 +2140,11 @@ export default function Page() {
 
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Rentang Tanggal</p>
-                <div className="flex items-center gap-2">
-                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-                    className="flex-1 h-9 border border-gray-200 rounded-xl px-3 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition" />
-                  <span className="text-gray-300 text-xs flex-shrink-0">–</span>
-                  <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)}
-                    className="flex-1 h-9 border border-gray-200 rounded-xl px-3 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition" />
-                  {(dateFrom || dateTo) && (
-                    <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="w-8 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 border border-gray-200 transition flex-shrink-0">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                    </button>
-                  )}
-                </div>
+                <DateRangeCalendarPicker
+                  from={dateFrom}
+                  to={dateTo}
+                  onChange={(f, t) => { setDateFrom(f); setDateTo(t); }}
+                />
               </div>
 
               {uniqueSourcePlatforms.length > 1 && (
@@ -2174,7 +2228,7 @@ export default function Page() {
 
         {/* ── Content ── */}
         {isLoading ? (
-          isMobile ? <MobileSkeletonList /> : <DesktopSkeletonTable />
+          isMobile ? <MobileSkeletonList /> : <DesktopSkeletonTable canSeeModal={canSeeModal} />
         ) : paginatedTransactions.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 py-16 px-4 text-center">
             <div className="text-gray-300 flex justify-center mb-3 opacity-50"><Inbox className="w-12 h-12" /></div>
