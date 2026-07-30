@@ -57,6 +57,11 @@ export interface InventoryRow {
 
     /** Badge "NEW" — true kalau ada unit yang masuk dalam 3 hari terakhir */
     is_new?: boolean;
+
+    /** Jumlah unit yang sudah "terjual" (dikomit ke customer) tapi belum lunas — RESERVED (DP) / HELD (Ambil Dulu) / PACKING (dana marketplace belum cair) */
+    belum_lunas?: number;
+    /** Rincian breakdown belum lunas, misal "2 DP · 1 Ambil Dulu" */
+    belum_lunas_label?: string;
 }
 
 interface Props {
@@ -69,6 +74,8 @@ interface Props {
     showSparepart?: boolean;
     /** Tampilkan kolom Total Jual = Harga Jual × Stok Tersisa (opt-in — Data Barang) */
     showTotalJual?: boolean;
+    /** Label kolom tanggal — default "Tanggal Masuk", dipakai "Tanggal Terjual" di tab Terjual */
+    dateColumnLabel?: string;
     onRowClick?: (row: InventoryRow) => void;
     renderActions?: (row: InventoryRow) => React.ReactNode;
     /** Render kolom Audit di samping Aksi (opt-in — Data Barang) */
@@ -108,11 +115,22 @@ const NewBadge = () => (
         New
     </span>
 );
+//  Badge "Belum Lunas" — dipakai saat model punya unit RESERVED (DP) / HELD
+//  (Ambil Dulu) / PACKING (dana marketplace belum cair). Unit yang SUDAH lunas
+//  (SOLD) justru hilang dari tabel ini, jadi tidak butuh badge.
+const BelumLunasBadge = ({ label }: { label?: string }) => (
+    <span
+        title={label ? `Terjual, belum lunas: ${label}` : "Ada unit yang sudah terjual tapi belum lunas"}
+        className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wide bg-amber-500 text-white shrink-0 shadow-sm shadow-amber-500/30"
+    >
+        Belum Lunas
+    </span>
+);
 
 
 
 export default function InventoryTable({
-    rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual,
+    rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual, dateColumnLabel,
     onRowClick, renderActions, renderAudit, renderSo, sortBy, onSort,
 }: Props) {
     const [localSort, setLocalSort] = useState<{ col: SortKey; dir: "asc" | "desc" } | null>(null);
@@ -189,7 +207,7 @@ export default function InventoryTable({
                         {canSeePrivate && <Th right sortKey="GROSS_PROFIT" activeSort={sortBy} onSort={onSort}>Gross Profit</Th>}
                         {showTotalJual && canSeeStock && <Th right sortKey="TOTAL_JUAL" activeSort={sortBy} onSort={onSort}>Total Jual</Th>}
                         {canSeePrivate && <Th sortKey="SUMBER" activeSort={sortBy} onSort={onSort}>Sumber</Th>}
-                        {canSeePrivate && <Th sortKey="TANGGAL" activeSort={sortBy} onSort={onSort}>Tanggal Masuk</Th>}
+                        {canSeePrivate && <Th sortKey="TANGGAL" activeSort={sortBy} onSort={onSort}>{dateColumnLabel ?? "Tanggal Masuk"}</Th>}
                         <Th sortKey="SN" activeSort={sortBy} onSort={onSort}>SN</Th>
                         {canSeeStock && <Th center sortKey="STOK" activeSort={sortBy} onSort={onSort} title="Stok Tersisa">ST</Th>}
                         <Th center sortKey="SIAP" activeSort={sortBy} onSort={onSort} title="Siap Jual">SJ</Th>
@@ -218,6 +236,7 @@ export default function InventoryTable({
                                         {row.laptop_name}
                                     </span>
                                     {row.is_new && <NewBadge />}
+                                    {(row.belum_lunas ?? 0) > 0 && <BelumLunasBadge label={row.belum_lunas_label} />}
                                 </div>
                             </td>
 
