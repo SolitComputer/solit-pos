@@ -35,7 +35,7 @@ export default function AkuntansiPeriodPickerPage() {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
-const [year, setYear] = useState(currentYear);
+  const [year, setYear] = useState(currentYear);
 
   // Foto companion custom — bisa diganti langsung dari web (upload), tanpa perlu edit kode.
   // Kalau belum pernah di-upload, fallback ke foto default di /public/images.
@@ -71,7 +71,7 @@ const [year, setYear] = useState(currentYear);
     } finally {
       setUploadingPhoto(false);
     }
- };
+  };
 
   // Motif/watermark background di kartu bulan — sama seperti foto companion, bisa diganti dari web.
   const [cardWatermarkUrl, setCardWatermarkUrl] = useState<string | null>(null);
@@ -129,7 +129,7 @@ const [year, setYear] = useState(currentYear);
 
         <div className="relative max-w-[1100px] mx-auto px-6 py-10 space-y-8">
           {/* Header — glass hero panel, foto & year switcher digabung jadi satu widget */}
-          <div className="relative rounded-[28px] border border-white/70 bg-white/50 backdrop-blur-sm shadow-[0_10px_35px_rgba(150,120,80,0.10)] px-6 py-6 sm:px-8 sm:py-7 flex items-start justify-between flex-wrap gap-6">
+        <div className="relative rounded-[28px] border border-white/70 bg-white/50 backdrop-blur-sm shadow-[0_10px_35px_rgba(70,120,170,0.10)] px-6 py-6 sm:px-8 sm:py-7 flex items-start justify-between flex-wrap gap-6">
             <span aria-hidden="true" className="butterfly butterfly-1">
               <svg viewBox="0 0 32 24" className="w-5 h-4 sm:w-6 sm:h-5">
                 <g className="butterfly-wing-l" style={{ transformOrigin: "16px 12px" }}>
@@ -195,7 +195,7 @@ const [year, setYear] = useState(currentYear);
 
             {/* Companion frame (foto) + Year switcher — satu grup, tidak lagi tabrakan */}
             <div className="relative flex flex-col items-center gap-3">
-             <div className="nahida-float group relative w-20 h-20 sm:w-28 sm:h-28">
+              <div className="nahida-float group relative w-20 h-20 sm:w-28 sm:h-28">
                 <div className="absolute -inset-3 rounded-full bg-gradient-to-br from-[#BFE8CE] via-[#E7D9F5] to-[#F6E3B4] opacity-70 blur-xl" />
                 <div className="absolute inset-0 rounded-full p-[3px] bg-gradient-to-br from-[#9FD8B5] via-[#F6E3B4] to-[#E7D9F5] shadow-[0_6px_18px_rgba(150,120,80,0.25)]">
                   <div className="w-full h-full rounded-full overflow-hidden bg-white">
@@ -287,9 +287,9 @@ const [year, setYear] = useState(currentYear);
                 >
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 z-[-1] flex items-center justify-center opacity-[0.07]"
+                    className="pointer-events-none absolute inset-0 z-[-1] flex items-center justify-center opacity-[0.22]"
                   >
-                   {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={cardWatermarkUrl || "/images/nahida-wle.png"}
                       alt=""
@@ -356,17 +356,17 @@ const [year, setYear] = useState(currentYear);
             })}
           </div>
 
-        {/* Footer note */}
+          {/* Footer note */}
           <div className="relative rounded-2xl border border-white/70 bg-white/50 backdrop-blur-sm px-5 py-3.5 shadow-[0_4px_16px_rgba(150,120,80,0.06)]">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <p className="text-xs text-gray-500 font-mono">
                 Data jurnal dipisah per bulan. Bulan yang belum lewat tetap bisa dibuka untuk input berjalan.
               </p>
-              <button
+<button
                 type="button"
                 onClick={() => watermarkInputRef.current?.click()}
                 disabled={uploadingWatermark}
-                className="text-[11px] font-semibold text-[#9C7420] hover:underline disabled:opacity-50 disabled:cursor-wait shrink-0"
+                className="text-[11px] font-semibold text-[#2F6FA6] hover:underline disabled:opacity-50 disabled:cursor-wait shrink-0"
               >
                 {uploadingWatermark ? "Mengupload..." : "Ganti motif kartu"}
               </button>
