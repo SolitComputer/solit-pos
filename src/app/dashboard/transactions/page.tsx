@@ -1062,8 +1062,21 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
   const datePart = formatDate(item.created_at);
   const timePart = new Date(item.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
-  const renderLaptopCell = () => {
+ const renderLaptopCell = () => {
     const grouped: any[] = item.grouped_items ?? [];
+    const accs: any[] = item.accessory_items ?? [];
+
+    // ── REVISI: List nama aksesoris, ditampilkan di bawah nama laptop (kalau ada) ──
+    const accessoryList = accs.length > 0 ? (
+      <div className={`space-y-0.5 ${(grouped.length > 0 || item.laptop_name) ? "mt-1.5 pt-1.5 border-t border-gray-100" : ""}`}>
+        {accs.map((a: any, idx: number) => (
+          <div key={idx} className="text-[10px] font-semibold text-emerald-700 leading-snug truncate">
+            {a.name} <span className="text-gray-400 font-normal">({a.quantity}x)</span>
+          </div>
+        ))}
+      </div>
+    ) : null;
+
     if (grouped.length > 1) {
       return (
         <div className="space-y-2">
@@ -1079,9 +1092,24 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
               </div>
             </div>
           ))}
+          {accessoryList}
         </div>
       );
     }
+
+    // ── REVISI: Transaksi aksesoris-only (tidak ada laptop_name) → tampilkan nama aksesoris, bukan "—" ──
+    if (!item.laptop_name && accs.length > 0) {
+      return (
+        <div className="space-y-0.5">
+          {accs.map((a: any, idx: number) => (
+            <div key={idx} className="text-xs font-bold text-emerald-700 leading-snug truncate">
+              {a.name} <span className="text-[10px] text-gray-400 font-normal">({a.quantity}x)</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     return (
       <div>
         <div className="text-xs font-bold text-gray-900 leading-snug mb-1">{item.laptop_name || "—"}</div>
@@ -1091,6 +1119,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
             {item.storage && <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold whitespace-nowrap border border-blue-100">{item.storage}</span>}
           </div>
         )}
+        {accessoryList}
       </div>
     );
   };
