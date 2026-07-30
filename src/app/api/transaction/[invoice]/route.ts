@@ -4,6 +4,13 @@ import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { recordOutflow, cancelOutflowByInvoice } from "@/lib/accessoryOutflow";
 
+const STATUS_TO_UNIT_STATUS: Record<string, string> = {
+  RESERVED: "RESERVED",
+  HELD: "HELD",
+  PACKING: "PACKING",
+  PAID: "SOLD",
+};
+
 interface Props {
   params: Promise<{ invoice: string }>;
 }
@@ -12,7 +19,7 @@ interface Props {
 // Mengembalikan boolean supaya kegagalan write TIDAK ditelan diam-diam.
 async function setUnitStatusById(
   unitId: string,
-  status: "SIAP_JUAL" | "TERJUAL"
+  status: "SIAP_JUAL" | "SOLD"
 ): Promise<boolean> {
   const { error } = await supabase
     .from("laptop_units")
@@ -27,7 +34,7 @@ async function setUnitStatusById(
 }
 
 // ── Helper: set status unit by SN (fallback legacy) ──────────────────────────
-async function setUnitStatus(sn: string, status: "SIAP_JUAL" | "TERJUAL") {
+async function setUnitStatus(sn: string, status: "SIAP_JUAL" | "SOLD") {
   const { error } = await supabase
     .from("laptop_units")
     .update({ status })
@@ -176,7 +183,7 @@ async function syncUnitStatusesByIds(
   // Update status di laptop_units — sekarang track hasil sukses/gagalnya
   const results = await Promise.all([
     ...toRelease.map((id) => setUnitStatusById(id, "SIAP_JUAL")),
-    ...toMark.map((id) => setUnitStatusById(id, "TERJUAL")),
+    ...toMark.map((id) => setUnitStatusById(id, "SOLD")),
   ]);
 
   const failed = results.filter((ok) => !ok).length;
@@ -235,12 +242,52 @@ async function resolveNewUnitIds(
   return [...resolved];
 }
 
+// ── Fix utama: sinkronkan SEMUA unit yang masih jadi bagian transaksi ke
+// status transaksi yang sebenarnya (bukan hard-code "TERJUAL"), dan lepas
+// unit yang sudah tidak ikut ke SIAP_JUAL. Dipanggil setiap kali status
+// transaksi berubah — TERLEPAS apakah unit_ids ikut dikirim atau tidak.
+async function applyFinalUnitStatuses(
+  releasedIds: string[],
+  activeIds: string[],
+  activeStatus: string
+) {
+  if (releasedIds.length === 0 && activeIds.length === 0) return;
+
+  if (releasedIds.length > 0) {
+    const { error } = await supabase
+      .from("laptop_units")
+      .update({ status: "SIAP_JUAL", reserved_by: null, reserved_invoice: null })
+      .in("id", releasedIds);
+    if (error) console.error("[applyFinalUnitStatuses] gagal release unit:", error.message);
+  }
+
+  if (activeIds.length > 0) {
+    const { error } = await supabase
+      .from("laptop_units")
+      .update({ status: activeStatus })
+      .in("id", activeIds);
+    if (error) console.error(`[applyFinalUnitStatuses] gagal set status ${activeStatus}:`, error.message);
+  }
+
+  const affectedUnitIds = [...releasedIds, ...activeIds];
+  const { data: affectedUnits } = await supabase
+    .from("laptop_units")
+    .select("laptop_id")
+    .in("id", affectedUnitIds);
+
+  const affectedLaptopIds = [
+    ...new Set((affectedUnits ?? []).map((u: { laptop_id: string }) => u.laptop_id).filter(Boolean)),
+  ];
+
+  await syncLaptopParentStats(affectedLaptopIds);
+}
+
 async function syncUnitStatusesByFinalIds(toRelease: string[], toMark: string[]) {
   if (toRelease.length === 0 && toMark.length === 0) return;
 
   const results = await Promise.all([
     ...toRelease.map((id) => setUnitStatusById(id, "SIAP_JUAL")),
-    ...toMark.map((id) => setUnitStatusById(id, "TERJUAL")),
+    ...toMark.map((id) => setUnitStatusById(id, "SOLD")),
   ]);
 
   const failed = results.filter((ok) => !ok).length;
@@ -261,12 +308,6 @@ async function syncUnitStatusesByFinalIds(toRelease: string[], toMark: string[])
   await syncLaptopParentStats(affectedLaptopIds);
 }
 
-// ── Rekonsiliasi penuh transaction_items terhadap komposisi unit FINAL ───
-// Beda dari versi diff-based: ini menghapus SEMUA baris unit yang tidak ada
-// di komposisi final (termasuk sisa data lama yang sudah nyangkut dari
-// sebelum fix ini), dan membuat baris untuk unit final yang belum punya
-// baris — jadi otomatis "menyembuhkan" data yang sudah kadung tidak sinkron,
-// tidak cuma yang berubah di sesi edit ini saja.
 async function reconcileTransactionItems(
   invoice: string,
   transactionId: string,
@@ -351,7 +392,7 @@ async function syncUnitStatuses(oldSNs: string[], newSNs: string[]) {
 
   await Promise.all([
     ...toRelease.map((sn) => setUnitStatus(sn, "SIAP_JUAL")),
-    ...toMark.map((sn) => setUnitStatus(sn, "TERJUAL")),
+    ...toMark.map((sn) => setUnitStatus(sn, "SOLD")),
   ]);
 
   // Ambil laptop_id dari SN yang terdampak lalu recalculate parent
@@ -854,13 +895,22 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    // ── Sync status unit ─────────────────────────────────────────────
-    // PRIORITAS 0: pembatalan transaksi → lepas SEMUA unit ke stok.
+
     if (isCancelling) {
       await releaseTransactionUnits(before, invoice);
-    }
-    else if (finalToRelease.length > 0 || finalToMark.length > 0) {
-      await syncUnitStatusesByFinalIds(finalToRelease, finalToMark);
+    } else {
+      const currentUnitIds = unitFieldsProvided
+        ? finalNewUnitIds
+        : (Array.isArray(before?.unit_ids) ? before.unit_ids : before?.unit_id ? [before.unit_id] : []).filter(Boolean);
+
+      const effectiveStatus = body.status !== undefined ? body.status : before?.status;
+      const mappedUnitStatus = STATUS_TO_UNIT_STATUS[effectiveStatus];
+
+      if (mappedUnitStatus) {
+        await applyFinalUnitStatuses(finalToRelease, currentUnitIds, mappedUnitStatus);
+      } else if (finalToRelease.length > 0 || finalToMark.length > 0) {
+        await syncUnitStatusesByFinalIds(finalToRelease, finalToMark);
+      }
     }
 
     // ── Activity log ─────────────────────────────────────────────────
