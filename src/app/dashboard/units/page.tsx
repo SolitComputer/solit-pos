@@ -588,6 +588,9 @@ export default function AllUnitsPage() {
     const [filterGradeTab, setFilterGradeTab] = useState("ALL");
     const [searchSN, setSearchSN] = useState("");
     const [searchLaptop, setSearchLaptop] = useState("");
+    // Mode cari banyak SN sekaligus (paste list SN dipisah baris baru/koma/spasi)
+    const [showBulkSN, setShowBulkSN] = useState(false);
+    const [bulkSNInput, setBulkSNInput] = useState("");
     const [filterPriceMin, setFilterPriceMin] = useState("");
     const [filterPriceMax, setFilterPriceMax] = useState("");
     const [filterDateFrom, setFilterDateFrom] = useState("");
@@ -682,10 +685,33 @@ export default function AllUnitsPage() {
 
     const soldUnits = units.filter(u => u.status === "SOLD");
 
+    // Parsing textarea "Cari Banyak SN" — pisah berdasarkan baris baru, koma,
+    // titik koma, atau spasi, lalu di-uppercase supaya matching case-insensitive.
+    const bulkSNList = bulkSNInput
+        .split(/[\s,;]+/)
+        .map(s => s.trim().toUpperCase())
+        .filter(Boolean);
+    const bulkSNSet = new Set(bulkSNList);
+    // Berapa SN dari daftar yang ketemu — dihitung per TOKEN unik yang di-paste
+    // (pakai bulkSNSet biar konsisten dgn bulkSNSet.size yang ditampilkan di UI),
+    // matching pakai includes() biar sama seperti kotak SN tunggal.
+    const bulkSNFoundCount = bulkSNSet.size > 0
+        ? Array.from(bulkSNSet).filter(token =>
+            soldUnits.some(u => u.serial_number.toUpperCase().includes(token))
+        ).length
+        : 0;
+
     const filteredUnits = sortUnits(
         soldUnits.filter(u => {
             if (filterGradeTab !== "ALL" && u.grade !== filterGradeTab) return false;
-            if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;
+            // Mode "Cari Banyak SN" aktif → exact-match ke daftar SN, dan kotak
+            // pencarian SN tunggal (searchSN) diabaikan supaya tidak bentrok.
+            if (bulkSNList.length > 0) {
+                const snUpper = u.serial_number.toUpperCase();
+                if (!bulkSNList.some(token => snUpper.includes(token))) return false;
+            } else if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) {
+                return false;
+            }
             if (searchLaptop && !u.laptop_name.toLowerCase().includes(searchLaptop.toLowerCase())) return false;
             if (filterPriceMin && u.selling_price < Number(filterPriceMin)) return false;
             if (filterPriceMax && u.selling_price > Number(filterPriceMax)) return false;
@@ -696,10 +722,10 @@ export default function AllUnitsPage() {
         dateSortOrder
     );
 
-    const hasActiveFilter = searchSN || searchLaptop || filterPriceMin || filterPriceMax || filterDateFrom || filterDateTo;
+    const hasActiveFilter = searchSN || searchLaptop || bulkSNInput || filterPriceMin || filterPriceMax || filterDateFrom || filterDateTo;
 
     const resetFilters = () => {
-        setSearchSN(""); setSearchLaptop("");
+        setSearchSN(""); setSearchLaptop(""); setBulkSNInput("");
         setFilterPriceMin(""); setFilterPriceMax("");
         setFilterDateFrom(""); setFilterDateTo("");
         setFilterGradeTab("ALL");
@@ -1032,7 +1058,8 @@ export default function AllUnitsPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                                 <input type="text" placeholder="Cari serial number..." value={searchSN} onChange={e => setSearchSN(e.target.value)}
-                                    className="w-full h-10 sm:h-9 border border-gray-200 rounded-lg pl-9 pr-8 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
+                                    disabled={bulkSNSet.size > 0}
+                                    className="w-full h-10 sm:h-9 border border-gray-200 rounded-lg pl-9 pr-8 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition disabled:opacity-50 disabled:cursor-not-allowed" />
                                 {searchSN && (
                                     <button onClick={() => setSearchSN("")} className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 transition">
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1071,6 +1098,15 @@ export default function AllUnitsPage() {
                                     {(filterPriceMin || filterPriceMax || filterDateFrom || filterDateTo) && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                                 </button>
 
+                                <button onClick={() => setShowBulkSN(v => !v)}
+                                    className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 h-10 sm:h-9 rounded-lg text-xs font-medium border transition active:scale-[0.98] ${showBulkSN || bulkSNInput ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h10" />
+                                    </svg>
+                                    Cari Banyak SN
+                                    {bulkSNInput && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                                </button>
+
                                 {hasActiveFilter && (
                                     <button onClick={resetFilters} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-2.5 h-10 sm:h-9 rounded-lg text-xs font-medium text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 transition active:scale-[0.98]">
                                         <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1104,6 +1140,32 @@ export default function AllUnitsPage() {
                                     <input type="date" value={filterDateTo} min={filterDateFrom || undefined} onChange={e => setFilterDateTo(e.target.value)}
                                         className="w-full h-10 sm:h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
                                 </div>
+                            </div>
+                        )}
+
+                        {showBulkSN && (
+                            <div className="border-t border-gray-100 pt-3">
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                    Tempel banyak Serial Number (pisahkan dengan baris baru, koma, atau spasi)
+                                </label>
+                                <textarea
+                                    value={bulkSNInput}
+                                    onChange={e => setBulkSNInput(e.target.value)}
+                                    rows={4}
+                                    placeholder={"Contoh:\n0006418\n0006804\n0006419"}
+                                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition resize-y"
+                                />
+                                {bulkSNSet.size > 0 && (
+                                    <div className="flex items-center justify-between mt-1.5">
+                                        <span className="text-[11px] text-gray-400">
+                                            <span className="font-semibold text-gray-600">{bulkSNFoundCount}</span> dari{" "}
+                                            <span className="font-semibold text-gray-600">{bulkSNSet.size}</span> SN ditemukan
+                                        </span>
+                                        <button onClick={() => setBulkSNInput("")} className="text-[11px] font-medium text-red-500 hover:underline">
+                                            Hapus daftar
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
