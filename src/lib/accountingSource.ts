@@ -258,12 +258,10 @@ async function buildTransactionDrafts(
         lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
       }
     } else if (t.status === "HELD") {
-      // "Ambil Dulu" → belum bayar = Piutang
       lines.push({ account_code: AKUN.PIUTANG, side: "DEBIT", nominal: deal });
     } else if (t.status === "PACKING" || t.status === "PENDING") {
       lines.push({ account_code: AKUN.ECOMMERS, side: "DEBIT", nominal: deal });
     } else if (t.status === "RESERVED") {
-      // DP: kas masuk sebesar DP, sisanya piutang
       const dp = Math.min(deal, Math.round(Number(t.dp_amount ?? 0)));
       if (dp > 0) lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: dp });
       const sisa = deal - dp;
@@ -272,7 +270,6 @@ async function buildTransactionDrafts(
 
     lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
 
-    // HPP terjual: Modal Keluar (440) ← HPP/Modal (130)
     if (modal > 0) {
       lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
       lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
