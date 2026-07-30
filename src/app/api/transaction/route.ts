@@ -62,6 +62,10 @@ async function handler(req: NextRequest) {
     }
 
     const search = url.searchParams.get("search") ?? "";
+    const snList = (url.searchParams.get("snList") ?? "")
+      .split(/[\s,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
     const status = url.searchParams.get("status") ?? "ALL";
     const invoiceExact = url.searchParams.get("invoiceExact") ?? "";
     const isExport = url.searchParams.get("export") === "1";
@@ -92,7 +96,24 @@ async function handler(req: NextRequest) {
       query = query.eq("invoice_number", invoiceExact.trim());
     } else {
       if (status !== "ALL") query = query.eq("status", status);
-      if (search.trim()) {
+
+      if (snList.length > 0) {
+        const { data: snItemMatches } = await supabase
+          .from("transaction_items")
+          .select("invoice_number")
+          .or(snList.map((token) => `serial_number.ilike.%${token}%`).join(","));
+
+        const snInvoiceNumbers = new Set<string>(
+          (snItemMatches ?? []).map((r: any) => r.invoice_number).filter(Boolean)
+        );
+
+        const snOrParts = snList.map((token) => `serial_number.ilike.%${token}%`);
+        if (snInvoiceNumbers.size > 0) {
+          snOrParts.push(`invoice_number.in.(${Array.from(snInvoiceNumbers).join(",")})`);
+        }
+
+        query = query.or(snOrParts.join(","));
+      } else if (search.trim()) {
         const term = search.trim();
 
         const [{ data: snMatches }, { data: cpuLaptops }] = await Promise.all([
