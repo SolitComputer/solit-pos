@@ -287,6 +287,120 @@ function PriceListPedagangContent() {
         });
       });
 
+      // ─── Sheet 2: Rekap Qty ────────────────────────────────────────────────
+      // Produk dengan nama + CPU + RAM + Storage yang SAMA digabung jadi 1 baris,
+      // harga TIDAK ikut jadi kunci grouping (beda dari sheet 1), cuma qty totalnya.
+      const wsQty = wb.addWorksheet("Rekap Qty", {
+        views: [{ state: "frozen", ySplit: 1 }],
+        pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
+      });
+
+      const QTY_COLS = [
+        { header: "No", key: "no", width: 6 },
+        { header: "Product", key: "product", width: 36 },
+        { header: "CPU", key: "cpu", width: 22 },
+        { header: "RAM", key: "ram", width: 12 },
+        { header: "HDD/SSD", key: "storage", width: 16 },
+        { header: "Qty", key: "qty", width: 12 },
+        { header: "Price Store", key: "price", width: 24 },
+      ];
+      wsQty.columns = QTY_COLS;
+
+      QTY_COLS.forEach((col, i) => {
+        const cell = wsQty.getCell(1, i + 1);
+        cell.value = col.header;
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
+        cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
+        cell.border = {
+          top: { style: "thin", color: { argb: COLOR.borderColor } },
+          left: { style: "thin", color: { argb: COLOR.borderColor } },
+          bottom: { style: "medium", color: { argb: "FF94A3B8" } },
+          right: { style: "thin", color: { argb: COLOR.borderColor } },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      });
+      wsQty.getRow(1).height = 30;
+
+      // Agregasi: product + CPU + RAM + Storage sama -> gabung, harga diabaikan dari key
+      const qtyGroupedMap = new Map<string, {
+        product: string;
+        cpu: string;
+        ram: string;
+        storage: string;
+        qty: number;
+        price: number;
+      }>();
+
+      unitsToExport.forEach((u) => {
+        const product = u.laptop?.laptop_name || "-";
+        const cpu = u.laptop?.cpu || "-";
+        const ram = u.laptop?.ram || "-";
+        const storage = u.laptop?.storage || "-";
+        const price = u.pedagang_price || 0;
+
+        const key = `${product}|${cpu}|${ram}|${storage}`;
+
+        if (qtyGroupedMap.has(key)) {
+          const g = qtyGroupedMap.get(key)!;
+          g.qty += 1;
+          // price TIDAK di-update lagi di sini — sengaja pakai harga unit
+          // pertama yang ketemu di grup ini, tidak digabung/dirata-rata.
+        } else {
+          qtyGroupedMap.set(key, { product, cpu, ram, storage, qty: 1, price });
+        }
+      });
+
+      const qtyData = Array.from(qtyGroupedMap.values()).sort((a, b) =>
+        a.product.localeCompare(b.product, "id")
+      );
+
+      qtyData.forEach((item, idx) => {
+        const rowBg = idx % 2 === 0 ? COLOR.rowOdd : COLOR.rowEven;
+
+        const row = wsQty.addRow({
+          no: idx + 1,
+          product: item.product,
+          cpu: item.cpu,
+          ram: item.ram,
+          storage: item.storage,
+          qty: item.qty,
+          price: item.price,
+        });
+        row.height = 22;
+
+        row.eachCell((cell, colNum) => {
+          const key = wsQty.getColumn(colNum).key as string;
+
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
+          cell.border = {
+            top: { style: "hair", color: { argb: COLOR.borderColor } },
+            left: { style: "hair", color: { argb: COLOR.borderColor } },
+            bottom: { style: "hair", color: { argb: COLOR.borderColor } },
+            right: { style: "hair", color: { argb: COLOR.borderColor } },
+          };
+          cell.font = { size: 10, name: "Arial" };
+          cell.alignment = { vertical: "middle" };
+
+          if (key === "no") {
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+            cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
+          } else if (key === "product") {
+            cell.font = { size: 10, name: "Arial", bold: true };
+            cell.alignment = { horizontal: "left", vertical: "middle" };
+          } else if (["cpu", "ram", "storage"].includes(key)) {
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+          } else if (key === "qty") {
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } };
+            cell.font = { size: 10, name: "Arial", bold: true, color: { argb: "FF15803D" } };
+            cell.alignment = { horizontal: "center", vertical: "middle" };
+          } else if (key === "price") {
+            cell.numFmt = '"Rp "#,##0';
+            cell.font = { size: 10, name: "Arial", bold: true };
+            cell.alignment = { horizontal: "right", vertical: "middle" };
+          }
+        });
+      });
+
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
