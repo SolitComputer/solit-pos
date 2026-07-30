@@ -105,12 +105,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 <main className="flex-1">
             {!isDashboardHome && (
-              <div className="hidden lg:flex items-center px-5 pt-3">
+              <div className="hidden lg:flex items-center px-5 pt-1">
                 <BackButton />
               </div>
             )}
             <BirthdayBanner />
-            <div className="p-4 lg:p-5 w-full">
+            <div className="px-4 pb-4 pt-2 lg:px-5 lg:pb-5 lg:pt-2 w-full">
               {children}
             </div>
           </main>
