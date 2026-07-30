@@ -19,7 +19,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     const { data: laptopUnit, error: laptopErr } = await supabaseAdmin
       .from("laptop_units")
       .select(`
-        id, serial_number, grade, condition_note, selling_price, status, notes,
+        id, serial_number, grade, condition_note, selling_price, purchase_price, status, notes,
         laptop:laptops (
           id, laptop_name, brand, cpu, ram, storage, gpu, display
         )

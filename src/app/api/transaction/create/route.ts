@@ -116,7 +116,41 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             const { data: checks, error: e } = await supabase
                 .from("laptop_units").select("id, serial_number, status").in("id", laptopUnitIds);
             if (e) throw e;
-            const notAvailable = (checks ?? []).filter(u => u.status !== "SIAP_JUAL");
+
+            // Unit berstatus DALAM_PENYIAPAN (masuk alur Penyiapan Barang) tapi
+            // preparation order-nya sudah SELESAI & belum pernah dibuatkan
+            // transaksi tetap dianggap tersedia. Tanpa pengecualian ini, unit
+            // SELAMANYA nyangkut di DALAM_PENYIAPAN karena tidak ada endpoint
+            // lain yang mengembalikannya ke SIAP_JUAL setelah barang selesai
+            // diantar/diambil customer — ini penyebab "Unit laptop tidak
+            // tersedia" saat klik "Lanjut ke Pembayaran" dari halaman Penyiapan.
+            const stuckInPrepIds = (checks ?? [])
+                .filter(u => u.status === "DALAM_PENYIAPAN")
+                .map(u => u.id);
+            const releasedFromPrep = new Set<string>();
+            if (stuckInPrepIds.length > 0) {
+                const { data: prepItems } = await supabase
+                    .from("preparation_items")
+                    .select("unit_id, preparation_id")
+                    .in("unit_id", stuckInPrepIds);
+                const prepIds = [...new Set((prepItems ?? []).map((p: any) => p.preparation_id))];
+                if (prepIds.length > 0) {
+                    const { data: doneOrders } = await supabase
+                        .from("preparation_orders")
+                        .select("id, transaction_invoice")
+                        .in("id", prepIds)
+                        .eq("status", "SELESAI")
+                        .is("transaction_invoice", null);
+                    const doneOrderIds = new Set((doneOrders ?? []).map((o: any) => o.id));
+                    for (const it of prepItems ?? []) {
+                        if (doneOrderIds.has(it.preparation_id)) releasedFromPrep.add(it.unit_id);
+                    }
+                }
+            }
+
+            const notAvailable = (checks ?? []).filter(
+                u => u.status !== "SIAP_JUAL" && !releasedFromPrep.has(u.id)
+            );
             if (notAvailable.length > 0)
                 return NextResponse.json({ success: false, message: `Unit laptop tidak tersedia: ${notAvailable.map(u => u.serial_number).join(", ")}` }, { status: 409 });
         }
