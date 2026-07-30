@@ -245,26 +245,53 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       });
 
     } else {
-      const finalSN = transaction.serial_number || serial_number;
-      if (!finalSN) {
-        return NextResponse.json(
-          { success: false, message: "Serial number wajib diisi" },
-          { status: 400 }
-        );
+      // FIX: unit_id/unit_ids adalah SUMBER KEBENARAN (dipakai konsisten di
+      // seluruh endpoint lain — reserve, transaction/[invoice], dst). Sebelum
+      // ini, kode di sini malah cari unit lewat transaction.serial_number
+      // (field teks yang bisa basi — mis. setelah Tukar SN), jadi kalau
+      // unit_id & serial_number tidak sinkron, unit yang di-mark SOLD adalah
+      // unit yang SALAH — unit asli (di unit_id) tidak pernah ke-update.
+      const targetUnitId: string | null =
+        transaction.unit_id ||
+        (Array.isArray(transaction.unit_ids) && transaction.unit_ids.length > 0
+          ? transaction.unit_ids[0]
+          : null);
+
+      let unit: { id: string; laptop_id: string; status: string; serial_number: string } | null = null;
+
+      if (targetUnitId) {
+        const { data } = await supabaseAdmin
+          .from("laptop_units")
+          .select("id, laptop_id, status, serial_number")
+          .eq("id", targetUnitId)
+          .maybeSingle();
+        unit = data;
       }
 
-      const { data: unit } = await supabaseAdmin
-        .from("laptop_units")
-        .select("id, laptop_id, status")
-        .eq("serial_number", finalSN)
-        .single();
+      if (!unit) {
+        const fallbackSN = transaction.serial_number || serial_number;
+        if (!fallbackSN) {
+          return NextResponse.json(
+            { success: false, message: "Serial number wajib diisi" },
+            { status: 400 }
+          );
+        }
+        const { data } = await supabaseAdmin
+          .from("laptop_units")
+          .select("id, laptop_id, status, serial_number")
+          .eq("serial_number", fallbackSN)
+          .maybeSingle();
+        unit = data;
+      }
 
       if (!unit) {
         return NextResponse.json(
-          { success: false, message: `Unit SN "${finalSN}" tidak ditemukan` },
+          { success: false, message: `Unit untuk transaksi ${invoice_number} tidak ditemukan` },
           { status: 404 }
         );
       }
+
+      const finalSN = unit.serial_number;
 
       // Optimistic lock — sama seperti jalur multi-unit di atas.
       const { data: updatedTx, error: updateErr } = await supabaseAdmin
