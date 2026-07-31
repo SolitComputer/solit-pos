@@ -8,8 +8,10 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-//  Harus sama dengan SO_TTL di LaptopsContent (1 hari).
-const SO_TTL_MS = 1 * 24 * 60 * 60 * 1000;
+//  Harus sama logikanya dengan isSoActive di LaptopsContent — reset otomatis
+//  tiap jam 00:00 WIB (perbandingan tanggal kalender), BUKAN rolling 24 jam.
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7, Indonesia tidak pakai DST
+const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 
 async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
@@ -29,10 +31,12 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    // SO dianggap aktif hanya jika belum lewat 1 hari (auto-reset)
+   // SO dianggap aktif hanya jika masih di tanggal WIB yang sama dengan hari
+    // ini — begitu lewat jam 00:00 WIB, otomatis dianggap tidak aktif walau
+    // belum genap 24 jam sejak ditandai.
     const isActive =
       current.so_at != null &&
-      Date.now() - new Date(current.so_at).getTime() < SO_TTL_MS;
+      toWibDateStr(new Date(current.so_at)) === toWibDateStr(new Date());
 
     // Aktif → batalkan (undo). Belum/expired → tandai SO sekarang.
     const payload = isActive
