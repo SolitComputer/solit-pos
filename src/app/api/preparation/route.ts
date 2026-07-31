@@ -138,31 +138,16 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       schedDate = scheduled_delivery_date;
     }
 
-    // ── Validasi ketersediaan unit (cegah double-booking) ──
-    // Unit yang statusnya sudah bukan SIAP_JUAL (misal sudah dipakai di
-    // penyiapan lain / sudah terjual) tidak boleh dimasukkan ke order baru.
-    const unitIds = cleanItems.map((it) => it.unit_id).filter(Boolean) as string[];
-    let unitsToReserve: { id: string; serial_number: string }[] = [];
-
-    if (unitIds.length > 0) {
-      const { data: existingUnits, error: unitsCheckError } = await supabase
-        .from("laptop_units")
-        .select("id, status, serial_number")
-        .in("id", unitIds);
-      if (unitsCheckError) throw unitsCheckError;
-
-      const notAvailable = (existingUnits ?? []).filter((u) => u.status !== "SIAP_JUAL");
-      if (notAvailable.length > 0) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `SN ${notAvailable.map((u) => u.serial_number).join(", ")} sudah tidak tersedia (status: ${notAvailable[0].status})`,
-          },
-          { status: 409 }
-        );
-      }
-      unitsToReserve = (existingUnits ?? []).map((u) => ({ id: u.id, serial_number: u.serial_number }));
-    }
+    // ── Bypass validasi ketersediaan unit (business rule fase Preparation) ──
+    // Fase Preparation TIDAK BOLEH error walau SN sama diinput dua kali/lebih,
+    // atau SN yang sedang dipakai order lain (status DALAM_PENYIAPAN) dipakai
+    // lagi. Makanya di sini SENGAJA TIDAK ada pengecekan status yang bisa
+    // menolak request (tidak ada lagi response 409).
+    // Guard "SIAP_JUAL" tetap dipasang di query UPDATE di bawah — itu cukup
+    // untuk mencegah unit yang sudah DALAM_PENYIAPAN/SOLD ikut ter-update
+    // (jadi Data Barang tidak salah hitung), tapi TIDAK membuat request ini gagal.
+    const unitIds = [...new Set(cleanItems.map((it) => it.unit_id).filter(Boolean))] as string[];
+    const unitsToReserve: { id: string }[] = unitIds.map((id) => ({ id }));
 
     const order_number = await generateOrderNumber();
 

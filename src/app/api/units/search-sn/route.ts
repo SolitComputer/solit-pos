@@ -32,8 +32,14 @@ export async function GET(req: NextRequest) {
                     laptop_bag_price
                 )
             `)
-            .ilike("serial_number", `%${q}%`)
-            .eq("status", "SIAP_JUAL")
+          .ilike("serial_number", `%${q}%`)
+            // Business rule: SN yang sama boleh dipakai di lebih dari 1
+            // penyiapan sekaligus — jadi unit yang statusnya masih
+            // DALAM_PENYIAPAN (sedang dipakai penyiapan lain) TETAP muncul
+            // di pencarian ini, bukan cuma SIAP_JUAL. Yang TIDAK ditampilkan
+            // cuma unit yang sudah benar-benar SOLD/RESERVED/HELD/PACKING
+            // (sudah terjual/diproses via jalur transaksi).
+            .in("status", ["SIAP_JUAL", "DALAM_PENYIAPAN"])
             .limit(8)
             .order("serial_number"),
 
@@ -65,7 +71,7 @@ export async function GET(req: NextRequest) {
     if (accessoryResult.error) console.error("search-sn accessory error:", accessoryResult.error);
 
     // ── Format laptop units ───────────────────────────────────────────────────
-    const laptopFormatted = (laptopResult.data || []).map((u: any) => ({
+   const laptopFormatted = (laptopResult.data || []).map((u: any) => ({
         id: u.id,
         serial_number: u.serial_number,
         grade: u.grade,
@@ -77,6 +83,10 @@ export async function GET(req: NextRequest) {
         laptop_name: u.laptops?.laptop_name ?? "",
         // Penanda tipe — dipakai di frontend untuk render berbeda
         unit_type: "laptop" as const,
+        // True kalau unit ini SEDANG dipakai penyiapan lain (masih boleh
+        // dipilih lagi — lihat business rule di query di atas) — dipakai FE
+        // untuk kasih hint visual, bukan untuk memblokir apapun.
+        in_other_preparation: u.status === "DALAM_PENYIAPAN",
     }));
 
     // ── Format accessory units ────────────────────────────────────────────────

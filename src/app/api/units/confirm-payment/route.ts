@@ -156,10 +156,23 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         .select("id, laptop_id, serial_number, status")
         .in("id", unitIds);
 
-      if (!units || units.length !== unitIds.length) {
+    if (!units || units.length !== unitIds.length) {
         return NextResponse.json(
           { success: false, message: "Beberapa unit tidak ditemukan" },
           { status: 404 }
+        );
+      }
+
+      // ── Guard double-booking: unit sudah SOLD via transaksi lain ──────────
+      // Sama seperti jalur single-unit di atas — cek SEBELUM transaksi ini
+      // ditandai PAID, supaya tidak ada 2 transaksi PAID untuk unit fisik
+      // yang sama.
+      const alreadySold = units.filter((u: any) => u.status === "SOLD");
+      if (alreadySold.length > 0) {
+        const snList = alreadySold.map((u: any) => u.serial_number).join(", ");
+        return NextResponse.json(
+          { success: false, message: `Unit SN ${snList} sudah terjual lewat transaksi lain. Tidak bisa diproses lagi.` },
+          { status: 409 }
         );
       }
 
@@ -293,6 +306,18 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         return NextResponse.json(
           { success: false, message: `Unit untuk transaksi ${invoice_number} tidak ditemukan` },
           { status: 404 }
+        );
+      }
+
+      // ── Guard double-booking: unit sudah SOLD via transaksi lain ──────────
+      // SN yang sama sekarang boleh dipakai di lebih dari 1 penyiapan
+      // sekaligus (lihat units/search-sn). Kalau unit ini ternyata SUDAH
+      // SOLD (transaksi lain sudah lunas duluan untuk unit fisik yang sama),
+      // transaksi INI tidak boleh ikut menjual unit yang sama lagi.
+      if (unit.status === "SOLD") {
+        return NextResponse.json(
+          { success: false, message: `Unit SN ${unit.serial_number} sudah terjual lewat transaksi lain. Tidak bisa diproses lagi.` },
+          { status: 409 }
         );
       }
 
