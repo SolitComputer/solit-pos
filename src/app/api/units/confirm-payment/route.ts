@@ -3,6 +3,16 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 
+const OWNERSHIP_EXEMPT_ROLES = [
+  "ADMIN",
+  "PROGRAMMER",
+  "ASISTEN_CEO",
+  "KEPALA_SALES",
+  "KEPALA_ZENITH",
+  "KEPALA_SOTECH",
+  "KEPALA_ONPOINT",
+];
+
 async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     const body = await req.json();
@@ -27,24 +37,19 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         { status: 404 }
       );
     }
+    
+    const userRoles: string[] = user.roles ?? [user.role];
+    const isOwnershipExempt = userRoles.some((r) => OWNERSHIP_EXEMPT_ROLES.includes(r));
 
-    // ── Gate kepemilikan: hanya sales yang MEMBUAT transaksi ini yang boleh FU/Lunas ──
-    if (transaction.sales_id !== user.id) {
+    if (
+      transaction.status !== "PACKING" &&
+      !isOwnershipExempt &&
+      transaction.sales_id !== user.id
+    ) {
       return NextResponse.json(
         {
           success: false,
           message: "Hanya sales yang membuat transaksi ini yang bisa menyelesaikan pembayaran.",
-        },
-        { status: 403 }
-      );
-    }
-
-    // ── Gate kepemilikan: hanya sales yang MEMBUAT transaksi ini yang boleh FU ──
-    if (transaction.sales_id !== user.id) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Hanya sales yang membuat transaksi ini yang bisa menyelesaikan (FU).",
         },
         { status: 403 }
       );
