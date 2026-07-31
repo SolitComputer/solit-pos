@@ -3950,7 +3950,7 @@ export default function AttendanceDashboardPage() {
                                                     setAbsentPopupMode(null);
                                                     setSelectedDate(p => p === dk ? null : dk);
                                                 }}
-                                                    className={`relative flex flex-col items-start justify-start p-1.5 sm:p-3 rounded-lg sm:rounded-xl min-h-[58px] sm:min-h-[80px] transition-all duration-300 ${isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl sm:scale-[1.02] ring-2 ring-[#1a1a2e]/30" : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200" : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50" : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md" : "hover:bg-gray-50 hover:shadow-sm"}`}>
+                                                    className={`relative flex flex-col items-start justify-start p-1.5 sm:p-3 rounded-lg sm:rounded-xl min-h-[58px] sm:min-h-[80px] transition-all duration-300 ${isSel ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e] shadow-xl sm:scale-[1.02] ring-2 ring-[#1a1a2e]/30" : isTod ? "bg-gradient-to-br from-blue-50 to-indigo-50 ring-1 ring-blue-200" : isUserDayOff && !tot ? "bg-gradient-to-br from-red-50 to-rose-50 border border-red-100" : tot ? "bg-gray-50/80 hover:bg-gray-100 hover:shadow-md border border-gray-100" : "bg-gray-50/50 border border-gray-200/60 hover:bg-gray-100/80 hover:shadow-sm"}`}>
                                                     {isUserDayOff && (filterUser !== "Semua" || !isAdminRole(currentUser?.role)) && <span className="absolute top-1 right-1 sm:top-2 sm:right-2 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-400 ring-2 ring-white" />}
                                                     <span className={`text-[11px] sm:text-xs font-semibold ${isSel ? "text-white/90" : isTod ? "text-blue-700" : isUserDayOff ? "text-red-500" : "text-gray-700"}`}>
                                                         {day}
@@ -3980,7 +3980,12 @@ export default function AttendanceDashboardPage() {
                                                         <div className="mt-auto pt-1 w-full">
                                                             <div className="w-full h-1 sm:h-1.5 rounded-full bg-red-300" />
                                                         </div>
-                                                    ) : null}
+                                                    ) : (
+                                                        /* Placeholder garis halus untuk tanggal biasa yang belum terisi */
+                                                        <div className="mt-auto pt-1 w-full">
+                                                            <div className={`w-full h-1 sm:h-1.5 rounded-full ${isSel ? "bg-white/20" : "bg-gray-200/50"}`} />
+                                                        </div>
+                                                    )}
                                                 </button>
                                             );
                                         })}
