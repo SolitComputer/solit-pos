@@ -165,6 +165,9 @@ const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Ju
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"] as const;
+const FULL_ALLOWANCE_USER_IDS: string[] = [
+    "236c08b5-0dd2-4f2f-95d6-286c5b6dd75e",
+];
 function isAdminRole(role?: string): boolean {
     return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role);
 }
@@ -357,7 +360,7 @@ function computeMonthlySalary(
     salary: UserSalary | undefined,
     allowance: UserAllowances | undefined,
     overtimeAmount: number,
-    stat: { totalWorkdays: number; score: number; pct: number } | undefined
+    stat: { totalWorkdays: number; score: number; pct: number; userId: string } | undefined
 ) {
     const isPercentage = salary?.salary_type === "PERCENTAGE";
 
@@ -370,8 +373,9 @@ function computeMonthlySalary(
             : salary.base_salary
         : 0;
 
-    //    PERCENTAGE → disesuaikan % kehadiran
-    const allowanceFactor = isPercentage ? (stat?.pct ?? 0) / 100 : 1;
+    const allowanceFactor = stat?.userId && FULL_ALLOWANCE_USER_IDS.includes(stat.userId)
+        ? 1
+        : (stat?.pct ?? 0) / 100;
     const allowanceWife = Math.round((allowance?.allowance_wife || 0) * allowanceFactor);
     const allowanceChild = Math.round((allowance?.allowance_child || 0) * allowanceFactor);
 
@@ -1836,6 +1840,52 @@ function AttendanceSummaryDetailModal({ detail, onClose }: {
     );
 }
 
+function LeaveDetailModal({ name, dates, monthLabel, onClose }: {
+    name: string; dates: string[]; monthLabel: string; onClose: () => void;
+}) {
+    const fmt = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
+    const sorted = [...dates].sort();
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-cyan-600 to-teal-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">Detail Cuti</p>
+                        <p className="text-xs text-white/70 mt-1">{name} · {monthLabel}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-3">
+                        Tanggal cuti ({sorted.length})
+                    </p>
+                    {sorted.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Tidak ada data</p>
+                    ) : (
+                        sorted.map(d => (
+                            <div key={d} className="flex items-center justify-between gap-3 bg-cyan-50/60 border border-cyan-100 rounded-xl px-3.5 py-3">
+                                <p className="text-sm font-bold text-gray-800">{fmt(d)}</p>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-cyan-100 text-cyan-700 border-cyan-200 flex-shrink-0">
+                                    Cuti
+                                </span>
+                            </div>
+                        ))
+                    )}
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 type SalarySlip = {
     id: string;
     user_id: string;
@@ -2675,6 +2725,7 @@ export default function AttendanceDashboardPage() {
     const [salaryHistory, setSalaryHistory] = useState<any[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [attendanceSummaryDetail, setAttendanceSummaryDetail] = useState<AttendanceSummaryDetail | null>(null);
+    const [leaveDetail, setLeaveDetail] = useState<{ name: string; dates: string[] } | null>(null);
     const [absentPopupMode, setAbsentPopupMode] = useState<"karyawan" | "pkl" | null>(null);
     const [pklFilterMode, setPklFilterMode] = useState(false);
     const [calendarPklFilter, setCalendarPklFilter] = useState<"all" | "karyawan" | "pkl">("karyawan");
@@ -3469,11 +3520,16 @@ export default function AttendanceDashboardPage() {
                         ? Math.round((sal.base_salary / userStat.totalWorkdays) * userStat.score)
                         : 0;
 
-            // Tunjangan (disesuaikan % kehadiran)
+            // Tunjangan ikut % kehadiran, KECUALI akun di FULL_ALLOWANCE_USER_IDS —
+            // sama persis dengan logic di computeMonthlySalary, biar slip PDF selalu
+            // konsisten dengan angka di tabel Rekap Gaji.
+            const allowanceFactor = FULL_ALLOWANCE_USER_IDS.includes(userStat.userId)
+                ? 1
+                : (userStat.pct / 100);
             const allowanceWife =
-                Math.round((allow?.allowance_wife || 0) * (userStat.pct / 100)) || 0;
+                Math.round((allow?.allowance_wife || 0) * allowanceFactor) || 0;
             const allowanceChild =
-                Math.round((allow?.allowance_child || 0) * (userStat.pct / 100)) || 0;
+                Math.round((allow?.allowance_child || 0) * allowanceFactor) || 0;
 
             // Potongan (langsung)
             const deductionLoan = allow?.deduction_loan || 0;
@@ -4109,6 +4165,7 @@ export default function AttendanceDashboardPage() {
                                                 <tr className="border-b border-gray-100 bg-gray-50/50">
                                                     <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Jam Masuk</th>
+                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Batas Absen</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Metode</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Lokasi</th>
@@ -4142,6 +4199,21 @@ export default function AttendanceDashboardPage() {
                                                                         {toWIBTime(a.check_in_time || a.created_at)}
                                                                     </span>
                                                                 )}
+                                                            </td>
+                                                            <td className="px-4 py-4">
+                                                                {(() => {
+                                                                    const eff = effectiveShiftFor(userId, dateKey);
+                                                                    return (
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg w-fit whitespace-nowrap">
+                                                                                Telat &gt; {minToHHMM(eff.late)}
+                                                                            </span>
+                                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-1 rounded-lg w-fit whitespace-nowrap">
+                                                                                Tutup {minToHHMM(eff.close)}
+                                                                            </span>
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </td>
                                                             <td className="px-4 py-4">
                                                                 {manualRec ? (
@@ -4406,6 +4478,19 @@ export default function AttendanceDashboardPage() {
                                                                 className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600 text-sm font-black border border-red-200 hover:bg-red-200 hover:scale-105 transition-all cursor-pointer"
                                                                 title={`Lihat detail ketidakhadiran ${u.name}`}>
                                                                 {absent}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-gray-200 text-sm font-black">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        {u.leave > 0 ? (
+                                                            <button
+                                                                onClick={() => setLeaveDetail({ name: u.name, dates: u.leaveDates })}
+                                                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 text-sm font-black border border-cyan-200 hover:bg-cyan-200 hover:scale-105 transition-all cursor-pointer"
+                                                                title={`Lihat detail cuti ${u.name}`}
+                                                            >
+                                                                {u.leave}
                                                             </button>
                                                         ) : (
                                                             <span className="text-gray-200 text-sm font-black">—</span>
@@ -5081,12 +5166,13 @@ export default function AttendanceDashboardPage() {
                                                             {/* Cuti */}
                                                             <td className="px-3 py-4 text-center">
                                                                 {u.leave > 0 ? (
-                                                                    <span
-                                                                        className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 text-sm font-black border border-cyan-200"
-                                                                        title={`Cuti (dihitung hadir): ${u.leaveDates.map(d => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })).join(", ")}`}
+                                                                    <button
+                                                                        onClick={() => setLeaveDetail({ name: u.name, dates: u.leaveDates })}
+                                                                        className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 text-sm font-black border border-cyan-200 hover:bg-cyan-200 hover:scale-105 transition-all cursor-pointer"
+                                                                        title={`Lihat detail cuti ${u.name}`}
                                                                     >
                                                                         {u.leave}
-                                                                    </span>
+                                                                    </button>
                                                                 ) : <span className="text-gray-200 text-sm font-black">—</span>}
                                                             </td>
 
@@ -5990,6 +6076,15 @@ export default function AttendanceDashboardPage() {
                 <AttendanceSummaryDetailModal
                     detail={attendanceSummaryDetail}
                     onClose={() => setAttendanceSummaryDetail(null)}
+                />
+            )}
+
+            {leaveDetail && (
+                <LeaveDetailModal
+                    name={leaveDetail.name}
+                    dates={leaveDetail.dates}
+                    monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
+                    onClose={() => setLeaveDetail(null)}
                 />
             )}
 
