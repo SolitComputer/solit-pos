@@ -319,6 +319,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!hasRouteAccess) {
+    if (!isPageRoute) {
+      return NextResponse.json(
+        { success: false, message: "Forbidden: role Anda tidak punya akses ke endpoint ini" },
+        { status: 403 }
+      );
+    }
     return NextResponse.redirect(
       new URL(ROLE_DEFAULT_REDIRECT[effectivePrimary] ?? "/dashboard", request.url)
     );

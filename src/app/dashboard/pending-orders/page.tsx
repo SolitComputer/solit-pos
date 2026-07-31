@@ -8,7 +8,7 @@ import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyP
 interface PendingTransaction {
     id: string;
     invoice_number: string;
-    status: "RESERVED" | "HELD" | "PENDING" | "PAID";
+    status: "RESERVED" | "HELD" | "PENDING" | "PACKING" | "PAID";
     sales_id: string;
     customer_name: string;
     customer_phone: string | null;
@@ -99,7 +99,7 @@ function DetailModal({ tx, onClose }: { tx: PendingTransaction; onClose: () => v
     const originalStatus = getOriginalStatus(tx);
     const statusLabel = tx.status === "PAID" && originalStatus
         ? `${originalStatus === "RESERVED" ? "DP" : "Ambil Dulu"} → Lunas`
-        : (tx.status === "RESERVED" ? "DP" : tx.status === "HELD" ? "Ambil Dulu" : tx.status);
+        : (tx.status === "RESERVED" ? "DP" : tx.status === "HELD" ? "Ambil Dulu" : tx.status === "PACKING" ? "Packing" : tx.status);
 
     const rows: { label: string; value: React.ReactNode }[] = [
         { label: "Invoice", value: <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">{tx.invoice_number}</span> },
@@ -434,7 +434,7 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
     );
 }
 
-function StatusBadge({ status }: { status: "RESERVED" | "HELD" | "PENDING" }) {
+function StatusBadge({ status }: { status: "RESERVED" | "HELD" | "PENDING" | "PACKING" }) {
     if (status === "RESERVED") {
         return (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
@@ -446,6 +446,13 @@ function StatusBadge({ status }: { status: "RESERVED" | "HELD" | "PENDING" }) {
         return (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
                 <Clock size={12} /> Pending
+            </span>
+        );
+    }
+    if (status === "PACKING") {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-200 whitespace-nowrap">
+                <Package size={12} /> Packing
             </span>
         );
     }
@@ -480,7 +487,7 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
             {/* Invoice + status */}
             <td className="px-3 py-2.5 min-w-[140px]">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                    <StatusBadge status={tx.status as "RESERVED" | "HELD" | "PENDING"} />
+                    <StatusBadge status={tx.status as "RESERVED" | "HELD" | "PENDING" | "PACKING"} />
                     {isOld && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-50 text-red-500 border border-red-200">
                             <AlertTriangle size={12} /> {age}
@@ -728,7 +735,7 @@ function TableHead({ isHistory }: { isHistory?: boolean }) {
 export default function PendingOrdersPage() {
     const [transactions, setTransactions] = useState<PendingTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [filterStatus, setFilterStatus] = useState<"ALL" | "RESERVED" | "HELD" | "PENDING">("ALL");
+    const [filterStatus, setFilterStatus] = useState<"ALL" | "RESERVED" | "HELD" | "PENDING" | "PACKING">("ALL");
     const [searchQuery, setSearchQuery] = useState("");
     const [minSisa, setMinSisa] = useState("");
     const [maxSisa, setMaxSisa] = useState("");
@@ -738,6 +745,7 @@ export default function PendingOrdersPage() {
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
     const [userRole, setUserRole] = useState<UserRole | null>(null);
+    const [userRoles, setUserRoles] = useState<string[]>([]);
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmPaymentTx, setConfirmPaymentTx] = useState<PendingTransaction | null>(null);
     const [detailTx, setDetailTx] = useState<PendingTransaction | null>(null);
@@ -745,14 +753,30 @@ export default function PendingOrdersPage() {
     const [cancelling, setCancelling] = useState(false);
 
     const [userId, setUserId] = useState<string | null>(null);
-    // Reuse permission yang sama dengan tombol "Restore/Batal" di halaman Riwayat Transaksi
     const canCancel = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
+
+    const CONFIRM_PAYMENT_ROLES = [
+        "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+        "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES",
+        "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
+    ];
+
+    const canConfirmTx = (tx: PendingTransaction): boolean => {
+        if (!userId) return false;
+        if (tx.status === "PACKING") {
+            return userRoles.some((r) => CONFIRM_PAYMENT_ROLES.includes(r));
+        }
+        return tx.sales_id === userId;
+    };
 
     useEffect(() => {
         fetch("/api/auth/me").then(r => r.json()).then(r => {
-            setUserRole(r.user?.role ?? null);
+            const role = r.user?.role ?? null;
+            const roles: string[] = Array.isArray(r.user?.roles) && r.user.roles.length > 0 ? r.user.roles : role ? [role] : [];
+            setUserRole(role);
+            setUserRoles(roles);
             setUserId(r.user?.id ?? null);
-        }).catch(() => { setUserRole(null); setUserId(null); });
+        }).catch(() => { setUserRole(null); setUserRoles([]); setUserId(null); });
     }, []);
 
     const fetchData = useCallback(async () => {
@@ -855,6 +879,7 @@ export default function PendingOrdersPage() {
         reserved: transactions.filter(t => t.status === "RESERVED").length,
         held: transactions.filter(t => t.status === "HELD").length,
         pending: transactions.filter(t => t.status === "PENDING").length,
+        packing: transactions.filter(t => t.status === "PACKING").length,
     };
 
     const totalValue = filtered.reduce((sum, tx) => sum + (tx.deal_price || tx.amount || 0), 0);
@@ -909,11 +934,12 @@ export default function PendingOrdersPage() {
                     </div>
 
                     {/* ── STATS STRIP ─────────────────────────────────────── */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
                         {[
                             { label: "Total Pending", value: String(counts.all), sub: "transaksi aktif", color: "border-l-gray-700" },
                             { label: "DP", value: String(counts.reserved), sub: <span className="inline-flex items-center gap-1"><CreditCard size={11} /> Reserved</span>, color: "border-l-blue-400" },
                             { label: "Ambil Dulu", value: String(counts.held), sub: <span className="inline-flex items-center gap-1"><Package size={11} /> Held</span>, color: "border-l-orange-400" },
+                            { label: "Packing", value: String(counts.packing), sub: <span className="inline-flex items-center gap-1"><Package size={11} /> Marketplace</span>, color: "border-l-violet-400" },
                             { label: "Total Nilai", value: fmt(totalValue), sub: "dari filter aktif", color: "border-l-emerald-500" },
                         ].map(s => (
                             <div key={s.label} className={`bg-white rounded-2xl border border-gray-100 border-l-4 ${s.color} shadow-sm px-4 py-3`}>
@@ -972,6 +998,7 @@ export default function PendingOrdersPage() {
                                         { value: "RESERVED", label: <><CreditCard size={12} /> DP</>, count: counts.reserved },
                                         { value: "HELD", label: <><Package size={12} /> Ambil</>, count: counts.held },
                                         { value: "PENDING", label: <><Clock size={12} /> Pending</>, count: counts.pending },
+                                        { value: "PACKING", label: <><Package size={12} /> Packing</>, count: counts.packing },
                                     ] as const).map(opt => (
                                         <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
                                             className={`h-7 px-2.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${filterStatus === opt.value ? "bg-gray-800 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
@@ -1010,7 +1037,7 @@ export default function PendingOrdersPage() {
                                         ) : (
                                             filtered.map((tx, idx) => (
                                                 <PendingRow key={tx.id} tx={tx} idx={idx}
-                                                    canConfirm={!!userId && tx.sales_id === userId}
+                                                    canConfirm={canConfirmTx(tx)}
                                                     canCancel={canCancel}
                                                     onConfirm={setConfirmPaymentTx}
                                                     onCancel={setCancelTx}
