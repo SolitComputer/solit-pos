@@ -31,7 +31,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       query = query.eq("laptop_id", laptopId);
     }
 
-    const { data, error } = await query;
+   const { data, error } = await query;
 
     if (error) {
       return NextResponse.json(
@@ -40,7 +40,20 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
-    return NextResponse.json({ success: true, data: data || [] });
+    //  Unit status SIAP_JUAL baru dianggap benar-benar "siap jual" kalau
+    //  Harga Modal (purchase_price) & Harga Jual (selling_price) sudah
+    //  diisi (> 0). Kalau salah satu masih 0/kosong, jangan tampilkan dulu
+    //  sampai datanya dilengkapi di Data Laptop.
+    //  RESERVED/HELD/PACKING tetap tampil apa adanya — sudah terikat
+    //  transaksi, perlu kelihatan untuk proses pelunasan.
+    const filtered = (data || []).filter((u: Record<string, any>) => {
+      if (u.status !== "SIAP_JUAL") return true;
+      const hasPurchasePrice = Number(u.purchase_price) > 0;
+      const hasSellingPrice = Number(u.selling_price) > 0;
+      return hasPurchasePrice && hasSellingPrice;
+    });
+
+    return NextResponse.json({ success: true, data: filtered });
   } catch (err) {
     console.error("[ready-units]", err);
     return NextResponse.json({ success: false }, { status: 500 });

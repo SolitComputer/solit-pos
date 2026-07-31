@@ -30,14 +30,25 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
-    //  Field sensitif disaring DI SERVER, bukan sekadar disembunyikan di UI.
+   //  Field sensitif disaring DI SERVER, bukan sekadar disembunyikan di UI.
     //  Kalau hanya disembunyikan di frontend, Sales tetap bisa membacanya
     //  lewat Network tab DevTools.
     const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
 
+    //  Hitung flag "is_price_complete" SEBELUM data privat disaring, supaya
+    //  role yang tidak boleh lihat Harga Modal (mis. Sales) tetap bisa tahu
+    //  status kelengkapan harga tanpa perlu tahu angka aslinya.
+    const withReadyFlag = (data ?? []).map((l: Record<string, any>) => ({
+      ...l,
+      laptop_units: (l.laptop_units ?? []).map((u: Record<string, any>) => ({
+        ...u,
+        is_price_complete: Number(u.purchase_price) > 0 && Number(u.selling_price) > 0,
+      })),
+    }));
+
     const safe = canSeePrivate
-      ? data
-      : (data ?? []).map((l: Record<string, any>) => ({
+      ? withReadyFlag
+      : withReadyFlag.map((l: Record<string, any>) => ({
           ...l,
         laptop_units: (l.laptop_units ?? []).map((u: Record<string, any>) => ({
             id: u.id,
@@ -46,6 +57,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
             status: u.status,
             selling_price: u.selling_price,
             official_price: u.official_price,
+            is_price_complete: u.is_price_complete,
           })),
         }));
 
