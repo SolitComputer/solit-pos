@@ -18,6 +18,19 @@ export async function POST() {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
+    const { data: userRow } = await supabaseAdmin
+      .from("users")
+      .select("biometric_enabled")
+      .eq("id", user.id)
+      .single();
+
+    if (!userRow?.biometric_enabled) {
+      return NextResponse.json(
+        { success: false, message: "Sidik jari dinonaktifkan untuk akun ini. Hubungi admin." },
+        { status: 403 }
+      );
+    }
+
     const { data: creds } = await supabaseAdmin
       .from("user_webauthn_credentials")
       .select("credential_id, transports")
