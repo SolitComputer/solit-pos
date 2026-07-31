@@ -439,23 +439,26 @@ export function withAuth(
       return res;
     }
 
-    // ✅ Multi-role + PKL inheritance:
-    //   - userRoles asli:      ["PKL_MARKETING"]
-    //   - effectiveRoles:      ["PKL_MARKETING", "MARKETING"]
-    //   Jadi PKL_MARKETING otomatis lolos di route yang allow MARKETING,
-    //   tanpa perlu nambahin PKL_MARKETING manual di tiap withAuth().
-    if (allowedRoles) {
-      const userRoles = user.roles ?? [user.role];
-      const effectiveRoles = expandRolesWithParents(userRoles);
-      const hasAccess = effectiveRoles.some(r =>
-        (allowedRoles as string[]).includes(r)
-      );
-      if (!hasAccess) {
-        return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    try {
+      if (allowedRoles) {
+        const userRoles = user.roles ?? [user.role];
+        const effectiveRoles = expandRolesWithParents(userRoles);
+        const hasAccess = effectiveRoles.some(r =>
+          (allowedRoles as string[]).includes(r)
+        );
+        if (!hasAccess) {
+          return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+        }
       }
-    }
 
-    return handler(req, ctx, user);
+      return await handler(req, ctx, user);
+    } catch (err) {
+      console.error("[withAuth] unhandled error:", err);
+      return NextResponse.json(
+        { success: false, message: "Terjadi kesalahan internal server: " + String(err) },
+        { status: 500 }
+      );
+    }
   };
 }
 
