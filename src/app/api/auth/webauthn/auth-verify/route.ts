@@ -93,15 +93,27 @@ export async function POST(request: Request) {
 
         const { data: userRow } = await supabaseAdmin
             .from("users")
-            .select("webauthn_challenge, webauthn_challenge_at, shift")
+            .select("webauthn_challenge, webauthn_challenge_at, shift, biometric_enabled")
             .eq("id", user.id)
             .single();
 
-        if (!userRow?.webauthn_challenge) {
-            return NextResponse.json({ success: false, message: "Tidak ada sesi absen aktif, ulangi lagi" }, { status: 400 });
+        // ✅ FIX: konsisten dengan register-verify — kalau admin sudah nonaktifkan
+        // sidik jari user ini, tolak absen sidik jari meski kredensial lama masih ada.
+        if (!userRow?.biometric_enabled) {
+            return NextResponse.json(
+                { success: false, message: "Sidik jari dinonaktifkan untuk akun ini. Hubungi admin." },
+                { status: 403 }
+            );
         }
+
+        if (!userRow?.webauthn_challenge) {
+            return NextResponse.json({ success: false, message: "Sesi absen belum dimulai. Tekan tombol sidik jari sekali lagi." }, { status: 400 });
+        }
+        // ✅ FIX konteks: pesan diperjelas karena akar masalahnya adalah TTL
+        // kehabisan waktu saat proses daftar+absen numpuk jadi 1 klik (sudah
+        // dipisah di halaman /biometric-enroll — lihat perubahan face-verify).
         if (Date.now() - new Date(userRow.webauthn_challenge_at).getTime() > CHALLENGE_TTL_MS) {
-            return NextResponse.json({ success: false, message: "Sesi absen kedaluwarsa, ulangi lagi" }, { status: 400 });
+            return NextResponse.json({ success: false, message: "Sesi absen kedaluwarsa (terlalu lama antara mulai dan scan sidik jari). Coba tekan tombol sidik jari lagi." }, { status: 400 });
         }
 
         const body = await request.json();
