@@ -231,19 +231,16 @@ function CreateModal({
       try {
         const res = await fetch(`/api/units/search-sn?q=${encodeURIComponent(q)}`);
         const result = await res.json();
-        const existing = new Set(items.map((i) => i.serial_number.toLowerCase()));
-        setSnResults(
-          (result.data || []).filter(
-            (u: any) => !existing.has((u.serial_number || "").toLowerCase())
-          )
-        );
+        // SENGAJA TIDAK filter SN yang sudah ada di `items` — business rule
+        // mengizinkan SN yang sama dipilih/diinput lebih dari sekali.
+        setSnResults(result.data || []);
       } catch {
         setSnResults([]);
       } finally {
         setSearching(false);
       }
     },
-    [items]
+    []
   );
 
   const addUnit = (u: any) => {
@@ -259,13 +256,11 @@ function CreateModal({
     setSnSearch("");
     setSnResults([]);
   };
-  const addManual = () => {
+ const addManual = () => {
     const sn = manualSN.trim();
     if (!sn) return;
-    if (items.some((i) => i.serial_number.toLowerCase() === sn.toLowerCase())) {
-      setManualSN("");
-      return;
-    }
+    // SENGAJA TIDAK cek duplikat — business rule mengizinkan SN yang sama
+    // diinput berkali-kali pada fase persiapan (tidak memengaruhi stok).
     setItems((prev) => [...prev, { serial_number: sn }]);
     setManualSN("");
   };
@@ -414,6 +409,11 @@ function CreateModal({
                       {u.laptop_name}
                       {u.grade ? ` · Grade ${u.grade}` : ""}
                     </p>
+                    {u.in_other_preparation && (
+                      <p className="text-[10px] text-amber-600 font-semibold mt-0.5">
+                        ⚠ Sedang dipakai di penyiapan lain — masih boleh dipilih
+                      </p>
+                    )}
                   </button>
                 ))}
               </div>
@@ -505,10 +505,8 @@ function CreateModal({
             <BarcodeScanModal
               onScan={(sn) => {
                 const clean = sn.trim();
-                if (
-                  clean &&
-                  !items.some((i) => i.serial_number.toLowerCase() === clean.toLowerCase())
-                ) {
+                // SENGAJA TIDAK cek duplikat, sama seperti addManual di atas.
+                if (clean) {
                   setItems((prev) => [...prev, { serial_number: clean }]);
                 }
               }}

@@ -23,6 +23,14 @@ interface PrepItem {
     is_checked: boolean; check_note: string | null;
     is_cancelled: boolean; cancel_reason: string | null;
     cancelled_at: string | null; cancelled_by_name: string | null;
+    // Diisi oleh GET /api/preparation/[id] kalau unit_id item ini ternyata
+    // sudah SOLD lewat transaksi di pesanan LAIN (business rule: SN yang sama
+    // boleh dipakai di lebih dari 1 penyiapan sekaligus — lihat units/search-sn).
+    sold_elsewhere?: {
+        invoice_number: string;
+        preparation_id: string | null;
+        preparation_order_number: string | null;
+    } | null;
 }
 interface PrepOrder {
     id: string; order_number: string; customer_name: string; customer_phone: string | null;
@@ -787,11 +795,17 @@ export default function PreparationDetailPage() {
         </DashboardLayout>
     );
 
-    const sm = STATUS_META[order.status] ?? STATUS_META.MENUNGGU;
+   const sm = STATUS_META[order.status] ?? STATUS_META.MENUNGGU;
     const activeItems = order.preparation_items.filter(it => !it.is_cancelled);
     const cancelledItems = order.preparation_items.filter(it => it.is_cancelled);
-    const checked = activeItems.filter(it => it.is_checked).length;
-    const allChecked = activeItems.length > 0 && checked === activeItems.length;
+    // Unit yang sudah kedeteksi "sold_elsewhere" (terjual lewat pesanan lain)
+    // TIDAK BISA dicentang manual — unitnya sudah tidak ada secara fisik.
+    // Jadi tidak ikut disyaratkan checked, supaya "Tandai Siap Kirim" tidak
+    // macet permanen gara-gara 1 unit yang memang sudah tidak bisa diproses
+    // di sini. Provider harus klik "Batalkan" pada unit itu untuk beres-beres.
+    const checkableItems = activeItems.filter(it => !it.sold_elsewhere);
+    const checked = checkableItems.filter(it => it.is_checked).length;
+    const allChecked = checkableItems.length > 0 && checked === checkableItems.length;
     const canCancelItem = canCancel && !order.transaction_invoice && order.status !== "DIBATALKAN";
     const dest = order.dest_lat != null && order.dest_lng != null ? { lat: order.dest_lat, lng: order.dest_lng } : null;
     const isAssignedDriver = !!userId && order.delivery_user_id === userId;
@@ -808,8 +822,31 @@ export default function PreparationDetailPage() {
         : (order.delivery_started_at ? new Date(order.delivery_started_at).getTime() : nowTs);
     const elapsedMs = nowTs - startMs;
 
-    // (item 4) tombol batal hanya muncul jika role berwenang & status masih bisa dibatalkan
-    const canShowCancel = canCancel && order.status !== "SELESAI" && order.status !== "DIBATALKAN";
+    // Tombol batal tetap muncul walau status sudah SELESAI (barang sudah
+    // diantar) — sesuai business rule: kalau customer batal beli SETELAH
+    // barang sampai, order ini masih harus bisa dibatalkan supaya unit-nya
+    // dilepas balik ke stok. Yang tetap diblokir cuma:
+    // 1) sudah pernah DIBATALKAN sebelumnya
+    // 2) sudah terhubung ke transaksi (transaction_invoice terisi) — proses
+    //    pembayaran sudah jalan di sisi Sales, harus dibatalkan dari sana.
+    // Kondisi ini sengaja disamakan persis dengan guard di
+    // api/preparation/[id]/cancel/route.ts supaya tombol tidak pernah
+    // tampil untuk kasus yang backend-nya akan tetap tolak.
+    const canShowCancel = canCancel && order.status !== "DIBATALKAN" && !order.transaction_invoice;
+
+    // Kalau SEMUA unit aktif (belum dibatalkan) di order ini ternyata sudah
+    // "sold_elsewhere" (SN yang sama sudah lunas duluan lewat pesanan lain
+    // — lihat GET /api/preparation/[id]), order ini TIDAK PUNYA lagi unit
+    // yang bisa dijual. Klik "Lanjut ke Pembayaran" di kondisi ini akan
+    // selalu gagal (unitnya sudah tidak ada secara fisik), jadi CTA diganti
+    // jadi "Lihat Transaksi" yang mengarah ke invoice yang BENAR-BENAR
+    // menjual unit tersebut — bukan order.transaction_invoice, karena order
+    // ini sendiri belum pernah dilink ke transaksi manapun.
+    const activeItemsForPayment = order.preparation_items.filter(it => !it.is_cancelled);
+    const soldElsewhereItems = activeItemsForPayment.filter(it => it.sold_elsewhere);
+    const allSoldElsewhere =
+        activeItemsForPayment.length > 0 && soldElsewhereItems.length === activeItemsForPayment.length;
+    const soldElsewhereInvoice = soldElsewhereItems[0]?.sold_elsewhere?.invoice_number ?? null;
 
     return (
         <DashboardLayout>
@@ -1024,38 +1061,64 @@ export default function PreparationDetailPage() {
                                 )}
                             </h2>
                             {order.status === "DIPROSES" && (
-                                <span className="text-xs font-semibold text-blue-600">{checked}/{activeItems.length} dicek</span>
+                                <span className="text-xs font-semibold text-blue-600">{checked}/{checkableItems.length} dicek</span>
                             )}
                         </div>
-                        <div className="space-y-2">
+                       <div className="space-y-2">
                             {order.preparation_items.map(it => {
-                                const interactive = order.status === "DIPROSES" && canDone && !it.is_cancelled;
+                                const interactive = order.status === "DIPROSES" && canDone && !it.is_cancelled && !it.sold_elsewhere;
                                 return (
                                     <div key={it.id}
-                                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition ${it.is_cancelled ? "border-gray-200 bg-gray-50 opacity-60" : it.is_checked ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-white"}`}>
-                                        <button type="button" disabled={!interactive} onClick={() => toggleItem(it)}
-                                            className={`flex items-center gap-3 flex-1 min-w-0 text-left ${interactive ? "cursor-pointer" : "cursor-default"}`}>
-                                            <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${it.is_checked && !it.is_cancelled ? "bg-emerald-500 border-emerald-500" : "bg-white border-gray-300"}`}>
-                                                {it.is_checked && !it.is_cancelled && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                                            </span>
-                                            <div className="min-w-0">
-                                                <p className={`font-mono text-sm font-bold text-gray-800 ${it.is_cancelled ? "line-through" : ""}`}>{it.serial_number}</p>
-                                                {it.laptop_name && <p className="text-xs text-gray-500 truncate">{it.laptop_name}</p>}
-                                                {it.is_cancelled && (
-                                                    <p className="text-[10px] text-red-500 mt-0.5">
-                                                        Dibatalkan{it.cancelled_by_name ? ` oleh ${it.cancelled_by_name}` : ""}{it.cancel_reason ? ` — ${it.cancel_reason}` : ""}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </button>
-                                        {it.is_cancelled ? (
-                                            <span className="flex-shrink-0 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Batal</span>
-                                        ) : canCancelItem ? (
-                                            <button type="button" onClick={() => setCancelItemTarget(it)}
-                                                className="flex-shrink-0 text-[11px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition">
-                                                Batalkan
+                                        className={`w-full rounded-xl border transition p-3 ${it.is_cancelled ? "border-gray-200 bg-gray-50 opacity-60" : it.sold_elsewhere ? "border-red-200 bg-red-50" : it.is_checked ? "border-emerald-200 bg-emerald-50" : "border-gray-200 bg-white"}`}>
+                                        <div className="flex items-center gap-3">
+                                            <button type="button" disabled={!interactive} onClick={() => toggleItem(it)}
+                                                className={`flex items-center gap-3 flex-1 min-w-0 text-left ${interactive ? "cursor-pointer" : "cursor-default"}`}>
+                                                <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${it.is_checked && !it.is_cancelled ? "bg-emerald-500 border-emerald-500" : "bg-white border-gray-300"}`}>
+                                                    {it.is_checked && !it.is_cancelled && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className={`font-mono text-sm font-bold text-gray-800 ${it.is_cancelled ? "line-through" : ""}`}>{it.serial_number}</p>
+                                                    {it.laptop_name && <p className="text-xs text-gray-500 truncate">{it.laptop_name}</p>}
+                                                    {it.is_cancelled && (
+                                                        <p className="text-[10px] text-red-500 mt-0.5">
+                                                            Dibatalkan{it.cancelled_by_name ? ` oleh ${it.cancelled_by_name}` : ""}{it.cancel_reason ? ` — ${it.cancel_reason}` : ""}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </button>
-                                        ) : null}
+                                            {it.is_cancelled ? (
+                                                <span className="flex-shrink-0 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Batal</span>
+                                            ) : canCancelItem ? (
+                                                <button type="button" onClick={() => setCancelItemTarget(it)}
+                                                    className="flex-shrink-0 text-[11px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition">
+                                                    Batalkan
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                        {/* Unit ini kedeteksi sudah dibayar lewat pesanan/transaksi LAIN — bisa
+                                            terjadi karena SN yang sama sengaja boleh dipakai di lebih dari 1
+                                            penyiapan sekaligus (lihat units/search-sn). Provider tidak bisa
+                                            centang unit ini (interactive = false di atas); harus klik
+                                            "Batalkan" supaya order ini tidak macet di "Tandai Siap Kirim". */}
+                                        {it.sold_elsewhere && !it.is_cancelled && (
+                                            <div className="mt-2 flex items-start gap-1.5 bg-red-100 border border-red-200 rounded-lg px-2.5 py-1.5">
+                                                <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />
+                                                <p className="text-[11px] text-red-700 font-semibold">
+                                                    Sudah dibayar via{" "}
+                                                    {it.sold_elsewhere.preparation_order_number && it.sold_elsewhere.preparation_id ? (
+                                                        <Link
+                                                            href={`/dashboard/preparation/${it.sold_elsewhere.preparation_id}`}
+                                                            className="underline hover:text-red-900"
+                                                        >
+                                                            pesanan {it.sold_elsewhere.preparation_order_number}
+                                                        </Link>
+                                                    ) : (
+                                                        `invoice ${it.sold_elsewhere.invoice_number}`
+                                                    )}
+                                                    . Klik "Batalkan" unit ini kalau tidak jadi diproses di sini.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -1065,7 +1128,7 @@ export default function PreparationDetailPage() {
                         {order.status === "DIPROSES" && canDone && (
                             <button onClick={() => setShowDone(true)} disabled={!allChecked}
                                 className="w-full mt-4 h-11 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                                {allChecked ? " Tandai Siap Kirim" : `Cek semua unit dulu (${checked}/${activeItems.length})`}
+                                {allChecked ? " Tandai Siap Kirim" : `Cek semua unit dulu (${checked}/${checkableItems.length})`}
                             </button>
                         )}
                     </div>
@@ -1221,14 +1284,25 @@ export default function PreparationDetailPage() {
                                 </p>
                             )}
 
-                            <div className="mt-4">
-                                {order.transaction_invoice
-                                    ? <Link href={`/receipt/${order.transaction_invoice}`} className="inline-flex items-center gap-2 h-10 px-5 bg-emerald-700 text-white rounded-xl text-sm font-bold hover:bg-emerald-800 transition">
+                          <div className="mt-4">
+                                {order.transaction_invoice ? (
+                                    <Link href={`/receipt/${order.transaction_invoice}`} className="inline-flex items-center gap-2 h-10 px-5 bg-emerald-700 text-white rounded-xl text-sm font-bold hover:bg-emerald-800 transition">
                                         Lihat Transaksi →
                                     </Link>
-                                    : <Link href={`/payment/create?prep_id=${order.id}`} className="inline-flex items-center gap-2 h-10 px-5 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition">
+                                ) : allSoldElsewhere && soldElsewhereInvoice ? (
+                                    <>
+                                        <Link href={`/receipt/${soldElsewhereInvoice}`} className="inline-flex items-center gap-2 h-10 px-5 bg-emerald-700 text-white rounded-xl text-sm font-bold hover:bg-emerald-800 transition">
+                                            Lihat Transaksi →
+                                        </Link>
+                                        <p className="text-[11px] text-gray-400 mt-2">
+                                            Semua unit di pesanan ini sudah terjual lewat transaksi lain.
+                                        </p>
+                                    </>
+                                ) : (
+                                    <Link href={`/payment/create?prep_id=${order.id}`} className="inline-flex items-center gap-2 h-10 px-5 bg-[#1a1a2e] text-white rounded-xl text-sm font-bold hover:bg-[#16213e] transition">
                                         Lanjut ke Pembayaran →
-                                    </Link>}
+                                    </Link>
+                                )}
                             </div>
                         </div>
                     )}

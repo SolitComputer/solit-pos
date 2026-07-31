@@ -34,8 +34,36 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       }, { status: 400 });
     }
 
-    // Semua unit harus sudah dicek
     const items = order.preparation_items ?? [];
+
+    // ── Guard double-booking: unit sudah SOLD lewat pesanan/transaksi LAIN ──
+    // SN yang sama sengaja boleh dipakai di lebih dari 1 penyiapan sekaligus
+    // (lihat units/search-sn). Kalau salah satu penyiapan itu SUDAH lunas
+    // duluan (unit-nya sudah SOLD), provider TIDAK BOLEH menandai "Siap
+    // Kirim" untuk unit yang sama di penyiapan lain — fisiknya sudah tidak
+    // ada. Item ini harus dibatalkan (endpoint items/[itemId]/cancel) dulu
+    // sebelum penyiapan ini bisa lanjut.
+    const activeUnitIds = [...new Set(
+      items.filter((it: any) => !it.is_cancelled && it.unit_id).map((it: any) => it.unit_id)
+    )] as string[];
+
+    if (activeUnitIds.length > 0) {
+      const { data: soldUnits } = await supabase
+        .from("laptop_units")
+        .select("serial_number, status")
+        .in("id", activeUnitIds)
+        .eq("status", "SOLD");
+
+      if (soldUnits && soldUnits.length > 0) {
+        const snList = soldUnits.map((u: any) => u.serial_number).join(", ");
+        return NextResponse.json({
+          success: false,
+          message: `SN ${snList} sudah terjual lewat pesanan/transaksi lain. Batalkan unit tersebut dulu sebelum menandai siap kirim.`,
+        }, { status: 409 });
+      }
+    }
+
+    // Semua unit harus sudah dicek
     const allChecked = items.length > 0 && items.every((it: any) => it.is_checked);
     if (!allChecked) {
       const unchecked = items.filter((it: any) => !it.is_checked).length;
