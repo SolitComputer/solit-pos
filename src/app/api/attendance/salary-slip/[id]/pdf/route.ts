@@ -232,7 +232,7 @@ export async function GET(
         <div class="table-header">Penghasilan</div>
         <table>
           <tbody>
-            ${row("Gaji Pokok", slip.base_salary)}
+            ${row("Gaji Pokok", slip.salary_income ?? slip.base_salary)}
             ${row("Tunjangan Istri", slip.allowance_wife)}
             ${row("Tunjangan Anak", slip.allowance_child)}
             ${row("Tunjangan Transport", slip.allowance_transport)}
