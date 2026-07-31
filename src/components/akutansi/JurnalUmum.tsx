@@ -145,8 +145,8 @@ export default function JurnalUmum({ period }: { period: string }) {
         return localStorage.getItem("jurnal-show-pending") === "true";
     });
 
-    const load = useCallback(async () => {
-        setLoading(true);
+    const load = useCallback(async (showLoader = true) => {
+        if (showLoader) setLoading(true);
         try {
             const [jRes, pRes] = await Promise.all([
                 fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}`),
@@ -166,9 +166,9 @@ export default function JurnalUmum({ period }: { period: string }) {
             setPending(pendingSorted);
             setPendingSummary(p.success ? p.summary ?? null : null);
 
-            setSelected(new Set());
+            if (showLoader) setSelected(new Set());
         } finally {
-            setLoading(false);
+            if (showLoader) setLoading(false);
         }
     }, [period, sortOrder]);
 
@@ -996,7 +996,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                     >
                                                                                         <Clock className="w-4 h-4" />
                                                                                     </button>
-                                                                                    <WarningToggle entry={entry} onUpdated={load} setToast={setToast} />
+                                                                                    <WarningToggle entry={entry} onUpdated={() => load(false)} setToast={setToast} />
                                                                                     <button
                                                                                         onClick={() => handleDelete(entry)}
                                                                                         className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
