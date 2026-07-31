@@ -26,7 +26,11 @@ const ENTRY_SELECT = `
   *,
   created_by_user:users!journal_entries_created_by_fkey(id, name),
   updated_by_user:users!journal_entries_updated_by_fkey(id, name),
-  lines:journal_lines(*)
+  lines:journal_lines(*),
+  warning_logs:journal_warning_logs(
+    id, action, reason, created_at,
+    created_by_user:users!journal_warning_logs_created_by_fkey(id, name)
+  )
 `;
 
 async function isValidAccountAnywhere(supabase: SupabaseClient, code: string) {
@@ -50,8 +54,8 @@ export const GET = withAuth(async (req) => {
     .select(ENTRY_SELECT)
     .eq("period", period)
     .order("tanggal", { ascending: sort === "asc" })
-    .order("created_at", { ascending: sort === "asc" }); // urutan dalam tanggal yang sama tetap konsisten (dipakai drag-and-drop reorder)
-
+    .order("created_at", { ascending: sort === "asc" }) // urutan dalam tanggal yang sama tetap konsisten (dipakai drag-and-drop reorder)
+    .order("created_at", { ascending: true, foreignTable: "journal_warning_logs" }); // histori warning selalu lama → baru
   if (error) {
     console.error("[akuntansi GET jurnal]", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });

@@ -83,9 +83,12 @@ export const GET = withAuth(handler, [
   "PROGRAMMER",
   "ASISTEN_CEO",
   "KEPALA_SALES",
+  "KEPALA_ZENITH",
   "CREW_SALES",
   "ACCOUNTING",
   "PENGANTARAN",
   "KEPALA_SOTECH",
   "SOTECH",
+  "KEPALA_ONPOINT",
+  "ONPOINT",
 ]);
