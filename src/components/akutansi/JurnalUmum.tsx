@@ -27,6 +27,14 @@ interface JournalLine {
     line_order: number;
 }
 
+interface WarningLog {
+    id: string;
+    action: "ACTIVATE" | "DEACTIVATE";
+    reason: string | null;
+    created_at: string;
+    created_by_user?: { id: string; name: string } | null;
+}
+
 interface JournalEntry {
     id: string;
     period: string;
@@ -48,6 +56,8 @@ interface JournalEntry {
         storage: string | null;
         modal_missing?: boolean;
     } | null;
+    has_warning: boolean;
+    warning_logs: WarningLog[];
 }
 
 interface PendingDraft {
@@ -880,7 +890,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                             ref={provided.innerRef}
                                                             {...provided.draggableProps}
                                                             {...provided.dragHandleProps}
-                                                            className={snapshot.isDragging ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400" : ""}
+                                                            className={`group ${snapshot.isDragging ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400" : ""}`}
                                                             style={provided.draggableProps.style}
                                                         >
                                                             {linesToRender.map((line, i) => {
@@ -986,6 +996,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                     >
                                                                                         <Clock className="w-4 h-4" />
                                                                                     </button>
+                                                                                    <WarningToggle entry={entry} onUpdated={load} setToast={setToast} />
                                                                                     <button
                                                                                         onClick={() => handleDelete(entry)}
                                                                                         className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
@@ -1058,6 +1069,170 @@ function Stat({ label, value, subvalue, tone }: { label: string; value: React.Re
             <p className="text-[10px] font-semibold uppercase tracking-wide opacity-50 mb-1">{label}</p>
             <p className="text-base font-black font-mono truncate">{value}</p>
             {subvalue && <p className="text-[10.5px] font-semibold text-gray-400 truncate mt-0.5">{subvalue}</p>}
+        </div>
+    );
+}
+
+// ─── Warning toggle — ikon warning + form alasan + riwayat (kolom Aksi) ───────
+function WarningToggle({
+    entry,
+    onUpdated,
+    setToast,
+}: {
+    entry: JournalEntry;
+    onUpdated: () => void;
+    setToast: (msg: string) => void;
+}) {
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const [popPos, setPopPos] = useState<{ top: number; left: number } | null>(null);
+    const [showReasonForm, setShowReasonForm] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
+    const [reason, setReason] = useState("");
+    const [busy, setBusy] = useState(false);
+
+    // Posisi popover dihitung dari posisi tombol di layar (position: fixed) — supaya
+    // TIDAK terpotong oleh overflow-hidden/overflow-x-auto milik container tabel,
+    // sama seperti pola dropdown filter akun "Ref" di header tabel.
+    const computePos = () => {
+        const btn = btnRef.current;
+        if (!btn) return;
+        const rect = btn.getBoundingClientRect();
+        setPopPos({ top: rect.bottom + 6, left: Math.max(8, rect.right - 256) });
+    };
+
+    useEffect(() => {
+        if (!showReasonForm) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+                setShowReasonForm(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [showReasonForm]);
+
+    const activate = async () => {
+        if (!reason.trim() || busy) return;
+        setBusy(true);
+        try {
+            const res = await fetch(`/api/akutansi/jurnal/${entry.id}/warning`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason: reason.trim() }),
+            });
+            const json = await res.json();
+            if (!json.success) { setToast(json.message ?? "Gagal mengaktifkan warning"); return; }
+            setShowReasonForm(false);
+            setReason("");
+            onUpdated();
+        } catch {
+            setToast("Koneksi bermasalah");
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const deactivate = async () => {
+        if (busy) return;
+        if (!confirm("Nonaktifkan warning untuk jurnal ini?")) return;
+        setBusy(true);
+        try {
+            const res = await fetch(`/api/akutansi/jurnal/${entry.id}/warning`, { method: "DELETE" });
+            const json = await res.json();
+            if (!json.success) { setToast(json.message ?? "Gagal menonaktifkan warning"); return; }
+            onUpdated();
+        } catch {
+            setToast("Koneksi bermasalah");
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    if (entry.has_warning) {
+        return (
+            <div ref={wrapperRef} className="inline-block">
+                <button
+                    ref={btnRef}
+                    onClick={deactivate}
+                    onMouseEnter={() => { computePos(); setShowHistory(true); }}
+                    onMouseLeave={() => setShowHistory(false)}
+                    disabled={busy}
+                    title="Klik untuk nonaktifkan warning"
+                    className="p-1.5 rounded-lg text-amber-500 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
+                >
+                    <AlertTriangle className="w-4 h-4" />
+                </button>
+                {showHistory && popPos && (
+                    <div
+                        onMouseEnter={() => setShowHistory(true)}
+                        onMouseLeave={() => setShowHistory(false)}
+                        className="fixed z-[95] w-64 bg-white border border-amber-200 rounded-xl shadow-xl p-3 text-left"
+                        style={{ top: popPos.top, left: popPos.left }}
+                    >
+                        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">Riwayat Warning</p>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {(!entry.warning_logs || entry.warning_logs.length === 0) ? (
+                                <p className="text-[11px] text-gray-400">Belum ada riwayat.</p>
+                            ) : (
+                                [...entry.warning_logs].reverse().map((w) => (
+                                    <div key={w.id} className="text-[11px] border-b border-gray-50 pb-1.5 last:border-0 last:pb-0">
+                                        <p className={`font-bold ${w.action === "ACTIVATE" ? "text-amber-700" : "text-gray-400"}`}>
+                                            {w.action === "ACTIVATE" ? "Diaktifkan" : "Dinonaktifkan"} · {w.created_by_user?.name ?? "—"}
+                                        </p>
+                                        {w.reason && <p className="text-gray-600 mt-0.5">{w.reason}</p>}
+                                        <p className="text-[9px] text-gray-300 mt-0.5">{fmtWaktu(w.created_at)}</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <div ref={wrapperRef} className="inline-block opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+            <button
+                ref={btnRef}
+                onClick={() => { computePos(); setShowReasonForm((v) => !v); }}
+                title="Beri tanda warning"
+                className="p-1.5 rounded-lg text-gray-300 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
+            >
+                <AlertTriangle className="w-4 h-4" />
+            </button>
+            {showReasonForm && popPos && (
+                <div
+                    className="fixed z-[95] w-64 bg-white border border-gray-200 rounded-xl shadow-xl p-3"
+                    style={{ top: popPos.top, left: popPos.left }}
+                >
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Alasan Warning</p>
+                    <textarea
+                        autoFocus
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="Tulis alasan warning..."
+                        rows={2}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition resize-none"
+                    />
+                    <div className="flex gap-2 mt-2">
+                        <button
+                            onClick={() => { setShowReasonForm(false); setReason(""); }}
+                            className="flex-1 h-7 text-[11px] font-semibold text-gray-400 hover:text-gray-600"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={activate}
+                            disabled={busy || !reason.trim()}
+                            className="flex-1 h-7 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-[11px] font-bold disabled:opacity-40"
+                        >
+                            {busy ? "..." : "Aktifkan"}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
