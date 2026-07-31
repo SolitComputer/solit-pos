@@ -1,0 +1,25 @@
+- generic [active] [ref=f3e1]:
+  - main [ref=f3e2]:
+    - generic [ref=f3e8]:
+      - generic [ref=f3e9]:
+        - generic [ref=f3e10]:
+          - img "Logo Solit" [ref=f3e14]
+          - heading "Solit POS" [level=1] [ref=f3e15]
+          - paragraph [ref=f3e16]: Akses sistem terintegrasi
+        - generic [ref=f3e17]:
+          - generic [ref=f3e18]:
+            - generic [ref=f3e19]: Nomor WhatsApp
+            - generic [ref=f3e22]:
+              - generic: "0"
+              - textbox "8xxxxxxxxxx" [ref=f3e23]
+            - paragraph [ref=f3e24]: "Contoh: 8 1 2 3 4 5 6 7 8 9 0 (nomor setelah 0)"
+          - generic [ref=f3e25]:
+            - generic [ref=f3e26]: Password
+            - generic [ref=f3e30]:
+              - textbox "••••••••" [ref=f3e31]
+              - button [ref=f3e32] [cursor=pointer]
+          - button "Masuk ke Dashboard" [ref=f3e36] [cursor=pointer]
+        - paragraph [ref=f3e40]: Sistem manajemen point of sale terintegrasi
+      - paragraph [ref=f3e41]: © 2025 Solit — Hak akses terbatas untuk internal
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=f3e47] [cursor=pointer]

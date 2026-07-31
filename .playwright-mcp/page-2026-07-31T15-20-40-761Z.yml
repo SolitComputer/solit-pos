@@ -1,0 +1,6 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e9]:
+    - img "Solit POS" [ref=e13]
+    - heading "Solit POS" [level=1] [ref=e16]
+    - paragraph [ref=e17]: Inventory & Payment System
+  - region "Notifications alt+T"
