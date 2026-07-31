@@ -25,6 +25,7 @@ interface LaptopUnit {
     purchase_price?: number;
     notes?: string;
     created_at?: string;
+    is_price_complete?: boolean;
 }
 
 interface Laptop {
@@ -82,11 +83,13 @@ const isAuditActive = (auditedAt?: string | null) =>
     !!auditedAt && Date.now() - new Date(auditedAt).getTime() < AUDIT_TTL_MS;
 
 // ── SO (Stock Opname) ────────────────────────────────────────────────────────
-// State terpisah total dari Audit — TTL 1 hari (bukan 2 hari seperti Audit).
-const SO_TTL_DAYS = 1;
-const SO_TTL_MS = SO_TTL_DAYS * 24 * 60 * 60 * 1000;
+// Reset otomatis tiap jam 00:00 WIB — BUKAN rolling 24 jam. Begitu tanggal
+// kalender (WIB) berganti, status SO langsung dianggap tidak aktif lagi,
+// walau belum genap 24 jam sejak di-SO.
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7, Indonesia tidak pakai DST
+const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 const isSoActive = (soAt?: string | null) =>
-    !!soAt && Date.now() - new Date(soAt).getTime() < SO_TTL_MS;
+    !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
     SIAP_JUAL: { badge: "bg-gray-100 text-gray-700 border-gray-300", dot: "bg-green-500", label: "Siap Jual" },
@@ -486,7 +489,14 @@ export function LaptopsContent() {
             const result = await res.json();
             const normalized = (result.data || []).map((l: Laptop) => {
                 const units = l.laptop_units || [];
-                const siapJual = units.filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
+                // Hitungan RAW (semua unit SIAP_JUAL apa adanya) — dipakai untuk
+                // stok_tersedia, supaya laptop yang harganya belum lengkap TETAP
+                // muncul di Data Laptop (tidak ikut ke-filter hilang oleh filterStock).
+                const siapJualRaw = units.filter((u: LaptopUnit) => u.status === "SIAP_JUAL").length;
+                // Hitungan "siap jual beneran" (harga lengkap) — dipakai KHUSUS
+                // untuk badge/angka "Siap Jual" yang tampil, supaya konsisten
+                // dengan apa yang muncul di halaman Barang Siap Jual.
+                const siapJualReady = units.filter((u: LaptopUnit) => u.status === "SIAP_JUAL" && u.is_price_complete).length;
                 const stokMinus = units.filter((u: LaptopUnit) => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
                 // Unit yang sedang di antrian penyiapan (belum lunas, dipindah oleh
                 // sales ke penyedia barang) TETAP dihitung sebagai stok Data Barang.
@@ -510,8 +520,8 @@ export function LaptopsContent() {
                     // Unit DALAM_PENYIAPAN (antrian penyiapan internal, BELUM lunas) beda
                     // dari RESERVED — sengaja TETAP dihitung supaya Data Barang tidak
                     // berkurang saat order baru masuk antrian penyiapan (business rule).
-                    stok_tersedia: siapJual + stokMinus + dalamPenyiapan,
-                    siap_jual: siapJual,
+                    stok_tersedia: siapJualRaw + stokMinus + dalamPenyiapan,
+                    siap_jual: siapJualReady,
                     stok_minus: stokMinus,
                     terjual: units.filter((u: LaptopUnit) => u.status === "SOLD").length,
                     belum_lunas: belumLunas,
@@ -1651,7 +1661,7 @@ function SoButton({ active, loading, soBy, soAt, onClick }: {
     const title = active
         ? `SO oleh ${soBy ?? "—"}${soAt ? " · " + new Date(soAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}\nKlik untuk batalkan SO`
         : expiredButOnceSo
-            ? `Terakhir SO oleh ${soBy ?? "—"} · ${new Date(soAt as string).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} (sudah lewat ${SO_TTL_DAYS} hari)\nKlik untuk SO lagi`
+            ? `Terakhir SO oleh ${soBy ?? "—"} · ${new Date(soAt as string).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} (sudah ganti hari, ter-reset otomatis jam 00:00)\nKlik untuk SO lagi`
             : "Klik untuk tandai sudah SO";
 
     return (
