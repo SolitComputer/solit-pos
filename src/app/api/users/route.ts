@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { clearExpiredStoryFields } from "@/lib/expireStories";
 import bcrypt from "bcryptjs";
 
 const FULL_ACCESS_ROLES = new Set(["ADMIN", "PROGRAMMER", "ASISTEN_CEO"]);
@@ -68,26 +69,40 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     enrolledBiometricIds = new Set((credRows ?? []).map((c: any) => c.user_id));
   }
 
-  const users = (data ?? []).map((u: any) => ({
-    ...u,
-    roles: Array.isArray(u.roles) && u.roles.length > 0
-      ? u.roles
-      : [u.role].filter(Boolean),
-    shift: u.shift ?? "PAGI",
-    password_set: isAdmin ? (u.password_set ?? false) : false,
-    face_embedding: isAdmin
-      ? (u.face_embedding !== null && u.face_embedding !== undefined)
-      : false,
-    force_logout_at: isAdmin ? (u.force_logout_at ?? null) : null,
-    biometric_enabled: isAdmin ? (u.biometric_enabled ?? false) : false,
-    biometric_enrolled: isAdmin ? enrolledBiometricIds.has(u.id) : false,
-    phone_number: (isAdmin || isKepala) ? (u.phone_number ?? null) : null,
-    email: isAdmin ? (u.email ?? null) : null,
-    birth_date: u.birth_date ?? null,
-    status_note: (u.status_note_expires_at && new Date(u.status_note_expires_at) < new Date())
-      ? null
-      : (u.status_note ?? null),
-  }));
+  // Catatan/lagu yang sudah lewat 24 jam beneran dibersihkan dari database
+  // di sini (bukan cuma disembunyikan di response) — sama seperti GET /api/profile.
+  const expiryResults = await Promise.all(
+    (data ?? []).map((u: any) => clearExpiredStoryFields(supabaseAdmin, u))
+  );
+
+  const users = (data ?? []).map((u: any, i: number) => {
+    const { noteExpired, songExpired } = expiryResults[i];
+    return {
+      ...u,
+      roles: Array.isArray(u.roles) && u.roles.length > 0
+        ? u.roles
+        : [u.role].filter(Boolean),
+      shift: u.shift ?? "PAGI",
+      password_set: isAdmin ? (u.password_set ?? false) : false,
+      face_embedding: isAdmin
+        ? (u.face_embedding !== null && u.face_embedding !== undefined)
+        : false,
+      force_logout_at: isAdmin ? (u.force_logout_at ?? null) : null,
+      biometric_enabled: isAdmin ? (u.biometric_enabled ?? false) : false,
+      biometric_enrolled: isAdmin ? enrolledBiometricIds.has(u.id) : false,
+      phone_number: (isAdmin || isKepala) ? (u.phone_number ?? null) : null,
+      email: isAdmin ? (u.email ?? null) : null,
+      birth_date: u.birth_date ?? null,
+      status_note: noteExpired ? null : (u.status_note ?? null),
+      status_note_expires_at: noteExpired ? null : (u.status_note_expires_at ?? null),
+      song_title: songExpired ? null : (u.song_title ?? null),
+      song_artist: songExpired ? null : (u.song_artist ?? null),
+      song_artwork_url: songExpired ? null : (u.song_artwork_url ?? null),
+      song_preview_url: songExpired ? null : (u.song_preview_url ?? null),
+      song_clip_start: songExpired ? 0 : (u.song_clip_start ?? 0),
+      song_expires_at: songExpired ? null : (u.song_expires_at ?? null),
+    };
+  });
 
   return NextResponse.json({ success: true, users });
 }

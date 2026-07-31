@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import { clearExpiredStoryFields } from "@/lib/expireStories";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,13 +27,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         return NextResponse.json({ success: false, message: "User tidak ditemukan" }, { status: 404 });
     }
 
-    const noteExpired = data.status_note_expires_at
-        ? new Date(data.status_note_expires_at) < new Date()
-        : false;
-
-    const songExpired = data.song_expires_at
-        ? new Date(data.song_expires_at) < new Date()
-        : false;
+    const { noteExpired, songExpired } = await clearExpiredStoryFields(supabase, data);
 
     return NextResponse.json({
         success: true,
