@@ -4,9 +4,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import imageCompression from "browser-image-compression";
 import { humanizeRoleKey } from "@/lib/permissions";
 import ImageCropModal from "./ImageCropModal";
+import { useSongPicker, SavedSong } from "@/components/social/song/useSongPicker";
+import SongPickerPanel from "@/components/social/song/SongPickerPanel";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
-    Loader2, Pencil, Check, X, Music, Search, Play, Pause,
+    Loader2, Pencil, Check, X, Music, Play, Pause,
     MessageCircle, Eye, CheckCircle2, AlertCircle,
 } from "lucide-react";
 
@@ -27,14 +29,6 @@ interface ProfileData {
     song_preview_url: string | null;
     song_clip_start: number;
     song_expires_at: string | null;
-}
-
-interface SongResult {
-    trackId: number;
-    trackName: string;
-    artistName: string;
-    artworkUrl: string | null;
-    previewUrl: string | null;
 }
 
 interface AchievementBlock {
@@ -116,26 +110,32 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [viewers, setViewers] = useState<{ id: string; name: string; profile_photo_url: string | null; viewed_at: string }[]>([]);
     const [showViewers, setShowViewers] = useState(false);
 
-    const [showSongSearch, setShowSongSearch] = useState(false);
-    const [songQuery, setSongQuery] = useState("");
-    const [songResults, setSongResults] = useState<SongResult[]>([]);
-    const [searchingSong, setSearchingSong] = useState(false);
-    const [savingSong, setSavingSong] = useState(false);
     const [removingSong, setRemovingSong] = useState(false);
     const [playingPreview, setPlayingPreview] = useState(false);
     const [showInfoPopup, setShowInfoPopup] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
 
-    const [pendingSong, setPendingSong] = useState<SongResult | null>(null);
-    const [clipStart, setClipStart] = useState(0);
-    const [clipDuration, setClipDuration] = useState(30);
-    const [cropPlaying, setCropPlaying] = useState(false);
-    const cropAudioRef = useRef<HTMLAudioElement>(null);
-
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
     const callerRoles = currentUser?.roles?.length ? currentUser.roles : [currentUser?.role].filter(Boolean) as string[];
     const isAdmin = callerRoles.some((r) => ADMIN_ROLES.includes(r));
+
+    const songPicker = useSongPicker(
+        (song: SavedSong) => {
+            setProfile((p) => (p ? {
+                ...p,
+                song_title: song.title,
+                song_artist: song.artist,
+                song_artwork_url: song.artwork_url,
+                song_preview_url: song.preview_url,
+                song_clip_start: song.clip_start,
+                song_expires_at: song.expires_at,
+            } : p));
+            setPlayingPreview(false);
+            showToast("Lagu berhasil ditambahkan", "ok");
+        },
+        (msg) => showToast(msg, "err")
+    );
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -167,23 +167,6 @@ export default function ProfileView({ userId }: { userId: string }) {
             .then((d) => { if (d.success) setViewers(d.data); })
             .catch(() => { });
     }, [isSelf, profile?.status_note, userId]);
-
-    useEffect(() => {
-        if (!showSongSearch || songQuery.trim().length < 2) { setSongResults([]); return; }
-        const t = setTimeout(async () => {
-            setSearchingSong(true);
-            try {
-                const res = await fetch(`/api/profile/song?q=${encodeURIComponent(songQuery.trim())}`);
-                const data = await res.json();
-                if (data.success) setSongResults(data.data);
-            } catch {
-                // diam-diam gagal, biarkan hasil pencarian sebelumnya
-            } finally {
-                setSearchingSong(false);
-            }
-        }, 400);
-        return () => clearTimeout(t);
-    }, [songQuery, showSongSearch]);
 
     const handleSaveNote = async () => {
         const trimmed = noteDraft.trim();
@@ -223,91 +206,6 @@ export default function ProfileView({ userId }: { userId: string }) {
         }
     };
 
-    const handlePickSearchResult = (song: SongResult) => {
-        setPendingSong(song);
-        setClipStart(0);
-        setClipDuration(30);
-        setCropPlaying(false);
-    };
-
-    const handleCancelCrop = () => {
-        cropAudioRef.current?.pause();
-        setCropPlaying(false);
-        setPendingSong(null);
-    };
-
-    const toggleCropPlay = () => {
-        const audio = cropAudioRef.current;
-        if (!audio) return;
-        if (cropPlaying) {
-            audio.pause();
-            setCropPlaying(false);
-        } else {
-            audio.currentTime = clipStart;
-            audio.play().catch(() => { });
-            setCropPlaying(true);
-        }
-    };
-
-    // Otomatis stop tepat CLIP_LENGTH detik setelah titik awal yang dipilih
-    const handleCropTimeUpdate = () => {
-        const audio = cropAudioRef.current;
-        if (!audio) return;
-        if (audio.currentTime >= clipStart + CLIP_LENGTH) {
-            audio.pause();
-            setCropPlaying(false);
-        }
-    };
-
-    const handleCropSliderChange = (value: number) => {
-        setClipStart(value);
-        if (cropAudioRef.current) {
-            cropAudioRef.current.currentTime = value;
-        }
-    };
-
-    const handleConfirmSong = async () => {
-        if (!pendingSong) return;
-        setSavingSong(true);
-        try {
-            const res = await fetch("/api/profile/song", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: pendingSong.trackName,
-                    artist: pendingSong.artistName,
-                    artwork_url: pendingSong.artworkUrl,
-                    preview_url: pendingSong.previewUrl,
-                    clip_start: clipStart,
-                }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                setProfile((p) => (p ? {
-                    ...p,
-                    song_title: pendingSong.trackName,
-                    song_artist: pendingSong.artistName,
-                    song_artwork_url: pendingSong.artworkUrl,
-                    song_preview_url: pendingSong.previewUrl,
-                    song_clip_start: clipStart,
-                } : p));
-                cropAudioRef.current?.pause();
-                setPendingSong(null);
-                setShowSongSearch(false);
-                setSongQuery("");
-                setSongResults([]);
-                setPlayingPreview(false);
-                showToast("Lagu berhasil ditambahkan", "ok");
-            } else {
-                showToast(data.message ?? "Gagal menyimpan lagu", "err");
-            }
-        } catch {
-            showToast("Terjadi kesalahan", "err");
-        } finally {
-            setSavingSong(false);
-        }
-    };
-
     const handleRemoveSong = async () => {
         setRemovingSong(true);
         try {
@@ -338,7 +236,7 @@ export default function ProfileView({ userId }: { userId: string }) {
             audio.pause();
             setPlayingPreview(false);
         } else {
-            audio.currentTime = profile.song_clip_start ?? 0;
+            audio.currentTime = 0;
             audio.play().catch(() => { });
             setPlayingPreview(true);
         }
@@ -353,8 +251,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const handleMainTimeUpdate = () => {
         const audio = audioRef.current;
         if (!audio || !profile) return;
-        const start = profile.song_clip_start ?? 0;
-        if (audio.currentTime >= start + CLIP_LENGTH) {
+        if (audio.currentTime >= CLIP_LENGTH) {
             audio.pause();
             setPlayingPreview(false);
         }
@@ -863,106 +760,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 </div>
 
                                 {isSelf ? (
-                                    !showSongSearch ? (
-                                        <button onClick={() => setShowSongSearch(true)}
-                                            className="w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
-                                            style={{ background: "#ffffff", color: "#64748b", border: "1px dashed #cbd5e1" }}>
-                                            <Music className="w-4 h-4" /> Tambahkan lagu
-                                        </button>
-                                    ) : pendingSong ? (
-                                        <div className="space-y-3 p-3 rounded-2xl border border-slate-100" style={{ background: "#fafafa" }}>
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
-                                                    {pendingSong.artworkUrl && <img src={pendingSong.artworkUrl} alt={pendingSong.trackName} className="w-full h-full object-cover" />}
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>{pendingSong.trackName}</p>
-                                                    <p className="text-xs truncate" style={{ color: "#94a3b8" }}>{pendingSong.artistName}</p>
-                                                </div>
-                                                {pendingSong.previewUrl && (
-                                                    <button onClick={toggleCropPlay}
-                                                        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                                                        style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                                                        {cropPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            {pendingSong.previewUrl ? (
-                                                <div>
-                                                    <p className="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "#94a3b8" }}>
-                                                        Pilih potongan {CLIP_LENGTH} detik yang ditampilkan
-                                                    </p>
-                                                    <input
-                                                        type="range"
-                                                        min={0}
-                                                        max={Math.max(0, Math.floor(clipDuration - CLIP_LENGTH))}
-                                                        value={clipStart}
-                                                        onChange={(e) => handleCropSliderChange(Number(e.target.value))}
-                                                        className="w-full accent-violet-600"
-                                                    />
-                                                    <div className="flex justify-between text-[9px] mt-1" style={{ color: "#cbd5e1" }}>
-                                                        <span>0:{String(Math.floor(clipStart)).padStart(2, "0")}</span>
-                                                        <span>0:{String(Math.min(Math.floor(clipDuration), Math.floor(clipStart + CLIP_LENGTH))).padStart(2, "0")}</span>
-                                                    </div>
-                                                    <audio
-                                                        ref={cropAudioRef}
-                                                        src={pendingSong.previewUrl}
-                                                        onLoadedMetadata={(e) => setClipDuration(e.currentTarget.duration || 30)}
-                                                        onTimeUpdate={handleCropTimeUpdate}
-                                                        onEnded={() => setCropPlaying(false)}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <p className="text-[10.5px] italic" style={{ color: "#cbd5e1" }}>Preview audio tidak tersedia untuk lagu ini</p>
-                                            )}
-
-                                            <div className="flex gap-2">
-                                                <button onClick={handleCancelCrop}
-                                                    className="flex-1 h-9 sm:h-10 rounded-xl text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300" style={{ background: "#f1f5f9", color: "#64748b" }}>
-                                                    Batal
-                                                </button>
-                                                <button onClick={handleConfirmSong} disabled={savingSong}
-                                                    className="flex-1 h-9 sm:h-10 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                                                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                                                    {savingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Gunakan Potongan Ini
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <div className="relative">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
-                                                <input value={songQuery} onChange={(e) => setSongQuery(e.target.value)} autoFocus
-                                                    placeholder="Cari judul lagu atau artis..."
-                                                    className="w-full h-10 rounded-xl pl-9 pr-8 text-sm border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                                                    style={{ borderColor: "#e2e8f0", background: "#ffffff", color: "#334155" }} />
-                                                <button onClick={() => { setShowSongSearch(false); setSongQuery(""); setSongResults([]); }}
-                                                    className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                                                    <X className="w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
-                                                </button>
-                                            </div>
-                                            {searchingSong && (
-                                                <p className="text-xs text-slate-400 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Mencari...</p>
-                                            )}
-                                            {songResults.length > 0 && (
-                                                <div className="max-h-56 overflow-y-auto space-y-1 rounded-xl border border-slate-100 p-1.5 bg-white">
-                                                    {songResults.map((song) => (
-                                                        <button key={song.trackId} onClick={() => handlePickSearchResult(song)}
-                                                            className="w-full flex items-center gap-2.5 p-1.5 rounded-lg text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
-                                                            <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100">
-                                                                {song.artworkUrl && <img src={song.artworkUrl} alt={song.trackName} className="w-full h-full object-cover" />}
-                                                            </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <p className="text-xs font-semibold truncate" style={{ color: "#0f172a" }}>{song.trackName}</p>
-                                                                <p className="text-[10.5px] truncate" style={{ color: "#94a3b8" }}>{song.artistName}</p>
-                                                            </div>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )
+                                    <SongPickerPanel picker={songPicker} />
                                 ) : (
                                     <p className="text-xs italic" style={{ color: "#cbd5e1" }}>Belum ada lagu favorit</p>
                                 )}

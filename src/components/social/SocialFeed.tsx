@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import { useChatContext } from "@/contexts/ChatContext";
 import { humanizeRoleKey } from "@/lib/permissions";
-import { Search, MessageCircle, Music, Play, Pause, X, Plus, Eye } from "lucide-react";
+import { useSongPicker } from "./song/useSongPicker";
+import SongPickerPanel from "./song/SongPickerPanel";
+import { Search, MessageCircle, Music, Play, Pause, X, Plus, Eye, Loader2, Check } from "lucide-react";
+
+const MAX_NOTE_LENGTH = 60;
 
 interface SocialUser {
     id: string;
@@ -56,17 +59,18 @@ function describeUser(u: SocialUser): string {
 }
 
 export default function SocialFeed() {
-    const router = useRouter();
     const { openChat } = useChatContext();
     const [me, setMe] = useState<{ id: string; name: string } | null>(null);
     const [users, setUsers] = useState<SocialUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [viewingUser, setViewingUser] = useState<SocialUser | null>(null);
-
-    useEffect(() => {
-        getCurrentUserClient().then((u) => { if (u) setMe({ id: u.id, name: u.name }); });
-    }, []);
+    const [showAddChooser, setShowAddChooser] = useState(false);
+    const [showSongPicker, setShowSongPicker] = useState(false);
+    const [showNoteEditor, setShowNoteEditor] = useState(false);
+    const [noteDraft, setNoteDraft] = useState("");
+    const [savingNote, setSavingNote] = useState(false);
+    const [noteError, setNoteError] = useState<string | null>(null);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -80,6 +84,53 @@ export default function SocialFeed() {
             setLoading(false);
         }
     };
+
+    const songPicker = useSongPicker(() => {
+        setShowSongPicker(false);
+        fetchUsers();
+    });
+
+    const closeSongPicker = () => {
+        songPicker.handleCancelCrop();
+        songPicker.closeSearch();
+        setShowSongPicker(false);
+    };
+
+    const handleSaveNote = async () => {
+        const trimmed = noteDraft.trim();
+        if (!trimmed) return;
+        setSavingNote(true);
+        setNoteError(null);
+        try {
+            const res = await fetch("/api/profile/note", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ note: trimmed }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setShowNoteEditor(false);
+                setNoteDraft("");
+                fetchUsers();
+            } else {
+                setNoteError(data.message ?? "Gagal membuat catatan");
+            }
+        } catch {
+            setNoteError("Terjadi kesalahan");
+        } finally {
+            setSavingNote(false);
+        }
+    };
+
+    const closeNoteEditor = () => {
+        setShowNoteEditor(false);
+        setNoteDraft("");
+        setNoteError(null);
+    };
+
+    useEffect(() => {
+        getCurrentUserClient().then((u) => { if (u) setMe({ id: u.id, name: u.name }); });
+    }, []);
 
     useEffect(() => { fetchUsers(); }, []);
 
@@ -137,8 +188,9 @@ export default function SocialFeed() {
                                 onClick={() =>
                                     hasActiveStory(myUser)
                                         ? setViewingUser(myUser)
-                                        : router.push("/dashboard/profile")
+                                        : setShowAddChooser(true)
                                 }
+                                onAddClick={() => setShowAddChooser(true)}
                             />
                         )}
                         {loading && !myUser && (
@@ -236,6 +288,100 @@ export default function SocialFeed() {
                 />
             )}
 
+            {showAddChooser && (
+                <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50" onClick={() => setShowAddChooser(false)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-xs overflow-hidden p-2">
+                        <button
+                            onClick={() => { setShowAddChooser(false); setNoteDraft(""); setNoteError(null); setShowNoteEditor(true); }}
+                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl hover:bg-slate-50 text-left"
+                        >
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#ede9fe", color: "#7c3aed" }}>
+                                <MessageCircle className="w-4 h-4" />
+                            </div>
+                            <span className="text-sm font-bold text-slate-700">Tulis Catatan</span>
+                        </button>
+                        <button
+                            onClick={() => { setShowAddChooser(false); songPicker.openSearch(); setShowSongPicker(true); }}
+                            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl hover:bg-slate-50 text-left"
+                        >
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#dcfce7", color: "#16a34a" }}>
+                                <Music className="w-4 h-4" />
+                            </div>
+                            <span className="text-sm font-bold text-slate-700">Tambah Lagu</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {showSongPicker && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/70" style={{ backdropFilter: "blur(6px)" }} onClick={closeSongPicker} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+                        <div className="p-5 flex items-center justify-between" style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <Music className="w-4 h-4 text-white flex-shrink-0" />
+                                <p className="text-sm font-bold text-white truncate">Tambah Lagu</p>
+                            </div>
+                            <button onClick={closeSongPicker} className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                                style={{ background: "rgba(255,255,255,0.1)" }}>
+                                <X className="w-4 h-4 text-white" />
+                            </button>
+                        </div>
+                        <div className="p-5">
+                            <SongPickerPanel picker={songPicker} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showNoteEditor && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/70" style={{ backdropFilter: "blur(6px)" }} onClick={closeNoteEditor} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+                        <div className="p-5 flex items-center justify-between" style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <MessageCircle className="w-4 h-4 text-white flex-shrink-0" />
+                                <p className="text-sm font-bold text-white truncate">Tulis Catatan</p>
+                            </div>
+                            <button onClick={closeNoteEditor} className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                                style={{ background: "rgba(255,255,255,0.1)" }}>
+                                <X className="w-4 h-4 text-white" />
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-3">
+                            <div>
+                                <input
+                                    value={noteDraft}
+                                    onChange={(e) => setNoteDraft(e.target.value.slice(0, MAX_NOTE_LENGTH))}
+                                    placeholder="Tulis catatan singkat... (hilang dalam 24 jam)"
+                                    autoFocus
+                                    onKeyDown={(e) => { if (e.key === "Enter") handleSaveNote(); }}
+                                    className="w-full h-11 rounded-xl px-3.5 text-sm border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                                    style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#334155" }}
+                                />
+                                <div className="flex items-center justify-between mt-1.5">
+                                    <span className="text-[10px] text-slate-300">{noteDraft.length}/{MAX_NOTE_LENGTH}</span>
+                                    {noteError && <span className="text-[10px] font-semibold text-red-500">{noteError}</span>}
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={closeNoteEditor}
+                                    className="flex-1 h-10 rounded-xl text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                                    style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                    Batal
+                                </button>
+                                <button onClick={handleSaveNote} disabled={savingNote || !noteDraft.trim()}
+                                    className="flex-1 h-10 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 disabled:opacity-50"
+                                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                                    {savingNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Simpan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
@@ -244,13 +390,19 @@ export default function SocialFeed() {
     );
 }
 
-function StoryBubble({ user, isSelf, onClick }: { user: SocialUser; isSelf?: boolean; onClick: () => void }) {
+function StoryBubble({ user, isSelf, onClick, onAddClick }: { user: SocialUser; isSelf?: boolean; onClick: () => void; onAddClick?: () => void }) {
     const active = hasActiveStory(user);
     const hasNote = !!user.status_note;
     const hasSong = !!user.song_title;
 
     return (
-        <button onClick={onClick} className="relative flex flex-col items-center gap-2 flex-shrink-0 w-20 snap-start group">
+        <div
+            onClick={onClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
+            className="relative flex flex-col items-center gap-2 flex-shrink-0 w-20 snap-start group cursor-pointer"
+        >
             <div className="relative">
                 {/* Sticker gelap menumpuk di atas foto — gaya Instagram Music/Notes.
                      Sekarang SATU kotak (bukan dua kotak terpisah): lagu selalu di baris
@@ -290,16 +442,20 @@ function StoryBubble({ user, isSelf, onClick }: { user: SocialUser; isSelf?: boo
                             : getInitials(user.name)}
                     </div>
                 </div>
-                {isSelf && !active && (
-                    <div className="absolute bottom-0 right-1 w-5 h-5 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center border-2 border-white">
+                {isSelf && onAddClick && (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onAddClick(); }}
+                        title="Tambah catatan atau lagu"
+                        className="absolute bottom-0 right-1 w-5 h-5 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center border-2 border-white focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
+                    >
                         <Plus className="w-3 h-3" />
-                    </div>
+                    </button>
                 )}
             </div>
             <p className="text-[10.5px] font-semibold text-slate-600 truncate w-full text-center">
                 {isSelf ? "Catatan Anda" : user.name.split(" ")[0]}
             </p>
-        </button>
+        </div>
     );
 }
 
@@ -340,9 +496,9 @@ function StoryModal({ user, isSelf, onClose, onChat }: { user: SocialUser; isSel
 
     const handleTimeUpdate = () => {
         const audio = audioRef.current;
-        if (!audio) return;
-        const start = user.song_clip_start ?? 0;
-        if (audio.currentTime >= start + CLIP_LENGTH) {
+        if (!audio || !user) return;
+        // Preview API is 30s max
+        if (audio.currentTime >= 30) {
             audio.pause();
             setPlaying(false);
         }
@@ -355,7 +511,7 @@ function StoryModal({ user, isSelf, onClose, onChat }: { user: SocialUser; isSel
             audio.pause();
             setPlaying(false);
         } else {
-            audio.currentTime = user.song_clip_start ?? 0;
+            audio.currentTime = 0; // API preview is always 30s from 0
             audio.play().catch(() => { });
             setPlaying(true);
         }
