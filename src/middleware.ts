@@ -370,7 +370,7 @@ export const config = {
     "/login",
     "/face-verify",
     "/biometric-enroll",
-    "/api/auth/:path*",io
+    "/api/auth/:path*",
     "/api/laptops/:path*",
     "/api/dashboard/:path*",
     "/api/transaction/:path*",
