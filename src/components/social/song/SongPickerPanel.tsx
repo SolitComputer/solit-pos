@@ -69,6 +69,7 @@ export default function SongPickerPanel({ picker }: SongPickerPanelProps) {
                         <audio
                             ref={cropAudioRef}
                             src={pendingSong.previewUrl}
+                            autoPlay
                             onTimeUpdate={handleCropTimeUpdate}
                             onEnded={handleCropEnded}
                         />
