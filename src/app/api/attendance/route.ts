@@ -59,14 +59,19 @@ export async function GET(request: Request) {
       from += PAGE_SIZE;
     }
 
-    // Dedup logic TIDAK diubah — tetap ambil kejadian SUCCESS pertama
-    // per user per hari (jam kedatangan asli), hanya sumber datanya
-    // sekarang lengkap (tidak terpotong lagi).
+    // ✅ FIX BUG: dedup key sebelumnya cuma `user_id_tanggal` (tanpa arah),
+    // jadi begitu ada absen PULANG (direction OUT) di hari yang sama dengan
+    // absen masuk (direction IN), record OUT-nya SELALU ketiban/dibuang di
+    // sini karena udah "seen" duluan sama record IN (IN selalu lebih dulu
+    // secara waktu). Akibatnya absen pulang gak pernah nyampe ke frontend
+    // sama sekali walau tersimpan aman di database. Sekarang key ikut
+    // sertakan arah, jadi IN dan OUT hari yang sama dua-duanya selamat.
     const seen = new Set<string>();
     const deduplicated = allData.filter((item: any) => {
       const wibDate = new Date(new Date(item.created_at).getTime() + 7 * 60 * 60 * 1000)
         .toISOString().slice(0, 10);
-      const key = `${item.user_id}_${wibDate}`;
+      const direction = item.direction ?? "IN";
+      const key = `${item.user_id}_${wibDate}_${direction}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -90,6 +95,7 @@ export async function GET(request: Request) {
       face_distance: item.face_distance,
       created_at: item.created_at,
       late_weight: item.late_weight != null ? Number(item.late_weight) : null,
+      direction: item.direction ?? "IN", // ✅ NEW — biar frontend bisa pisahin IN vs OUT
     }));
 
     return NextResponse.json({ success: true, data: formattedData });
