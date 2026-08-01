@@ -1414,6 +1414,10 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
         manualAlreadyExists?: boolean;
         manualStatus?: string;
         manualCreatedByName?: string | null;
+        checkedIn?: boolean;      // ✅ NEW
+        checkedOut?: boolean;     // ✅ NEW
+        needsCheckout?: boolean;  // ✅ NEW
+        checkoutAt?: string;      // ✅ NEW
     } | null;
     loading: boolean; onRefresh: () => void;
 }) {
@@ -1429,10 +1433,11 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
     const closeAt = status.closeAt ?? "—";
     const needEnroll = status.needEnroll;
 
-    type CardState = "EXEMPT" | "MANUAL" | "ATTENDED" | "DAY_OFF" | "TOO_EARLY" | "TOO_LATE" | "OPEN";
+    type CardState = "EXEMPT" | "MANUAL" | "NEEDS_CHECKOUT" | "ATTENDED" | "DAY_OFF" | "TOO_EARLY" | "TOO_LATE" | "OPEN";
     let state: CardState;
     if (status.isExempt) state = "EXEMPT";
     else if (status.manualAlreadyExists) state = "MANUAL";
+    else if (status.needsCheckout) state = "NEEDS_CHECKOUT";
     else if (status.alreadyAttended) state = "ATTENDED";
     else if (status.isDayOff) state = "DAY_OFF";
     else if (status.reason === "TOO_EARLY") state = "TOO_EARLY";
@@ -1478,11 +1483,24 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                 showBtn: false,
             };
             break;
+        // ✅ NEW — tanpa case ini, orang yang udah absen masuk gak akan pernah
+        // lihat ada yang perlu dilakukan lagi, jadi gak pernah absen pulang.
+        case "NEEDS_CHECKOUT":
+            cfg = {
+                icon: <Clock className="w-6 h-6 text-orange-600" />, gradient: "from-orange-50 to-amber-50", iconBg: "bg-orange-100",
+                badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-400 animate-pulse",
+                badgeText: "Belum Absen Pulang", title: "Jangan Lupa Absen Pulang",
+                sub: status.checkoutAt ? `Jam pulang: ${status.checkoutAt} · Shift ${status.shift}` : `Shift ${status.shift}`,
+                showBtn: true, btnLabel: "Absen Pulang →",
+                btnColor: "bg-gradient-to-r from-orange-500 to-amber-600",
+                btnAction: () => { window.location.href = "/face-verify?from=/dashboard/attendance"; },
+            };
+            break;
         case "ATTENDED":
             cfg = {
                 icon: <CheckCircle2 className="w-6 h-6 text-emerald-600" />, gradient: "from-emerald-50 to-green-50", iconBg: "bg-emerald-100",
                 badge: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-400",
-                badgeText: "Sudah Absen", title: "Absensi Hari Ini Tercatat",
+                badgeText: "Sudah Absen", title: "Absen Masuk & Pulang Tercatat",
                 sub: `Shift ${status.shift}`, showBtn: false,
             };
             break;
@@ -2910,6 +2928,10 @@ export default function AttendanceDashboardPage() {
                 manualAlreadyExists: d.manualAlreadyExists ?? false,
                 manualStatus: d.manualStatus ?? null,
                 manualCreatedByName: d.manualCreatedByName ?? null,
+                checkedIn: d.checkedIn ?? false,
+                checkedOut: d.checkedOut ?? false,
+                needsCheckout: d.needsCheckout ?? false,
+                checkoutAt: d.checkoutAt,
             });
         } catch { }
         finally { setStatusLoading(false); }
@@ -5993,7 +6015,7 @@ export default function AttendanceDashboardPage() {
                 />
             )}
 
-          {showManualCheckoutModal && isAdminRole(currentUser?.role) && (
+            {showManualCheckoutModal && isAdminRole(currentUser?.role) && (
                 <ManualCheckoutModal
                     users={allUsers}
                     onClose={() => setShowManualCheckoutModal(false)}
