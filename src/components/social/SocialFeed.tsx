@@ -26,7 +26,7 @@ interface SocialUser {
     song_clip_start: number;
     song_expires_at: string | null;
 }
-const CLIP_LENGTH = 30; // durasi klip lagu — 30 detik
+const CLIP_LENGTH = 15; // durasi klip lagu — 15 detik (preview iTunes)
 
 function getInitials(name: string) {
     return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
@@ -497,10 +497,11 @@ function StoryModal({ user, isSelf, onClose, onChat }: { user: SocialUser; isSel
     const handleTimeUpdate = () => {
         const audio = audioRef.current;
         if (!audio || !user) return;
-        // Preview API is 30s max
-        if (audio.currentTime >= 30) {
+        // Berhenti setelah CLIP_LENGTH habis dari titik mulai
+        if (audio.currentTime >= (user.song_clip_start ?? 0) + CLIP_LENGTH) {
             audio.pause();
             setPlaying(false);
+            audio.currentTime = user.song_clip_start ?? 0;
         }
     };
 
@@ -511,7 +512,7 @@ function StoryModal({ user, isSelf, onClose, onChat }: { user: SocialUser; isSel
             audio.pause();
             setPlaying(false);
         } else {
-            audio.currentTime = 0; // API preview is always 30s from 0
+            audio.currentTime = user.song_clip_start ?? 0;
             audio.play().catch(() => { });
             setPlaying(true);
         }

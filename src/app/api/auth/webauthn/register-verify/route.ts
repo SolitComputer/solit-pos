@@ -46,15 +46,55 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const verification = await verifyRegistrationResponse({
-      response: body,
-      expectedChallenge: userRow.webauthn_challenge,
-      expectedOrigin: ORIGIN,
-      expectedRPID: RP_ID,
-    });
+    // ✅ NEW: validasi bentuk data dari browser SEBELUM diproses kriptografi.
+    // Kalau field ini kosong, artinya request corrupt/terpotong di jaringan —
+    // bukan masalah verifikasi. Pesan jadi tepat sasaran, bukan disamaratakan.
+    if (!body?.id || !body?.rawId || !body?.response) {
+      return NextResponse.json(
+        { success: false, message: "Data pendaftaran dari browser tidak lengkap. Coba ulangi." },
+        { status: 400 }
+      );
+    }
+
+    let verification;
+    try {
+      verification = await verifyRegistrationResponse({
+        response: body,
+        expectedChallenge: userRow.webauthn_challenge,
+        expectedOrigin: ORIGIN,
+        expectedRPID: RP_ID,
+      });
+    } catch (err: any) {
+      const msg: string = err?.message ?? "";
+      console.error("[webauthn register-verify] verifyRegistrationResponse error:", err?.name, msg);
+
+      let userMessage = "Verifikasi gagal — data dari device tidak sesuai dengan sesi pendaftaran ini.";
+      if (/origin/i.test(msg)) {
+        userMessage = "Domain tidak cocok (origin mismatch). Pastikan dibuka lewat domain resmi, bukan IP atau domain lain.";
+      } else if (/rp ?id/i.test(msg)) {
+        userMessage = "RP ID tidak cocok dengan konfigurasi server. Hubungi programmer.";
+      } else if (/challenge/i.test(msg)) {
+        userMessage = "Sesi pendaftaran tidak cocok (challenge berbeda). Ulangi dari awal — jangan buka 2 tab pendaftaran bersamaan.";
+      } else if (/algorithm|alg\b/i.test(msg)) {
+        userMessage = "Device ini pakai algoritma sidik jari yang tidak didukung server.";
+      } else if (/verification/i.test(msg)) {
+        userMessage = "Verifikasi pengguna (sidik jari/PIN) tidak terkonfirmasi oleh device. Pastikan benar-benar menyentuh sensor sidik jari sampai selesai.";
+      }
+
+      return NextResponse.json(
+        { success: false, message: userMessage, debugReason: msg || err?.name || "unknown_error" },
+        { status: 400 }
+      );
+    }
 
     if (!verification.verified || !verification.registrationInfo) {
-      return NextResponse.json({ success: false, message: "Verifikasi pendaftaran gagal" }, { status: 400 });
+      // ✅ NEW: log detail penuh biar kelihatan kenapa "verified" jadi false
+      // meski tidak ada exception yang dilempar library.
+      console.error("[webauthn register-verify] verified=false:", verification);
+      return NextResponse.json(
+        { success: false, message: "Sidik jari tidak dapat diverifikasi oleh server. Coba scan ulang, atau gunakan jari/perangkat lain." },
+        { status: 400 }
+      );
     }
 
     const { credential } = verification.registrationInfo;
@@ -82,8 +122,11 @@ export async function POST(request: Request) {
       .eq("id", user.id);
 
     return NextResponse.json({ success: true, message: "Sidik jari berhasil didaftarkan di device ini" });
-  } catch (err) {
-    console.error("[webauthn register-verify]", err);
-    return NextResponse.json({ success: false, message: "Gagal memverifikasi pendaftaran" }, { status: 500 });
+  } catch (err: any) {
+    console.error("[webauthn register-verify] unhandled error:", err?.name, err?.message, err);
+    return NextResponse.json(
+      { success: false, message: "Gagal memproses pendaftaran karena error internal server.", debugReason: err?.message ?? "unknown" },
+      { status: 500 }
+    );
   }
 }

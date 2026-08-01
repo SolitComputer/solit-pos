@@ -46,11 +46,14 @@ export async function POST() {
         id: c.credential_id,
         transports: c.transports ?? undefined,
       })),
+     
       authenticatorSelection: {
-        residentKey: "preferred",
+        residentKey: "discouraged",
         userVerification: "required",
         authenticatorAttachment: "platform",
       },
+      
+      timeout: 90000,
     });
 
     await supabaseAdmin
