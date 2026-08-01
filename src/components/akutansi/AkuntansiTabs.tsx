@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Fraunces } from "next/font/google";
+import { Fraunces, Outfit } from "next/font/google";
 import { periodLabel } from "@/lib/accounting";
 import JurnalUmum from "./JurnalUmum";
 import BukuBesar from "./BukuBesar";
@@ -16,6 +16,12 @@ const fraunces = Fraunces({
   subsets: ["latin"],
   weight: ["600", "900"],
   style: ["normal", "italic"],
+  display: "swap",
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "900"],
   display: "swap",
 });
 
@@ -72,7 +78,7 @@ export default function AkuntansiTabs({ period }: { period: string }) {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-0">
+    <div className={`${outfit.className} max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-0`}>
       {/* Header — "sampul ledger" */}
       <div className="ledger-cover relative overflow-hidden bg-gradient-to-br from-[#FBF7EC] to-[#F3ECD8] border border-[#E4DCC8] rounded-2xl px-5 sm:px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
         <div className="relative flex items-center gap-3">
