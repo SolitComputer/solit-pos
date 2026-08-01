@@ -30,8 +30,8 @@ function ts() {
 }
 
 type AttendanceTimeResult =
-  | { allowed: true; reason: "OPEN"; openAt: string; closeAt: string }
-  | { allowed: false; reason: "TOO_EARLY" | "TOO_LATE"; openAt: string; closeAt: string };
+  | { allowed: true; reason: "OPEN" | "EARLY_OVERTIME"; openAt: string; closeAt: string }
+  | { allowed: false; reason: "TOO_LATE"; openAt: string; closeAt: string };
 
 function isAttendanceTimeClient(shift: ShiftType): AttendanceTimeResult {
   const cfg = SHIFT_CONFIG_CLIENT[shift];
@@ -44,8 +44,10 @@ function isAttendanceTimeClient(shift: ShiftType): AttendanceTimeResult {
   const pad = (n: number) => String(n).padStart(2, "0");
   const openAt = `${pad(cfg.startH)}:${pad(cfg.startM)} WIB`;
   const closeAt = `${pad(cfg.endH)}:${pad(cfg.endM)} WIB`;
-  if (total < start) return { allowed: false, reason: "TOO_EARLY", openAt, closeAt };
+  // ✅ FIX (poin 2): absen sebelum jam mulai TIDAK LAGI diblokir — otomatis
+  // jadi lemburan (lihat lib/overtimeEngine.ts).
   if (total > end) return { allowed: false, reason: "TOO_LATE", openAt, closeAt };
+  if (total < start) return { allowed: true, reason: "EARLY_OVERTIME", openAt, closeAt };
   return { allowed: true, reason: "OPEN", openAt, closeAt };
 }
 
@@ -91,6 +93,8 @@ export default function FaceVerifyPage() {
   const [scheduleInfo, setScheduleInfo] = useState<{
     openAt: string; closeAt: string; lateAt: string;
   } | null>(null);
+  const [attendanceDirection, setAttendanceDirection] = useState<"IN" | "OUT">("IN"); // ✅ NEW — poin 1
+  const [isHolidayToday, setIsHolidayToday] = useState(false); // ✅ NEW — poin 12
 
   const [biometricEligible, setBiometricEligible] = useState(false);
   const [biometricEnrolled, setBiometricEnrolled] = useState(false);
@@ -255,34 +259,44 @@ export default function FaceVerifyPage() {
           setBiometricDeviceSupported(false);
         }
 
-        if (statusResult.alreadyAttended) {
+       // ✅ FIX (poin 1): "selesai hari ini" sekarang berarti sudah absen
+        // MASUK **dan** PULANG. Kalau baru absen masuk, halaman ini tetap
+        // dibuka lagi nanti untuk absen pulang.
+        const direction: "IN" | "OUT" = statusResult.needsCheckout ? "OUT" : "IN";
+        setAttendanceDirection(direction);
+
+        if (statusResult.checkedIn && statusResult.checkedOut) {
           window.location.href = redirectTo;
           return;
         }
 
-        if (statusResult.isDayOff || statusResult.isTodayDayOff) {
-          addLog("hari libur terdeteksi — absen tidak wajib", "ok");
+        // ✅ FIX (poin 12): hari libur TIDAK LAGI memblokir absen masuk —
+        // tetap boleh absen dan seluruh durasinya jadi lemburan penuh.
+        if ((statusResult.isDayOff || statusResult.isTodayDayOff) && direction === "IN") {
+          addLog("hari libur terdeteksi — absen tidak wajib, tapi tetap bisa (akan dihitung lembur)", "ok");
+          setIsHolidayToday(true);
           setStage("day-off");
           return;
         }
 
-        const clientCheck = isAttendanceTimeClient(shift);
-        const isOutOfTime =
-          statusResult.isAttendanceTime === false ||
-          (statusResult.isAttendanceTime == null && !clientCheck.allowed);
+        // ✅ FIX (poin 2): batas waktu HANYA berlaku untuk absen MASUK yang
+        // kelewat batas jam terakhir. Absen PULANG tidak punya batas waktu.
+        if (direction === "IN") {
+          const clientCheck = isAttendanceTimeClient(shift);
+          const isOutOfTime = statusResult.isAttendanceTime === false
+            ? statusResult.reason === "TOO_LATE"
+            : (statusResult.isAttendanceTime == null && clientCheck.reason === "TOO_LATE");
 
-        if (isOutOfTime) {
-          addLog(`Server: di luar jam absen (shift ${shift})`, "warn");
-          const reason: "TOO_EARLY" | "TOO_LATE" =
-            (statusResult.reason ?? (clientCheck.allowed ? "TOO_LATE" : clientCheck.reason)) === "TOO_EARLY"
-              ? "TOO_EARLY" : "TOO_LATE";
-          setTimeInfo({
-            reason,
-            openAt: statusResult.openAt ?? clientCheck.openAt,
-            closeAt: statusResult.closeAt ?? clientCheck.closeAt,
-          });
-          setStage("out-of-time");
-          return;
+          if (isOutOfTime) {
+            addLog(`Server: waktu absen masuk sudah berakhir (shift ${shift})`, "warn");
+            setTimeInfo({
+              reason: "TOO_LATE",
+              openAt: statusResult.openAt ?? clientCheck.openAt,
+              closeAt: statusResult.closeAt ?? clientCheck.closeAt,
+            });
+            setStage("out-of-time");
+            return;
+          }
         }
 
         if (statusResult.needEnroll) {
@@ -290,7 +304,7 @@ export default function FaceVerifyPage() {
           setMessage("Daftarkan wajah — cek lokasi terlebih dahulu");
         } else {
           setStage("location");
-          setMessage("Klik tombol di bawah untuk cek lokasi");
+          setMessage(direction === "OUT" ? "Klik tombol di bawah untuk cek lokasi absen pulang" : "Klik tombol di bawah untuk cek lokasi");
         }
       } catch (err) {
         console.error(err);
@@ -451,13 +465,20 @@ export default function FaceVerifyPage() {
               });
               const enrollData = await enrollRes.json();
 
-              if (enrollData.success) {
+             if (enrollData.success) {
                 addLog("enrollment berhasil ", "ok");
                 const vd = await doVerify(embedding, 1, coords);
                 if (vd.success) {
                   setStage("success");
-                  setMessage("Wajah berhasil didaftarkan dan absen tercatat ");
-                  setTimeout(() => (window.location.href = redirectTo), 1800);
+                  setMessage(
+                    vd.overtimeDetected
+                      ? "Wajah berhasil didaftarkan, absen tercatat — lemburmu terdeteksi, isi keterangan sebentar lagi"
+                      : "Wajah berhasil didaftarkan dan absen tercatat "
+                  );
+                  const target = vd.overtimeDetected && vd.overtime?.id
+                    ? `/dashboard/attendance/overtime?fillDetail=${vd.overtime.id}`
+                    : redirectTo;
+                  setTimeout(() => (window.location.href = target), 1800);
                 } else if (vd.outOfTime) {
                   //  FIX: pakai reason + jadwal dari server
                   setTimeInfo({
@@ -480,10 +501,17 @@ export default function FaceVerifyPage() {
               addLog(`mencoba verifikasi [${currentAttempt}/${MAX_ATTEMPTS}]...`, "info");
               const vd = await doVerify(embedding, currentAttempt, coords);
 
-              if (vd.success) {
+             if (vd.success) {
                 setStage("success");
-                setMessage("Absen wajah berhasil  Selamat bekerja");
-                setTimeout(() => (window.location.href = redirectTo), 1500);
+                setMessage(
+                  vd.direction === "OUT"
+                    ? (vd.overtimeDetected ? "Absen pulang berhasil — lemburmu terdeteksi, isi keterangan sebentar lagi" : "Absen pulang berhasil. Sampai jumpa besok!")
+                    : (vd.overtimeDetected ? "Absen masuk berhasil — lemburmu terdeteksi, isi keterangan sebentar lagi" : "Absen masuk berhasil  Selamat bekerja")
+                );
+                const target = vd.overtimeDetected && vd.overtime?.id
+                  ? `/dashboard/attendance/overtime?fillDetail=${vd.overtime.id}`
+                  : redirectTo;
+                setTimeout(() => (window.location.href = target), 1500);
               } else if (vd.outOfTime) {
                 setTimeInfo({
                   reason: vd.reason === "TOO_EARLY" ? "TOO_EARLY" : "TOO_LATE",
@@ -611,11 +639,18 @@ export default function FaceVerifyPage() {
           accuracy: gpsCoords?.accuracy ?? null,
         }),
       });
-      const verifyData2 = await verifyRes2.json();
+     const verifyData2 = await verifyRes2.json();
       if (verifyData2.success) {
         setStage("success");
-        setMessage(verifyData2.alreadyAttended ? "Sudah absen hari ini" : "Absen sidik jari berhasil");
-        setTimeout(() => (window.location.href = redirectTo), 1500);
+        setMessage(
+          verifyData2.overtimeDetected
+            ? "Absen sidik jari berhasil — lemburmu terdeteksi, isi keterangan sebentar lagi"
+            : "Absen sidik jari berhasil"
+        );
+        const target = verifyData2.overtimeDetected && verifyData2.overtime?.id
+          ? `/dashboard/attendance/overtime?fillDetail=${verifyData2.overtime.id}`
+          : redirectTo;
+        setTimeout(() => (window.location.href = target), 1500);
       } else if (verifyData2.outOfTime) {
         setTimeInfo({
           reason: verifyData2.reason === "TOO_EARLY" ? "TOO_EARLY" : "TOO_LATE",
@@ -787,10 +822,13 @@ export default function FaceVerifyPage() {
         {/* Title */}
         <div style={{ textAlign: "center", marginBottom: 18 }}>
           <div style={{ fontSize: 16, fontWeight: 500, color: "rgba(255,255,255,0.88)", letterSpacing: 0.2, marginBottom: 3 }}>
-            {stage === "enroll" || stage === "enrolling" ? "Daftarkan Wajah" : "Absensi Wajah"}
+            {stage === "enroll" || stage === "enrolling"
+              ? "Daftarkan Wajah"
+              : attendanceDirection === "OUT" ? "Absen Pulang" : "Absen Masuk"}
           </div>
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: 0.3 }}>
             Solit POS — Absensi Biometrik · Shift {userShift}
+            {isHolidayToday && <span style={{ color: "rgba(251,146,60,0.7)" }}> · Hari Libur (Lembur)</span>}
           </div>
         </div>
 
@@ -828,18 +866,17 @@ export default function FaceVerifyPage() {
               <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
                 Hari Ini Kamu Libur
               </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
                 Absen tidak wajib di hari libur.<br />
-                Kehadiranmu <span style={{ color: "rgba(251,146,60,0.8)", fontWeight: 600 }}>tidak akan dihitung absen</span> hari ini.
+                {/* ✅ FIX (poin 12): kalau tetap absen, sekarang dihitung lembur penuh */}
+                Tapi kalau tetap masuk, jam kerjamu <span style={{ color: "rgba(251,146,60,0.8)", fontWeight: 600 }}>akan dihitung lembur penuh</span>.
               </div>
             </div>
-            <button className="btn-main" disabled={skipping} onClick={handleSkipToRedirect}>
-              {skipping ? (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid rgba(255,255,255,0.7)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-                  Mengalihkan...
-                </span>
-              ) : "Lanjut ke Dashboard →"}
+            <button className="btn-main" onClick={() => { setStage("location"); setMessage("Cek lokasi untuk absen lembur hari libur"); }}>
+              Tetap Absen (Lembur) →
+            </button>
+            <button className="btn-ghost" style={{ marginTop: 10, width: "100%", textAlign: "center" }} disabled={skipping} onClick={handleSkipToRedirect}>
+              {skipping ? "Mengalihkan..." : "Lewati, tidak usah absen →"}
             </button>
           </div>
         )}

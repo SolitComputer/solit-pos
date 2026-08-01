@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2, AlertTriangle, Camera, Inbox, Pencil, Play, Check, X, Ban, ClipboardList, Circle, HelpCircle, Trophy, type LucideIcon } from "lucide-react";
+import { OvertimeTable, type OvertimeTableRow } from "@/components/attendance/OvertimeTable"; // ✅ NEW poin 15
+import { OvertimeFillDetailModal } from "@/components/attendance/OvertimeFillDetailModal"; // ✅ NEW
+import { OvertimeSOPBanner } from "@/components/attendance/OvertimeSOPBanner"; // ✅ NEW poin 14
+import { isPKLRole as isPklRoleShared } from "@/lib/permissions"; // ✅ NEW poin 16
 
 type OvertimeRequest = {
   id: string; user_id: string; request_date: string;
@@ -1552,7 +1556,11 @@ export default function OvertimePage() {
   const [proofPhotoData, setProofPhotoData] = useState<OvertimeRequest | null>(null);
   const [editData, setEditData] = useState<OvertimeRequest | null>(null);
   const [deleteData, setDeleteData] = useState<OvertimeRequest | null>(null);
-  const [activeTab, setActiveTab] = useState<"KARYAWAN" | "PKL">("KARYAWAN");
+  const [activeTab, setActiveTab] = useState<"KARYAWAN" | "PKL">("KARYAWAN"); // sudah tidak dipakai di UI baru — boleh dihapus nanti
+
+  // ✅ NEW — dibuka otomatis kalau datang dari redirect /face-verify?fillDetail=<id>
+  const fillDetailIdFromUrl = searchParams.get("fillDetail");
+  const [fillDetailOvertime, setFillDetailOvertime] = useState<{ id: string; minutes: number; direction: string } | null>(null);
   const autoCompletingIds = useRef<Set<string>>(new Set());
   // FIX: simpan posisi scroll window sebelum user buka detail karyawan,
   // supaya pas back, halaman balik ke posisi semula (bukan ke paling atas)
@@ -1605,6 +1613,15 @@ export default function OvertimePage() {
     ]).finally(() => setLoading(false));
   }, [fetchOvertimes, fetchAllUsers, currentUser?.role, calendarMonth]);
 
+  // ✅ NEW — buka modal isi-detail otomatis kalau datang dari redirect absen
+  useEffect(() => {
+    if (!fillDetailIdFromUrl) return;
+    const found = overtimes.find((o) => o.id === fillDetailIdFromUrl);
+    if (found) {
+      setFillDetailOvertime({ id: found.id, minutes: (found as any).duration_minutes ?? 0, direction: (found as any).direction ?? "MANUAL" });
+    }
+  }, [fillDetailIdFromUrl, overtimes]);
+
   useEffect(() => {
     if (!currentUser) return;
     const parse = (iso: string | null) => { if (!iso) return 0; try { const t = new Date(iso).getTime(); return isNaN(t) ? 0 : t; } catch { return 0; } };
@@ -1651,10 +1668,20 @@ export default function OvertimePage() {
       if (map.has(uid)) { map.get(uid)!.items.push(o); }
       else if (!q || o.users.name.toLowerCase().includes(q)) { map.set(uid, { user: o.users, items: [o] }); }
     });
-    const hasStatusFilter = filterStatus !== "Semua";
+   const hasStatusFilter = filterStatus !== "Semua";
     const result = Array.from(map.values()).filter(g => !hasStatusFilter || g.items.length > 0);
     return result.sort((a, b) => a.user.name.localeCompare(b.user.name, "id-ID"));
   }, [filtered, allUsers, filterStatus, searchQuery]);
+
+  // ✅ NEW (poin 15/16/17): baris flat untuk tabel — karyawan non-PKL saja,
+  // ikut filter search + status yang sama seperti sebelumnya.
+  const tableRows: OvertimeTableRow[] = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return filtered
+      .filter((o) => o.users && !isPklRoleShared(o.users.role))
+      .filter((o) => !q || o.users!.name.toLowerCase().includes(q))
+      .sort((a, b) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime()) as unknown as OvertimeTableRow[];
+  }, [filtered, searchQuery]);
 
   const groupedKaryawan = useMemo(
     () => groupedByUser.filter(g => !isUserPKL(g.user.role)),
@@ -1725,10 +1752,8 @@ export default function OvertimePage() {
                   <Pencil size={16} /><span className="hidden sm:inline">Input Manual</span>
                 </button>
               )}
-              <button onClick={() => setShowRequestModal(true)}
-                className="h-9 px-4 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm shadow-violet-200">
-                <span><Plus className="w-4 h-4 inline mr-1" /></span><span>Ajukan Lemburan</span>
-              </button>
+              {/* ✅ REMOVED (poin 2): pengajuan mandiri sudah tidak relevan —
+                  lembur sekarang otomatis dari absen masuk lebih awal / pulang lebih larut */}
             </div>
           </div>
 
@@ -1834,36 +1859,18 @@ export default function OvertimePage() {
             </div>
           )}
 
-          {/* ── Employee List / Detail ── */}
-          {selectedUserId && selectedUserData ? (
-            <EmployeeDetailView
-              userId={selectedUserId}
-              name={(selectedUserData.user as { id: string; name: string; role: string }).name}
-              role={(selectedUserData.user as { id: string; name: string; role: string }).role}
-              overtimes={selectedUserData.items}
-              userCanViewPay={userCanViewPay}
-              currentUser={currentUser}
-              onBack={() => setSelectedUserId(null)}
-              onDetailOpen={o => setDetailData(o)}
-            />
-          ) : (
-            <EmployeeListPanel
-              groupedByUser={activeGroupedByUser}
-              loading={loading}
-              userCanViewPay={userCanViewPay}
-              currentUser={currentUser}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              filterStatus={filterStatus}
-              setFilterStatus={setFilterStatus}
-              statuses={statuses}
-              onSelectUser={uid => {
-                // FIX: rekam posisi scroll saat ini sebelum pindah ke detail karyawan
-                listScrollPositionRef.current = window.scrollY;
-                setSelectedUserId(uid);
-              }}
-            />
-          )}
+         {/* ── Poin 14: SOP wajib tampil di halaman lembur ── */}
+          <OvertimeSOPBanner />
+
+          {/* ── Poin 15/16/17: tabel lembur, karyawan non-PKL saja, filter tetap sama ── */}
+          <OvertimeTable
+            rows={tableRows}
+            loading={loading}
+            canApprove={(targetRole) => canApproveTarget(currentUser?.roles ?? currentUser?.role, targetRole)}
+            canAudit={isAdminRole(currentUser?.roles ?? currentUser?.role)}
+            currentUserId={currentUser?.id}
+            onRefresh={refetch}
+          />
 
         </div>
       </div>
@@ -1878,6 +1885,20 @@ export default function OvertimePage() {
       {proofPhotoData && <ProofPhotoModal overtime={proofPhotoData} onClose={() => setProofPhotoData(null)} canViewPay={userCanViewPay} />}
       {editData && <EditOvertimeModal overtime={editData} onClose={() => setEditData(null)} onSaved={() => { refetch(); setEditData(null); }} />}
       {deleteData && <DeleteConfirmModal overtime={deleteData} onClose={() => setDeleteData(null)} onDeleted={() => { refetch(); setDeleteData(null); }} canViewPay={userCanViewPay} />}
+    {fillDetailOvertime && (
+        <OvertimeFillDetailModal
+          overtimeId={fillDetailOvertime.id}
+          minutes={fillDetailOvertime.minutes}
+          direction={fillDetailOvertime.direction}
+          onClose={() => {
+            setFillDetailOvertime(null);
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete("fillDetail");
+            router.replace(params.toString() ? `?${params.toString()}` : "?", { scroll: false });
+          }}
+          onSaved={refetch}
+        />
+      )}
       {
         detailData && (
           <OvertimeDetailModal

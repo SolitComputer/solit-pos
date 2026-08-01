@@ -78,6 +78,7 @@ export async function POST(request: Request) {
     const {
       start_date, end_date, shift, notes,
       open_hour, open_minute, late_hour, late_minute, close_hour, close_minute,
+      checkout_hour, checkout_minute, // ✅ NEW — jam pulang, independen dari open/late/close
     } = body;
 
     const daysOfWeek: number[] = Array.isArray(body.days_of_week) && body.days_of_week.length > 0
@@ -129,6 +130,29 @@ export async function POST(request: Request) {
       };
     }
 
+    // ✅ NEW — jam pulang (checkout) independen dari open/late/close di atas:
+    // bisa di-override sendiri tanpa harus ikut nge-custom jam masuk juga.
+    // null di sini artinya "jadwal tanggal ini TIDAK meng-custom checkout" —
+    // resolveScheduleOverride() lalu tetap pakai checkout dari
+    // user_shift_config si karyawan, bukan ketiban default shift begitu saja.
+    let checkoutFields: { checkout_hour: number | null; checkout_minute: number | null } = {
+      checkout_hour: null, checkout_minute: null,
+    };
+    if (checkout_hour != null) {
+      const shiftDefault = SHIFT_DEFAULTS[shift as ShiftName];
+      const effectiveCloseTotal = useCustom
+        ? close_hour * 60 + (close_minute ?? 0)
+        : shiftDefault.close_hour * 60 + shiftDefault.close_minute;
+      const checkoutTotal = checkout_hour * 60 + (checkout_minute ?? 0);
+      if (effectiveCloseTotal >= checkoutTotal) {
+        return NextResponse.json(
+          { success: false, message: "Jam pulang harus setelah jam tutup absen masuk" },
+          { status: 400 }
+        );
+      }
+      checkoutFields = { checkout_hour, checkout_minute: checkout_minute ?? 0 };
+    }
+
     // ── Otorisasi ───────────────────────────────────────────────────────────
     const scope = await getAttendanceScope(supabase, user);
     if (!scope.all) {
@@ -148,6 +172,7 @@ export async function POST(request: Request) {
       days_of_week: daysOfWeek,
       shift: shift as ShiftName,
       ...hours,
+      ...checkoutFields, // ✅ NEW
       notes: notes || null,
       created_by: user.id,
     }));

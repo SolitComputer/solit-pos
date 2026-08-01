@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { usePrepNotify } from "@/hooks/usePrepNotify";
+import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
@@ -1200,6 +1201,7 @@ export default function Sidebar() {
   }, []);
 
   const prep = usePrepNotify(userRoles, user?.id);
+  const overtimeNotify = useOvertimeNotify(userRoles, user?.id); // ✅ NEW — poin 9
   const { sound_key: notifSoundKey, custom_sound_url: notifCustomUrl } = useNotificationSettings(user?.id ?? null);
 
   useEffect(() => {
@@ -1210,6 +1212,7 @@ export default function Sidebar() {
 
   const onAntrian = pathname.startsWith("/dashboard/preparation/antrian");
   const onSiapKirim = pathname.startsWith("/dashboard/preparation/siap-kirim");
+  const onOvertimePage = pathname.startsWith("/dashboard/attendance/overtime"); // ✅ NEW
 
   usePrepAlarm(onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, true, 4000, notifSoundKey, notifCustomUrl);
   usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true, 4000, notifSoundKey, notifCustomUrl);
@@ -1219,6 +1222,7 @@ export default function Sidebar() {
     "/dashboard/preparation/pengantaran": deliveryBadge,
     "/dashboard/preparation/antrian": prep.menungguUnacked.length,
     "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
+    "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count, // ✅ NEW — poin 9
   };
 
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
@@ -1251,6 +1255,17 @@ export default function Sidebar() {
           <button onClick={() => { prep.ackSiapKirim(prep.siapKirimUnacked); router.push("/dashboard/preparation/siap-kirim"); }} className="w-full bg-orange-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-orange-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
             <span className="text-sm font-black">{prep.siapKirimUnacked.length} barang siap — pilih pengiriman</span>
+          </button>
+        </div>
+      )}
+      {/* ✅ NEW — poin 9: kepala divisi (atau Admin, kalau kepala divisi yang lembur) diberi tahu ada lemburan menunggu ACC */}
+      {!onOvertimePage && overtimeNotify.count > 0 && (
+        <div className="fixed left-1/2 -translate-x-1/2 z-[58] w-full max-w-sm px-2" style={{
+          top: (!onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12) + (!onSiapKirim && prep.siapKirimUnacked.length > 0 ? 52 : 0),
+        }}>
+          <button onClick={() => router.push("/dashboard/attendance/overtime")} className="w-full bg-violet-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-violet-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
+            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+            <span className="text-sm font-black">{overtimeNotify.count} lemburan menunggu ACC</span>
           </button>
         </div>
       )}
