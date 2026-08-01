@@ -1,7 +1,7 @@
 // src/app/api/auth/face-status/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifyToken, resolveShiftConfigFromDB, isAttendanceTimeForSchedule, signAttendanceCookie, verifyAttendanceCookie } from "@/lib/auth";
+import { verifyToken, resolveShiftConfigFromDB, isAttendanceTimeForSchedule, signAttendanceCookie, verifyAttendanceCookie, type DaySchedule } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 import { resolveScheduleOverride, toAuthScheduleShape } from "@/lib/shiftSchedule";
 
@@ -70,14 +70,22 @@ export async function GET() {
       supabase.from("user_monthly_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
       supabase.from("attendance_manual").select("id, status, created_by")
         .eq("user_id", user.id).eq("attendance_date", todayDate).maybeSingle(),
-      supabase.from("face_verifications").select("id")
-        .eq("user_id", user.id).eq("status", "SUCCESS")
+     supabase.from("face_verifications").select("id, created_at")
+        .eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "IN")
         .gte("created_at", `${todayDate}T00:00:00+07:00`)
         .lte("created_at", `${todayDate}T23:59:59+07:00`)
-        .order("created_at", { ascending: false })
-        .limit(1),
+        .maybeSingle(),
       supabase.from("users").select("face_embedding, shift, biometric_enabled").eq("id", user.id).single(),
     ]);
+
+    // ✅ NEW — cek terpisah apakah sudah absen PULANG hari ini
+    const { data: todayOutRow } = await supabase
+      .from("face_verifications")
+      .select("id, created_at")
+      .eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "OUT")
+      .gte("created_at", `${todayDate}T00:00:00+07:00`)
+      .lte("created_at", `${todayDate}T23:59:59+07:00`)
+      .maybeSingle();
 
     const userShift = ((userData as any)?.shift ?? (user as any).shift ?? "PAGI") as "PAGI" | "SORE";
 
@@ -163,14 +171,19 @@ export async function GET() {
       return response;
     }
 
-    const isTodayDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !Boolean(dateWork));
-    const alreadyAttendedDB = Array.isArray(todaySuccess) ? todaySuccess.length > 0 : Boolean(todaySuccess);
+   const isTodayDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !Boolean(dateWork));
+    const alreadyAttendedDB = Boolean(todaySuccess); // ini sekarang khusus status absen MASUK
+    const alreadyCheckedOut = Boolean(todayOutRow);  // ✅ NEW — status absen PULANG
 
-    const baseSchedule = await resolveShiftConfigFromDB(user.id, supabase);
+   const baseSchedule = await resolveShiftConfigFromDB(user.id, supabase);
     const override = await resolveScheduleOverride(supabase, user.id, todayDate);
 
-    const schedule = override
-      ? { ...baseSchedule, ...toAuthScheduleShape(override) }
+    const overrideShape = override ? toAuthScheduleShape(override) : null;
+    // ✅ FIX: checkout eksplisit — pakai overrideShape.checkout kalau jadwal
+    // tanggal ini nge-custom jam pulang, kalau enggak tetap pakai
+    // baseSchedule.checkout (dari Atur Shift akun), bukan default global.
+    const schedule: DaySchedule = overrideShape
+      ? { ...baseSchedule, ...overrideShape, checkout: overrideShape.checkout ?? baseSchedule.checkout }
       : baseSchedule;
 
     const effectiveShift = override ? override.shift : userShift;
@@ -182,7 +195,9 @@ export async function GET() {
     const closeAt = `${pad(schedule.end.h)}:${pad(schedule.end.m)} WIB`;
     const lateAt = `${pad(schedule.lateFrom.h)}:${pad(schedule.lateFrom.m)} WIB`;
 
-    const isAttendanceTimeNow = timeStatus.reason === "OPEN";
+    // ✅ FIX: EARLY_OVERTIME sekarang juga dianggap "waktu absen terbuka"
+    // (cuma informasinya beda — akan dihitung lembur, bukan diblokir)
+    const isAttendanceTimeNow = timeStatus.reason === "OPEN" || timeStatus.reason === "EARLY_OVERTIME";
     const reason = timeStatus.reason;
     const needEnroll = !(userData as any)?.face_embedding;
 
@@ -199,7 +214,7 @@ export async function GET() {
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id);
 
-    const response = NextResponse.json({
+   const response = NextResponse.json({
       success: true,
       alreadyAttended,
       needEnroll,
@@ -211,12 +226,18 @@ export async function GET() {
       openAt,
       closeAt,
       lateAt,
+      checkoutAt: `${pad(schedule.checkout.h)}:${pad(schedule.checkout.m)} WIB`, // ✅ NEW
       isExempt: false,
+      // ✅ NEW — dipakai halaman absen untuk menampilkan tombol "Absen Masuk" vs "Absen Pulang"
+      checkedIn: alreadyAttendedDB,
+      checkedOut: alreadyCheckedOut,
+      needsCheckout: alreadyAttendedDB && !alreadyCheckedOut,
       scheduleSource: override ? "SHIFT_SCHEDULE" : schedule.source,
       scheduleToday: {
         openAt: `${pad(schedule.start.h)}:${pad(schedule.start.m)}`,
         closeAt: `${pad(schedule.end.h)}:${pad(schedule.end.m)}`,
         lateAt: `${pad(schedule.lateFrom.h)}:${pad(schedule.lateFrom.m)}`,
+        checkoutAt: `${pad(schedule.checkout.h)}:${pad(schedule.checkout.m)}`, // ✅ NEW
         source: override ? "SHIFT_SCHEDULE" : schedule.source,
       },
       manualAlreadyExists: false,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import { useChatContext } from "@/contexts/ChatContext";
 import { humanizeRoleKey } from "@/lib/permissions";
@@ -71,6 +72,9 @@ export default function SocialFeed() {
     const [noteDraft, setNoteDraft] = useState("");
     const [savingNote, setSavingNote] = useState(false);
     const [noteError, setNoteError] = useState<string | null>(null);
+    const [playingSongId, setPlayingSongId] = useState<string | null>(null);
+    const listAudioRef = useRef<HTMLAudioElement>(null);
+    const router = useRouter();
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -155,6 +159,30 @@ export default function SocialFeed() {
         }
         return [...list].sort((a, b) => a.name.localeCompare(b.name));
     }, [users, me, search]);
+
+    const handlePlaySong = (u: SocialUser) => {
+        if (!u.song_preview_url) return;
+        const audio = listAudioRef.current;
+        if (!audio) return;
+        if (playingSongId === u.id) {
+            audio.pause();
+            setPlayingSongId(null);
+            return;
+        }
+        audio.src = u.song_preview_url;
+        audio.currentTime = 0;
+        audio.play().catch(() => { });
+        setPlayingSongId(u.id);
+    };
+
+    const handleListAudioTimeUpdate = () => {
+        const audio = listAudioRef.current;
+        if (!audio) return;
+        if (audio.currentTime >= CLIP_LENGTH) {
+            audio.pause();
+            setPlayingSongId(null);
+        }
+    };
 
     const handleChat = (u: SocialUser) => {
         openChat({ id: u.id, name: u.name, role: u.role, profile_photo_url: u.profile_photo_url });
@@ -245,7 +273,11 @@ export default function SocialFeed() {
                                     className="px-4 py-3 flex items-center gap-3 rounded-2xl border border-slate-100 hover:border-violet-200 hover:bg-slate-50/70 transition-colors cursor-pointer"
                                     onClick={() => (hasActiveStory(u) ? setViewingUser(u) : handleChat(u))}
                                 >
-                                    <div className="relative flex-shrink-0">
+                                    <div
+                                        className="relative flex-shrink-0 cursor-pointer"
+                                        title={`Lihat profil ${u.name}`}
+                                        onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/profile/${u.id}`); }}
+                                    >
                                         <div
                                             className="w-11 h-11 rounded-full flex items-center justify-center text-white text-xs font-black overflow-hidden"
                                             style={{
@@ -259,8 +291,22 @@ export default function SocialFeed() {
                                         </div>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-bold text-slate-800 truncate">{u.name}</p>
-                                        <p className="text-[11px] text-slate-400 truncate">
+                                        <p
+                                            className="text-sm font-bold text-slate-800 truncate w-fit cursor-pointer hover:text-violet-600 hover:underline"
+                                            onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/profile/${u.id}`); }}
+                                        >
+                                            {u.name}
+                                        </p>
+                                        <p
+                                            className={`text-[11px] text-slate-400 truncate ${u.song_preview_url ? "cursor-pointer hover:text-emerald-600" : ""}`}
+                                            onClick={(e) => {
+                                                if (!u.song_preview_url) return;
+                                                e.stopPropagation();
+                                                handlePlaySong(u);
+                                            }}
+                                            title={u.song_preview_url ? "Putar lagu" : undefined}
+                                        >
+                                            {playingSongId === u.id && <Pause className="w-3 h-3 inline -mt-0.5 mr-1" />}
                                             {describeUser(u)}
                                         </p>
                                     </div>
@@ -278,6 +324,8 @@ export default function SocialFeed() {
                     )}
                 </div>
             </div>
+
+            <audio ref={listAudioRef} onEnded={() => setPlayingSongId(null)} onTimeUpdate={handleListAudioTimeUpdate} />
 
             {viewingUser && (
                 <StoryModal
@@ -464,6 +512,7 @@ function StoryModal({ user, isSelf, onClose, onChat }: { user: SocialUser; isSel
     const audioRef = useRef<HTMLAudioElement>(null);
     const [viewers, setViewers] = useState<{ id: string; name: string; profile_photo_url: string | null; viewed_at: string }[]>([]);
     const [showViewers, setShowViewers] = useState(false);
+    const router = useRouter();
 
     useEffect(() => {
         if (user.song_preview_url && audioRef.current) {
@@ -523,14 +572,18 @@ function StoryModal({ user, isSelf, onClose, onChat }: { user: SocialUser; isSel
             <div className="absolute inset-0 bg-black/70" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
             <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
                 <div className="p-5 flex items-center justify-between" style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                    <div className="flex items-center gap-3 min-w-0">
+                   <div
+                        className="flex items-center gap-3 min-w-0 cursor-pointer group"
+                        title={`Lihat profil ${user.name}`}
+                        onClick={() => router.push(`/dashboard/profile/${user.id}`)}
+                    >
                         <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-white text-sm font-black"
                             style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
                             {user.profile_photo_url
                                 ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
                                 : getInitials(user.name)}
                         </div>
-                        <p className="text-sm font-bold text-white truncate">{user.name}</p>
+                        <p className="text-sm font-bold text-white truncate group-hover:underline">{user.name}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ background: "rgba(255,255,255,0.1)" }}>
