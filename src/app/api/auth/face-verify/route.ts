@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 import { resolveScheduleOverride, toAuthScheduleShape } from "@/lib/shiftSchedule";
+import { processAttendanceVerification } from "@/lib/attendanceVerification";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,172 +59,75 @@ export async function POST(request: Request) {
     const user = await verifyToken(token);
     if (!user) return NextResponse.json({ success: false, message: "Token invalid" }, { status: 401 });
 
-    const nowWIBCheck = new Date(Date.now() + 7 * 3600_000);
-    const todayDowCheck = nowWIBCheck.getUTCDay();
-    const todayDateCheck = nowWIBCheck.toISOString().slice(0, 10);
-
-    const [{ data: weeklyOffCheck }, { data: specificOffCheck }, { data: dateWorkCheck }, { data: monthlyOffCheck }] = await Promise.all([
-      supabaseAdmin.from("user_day_off").select("id")
-        .eq("user_id", user.id).eq("day_of_week", todayDowCheck).maybeSingle(),
-      supabaseAdmin.from("user_date_off").select("id")
-        .eq("user_id", user.id).eq("off_date", todayDateCheck).maybeSingle(),
-      supabaseAdmin.from("user_date_work").select("id")
-        .eq("user_id", user.id).eq("work_date", todayDateCheck).maybeSingle(),
-      supabaseAdmin.from("user_monthly_off").select("id")
-        .eq("user_id", user.id).eq("off_date", todayDateCheck).maybeSingle(),
-    ]);
-
-    if (Boolean(monthlyOffCheck) || ((weeklyOffCheck || specificOffCheck) && !dateWorkCheck)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Hari ini adalah hari liburmu — tidak perlu absen 🏖️",
-          isDayOff: true,
-        },
-        { status: 403 }
-      );
-    }
-
-    const [baseSchedule, scheduleOverride] = await Promise.all([
-      resolveShiftConfigFromDB(user.id, supabaseAdmin),
-      resolveScheduleOverride(supabaseAdmin, user.id, todayDateCheck),
-    ]);
-
-    const schedule = scheduleOverride
-      ? { ...baseSchedule, ...toAuthScheduleShape(scheduleOverride) }
-      : baseSchedule;
-
-    const timeCheck = isAttendanceTimeForSchedule(schedule);
-
-    if (!timeCheck.allowed) {
-      const msg = timeCheck.reason === "TOO_EARLY"
-        ? `Absen belum dibuka. Buka pukul ${timeCheck.openAt}`
-        : `Waktu absen sudah berakhir. Batas ${timeCheck.closeAt}`;
-      return NextResponse.json(
-        { success: false, message: msg, reason: timeCheck.reason, outOfTime: true },
-        { status: 403 }
-      );
-    }
-
     const body = await request.json();
     const { embedding, attemptCount = 1, latitude, longitude, accuracy } = body;
 
-    // Validasi embedding: harus array 128 angka valid (finite).
-    // Tanpa ini, `embedding: []` bikin euclideanDistance = 0 → dianggap match
-    // → bypass verifikasi wajah.
+    // Validasi embedding: harus array 128 angka valid (finite). Tanpa ini,
+    // `embedding: []` bikin euclideanDistance = 0 → dianggap match → bypass
+    // verifikasi wajah.
     if (
       !Array.isArray(embedding) ||
       embedding.length !== 128 ||
       !embedding.every((n) => typeof n === "number" && Number.isFinite(n))
     ) {
-      return NextResponse.json(
-        { success: false, message: "Data wajah tidak valid" },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "Data wajah tidak valid" }, { status: 400 });
     }
 
-    const ua = request.headers.get("user-agent") ?? "";
-    const device = parseDevice(ua);
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
-
-    const nowWIB = new Date(Date.now() + 7 * 3600_000);
-    const todayDate = nowWIB.toISOString().slice(0, 10);
-
-    const [{ data: userFullData }, { data: alreadyToday }] = await Promise.all([
-      supabaseAdmin
-        .from("users")
-        .select("face_embedding, shift")
-        .eq("id", user.id)
-        .single(),
-      supabaseAdmin
-        .from("face_verifications")
-        .select("id, created_at")
-        .eq("user_id", user.id)
-        .eq("status", "SUCCESS")
-        .gte("created_at", `${todayDate}T00:00:00+07:00`)
-        .lte("created_at", `${todayDate}T23:59:59+07:00`)
-        .maybeSingle(),
-    ]);
-
-    const userShift = (scheduleOverride?.shift
-      ?? userFullData?.shift
-      ?? "PAGI") as "PAGI" | "SORE";
-
-    const { weight } = calcAttendanceWeightFromSchedule(
-      new Date().toISOString(),
-      schedule
-    );
-
-    if (alreadyToday) {
-      const expiry = getAttendanceExpiry();
-      const response = NextResponse.json({
-        success: true,
-        message: "Sudah absen hari ini",
-        alreadyAttended: true,
-        firstCheckIn: alreadyToday.created_at,
-      });
-      await setAttendanceCookies(response, user.id, expiry);
-      return response;
-    }
+    const { data: userFullData } = await supabaseAdmin
+      .from("users").select("face_embedding, role, roles").eq("id", user.id).single();
 
     if (!userFullData?.face_embedding) {
-      return NextResponse.json(
-        { success: false, message: "Wajah belum terdaftar", needEnroll: true },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "Wajah belum terdaftar", needEnroll: true }, { status: 400 });
     }
 
     const THRESHOLD = 0.5;
     const distance = euclideanDistance(embedding, userFullData.face_embedding);
     const matched = distance < THRESHOLD;
 
-    const insertPayload: Record<string, any> = {
-      user_id: user.id,
-      status: matched ? "SUCCESS" : "FAILED",
-      attempt_count: Number(attemptCount),
-      device,
-      ip_address: ip,
-      shift: userShift,
-      late_weight: matched ? weight : null,
-      method: "FACE",
-    };
-    if (latitude != null) insertPayload.latitude = latitude;
-    if (longitude != null) insertPayload.longitude = longitude;
-    if (accuracy != null) insertPayload.accuracy = accuracy;
-
-    const { error: insertError } = await supabaseAdmin
-      .from("face_verifications")
-      .insert(insertPayload);
-
-    if (insertError) {
-      console.error("INSERT GAGAL:", insertError.message, insertError);
-    }
-
     if (!matched) {
-      return NextResponse.json(
-        { success: false, message: "Wajah tidak dikenali", distance },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: "Wajah tidak dikenali", distance }, { status: 400 });
     }
 
-    if (insertError) {
-      return NextResponse.json(
-        { success: false, message: "Wajah cocok tapi gagal menyimpan ke database. Hubungi admin/programmer." },
-        { status: 500 }
-      );
+    const ua = request.headers.get("user-agent") ?? "";
+    const device = parseDevice(ua);
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
+
+    // ✅ Semua logika arah IN/OUT + deteksi lembur otomatis ada di sini,
+    // jadi face-verify, webauthn, dan absen-pulang-manual admin semuanya
+    // konsisten (poin 1, 2, 7, 12, 13, 16).
+    const result = await processAttendanceVerification({
+      supabaseAdmin,
+      userId: user.id,
+      userRole: (Array.isArray(userFullData.roles) && userFullData.roles[0]) || userFullData.role,
+      method: "FACE",
+      device,
+      ip,
+      latitude, longitude, accuracy,
+    });
+
+    if (!result.ok) {
+      return NextResponse.json({ success: false, message: result.message, code: result.code }, { status: result.status });
     }
 
     const expiry = getAttendanceExpiry();
     const response = NextResponse.json({
       success: true,
-      message: "Absen wajah berhasil",
+      message: result.message,
+      direction: result.direction,
       distance,
+      overtimeDetected: !!result.overtime,
+      overtime: result.overtime,
     });
+    // Cookie "sudah absen hari ini" tetap dipasang setelah OUT juga, supaya
+    // halaman lain (middleware, sidebar) tahu sesi absen hari ini sudah selesai.
     await setAttendanceCookies(response, user.id, expiry);
     return response;
   } catch (err: any) {
     console.error("EXCEPTION di face-verify POST:", err);
-    return NextResponse.json({ success: false, message: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: `Internal server error: ${err?.message ?? "unknown error"}` },
+      { status: 500 }
+    );
   }
 }
 

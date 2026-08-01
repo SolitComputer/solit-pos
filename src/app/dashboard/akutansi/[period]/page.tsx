@@ -1,4 +1,3 @@
-// src/app/dashboard/akuntansi/[period]/page.tsx
 import { notFound } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { isValidPeriod } from "@/lib/accounting";

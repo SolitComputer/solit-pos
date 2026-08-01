@@ -5,6 +5,8 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { ShiftConfigModal } from "@/components/attendance/ShiftConfigModal";
+import { ManualCheckoutModal } from "@/components/attendance/ManualCheckoutModal"; // ✅ NEW poin 8
+import { OvertimeSOPBanner } from "@/components/attendance/OvertimeSOPBanner";
 import { MonthlyOffModal } from "@/components/attendance/onthlyOffModal";
 import { canManageAttendance, DIVISION_MAP, isFullAccessMulti, getEffectiveSubordinates } from "@/lib/permissions";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -2700,6 +2702,7 @@ export default function AttendanceDashboardPage() {
     // Modal state
     const [showDayOffModal, setShowDayOffModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
+    const [showManualCheckoutModal, setShowManualCheckoutModal] = useState(false); // ✅ NEW poin 8
     const [showSalaryModal, setShowSalaryModal] = useState(false);
     const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [editManualData, setEditManualData] = useState<ManualAttendance | null>(null);
@@ -3797,6 +3800,14 @@ export default function AttendanceDashboardPage() {
                                 {usersLoading ? "Loading..." : "Absen Manual"}
                             </button>
                         )}
+                        {isAdmin && (
+                            <button
+                                onClick={async () => { if (allUsers.length === 0) await fetchAllUsers(); setShowManualCheckoutModal(true); }}
+                                className="flex items-center gap-1.5 text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 px-4 py-2 rounded-xl hover:bg-orange-100 transition-all active:scale-95"
+                            >
+                                Absen Pulang Manual
+                            </button>
+                        )}
                         {canManage && (
                             <>
                                 <button
@@ -3826,6 +3837,7 @@ export default function AttendanceDashboardPage() {
                     </div>
                 </div>
 
+                <OvertimeSOPBanner compact />
                 <TodayAttendanceCard status={todayStatus} loading={statusLoading} onRefresh={fetchTodayStatus} />
 
                 {/* ── Stat Cards ── */}
@@ -5978,6 +5990,14 @@ export default function AttendanceDashboardPage() {
                         await fetchAttendance();
                         fetchTodayStatus();
                     }}
+                />
+            )}
+
+          {showManualCheckoutModal && isAdminRole(currentUser?.role) && (
+                <ManualCheckoutModal
+                    users={allUsers}
+                    onClose={() => setShowManualCheckoutModal(false)}
+                    onSaved={() => { refreshAll(); fetchTodayStatus(); }}
                 />
             )}
             {showManualModal && isAdminRole(currentUser?.role) && (

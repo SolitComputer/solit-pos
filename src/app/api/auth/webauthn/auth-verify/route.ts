@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 import { resolveScheduleOverride, toAuthScheduleShape } from "@/lib/shiftSchedule";
+import { processAttendanceVerification } from "@/lib/attendanceVerification";
 import { verifyAuthenticationResponse, isoBase64URL, RP_ID, ORIGIN, CHALLENGE_TTL_MS } from "@/lib/webauthn";
 
 const supabaseAdmin = createClient(
@@ -54,46 +55,9 @@ export async function POST(request: Request) {
         const user = await verifyToken(token);
         if (!user) return NextResponse.json({ success: false, message: "Token invalid" }, { status: 401 });
 
-        const nowWIBCheck = new Date(Date.now() + 7 * 3600_000);
-        const todayDowCheck = nowWIBCheck.getUTCDay();
-        const todayDateCheck = nowWIBCheck.toISOString().slice(0, 10);
-
-        const [{ data: weeklyOffCheck }, { data: specificOffCheck }, { data: dateWorkCheck }, { data: monthlyOffCheck }] = await Promise.all([
-            supabaseAdmin.from("user_day_off").select("id").eq("user_id", user.id).eq("day_of_week", todayDowCheck).maybeSingle(),
-            supabaseAdmin.from("user_date_off").select("id").eq("user_id", user.id).eq("off_date", todayDateCheck).maybeSingle(),
-            supabaseAdmin.from("user_date_work").select("id").eq("user_id", user.id).eq("work_date", todayDateCheck).maybeSingle(),
-            supabaseAdmin.from("user_monthly_off").select("id").eq("user_id", user.id).eq("off_date", todayDateCheck).maybeSingle(),
-        ]);
-
-        if (Boolean(monthlyOffCheck) || ((weeklyOffCheck || specificOffCheck) && !dateWorkCheck)) {
-            return NextResponse.json(
-                { success: false, message: "Hari ini adalah hari liburmu — tidak perlu absen", isDayOff: true },
-                { status: 403 }
-            );
-        }
-
-        const [baseSchedule, scheduleOverride] = await Promise.all([
-            resolveShiftConfigFromDB(user.id, supabaseAdmin),
-            resolveScheduleOverride(supabaseAdmin, user.id, todayDateCheck),
-        ]);
-        const schedule = scheduleOverride
-            ? { ...baseSchedule, ...toAuthScheduleShape(scheduleOverride) }
-            : baseSchedule;
-
-        const timeCheck = isAttendanceTimeForSchedule(schedule);
-        if (!timeCheck.allowed) {
-            const msg = timeCheck.reason === "TOO_EARLY"
-                ? `Absen belum dibuka. Buka pukul ${timeCheck.openAt}`
-                : `Waktu absen sudah berakhir. Batas ${timeCheck.closeAt}`;
-            return NextResponse.json(
-                { success: false, message: msg, reason: timeCheck.reason, outOfTime: true },
-                { status: 403 }
-            );
-        }
-
-        const { data: userRow } = await supabaseAdmin
+       const { data: userRow } = await supabaseAdmin
             .from("users")
-            .select("webauthn_challenge, webauthn_challenge_at, shift, biometric_enabled")
+            .select("webauthn_challenge, webauthn_challenge_at, shift, biometric_enabled, role, roles")
             .eq("id", user.id)
             .single();
 
@@ -181,57 +145,30 @@ export async function POST(request: Request) {
                 .eq("id", user.id),
         ]);
 
-        const nowWIB = new Date(Date.now() + 7 * 3600_000);
-        const todayDate = nowWIB.toISOString().slice(0, 10);
-
-        const { data: alreadyToday } = await supabaseAdmin
-            .from("face_verifications")
-            .select("id, created_at")
-            .eq("user_id", user.id)
-            .eq("status", "SUCCESS")
-            .gte("created_at", `${todayDate}T00:00:00+07:00`)
-            .lte("created_at", `${todayDate}T23:59:59+07:00`)
-            .maybeSingle();
-
-        if (alreadyToday) {
-            const expiry = getAttendanceExpiry();
-            const response = NextResponse.json({
-                success: true, message: "Sudah absen hari ini", alreadyAttended: true, firstCheckIn: alreadyToday.created_at,
-            });
-            await setAttendanceCookies(response, user.id, expiry);
-            return response;
-        }
-
-        const { weight } = calcAttendanceWeightFromSchedule(new Date().toISOString(), schedule);
         const ua = request.headers.get("user-agent") ?? "";
         const device = parseDevice(ua);
         const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
 
-        const insertPayload: Record<string, any> = {
-            user_id: user.id,
-            status: "SUCCESS",
-            attempt_count: 1,
-            device,
-            ip_address: ip,
-            shift: scheduleOverride?.shift ?? userRow.shift ?? "PAGI",
-            late_weight: weight,
+        const result = await processAttendanceVerification({
+            supabaseAdmin,
+            userId: user.id,
+            userRole: (Array.isArray(userRow.roles) && userRow.roles[0]) || userRow.role,
             method: "BIOMETRIC",
-        };
-        if (latitude != null) insertPayload.latitude = latitude;
-        if (longitude != null) insertPayload.longitude = longitude;
-        if (accuracy != null) insertPayload.accuracy = accuracy;
+            device, ip, latitude, longitude, accuracy,
+        });
 
-        const { error: insertError } = await supabaseAdmin.from("face_verifications").insert(insertPayload);
-        if (insertError) {
-            console.error("[webauthn auth-verify] insert absensi gagal:", insertError.message);
-            return NextResponse.json(
-                { success: false, message: "Sidik jari cocok tapi gagal menyimpan ke database. Hubungi admin/programmer." },
-                { status: 500 }
-            );
+        if (!result.ok) {
+            return NextResponse.json({ success: false, message: result.message, code: result.code }, { status: result.status });
         }
 
         const expiry = getAttendanceExpiry();
-        const response = NextResponse.json({ success: true, message: "Absen sidik jari berhasil" });
+        const response = NextResponse.json({
+            success: true,
+            message: result.message,
+            direction: result.direction,
+            overtimeDetected: !!result.overtime,
+            overtime: result.overtime,
+        });
         await setAttendanceCookies(response, user.id, expiry);
         return response;
     } catch (err) {
