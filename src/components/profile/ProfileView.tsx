@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import imageCompression from "browser-image-compression";
 import { humanizeRoleKey } from "@/lib/permissions";
+import ImageCropModal from "./ImageCropModal";
+import { useSongPicker, SavedSong } from "@/components/social/song/useSongPicker";
+import SongPickerPanel from "@/components/social/song/SongPickerPanel";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
-    Loader2, Pencil, Check, X, Music, Search, Play, Pause,
-    MessageCircle, Eye,
+    Loader2, Pencil, Check, X, Music, Play, Pause,
+    MessageCircle, Eye, CheckCircle2, AlertCircle,
 } from "lucide-react";
 
 interface ProfileData {
@@ -26,14 +29,6 @@ interface ProfileData {
     song_preview_url: string | null;
     song_clip_start: number;
     song_expires_at: string | null;
-}
-
-interface SongResult {
-    trackId: number;
-    trackName: string;
-    artistName: string;
-    artworkUrl: string | null;
-    previewUrl: string | null;
 }
 
 interface AchievementBlock {
@@ -77,9 +72,14 @@ function noteTimeLeft(expiresAtIso: string): string {
 
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
     useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
+    const Icon = type === "ok" ? CheckCircle2 : AlertCircle;
     return (
-        <div className={`fixed top-4 right-4 left-4 sm:left-auto sm:top-5 sm:right-5 sm:max-w-sm z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"}`}>
-            {msg}
+        <div className={`fixed top-4 right-4 left-4 sm:left-auto sm:top-5 sm:right-5 sm:max-w-sm z-[9999] flex items-start gap-2.5 pl-3.5 pr-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold bg-white border ${type === "ok" ? "border-emerald-100" : "border-red-100"}`}
+            style={{ boxShadow: "0 14px 34px rgba(15,12,41,0.14)" }}>
+            <span className={`mt-0.5 flex-shrink-0 ${type === "ok" ? "text-emerald-500" : "text-red-500"}`}>
+                <Icon className="w-4 h-4" />
+            </span>
+            <span className={type === "ok" ? "text-slate-700" : "text-red-600"}>{msg}</span>
         </div>
     );
 }
@@ -100,6 +100,8 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [uploadingBanner, setUploadingBanner] = useState(false);
     const bannerInputRef = useRef<HTMLInputElement>(null);
     const [showPhotoModal, setShowPhotoModal] = useState(false);
+    const [showPhotoActions, setShowPhotoActions] = useState(false);
+    const [cropTarget, setCropTarget] = useState<{ type: "avatar" | "banner"; src: string; fileName: string } | null>(null);
 
     const [editingNote, setEditingNote] = useState(false);
     const [noteDraft, setNoteDraft] = useState("");
@@ -108,26 +110,32 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [viewers, setViewers] = useState<{ id: string; name: string; profile_photo_url: string | null; viewed_at: string }[]>([]);
     const [showViewers, setShowViewers] = useState(false);
 
-    const [showSongSearch, setShowSongSearch] = useState(false);
-    const [songQuery, setSongQuery] = useState("");
-    const [songResults, setSongResults] = useState<SongResult[]>([]);
-    const [searchingSong, setSearchingSong] = useState(false);
-    const [savingSong, setSavingSong] = useState(false);
     const [removingSong, setRemovingSong] = useState(false);
     const [playingPreview, setPlayingPreview] = useState(false);
     const [showInfoPopup, setShowInfoPopup] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
 
-    const [pendingSong, setPendingSong] = useState<SongResult | null>(null);
-    const [clipStart, setClipStart] = useState(0);
-    const [clipDuration, setClipDuration] = useState(30);
-    const [cropPlaying, setCropPlaying] = useState(false);
-    const cropAudioRef = useRef<HTMLAudioElement>(null);
-
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
     const callerRoles = currentUser?.roles?.length ? currentUser.roles : [currentUser?.role].filter(Boolean) as string[];
     const isAdmin = callerRoles.some((r) => ADMIN_ROLES.includes(r));
+
+    const songPicker = useSongPicker(
+        (song: SavedSong) => {
+            setProfile((p) => (p ? {
+                ...p,
+                song_title: song.title,
+                song_artist: song.artist,
+                song_artwork_url: song.artwork_url,
+                song_preview_url: song.preview_url,
+                song_clip_start: song.clip_start,
+                song_expires_at: song.expires_at,
+            } : p));
+            setPlayingPreview(false);
+            showToast("Lagu berhasil ditambahkan", "ok");
+        },
+        (msg) => showToast(msg, "err")
+    );
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -159,23 +167,6 @@ export default function ProfileView({ userId }: { userId: string }) {
             .then((d) => { if (d.success) setViewers(d.data); })
             .catch(() => { });
     }, [isSelf, profile?.status_note, userId]);
-
-    useEffect(() => {
-        if (!showSongSearch || songQuery.trim().length < 2) { setSongResults([]); return; }
-        const t = setTimeout(async () => {
-            setSearchingSong(true);
-            try {
-                const res = await fetch(`/api/profile/song?q=${encodeURIComponent(songQuery.trim())}`);
-                const data = await res.json();
-                if (data.success) setSongResults(data.data);
-            } catch {
-                // diam-diam gagal, biarkan hasil pencarian sebelumnya
-            } finally {
-                setSearchingSong(false);
-            }
-        }, 400);
-        return () => clearTimeout(t);
-    }, [songQuery, showSongSearch]);
 
     const handleSaveNote = async () => {
         const trimmed = noteDraft.trim();
@@ -215,91 +206,6 @@ export default function ProfileView({ userId }: { userId: string }) {
         }
     };
 
-    const handlePickSearchResult = (song: SongResult) => {
-        setPendingSong(song);
-        setClipStart(0);
-        setClipDuration(30);
-        setCropPlaying(false);
-    };
-
-    const handleCancelCrop = () => {
-        cropAudioRef.current?.pause();
-        setCropPlaying(false);
-        setPendingSong(null);
-    };
-
-    const toggleCropPlay = () => {
-        const audio = cropAudioRef.current;
-        if (!audio) return;
-        if (cropPlaying) {
-            audio.pause();
-            setCropPlaying(false);
-        } else {
-            audio.currentTime = clipStart;
-            audio.play().catch(() => { });
-            setCropPlaying(true);
-        }
-    };
-
-    // Otomatis stop tepat CLIP_LENGTH detik setelah titik awal yang dipilih
-    const handleCropTimeUpdate = () => {
-        const audio = cropAudioRef.current;
-        if (!audio) return;
-        if (audio.currentTime >= clipStart + CLIP_LENGTH) {
-            audio.pause();
-            setCropPlaying(false);
-        }
-    };
-
-    const handleCropSliderChange = (value: number) => {
-        setClipStart(value);
-        if (cropAudioRef.current) {
-            cropAudioRef.current.currentTime = value;
-        }
-    };
-
-    const handleConfirmSong = async () => {
-        if (!pendingSong) return;
-        setSavingSong(true);
-        try {
-            const res = await fetch("/api/profile/song", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: pendingSong.trackName,
-                    artist: pendingSong.artistName,
-                    artwork_url: pendingSong.artworkUrl,
-                    preview_url: pendingSong.previewUrl,
-                    clip_start: clipStart,
-                }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                setProfile((p) => (p ? {
-                    ...p,
-                    song_title: pendingSong.trackName,
-                    song_artist: pendingSong.artistName,
-                    song_artwork_url: pendingSong.artworkUrl,
-                    song_preview_url: pendingSong.previewUrl,
-                    song_clip_start: clipStart,
-                } : p));
-                cropAudioRef.current?.pause();
-                setPendingSong(null);
-                setShowSongSearch(false);
-                setSongQuery("");
-                setSongResults([]);
-                setPlayingPreview(false);
-                showToast("Lagu berhasil ditambahkan", "ok");
-            } else {
-                showToast(data.message ?? "Gagal menyimpan lagu", "err");
-            }
-        } catch {
-            showToast("Terjadi kesalahan", "err");
-        } finally {
-            setSavingSong(false);
-        }
-    };
-
     const handleRemoveSong = async () => {
         setRemovingSong(true);
         try {
@@ -330,7 +236,7 @@ export default function ProfileView({ userId }: { userId: string }) {
             audio.pause();
             setPlayingPreview(false);
         } else {
-            audio.currentTime = profile.song_clip_start ?? 0;
+            audio.currentTime = 0;
             audio.play().catch(() => { });
             setPlayingPreview(true);
         }
@@ -345,66 +251,87 @@ export default function ProfileView({ userId }: { userId: string }) {
     const handleMainTimeUpdate = () => {
         const audio = audioRef.current;
         if (!audio || !profile) return;
-        const start = profile.song_clip_start ?? 0;
-        if (audio.currentTime >= start + CLIP_LENGTH) {
+        if (audio.currentTime >= CLIP_LENGTH) {
             audio.pause();
             setPlayingPreview(false);
         }
     };
 
-    const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         e.target.value = "";
         if (!file) return;
-        setUploading(true);
-        try {
-            const compressed = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 800, useWebWorker: true });
-            const form = new FormData();
-            form.append("file", compressed, compressed.name || "avatar.jpg");
-            if (!isSelf) form.append("user_id", userId);
-            const res = await fetch("/api/profile/photo", { method: "POST", body: form });
-            const data = await res.json();
-            if (data.success) {
-                setProfile((p) => (p ? { ...p, profile_photo_url: data.data.profile_photo_url } : p));
-                if (isSelf) {
-                    window.dispatchEvent(new CustomEvent("solit:profile-updated", {
-                        detail: { profile_photo_url: data.data.profile_photo_url },
-                    }));
-                }
-                showToast("Foto profil berhasil diperbarui", "ok");
-            } else {
-                showToast(data.message ?? "Gagal upload foto", "err");
-            }
-        } catch {
-            showToast("Terjadi kesalahan saat memproses foto", "err");
-        } finally {
-            setUploading(false);
-        }
+        setCropTarget({ type: "avatar", src: URL.createObjectURL(file), fileName: file.name || "avatar.jpg" });
     };
 
-    const handleBannerFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleBannerFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         e.target.value = "";
         if (!file) return;
-        setUploadingBanner(true);
-        try {
-            const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1600, useWebWorker: true });
-            const form = new FormData();
-            form.append("file", compressed, compressed.name || "banner.jpg");
-            form.append("type", "banner");
-            if (!isSelf) form.append("user_id", userId);
-            const res = await fetch("/api/profile/photo", { method: "POST", body: form });
-            const data = await res.json();
-            if (data.success) {
-                setProfile((p) => (p ? { ...p, banner_url: data.data.banner_url } : p));
-                showToast("Banner berhasil diperbarui", "ok");
-            } else {
-                showToast(data.message ?? "Gagal upload banner", "err");
+        setCropTarget({ type: "banner", src: URL.createObjectURL(file), fileName: file.name || "banner.jpg" });
+    };
+
+    const handleCropCancel = () => {
+        if (cropTarget) URL.revokeObjectURL(cropTarget.src);
+        setCropTarget(null);
+    };
+
+    // Dipanggil ImageCropModal setelah user tekan "Simpan" — terima hasil crop (blob),
+    // lalu lanjut ke alur compress + upload yang sama seperti sebelumnya
+    const handleCropConfirm = async (blob: Blob) => {
+        if (!cropTarget) return;
+        const { type, fileName } = cropTarget;
+        URL.revokeObjectURL(cropTarget.src);
+        setCropTarget(null);
+
+        const croppedFile = new File([blob], fileName, { type: "image/jpeg" });
+
+        if (type === "avatar") {
+            setUploading(true);
+            try {
+                const compressed = await imageCompression(croppedFile, { maxSizeMB: 0.8, maxWidthOrHeight: 800, useWebWorker: true });
+                const form = new FormData();
+                form.append("file", compressed, compressed.name || "avatar.jpg");
+                if (!isSelf) form.append("user_id", userId);
+                const res = await fetch("/api/profile/photo", { method: "POST", body: form });
+                const data = await res.json();
+                if (data.success) {
+                    setProfile((p) => (p ? { ...p, profile_photo_url: data.data.profile_photo_url } : p));
+                    if (isSelf) {
+                        window.dispatchEvent(new CustomEvent("solit:profile-updated", {
+                            detail: { profile_photo_url: data.data.profile_photo_url },
+                        }));
+                    }
+                    showToast("Foto profil berhasil diperbarui", "ok");
+                } else {
+                    showToast(data.message ?? "Gagal upload foto", "err");
+                }
+            } catch {
+                showToast("Terjadi kesalahan saat memproses foto", "err");
+            } finally {
+                setUploading(false);
             }
-        } catch {
-            showToast("Terjadi kesalahan saat memproses banner", "err");
-        } finally {
-            setUploadingBanner(false);
+        } else {
+            setUploadingBanner(true);
+            try {
+                const compressed = await imageCompression(croppedFile, { maxSizeMB: 1, maxWidthOrHeight: 1600, useWebWorker: true });
+                const form = new FormData();
+                form.append("file", compressed, compressed.name || "banner.jpg");
+                form.append("type", "banner");
+                if (!isSelf) form.append("user_id", userId);
+                const res = await fetch("/api/profile/photo", { method: "POST", body: form });
+                const data = await res.json();
+                if (data.success) {
+                    setProfile((p) => (p ? { ...p, banner_url: data.data.banner_url } : p));
+                    showToast("Banner berhasil diperbarui", "ok");
+                } else {
+                    showToast(data.message ?? "Gagal upload banner", "err");
+                }
+            } catch {
+                showToast("Terjadi kesalahan saat memproses banner", "err");
+            } finally {
+                setUploadingBanner(false);
+            }
         }
     };
 
@@ -471,6 +398,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     }
 
     const roles = profile.roles?.length ? profile.roles : [profile.role];
+    const hasStatusBubble = Boolean(profile.song_title || profile.status_note);
 
     return (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-0 py-6 sm:py-8 lg:py-10 space-y-4 sm:space-y-5 lg:space-y-6">
@@ -489,7 +417,7 @@ export default function ProfileView({ userId }: { userId: string }) {
 
                         {profile.song_title && (
                             <>
-                                <div className="w-36 h-36 mx-auto rounded-full overflow-hidden shadow-lg mb-5"
+                                <div className="w-36 h-36 mx-auto rounded-full overflow-hidden shadow-lg mb-5 ring-4 ring-white/10"
                                     style={{ animation: playingPreview ? "solitAvatarSpin 8s linear infinite" : "none" }}>
                                     {profile.song_artwork_url
                                         ? <img src={profile.song_artwork_url} alt={profile.song_title} className="w-full h-full object-cover" />
@@ -550,12 +478,65 @@ export default function ProfileView({ userId }: { userId: string }) {
             {showPhotoModal && profile.profile_photo_url && (
                 <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" onClick={() => setShowPhotoModal(false)}>
                     <div className="absolute inset-0 bg-black/80" style={{ backdropFilter: "blur(4px)" }} />
-                    <button onClick={() => setShowPhotoModal(false)}
-                        className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
-                        <X className="w-5 h-5 text-white" />
-                    </button>
+                    <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 flex items-center gap-2">
+                        {(isSelf || isAdmin) && (
+                            <button onClick={(e) => { e.stopPropagation(); setShowPhotoModal(false); setConfirmDelete(true); }}
+                                title="Hapus foto profil"
+                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-red-500/80 flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                                <Trash2 className="w-5 h-5 text-white" />
+                            </button>
+                        )}
+                        <button onClick={() => setShowPhotoModal(false)}
+                            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                            <X className="w-5 h-5 text-white" />
+                        </button>
+                    </div>
                     <img src={profile.profile_photo_url} alt={profile.name} onClick={(e) => e.stopPropagation()}
                         className="relative max-w-full max-h-[85vh] rounded-2xl object-contain" />
+                </div>
+            )}
+
+            {showPhotoActions && (
+                <div className="fixed inset-0 z-[9996] flex items-end sm:items-center justify-center" onClick={() => setShowPhotoActions(false)}>
+                    <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(4px)" }} />
+                    <div className="relative w-full sm:w-80 bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-2 pb-6 sm:pb-2"
+                        onClick={(e) => e.stopPropagation()}>
+                        <div className="sm:hidden w-10 h-1 rounded-full bg-slate-200 mx-auto my-2" />
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400 px-4 pt-1 pb-2">Foto Profil</p>
+
+                        {profile.profile_photo_url && (
+                            <button onClick={() => { setShowPhotoActions(false); setShowPhotoModal(true); }}
+                                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-slate-50 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
+                                <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(99,102,241,0.10)", color: "#6366f1" }}>
+                                    <Eye className="w-4 h-4" />
+                                </span>
+                                <span className="text-sm font-semibold text-slate-700">Lihat Foto Profil</span>
+                            </button>
+                        )}
+
+                        <button onClick={() => { setShowPhotoActions(false); fileInputRef.current?.click(); }}
+                            className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-slate-50 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
+                            <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(99,102,241,0.10)", color: "#6366f1" }}>
+                                <Camera className="w-4 h-4" />
+                            </span>
+                            <span className="text-sm font-semibold text-slate-700">{profile.profile_photo_url ? "Ganti Foto" : "Tambah Foto"}</span>
+                        </button>
+
+                        {profile.profile_photo_url && (
+                            <button onClick={() => { setShowPhotoActions(false); setConfirmDelete(true); }}
+                                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-red-50 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200">
+                                <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#fff1f2", color: "#dc2626" }}>
+                                    <Trash2 className="w-4 h-4" />
+                                </span>
+                                <span className="text-sm font-semibold text-red-600">Hapus Foto</span>
+                            </button>
+                        )}
+
+                        <button onClick={() => setShowPhotoActions(false)}
+                            className="w-full mt-1 py-3 rounded-2xl text-sm font-bold text-slate-500 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
+                            Batal
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -615,11 +596,29 @@ export default function ProfileView({ userId }: { userId: string }) {
                 </div>
             )}
 
+            {cropTarget && (
+                <ImageCropModal
+                    src={cropTarget.src}
+                    aspect={cropTarget.type === "avatar" ? 1 : 4}
+                    shape={cropTarget.type === "avatar" ? "round" : "rect"}
+                    title={cropTarget.type === "avatar" ? "Sesuaikan Foto Profil" : "Sesuaikan Banner"}
+                    saving={cropTarget.type === "avatar" ? uploading : uploadingBanner}
+                    onCancel={handleCropCancel}
+                    onConfirm={handleCropConfirm}
+                />
+            )}
+
             <div className="bg-white rounded-3xl overflow-hidden border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                <div className="relative h-24 sm:h-32 lg:h-40 overflow-hidden" style={{ background: profile.banner_url ? undefined : "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
+                <div className="relative h-32 sm:h-44 lg:h-56 overflow-hidden"
+                    style={{
+                        background: profile.banner_url
+                            ? undefined
+                            : "radial-gradient(140% 100% at 12% -20%, rgba(139,92,246,0.38), transparent 60%), radial-gradient(120% 100% at 100% 0%, rgba(29,185,84,0.20), transparent 55%), radial-gradient(circle at 1px 1px, rgba(255,255,255,0.09) 1px, transparent 0) 0 0/22px 22px, linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)",
+                    }}>
                     {profile.banner_url && (
                         <img src={profile.banner_url} alt="Banner" className="absolute inset-0 w-full h-full object-cover" />
                     )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-black/0 to-transparent pointer-events-none" />
                     {(isSelf || isAdmin) && (
                         <button onClick={() => bannerInputRef.current?.click()} disabled={uploadingBanner} title="Ganti banner"
                             className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/30 hover:bg-black/45 backdrop-blur-sm flex items-center justify-center transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
@@ -630,12 +629,12 @@ export default function ProfileView({ userId }: { userId: string }) {
                 </div>
 
                 <div className="px-5 sm:px-7 lg:px-8 pb-6 lg:pb-8">
-                    <div className="flex items-end justify-between -mt-10 sm:-mt-12 lg:-mt-14">
+                    <div className="flex items-end justify-between -mt-14 sm:-mt-16 lg:-mt-20">
                         <div className="relative">
-                            {(profile.song_title || profile.status_note) && (
+                            {hasStatusBubble && (
                                 <button onClick={() => setShowInfoPopup(true)}
-                                    className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full w-max max-w-[180px] px-3 py-2 rounded-2xl shadow-lg text-center z-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                                    style={{ background: "rgba(15,12,41,0.94)" }}>
+                                    className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full w-max max-w-[180px] px-3 py-2 rounded-2xl shadow-lg text-center z-20 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                    style={{ background: "rgba(15,12,41,0.92)", backdropFilter: "blur(10px)" }}>
                                     {profile.song_title && (
                                         <div className="flex items-center justify-center gap-1">
                                             <Music className="w-3 h-3 flex-shrink-0" style={{ color: "#1db954" }} />
@@ -649,13 +648,17 @@ export default function ProfileView({ userId }: { userId: string }) {
                                             <p className="text-[10.5px] font-semibold text-white truncate max-w-[150px]">{profile.status_note}</p>
                                         </div>
                                     )}
-                                    <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 rotate-45" style={{ background: "rgba(15,12,41,0.94)" }} />
+                                    <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 rotate-45 border-r border-b border-white/10" style={{ background: "rgba(15,12,41,0.92)" }} />
                                 </button>
                             )}
 
-                            <div className="rounded-full p-[3px]" style={{ background: (profile.song_title || profile.status_note) ? "linear-gradient(135deg, #1db954, #6366f1, #8b5cf6)" : "transparent" }}>
+                            <div className="rounded-full p-[3px]"
+                                style={{
+                                    background: hasStatusBubble ? "linear-gradient(135deg, #1db954, #6366f1, #8b5cf6)" : "transparent",
+                                    boxShadow: hasStatusBubble ? "0 8px 22px -6px rgba(99,102,241,0.45)" : "0 4px 14px rgba(15,12,41,0.10)",
+                                }}>
                                 <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
-                                    className={`relative w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-2xl lg:text-3xl font-black ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
+                                    className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
                                     style={{ background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)", animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none" }}>
                                     {profile.profile_photo_url
                                         ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
@@ -664,7 +667,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                             </div>
 
                             {(isSelf || isAdmin) && (
-                                <button onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Ganti foto profil"
+                                <button onClick={() => setShowPhotoActions(true)} disabled={uploading} title="Opsi foto profil"
                                     className="absolute -bottom-1 -right-1 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center hover:scale-110 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
                                     {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> : <Camera className="w-3.5 h-3.5 text-slate-600" />}
                                 </button>
@@ -688,14 +691,24 @@ export default function ProfileView({ userId }: { userId: string }) {
                             from { transform: rotate(0deg); }
                             to   { transform: rotate(360deg); }
                         }
+                        @keyframes solitShimmerSweep {
+                            0%   { transform: translateX(-120%) skewX(-20deg); opacity: 0; }
+                            15%  { opacity: 0.6; }
+                            55%  { opacity: 0; }
+                            100% { transform: translateX(220%) skewX(-20deg); opacity: 0; }
+                        }
+                        @media (prefers-reduced-motion: reduce) {
+                            * { animation: none !important; }
+                        }
                     `}</style>
 
-                   <div className="mt-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5 sm:gap-3">
+                    <div className="mt-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5 sm:gap-3">
                         <div className="min-w-0">
                             <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900">{profile.name}</h1>
                             <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-1.5">
                                 {roles.map((r) => (
-                                    <span key={r} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
+                                    <span key={r} className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
+                                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }} />
                                         {humanizeRoleKey(r)}
                                     </span>
                                 ))}
@@ -736,119 +749,23 @@ export default function ProfileView({ userId }: { userId: string }) {
 
                     {/* ── Lagu Favorit — hanya tampil kalau BELUM ada lagu; kalau sudah ada, tampil sebagai bubble di atas card ─────── */}
                     {!profile.song_title && (
-                    <div className="mt-4 rounded-2xl p-3.5 sm:p-4" style={{ background: "#f8fafc", border: "1px solid #eef2f7" }}>
-                        <div className="flex items-center gap-1.5 mb-3">
-                            <Music className="w-4 h-4" style={{ color: "#1db954" }} />
-                            <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>
-                                {isSelf ? "Lagu Favorit" : `Lagu Favorit ${profile.name.split(" ")[0]}`}
-                            </p>
+                        <div className="mt-4 rounded-3xl overflow-hidden border border-slate-100">
+                            <div className="h-1" style={{ background: "linear-gradient(90deg, #1db954, #6366f1, #8b5cf6)" }} />
+                            <div className="p-3.5 sm:p-4" style={{ background: "#f8fafc" }}>
+                                <div className="flex items-center gap-1.5 mb-3">
+                                    <Music className="w-4 h-4" style={{ color: "#1db954" }} />
+                                    <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>
+                                        {isSelf ? "Lagu Favorit" : `Lagu Favorit ${profile.name.split(" ")[0]}`}
+                                    </p>
+                                </div>
+
+                                {isSelf ? (
+                                    <SongPickerPanel picker={songPicker} />
+                                ) : (
+                                    <p className="text-xs italic" style={{ color: "#cbd5e1" }}>Belum ada lagu favorit</p>
+                                )}
+                            </div>
                         </div>
-
-                        {isSelf ? (
-                            !showSongSearch ? (
-                                <button onClick={() => setShowSongSearch(true)}
-                                    className="w-full h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
-                                    style={{ background: "#ffffff", color: "#64748b", border: "1px dashed #cbd5e1" }}>
-                                    <Music className="w-4 h-4" /> Tambahkan lagu
-                                </button>
-                            ) : pendingSong ? (
-                                <div className="space-y-3 p-3 rounded-2xl border border-slate-100" style={{ background: "#fafafa" }}>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
-                                            {pendingSong.artworkUrl && <img src={pendingSong.artworkUrl} alt={pendingSong.trackName} className="w-full h-full object-cover" />}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-bold truncate" style={{ color: "#0f172a" }}>{pendingSong.trackName}</p>
-                                            <p className="text-xs truncate" style={{ color: "#94a3b8" }}>{pendingSong.artistName}</p>
-                                        </div>
-                                        {pendingSong.previewUrl && (
-                                            <button onClick={toggleCropPlay}
-                                                className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                                                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                                                {cropPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {pendingSong.previewUrl ? (
-                                        <div>
-                                            <p className="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "#94a3b8" }}>
-                                                Pilih potongan {CLIP_LENGTH} detik yang ditampilkan
-                                            </p>
-                                            <input
-                                                type="range"
-                                                min={0}
-                                                max={Math.max(0, Math.floor(clipDuration - CLIP_LENGTH))}
-                                                value={clipStart}
-                                                onChange={(e) => handleCropSliderChange(Number(e.target.value))}
-                                                className="w-full accent-violet-600"
-                                            />
-                                            <div className="flex justify-between text-[9px] mt-1" style={{ color: "#cbd5e1" }}>
-                                                <span>0:{String(Math.floor(clipStart)).padStart(2, "0")}</span>
-                                                <span>0:{String(Math.min(Math.floor(clipDuration), Math.floor(clipStart + CLIP_LENGTH))).padStart(2, "0")}</span>
-                                            </div>
-                                            <audio
-                                                ref={cropAudioRef}
-                                                src={pendingSong.previewUrl}
-                                                onLoadedMetadata={(e) => setClipDuration(e.currentTarget.duration || 30)}
-                                                onTimeUpdate={handleCropTimeUpdate}
-                                                onEnded={() => setCropPlaying(false)}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <p className="text-[10.5px] italic" style={{ color: "#cbd5e1" }}>Preview audio tidak tersedia untuk lagu ini</p>
-                                    )}
-
-                                    <div className="flex gap-2">
-                                        <button onClick={handleCancelCrop}
-                                            className="flex-1 h-9 sm:h-10 rounded-xl text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300" style={{ background: "#f1f5f9", color: "#64748b" }}>
-                                            Batal
-                                        </button>
-                                        <button onClick={handleConfirmSong} disabled={savingSong}
-                                            className="flex-1 h-9 sm:h-10 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                                            {savingSong ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Gunakan Potongan Ini
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
-                                        <input value={songQuery} onChange={(e) => setSongQuery(e.target.value)} autoFocus
-                                            placeholder="Cari judul lagu atau artis..."
-                                            className="w-full h-10 rounded-xl pl-9 pr-8 text-sm border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                                            style={{ borderColor: "#e2e8f0", background: "#ffffff", color: "#334155" }} />
-                                        <button onClick={() => { setShowSongSearch(false); setSongQuery(""); setSongResults([]); }}
-                                            className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                                            <X className="w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
-                                        </button>
-                                    </div>
-                                    {searchingSong && (
-                                        <p className="text-xs text-slate-400 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Mencari...</p>
-                                    )}
-                                    {songResults.length > 0 && (
-                                        <div className="max-h-56 overflow-y-auto space-y-1 rounded-xl border border-slate-100 p-1.5 bg-white">
-                                            {songResults.map((song) => (
-                                                <button key={song.trackId} onClick={() => handlePickSearchResult(song)}
-                                                    className="w-full flex items-center gap-2.5 p-1.5 rounded-lg text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
-                                                    <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100">
-                                                        {song.artworkUrl && <img src={song.artworkUrl} alt={song.trackName} className="w-full h-full object-cover" />}
-                                                    </div>
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="text-xs font-semibold truncate" style={{ color: "#0f172a" }}>{song.trackName}</p>
-                                                        <p className="text-[10.5px] truncate" style={{ color: "#94a3b8" }}>{song.artistName}</p>
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        ) : (
-                            <p className="text-xs italic" style={{ color: "#cbd5e1" }}>Belum ada lagu favorit</p>
-                        )}
-                    </div>
                     )}
 
                     <div className="mt-4">
@@ -874,7 +791,8 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 </div>
                             </div>
                         ) : (
-                            <div>
+                            <div className="pt-3 border-t border-slate-50">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Tentang</p>
                                 <div className="flex items-start justify-between gap-2">
                                     <p className="text-sm text-slate-500 leading-relaxed">
                                         {profile.bio || <span className="italic text-slate-300">Belum ada bio</span>}
@@ -895,23 +813,31 @@ export default function ProfileView({ userId }: { userId: string }) {
             </div>
 
             {achievements && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-5">
-                    <AchievementCard
-                        icon={<CalendarCheck className="w-5 h-5" />} title="Kehadiran Bulan Ini" monthLabel={monthLabel(achievements.month)}
-                        value={`${achievements.attendance.daysThisMonth} hari`} sub={`${achievements.attendance.onTimeThisMonth} kali tepat waktu`}
-                        rank={achievements.attendance.rankThisMonth} totalRanked={achievements.attendance.totalRanked}
-                        isRecord={achievements.attendance.isCompanyRecordHolder}
-                        personalBest={achievements.attendance.personalBest ? `Rekor pribadi: ${achievements.attendance.personalBest.days} hari (${monthLabel(achievements.attendance.personalBest.month)})` : null}
-                        accent="linear-gradient(180deg, #34d399, #059669)"
-                    />
-                    <AchievementCard
-                        icon={<Clock className="w-5 h-5" />} title="Lembur Bulan Ini" monthLabel={monthLabel(achievements.month)}
-                        value={`${achievements.overtime.hoursThisMonth} jam`} sub={`${achievements.overtime.sessionsThisMonth} sesi lembur`}
-                        rank={achievements.overtime.rankThisMonth} totalRanked={achievements.overtime.totalRanked}
-                        isRecord={achievements.overtime.isCompanyRecordHolder}
-                        personalBest={achievements.overtime.personalBest ? `Rekor pribadi: ${achievements.overtime.personalBest.hours} jam (${monthLabel(achievements.overtime.personalBest.month)})` : null}
-                        accent="linear-gradient(180deg, #fbbf24, #d97706)"
-                    />
+                <div className="no-scrollbar flex sm:grid sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-5 overflow-x-auto sm:overflow-visible snap-x snap-mandatory sm:snap-none -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0"
+                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+                    <div className="min-w-[82%] sm:min-w-0 snap-center">
+                        <AchievementCard
+                            icon={<CalendarCheck className="w-5 h-5" />} title="Kehadiran Bulan Ini" monthLabel={monthLabel(achievements.month)}
+                            value={`${achievements.attendance.daysThisMonth} hari`} sub={`${achievements.attendance.onTimeThisMonth} kali tepat waktu`}
+                            rank={achievements.attendance.rankThisMonth} totalRanked={achievements.attendance.totalRanked}
+                            isRecord={achievements.attendance.isCompanyRecordHolder}
+                            personalBest={achievements.attendance.personalBest ? `Rekor pribadi: ${achievements.attendance.personalBest.days} hari (${monthLabel(achievements.attendance.personalBest.month)})` : null}
+                            accentSolid="#059669" accentSoft="rgba(5,150,105,0.12)" accentBar="linear-gradient(90deg, #34d399, #059669)"
+                        />
+                    </div>
+                    <div className="min-w-[82%] sm:min-w-0 snap-center">
+                        <AchievementCard
+                            icon={<Clock className="w-5 h-5" />} title="Lembur Bulan Ini" monthLabel={monthLabel(achievements.month)}
+                            value={`${achievements.overtime.hoursThisMonth} jam`} sub={`${achievements.overtime.sessionsThisMonth} sesi lembur`}
+                            rank={achievements.overtime.rankThisMonth} totalRanked={achievements.overtime.totalRanked}
+                            isRecord={achievements.overtime.isCompanyRecordHolder}
+                            personalBest={achievements.overtime.personalBest ? `Rekor pribadi: ${achievements.overtime.personalBest.hours} jam (${monthLabel(achievements.overtime.personalBest.month)})` : null}
+                            accentSolid="#d97706" accentSoft="rgba(217,119,6,0.12)" accentBar="linear-gradient(90deg, #fbbf24, #d97706)"
+                        />
+                    </div>
+                    <style jsx>{`
+                        .no-scrollbar::-webkit-scrollbar { display: none; }
+                    `}</style>
                 </div>
             )}
         </div>
@@ -919,35 +845,36 @@ export default function ProfileView({ userId }: { userId: string }) {
 }
 
 function AchievementCard({
-    icon, title, monthLabel, value, sub, rank, totalRanked, isRecord, personalBest, accent,
+    icon, title, monthLabel, value, sub, rank, totalRanked, isRecord, personalBest, accentSolid, accentSoft, accentBar,
 }: {
     icon: React.ReactNode; title: string; monthLabel: string; value: string; sub: string;
     rank: number | null; totalRanked: number; isRecord: boolean;
-    personalBest: string | null; accent: string;
+    personalBest: string | null; accentSolid: string; accentSoft: string; accentBar: string;
 }) {
     const hasAchievement = rank !== null && rank <= 5;
 
     return (
-        <div className="bg-white rounded-2xl p-4 sm:p-5 lg:p-6 relative overflow-hidden border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-            <div className="absolute top-0 left-0 w-1 h-full" style={{ background: accent }} />
-            <div className="pl-2.5 sm:pl-3">
-                <div className="flex items-start justify-between mb-2">
-                    <span className="text-slate-700">{icon}</span>
-                    {hasAchievement && <RankBadge rank={rank as number} />}
+        <div className="group bg-white rounded-2xl p-4 sm:p-5 lg:p-6 relative overflow-hidden border border-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full"
+            style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+            <div className="absolute top-0 left-0 right-0 h-1" style={{ background: accentBar }} />
+            <div className="flex items-start justify-between mb-3">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110" style={{ background: accentSoft, color: accentSolid }}>
+                    {icon}
                 </div>
-                <p className="text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>{title} · {monthLabel}</p>
-                <p className="text-2xl sm:text-3xl font-black mt-1" style={{ color: "#0f172a" }}>{value}</p>
-                <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>{sub}</p>
-                {rank && <p className="text-[10.5px] mt-1.5 font-semibold text-slate-400">Peringkat #{rank} dari {totalRanked} orang</p>}
-                {personalBest && (
-                    <div className="mt-3 pt-3 border-t border-slate-50 flex items-center gap-1.5">
-                        {isRecord ? <Trophy className="w-3.5 h-3.5" style={{ color: "#d97706" }} /> : <Flame className="w-3.5 h-3.5 text-slate-300" />}
-                        <p className="text-[10.5px] font-semibold" style={{ color: isRecord ? "#d97706" : "#94a3b8" }}>
-                            {personalBest}{isRecord ? " — Rekor Perusahaan!" : ""}
-                        </p>
-                    </div>
-                )}
+                {hasAchievement && <RankBadge rank={rank as number} />}
             </div>
+            <p className="text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>{title} · {monthLabel}</p>
+            <p className="text-3xl sm:text-4xl font-black mt-1 tabular-nums" style={{ color: "#0f172a" }}>{value}</p>
+            <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>{sub}</p>
+            {rank && <p className="text-[10.5px] mt-1.5 font-semibold text-slate-400">Peringkat #{rank} dari {totalRanked} orang</p>}
+            {personalBest && (
+                <div className="mt-3 pt-3 border-t border-slate-50 flex items-center gap-1.5">
+                    {isRecord ? <Trophy className="w-3.5 h-3.5" style={{ color: "#d97706" }} /> : <Flame className="w-3.5 h-3.5 text-slate-300" />}
+                    <p className="text-[10.5px] font-semibold" style={{ color: isRecord ? "#d97706" : "#94a3b8" }}>
+                        {personalBest}{isRecord ? " — Rekor Perusahaan!" : ""}
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
@@ -1018,14 +945,16 @@ function AchievementTitleBadge({ rank, label }: { rank: number; label: string })
 
     return (
         <div
-            className="flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full"
+            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
             style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
             title={`Top ${rank} ${label} bulan ini`}
         >
-            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
+            <div className="absolute inset-y-0 w-8 pointer-events-none" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)", animation: "solitShimmerSweep 2.2s ease-out 0.4s 1 both" }} />
+            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
                 <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             </div>
-            <div className="leading-tight">
+            <div className="relative leading-tight">
                 <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">TOP {rank}</p>
                 <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>{label}</p>
             </div>

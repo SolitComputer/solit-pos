@@ -34,6 +34,7 @@ async function getHandler(req: NextRequest) {
       // Artwork default iTunes 100x100 — perbesar ke 300x300 biar tidak pecah
       artworkUrl: r.artworkUrl100 ? r.artworkUrl100.replace("100x100", "300x300") : null,
       previewUrl: r.previewUrl ?? null,
+      trackTimeMillis: r.trackTimeMillis ?? 30000,
     }));
 
     return NextResponse.json({ success: true, data: results });

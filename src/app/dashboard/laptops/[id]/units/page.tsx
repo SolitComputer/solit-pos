@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
@@ -167,6 +167,67 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
     );
 }
 
+//  4 komponen di bawah ini disalin identik dari LaptopsContent.tsx supaya
+//  gaya visual halaman Units 1:1 sama dengan Data Laptop.
+function StatCard({ label, value, accent, icon }: { label: string; value: string; accent: string; icon: React.ReactNode }) {
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3.5 hover:shadow-md transition-all duration-200">
+            <div className={`w-1 h-10 rounded-full ${accent} flex-shrink-0`} />
+            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-gray-100">{icon}</div>
+                <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">{label}</p>
+                    <p className="text-sm font-black text-gray-800 tabular-nums truncate">{value}</p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function FilterSelect({ value, onChange, children }: {
+    value: string; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void; children: React.ReactNode;
+}) {
+    return (
+        <select value={value} onChange={onChange}
+            className="filter-select h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150 cursor-pointer hover:bg-gray-100">
+            {children}
+        </select>
+    );
+}
+
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+    return (
+        <span className="inline-flex items-center gap-1.5 h-6 px-2.5 bg-gray-800 text-white text-[10px] font-semibold rounded-lg">
+            {label}
+            <button onClick={onRemove} className="hover:text-gray-300 transition-colors ml-0.5">
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </span>
+    );
+}
+
+function TotalPill({ label, value, color }: { label: string; value: string; color: string }) {
+    return (
+        <div className="inline-flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl pl-2.5 pr-3 py-1.5">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{label}</span>
+            <span className={`text-sm font-black tabular-nums ${color}`}>{value}</span>
+        </div>
+    );
+}
+
+function FooterStat({ label, value, dot, color }: { label: string; value: number; dot: string; color: string }) {
+    return (
+        <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-xl pl-2.5 pr-3 py-1.5 shadow-sm">
+            <span className={`w-1.5 h-1.5 rounded-full ${dot} flex-shrink-0`} />
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{label}</span>
+            <span className={`text-sm font-black tabular-nums ${color}`}>{value}</span>
+            <span className="text-[10px] font-medium text-gray-300">unit</span>
+        </div>
+    );
+}
+
 export default function UnitsPage() {
     const params = useParams();
     const laptopId = params.id as string;
@@ -228,6 +289,11 @@ export default function UnitsPage() {
     const [priceInput, setPriceInput] = useState({ selling_price: "", sparepart_cost: "", official_price: "" });
     const [priceSaving, setPriceSaving] = useState(false);
 
+    //  Sort kolom tabel — pola sama persis dgn LaptopsContent.tsx supaya klik header konsisten
+    const [sortBy, setSortBy] = useState("DEFAULT");
+    const handleSort = (asc: string, desc: string) => {
+        setSortBy(prev => (prev === asc ? desc : asc));
+    };
 
     const activeUnits = units.filter(u => u.status !== "SOLD");
 
@@ -332,22 +398,45 @@ export default function UnitsPage() {
         }
     };
 
-    const filteredUnits = sortUnits(
-        activeUnits.filter(u => {
-            if (filterStatus !== "ALL" && u.status !== filterStatus) return false;
-            if (filterGradeTab !== "ALL" && u.grade !== filterGradeTab) return false;
-            if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;
-            if (filterPriceMin && u.selling_price < Number(filterPriceMin)) return false;
-            if (filterPriceMax && u.selling_price > Number(filterPriceMax)) return false;
-            if (filterAudit === "AUDITED" && !isUnitAuditActive(u)) return false;
-            if (filterAudit === "UNAUDITED" && isUnitAuditActive(u)) return false;
-            if (filterSO === "SO" && !isUnitSOActive(u)) return false;
-            if (filterSO === "BELUM_SO" && isUnitSOActive(u)) return false;
-            return true;
-        })
-    );
+    const filteredUnits = useMemo(() => {
+        const list = sortUnits(
+            activeUnits.filter(u => {
+                if (filterStatus !== "ALL" && u.status !== filterStatus) return false;
+                if (filterGradeTab !== "ALL" && u.grade !== filterGradeTab) return false;
+                if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;
+                if (filterPriceMin && u.selling_price < Number(filterPriceMin)) return false;
+                if (filterPriceMax && u.selling_price > Number(filterPriceMax)) return false;
+                if (filterAudit === "AUDITED" && !isUnitAuditActive(u)) return false;
+                if (filterAudit === "UNAUDITED" && isUnitAuditActive(u)) return false;
+                if (filterSO === "SO" && !isUnitSOActive(u)) return false;
+                if (filterSO === "BELUM_SO" && isUnitSOActive(u)) return false;
+                return true;
+            })
+        );
 
-    const hasActiveFilter = searchSN || filterPriceMin || filterPriceMax || filterAudit !== "ALL" || filterSO !== "ALL";
+        //  Sort override — field disesuaikan ke level unit (bukan model laptop kayak di LaptopsContent)
+        switch (sortBy) {
+            case "PRICE_ASC": list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0)); break;
+            case "PRICE_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
+            case "TOTAL_JUAL_ASC": list.sort((a, b) => (a.selling_price || 0) - (b.selling_price || 0)); break;
+            case "TOTAL_JUAL_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
+            case "MODAL_ASC": list.sort((a, b) => (a.purchase_price || 0) - (b.purchase_price || 0)); break;
+            case "MODAL_DESC": list.sort((a, b) => (b.purchase_price || 0) - (a.purchase_price || 0)); break;
+            case "SPAREPART_ASC": list.sort((a, b) => (a.sparepart_cost || 0) - (b.sparepart_cost || 0)); break;
+            case "SPAREPART_DESC": list.sort((a, b) => (b.sparepart_cost || 0) - (a.sparepart_cost || 0)); break;
+            case "SUMBER_ASC": list.sort((a, b) => (a.source || "").localeCompare(b.source || "", "id")); break;
+            case "SUMBER_DESC": list.sort((a, b) => (b.source || "").localeCompare(a.source || "", "id")); break;
+            case "TANGGAL_ASC": list.sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "")); break;
+            case "TANGGAL_DESC": list.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")); break;
+            case "AUDIT_ASC": list.sort((a, b) => (isUnitAuditActive(a) ? 1 : 0) - (isUnitAuditActive(b) ? 1 : 0)); break;
+            case "AUDIT_DESC": list.sort((a, b) => (isUnitAuditActive(b) ? 1 : 0) - (isUnitAuditActive(a) ? 1 : 0)); break;
+            case "SN": list.sort((a, b) => a.serial_number.localeCompare(b.serial_number, undefined, { numeric: true })); break;
+            default: break; // DEFAULT → tetap urutan sortUnits() (grade lalu SN)
+        }
+        return list;
+    }, [activeUnits, filterStatus, filterGradeTab, searchSN, filterPriceMin, filterPriceMax, filterAudit, filterSO, sortBy]);
+
+    const hasActiveFilter = searchSN || filterPriceMin || filterPriceMax || filterAudit !== "ALL" || filterSO !== "ALL" || sortBy !== "DEFAULT";
     const isAllSelected = filteredUnits.length > 0 && filteredUnits.every(u => selectedIds.has(u.id));
     const isIndeterminate = filteredUnits.some(u => selectedIds.has(u.id)) && !isAllSelected;
 
@@ -398,6 +487,14 @@ export default function UnitsPage() {
         gradeB: activeUnits.filter(u => u.grade === "B").length,
         gradeC: activeUnits.filter(u => u.grade === "C").length,
     };
+
+    //  Total Keseluruhan untuk bar ringkasan di atas tabel — dihitung dari
+    //  filteredUnits (ikut filter aktif), pola sama dgn LaptopsContent.tsx
+    const totalModalLaptop = filteredUnits.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
+    const totalModalSparepart = filteredUnits.reduce((s, u) => s + (u.sparepart_cost ?? 0), 0);
+    const totalGrossProfit = filteredUnits.reduce((s, u) => s + ((u.selling_price || 0) - (u.sparepart_cost || 0) - (u.purchase_price || 0)), 0);
+    const totalHargaJual = filteredUnits.reduce((s, u) => s + (u.selling_price || 0), 0);
+    const totalNilaiJual = totalHargaJual; //  qty per unit selalu 1, jadi sama dgn Harga Jual
 
     //  Mapping unit → baris tabel. Struktur kolom identik dgn Data Barang,
     //  bedanya di sini ST/SJ/M bernilai 0 atau 1 karena 1 baris = 1 unit.
@@ -464,7 +561,7 @@ export default function UnitsPage() {
     const resetFilters = () => {
         setSearchSN(""); setFilterPriceMin(""); setFilterPriceMax("");
         setFilterStatus("ALL"); setFilterGradeTab("ALL");
-        setFilterAudit("ALL"); setFilterSO("ALL");
+        setFilterAudit("ALL"); setFilterSO("ALL"); setSortBy("DEFAULT");
     };
 
     // ─── Export Excel ─────────────────────────────────────────────────────────
@@ -583,8 +680,26 @@ export default function UnitsPage() {
 
     return (
         <DashboardLayout>
+            <style>{`
+                @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes popIn   { from { opacity: 0; transform: scale(0.94) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+                @keyframes slideDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes slideUp   { from { opacity: 0; transform: translateY(16px);  } to { opacity: 1; transform: translateY(0); } }
+                .animate-fadeIn    { animation: fadeIn    0.2s  ease-out; }
+                .animate-popIn     { animation: popIn     0.25s cubic-bezier(0.34,1.56,0.64,1); }
+                .animate-slideDown { animation: slideDown 0.3s  ease-out; }
+                .animate-slideUp   { animation: slideUp   0.3s  ease-out; }
+                .filter-select {
+                    appearance: none;
+                    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+                    background-position: right 10px center;
+                    background-repeat: no-repeat;
+                    background-size: 16px;
+                    padding-right: 32px !important;
+                }
+            `}</style>
             <main className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8">
-                <div className="max-w-7xl mx-auto space-y-5">
+                <div className="max-w-full mx-auto space-y-5">
 
                     {/* Breadcrumb */}
                     <div className="flex items-center gap-2 text-sm">
@@ -663,26 +778,21 @@ export default function UnitsPage() {
                     </div>
 
                     {/* Stats Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                        {[
-                            { label: "Total Unit", value: counts.total, color: "text-gray-800", icon: <Package size={16} /> },
-                            { label: "Siap Jual", value: counts.siap, color: "text-emerald-600", icon: <CheckCircle2 size={16} /> },
-                            { label: "Belum Siap", value: counts.belum, color: "text-amber-600", icon: null },
-                            { label: "Service", value: counts.service, color: "text-blue-600", icon: <Wrench size={16} /> },
-                            { label: "Terjual", value: counts.sold, color: "text-gray-500", icon: <Wallet size={16} /> },
-                        ].map(stat => (
-                            <div key={stat.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
-                                <div className="flex items-center justify-between">
-                                    <p className="text-xs text-gray-400">{stat.label}</p>
-                                    <span className="text-sm opacity-50">{stat.icon}</span>
-                                </div>
-                                <p className={`text-xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
-                            </div>
-                        ))}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 animate-slideDown">
+                        <StatCard label="Total Unit" value={`${counts.total} unit`} accent="bg-gray-700"
+                            icon={<Package size={16} className="text-gray-600" />} />
+                        <StatCard label="Siap Jual" value={`${counts.siap} unit`} accent="bg-green-500"
+                            icon={<CheckCircle2 size={16} className="text-green-600" />} />
+                        <StatCard label="Belum Siap" value={`${counts.belum} unit`} accent="bg-amber-400"
+                            icon={<svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>} />
+                        <StatCard label="Service" value={`${counts.service} unit`} accent="bg-blue-500"
+                            icon={<Wrench size={16} className="text-blue-600" />} />
+                        <StatCard label="Terjual" value={`${counts.sold} unit`} accent="bg-gray-400"
+                            icon={<Wallet size={16} className="text-gray-500" />} />
                     </div>
 
                     {/* Grade Tabs */}
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-1.5">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 animate-slideDown">
                         <div className="flex gap-1.5">
                             {[
                                 { value: "ALL", label: "Semua Grade", count: units.length },
@@ -707,7 +817,7 @@ export default function UnitsPage() {
                     </div>
 
                     {/* Status Filter Tabs */}
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-2">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 animate-slideDown">
                         <div className="flex flex-wrap gap-1.5">
                             {[
                                 { value: "ALL", label: "Semua Status", count: filterGradeTab === "ALL" ? units.length : units.filter(u => u.grade === filterGradeTab).length },
@@ -727,14 +837,14 @@ export default function UnitsPage() {
                     </div>
 
                     {/* Search & Filter */}
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 space-y-3">
-                        <div className="flex gap-2">
-                            <div className="relative flex-1">
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3.5 animate-slideDown">
+                        <div className="flex flex-wrap gap-2">
+                            <div className="relative flex-1 min-w-[180px]">
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                                 <input type="text" placeholder="Cari serial number..." value={searchSN} onChange={e => setSearchSN(e.target.value)}
-                                    className="w-full h-9 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
+                                    className="w-full h-9 border border-gray-200 rounded-xl pl-9 pr-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150" />
                                 {searchSN && (
                                     <button onClick={() => setSearchSN("")} className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 transition">
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -743,30 +853,38 @@ export default function UnitsPage() {
                                     </button>
                                 )}
                             </div>
-                          {canAuditUnits && (
-                                <select
-                                    value={filterAudit}
-                                    onChange={e => setFilterAudit(e.target.value as typeof filterAudit)}
-                                    className="px-3 h-9 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
-                                >
+                            {canAuditUnits && (
+                                <FilterSelect value={filterAudit} onChange={e => setFilterAudit(e.target.value as typeof filterAudit)}>
                                     <option value="ALL">Semua Audit</option>
                                     <option value="AUDITED">Sudah Audit</option>
                                     <option value="UNAUDITED">Belum Audit</option>
-                                </select>
+                                </FilterSelect>
                             )}
                             {canSOUnits && (
-                                <select
-                                    value={filterSO}
-                                    onChange={e => setFilterSO(e.target.value as typeof filterSO)}
-                                    className="px-3 h-9 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
-                                >
+                                <FilterSelect value={filterSO} onChange={e => setFilterSO(e.target.value as typeof filterSO)}>
                                     <option value="ALL">Semua SO</option>
                                     <option value="SO">Sudah SO</option>
                                     <option value="BELUM_SO">Belum SO</option>
-                                </select>
+                                </FilterSelect>
                             )}
+                            <FilterSelect value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                                <option value="DEFAULT">Urutan Default</option>
+                                <option value="PRICE_ASC">Harga Jual: Rendah → Tinggi</option>
+                                <option value="PRICE_DESC">Harga Jual: Tinggi → Rendah</option>
+                                {canSeePriceInfo && <option value="MODAL_ASC">Harga Modal: Rendah → Tinggi</option>}
+                                {canSeePriceInfo && <option value="MODAL_DESC">Harga Modal: Tinggi → Rendah</option>}
+                                {canSeePriceInfo && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
+                                {canSeePriceInfo && <option value="SPAREPART_DESC">Modal Sparepart: Tinggi → Rendah</option>}
+                                {canSeePriceInfo && <option value="SUMBER_ASC">Sumber: A → Z</option>}
+                                {canSeePriceInfo && <option value="SUMBER_DESC">Sumber: Z → A</option>}
+                                {canSeePriceInfo && <option value="TANGGAL_ASC">Tanggal Masuk: Lama → Baru</option>}
+                                {canSeePriceInfo && <option value="TANGGAL_DESC">Tanggal Masuk: Baru → Lama</option>}
+                                {canAuditUnits && <option value="AUDIT_DESC">Audit: Sudah Diaudit Dulu</option>}
+                                {canAuditUnits && <option value="AUDIT_ASC">Audit: Belum Diaudit Dulu</option>}
+                                <option value="SN">Urut SN</option>
+                            </FilterSelect>
                             <button onClick={() => setShowAdvancedFilter(v => !v)}
-                                className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium border transition ${showAdvancedFilter || filterPriceMin || filterPriceMax ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                                className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-medium border transition-all duration-150 ${showAdvancedFilter || filterPriceMin || filterPriceMax ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
                                 </svg>
@@ -774,7 +892,7 @@ export default function UnitsPage() {
                                 {(filterPriceMin || filterPriceMax) && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                             </button>
                             {hasActiveFilter && (
-                                <button onClick={resetFilters} className="inline-flex items-center gap-1 px-2.5 h-9 rounded-lg text-xs font-medium text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 transition">
+                                <button onClick={resetFilters} className="inline-flex items-center gap-1 px-2.5 h-9 rounded-xl text-xs font-medium text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 active:scale-[0.97] transition-all duration-150">
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                     </svg>
@@ -787,13 +905,18 @@ export default function UnitsPage() {
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Jual Min (Rp)</label>
                                     <input type="number" placeholder="Contoh: 1000000" value={filterPriceMin} onChange={e => setFilterPriceMin(e.target.value)}
-                                        className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
+                                        className="w-full h-9 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Jual Max (Rp)</label>
                                     <input type="number" placeholder="Contoh: 5000000" value={filterPriceMax} onChange={e => setFilterPriceMax(e.target.value)}
-                                        className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
+                                        className="w-full h-9 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150" />
                                 </div>
+                            </div>
+                        )}
+                        {sortBy !== "DEFAULT" && (
+                            <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                <FilterChip label={`Sort: ${sortBy}`} onRemove={() => setSortBy("DEFAULT")} />
                             </div>
                         )}
                     </div>
@@ -829,7 +952,7 @@ export default function UnitsPage() {
                     {isLoading ? (
                         <SkeletonUnits />
                     ) : filteredUnits.length === 0 ? (
-                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm py-12 text-center">
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-12 text-center animate-fadeIn">
                             <div className="mb-2 opacity-50"><Package size={30} className="mx-auto text-gray-400" /></div>
                             <p className="text-gray-500 text-sm font-medium">Tidak ada unit ditemukan</p>
                             <p className="text-gray-400 text-xs mt-1">
@@ -844,12 +967,32 @@ export default function UnitsPage() {
                             )}
                         </div>
                     ) : (
-                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden animate-slideUp">
+                            {/* Total Keseluruhan — ikut filter aktif, sama pola dgn LaptopsContent.tsx */}
+                            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60 flex flex-wrap items-center gap-3">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                                    Total Keseluruhan
+                                </span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {canSeePriceInfo && (
+                                        <>
+                                            <TotalPill label="Modal Laptop" value={fmt(totalModalLaptop)} color="text-gray-800" />
+                                            <TotalPill label="Modal Sparepart" value={fmt(totalModalSparepart)} color="text-gray-800" />
+                                            <TotalPill label="Gross Profit" value={fmt(totalGrossProfit)} color={totalGrossProfit >= 0 ? "text-emerald-700" : "text-red-600"} />
+                                        </>
+                                    )}
+                                    <TotalPill label="Harga Store" value={fmt(totalHargaJual)} color="text-gray-800" />
+                                    <TotalPill label="Total Jual" value={fmt(totalNilaiJual)} color="text-emerald-700" />
+                                </div>
+                            </div>
                             <InventoryTable
                                 rows={tableRows}
                                 canSeePrivate={canSeePriceInfo}
                                 canSeeStock={canSeePriceInfo}
                                 showSparepart
+                                showTotalJual
+                                sortBy={sortBy}
+                                onSort={handleSort}
                                 onRowClick={(row) => {
                                     const u = filteredUnits.find(x => x.id === row.id);
                                     if (u) setDetailUnit(u);
@@ -915,25 +1058,21 @@ export default function UnitsPage() {
                                     );
                                 }}
                             />
-                            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between flex-wrap gap-1">
-                                <span className="text-xs text-gray-400">
-                                    Menampilkan <span className="font-medium text-gray-600">{filteredUnits.length}</span> dari <span className="font-medium text-gray-600">{units.length}</span> unit
-                                    {(canAuditUnits || canSOUnits) && (
-                                        <>
-                                            {" · "}
-                                            <span className="text-emerald-600 font-medium">
-                                                {activeUnits.filter(isUnitAuditActive).length} teraudit
-                                            </span>
-                                            {" · "}
-                                            <span className="text-sky-600 font-medium">
-                                                {activeUnits.filter(isUnitSOActive).length} sudah SO
-                                            </span>
-                                        </>
+                            <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
+                                <p className="text-xs text-gray-400 font-medium">
+                                    Menampilkan <span className="text-gray-700 font-bold">{filteredUnits.length}</span> dari <span className="text-gray-700 font-bold">{units.length}</span> unit
+                                </p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {canAuditUnits && (
+                                        <FooterStat label="Teraudit" value={activeUnits.filter(isUnitAuditActive).length} dot="bg-emerald-500" color="text-emerald-700" />
                                     )}
-                                </span>
-                                {(hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL") && (
-                                    <span className="text-xs text-amber-600 font-medium">Filter aktif</span>
-                                )}
+                                    {canSOUnits && (
+                                        <FooterStat label="Sudah SO" value={activeUnits.filter(isUnitSOActive).length} dot="bg-sky-500" color="text-sky-700" />
+                                    )}
+                                    {(hasActiveFilter || filterStatus !== "ALL" || filterGradeTab !== "ALL") && (
+                                        <span className="text-xs text-amber-600 font-medium">Filter aktif</span>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1019,7 +1158,7 @@ export default function UnitsPage() {
 
 function SkeletonUnits() {
     return (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>

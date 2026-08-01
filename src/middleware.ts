@@ -181,6 +181,17 @@ export async function middleware(request: NextRequest) {
     return forward();
   }
 
+  if (pathname.startsWith("/biometric-enroll")) {
+    if (!token) return NextResponse.redirect(new URL("/login", request.url));
+    return forward();
+  }
+
+
+  if (pathname.startsWith("/biometric-enroll")) {
+    if (!token) return NextResponse.redirect(new URL("/login", request.url));
+    return forward();
+  }
+
   if (PUBLIC_API_ROUTES.some((p) => pathname.startsWith(p))) {
     return forward();
   }
@@ -364,6 +375,9 @@ export const config = {
     "/scan/:path*",
     "/login",
     "/face-verify",
+    "/biometric-enroll",
+    "/api/auth/:path*",
+    "/biometric-enroll",
     "/api/auth/:path*",
     "/api/laptops/:path*",
     "/api/dashboard/:path*",
