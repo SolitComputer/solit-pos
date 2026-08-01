@@ -1,5 +1,6 @@
 "use client";
 
+import { getOvertimeColor, formatOvertimeMinutes } from "@/lib/overtimeEngine";
 import React from "react";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
@@ -53,6 +54,7 @@ type Attendance = {
     late_weight?: number | null;
     displayStatus?: "PRESENT" | "LATE" | "SKIP";
     source?: "AUTO" | "MANUAL";
+    direction?: "IN" | "OUT"; // ✅ NEW
 };
 
 type ManualAttendance = {
@@ -2685,6 +2687,10 @@ export default function AttendanceDashboardPage() {
         }
         return null;
     }); const [attendances, setAttendances] = useState<Attendance[]>([]);
+    const [checkoutTimes, setCheckoutTimes] = useState<Record<string, string>>({}); // ✅ NEW — key: `${user_id}_${dateKey}` → jam pulang (ISO), buat kolom Jam Pulang
+    const [afterOutOvertime, setAfterOutOvertime] = useState<Record<string, { minutes: number; status: string; auditStatus: string }>>({});
+    // ✅ NEW — key: `${user_id}_${dateKey}`. Isi: lembur yang SUDAH otomatis
+    // kedeteksi sistem dari absen OUT lewat jam pulang.
     const [manualRecords, setManualRecords] = useState<ManualAttendance[]>([]);
     const [dayOffs, setDayOffs] = useState<DayOff[]>([]);
     const [allDateOffs, setAllDateOffs] = useState<DateOff[]>([]);
@@ -2777,7 +2783,53 @@ export default function AttendanceDashboardPage() {
         }
     }, []);
 
-    const fetchAttendance = useCallback(async () => { const r = await fetch("/api/attendance"); const d = await r.json(); if (d.success) setAttendances((d.data || []).map((a: Attendance) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" }))); }, []);
+    const fetchAttendance = useCallback(async () => {
+        const r = await fetch("/api/attendance");
+        const d = await r.json();
+        if (!d.success) return;
+        const rows: Attendance[] = d.data || [];
+        // ✅ FIX: pisahkan absen PULANG (direction OUT) dari absen masuk — OUT
+        // gak boleh ikut masuk ke `attendances`, karena seluruh logic status/
+        // kalender/gaji di bawah berasumsi "1 baris = 1 kedatangan (IN)".
+        const inRows = rows.filter(a => a.direction !== "OUT");
+        const outRows = rows.filter(a => a.direction === "OUT");
+
+        setAttendances(inRows.map((a) => ({ ...a, displayStatus: getDisplayStatus(a), source: "AUTO" })));
+
+        const co: Record<string, string> = {};
+        outRows.forEach(a => {
+            const key = `${a.user_id}_${toWIBDateKey(a.check_in_time || a.created_at)}`;
+            co[key] = a.check_in_time || a.created_at;
+        });
+        setCheckoutTimes(co);
+    }, []);
+
+    // ✅ NEW — inilah penyebab 3 error: fungsi + effect ini belum sempat
+    // ketambahan, padahal dipanggil dari tabel Jam Pulang.
+    const fetchAfterOutOvertime = useCallback(async (year: number, month: number) => {
+        try {
+            const r = await fetch("/api/attendance/overtime");
+            const d = await r.json();
+            if (!d.success) return;
+            const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
+            const map: Record<string, { minutes: number; status: string; auditStatus: string }> = {};
+            (d.data || []).forEach((o: any) => {
+                if (o.direction !== "AFTER_OUT") return;
+                if (!o.request_date?.startsWith(monthPrefix)) return;
+                map[`${o.user_id}_${o.request_date}`] = {
+                    minutes: o.duration_minutes ?? 0,
+                    status: o.status,
+                    auditStatus: o.audit_status,
+                };
+            });
+            setAfterOutOvertime(map);
+        } catch { }
+    }, []);
+
+    useEffect(() => {
+        if (!selectedMonth) return;
+        fetchAfterOutOvertime(selectedMonth.year, selectedMonth.month);
+    }, [selectedMonth, fetchAfterOutOvertime]);
     const fetchManualRecords = useCallback(async (y: number, m: number) => {
         const r = await fetch(`/api/attendance/manual?year=${y}&month=${m + 1}`);
         const d = await r.json();
@@ -4199,6 +4251,7 @@ export default function AttendanceDashboardPage() {
                                                 <tr className="border-b border-gray-100 bg-gray-50/50">
                                                     <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Jam Masuk</th>
+                                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Jam Pulang</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Batas Absen</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
                                                     <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Metode</th>
@@ -4233,6 +4286,45 @@ export default function AttendanceDashboardPage() {
                                                                         {toWIBTime(a.check_in_time || a.created_at)}
                                                                     </span>
                                                                 )}
+                                                            </td>
+                                                            <td className="px-4 py-4">
+                                                                {manualRec && (["ABSENT", "SICK", "PERMIT"] as string[]).includes(manualRec.status) ? (
+                                                                    <span className="text-[10px] text-gray-300 font-bold">—</span>
+                                                                ) : (() => {
+                                                                    const checkoutIso = checkoutTimes[`${userId}_${dateKey}`];
+                                                                    if (!checkoutIso) {
+                                                                        return <span className="text-[10px] text-gray-300 font-bold">Belum pulang</span>;
+                                                                    }
+                                                                    const ot = afterOutOvertime[`${userId}_${dateKey}`];
+                                                                    const otColor = ot ? getOvertimeColor({ status: ot.status, audit_status: ot.auditStatus }) : null;
+                                                                    return (
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <span className="font-mono font-black text-violet-700 text-sm">
+                                                                                {toWIBTime(checkoutIso)}
+                                                                            </span>
+                                                                            {ot && (
+                                                                                <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border w-fit whitespace-nowrap ${otColor === "GREEN" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : otColor === "AMBER" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}>
+                                                                                    <Clock className="w-2.5 h-2.5" /> Lembur {formatOvertimeMinutes(ot.minutes)}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </td>
+                                                            <td className="px-4 py-4">
+                                                                {(() => {
+                                                                    const eff = effectiveShiftFor(userId, dateKey);
+                                                                    return (
+                                                                        <div className="flex flex-col gap-1">
+                                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg w-fit whitespace-nowrap">
+                                                                                Telat &gt; {minToHHMM(eff.late)}
+                                                                            </span>
+                                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-1 rounded-lg w-fit whitespace-nowrap">
+                                                                                Tutup {minToHHMM(eff.close)}
+                                                                            </span>
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </td>
                                                             <td className="px-4 py-4">
                                                                 {(() => {
