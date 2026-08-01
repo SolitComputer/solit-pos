@@ -123,6 +123,7 @@ export default function JurnalUmum({ period }: { period: string }) {
     } | null>(null); const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [search, setSearch] = useState("");
+    const [searchNominal, setSearchNominal] = useState("");
     const [pendingSearch, setPendingSearch] = useState(""); // search khusus untuk daftar pending (325 data belum konfirmasi)
     // Filter berdasarkan akun yang dipilih lewat dropdown "Ref" — bisa lebih dari satu (OR).
     const [accountCodeFilter, setAccountCodeFilter] = useState<Set<string>>(new Set());
@@ -243,7 +244,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         const destinationIndex = result.destination.index;
         if (sourceIndex === destinationIndex) return;
 
-        if (search.trim() !== "" || accountCodeFilter.size > 0) {
+        if (search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0) {
             setToast("Harap kosongkan pencarian dan filter akun sebelum mengubah urutan.");
             return;
         }
@@ -286,23 +287,20 @@ export default function JurnalUmum({ period }: { period: string }) {
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
+        const qNom = searchNominal.trim();
         let result = entries;
 
-        if (q) {
-            // Angka murni dari query (buang "Rp", titik, koma, spasi) supaya "3.600.000",
-            // "Rp3.600.000", atau "3600000" semuanya bisa nemuin baris Debit/Kredit yang cocok.
-            const qDigits = q.replace(/[^0-9]/g, "");
-            result = result.filter(
-                (e) =>
+        if (q || qNom) {
+            const qNomDigits = qNom.replace(/[^0-9]/g, "");
+            result = result.filter((e) => {
+                const matchText = !q || (
                     e.keterangan.toLowerCase().includes(q) ||
                     (e.ref ?? "").toLowerCase().includes(q) ||
-                    e.lines.some(
-                        (l) =>
-                            l.account_code.includes(q) ||
-                            l.account_name.toLowerCase().includes(q) ||
-                            (qDigits !== "" && String(Math.round(Number(l.nominal))).startsWith(qDigits))
-                    )
-            );
+                    e.lines.some((l) => l.account_code.includes(q) || l.account_name.toLowerCase().includes(q))
+                );
+                const matchNominal = !qNomDigits || e.lines.some((l) => String(Math.round(Number(l.nominal))).startsWith(qNomDigits));
+                return matchText && matchNominal;
+            });
         }
 
         // Filter kode akun: OR — entry lolos kalau salah satu baris akunnya
@@ -318,7 +316,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
 
         return result;
-    }, [entries, search, accountCodeFilter]);
+    }, [entries, search, searchNominal, accountCodeFilter]);
 
     // Search untuk daftar PENDING (data yang belum dikonfirmasi ke jurnal umum) —
     // terpisah dari `filtered` di atas karena sumber datanya beda (PendingDraft, bukan JournalEntry).
@@ -459,7 +457,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         }, 0);
     }, [filtered, accountCodeFilter]);
 
-    const isFiltered = search.trim() !== "" || accountCodeFilter.size > 0;
+    const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0;
 
     useEffect(() => {
         if (!toast) return;
@@ -614,14 +612,25 @@ export default function JurnalUmum({ period }: { period: string }) {
 
             {/* ── Toolbar ── */}
             <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col sm:flex-row gap-2">
-                <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Cari keterangan, akun, ref, nominal..."
-                        className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
-                    />
+                <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                        <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Cari keterangan, akun, ref..."
+                            className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                        />
+                    </div>
+                    <div className="relative flex-1">
+                        <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                            value={searchNominal}
+                            onChange={(e) => setSearchNominal(e.target.value)}
+                            placeholder="Cari nominal..."
+                            className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                        />
+                    </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -1746,6 +1755,8 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
         CREATE: "Dibuat manual",
         EDIT: "Diedit",
         DELETE: "Dihapus",
+        ACTIVATE: "Ditandai Bermasalah",
+        DEACTIVATE: "Tanda Bermasalah Dicabut",
     };
 
     return (
@@ -1788,6 +1799,12 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
                                             <p className="text-gray-600">{l.after_data?.keterangan}</p>
                                             <p className="font-mono text-gray-500">{rp(Number(l.after_data?.total ?? 0))}</p>
                                         </div>
+                                    </div>
+                                )}
+                                {l.action === "ACTIVATE" && l.reason && (
+                                    <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2 text-[10px]">
+                                        <p className="text-red-700 font-bold mb-0.5">Alasan:</p>
+                                        <p className="text-red-600/80">{l.reason}</p>
                                     </div>
                                 )}
                             </div>
