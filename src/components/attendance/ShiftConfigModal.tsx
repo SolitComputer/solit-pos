@@ -4,18 +4,20 @@
 import { useState, useEffect, useRef } from "react";
 
 interface ShiftConfigData {
-  user_id:      string;
-  user_name:    string;
-  user_role:    string;
-  shift:        "PAGI" | "SORE";
-  has_custom:   boolean;
-  open_hour:    number;
-  open_minute:  number;
-  late_hour:    number;
-  late_minute:  number;
-  close_hour:   number;
+  user_id: string;
+  user_name: string;
+  user_role: string;
+  shift: "PAGI" | "SORE";
+  has_custom: boolean;
+  open_hour: number;
+  open_minute: number;
+  late_hour: number;
+  late_minute: number;
+  close_hour: number;
   close_minute: number;
-  config_id:    string | null;
+  checkout_hour: number; // ✅ NEW — jam pulang
+  checkout_minute: number; // ✅ NEW — jam pulang
+  config_id: string | null;
 }
 
 interface UserInfo { id: string; name: string; role: string }
@@ -30,12 +32,12 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
   initialUserId?: string;
   onClose: () => void;
 }) {
-  const [configs,   setConfigs]   = useState<ShiftConfigData[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [saving,    setSaving]    = useState<string | null>(null);
+  const [configs, setConfigs] = useState<ShiftConfigData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
   const [resetting, setResetting] = useState<string | null>(null);
-  const [error,     setError]     = useState("");
-  const [search,    setSearch]    = useState("");
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
 
   // Jika initialUserId diisi → mode single user (fokus ke 1 user)
   // "all" → tampilkan semua
@@ -49,9 +51,10 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
 
   const [forms, setForms] = useState<Record<string, {
     shift: "PAGI" | "SORE";
-    open_hour: number;  open_minute: number;
-    late_hour: number;  late_minute: number;
+    open_hour: number; open_minute: number;
+    late_hour: number; late_minute: number;
     close_hour: number; close_minute: number;
+    checkout_hour: number; checkout_minute: number; // ✅ NEW — jam pulang
   }>>({});
 
   const loadConfigs = async () => {
@@ -64,13 +67,15 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
         const initForms: typeof forms = {};
         d.data.forEach((c: ShiftConfigData) => {
           initForms[c.user_id] = {
-            shift:        c.shift,
-            open_hour:    c.open_hour,
-            open_minute:  c.open_minute,
-            late_hour:    c.late_hour,
-            late_minute:  c.late_minute,
-            close_hour:   c.close_hour,
+            shift: c.shift,
+            open_hour: c.open_hour,
+            open_minute: c.open_minute,
+            late_hour: c.late_hour,
+            late_minute: c.late_minute,
+            close_hour: c.close_hour,
             close_minute: c.close_minute,
+            checkout_hour: c.checkout_hour,   // ✅ NEW
+            checkout_minute: c.checkout_minute, // ✅ NEW
           };
         });
         setForms(initForms);
@@ -100,9 +105,11 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
   }, [loading, filterToUser, initialUserId]);
 
   const handleShiftChange = (userId: string, shift: "PAGI" | "SORE") => {
+    // ✅ NEW: jam pulang. PAGI = 17:00 (sudah dikonfirmasi). SORE = 21:00 cuma
+    // nilai awal — TIDAK seragam per orang, wajib dicek/diubah manual tiap akun.
     const defaults = shift === "PAGI"
-      ? { open_hour: 7, open_minute: 30, late_hour: 8,  late_minute: 0,  close_hour: 12, close_minute: 0 }
-      : { open_hour: 14, open_minute: 0, late_hour: 16, late_minute: 0,  close_hour: 18, close_minute: 0 };
+      ? { open_hour: 7, open_minute: 30, late_hour: 8, late_minute: 0, close_hour: 12, close_minute: 0, checkout_hour: 17, checkout_minute: 0 }
+      : { open_hour: 14, open_minute: 0, late_hour: 16, late_minute: 0, close_hour: 18, close_minute: 0, checkout_hour: 21, checkout_minute: 0 };
     setForms(p => ({ ...p, [userId]: { shift, ...defaults } }));
   };
 
@@ -115,11 +122,12 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id:      userId,
-          shift:        f.shift,
-          open_hour:    f.open_hour,  open_minute:  f.open_minute,
-          late_hour:    f.late_hour,  late_minute:  f.late_minute,
-          close_hour:   f.close_hour, close_minute: f.close_minute,
+          user_id: userId,
+          shift: f.shift,
+          open_hour: f.open_hour, open_minute: f.open_minute,
+          late_hour: f.late_hour, late_minute: f.late_minute,
+          close_hour: f.close_hour, close_minute: f.close_minute,
+          checkout_hour: f.checkout_hour, checkout_minute: f.checkout_minute, // ✅ NEW
         }),
       });
       const d = await r.json();
@@ -135,17 +143,19 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
     try {
       await fetch(`/api/attendance/shift-config?user_id=${userId}`, { method: "DELETE" });
       await loadConfigs();
-    } catch {}
+    } catch { }
     finally { setResetting(null); }
   };
 
   const validateForm = (f: typeof forms[string] | undefined) => {
     if (!f) return null;
-    const open  = f.open_hour  * 60 + f.open_minute;
-    const late  = f.late_hour  * 60 + f.late_minute;
+    const open = f.open_hour * 60 + f.open_minute;
+    const late = f.late_hour * 60 + f.late_minute;
     const close = f.close_hour * 60 + f.close_minute;
-    if (open >= late)  return "Jam buka harus sebelum jam telat";
+    const checkout = f.checkout_hour * 60 + f.checkout_minute; // ✅ NEW
+    if (open >= late) return "Jam buka harus sebelum jam telat";
     if (late >= close) return "Jam telat harus sebelum jam tutup";
+    if (close >= checkout) return "Jam pulang harus setelah batas absen masuk"; // ✅ NEW
     return null;
   };
 
@@ -234,31 +244,31 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
           ) : (
             <div className="space-y-4">
               {shown.map(c => {
-                const f      = forms[c.user_id];
+                const f = forms[c.user_id];
                 if (!f) return null;
                 const valErr = validateForm(f);
-                const saved  = configs.find(x => x.user_id === c.user_id);
+                const saved = configs.find(x => x.user_id === c.user_id);
                 const isDirty = saved && (
-                  f.shift        !== saved.shift        ||
-                  f.open_hour    !== saved.open_hour    || f.open_minute   !== saved.open_minute   ||
-                  f.late_hour    !== saved.late_hour    || f.late_minute   !== saved.late_minute   ||
-                  f.close_hour   !== saved.close_hour   || f.close_minute  !== saved.close_minute
+                  f.shift !== saved.shift ||
+                  f.open_hour !== saved.open_hour || f.open_minute !== saved.open_minute ||
+                  f.late_hour !== saved.late_hour || f.late_minute !== saved.late_minute ||
+                  f.close_hour !== saved.close_hour || f.close_minute !== saved.close_minute ||
+                  f.checkout_hour !== saved.checkout_hour || f.checkout_minute !== saved.checkout_minute // ✅ NEW
                 );
 
                 return (
                   <div
                     key={c.user_id}
                     ref={el => { userCardRefs.current[c.user_id] = el; }}
-                    className={`rounded-2xl border p-5 transition-all duration-200 hover:shadow-md ${
-                      c.has_custom
-                        ? "bg-gradient-to-br from-indigo-50/60 to-white border-indigo-200"
-                        : "bg-white border-gray-100"
-                    } ${
+                    className={`rounded-2xl border p-5 transition-all duration-200 hover:shadow-md ${c.has_custom
+                      ? "bg-gradient-to-br from-indigo-50/60 to-white border-indigo-200"
+                      : "bg-white border-gray-100"
+                      } ${
                       // Highlight ring jika ini user yang dimaksud
                       c.user_id === initialUserId
                         ? "ring-2 ring-indigo-400/50 shadow-lg"
                         : ""
-                    }`}
+                      }`}
                   >
                     {/* Header card */}
                     <div className="flex items-center gap-3 mb-5">
@@ -272,7 +282,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {c.has_custom && (
                           <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-full">
-                             Custom
+                            Custom
                           </span>
                         )}
                         {isDirty && (
@@ -292,11 +302,10 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                             key={s}
                             type="button"
                             onClick={() => handleShiftChange(c.user_id, s)}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all duration-200 ${
-                              f.shift === s
-                                ? "bg-[#1a1a2e] text-white border-[#1a1a2e] shadow-md"
-                                : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
-                            }`}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all duration-200 ${f.shift === s
+                              ? "bg-[#1a1a2e] text-white border-[#1a1a2e] shadow-md"
+                              : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                              }`}
                           >
                             {s === "PAGI" ? " Pagi" : " Sore"}
                           </button>
@@ -307,8 +316,8 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                       </span>
                     </div>
 
-                    {/* 3 kolom jam */}
-                    <div className="grid grid-cols-3 gap-3 mb-4">
+                    {/* 4 kolom jam (✅ NEW: tambah Jam Pulang) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                       {/* Buka */}
                       <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                         <label className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide mb-2 block">
@@ -366,7 +375,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                       {/* Tutup */}
                       <div className="bg-red-50 border border-red-100 rounded-xl p-3">
                         <label className="text-[10px] font-bold text-red-700 uppercase tracking-wide mb-2 block">
-                           Tutup Absen
+                          Tutup Absen
                         </label>
                         <div className="flex items-center gap-1">
                           <input
@@ -389,6 +398,33 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                         </div>
                         <p className="text-[9px] text-red-600 mt-1.5">Halaman absen tertutup</p>
                       </div>
+
+                      {/* ✅ NEW: Jam Pulang — dasar hitung lembur "sesudah pulang" */}
+                      <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
+                        <label className="text-[10px] font-bold text-violet-700 uppercase tracking-wide mb-2 block">
+                          Jam Pulang
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number" min={0} max={23} value={f.checkout_hour}
+                            onChange={e => setForms(p => ({
+                              ...p,
+                              [c.user_id]: { ...p[c.user_id], checkout_hour: Math.min(23, Math.max(0, Number(e.target.value))) }
+                            }))}
+                            className="w-12 h-10 border border-violet-200 rounded-xl text-center text-sm font-mono font-bold bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
+                          />
+                          <span className="text-gray-400 font-bold">:</span>
+                          <input
+                            type="number" min={0} max={59} value={f.checkout_minute}
+                            onChange={e => setForms(p => ({
+                              ...p,
+                              [c.user_id]: { ...p[c.user_id], checkout_minute: Math.min(59, Math.max(0, Number(e.target.value))) }
+                            }))}
+                            className="w-12 h-10 border border-violet-200 rounded-xl text-center text-sm font-mono font-bold bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
+                          />
+                        </div>
+                        <p className="text-[9px] text-violet-600 mt-1.5">Absen setelah ini = lembur</p>
+                      </div>
                     </div>
 
                     {/* Preview / Error */}
@@ -405,6 +441,8 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                           <span className="text-amber-700 font-bold font-mono">{fmtTime(f.late_hour, f.late_minute)}</span>
                           <span className="text-gray-400 mx-1.5">→ terlambat s/d</span>
                           <span className="text-red-700 font-bold font-mono">{fmtTime(f.close_hour, f.close_minute)}</span>
+                          <span className="text-gray-400 mx-1.5">→ pulang</span>
+                          <span className="text-violet-700 font-bold font-mono">{fmtTime(f.checkout_hour, f.checkout_minute)}</span>
                           <span className="text-gray-400 ml-1">WIB</span>
                         </p>
                       </div>
@@ -455,7 +493,7 @@ export function ShiftConfigModal({ users, initialUserId, onClose }: {
                   onClick={() => { setFilterToUser("all"); setSearch(""); }}
                   className="h-9 px-4 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl text-xs font-semibold hover:bg-indigo-100 transition-all"
                 >
-                   Lihat Semua
+                  Lihat Semua
                 </button>
               )}
               <button
