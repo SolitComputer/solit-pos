@@ -9,8 +9,8 @@ const supabase = createClient(
 );
 
 const SHIFT_DEFAULTS = {
-  PAGI: { open_hour: 7, open_minute: 30, late_hour: 8, late_minute: 0, close_hour: 12, close_minute: 0 },
-  SORE: { open_hour: 14, open_minute: 0, late_hour: 16, late_minute: 0, close_hour: 18, close_minute: 0 },
+  PAGI: { open_hour: 7, open_minute: 30, late_hour: 8, late_minute: 0, close_hour: 12, close_minute: 0, checkout_hour: 17, checkout_minute: 0 },
+  SORE: { open_hour: 14, open_minute: 0, late_hour: 16, late_minute: 0, close_hour: 18, close_minute: 0, checkout_hour: 21, checkout_minute: 0 },
 } as const;
 
 // GET — config (admin: semua | kepala: bawahannya | user: dirinya)
@@ -73,6 +73,8 @@ export async function GET(request: Request) {
           late_minute: config?.late_minute ?? defaults.late_minute,
           close_hour: config?.close_hour ?? defaults.close_hour,
           close_minute: config?.close_minute ?? defaults.close_minute,
+          checkout_hour: config?.checkout_hour ?? defaults.checkout_hour, // ✅ NEW
+          checkout_minute: config?.checkout_minute ?? defaults.checkout_minute, // ✅ NEW
           config_id: config?.id ?? null,
         };
       });
@@ -108,6 +110,8 @@ export async function GET(request: Request) {
         late_minute: config?.late_minute ?? defaults.late_minute,
         close_hour: config?.close_hour ?? defaults.close_hour,
         close_minute: config?.close_minute ?? defaults.close_minute,
+        checkout_hour: config?.checkout_hour ?? defaults.checkout_hour, // ✅ NEW
+        checkout_minute: config?.checkout_minute ?? defaults.checkout_minute, // ✅ NEW
       },
     });
   } catch (err: any) {
@@ -121,16 +125,20 @@ export async function POST(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
 
-    const body = await request.json();
+ const body = await request.json();
     const {
       user_id, shift,
       open_hour, open_minute = 0,
       late_hour, late_minute = 0,
       close_hour, close_minute = 0,
+      checkout_hour, checkout_minute = 0, // ✅ NEW — jam pulang
     } = body;
 
     if (!user_id) {
       return NextResponse.json({ success: false, message: "user_id wajib" }, { status: 400 });
+    }
+    if (checkout_hour === undefined || checkout_hour === null) {
+      return NextResponse.json({ success: false, message: "checkout_hour (jam pulang) wajib diisi" }, { status: 400 });
     }
 
     // Izin: full access → semua | kepala divisi → hanya bawahannya
@@ -140,16 +148,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
     }
 
-    // Validasi logika waktu: open < late < close
+    // Validasi logika waktu: open < late < close < checkout
     const openTotal = open_hour * 60 + open_minute;
     const lateTotal = late_hour * 60 + late_minute;
     const closeTotal = close_hour * 60 + close_minute;
+    const checkoutTotal = checkout_hour * 60 + checkout_minute; // ✅ NEW
 
     if (openTotal >= lateTotal) {
       return NextResponse.json({ success: false, message: "Jam buka harus sebelum jam telat" }, { status: 400 });
     }
     if (lateTotal >= closeTotal) {
       return NextResponse.json({ success: false, message: "Jam telat harus sebelum jam tutup" }, { status: 400 });
+    }
+    if (closeTotal >= checkoutTotal) {
+      return NextResponse.json({ success: false, message: "Jam pulang harus setelah batas absen masuk (jam tutup)" }, { status: 400 });
     }
 
     const { data, error } = await supabase
@@ -161,6 +173,7 @@ export async function POST(request: Request) {
           open_hour, open_minute,
           late_hour, late_minute,
           close_hour, close_minute,
+          checkout_hour, checkout_minute, // ✅ NEW
           created_by: user.id,
           updated_at: new Date().toISOString(),
         },
