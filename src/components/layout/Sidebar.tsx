@@ -146,6 +146,7 @@ const Icons = {
   aiCeo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8z" /><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" /></svg>),
   profile: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" /></svg>),
   social: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none" /></svg>),
+  fingerprint: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 015 5v2" /><path d="M7 9V7a5 5 0 019.8-1.5" /><path d="M4.5 10.5V9a7.5 7.5 0 011-3.8" /><path d="M12 9v3.5a5.5 5.5 0 01-1.2 3.4" /><path d="M16 9v2.5c0 3-1 5.5-3 7" /><path d="M8.5 9v3c0 3.5-1 6-3 8" /><path d="M19.5 9v1.5c0 4.5-1.5 8-4 10.5" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -167,6 +168,7 @@ const ITEM_AI_CEO: MenuItem = { name: "AI CEO", href: "/dashboard/ai-ceo", icon:
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
+const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
@@ -1020,6 +1022,37 @@ export default function Sidebar() {
       .catch(() => { });
   }, [user?.id]);
 
+  const [needsBiometricEnroll, setNeedsBiometricEnroll] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchBiometricStatus = () => {
+      fetch("/api/auth/webauthn/status", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success) {
+            setNeedsBiometricEnroll(Boolean(d.biometricEligible) && !d.biometricEnrolled);
+          } else {
+            console.error("[sidebar] webauthn status gagal:", d);
+          }
+        })
+        .catch((err) => console.error("[sidebar] webauthn status fetch error:", err));
+    };
+
+    fetchBiometricStatus();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchBiometricStatus();
+    };
+    window.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", fetchBiometricStatus);
+    return () => {
+      window.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", fetchBiometricStatus);
+    };
+  }, [user?.id]);
+
   const [rail, setRail] = useState(false);
   const [width, setWidth] = useState(DEFAULT_W);
   const [dragging, setDragging] = useState(false);
@@ -1093,6 +1126,7 @@ export default function Sidebar() {
       : [];
 
   const groups: MenuGroup[] = dedupeGroups([
+    ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
     ...staticGroups,
     ...dynamicGroups.map((g) => ({
       label: g.label,

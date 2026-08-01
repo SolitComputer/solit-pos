@@ -626,7 +626,21 @@ export default function FaceVerifyPage() {
         setBioError(verifyData2.message ?? "Autentikasi sidik jari gagal");
       }
     } catch (err: any) {
-      setBioError(err?.name === "NotAllowedError" ? "Dibatalkan atau ditolak oleh device" : "Gagal memproses sidik jari");
+      const name = err?.name;
+      if (name === "NotAllowedError") {
+        setBioError("Dibatalkan, ditolak, atau waktu habis. Coba lagi.");
+      } else if (name === "InvalidStateError") {
+        setBioError("Sidik jari sudah pernah didaftarkan di device ini.");
+      } else if (name === "SecurityError") {
+        setBioError("Domain tidak cocok dengan yang terdaftar. Hubungi programmer.");
+      } else if (name === "NotSupportedError") {
+        setBioError("Device/browser ini tidak mendukung sidik jari platform.");
+      } else if (name === "AbortError") {
+        setBioError("Proses dibatalkan. Coba lagi.");
+      } else {
+        setBioError("Gagal memproses sidik jari. Pastikan sidik jari sudah diatur di Pengaturan HP.");
+      }
+      console.error("[biometric attendance] webauthn error:", name, err);
     } finally {
       setBioBusy(false);
     }

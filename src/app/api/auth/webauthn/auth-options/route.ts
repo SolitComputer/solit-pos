@@ -47,6 +47,9 @@ export async function POST() {
       rpID: RP_ID,
       allowCredentials: creds.map((c: any) => ({ id: c.credential_id, transports: c.transports ?? undefined })),
       userVerification: "required",
+      // ✅ NEW: sama seperti register-options — beri waktu lebih untuk sensor
+      // yang lambat, terutama saat absen pagi ketika user buru-buru.
+      timeout: 90000,
     });
 
     await supabaseAdmin

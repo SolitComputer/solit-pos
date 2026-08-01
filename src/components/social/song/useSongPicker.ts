@@ -20,10 +20,10 @@ export interface SavedSong {
     expires_at: string;
 }
 
-export const CLIP_LENGTH = 30;
+export const CLIP_LENGTH = 15;
 
 // Semua state + handler buat alur "cari lagu di iTunes → pilih hasil →
-// tentukan potongan 30 detik → simpan ke /api/profile/song". Dipakai bareng
+// tentukan potongan 15 detik → simpan ke /api/profile/song". Dipakai bareng
 // oleh ProfileView (inline di kartu profil) dan SocialFeed (di dalam modal),
 // biar logikanya nggak dobel.
 export function useSongPicker(onSaved: (song: SavedSong) => void, onError?: (msg: string) => void) {
@@ -38,6 +38,7 @@ export function useSongPicker(onSaved: (song: SavedSong) => void, onError?: (msg
     const [clipDuration, setClipDuration] = useState(30);
     const [cropPlaying, setCropPlaying] = useState(false);
     const cropAudioRef = useRef<HTMLAudioElement>(null);
+    const clipStartRef = useRef(0); // Supaya onTimeUpdate selalu dapat nilai paling baru walau state belum render
 
     useEffect(() => {
         if (!showSongSearch || songQuery.trim().length < 2) { setSongResults([]); return; }
@@ -67,8 +68,10 @@ export function useSongPicker(onSaved: (song: SavedSong) => void, onError?: (msg
     const handlePickSearchResult = (song: SongResult) => {
         setPendingSong(song);
         setClipStart(0);
-        setClipDuration(song.trackTimeMillis ? song.trackTimeMillis / 1000 : 30);
-        setCropPlaying(false);
+        clipStartRef.current = 0;
+        // Preview iTunes API selalu 30 detik
+        setClipDuration(30);
+        setCropPlaying(true);
     };
 
     const handleCancelCrop = () => {
@@ -84,9 +87,7 @@ export function useSongPicker(onSaved: (song: SavedSong) => void, onError?: (msg
             audio.pause();
             setCropPlaying(false);
         } else {
-            // Karena preview cuma 30 detik, selalu mainkan dari awal, 
-            // walau visual slider-nya seolah-olah bergeser di lagu penuh
-            audio.currentTime = 0;
+            audio.currentTime = clipStart;
             audio.play().catch(() => { });
             setCropPlaying(true);
         }
@@ -95,10 +96,11 @@ export function useSongPicker(onSaved: (song: SavedSong) => void, onError?: (msg
     const handleCropTimeUpdate = () => {
         const audio = cropAudioRef.current;
         if (!audio) return;
-        // Berhenti setelah 30 detik (preview habis)
-        if (audio.currentTime >= CLIP_LENGTH) {
+        // Berhenti setelah durasi clip habis
+        if (audio.currentTime >= clipStartRef.current + CLIP_LENGTH) {
             audio.pause();
             setCropPlaying(false);
+            audio.currentTime = clipStartRef.current;
         }
     };
 
@@ -106,7 +108,14 @@ export function useSongPicker(onSaved: (song: SavedSong) => void, onError?: (msg
 
     const handleCropSliderChange = (value: number) => {
         setClipStart(value);
-        // Jangan ubah audio.currentTime karena audio aslinya cuma 30 detik
+        clipStartRef.current = value;
+        if (cropAudioRef.current) {
+            cropAudioRef.current.currentTime = value;
+            if (!cropPlaying) {
+                cropAudioRef.current.play().catch(() => {});
+                setCropPlaying(true);
+            }
+        }
     };
 
     const handleConfirmSong = async () => {
