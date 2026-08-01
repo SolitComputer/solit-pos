@@ -11,8 +11,10 @@ const DAY_FULL = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 const SHIFT_PREVIEW = {
-  PAGI: { open: "07:30", late: "08:00", close: "12:00", emoji: Sunrise, label: "Pagi" },
-  SORE: { open: "14:00", late: "16:00", close: "18:00", emoji: Sunset, label: "Sore" },
+  // ✅ NEW: checkout cuma nilai awal input — SORE terutama TIDAK seragam per
+  // orang (sudah dikonfirmasi), jadi wajib dicek/diubah manual tiap dipakai.
+  PAGI: { open: "07:30", late: "08:00", close: "12:00", checkout: "17:00", emoji: Sunrise, label: "Pagi" },
+  SORE: { open: "14:00", late: "16:00", close: "18:00", checkout: "21:00", emoji: Sunset, label: "Sore" },
 } as const;
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -46,6 +48,8 @@ export function ShiftScheduleTab({
   const [shift, setShift] = useState<"PAGI" | "SORE">("PAGI");
   const [useCustomHours, setUseCustomHours] = useState(false);
   const [hours, setHours] = useState({ open: "07:30", late: "08:00", close: "12:00" });
+  const [useCustomCheckout, setUseCustomCheckout] = useState(false); // ✅ NEW
+  const [checkoutTime, setCheckoutTime] = useState("17:00"); // ✅ NEW
   const [notes, setNotes] = useState("");
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -120,6 +124,9 @@ export function ShiftScheduleTab({
       const p = SHIFT_PREVIEW[s];
       setHours({ open: p.open, late: p.late, close: p.close });
     }
+    if (!useCustomCheckout) { // ✅ NEW
+      setCheckoutTime(SHIFT_PREVIEW[s].checkout);
+    }
   };
 
   const parseHM = (v: string) => {
@@ -127,11 +134,20 @@ export function ShiftScheduleTab({
     return { h: h || 0, m: m || 0 };
   };
 
-  const save = async () => {
+ const save = async () => {
     if (selectedUsers.length === 0) return setError("Pilih minimal 1 karyawan");
     if (!range.start) return setError("Pilih rentang tanggal di kalender");
     if (days.length === 0) return setError("Pilih minimal 1 hari");
     if (affectedDates.length === 0) return setError("Tidak ada tanggal yang cocok — cek pilihan hari");
+
+    // ✅ NEW: validasi checkout harus setelah jam tutup absen masuk
+    if (useCustomCheckout) {
+      const c = parseHM(hours.close);
+      const co = parseHM(checkoutTime);
+      if ((c.h * 60 + c.m) >= (co.h * 60 + co.m)) {
+        return setError("Jam pulang harus setelah jam tutup absen masuk");
+      }
+    }
 
     setSaving(true); setError("");
     try {
@@ -151,6 +167,13 @@ export function ShiftScheduleTab({
           late_hour: l.h,  late_minute: l.m,
           close_hour: c.h, close_minute: c.m,
         });
+      }
+
+      // ✅ NEW — independen dari useCustomHours: bisa ubah checkout doang
+      // tanpa harus ikut override open/late/close juga
+      if (useCustomCheckout) {
+        const co = parseHM(checkoutTime);
+        Object.assign(payload, { checkout_hour: co.h, checkout_minute: co.m });
       }
 
       const r = await fetch("/api/attendance/shift-schedule", {
@@ -431,7 +454,7 @@ export function ShiftScheduleTab({
             <span className="text-gray-300 font-semibold normal-case">(override jam default shift)</span>
           </label>
 
-          {useCustomHours && (
+         {useCustomHours && (
             <div className="grid grid-cols-3 gap-2 mt-3">
               {([
                 ["open", "Buka", "emerald"],
@@ -449,6 +472,39 @@ export function ShiftScheduleTab({
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        {/* ✅ NEW: Jam Pulang — independen dari "Pakai jam custom" di atas */}
+        <div>
+          <label className="flex items-center gap-2 text-[11px] font-black text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useCustomCheckout}
+              onChange={e => {
+                setUseCustomCheckout(e.target.checked);
+                if (!e.target.checked) setCheckoutTime(SHIFT_PREVIEW[shift].checkout);
+              }}
+              className="w-4 h-4 rounded accent-violet-600"
+            />
+            Atur jam pulang custom
+            <span className="text-gray-300 font-semibold normal-case">(dasar hitung lembur "sesudah pulang")</span>
+          </label>
+
+          {useCustomCheckout ? (
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <div className="bg-violet-50 border border-violet-100 rounded-xl p-2.5">
+                <label className="block text-[9px] font-black text-violet-700 uppercase mb-1.5">Jam Pulang</label>
+                <input
+                  type="time"
+                  value={checkoutTime}
+                  onChange={e => setCheckoutTime(e.target.value)}
+                  className="w-full h-8 border border-gray-200 rounded-lg px-2 text-xs font-mono font-bold bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/20"
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="text-[10px] text-gray-300 mt-1.5">Kosong = ikut jam pulang default akun masing-masing (menu Atur Shift)</p>
           )}
         </div>
 
@@ -528,7 +584,7 @@ export function ShiftScheduleTab({
             {[...schedules]
               .sort((a, b) => a.start_date.localeCompare(b.start_date))
               .map(s => {
-                const dows = s.days_of_week ?? ALL_DAYS;
+               const dows = s.days_of_week ?? ALL_DAYS;
                 const everyDay = dows.length === 7;
                 const custom = s.open_hour != null;
                 const base = SHIFT_DEFAULTS[s.shift];
@@ -536,6 +592,7 @@ export function ShiftScheduleTab({
                 const openM = custom ? (s.open_minute ?? 0) : base.open_minute;
                 const closeH = custom ? s.close_hour! : base.close_hour;
                 const closeM = custom ? (s.close_minute ?? 0) : base.close_minute;
+                const hasCheckout = s.checkout_hour != null; // ✅ NEW — cuma tampil kalau di-custom
                 const name = (s as any).users?.name ?? userById[s.user_id]?.name ?? "—";
 
                 return (
@@ -564,9 +621,14 @@ export function ShiftScheduleTab({
                         <p className="inline-flex items-center gap-1 text-[10px] font-black leading-none">
                           {(() => { const SIcon = SHIFT_PREVIEW[s.shift].emoji; return <SIcon size={11} className="flex-shrink-0" />; })()} {s.shift}
                         </p>
-                        <p className="text-[9px] font-mono font-bold opacity-70 mt-0.5">
+                       <p className="text-[9px] font-mono font-bold opacity-70 mt-0.5">
                           {pad2(openH)}:{pad2(openM)}–{pad2(closeH)}:{pad2(closeM)}
                         </p>
+                        {hasCheckout && (
+                          <p className="text-[8px] font-mono font-bold text-violet-500 mt-0.5">
+                            pulang {pad2(s.checkout_hour!)}:{pad2(s.checkout_minute ?? 0)}
+                          </p>
+                        )}
                       </div>
                       <button
                         onClick={() => remove(s.id)}

@@ -6,11 +6,16 @@ export type ShiftWindow = {
   open_hour: number;  open_minute: number;
   late_hour: number;  late_minute: number;
   close_hour: number; close_minute: number;
+  checkout_hour: number; checkout_minute: number; // ✅ NEW — jam pulang
 };
 
 export const SHIFT_DEFAULTS: Record<ShiftName, ShiftWindow> = {
-  PAGI: { open_hour: 7,  open_minute: 30, late_hour: 8,  late_minute: 0, close_hour: 12, close_minute: 0 },
-  SORE: { open_hour: 14, open_minute: 0,  late_hour: 16, late_minute: 0, close_hour: 18, close_minute: 0 },
+  // ✅ NEW: checkout = jam pulang. PAGI=17:00 dikonfirmasi user; SORE=21:00
+  // cuma fallback terakhir kalau gak ada override sama sekali — nilai
+  // sebenarnya beda-beda per orang, diatur manual via user_shift_config
+  // atau user_shift_schedule.
+  PAGI: { open_hour: 7,  open_minute: 30, late_hour: 8,  late_minute: 0, close_hour: 12, close_minute: 0, checkout_hour: 17, checkout_minute: 0 },
+  SORE: { open_hour: 14, open_minute: 0,  late_hour: 16, late_minute: 0, close_hour: 18, close_minute: 0, checkout_hour: 21, checkout_minute: 0 },
 };
 
 export type ShiftScheduleRow = {
@@ -23,6 +28,7 @@ export type ShiftScheduleRow = {
   open_hour: number | null;  open_minute: number | null;
   late_hour: number | null;  late_minute: number | null;
   close_hour: number | null; close_minute: number | null;
+  checkout_hour: number | null; checkout_minute: number | null; // ✅ NEW
   notes: string | null;
   created_at: string;
 };
@@ -31,6 +37,18 @@ export type EffectiveShift = ShiftWindow & {
   shift: ShiftName;
   source: "SCHEDULE" | "CONFIG" | "DEFAULT";
   schedule_id: string | null;
+};
+
+/**
+ * ✅ NEW — sama seperti EffectiveShift, TAPI checkout_hour/checkout_minute
+ * boleh null. Dipakai KHUSUS oleh resolveScheduleOverride(): null berarti
+ * "jadwal tanggal ini TIDAK meng-custom jam pulang", jadi caller harus tetap
+ * pakai checkout dari baseSchedule (dari user_shift_config), BUKAN ketiban
+ * default global begitu saja.
+ */
+export type EffectiveShiftOverride = Omit<EffectiveShift, "checkout_hour" | "checkout_minute"> & {
+  checkout_hour: number | null;
+  checkout_minute: number | null;
 };
 
 type ShiftWindowOverride = {
@@ -87,6 +105,11 @@ function windowFrom(
     late_minute: override.late_minute ?? 0,
     close_hour: override.close_hour,
     close_minute: override.close_minute ?? 0,
+    // ✅ NEW — checkout di-override SENDIRI-SENDIRI, gak ikut syarat
+    // open/late/close di atas: kalau schedule/config ini gak isi checkout_hour,
+    // fallback ke default shift, bukan bikin seluruh override gagal
+    checkout_hour: override.checkout_hour ?? base.checkout_hour,
+    checkout_minute: override.checkout_hour != null ? (override.checkout_minute ?? 0) : base.checkout_minute,
   };
 }
 
@@ -166,22 +189,30 @@ export type ScheduleTimes = {
   start:    { h: number; m: number };
   lateFrom: { h: number; m: number };
   end:      { h: number; m: number };
+  checkout?: { h: number; m: number }; // ✅ FIX — opsional: cuma ada kalau di-override
 };
 
-export function toAuthScheduleShape(eff: EffectiveShift): ScheduleTimes {
-  return {
+export function toAuthScheduleShape(eff: EffectiveShiftOverride): ScheduleTimes {
+  const shape: ScheduleTimes = {
     start:    { h: eff.open_hour,  m: eff.open_minute },
     lateFrom: { h: eff.late_hour,  m: eff.late_minute },
     end:      { h: eff.close_hour, m: eff.close_minute },
   };
+  // ✅ FIX (bug poin 1 di atas): checkout cuma disertakan kalau eff.checkout_hour
+  // eksplisit ada (bukan null) — kalau jadwal tanggal ini gak nge-custom
+  // checkout, biarkan caller (attendanceVerification.ts, face-status/route.ts)
+  // tetap pakai checkout dari baseSchedule.
+  if (eff.checkout_hour != null) {
+    shape.checkout = { h: eff.checkout_hour, m: eff.checkout_minute ?? 0 };
+  }
+  return shape;
 }
-
 
 export async function resolveScheduleOverride(
   supabase: SupabaseClient,
   userId: string,
   dateStr: string
-): Promise<EffectiveShift | null> {
+): Promise<EffectiveShiftOverride | null> {
   const { data, error } = await supabase
     .from("user_shift_schedule")
     .select("*")
@@ -208,5 +239,9 @@ export async function resolveScheduleOverride(
     late_minute: hasCustom ? (picked.late_minute ?? 0) : base.late_minute,
     close_hour: hasCustom ? picked.close_hour! : base.close_hour,
     close_minute: hasCustom ? (picked.close_minute ?? 0) : base.close_minute,
+    // ✅ FIX: null kalau TIDAK di-custom (jangan fallback ke default global) —
+    // lihat penjelasan bug di toAuthScheduleShape.
+    checkout_hour: picked.checkout_hour ?? null,
+    checkout_minute: picked.checkout_hour != null ? (picked.checkout_minute ?? 0) : null,
   };
 }
