@@ -1755,6 +1755,8 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
         CREATE: "Dibuat manual",
         EDIT: "Diedit",
         DELETE: "Dihapus",
+        ACTIVATE: "Ditandai Bermasalah",
+        DEACTIVATE: "Tanda Bermasalah Dicabut",
     };
 
     return (
@@ -1797,6 +1799,12 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
                                             <p className="text-gray-600">{l.after_data?.keterangan}</p>
                                             <p className="font-mono text-gray-500">{rp(Number(l.after_data?.total ?? 0))}</p>
                                         </div>
+                                    </div>
+                                )}
+                                {l.action === "ACTIVATE" && l.reason && (
+                                    <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2 text-[10px]">
+                                        <p className="text-red-700 font-bold mb-0.5">Alasan:</p>
+                                        <p className="text-red-600/80">{l.reason}</p>
                                     </div>
                                 )}
                             </div>
