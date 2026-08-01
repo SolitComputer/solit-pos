@@ -248,12 +248,18 @@ async function buildTransactionDrafts(
       const a1 = Math.round(Number(t.amount_method_1 ?? 0));
       const a2 = Math.round(Number(t.amount_method_2 ?? 0));
 
-      if (m2 && a1 > 0 && a2 > 0 && Math.abs(a1 + a2 - deal) <= 1) {
-        // Split payment (TF + Tunai) — toleransi selisih Rp1 akibat pembulatan,
-        // selisihnya "diserap" ke baris kedua supaya total tetap match `deal`.
-        const a2Adjusted = deal - a1;
-        lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: a1 });
-        lines.push({ account_code: kasAccountFromPaymentMethod(m2), side: "DEBIT", nominal: a2Adjusted });
+      const isSplitPayment = !!m2 && a1 > 0 && a2 > 0;
+
+      if (isSplitPayment) {
+     
+        const account2 = kasAccountFromPaymentMethod(m2);
+        const account1 = account2 === AKUN.KAS_CASH ? AKUN.KAS_SALDO : AKUN.KAS_CASH;
+
+        const a2Final = deal - a1;
+        lines.push({ account_code: account1, side: "DEBIT", nominal: a1 });
+        if (a2Final > 0) {
+          lines.push({ account_code: account2, side: "DEBIT", nominal: a2Final });
+        }
       } else {
         lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
       }

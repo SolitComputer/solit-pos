@@ -1,0 +1,113 @@
+[   15870ms] [INFO] Download the React DevTools for a better development experience: https://react.dev/link/react-devtools @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   16326ms] [TIMESTAMP] Server Requests Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1241
+[   16327ms] [TIMESTAMP] Server Components Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1249
+[   16753ms] [LOG] [HMR] connected @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/shared/forward-logs-shared.js:27
+[   16890ms] [TIMESTAMP] Blocking Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18271
+[   16891ms] [TIMESTAMP] Transition Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18279
+[   16891ms] [TIMESTAMP] Suspense Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18287
+[   16892ms] [TIMESTAMP] Idle Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18295
+[   17307ms] [TIMESTAMP] Blocked @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:17801
+[   17463ms] [TIMESTAMP] Server Requests Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1241
+[   17468ms] [TIMESTAMP] Server Components Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:1249
+[   17468ms] [TIMESTAMP] ​Preloads @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17469ms] [TIMESTAMP] ​Loading @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17469ms] [TIMESTAMP] ​HTTPAccessErrorFallback @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17469ms] [TIMESTAMP] ​NotFound @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17469ms] [TIMESTAMP] ​RootLayout @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17472ms] [TIMESTAMP] ​Next.MetadataOutlet @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17473ms] [TIMESTAMP] ​NonIndex @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17473ms] [TIMESTAMP] ​Next.Viewport @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17475ms] [TIMESTAMP] ​ViewportWrapper @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17475ms] [TIMESTAMP] ​Next.Metadata @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17475ms] [TIMESTAMP] ​MetadataWrapper @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-server-dom-webpack/cjs/react-server-dom-webpack-client.browser.development.js:3943
+[   17475ms] [TIMESTAMP] Blocked @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:17801
+[   17534ms] [TIMESTAMP] Blocked @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:17801
+[   17627ms] [TIMESTAMP] Blocked @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:17801
+[   17705ms] [TIMESTAMP] Blocked @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:17801
+[   17755ms] [TIMESTAMP] Blocked @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:17801
+[   17766ms] [TIMESTAMP] Blocked @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:17801
+[   17834ms] [TIMESTAMP] Blocked @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:17801
+[   17835ms] [TIMESTAMP] Errored @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4630
+[   17836ms] [TIMESTAMP] Blocking Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18271
+[   17836ms] [TIMESTAMP] Transition Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18279
+[   17836ms] [TIMESTAMP] Suspense Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18287
+[   17837ms] [TIMESTAMP] Idle Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18295
+[   17880ms] [ERROR] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:57
+[   17933ms] [TIMESTAMP] Errored @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4630
+[   17973ms] [TIMESTAMP] Commit @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4724
+[   18017ms] Error: Element type is invalid. Received a promise that resolves to: undefined. Lazy element type must resolve to a class or function.
+    at beginWork (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:12104:19)
+    at runWithFiberInDEV (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:990:13)
+    at performUnitOfWork (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18989:22)
+    at workLoopSync (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18817:58)
+    at renderRootSync (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18798:11)
+    at performWorkOnRoot (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:17903:35)
+    at performWorkOnRootViaSchedulerTask (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:20472:24)
+    at performWorkUntilDeadline (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/scheduler/cjs/scheduler.development.js:45:56)
+    at EventHandlerNonNull* (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/scheduler/cjs/scheduler.development.js:223:7)
+    at  (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/scheduler/cjs/scheduler.development.js:364:5)
+    at (app-pages-browser)/./node_modules/next/dist/compiled/scheduler/cjs/scheduler.development.js (http://localhost:3000/_next/static/chunks/main-app.js?v=1785511233753:1324:1)
+    at options.factory (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:708:31)
+    at __webpack_require__ (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:29:33)
+    at fn (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:361:21)
+    at  (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/scheduler/index.js:4:20)
+    at (app-pages-browser)/./node_modules/next/dist/compiled/scheduler/index.js (http://localhost:3000/_next/static/chunks/main-app.js?v=1785511233753:1335:1)
+    at options.factory (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:708:31)
+    at __webpack_require__ (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:29:33)
+    at fn (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:361:21)
+    at  (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:26424:40)
+    at  (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:30808:5)
+    at (app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js (http://localhost:3000/_next/static/chunks/main-app.js?v=1785511233753:1182:1)
+    at options.factory (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:708:31)
+    at __webpack_require__ (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:29:33)
+    at fn (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:361:21)
+    at  (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/client.js:32:20)
+    at (app-pages-browser)/./node_modules/next/dist/compiled/react-dom/client.js (http://localhost:3000/_next/static/chunks/main-app.js?v=1785511233753:1204:1)
+    at options.factory (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:708:31)
+    at __webpack_require__ (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:29:33)
+    at fn (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:361:21)
+    at  (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/app-index.js:14:58)
+    at (app-pages-browser)/./node_modules/next/dist/client/app-index.js (http://localhost:3000/_next/static/chunks/main-app.js?v=1785511233753:116:1)
+    at options.factory (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:708:31)
+    at __webpack_require__ (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:29:33)
+    at fn (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:361:21)
+    at  (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/app-next-dev.js:15:44)
+    at appBootstrap/< (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/app-bootstrap.js:60:16)
+    at loadScriptsInSequence (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/app-bootstrap.js:25:16)
+    at appBootstrap (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/app-bootstrap.js:54:26)
+    at  (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/app-next-dev.js:13:32)
+    at (app-pages-browser)/./node_modules/next/dist/client/app-next-dev.js (http://localhost:3000/_next/static/chunks/main-app.js?v=1785511233753:138:1)
+    at options.factory (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:708:31)
+    at __webpack_require__ (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:29:33)
+    at __webpack_exec__ (http://localhost:3000/_next/static/chunks/main-app.js?v=1785511233753:1956:67)
+    at  (http://localhost:3000/_next/static/chunks/main-app.js?v=1785511233753:1957:154)
+    at webpackJsonpCallback (http://localhost:3000/_next/static/chunks/webpack.js?v=1785511233753:1395:46)
+    at  (http://localhost:3000/_next/static/chunks/main-app.js?v=1785511233753:9:61)
+[   18019ms] [TIMESTAMP] Waiting for Paint @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:19929
+[   18021ms] [TIMESTAMP] Root @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18022ms] [TIMESTAMP] ServerRoot @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18026ms] [TIMESTAMP] AppRouter @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18026ms] [TIMESTAMP] RootErrorBoundary @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18026ms] [TIMESTAMP] ErrorBoundary @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18029ms] [TIMESTAMP] ErrorBoundaryHandler @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18030ms] [TIMESTAMP] Router @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18030ms] [TIMESTAMP] HistoryUpdater @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18031ms] [TIMESTAMP] HistoryUpdater @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4554
+[   18032ms] [TIMESTAMP] RuntimeStylesForWebpack @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18032ms] [TIMESTAMP] HotReload @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18033ms] [TIMESTAMP] ErroredHtml @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18034ms] [TIMESTAMP] ErrorBoundary @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18035ms] [TIMESTAMP] ErrorBoundaryHandler @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18035ms] [TIMESTAMP] SegmentViewNode @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18035ms] [TIMESTAMP] SegmentTrieNode @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18035ms] [TIMESTAMP] DefaultGlobalError @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18036ms] [TIMESTAMP] WarningIcon @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4426
+[   18038ms] [TIMESTAMP] Router @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4554
+[   18089ms] [TIMESTAMP] HotReload @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4554
+[   18091ms] [TIMESTAMP] Remaining Effects @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:19980
+[   18132ms] [TIMESTAMP] Blocking Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18271
+[   18132ms] [TIMESTAMP] Transition Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18279
+[   18132ms] [TIMESTAMP] Suspense Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18287
+[   18132ms] [TIMESTAMP] Idle Track @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:18295
+[   18133ms] [TIMESTAMP] Render @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:19292
+[   18133ms] [TIMESTAMP] Commit @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:4724

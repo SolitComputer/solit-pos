@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import * as faceapi from "face-api.js";
-import { startRegistration, startAuthentication, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from "@simplewebauthn/browser";
-
+import { startAuthentication, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from "@simplewebauthn/browser";
 type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
   | "enrolling" | "verifying" | "success" | "error"
@@ -577,25 +576,29 @@ export default function FaceVerifyPage() {
   }, [redirectTo, gpsCoords]);
 
   const handleBiometricAttendance = useCallback(async () => {
+    if (!biometricEnrolled) {
+      // ✅ FIX: dulu di sini langsung register-options → startRegistration →
+      // register-verify → lanjut auth-options → startAuthentication →
+      // auth-verify dalam 1 klik. Itu 2 ceremony WebAuthn numpuk — kalau
+      // ceremony pertama (daftar) makan waktu agak lama, challenge buat
+      // ceremony kedua (absen) keburu kedaluwarsa. Pendaftaran sukses tapi
+      // absennya gagal. Sekarang daftar dipisah ke halaman sendiri.
+      window.location.href = "/biometric-enroll?from=/face-verify";
+      return;
+    }
     setBioBusy(true); setBioError(null);
     try {
-      if (!biometricEnrolled) {
-        const optRes = await fetch("/api/auth/webauthn/register-options", { method: "POST" });
-        const optData = await optRes.json();
-        if (!optData.success) { setBioError(optData.message ?? "Gagal memulai pendaftaran"); return; }
-        const attResp = await startRegistration({ optionsJSON: optData.options });
-        const verifyRes = await fetch("/api/auth/webauthn/register-verify", {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(attResp),
-        });
-        const verifyData = await verifyRes.json();
-        if (!verifyData.success) { setBioError(verifyData.message ?? "Gagal mendaftarkan sidik jari"); return; }
-        setBiometricEnrolled(true);
-        addLog("sidik jari berhasil didaftarkan di device ini", "ok");
-      }
-
       const optRes2 = await fetch("/api/auth/webauthn/auth-options", { method: "POST" });
       const optData2 = await optRes2.json();
-      if (!optData2.success) { setBioError(optData2.message ?? "Gagal memulai autentikasi"); return; }
+      if (!optData2.success) {
+        if (optData2.needEnroll) {
+          setBiometricEnrolled(false);
+          setBioError("Sidik jari belum terdaftar di device ini. Silakan daftar dulu.");
+        } else {
+          setBioError(optData2.message ?? "Gagal memulai autentikasi");
+        }
+        return;
+      }
 
       const assertion = await startAuthentication({ optionsJSON: optData2.options });
 
@@ -627,7 +630,7 @@ export default function FaceVerifyPage() {
     } finally {
       setBioBusy(false);
     }
-  }, [biometricEnrolled, gpsCoords, scheduleInfo, redirectTo, addLog]);
+  }, [biometricEnrolled, gpsCoords, scheduleInfo, redirectTo]);
 
   const renderBiometricOption = () => {
     if (!biometricEligible) return null;
@@ -651,7 +654,7 @@ export default function FaceVerifyPage() {
               Memproses sidik jari...
             </span>
           ) : supported ? (
-            biometricEnrolled ? "Absen dengan Sidik Jari" : "Daftar & Absen Sidik Jari"
+            biometricEnrolled ? "Absen dengan Sidik Jari" : "Daftarkan Sidik Jari Dulu →"
           ) : (
             "Sidik Jari (device tidak mendukung)"
           )}
