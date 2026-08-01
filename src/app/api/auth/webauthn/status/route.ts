@@ -28,12 +28,14 @@ export async function GET() {
         .order("created_at", { ascending: false }),
     ]);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       biometricEligible: Boolean(userRow?.biometric_enabled),
       biometricEnrolled: (creds ?? []).length > 0,
       devices: creds ?? [],
     });
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    return response;
   } catch (err) {
     console.error("[webauthn status]", err);
     return NextResponse.json({ success: false, message: "Gagal memuat status sidik jari" }, { status: 500 });
