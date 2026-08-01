@@ -1026,14 +1026,31 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (!user?.id) return;
-    fetch("/api/auth/webauthn/status")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success) {
-          setNeedsBiometricEnroll(Boolean(d.biometricEligible) && !d.biometricEnrolled);
-        }
-      })
-      .catch(() => { });
+
+    const fetchBiometricStatus = () => {
+      fetch("/api/auth/webauthn/status", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success) {
+            setNeedsBiometricEnroll(Boolean(d.biometricEligible) && !d.biometricEnrolled);
+          } else {
+            console.error("[sidebar] webauthn status gagal:", d);
+          }
+        })
+        .catch((err) => console.error("[sidebar] webauthn status fetch error:", err));
+    };
+
+    fetchBiometricStatus();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") fetchBiometricStatus();
+    };
+    window.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", fetchBiometricStatus);
+    return () => {
+      window.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", fetchBiometricStatus);
+    };
   }, [user?.id]);
 
   const [rail, setRail] = useState(false);
