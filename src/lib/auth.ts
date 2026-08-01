@@ -174,11 +174,13 @@ export const SHIFT_CONFIG = {
     start: { h: 7, m: 30 },
     lateFrom: { h: 8, m: 0 },
     end: { h: 12, m: 0 },
+    checkout: { h: 17, m: 0 }, // ✅ NEW — jam pulang, dasar hitung lembur "sesudah pulang"
   },
   SORE: {
     start: { h: 14, m: 0 },
     lateFrom: { h: 16, m: 0 },
     end: { h: 18, m: 0 },
+    checkout: { h: 21, m: 0 }, // ✅ NEW — asumsi saya, koreksi lewat Atur Shift kalau beda
   },
 } as const;
 
@@ -186,6 +188,8 @@ export interface DaySchedule {
   start: { h: number; m: number };
   lateFrom: { h: number; m: number };
   end: { h: number; m: number };
+  /** Jam pulang terjadwal — dipakai untuk deteksi lembur "sesudah pulang" (BARU) */
+  checkout: { h: number; m: number };
   source: "custom" | "shift" | "user_config";
 }
 
@@ -198,21 +202,27 @@ export function resolveSchedule(
     start_hour: number; start_minute: number;
     late_hour: number; late_minute: number;
     end_hour: number; end_minute: number;
+    checkout_hour?: number | null; checkout_minute?: number | null; // ✅ NEW
   } | null
 ): DaySchedule {
+  const cfg = SHIFT_CONFIG[shift];
   if (customSchedule) {
     return {
       start: { h: customSchedule.start_hour, m: customSchedule.start_minute },
       lateFrom: { h: customSchedule.late_hour, m: customSchedule.late_minute },
       end: { h: customSchedule.end_hour, m: customSchedule.end_minute },
+      // ✅ NEW — fallback ke default shift kalau checkout belum diisi admin
+      checkout: customSchedule.checkout_hour != null
+        ? { h: customSchedule.checkout_hour, m: customSchedule.checkout_minute ?? 0 }
+        : cfg.checkout,
       source: "custom",
     };
   }
-  const cfg = SHIFT_CONFIG[shift];
   return {
     start: cfg.start,
     lateFrom: cfg.lateFrom,
     end: cfg.end,
+    checkout: cfg.checkout, // ✅ NEW
     source: "shift",
   };
 }
@@ -227,7 +237,7 @@ export async function resolveShiftConfigFromDB(
   const todayDow = nowWIB.getUTCDay();
   const todayDate = nowWIB.toISOString().slice(0, 10);
 
-  const [
+ const [
     { data: userData },
     { data: dateSchedule },
     { data: weeklySchedule },
@@ -235,23 +245,27 @@ export async function resolveShiftConfigFromDB(
   ] = await Promise.all([
     supabaseAdmin.from("users").select("shift").eq("id", userId).single(),
     supabaseAdmin.from("user_date_schedule")
-      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
+      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute,checkout_hour,checkout_minute")
       .eq("user_id", userId).eq("schedule_date", todayDate).maybeSingle(),
     supabaseAdmin.from("user_schedule")
-      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute")
+      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute,checkout_hour,checkout_minute")
       .eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
     supabaseAdmin.from("user_shift_config")
-      .select("open_hour,open_minute,late_hour,late_minute,close_hour,close_minute,shift")
+      .select("open_hour,open_minute,late_hour,late_minute,close_hour,close_minute,checkout_hour,checkout_minute,shift")
       .eq("user_id", userId).maybeSingle(),
   ]);
 
   const shift: ShiftType = (userData?.shift as ShiftType) ?? "PAGI";
+  const defaultCheckout = SHIFT_CONFIG[shift].checkout;
 
   if (dateSchedule) {
     return {
       start: { h: dateSchedule.start_hour, m: dateSchedule.start_minute },
       lateFrom: { h: dateSchedule.late_hour, m: dateSchedule.late_minute },
       end: { h: dateSchedule.end_hour, m: dateSchedule.end_minute },
+      checkout: dateSchedule.checkout_hour != null
+        ? { h: dateSchedule.checkout_hour, m: dateSchedule.checkout_minute ?? 0 }
+        : defaultCheckout, // ✅ NEW
       source: "custom",
     };
   }
@@ -261,6 +275,9 @@ export async function resolveShiftConfigFromDB(
       start: { h: weeklySchedule.start_hour, m: weeklySchedule.start_minute },
       lateFrom: { h: weeklySchedule.late_hour, m: weeklySchedule.late_minute },
       end: { h: weeklySchedule.end_hour, m: weeklySchedule.end_minute },
+      checkout: weeklySchedule.checkout_hour != null
+        ? { h: weeklySchedule.checkout_hour, m: weeklySchedule.checkout_minute ?? 0 }
+        : defaultCheckout, // ✅ NEW
       source: "custom",
     };
   }
@@ -270,6 +287,9 @@ export async function resolveShiftConfigFromDB(
       start: { h: shiftConfig.open_hour, m: shiftConfig.open_minute },
       lateFrom: { h: shiftConfig.late_hour, m: shiftConfig.late_minute },
       end: { h: shiftConfig.close_hour, m: shiftConfig.close_minute },
+      checkout: shiftConfig.checkout_hour != null
+        ? { h: shiftConfig.checkout_hour, m: shiftConfig.checkout_minute ?? 0 }
+        : defaultCheckout, // ✅ NEW
       source: "user_config",
     };
   }
@@ -279,6 +299,7 @@ export async function resolveShiftConfigFromDB(
     start: cfg.start,
     lateFrom: cfg.lateFrom,
     end: cfg.end,
+    checkout: cfg.checkout, // ✅ NEW
     source: "shift",
   };
 }
@@ -297,7 +318,7 @@ export function isAttendanceTime(shift: "PAGI" | "SORE" = "PAGI"): boolean {
 // ── isAttendanceTimeForSchedule ───────────────────────────────────────────────
 export function isAttendanceTimeForSchedule(schedule: DaySchedule): {
   allowed: boolean;
-  reason: "TOO_EARLY" | "TOO_LATE" | "OPEN";
+  reason: "EARLY_OVERTIME" | "TOO_LATE" | "OPEN";
   openAt: string;
   closeAt: string;
 } {
@@ -310,8 +331,12 @@ export function isAttendanceTimeForSchedule(schedule: DaySchedule): {
   const openAt = `${pad(schedule.start.h)}:${pad(schedule.start.m)} WIB`;
   const closeAt = `${pad(schedule.end.h)}:${pad(schedule.end.m)} WIB`;
 
-  if (total < start) return { allowed: false, reason: "TOO_EARLY", openAt, closeAt };
+  // ✅ FIX (poin 2): tidak ada lagi batas "terlalu pagi" untuk absen MASUK.
+  // Absen sebelum jam mulai TETAP diizinkan, selisihnya jadi lembur otomatis
+  // (lihat lib/attendanceVerification.ts). Batas TOO_LATE (jam terakhir
+  // absen masuk) tetap berlaku seperti sebelumnya.
   if (total > end) return { allowed: false, reason: "TOO_LATE", openAt, closeAt };
+  if (total < start) return { allowed: true, reason: "EARLY_OVERTIME", openAt, closeAt };
   return { allowed: true, reason: "OPEN", openAt, closeAt };
 }
 
@@ -331,7 +356,12 @@ export function calcAttendanceWeightFromSchedule(
   const late = schedule.lateFrom.h * 60 + schedule.lateFrom.m;
   const end = schedule.end.h * 60 + schedule.end.m;
 
-  if (total < start || total > end) return { weight: 0, status: "DI_LUAR" };
+  // ✅ FIX: absen SEBELUM jam masuk sekarang dianggap TEPAT WAKTU (bukan DI_LUAR).
+  // Bagian sebelum jam masuk itu ditangani terpisah sebagai LEMBUR
+  // (lihat lib/overtimeEngine.ts computeBeforeInOvertimeMinutes), bukan
+  // sebagai alasan absensinya sendiri dianggap tidak sah.
+  if (total > end) return { weight: 0, status: "DI_LUAR" };
+  if (total < start) return { weight: 1, status: "TEPAT" };
   if (total >= late) return { weight: 0.5, status: "TERLAMBAT" };
   return { weight: 1, status: "TEPAT" };
 }
@@ -342,7 +372,7 @@ export function calcAttendanceWeight(
 ): { weight: 1 | 0.5 | 0; status: "TEPAT" | "TERLAMBAT" | "DI_LUAR" } {
   const cfg = SHIFT_CONFIG[shift];
   return calcAttendanceWeightFromSchedule(checkInISO, {
-    start: cfg.start, lateFrom: cfg.lateFrom, end: cfg.end, source: "shift",
+    start: cfg.start, lateFrom: cfg.lateFrom, end: cfg.end, checkout: cfg.checkout, source: "shift", // ✅ FIX: checkout wajib ada
   });
 }
 
