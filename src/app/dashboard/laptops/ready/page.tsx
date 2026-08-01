@@ -14,6 +14,7 @@ interface LaptopUnit {
     grade: "A" | "B" | "C";
     condition_note: string;
     purchase_price: number;
+    official_price?: number;
     selling_price: number;
     status: string;
     notes: string;
@@ -254,14 +255,137 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
-        </span>
+       </span>
+    );
+}
+
+// ─── Export helpers ───────────────────────────────────────────────────────────
+// Dipakai oleh 3 tombol export: SN (per-unit), Qty Setor, dan Qty Official.
+// Diletakkan di luar komponen (module scope) karena tidak butuh state apapun.
+type ExportColDef = {
+    header: string;
+    width: number;
+    align: "left" | "center" | "right";
+    numFmt?: string;
+};
+
+async function buildAndDownloadExcel(opts: {
+    sheetName: string;
+    tableName: string;
+    fileSuffix: string;
+    colDefs: ExportColDef[];
+    rows: (string | number)[][];
+}) {
+    const { default: ExcelJS } = await import("exceljs");
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "Solit POS";
+    wb.created = new Date();
+
+    const ws = wb.addWorksheet(opts.sheetName, {
+        pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
+    });
+
+    ws.addTable({
+        name: opts.tableName,
+        ref: "A1",
+        headerRow: true,
+        totalsRow: false,
+        style: { theme: "TableStyleMedium7", showRowStripes: true },
+        columns: opts.colDefs.map((c) => ({ name: c.header, filterButton: true })),
+        rows: opts.rows,
+    });
+
+    opts.colDefs.forEach((col, colIdx) => {
+        ws.getColumn(colIdx + 1).width = col.width;
+    });
+
+    ws.eachRow((row, rowNumber) => {
+        row.height = rowNumber === 1 ? 28 : 22;
+        row.eachCell((cell, colNumber) => {
+            const colDef = opts.colDefs[colNumber - 1];
+            if (rowNumber > 1 && colDef) {
+                cell.alignment = { vertical: "middle", horizontal: colDef.align };
+                if (colDef.numFmt) cell.numFmt = colDef.numFmt;
+            }
+        });
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    a.download = `${opts.fileSuffix}_${dateStr}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Kelompokkan unit per model laptop (laptop_id) — dipakai oleh 2 export Qty.
+// Harga per model = rata-rata harga unit yang > 0 (unit dengan harga
+// 0/kosong tidak ikut menggeser rata-rata).
+function groupUnitsByLaptop(list: LaptopUnit[], priceField: "purchase_price" | "official_price") {
+    const map = new Map<string, {
+        laptop_name: string; brand: string; cpu: string; ram: string; storage: string;
+        qty: number; priceSum: number; priceCount: number;
+    }>();
+    list.forEach(u => {
+        const key = u.laptop_id || u.laptop?.laptop_name || "unknown";
+        const price = Number(u[priceField]) || 0;
+        const row = map.get(key);
+        if (row) {
+            row.qty += 1;
+            if (price > 0) { row.priceSum += price; row.priceCount += 1; }
+        } else {
+            map.set(key, {
+                laptop_name: u.laptop?.laptop_name ?? "—",
+                brand: u.laptop?.brand ?? "—",
+                cpu: u.laptop?.cpu ?? "—",
+                ram: u.laptop?.ram ?? "—",
+                storage: u.laptop?.storage ?? "—",
+                qty: 1,
+                priceSum: price > 0 ? price : 0,
+                priceCount: price > 0 ? 1 : 0,
+            });
+        }
+    });
+    return Array.from(map.values());
+}
+
+// Tombol export kecil — dipakai 3x dengan label, warna, dan handler berbeda.
+function ExportButton({ label, colorClass, loading, disabled, noData, onClick }: {
+    label: string; colorClass: string; loading: boolean; disabled: boolean; noData: boolean; onClick: () => void;
+}) {
+    return (
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            title={noData ? "Tidak ada data untuk di-export" : label}
+            className={`flex items-center gap-1.5 text-xs font-semibold h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-xl border transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed ${colorClass}`}
+        >
+            {loading ? (
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            ) : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+            )}
+            <span className="hidden sm:inline">{loading ? "Mengexport..." : label}</span>
+        </button>
     );
 }
 
 function ReadyContent() {
     const [units, setUnits] = useState<LaptopUnit[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isExporting, setIsExporting] = useState(false);
+    const [exportingType, setExportingType] = useState<"sn" | "setor" | "official" | null>(null);
     const [userRole, setUserRole] = useState<UserRole | null>(null);
 
     // ── Filter ────────────────────────────────────────────────────────────────
@@ -425,35 +549,26 @@ const fetchUnits = async () => {
 
     const totalSelling = useMemo(() => filtered.reduce((sum, u) => sum + (u.selling_price || 0), 0), [filtered]);
 
-    // ── Export Excel ──────────────────────────────────────────────────────────
-    const exportToExcel = async () => {
+    // ── Export SN — daftar per-unit lengkap dengan serial number ───────────────
+    const exportSN = async () => {
         if (filtered.length === 0) return;
-        setIsExporting(true);
+        setExportingType("sn");
         try {
-            const { default: ExcelJS } = await import("exceljs");
-            const wb = new ExcelJS.Workbook();
-            wb.creator = "Solit POS";
-            wb.created = new Date();
-
-            const ws = wb.addWorksheet("Laptop Siap Jual", {
-                pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
-            });
-
-            const colDefs = [
-                { header: "No", width: 6, align: "center" as const },
-                { header: "Nama Laptop", width: 36, align: "left" as const },
-                { header: "Brand", width: 14, align: "left" as const },
-                { header: "CPU", width: 22, align: "left" as const },
-                { header: "Display", width: 20, align: "left" as const },
-                { header: "Serial Number", width: 24, align: "center" as const },
-                { header: "Grade", width: 12, align: "center" as const },
-                { header: "Harga Jual", width: 18, align: "right" as const, numFmt: '"Rp "#,##0' },
-                { header: "Status", width: 16, align: "center" as const },
-                { header: "Kondisi", width: 26, align: "left" as const },
-                { header: "Catatan", width: 30, align: "left" as const },
+            const colDefs: ExportColDef[] = [
+                { header: "No", width: 6, align: "center" },
+                { header: "Nama Laptop", width: 36, align: "left" },
+                { header: "Brand", width: 14, align: "left" },
+                { header: "CPU", width: 22, align: "left" },
+                { header: "Display", width: 20, align: "left" },
+                { header: "Serial Number", width: 24, align: "center" },
+                { header: "Grade", width: 12, align: "center" },
+                { header: "Harga Jual", width: 18, align: "right", numFmt: '"Rp "#,##0' },
+                { header: "Status", width: 16, align: "center" },
+                { header: "Kondisi", width: 26, align: "left" },
+                { header: "Catatan", width: 30, align: "left" },
             ];
 
-            const tableRows = filtered.map((u, idx) => [
+            const rows = filtered.map((u, idx) => [
                 idx + 1,
                 u.laptop?.laptop_name ?? "—",
                 u.laptop?.brand ?? "—",
@@ -467,50 +582,95 @@ const fetchUnits = async () => {
                 u.notes ?? "—",
             ]);
 
-            ws.addTable({
-                name: "TabelSiapJual",
-                ref: "A1",
-                headerRow: true,
-                totalsRow: false,
-                style: { theme: "TableStyleMedium7", showRowStripes: true },
-                columns: colDefs.map((c) => ({ name: c.header, filterButton: true })),
-                rows: tableRows,
+            await buildAndDownloadExcel({
+                sheetName: "Laptop Siap Jual - SN",
+                tableName: "TabelSiapJualSN",
+                fileSuffix: "SiapJual_SN",
+                colDefs,
+                rows,
             });
-
-            colDefs.forEach((col, colIdx) => {
-                ws.getColumn(colIdx + 1).width = col.width;
-            });
-
-            ws.eachRow((row, rowNumber) => {
-                row.height = rowNumber === 1 ? 28 : 22;
-                row.eachCell((cell, colNumber) => {
-                    const colDef = colDefs[colNumber - 1];
-                    if (rowNumber > 1 && colDef) {
-                        cell.alignment = { vertical: "middle", horizontal: colDef.align };
-                        if (colDef.numFmt) cell.numFmt = colDef.numFmt;
-                    }
-                });
-            });
-
-            const buffer = await wb.xlsx.writeBuffer();
-            const blob = new Blob([buffer], {
-                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            const now = new Date();
-            const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-            a.download = `SiapJual_${dateStr}.xlsx`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
         } catch (err) {
-            console.error("Export Excel gagal:", err);
+            console.error("Export SN gagal:", err);
             setAlertMsg("Gagal export Excel. Coba lagi.");
         } finally {
-            setIsExporting(false);
+            setExportingType(null);
+        }
+    };
+
+    // ── Export Qty Setor — direkap per model laptop, harga pakai Harga Setor ───
+    // (kalau harga per unit beda-beda, dipakai rata-ratanya)
+    const exportQtySetor = async () => {
+        if (filtered.length === 0) return;
+        setExportingType("setor");
+        try {
+            const groups = groupUnitsByLaptop(filtered, "purchase_price");
+            const colDefs: ExportColDef[] = [
+                { header: "No", width: 6, align: "center" },
+                { header: "Nama Laptop", width: 36, align: "left" },
+                { header: "Brand", width: 14, align: "left" },
+                { header: "CPU", width: 22, align: "left" },
+                { header: "RAM", width: 10, align: "center" },
+                { header: "Storage", width: 16, align: "center" },
+                { header: "Qty", width: 8, align: "center" },
+                { header: "Harga Setor", width: 18, align: "right", numFmt: '"Rp "#,##0' },
+                { header: "Total Setor", width: 20, align: "right", numFmt: '"Rp "#,##0' },
+            ];
+
+            const rows = groups.map((g, idx) => {
+                const avgPrice = g.priceCount > 0 ? Math.round(g.priceSum / g.priceCount) : 0;
+                return [idx + 1, g.laptop_name, g.brand, g.cpu, g.ram, g.storage, g.qty, avgPrice, avgPrice * g.qty];
+            });
+
+            await buildAndDownloadExcel({
+                sheetName: "Qty - Harga Setor",
+                tableName: "TabelQtySetor",
+                fileSuffix: "SiapJual_QtySetor",
+                colDefs,
+                rows,
+            });
+        } catch (err) {
+            console.error("Export Qty Setor gagal:", err);
+            setAlertMsg("Gagal export Excel. Coba lagi.");
+        } finally {
+            setExportingType(null);
+        }
+    };
+
+    // ── Export Qty Official — direkap per model laptop, harga pakai Harga Official ──
+    const exportQtyOfficial = async () => {
+        if (filtered.length === 0) return;
+        setExportingType("official");
+        try {
+            const groups = groupUnitsByLaptop(filtered, "official_price");
+            const colDefs: ExportColDef[] = [
+                { header: "No", width: 6, align: "center" },
+                { header: "Nama Laptop", width: 36, align: "left" },
+                { header: "Brand", width: 14, align: "left" },
+                { header: "CPU", width: 22, align: "left" },
+                { header: "RAM", width: 10, align: "center" },
+                { header: "Storage", width: 16, align: "center" },
+                { header: "Qty", width: 8, align: "center" },
+                { header: "Harga Official", width: 18, align: "right", numFmt: '"Rp "#,##0' },
+                { header: "Total Official", width: 20, align: "right", numFmt: '"Rp "#,##0' },
+            ];
+
+            const rows = groups.map((g, idx) => {
+                const avgPrice = g.priceCount > 0 ? Math.round(g.priceSum / g.priceCount) : 0;
+                return [idx + 1, g.laptop_name, g.brand, g.cpu, g.ram, g.storage, g.qty, avgPrice, avgPrice * g.qty];
+            });
+
+            await buildAndDownloadExcel({
+                sheetName: "Qty - Harga Official",
+                tableName: "TabelQtyOfficial",
+                fileSuffix: "SiapJual_QtyOfficial",
+                colDefs,
+                rows,
+            });
+        } catch (err) {
+            console.error("Export Qty Official gagal:", err);
+            setAlertMsg("Gagal export Excel. Coba lagi.");
+        } finally {
+            setExportingType(null);
         }
     };
 
@@ -609,24 +769,31 @@ const fetchUnits = async () => {
 
                         {/* Kanan: tombol aksi */}
                         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                            {/* Export: teks hanya tampil di ≥ sm */}
-                            <button
-                                onClick={exportToExcel}
-                                disabled={isExporting || filtered.length === 0}
-                                title={filtered.length === 0 ? "Tidak ada data untuk di-export" : `Export ${filtered.length} unit ke Excel`}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-900 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                {isExporting ? (
-                                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                ) : (
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                    </svg>
-                                )}
-                                <span className="hidden sm:inline">{isExporting ? "Mengexport..." : "Export Excel"}</span>
-                            </button>
+                            {/* 3 tombol export: SN (per-unit), Qty Setor, Qty Official */}
+                            <ExportButton
+                                label="Export SN"
+                                colorClass="text-emerald-700 hover:text-emerald-900 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
+                                loading={exportingType === "sn"}
+                                disabled={exportingType !== null || filtered.length === 0}
+                                noData={filtered.length === 0}
+                                onClick={exportSN}
+                            />
+                            <ExportButton
+                                label="Export Qty Setor"
+                                colorClass="text-amber-700 hover:text-amber-900 border-amber-200 bg-amber-50 hover:bg-amber-100"
+                                loading={exportingType === "setor"}
+                                disabled={exportingType !== null || filtered.length === 0}
+                                noData={filtered.length === 0}
+                                onClick={exportQtySetor}
+                            />
+                            <ExportButton
+                                label="Export Qty Official"
+                                colorClass="text-blue-700 hover:text-blue-900 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                                loading={exportingType === "official"}
+                                disabled={exportingType !== null || filtered.length === 0}
+                                noData={filtered.length === 0}
+                                onClick={exportQtyOfficial}
+                            />
 
                             {/* Refresh: teks hanya tampil di ≥ sm */}
                             <button

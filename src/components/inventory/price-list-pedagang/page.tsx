@@ -52,10 +52,123 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
   PACKING: { badge: "bg-sky-50 text-sky-700 border-sky-200", dot: "bg-sky-500", label: "Packing" },
 };
 
+// ─── Export helpers (module scope) ─────────────────────────────────────────
+// Dipakai oleh 2 tombol export: Full SN (per-unit) & Qty (direkap per model).
+// PENTING: kedua export ini TIDAK PERNAH menyertakan Harga Modal / tier
+// markup — file ini dipegang pedagang, apapun role yang export.
+const PRICELIST_COLOR = {
+  headerBg: "FF374151",
+  headerFg: "FFFFFFFF",
+  rowEven: "FFF8FAFC",
+  rowOdd: "FFFFFFFF",
+  borderColor: "FFE2E8F0",
+  subTextFg: "FF64748B",
+};
+
+type PricelistColKind = "index" | "title" | "center" | "qty" | "price";
+
+type PricelistColDef = {
+  header: string;
+  key: string;
+  width: number;
+  kind: PricelistColKind;
+};
+
+function styleHeaderCell(cell: ExcelJS.Cell) {
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: PRICELIST_COLOR.headerBg } };
+  cell.font = { bold: true, size: 11, color: { argb: PRICELIST_COLOR.headerFg }, name: "Arial" };
+  cell.border = {
+    top: { style: "thin", color: { argb: PRICELIST_COLOR.borderColor } },
+    left: { style: "thin", color: { argb: PRICELIST_COLOR.borderColor } },
+    bottom: { style: "medium", color: { argb: "FF94A3B8" } },
+    right: { style: "thin", color: { argb: PRICELIST_COLOR.borderColor } },
+  };
+  cell.alignment = { horizontal: "center", vertical: "middle" };
+}
+
+function styleDataCell(cell: ExcelJS.Cell, col: PricelistColDef, rowBg: string) {
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
+  cell.border = {
+    top: { style: "hair", color: { argb: PRICELIST_COLOR.borderColor } },
+    left: { style: "hair", color: { argb: PRICELIST_COLOR.borderColor } },
+    bottom: { style: "hair", color: { argb: PRICELIST_COLOR.borderColor } },
+    right: { style: "hair", color: { argb: PRICELIST_COLOR.borderColor } },
+  };
+  cell.font = { size: 10, name: "Arial" };
+  cell.alignment = { vertical: "middle" };
+
+  switch (col.kind) {
+    case "index":
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.font = { size: 10, name: "Arial", color: { argb: PRICELIST_COLOR.subTextFg } };
+      break;
+    case "title":
+      cell.font = { size: 10, name: "Arial", bold: true };
+      cell.alignment = { horizontal: "left", vertical: "middle" };
+      break;
+    case "center":
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      break;
+    case "qty":
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } };
+      cell.font = { size: 10, name: "Arial", bold: true, color: { argb: "FF15803D" } };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      break;
+    case "price":
+      cell.numFmt = '"Rp "#,##0';
+      cell.font = { size: 10, name: "Arial", bold: true };
+      cell.alignment = { horizontal: "right", vertical: "middle" };
+      break;
+  }
+}
+
+// Bangun & langsung download 1 file Excel — HANYA 1 sheet (sesuai keperluan:
+// 2 tombol export terpisah, masing-masing file isinya cuma 1 tab).
+async function buildPricelistSheet(
+  sheetTitle: string,
+  fileSuffix: string,
+  cols: PricelistColDef[],
+  rows: Record<string, string | number>[],
+) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Solit 03";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet(sheetTitle, {
+    views: [{ state: "frozen", ySplit: 1 }],
+    pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
+  });
+
+  ws.columns = cols.map((c) => ({ header: c.header, key: c.key, width: c.width }));
+  cols.forEach((_, i) => styleHeaderCell(ws.getCell(1, i + 1)));
+  ws.getRow(1).height = 30;
+
+  rows.forEach((rowData, idx) => {
+    const rowBg = idx % 2 === 0 ? PRICELIST_COLOR.rowOdd : PRICELIST_COLOR.rowEven;
+    const row = ws.addRow(rowData);
+    row.height = 22;
+    row.eachCell((cell, colNum) => {
+      const col = cols[colNum - 1];
+      if (col) styleDataCell(cell, col, rowBg);
+    });
+  });
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${fileSuffix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 function PriceListPedagangContent() {
   const [units, setUnits] = useState<PedagangUnit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExporting, setIsExporting] = useState(false);
+  const [exportingType, setExportingType] = useState<"sn" | "qty" | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -142,60 +255,58 @@ function PriceListPedagangContent() {
     setSearch(""); setFilterStatus("ALL"); setFilterGrade("ALL"); setFilterBrand("ALL");
   };
 
-  // ─── Export Excel ─────────────────────────────────────────────────────────
-  // PENTING: file ini akan dipegang pedagang — HARGA MODAL & persen markup
-  // TIDAK PERNAH dimasukkan ke sini, apapun role yang export.
-  const exportToExcel = async () => {
+  // ─── Export Full SN — 1 baris per unit, lengkap dengan Serial Number ──────
+  // PENTING: HARGA MODAL & persen markup TIDAK PERNAH dimasukkan ke sini,
+  // apapun role yang export — file ini dipegang pedagang.
+  const exportFullSN = async () => {
     if (filtered.length === 0) return;
-    setIsExporting(true);
+    setExportingType("sn");
     try {
-      const wb = new ExcelJS.Workbook();
-      wb.creator = "Solit 03";
-      wb.created = new Date();
-
-      const ws = wb.addWorksheet("Laptop Siap Jual", {
-        views: [{ state: "frozen", ySplit: 1 }],
-        pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
-      });
-
-      const COLOR = {
-        headerBg: "FF374151",
-        headerFg: "FFFFFFFF",
-        rowEven: "FFF8FAFC",
-        rowOdd: "FFFFFFFF",
-        borderColor: "FFE2E8F0",
-        subTextFg: "FF64748B",
-      };
-
-      const COLS = [
-        { header: "No", key: "no", width: 6 },
-        { header: "Product", key: "product", width: 36 },
-        { header: "CPU", key: "cpu", width: 22 },
-        { header: "RAM", key: "ram", width: 12 },
-        { header: "HDD/SSD", key: "storage", width: 16 },
-        { header: "Siap Jual", key: "qty", width: 12 },
-        { header: "Price Store", key: "price", width: 20 },
-      ];
-      ws.columns = COLS;
-
-      // Header row styling (row 1)
-      const headerRowNum = 1;
-      COLS.forEach((col, i) => {
-        const cell = ws.getCell(headerRowNum, i + 1);
-        cell.value = col.header;
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
-        cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
-        cell.border = {
-          top: { style: "thin", color: { argb: COLOR.borderColor } },
-          left: { style: "thin", color: { argb: COLOR.borderColor } },
-          bottom: { style: "medium", color: { argb: "FF94A3B8" } },
-          right: { style: "thin", color: { argb: COLOR.borderColor } },
-        };
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-      });
-      ws.getRow(headerRowNum).height = 30;
-
       // Ambil unit yang SIAP_JUAL (jika filter status ALL), atau ikuti filter status yang aktif
+      const unitsToExport = filterStatus === "ALL"
+        ? filtered.filter((u) => u.status === "SIAP_JUAL")
+        : filtered;
+
+      const cols: PricelistColDef[] = [
+        { header: "No", key: "no", width: 6, kind: "index" },
+        { header: "Product", key: "product", width: 36, kind: "title" },
+        { header: "CPU", key: "cpu", width: 22, kind: "center" },
+        { header: "RAM", key: "ram", width: 12, kind: "center" },
+        { header: "HDD/SSD", key: "storage", width: 16, kind: "center" },
+        { header: "Serial Number", key: "sn", width: 22, kind: "center" },
+        { header: "Grade", key: "grade", width: 10, kind: "center" },
+        { header: "Status", key: "status", width: 16, kind: "center" },
+        { header: "Price Store", key: "price", width: 20, kind: "price" },
+      ];
+
+      const rows = [...unitsToExport]
+        .sort((a, b) => (a.laptop?.laptop_name ?? "").localeCompare(b.laptop?.laptop_name ?? "", "id"))
+        .map((u, idx) => ({
+          no: idx + 1,
+          product: u.laptop?.laptop_name || "-",
+          cpu: u.laptop?.cpu || "-",
+          ram: u.laptop?.ram || "-",
+          storage: u.laptop?.storage || "-",
+          sn: u.serial_number || "-",
+          grade: `Grade ${u.grade}`,
+          status: STATUS_STYLE[u.status]?.label ?? u.status,
+          price: u.pedagang_price || 0,
+        }));
+
+      await buildPricelistSheet("Laptop Siap Jual - SN", "pricelist_pedagang_SN", cols, rows);
+    } catch (err) {
+      console.error("Export Full SN gagal:", err);
+    } finally {
+      setExportingType(null);
+    }
+  };
+
+  // ─── Export Qty — direkap per model laptop (product+CPU+RAM+Storage+harga) ──
+  // PENTING: HARGA MODAL & persen markup TIDAK PERNAH dimasukkan ke sini.
+  const exportQty = async () => {
+    if (filtered.length === 0) return;
+    setExportingType("qty");
+    try {
       const unitsToExport = filterStatus === "ALL"
         ? filtered.filter((u) => u.status === "SIAP_JUAL")
         : filtered;
@@ -222,142 +333,23 @@ function PriceListPedagangContent() {
         if (groupedMap.has(key)) {
           groupedMap.get(key)!.qty += 1;
         } else {
-          groupedMap.set(key, {
-            product,
-            cpu,
-            ram,
-            storage,
-            qty: 1,
-            price,
-          });
+          groupedMap.set(key, { product, cpu, ram, storage, qty: 1, price });
         }
       });
 
-      const groupedData = Array.from(groupedMap.values()).sort((a, b) =>
-        a.product.localeCompare(b.product, "id")
-      );
-
-      groupedData.forEach((item, idx) => {
-        const rowBg = idx % 2 === 0 ? COLOR.rowOdd : COLOR.rowEven;
-        const rowData = {
-          no: idx + 1,
-          product: item.product,
-          cpu: item.cpu,
-          ram: item.ram,
-          storage: item.storage,
-          qty: item.qty,
-          price: item.price,
-        };
-
-        const row = ws.addRow(rowData);
-        row.height = 22;
-
-        row.eachCell((cell, colNum) => {
-          const key = ws.getColumn(colNum).key as string;
-
-          // ── Base styling ──────────────────────────────────────────────
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
-          cell.border = {
-            top: { style: "hair", color: { argb: COLOR.borderColor } },
-            left: { style: "hair", color: { argb: COLOR.borderColor } },
-            bottom: { style: "hair", color: { argb: COLOR.borderColor } },
-            right: { style: "hair", color: { argb: COLOR.borderColor } },
-          };
-          cell.font = { size: 10, name: "Arial" };
-          cell.alignment = { vertical: "middle" };
-
-          // ── Per-column overrides ──────────────────────────────────────
-          if (key === "no") {
-            cell.alignment = { horizontal: "center", vertical: "middle" };
-            cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-          } else if (key === "product") {
-            cell.font = { size: 10, name: "Arial", bold: true };
-            cell.alignment = { horizontal: "left", vertical: "middle" };
-          } else if (["cpu", "ram", "storage"].includes(key)) {
-            cell.alignment = { horizontal: "center", vertical: "middle" };
-          } else if (key === "qty") {
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } };
-            cell.font = { size: 10, name: "Arial", bold: true, color: { argb: "FF15803D" } };
-            cell.alignment = { horizontal: "center", vertical: "middle" };
-          } else if (key === "price") {
-            cell.numFmt = '"Rp "#,##0';
-            cell.font = { size: 10, name: "Arial", bold: true };
-            cell.alignment = { horizontal: "right", vertical: "middle" };
-          }
-        });
-      });
-
-      // ─── Sheet 2: Rekap Qty ────────────────────────────────────────────────
-      // Produk dengan nama + CPU + RAM + Storage yang SAMA digabung jadi 1 baris,
-      // harga TIDAK ikut jadi kunci grouping (beda dari sheet 1), cuma qty totalnya.
-      const wsQty = wb.addWorksheet("Rekap Qty", {
-        views: [{ state: "frozen", ySplit: 1 }],
-        pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
-      });
-
-      const QTY_COLS = [
-        { header: "No", key: "no", width: 6 },
-        { header: "Product", key: "product", width: 36 },
-        { header: "CPU", key: "cpu", width: 22 },
-        { header: "RAM", key: "ram", width: 12 },
-        { header: "HDD/SSD", key: "storage", width: 16 },
-        { header: "Qty", key: "qty", width: 12 },
-        { header: "Price Store", key: "price", width: 24 },
+      const cols: PricelistColDef[] = [
+        { header: "No", key: "no", width: 6, kind: "index" },
+        { header: "Product", key: "product", width: 36, kind: "title" },
+        { header: "CPU", key: "cpu", width: 22, kind: "center" },
+        { header: "RAM", key: "ram", width: 12, kind: "center" },
+        { header: "HDD/SSD", key: "storage", width: 16, kind: "center" },
+        { header: "Qty", key: "qty", width: 12, kind: "qty" },
+        { header: "Price Store", key: "price", width: 20, kind: "price" },
       ];
-      wsQty.columns = QTY_COLS;
 
-      QTY_COLS.forEach((col, i) => {
-        const cell = wsQty.getCell(1, i + 1);
-        cell.value = col.header;
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.headerBg } };
-        cell.font = { bold: true, size: 11, color: { argb: COLOR.headerFg }, name: "Arial" };
-        cell.border = {
-          top: { style: "thin", color: { argb: COLOR.borderColor } },
-          left: { style: "thin", color: { argb: COLOR.borderColor } },
-          bottom: { style: "medium", color: { argb: "FF94A3B8" } },
-          right: { style: "thin", color: { argb: COLOR.borderColor } },
-        };
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-      });
-      wsQty.getRow(1).height = 30;
-
-      // Agregasi: product + CPU + RAM + Storage sama -> gabung, harga diabaikan dari key
-      const qtyGroupedMap = new Map<string, {
-        product: string;
-        cpu: string;
-        ram: string;
-        storage: string;
-        qty: number;
-        price: number;
-      }>();
-
-      unitsToExport.forEach((u) => {
-        const product = u.laptop?.laptop_name || "-";
-        const cpu = u.laptop?.cpu || "-";
-        const ram = u.laptop?.ram || "-";
-        const storage = u.laptop?.storage || "-";
-        const price = u.pedagang_price || 0;
-
-        const key = `${product}|${cpu}|${ram}|${storage}`;
-
-        if (qtyGroupedMap.has(key)) {
-          const g = qtyGroupedMap.get(key)!;
-          g.qty += 1;
-          // price TIDAK di-update lagi di sini — sengaja pakai harga unit
-          // pertama yang ketemu di grup ini, tidak digabung/dirata-rata.
-        } else {
-          qtyGroupedMap.set(key, { product, cpu, ram, storage, qty: 1, price });
-        }
-      });
-
-      const qtyData = Array.from(qtyGroupedMap.values()).sort((a, b) =>
-        a.product.localeCompare(b.product, "id")
-      );
-
-      qtyData.forEach((item, idx) => {
-        const rowBg = idx % 2 === 0 ? COLOR.rowOdd : COLOR.rowEven;
-
-        const row = wsQty.addRow({
+      const rows = Array.from(groupedMap.values())
+        .sort((a, b) => a.product.localeCompare(b.product, "id"))
+        .map((item, idx) => ({
           no: idx + 1,
           product: item.product,
           cpu: item.cpu,
@@ -365,56 +357,13 @@ function PriceListPedagangContent() {
           storage: item.storage,
           qty: item.qty,
           price: item.price,
-        });
-        row.height = 22;
+        }));
 
-        row.eachCell((cell, colNum) => {
-          const key = wsQty.getColumn(colNum).key as string;
-
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
-          cell.border = {
-            top: { style: "hair", color: { argb: COLOR.borderColor } },
-            left: { style: "hair", color: { argb: COLOR.borderColor } },
-            bottom: { style: "hair", color: { argb: COLOR.borderColor } },
-            right: { style: "hair", color: { argb: COLOR.borderColor } },
-          };
-          cell.font = { size: 10, name: "Arial" };
-          cell.alignment = { vertical: "middle" };
-
-          if (key === "no") {
-            cell.alignment = { horizontal: "center", vertical: "middle" };
-            cell.font = { size: 10, name: "Arial", color: { argb: COLOR.subTextFg } };
-          } else if (key === "product") {
-            cell.font = { size: 10, name: "Arial", bold: true };
-            cell.alignment = { horizontal: "left", vertical: "middle" };
-          } else if (["cpu", "ram", "storage"].includes(key)) {
-            cell.alignment = { horizontal: "center", vertical: "middle" };
-          } else if (key === "qty") {
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } };
-            cell.font = { size: 10, name: "Arial", bold: true, color: { argb: "FF15803D" } };
-            cell.alignment = { horizontal: "center", vertical: "middle" };
-          } else if (key === "price") {
-            cell.numFmt = '"Rp "#,##0';
-            cell.font = { size: 10, name: "Arial", bold: true };
-            cell.alignment = { horizontal: "right", vertical: "middle" };
-          }
-        });
-      });
-
-      const buffer = await wb.xlsx.writeBuffer();
-      const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `pricelist_pedagang_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      await buildPricelistSheet("Laptop Siap Jual - Qty", "pricelist_pedagang_Qty", cols, rows);
     } catch (err) {
-      console.error("Export pricelist pedagang gagal:", err);
+      console.error("Export Qty gagal:", err);
     } finally {
-      setIsExporting(false);
+      setExportingType(null);
     }
   };
 
@@ -497,10 +446,17 @@ function PriceListPedagangContent() {
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
           </button>
-          <button onClick={exportToExcel} disabled={isExporting || filtered.length === 0}
+          <button onClick={exportFullSN} disabled={exportingType !== null || filtered.length === 0}
+            title={filtered.length === 0 ? "Tidak ada data untuk di-export" : "Export Full SN"}
             className="inline-flex items-center gap-1.5 h-9 px-4 bg-gray-800 rounded-xl text-xs font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-gray-800/25">
             <Download className="w-3.5 h-3.5" />
-            {isExporting ? "Mengexport..." : "Export Excel"}
+            {exportingType === "sn" ? "Mengexport..." : "Export Full SN"}
+          </button>
+          <button onClick={exportQty} disabled={exportingType !== null || filtered.length === 0}
+            title={filtered.length === 0 ? "Tidak ada data untuk di-export" : "Export Qty"}
+            className="inline-flex items-center gap-1.5 h-9 px-4 bg-blue-600 rounded-xl text-xs font-semibold text-white hover:bg-blue-700 active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-blue-600/25">
+            <Download className="w-3.5 h-3.5" />
+            {exportingType === "qty" ? "Mengexport..." : "Export Qty"}
           </button>
         </div>
       </div>
