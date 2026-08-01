@@ -23,6 +23,7 @@ export default function BiometricEnrollPage() {
   const [deviceSupported, setDeviceSupported] = useState<boolean | null>(null);
   const [registering, setRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
@@ -49,11 +50,16 @@ export default function BiometricEnrollPage() {
   }, [eligible]);
 
   const handleRegister = async () => {
-    setRegistering(true); setError(null); setSuccess(null);
+    setRegistering(true); setError(null); setErrorDetail(null); setSuccess(null);
     try {
       const optRes = await fetch("/api/auth/webauthn/register-options", { method: "POST" });
       const optData = await optRes.json();
-      if (!optData.success) { setError(optData.message ?? "Gagal memulai pendaftaran"); return; }
+      if (!optData.success) {
+        console.error("[biometric enroll] register-options failed:", optData);
+        setError(optData.message ?? "Gagal memulai pendaftaran");
+        setErrorDetail(optData.debugReason ?? null);
+        return;
+      }
 
       const attResp = await startRegistration({ optionsJSON: optData.options });
 
@@ -63,7 +69,12 @@ export default function BiometricEnrollPage() {
         body: JSON.stringify(attResp),
       });
       const verifyData = await verifyRes.json();
-      if (!verifyData.success) { setError(verifyData.message ?? "Gagal mendaftarkan sidik jari"); return; }
+      if (!verifyData.success) {
+        console.error("[biometric enroll] register-verify failed:", verifyData);
+        setError(verifyData.message ?? "Gagal mendaftarkan sidik jari");
+        setErrorDetail(verifyData.debugReason ?? null);
+        return;
+      }
 
       setSuccess("Sidik jari berhasil didaftarkan di device ini");
       fetchStatus();
@@ -80,6 +91,8 @@ export default function BiometricEnrollPage() {
       } else {
         setError("Gagal memproses pendaftaran. Pastikan sidik jari sudah diatur di Pengaturan HP, lalu coba lagi.");
       }
+  
+      setErrorDetail(name ? `WebAuthn: ${name}` : null);
       console.error("[biometric enroll] webauthn error:", name, err);
     } finally {
       setRegistering(false);
@@ -142,9 +155,16 @@ export default function BiometricEnrollPage() {
             </div>
 
             <div style={{ background: "#fff", borderRadius: 16, padding: 18, border: "1px solid #f0f0f8" }}>
-              {error && (
-                <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c", marginBottom: 12 }}>
-                  <AlertTriangle className="w-3.5 h-3.5" style={{ flexShrink: 0 }} /> {error}
+            {error && (
+                <div style={{ padding: "10px 12px", borderRadius: 12, background: "#fff1f2", border: "1px solid #fecdd3", marginBottom: 12 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, fontWeight: 600, color: "#be123c" }}>
+                    <AlertTriangle className="w-3.5 h-3.5" style={{ flexShrink: 0 }} /> {error}
+                  </div>
+                  {errorDetail && (
+                    <div style={{ fontSize: 10, color: "#f43f5e", marginTop: 6, fontFamily: "monospace", wordBreak: "break-word", opacity: 0.75 }}>
+                      Detail: {errorDetail}
+                    </div>
+                  )}
                 </div>
               )}
               {success && (

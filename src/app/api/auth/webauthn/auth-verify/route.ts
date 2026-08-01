@@ -147,9 +147,25 @@ export async function POST(request: Request) {
                     transports: storedCred.transports ?? undefined,
                 },
             });
-        } catch (err) {
-            console.error("[webauthn auth-verify] verify error:", err);
-            return NextResponse.json({ success: false, message: "Verifikasi sidik jari gagal" }, { status: 400 });
+        } catch (err: any) {
+            const msg: string = err?.message ?? "";
+            console.error("[webauthn auth-verify] verify error:", err?.name, msg);
+
+            let userMessage = "Verifikasi sidik jari gagal — coba scan ulang.";
+            if (/origin/i.test(msg)) {
+                userMessage = "Domain tidak cocok (origin mismatch). Hubungi programmer.";
+            } else if (/rp ?id/i.test(msg)) {
+                userMessage = "RP ID tidak cocok dengan konfigurasi server. Hubungi programmer.";
+            } else if (/challenge/i.test(msg)) {
+                userMessage = "Sesi absen tidak cocok. Tekan tombol sidik jari sekali lagi.";
+            } else if (/counter/i.test(msg)) {
+                userMessage = "Kredensial sidik jari ini terdeteksi bermasalah (counter tidak valid). Reset sidik jari lalu daftar ulang.";
+            }
+
+            return NextResponse.json(
+                { success: false, message: userMessage, debugReason: msg || err?.name || "unknown_error" },
+                { status: 400 }
+            );
         }
 
         if (!verification.verified) {
