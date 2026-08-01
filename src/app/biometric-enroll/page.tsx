@@ -68,7 +68,19 @@ export default function BiometricEnrollPage() {
       setSuccess("Sidik jari berhasil didaftarkan di device ini");
       fetchStatus();
     } catch (err: any) {
-      setError(err?.name === "NotAllowedError" ? "Dibatalkan atau ditolak oleh device" : "Gagal memproses pendaftaran sidik jari");
+      const name = err?.name;
+      if (name === "NotAllowedError") {
+        setError("Dibatalkan, ditolak, atau waktu habis. Coba lagi.");
+      } else if (name === "InvalidStateError") {
+        setError("Sidik jari sudah pernah didaftarkan di device ini.");
+      } else if (name === "SecurityError") {
+        setError("Domain tidak cocok dengan yang terdaftar. Hubungi programmer.");
+      } else if (name === "NotSupportedError") {
+        setError("Device/browser ini tidak mendukung sidik jari platform.");
+      } else {
+        setError("Gagal memproses pendaftaran. Pastikan sidik jari sudah diatur di Pengaturan HP, lalu coba lagi.");
+      }
+      console.error("[biometric enroll] webauthn error:", name, err);
     } finally {
       setRegistering(false);
     }
