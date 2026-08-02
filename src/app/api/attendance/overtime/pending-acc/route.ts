@@ -35,13 +35,11 @@ export async function GET() {
 
     const isFullAccessUser = userRoles.some((r) => FULL_ACCESS.includes(r));
 
-    let query = supabase
-      .from("overtime_requests")
-      .select("id, user_id, duration_minutes, direction, request_date, category, work_description, users!inner(id,name,role)")
-      .eq("status", "PENDING")
-      .not("category", "is", null) // hanya yang sudah diisi karyawan — siap di-ACC
-      .order("created_at", { ascending: false })
-      .limit(50);
+    // ✅ FIX: sebelumnya filter langsung ke kolom tabel JOIN (`users.role`)
+    // lewat .in() — ini yang paling mungkin jadi sumber 500. Sekarang
+    // resolve ID user dulu secara terpisah, baru filter overtime_requests
+    // pakai user_id biasa (gak nyentuh JOIN buat filter-nya sama sekali).
+    let allowedUserIds: string[] | null = null; // null = full access, semua boleh
 
     if (!isFullAccessUser) {
       const subRoles = new Set<string>();
@@ -49,17 +47,54 @@ export async function GET() {
       if (subRoles.size === 0) {
         return NextResponse.json({ success: true, data: [] });
       }
-      query = query.in("users.role", Array.from(subRoles));
+
+      const { data: subUsers, error: subUsersError } = await supabase
+        .from("users")
+        .select("id")
+        .in("role", Array.from(subRoles));
+
+      if (subUsersError) {
+        console.error("[pending-acc] gagal ambil daftar bawahan:", subUsersError.message);
+        return NextResponse.json(
+          { success: false, message: `Gagal memuat daftar bawahan: ${subUsersError.message}` },
+          { status: 500 }
+        );
+      }
+
+      allowedUserIds = (subUsers ?? []).map((u: any) => u.id);
+      if (allowedUserIds.length === 0) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+    }
+
+let query = supabase
+      .from("overtime_requests")
+      .select("id, user_id, duration_minutes, direction, request_date, category, work_description")
+      .eq("status", "PENDING")
+      .not("category", "is", null) // hanya yang sudah diisi karyawan — siap di-ACC
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (allowedUserIds) {
+      query = query.in("user_id", allowedUserIds);
     }
 
     const { data, error } = await query;
     if (error) {
+      console.error("[pending-acc] query overtime_requests error:", error.message);
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
 
+    const userIds = [...new Set((data ?? []).map((o: any) => o.user_id))];
+    const { data: usersData } = userIds.length > 0
+      ? await supabase.from("users").select("id, name, role").in("id", userIds)
+      : { data: [] };
+    const usersMap: Record<string, any> = {};
+    (usersData ?? []).forEach((u: any) => { usersMap[u.id] = u; });
+
     const result = (data ?? []).map((o: any) => ({
       id: o.id,
-      user_name: o.users?.name ?? "Unknown",
+      user_name: usersMap[o.user_id]?.name ?? "Unknown",
       user_id: o.user_id,
       overtime_minutes: o.duration_minutes ?? 0,
       direction: o.direction,
@@ -69,6 +104,7 @@ export async function GET() {
 
     return NextResponse.json({ success: true, data: result });
   } catch (err: any) {
+    console.error("[pending-acc] exception:", err);
     return NextResponse.json({ success: false, message: err?.message ?? "Server error" }, { status: 500 });
   }
 }
