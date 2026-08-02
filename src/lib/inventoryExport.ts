@@ -12,6 +12,11 @@
 
 import ExcelJS from "exceljs";
 
+// Harga Official selalu dihitung dari Harga Setor + markup ini — SAMA dengan
+// rumus di InventoryTable.tsx (tabel web), supaya export & web selalu sinkron.
+// TIDAK dibaca dari kolom official_price di DB (banyak data lama masih 0).
+const OFFICIAL_PRICE_MARKUP = 300_000;
+
 export interface ExportUnit {
     id: string;
     serial_number: string;
@@ -139,7 +144,7 @@ export async function exportInventoryExcel(opts: {
         pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
     });
 
-   const cols1: Partial<ExcelJS.Column>[] = [
+    const cols1: Partial<ExcelJS.Column>[] = [
         { header: "No", key: "no", width: 5 },
         { header: "Nama Laptop", key: "nama", width: 34 },
         { header: "CPU", key: "cpu", width: 22 },
@@ -169,15 +174,14 @@ export async function exportInventoryExcel(opts: {
         const aktif = (l.laptop_units ?? []).filter(u => u.status !== "SOLD");
         const one = aktif.length === 1 ? aktif[0] : null;
 
-       const modals = aktif.map(u => u.purchase_price ?? 0).filter(n => n > 0);
+        const modals = aktif.map(u => u.purchase_price ?? 0).filter(n => n > 0);
         const minM = modals.length ? Math.min(...modals) : 0;
         const maxM = modals.length ? Math.max(...modals) : 0;
         const sumberSet = new Set(aktif.map(u => u.source).filter(Boolean));
 
-        // Harga Official per-unit — pola sama dgn Harga Modal di atas.
-        const officials = aktif.map(u => u.official_price ?? 0).filter(n => n > 0);
-        const minOf = officials.length ? Math.min(...officials) : 0;
-        const maxOf = officials.length ? Math.max(...officials) : 0;
+        // Harga Official = Harga Setor model + markup tetap — SAMA dengan rumus
+        // di tabel web (InventoryTable.tsx). Selalu satu angka pasti, tidak perlu
+        // agregasi range min–max per unit lagi.
 
         // Gross Profit per-unit = Harga Store - Harga Sparepart - Harga Modal,
         // dihitung per-unit dulu baru diagregasi biar akurat (bukan rata-rata model).
@@ -192,11 +196,7 @@ export async function exportInventoryExcel(opts: {
                 : minM === maxM ? minM
                     : `${minM.toLocaleString("id-ID")} – ${maxM.toLocaleString("id-ID")}`;
 
-        const officialCell: string | number = one
-            ? (one.official_price ?? 0)
-            : officials.length === 0 ? "—"
-                : minOf === maxOf ? minOf
-                    : `${minOf.toLocaleString("id-ID")} – ${maxOf.toLocaleString("id-ID")}`;
+        const officialCell: number = (l.selling_price || 0) + OFFICIAL_PRICE_MARKUP;
 
         const grossProfitCell: string | number = one
             ? ((one.selling_price ?? 0) - (one.sparepart_cost ?? 0) - (one.purchase_price ?? 0))
@@ -204,7 +204,7 @@ export async function exportInventoryExcel(opts: {
                 : minGp === maxGp ? minGp
                     : `${minGp.toLocaleString("id-ID")} – ${maxGp.toLocaleString("id-ID")}`;
 
-      const row = ws1.addRow({
+        const row = ws1.addRow({
             no: idx + 1,
             nama: l.laptop_name || "",
             cpu: l.cpu || "",
@@ -248,7 +248,7 @@ export async function exportInventoryExcel(opts: {
                 cell.alignment = { horizontal: "right", vertical: "middle" };
                 if (typeof cell.value === "number") cell.numFmt = RP;
                 else cell.font = { size: 9, name: "Calibri", italic: true, color: { argb: C.subFg } };
-           } else if (key === "jual") {
+            } else if (key === "jual") {
                 cell.numFmt = RP;
                 cell.alignment = { horizontal: "right", vertical: "middle" };
                 cell.font = { size: 10, name: "Calibri", bold: true, color: { argb: C.moneyFg } };
@@ -295,7 +295,7 @@ export async function exportInventoryExcel(opts: {
     });
 
     // Baris TOTAL
-   const totalGrossProfit = laptops.reduce((sum, l) => {
+    const totalGrossProfit = laptops.reduce((sum, l) => {
         const aktif = (l.laptop_units ?? []).filter(u => u.status !== "SOLD");
         return sum + aktif.reduce((s, u) => s + ((u.selling_price ?? 0) - (u.sparepart_cost ?? 0) - (u.purchase_price ?? 0)), 0);
     }, 0);
@@ -334,7 +334,7 @@ export async function exportInventoryExcel(opts: {
         pageSetup: { fitToPage: true, fitToWidth: 1, orientation: "landscape" },
     });
 
-   const cols2: Partial<ExcelJS.Column>[] = [
+    const cols2: Partial<ExcelJS.Column>[] = [
         { header: "No", key: "no", width: 5 },
         { header: "Nama Laptop", key: "nama", width: 32 },
         { header: "Brand", key: "brand", width: 12 },
@@ -362,14 +362,16 @@ export async function exportInventoryExcel(opts: {
     ws2.views = [{ state: "frozen", ySplit: 4 }];
     ws2.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: cols2.length } };
 
-   let n = 0;
+    let n = 0;
     laptops.forEach(l => {
         (l.laptop_units ?? []).forEach(u => {
             n++;
             const modal = u.purchase_price ?? 0;
             const sparepart = u.sparepart_cost ?? 0;
             const jual = u.selling_price ?? 0;
-            const official = u.official_price ?? 0;
+            // Sama seperti Sheet 1: Harga Official = Harga Setor unit + markup
+            // tetap, bukan field official_price mentah dari DB.
+            const official = jual + OFFICIAL_PRICE_MARKUP;
 
             const row = ws2.addRow({
                 no: n,
@@ -417,7 +419,7 @@ export async function exportInventoryExcel(opts: {
                 } else if (key === "tanggal") {
                     cell.alignment = { horizontal: "center", vertical: "middle" };
                     if (cell.value instanceof Date) cell.numFmt = "dd mmm yyyy";
-              } else if (["modal", "sparepart", "jual", "official"].includes(key)) {
+                } else if (["modal", "sparepart", "jual", "official"].includes(key)) {
                     cell.numFmt = RP;
                     cell.alignment = { horizontal: "right", vertical: "middle" };
                     if (key === "jual") cell.font = { size: 10, name: "Calibri", bold: true };
