@@ -255,7 +255,7 @@ function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
-       </span>
+        </span>
     );
 }
 
@@ -329,7 +329,7 @@ async function buildAndDownloadExcel(opts: {
 // Kelompokkan unit per model laptop (laptop_id) — dipakai oleh 2 export Qty.
 // Harga per model = rata-rata harga unit yang > 0 (unit dengan harga
 // 0/kosong tidak ikut menggeser rata-rata).
-function groupUnitsByLaptop(list: LaptopUnit[], priceField: "purchase_price" | "official_price") {
+function groupUnitsByLaptop(list: LaptopUnit[], priceField: "purchase_price" | "official_price" | "selling_price") {
     const map = new Map<string, {
         laptop_name: string; brand: string; cpu: string; ram: string; storage: string;
         qty: number; priceSum: number; priceCount: number;
@@ -412,7 +412,7 @@ function ReadyContent() {
             .catch(() => setUserRole(null));
     }, []);
 
-const fetchUnits = async () => {
+    const fetchUnits = async () => {
         setIsLoading(true);
         try {
             const res = await fetch("/api/laptops/ready-units");
@@ -603,7 +603,7 @@ const fetchUnits = async () => {
         if (filtered.length === 0) return;
         setExportingType("setor");
         try {
-            const groups = groupUnitsByLaptop(filtered, "purchase_price");
+            const groups = groupUnitsByLaptop(filtered, "selling_price");
             const colDefs: ExportColDef[] = [
                 { header: "No", width: 6, align: "center" },
                 { header: "Nama Laptop", width: 36, align: "left" },
