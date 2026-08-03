@@ -333,6 +333,11 @@ export default function SocialFeed() {
                     isSelf={me?.id === viewingUser.id}
                     onClose={() => setViewingUser(null)}
                     onChat={() => { handleChat(viewingUser); setViewingUser(null); }}
+                    onEditSong={() => {
+                        setViewingUser(null);
+                        songPicker.openSearch();
+                        setShowSongPicker(true);
+                    }}
                 />
             )}
 
@@ -507,7 +512,7 @@ function StoryBubble({ user, isSelf, onClick, onAddClick }: { user: SocialUser; 
     );
 }
 
-function StoryModal({ user, isSelf, onClose, onChat }: { user: SocialUser; isSelf?: boolean; onClose: () => void; onChat: () => void }) {
+function StoryModal({ user, isSelf, onClose, onChat, onEditSong }: { user: SocialUser; isSelf?: boolean; onClose: () => void; onChat: () => void; onEditSong?: () => void }) {
     const [playing, setPlaying] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
     const [viewers, setViewers] = useState<{ id: string; name: string; profile_photo_url: string | null; viewed_at: string }[]>([]);
@@ -602,28 +607,35 @@ function StoryModal({ user, isSelf, onClose, onChat }: { user: SocialUser; isSel
                     )}
 
                     {user.song_title && (
-                        <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: "#f8fafc" }}>
-                            <button onClick={togglePlay} disabled={!user.song_preview_url}
-                                className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 shadow-md disabled:cursor-default"
-                                style={{ animation: playing ? "solitSongSpin 3s linear infinite" : "none" }}>
-                                {user.song_artwork_url
-                                    ? <img src={user.song_artwork_url} alt={user.song_title} className="w-full h-full object-cover" />
-                                    : <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,#1db954,#159c46)" }}><Music className="w-5 h-5 text-white" /></div>}
-                            </button>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold truncate text-slate-800">{user.song_title}</p>
-                                <p className="text-[10.5px] truncate text-slate-400">
-                                    {user.song_artist}
-                                    {user.song_expires_at && ` · ${timeLeft(user.song_expires_at)}`}
-                                </p>
-                            </div>
-                            {user.song_preview_url && (
-                                <button onClick={togglePlay} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-slate-100">
-                                    {playing ? <Pause className="w-3.5 h-3.5 text-slate-600" /> : <Play className="w-3.5 h-3.5 text-slate-600 ml-0.5" />}
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: "#f8fafc" }}>
+                                <button onClick={togglePlay} disabled={!user.song_preview_url}
+                                    className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 shadow-md disabled:cursor-default"
+                                    style={{ animation: playing ? "solitSongSpin 3s linear infinite" : "none" }}>
+                                    {user.song_artwork_url
+                                        ? <img src={user.song_artwork_url} alt={user.song_title} className="w-full h-full object-cover" />
+                                        : <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg,#1db954,#159c46)" }}><Music className="w-5 h-5 text-white" /></div>}
                                 </button>
-                            )}
-                            {user.song_preview_url && (
-                                <audio ref={audioRef} src={user.song_preview_url} onTimeUpdate={handleTimeUpdate} onEnded={() => setPlaying(false)} />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold truncate text-slate-800">{user.song_title}</p>
+                                    <p className="text-[10.5px] truncate text-slate-400">
+                                        {user.song_artist}
+                                        {user.song_expires_at && ` · ${timeLeft(user.song_expires_at)}`}
+                                    </p>
+                                </div>
+                                {user.song_preview_url && (
+                                    <button onClick={togglePlay} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-slate-100">
+                                        {playing ? <Pause className="w-3.5 h-3.5 text-slate-600" /> : <Play className="w-3.5 h-3.5 text-slate-600 ml-0.5" />}
+                                    </button>
+                                )}
+                                {user.song_preview_url && (
+                                    <audio ref={audioRef} src={user.song_preview_url} onTimeUpdate={handleTimeUpdate} onEnded={() => setPlaying(false)} />
+                                )}
+                            </div>
+                            {isSelf && onEditSong && (
+                                <button onClick={onEditSong} className="flex items-center justify-center gap-1 mt-1 text-[11px] font-semibold text-slate-400 hover:text-violet-500 transition-colors">
+                                    Edit lagu
+                                </button>
                             )}
                         </div>
                     )}
