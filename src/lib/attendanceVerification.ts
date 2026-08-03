@@ -207,6 +207,12 @@ function buildTodayWIBTimestamp(dateKey: string, time: { h: number; m: number })
   return new Date(`${dateKey}T${pad(time.h)}:${pad(time.m)}:00+07:00`).toISOString();
 }
 
+function toWIBTimeString(iso: string): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const wib = new Date(new Date(iso).getTime() + 7 * 3600_000);
+  return `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())}:${pad(wib.getUTCSeconds())}`;
+}
+
 async function createOvertimeDraft(
   supabaseAdmin: any,
   args: {
@@ -236,6 +242,7 @@ async function createOvertimeDraft(
       request_date: args.requestDate,
       direction: args.direction,
       reason: AUTO_REASON_BY_DIRECTION[args.direction], // ✅ FIX — wajib diisi
+      requested_start: toWIBTimeString(args.actualStart), // ✅ FIX — wajib diisi, kolom NOT NULL
       status: "PENDING",
       duration_minutes: args.minutes,
       actual_start: args.actualStart,
