@@ -4527,15 +4527,17 @@ export default function AttendanceDashboardPage() {
                                                     const userId = a.user_id ?? "";
                                                     const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
                                                     const manualRec = manualMap[`${userId}_${dateKey}`];
-                                                    const rowStatusKey = manualRec?.status ?? a.displayStatus;
-                                                    const accentColor =
-                                                        rowStatusKey === "PRESENT" ? "border-l-emerald-400" :
-                                                            rowStatusKey === "LATE" ? "border-l-amber-400" :
-                                                                rowStatusKey === "SKIP" ? "border-l-gray-300" :
-                                                                    rowStatusKey === "SICK" ? "border-l-blue-400" :
-                                                                        rowStatusKey === "PERMIT" ? "border-l-violet-400" :
-                                                                            rowStatusKey === "ABSENT" ? "border-l-red-400" :
-                                                                                rowStatusKey === "LEAVE" ? "border-l-cyan-400" : "border-l-transparent";
+                                                  const rowStatusKey: string | undefined = manualRec?.status ?? a.displayStatus;
+                                                    const ACCENT_COLOR_MAP: Record<string, string> = {
+                                                        PRESENT: "border-l-emerald-400",
+                                                        LATE: "border-l-amber-400",
+                                                        SKIP: "border-l-gray-300",
+                                                        SICK: "border-l-blue-400",
+                                                        PERMIT: "border-l-violet-400",
+                                                        ABSENT: "border-l-red-400",
+                                                        LEAVE: "border-l-cyan-400",
+                                                    };
+                                                    const accentColor = (rowStatusKey && ACCENT_COLOR_MAP[rowStatusKey]) || "border-l-transparent";
                                                     return (
                                                         <tr key={a.id} className={`border-l-4 ${accentColor} hover:bg-gray-50/60 transition-colors duration-200 ${a.source === "MANUAL" ? "bg-blue-50/40" : idx % 2 === 1 ? "bg-gray-50/30" : ""}`}>
                                                             <td className="px-6 py-4">
