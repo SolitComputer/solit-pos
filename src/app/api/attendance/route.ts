@@ -122,7 +122,7 @@ export async function DELETE(request: Request) {
 
     const { data: record, error: checkError } = await supabase
       .from("face_verifications")
-      .select("id, user_id")
+      .select("id, user_id, created_at, direction")
       .eq("id", id)
       .maybeSingle();
 
@@ -130,17 +130,67 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, message: "Record tidak ditemukan" }, { status: 404 });
     }
 
+    // ✅ FIX: cari pasangan absen (arah sebaliknya) di HARI YANG SAMA (WIB).
+    // Kalau admin hapus absen MASUK, absen PULANG di hari itu ikut terhapus
+    // (dan sebaliknya). Tanpa ini, absen lama yang "ketinggalan" bikin
+    // sistem mengira user sudah absen masuk+pulang begitu dia absen ulang,
+    // padahal pasangannya sudah tidak relevan lagi — ini penyebab lembur
+    // jadi gak pernah kedeteksi lagi setelah hapus+absen-ulang.
+    const recordDirection = record.direction ?? "IN";
+    const wibDate = new Date(new Date(record.created_at).getTime() + 7 * 60 * 60 * 1000)
+      .toISOString().slice(0, 10);
+    const dayStart = `${wibDate}T00:00:00+07:00`;
+    const dayEnd = `${wibDate}T23:59:59+07:00`;
+    const oppositeDirection = recordDirection === "OUT" ? "IN" : "OUT";
+
+    const { data: pairRecord } = await supabase
+      .from("face_verifications")
+      .select("id")
+      .eq("user_id", record.user_id)
+      .eq("direction", oppositeDirection)
+      .eq("status", "SUCCESS")
+      .gte("created_at", dayStart)
+      .lte("created_at", dayEnd)
+      .maybeSingle();
+
+    const idsToDelete = pairRecord ? [record.id, pairRecord.id] : [record.id];
+
+    // ✅ FIX: draft lemburan yang masih nempel (source_face_verification_id)
+    // ke record yang mau dihapus ikut dibersihkan, supaya tidak ada data
+    // lemburan "hantu" yang nyangkut ke absen yang sudah tidak ada.
+    // Draft yang SUDAH DIAUDIT tetap dibiarkan (tidak dihapus otomatis)
+    // supaya histori pembayaran lemburan yang sudah final tidak hilang.
+    const { data: linkedOvertimes } = await supabase
+      .from("overtime_requests")
+      .select("id, audit_status")
+      .in("source_face_verification_id", idsToDelete);
+
+    const deletableOvertimeIds = (linkedOvertimes ?? [])
+      .filter((o: any) => o.audit_status !== "AUDITED")
+      .map((o: any) => o.id);
+    const lockedOvertimeCount = (linkedOvertimes?.length ?? 0) - deletableOvertimeIds.length;
+
+    if (deletableOvertimeIds.length > 0) {
+      await supabase.from("overtime_requests").delete().in("id", deletableOvertimeIds);
+    }
+
     const { error } = await supabase
       .from("face_verifications")
       .delete()
-      .eq("id", id);
+      .in("id", idsToDelete);
 
     if (error) {
       console.error("[attendance DELETE] error:", error);
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      deletedPairId: pairRecord?.id ?? null,
+      warning: lockedOvertimeCount > 0
+        ? `${lockedOvertimeCount} draft lemburan yang sudah diaudit TIDAK ikut terhapus otomatis — hapus manual lewat menu Lembur kalau perlu.`
+        : undefined,
+    });
   } catch (err: any) {
     console.error("[attendance DELETE] Exception:", err);
     return NextResponse.json({ success: false, message: err?.message ?? "Unknown error" }, { status: 500 });

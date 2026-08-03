@@ -3052,14 +3052,12 @@ export default function AttendanceDashboardPage() {
         setCheckoutTimes(co);
     }, []);
 
-    // ✅ NEW — inilah penyebab 3 error: fungsi + effect ini belum sempat
-    // ketambahan, padahal dipanggil dari tabel Jam Pulang.
     const fetchAfterOutOvertime = useCallback(async (year: number, month: number) => {
         try {
-            const r = await fetch("/api/attendance/overtime");
+            const r = await fetch(`/api/attendance/overtime?year=${year}&month=${month + 1}`);
             const d = await r.json();
             if (!d.success) return;
-            const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
+            const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
             const map: Record<string, { minutes: number; status: string; auditStatus: string }> = {};
             (d.data || []).forEach((o: any) => {
                 if (o.direction !== "AFTER_OUT") return;
@@ -4709,7 +4707,7 @@ export default function AttendanceDashboardPage() {
                                                     const userId = a.user_id ?? "";
                                                     const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
                                                     const manualRec = manualMap[`${userId}_${dateKey}`];
-                                                  const rowStatusKey: string | undefined = manualRec?.status ?? a.displayStatus;
+                                                    const rowStatusKey: string | undefined = manualRec?.status ?? a.displayStatus;
                                                     const ACCENT_COLOR_MAP: Record<string, string> = {
                                                         PRESENT: "border-l-emerald-400",
                                                         LATE: "border-l-amber-400",
@@ -4835,7 +4833,7 @@ export default function AttendanceDashboardPage() {
                                                                                 <>
                                                                                     <button
                                                                                         onClick={async () => {
-                                                                                            if (!confirm("Hapus absen wajah ini? Akan dihapus dari sistem.")) return;
+                                                                                            if (!confirm("Hapus absen wajah ini? Absen pulang di hari yang sama juga akan ikut terhapus.")) return;
                                                                                             try {
                                                                                                 const res = await fetch(`/api/attendance?id=${a.id}`, {
                                                                                                     method: "DELETE"
@@ -4845,6 +4843,7 @@ export default function AttendanceDashboardPage() {
                                                                                                     alert(d.message || "Gagal menghapus");
                                                                                                     return;
                                                                                                 }
+                                                                                                if (d.warning) alert(d.warning); 
                                                                                                 refreshAll(); // Refresh data
                                                                                             } catch (err) {
                                                                                                 console.error("Delete error:", err);
