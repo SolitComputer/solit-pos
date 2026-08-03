@@ -451,23 +451,51 @@ export default function ProfileView({ userId }: { userId: string }) {
                             </>
                         )}
 
-                        {profile.status_note && (
+                        {(profile.status_note || isSelf) && (
                             <div className={profile.song_title ? "mt-6 pt-5 border-t border-white/10" : ""}>
                                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(139,92,246,0.15)" }}>
                                     <MessageCircle className="w-6 h-6" style={{ color: "#c4b5fd" }} />
                                 </div>
-                                <p className="text-sm font-semibold leading-relaxed text-white mb-1">{profile.status_note}</p>
-                                {profile.status_note_expires_at && (
-                                    <p className="text-[10.5px] mb-3" style={{ color: "rgba(255,255,255,0.45)" }}>{noteTimeLeft(profile.status_note_expires_at)}</p>
-                                )}
-                                {isSelf && (
-                                    <div className="flex items-center justify-center gap-4 text-xs font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>
-                                        <button onClick={() => { handleClosePopup(); setShowViewers(true); }} className="flex items-center gap-1 hover:text-white">
-                                            <Eye className="w-3.5 h-3.5" />
-                                            {viewers.length > 0 ? `Dilihat ${viewers.length} orang` : "Belum ada yang melihat"}
-                                        </button>
-                                        <button onClick={() => { handleRemoveNote(); handleClosePopup(); }} className="hover:text-red-400">Hapus catatan</button>
+                                {editingNote ? (
+                                    <div className="flex flex-col gap-2 mb-3 px-4">
+                                        <input value={noteDraft} onChange={(e) => setNoteDraft(e.target.value.slice(0, 60))}
+                                            placeholder="Tulis catatan... (hilang 24 jam)" autoFocus
+                                            onKeyDown={(e) => { if (e.key === "Enter") handleSaveNote(); if (e.key === "Escape") setEditingNote(false); }}
+                                            className="w-full h-9 rounded-xl px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-400"
+                                            style={{ background: "rgba(255,255,255,0.05)", color: "#fff", border: "1px solid rgba(255,255,255,0.15)" }} />
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] text-white/50">{noteDraft.length}/60</span>
+                                            <div className="flex gap-3">
+                                                <button onClick={() => setEditingNote(false)} className="text-xs font-medium text-white/70 hover:text-white">Batal</button>
+                                                <button onClick={handleSaveNote} disabled={savingNote} className="text-xs font-bold text-violet-400 hover:text-violet-300 disabled:opacity-50">
+                                                    {savingNote ? "Menyimpan..." : "Simpan"}
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
+                                ) : profile.status_note ? (
+                                    <>
+                                        <p className="text-sm font-semibold leading-relaxed text-white mb-1">{profile.status_note}</p>
+                                        {profile.status_note_expires_at && (
+                                            <p className="text-[10.5px] mb-3" style={{ color: "rgba(255,255,255,0.45)" }}>{noteTimeLeft(profile.status_note_expires_at)}</p>
+                                        )}
+                                        {isSelf && (
+                                            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>
+                                                <button onClick={() => { handleClosePopup(); setShowViewers(true); }} className="flex items-center gap-1 hover:text-white">
+                                                    <Eye className="w-3.5 h-3.5" />
+                                                    {viewers.length > 0 ? `Dilihat ${viewers.length} orang` : "Belum ada yang melihat"}
+                                                </button>
+                                                <button onClick={() => { setEditingNote(true); setNoteDraft(profile.status_note || ""); }} className="hover:text-violet-300 flex items-center gap-1">
+                                                    <Pencil className="w-3.5 h-3.5" /> Edit catatan
+                                                </button>
+                                                <button onClick={() => { handleRemoveNote(); handleClosePopup(); }} className="hover:text-red-400">Hapus catatan</button>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <button onClick={() => { setEditingNote(true); setNoteDraft(""); }} className="text-xs font-semibold hover:text-violet-300 mb-2" style={{ color: "rgba(255,255,255,0.7)" }}>
+                                        + Tambah catatan
+                                    </button>
                                 )}
                             </div>
                         )}
