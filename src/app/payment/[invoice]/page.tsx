@@ -92,6 +92,7 @@ export default function EditTransactionPage() {
   const [formData, setFormData] = useState<Partial<Transaction>>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [editReason, setEditReason] = useState("");
 
   const [activeUnits, setActiveUnits] = useState<ActiveUnit[]>([]);
   const [allReadyUnits, setAllReadyUnits] = useState<ReadyUnit[]>([]);
@@ -419,6 +420,10 @@ export default function EditTransactionPage() {
   };
 
   const handleSave = async () => {
+    if (!editReason.trim()) {
+      alert("Alasan edit wajib diisi");
+      return;
+    }
     setShowConfirm(false);
     setIsSaving(true);
     try {
@@ -477,6 +482,7 @@ export default function EditTransactionPage() {
           ...(dealPricesPerUnit.length > 0 && {
             deal_prices_per_unit: dealPricesPerUnit,
           }),
+          edit_reason: editReason.trim(),
         }),
       });
       const result = await res.json();
@@ -486,6 +492,7 @@ export default function EditTransactionPage() {
       }
       setTransaction(result.data);
       setHasChanges(false);
+      setEditReason("");
       alert(" Transaksi berhasil diupdate");
     } catch {
       alert("Terjadi kesalahan");
@@ -1478,6 +1485,20 @@ export default function EditTransactionPage() {
                 </div>
               )}
 
+              {/* Alasan Edit — wajib diisi */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+                  Alasan Edit <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  rows={2}
+                  placeholder="Contoh: salah input harga deal, customer minta ganti unit, dll."
+                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition resize-none placeholder:text-gray-300"
+                />
+              </div>
+
               {/* Warning note */}
               <div className="warning-banner px-3.5 py-3 flex items-start gap-2.5">
                 <svg
@@ -1510,9 +1531,10 @@ export default function EditTransactionPage() {
               >
                 Batal
               </button>
-              <button
+            <button
                 onClick={handleSave}
-                className="save-btn flex-1 h-11 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+                disabled={!editReason.trim()}
+                className="save-btn flex-1 h-11 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <svg
                   className="w-4 h-4"
