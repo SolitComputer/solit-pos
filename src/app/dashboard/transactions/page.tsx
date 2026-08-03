@@ -240,10 +240,11 @@ function getPrimaryPriceDisplay(item: any) {
 
 // ─── RESTORE MODAL ────────────────────────────────────────────────────
 function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
-  item: any; isPending: boolean; restoring: boolean; onConfirm: () => void; onClose: () => void;
+  item: any; isPending: boolean; restoring: boolean; onConfirm: (reason: string) => void; onClose: () => void;
 }) {
   const statusLabelMap: Record<string, string> = { RESERVED: "DP", HELD: "Ambil Dulu", PACKING: "Packing", PENDING: "Pending", PAID: "Lunas" };
   const currentLabel = statusLabelMap[item.status] ?? item.status;
+  const [reason, setReason] = useState("");
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -268,10 +269,22 @@ function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
             {item.status === "PAID" && <p>• Garansi (jika ada) → <span className="font-bold text-orange-600">VOID</span></p>}
             {item.status === "RESERVED" && <p className="text-amber-700 font-semibold"> DP yang sudah dibayar diurus manual</p>}
           </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+              Alasan {isPending ? "Batalkan" : "Restore"} <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              placeholder="Contoh: customer batal, salah input transaksi, dll."
+              className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 transition resize-none placeholder:text-gray-300"
+            />
+          </div>
         </div>
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-3 bg-gray-50 flex-shrink-0">
           <button onClick={onClose} className="flex-1 h-11 sm:h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-          <button onClick={onConfirm} disabled={restoring} className="flex-1 h-11 sm:h-10 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60">
+          <button onClick={() => onConfirm(reason.trim())} disabled={restoring || !reason.trim()} className="flex-1 h-11 sm:h-10 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60">
             {restoring ? "Memproses..." : isPending ? "Ya, Batalkan" : "Ya, Restore"}
           </button>
         </div>
@@ -596,10 +609,14 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
     } catch { setConfirmError("Terjadi kesalahan koneksi"); } finally { setConfirming(false); }
   };
 
-  const handleRestore = async () => {
+  const handleRestore = async (reason: string) => {
     setRestoring(true);
     try {
-      const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, { method: "POST" });
+      const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
       const result = await res.json();
       if (!result.success) { setAlertModal("Gagal: " + result.message); return; }
       setShowRestoreModal(false); onRestored(item.invoice_number);
@@ -1051,10 +1068,14 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
     } catch { setConfirmError("Terjadi kesalahan koneksi"); } finally { setConfirming(false); }
   };
 
-  const handleRestore = async () => {
+  const handleRestore = async (reason: string) => {
     setRestoring(true);
     try {
-      const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, { method: "POST" });
+      const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
       const result = await res.json();
       if (!result.success) { setAlertModal("Gagal: " + result.message); return; }
       setShowRestoreModal(false); onRestored(item.invoice_number);
@@ -1348,8 +1369,11 @@ const MODAL_VISIBLE_ROLES = [
   "KEPALA_PENGELOLA_BARANG",
 ];
 
-function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }: { item: any; onClose: () => void; canSeeFinancials: boolean; canSeeModal: boolean }) {
+function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, canViewActivityLog }: { item: any; onClose: () => void; canSeeFinancials: boolean; canSeeModal: boolean; canViewActivityLog: boolean }) {
   const [fullItem, setFullItem] = useState<any>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -1383,6 +1407,18 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
   const totalModal = grouped.reduce((s, g) => s + Number(g.purchase_price_total ?? 0), 0);
   const totalJual = grouped.reduce((s, g) => s + Number(g.selling_price_total ?? 0), 0);
 
+  useEffect(() => {
+    if (!showHistory || !activeItem?.id) return;
+    let active = true;
+    setLoadingLogs(true);
+    fetch(`/api/activity-logs?entity=transaction&entity_id=${activeItem.id}&limit=50`)
+      .then((res) => res.json())
+      .then((res) => { if (active) setActivityLogs(res.logs ?? []); })
+      .catch(() => { if (active) setActivityLogs([]); })
+      .finally(() => { if (active) setLoadingLogs(false); });
+    return () => { active = false; };
+  }, [showHistory, activeItem?.id]);
+
   const modalContent = (
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
@@ -1405,6 +1441,60 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal }
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
+
+        {/* ── Info edit/restore terakhir + tombol riwayat ── */}
+        {(activeItem.last_edited_by || activeItem.restored_by || canViewActivityLog) && (
+          <div className="px-5 py-3 border-b border-gray-100 flex-shrink-0 bg-gray-50/60 space-y-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {activeItem.last_edited_by && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                  <Pencil className="w-2.5 h-2.5" />
+                  Diedit oleh {activeItem.last_edited_by}
+                  {activeItem.last_edited_at && ` · ${formatDateShort(activeItem.last_edited_at)}`}
+                  {activeItem.edit_reason && ` — "${activeItem.edit_reason}"`}
+                </span>
+              )}
+              {activeItem.restored_by && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-red-50 text-red-700 ring-1 ring-red-200">
+                  ↩ Direstore oleh {activeItem.restored_by}
+                  {activeItem.restored_at && ` · ${formatDateShort(activeItem.restored_at)}`}
+                  {activeItem.restore_reason && ` — "${activeItem.restore_reason}"`}
+                </span>
+              )}
+              {canViewActivityLog && (
+                <button
+                  type="button"
+                  onClick={() => setShowHistory((v) => !v)}
+                  className="ml-auto text-[10px] font-semibold px-2 py-1 rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition"
+                >
+                  {showHistory ? "Sembunyikan Riwayat" : "Lihat Riwayat"}
+                </button>
+              )}
+            </div>
+
+            {showHistory && (
+              <div className="max-h-48 overflow-y-auto space-y-1.5 pt-1">
+                {loadingLogs ? (
+                  <p className="text-[11px] text-gray-400">Memuat riwayat...</p>
+                ) : activityLogs.length === 0 ? (
+                  <p className="text-[11px] text-gray-400">Belum ada riwayat perubahan.</p>
+                ) : (
+                  activityLogs.map((log: any) => (
+                    <div key={log.id} className="bg-white border border-gray-100 rounded-lg px-3 py-2 text-[11px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-gray-700">
+                          {log.action === "EDIT" ? "Edit" : log.action === "RESTORE" ? "Restore" : log.action} — {log.user_name}
+                        </span>
+                        <span className="text-gray-400 flex-shrink-0">{formatDateShort(log.created_at)}</span>
+                      </div>
+                      {log.reason && <p className="text-gray-500 mt-0.5">"{log.reason}"</p>}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
@@ -1710,6 +1800,8 @@ export default function Page() {
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
   // ── Hanya ADMIN dan KEPALA_PENGELOLA_BARANG yang bisa lihat Margin ──
   const canSeeModal = userRoles.some((r) => MODAL_VISIBLE_ROLES.includes(r));
+  // ── Hanya role yang punya akses /api/activity-logs yang boleh lihat Riwayat ──
+  const canViewActivityLog = hasAnyRole(userRoles, ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
@@ -1988,7 +2080,7 @@ export default function Page() {
   return (
     <DashboardLayout>
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
-      {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} />}
+      {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} canViewActivityLog={canViewActivityLog} />}
       {isExporting && <ExportProgressModal progress={exportProgress} label={exportLabel} />}
 
       <div className={`${isMobile ? "px-4 py-4" : "max-w-[1920px] mx-auto px-6 py-4"} space-y-3`}>
