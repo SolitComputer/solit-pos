@@ -127,6 +127,8 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [pendingSearch, setPendingSearch] = useState(""); // search khusus untuk daftar pending (325 data belum konfirmasi)
     // Filter berdasarkan akun yang dipilih lewat dropdown "Ref" — bisa lebih dari satu (OR).
     const [accountCodeFilter, setAccountCodeFilter] = useState<Set<string>>(new Set());
+    // Filter khusus: kalau true, tabel HANYA menampilkan entry yang sudah ditandai warning (has_warning)
+    const [showOnlyWarning, setShowOnlyWarning] = useState(false);
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     const [showAccountFilter, setShowAccountFilter] = useState(false);
     const [accountFilterSearch, setAccountFilterSearch] = useState("");
@@ -315,8 +317,13 @@ export default function JurnalUmum({ period }: { period: string }) {
             });
         }
 
+        // Filter penanda: hanya tampilkan entry yang sudah ditandai warning (has_warning true)
+        if (showOnlyWarning) {
+            result = result.filter((e) => e.has_warning);
+        }
+
         return result;
-    }, [entries, search, searchNominal, accountCodeFilter]);
+    }, [entries, search, searchNominal, accountCodeFilter, showOnlyWarning]);
 
     // Search untuk daftar PENDING (data yang belum dikonfirmasi ke jurnal umum) —
     // terpisah dari `filtered` di atas karena sumber datanya beda (PendingDraft, bukan JournalEntry).
@@ -440,6 +447,13 @@ export default function JurnalUmum({ period }: { period: string }) {
         }, 0);
     }, [entries]);
 
+    // Jumlah entry yang sudah ditandai warning — dihitung dari SEMUA entry (bukan hasil filter lain),
+    // supaya angka di badge tombol filter tetap konsisten walau search/filter akun lagi aktif.
+    const totalWarningEntries = useMemo(
+        () => entries.filter((e) => e.has_warning).length,
+        [entries]
+    );
+
     const totalLinesFiltered = useMemo(() => {
         return filtered.reduce((s, e) => {
             const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
@@ -457,7 +471,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         }, 0);
     }, [filtered, accountCodeFilter]);
 
-    const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0;
+    const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || showOnlyWarning;
 
     useEffect(() => {
         if (!toast) return;
@@ -656,6 +670,26 @@ export default function JurnalUmum({ period }: { period: string }) {
                             Terlama
                         </button>
                     </div>
+
+                    <button
+                        onClick={() => setShowOnlyWarning((v) => !v)}
+                        title={showOnlyWarning ? "Tampilkan semua entry" : "Tampilkan hanya entry bertanda warning"}
+                        className={`h-10 px-3 rounded-lg text-[11px] font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 border shrink-0 whitespace-nowrap ${showOnlyWarning
+                            ? "bg-amber-500 border-amber-500 text-white"
+                            : "bg-white border-gray-200 text-gray-400 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200"
+                            }`}
+                    >
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Bertanda
+                        {totalWarningEntries > 0 && (
+                            <span
+                                className={`inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold ${showOnlyWarning ? "bg-white/25 text-white" : "bg-amber-100 text-amber-700"
+                                    }`}
+                            >
+                                {totalWarningEntries}
+                            </span>
+                        )}
+                    </button>
 
                     <button
                         onClick={() => setShowManual(true)}
