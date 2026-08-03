@@ -569,6 +569,14 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { invoice } = await props.params;
     const body = await req.json();
 
+    const editReason = typeof body.edit_reason === "string" ? body.edit_reason.trim() : "";
+    if (!editReason) {
+      return NextResponse.json(
+        { success: false, message: "Alasan edit wajib diisi" },
+        { status: 400 }
+      );
+    }
+
     const { data: before } = await supabase
       .from("transactions")
       .select("*")
@@ -877,6 +885,8 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       allowedFields.inventory_price = newInventoryPrice;
     }
 
+  allowedFields.edit_reason = editReason;
+
     allowedFields.last_edited_by = user.name;
     allowedFields.last_edited_at = new Date().toISOString();
 
@@ -913,7 +923,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       }
     }
 
-    // ── Activity log ─────────────────────────────────────────────────
+   // ── Activity log ─────────────────────────────────────────────────
     await logActivity({
       userId: user.id,
       userName: user.name,
@@ -922,6 +932,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       entity: "transaction",
       entityId: before?.id,
       entityLabel: `${invoice} — ${before?.customer_name ?? "—"}`,
+      reason: editReason,
       beforeData: before,
       afterData: data,
     });

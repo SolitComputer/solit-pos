@@ -15,6 +15,15 @@ type RestorableStatus = (typeof RESTORABLE_STATUSES)[number];
 async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { invoice } = await props.params;
+    const body = await req.json().catch(() => ({}));
+    const restoreReason = typeof body.reason === "string" ? body.reason.trim() : "";
+
+    if (!restoreReason) {
+      return NextResponse.json(
+        { success: false, message: "Alasan restore wajib diisi" },
+        { status: 400 }
+      );
+    }
 
     // ── 1. Ambil transaksi ────────────────────────────────────────────────
     const { data: transaction, error: txError } = await supabase
@@ -142,7 +151,7 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
         .eq("id", laptopId);
     }
 
-    // ── 5. Update status transaksi → CANCELLED ────────────────────────────
+  // ── 5. Update status transaksi → CANCELLED ────────────────────────────
     const prevStatus = currentStatus;
     const { error: updateTxError } = await supabase
       .from("transactions")
@@ -150,6 +159,9 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
         status: "CANCELLED",
         last_edited_by: user.name,
         last_edited_at: new Date().toISOString(),
+        restored_by: user.name,
+        restored_at: new Date().toISOString(),
+        restore_reason: restoreReason,
         notes: transaction.notes
           ? `${transaction.notes} | [RESTORED from ${prevStatus} by ${user.name}]`
           : `[RESTORED from ${prevStatus} by ${user.name}]`,
@@ -188,7 +200,7 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
       warrantyVoided = true;
     }
 
-    // ── 7. Log aktivitas ──────────────────────────────────────────────────
+   // ── 7. Log aktivitas ──────────────────────────────────────────────────
     await logActivity({
       userId: user.id,
       userName: user.name,
@@ -197,6 +209,7 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
       entity: "transaction",
       entityId: transaction.id,
       entityLabel: `${invoice} — ${transaction.customer_name} (dari ${prevStatus})`,
+      reason: restoreReason,
       beforeData: transaction,
     });
 

@@ -3865,6 +3865,15 @@ export default function AttendanceDashboardPage() {
                         >
                             <Trophy className="w-3.5 h-3.5" /> Leaderboard
                         </button>
+                        {/* ✅ NEW — poin 1: kepala divisi/admin approve izin pulang cepat */}
+                        {canManage && (
+                            <button
+                                onClick={() => router.push("/dashboard/attendance/early-checkout")}
+                                className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl hover:bg-amber-100 transition-all active:scale-95"
+                            >
+                                <Clock className="w-3.5 h-3.5" /> Izin Pulang Cepat
+                            </button>
+                        )}
                         {isAdmin && (
                             <button
                                 onClick={() => openAddManual()}

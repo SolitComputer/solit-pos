@@ -7,6 +7,7 @@ import {
   ROLE_DEFAULT_REDIRECT,
   UserRole,
   verifyAttendanceCookie,
+  signAttendanceCookie,
 } from "@/lib/auth";
 import {
   expandRolesWithParents,
@@ -80,6 +81,38 @@ async function hasAttendanceBypass(
     if (await verifyAttendanceCookie(v, userId)) return true;
   }
   return false;
+}
+
+// ✅ NEW — fallback lintas-device: cookie absen itu per-browser, jadi kalau
+// user pindah HP/browser di hari yang sama, cookie-nya kosong padahal DB
+// sudah mencatat dia absen. Cek langsung ke DB supaya tidak diminta
+// verifikasi wajah/sidik jari ulang di device lain.
+async function hasAttendedTodayInDB(userId: string): Promise<boolean> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+    const todayDate = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+    const dayStart = `${todayDate}T00:00:00+07:00`;
+    const dayEnd = `${todayDate}T23:59:59+07:00`;
+
+    const [{ data: faceIn }, { data: manual }, { data: leave }] = await Promise.all([
+      supabase.from("face_verifications").select("id")
+        .eq("user_id", userId).eq("status", "SUCCESS").eq("direction", "IN")
+        .gte("created_at", dayStart).lte("created_at", dayEnd).maybeSingle(),
+      supabase.from("attendance_manual").select("id")
+        .eq("user_id", userId).eq("attendance_date", todayDate).maybeSingle(),
+      supabase.from("leave_requests").select("id")
+        .eq("user_id", userId).eq("leave_date", todayDate).eq("status", "APPROVED").maybeSingle(),
+    ]);
+
+    return Boolean(faceIn || manual || leave);
+  } catch {
+    // fail-closed: kalau DB gak bisa diakses, tetap minta verifikasi seperti biasa
+    return false;
+  }
 }
 
 const SESSION_COOKIES = [
@@ -231,17 +264,39 @@ export async function middleware(request: NextRequest) {
   const isPageRoute = !pathname.startsWith("/api/");
 
   // ── Auto logout & force logout check (page routes only) ───────────────────
+  // ── Auto logout jam 3 pagi — sekarang berlaku untuk SEMUA route (page & API) ──
+  // FIX: sebelumnya blok ini ada di dalam `if (isPageRoute)`, jadi request API
+  // tanpa reload halaman tidak pernah kena auto-logout. Selain itu `iat` di
+  // token sebelumnya selalu 0 karena belum dinormalisasi (lihat perbaikan di
+  // lib/auth.ts) — jadi kondisi ini dulu memang tidak pernah kena sama sekali.
+  const issuedAt: number = (user as any).iat ?? 0;
+  const autoLogoutThreshold = getAutoLogoutThreshold();
+  if (issuedAt > 0 && issuedAt < autoLogoutThreshold) {
+    if (!isPageRoute) {
+      const res = NextResponse.json(
+        { success: false, message: "Sesi berakhir (auto-logout 03:00 WIB), silakan login ulang", reason: "session_expired" },
+        { status: 401 }
+      );
+      for (const name of SESSION_COOKIES) {
+        res.cookies.set(name, "", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          maxAge: 0,
+        });
+      }
+      return res;
+    }
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("reason", "session_expired");
+    return clearSessionAndRedirect(loginUrl);
+  }
+
+  // ── Force logout check (tetap page-route only, biar hemat query DB) ───────
   let shouldRefreshFlCookie = false;
 
   if (isPageRoute) {
-    const issuedAt: number = (user as any).iat ?? 0;
-    const autoLogoutThreshold = getAutoLogoutThreshold();
-    if (issuedAt > 0 && issuedAt < autoLogoutThreshold) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("reason", "session_expired");
-      return clearSessionAndRedirect(loginUrl);
-    }
-
     //  throttle cek force_logout: max 1x per 5 menit per sesi
     const nowSec = Math.floor(Date.now() / 1000);
     const lastFlCheck = Number(request.cookies.get("fl_check")?.value ?? 0);
@@ -277,10 +332,17 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Attendance / face-verify gate ─────────────────────────────────────────
+  let shouldStampAttendanceCookie = false; // ✅ NEW
+
   if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
     const exempt = isAttendanceExempt(user.role as string);
-    const hasAttended = await hasAttendanceBypass(request, user.id);
+    let hasAttended = await hasAttendanceBypass(request, user.id);
+
+    if (!exempt && !hasAttended && isWithinSystemHours()) {
+      hasAttended = await hasAttendedTodayInDB(user.id);
+      if (hasAttended) shouldStampAttendanceCookie = true;
+    }
+
     if (!exempt && isWithinSystemHours() && !hasAttended) {
       return NextResponse.redirect(
         new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
@@ -335,12 +397,6 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  // ── Inject user headers untuk API routes ──────────────────────────────────
-  // NOTE: header pakai roles ASLI (bukan effective) supaya API tahu role sebenarnya.
-  // Permission check di API dilakukan di withAuth() yang juga expand parent.
-  // PENTING: header di-set pada REQUEST yang diteruskan (requestHeaders), bukan
-  // pada response. `requestHeaders` sudah dibersihkan dari salinan kiriman client
-  // di awal middleware, jadi route hanya melihat identitas tepercaya dari JWT.
   requestHeaders.set("x-user-id", user.id);
   requestHeaders.set("x-user-role", user.role);
   requestHeaders.set("x-user-roles", userRoles.join(","));
@@ -356,6 +412,22 @@ export async function middleware(request: NextRequest) {
       path: "/",
       maxAge: 3600,
     });
+  }
+
+
+  if (shouldStampAttendanceCookie) {
+    const signed = await signAttendanceCookie(user.id);
+    const expiry = new Date();
+    expiry.setHours(23, 59, 59, 999);
+    for (const name of ["face_attended", "face_verified"]) {
+      response.cookies.set(name, signed, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        expires: expiry,
+      });
+    }
   }
 
   return response;
