@@ -545,7 +545,7 @@ export default function CreatePaymentPage() {
     };
 
     const onSubmit = async (data: CreatePaymentType) => {
-        if (!customerBirthDate) {
+        if (paymentFlow === "DIRECT" && !customerBirthDate) {
             alert("Tanggal lahir customer wajib diisi");
             setStep(1);
             return;
@@ -838,8 +838,10 @@ export default function CreatePaymentPage() {
                     {step === 1 && (paymentFlow === "DIRECT" || pendingSubType) && (
                         <>
                             <input type="text" placeholder="Atas Nama *" className={inputClass} {...register("customer_name")} />
-                           <div>
-                                <label className="text-xs text-gray-500 mb-1.5 block">Tanggal Lahir Customer *</label>
+                          <div>
+                                <label className="text-xs text-gray-500 mb-1.5 block">
+                                    Tanggal Lahir Customer {paymentFlow === "DIRECT" ? "*" : <span className="text-gray-400 font-normal">(opsional)</span>}
+                                </label>
                                 <input type="date" className={inputClass}
                                     value={customerBirthDate}
                                     onChange={e => setCustomerBirthDate(e.target.value)} />
@@ -921,7 +923,7 @@ export default function CreatePaymentPage() {
                             <button type="button" onClick={() => {
                                 if (!watch("customer_name")) { alert("Isi nama customer dulu"); return; }
                                 if (!isEcommerce && !watch("customer_phone")) { alert("Isi nomor WhatsApp dulu"); return; }
-                                if (!customerBirthDate) { alert("Isi tanggal lahir customer dulu"); return; }
+                                if (paymentFlow === "DIRECT" && !customerBirthDate) { alert("Isi tanggal lahir customer dulu"); return; }
                                 fromScan ? setStep(3) : setStep(2);
                             }} className={`w-full ${btnPrimary} inline-flex items-center justify-center gap-1.5`}>
                                 Lanjut <ChevronRight size={16} />

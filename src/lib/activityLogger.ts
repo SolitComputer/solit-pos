@@ -29,6 +29,7 @@ interface LogActivityParams {
   entity: LogEntity;
   entityId?: string;
   entityLabel?: string;
+  reason?: string | null;
   beforeData?: Record<string, any> | null;
   afterData?: Record<string, any> | null;
 }
@@ -42,6 +43,7 @@ export async function logActivity(params: LogActivityParams) {
     entity: params.entity,
     entity_id: params.entityId ?? null,
     entity_label: params.entityLabel ?? null,
+    reason: params.reason ?? null,
     before_data: params.beforeData ?? null,
     after_data: params.afterData ?? null,
   });
