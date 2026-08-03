@@ -917,7 +917,7 @@ function AchievementCard({
         <div className="group bg-white rounded-2xl p-4 sm:p-5 lg:p-6 relative overflow-hidden border border-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full"
             style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
             <div className="absolute top-0 left-0 right-0 h-1" style={{ background: accentBar }} />
-            <div className="flex items-start justify-between mb-3">
+           <div className="flex items-start justify-between mb-4">
                 <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110" style={{ background: accentSoft, color: accentSolid }}>
                     {icon}
                 </div>
@@ -926,7 +926,11 @@ function AchievementCard({
             <p className="text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>{title} · {monthLabel}</p>
             <p className="text-3xl sm:text-4xl font-black mt-1 tabular-nums" style={{ color: "#0f172a" }}>{value}</p>
             <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>{sub}</p>
-            {rank && <p className="text-[10.5px] mt-1.5 font-semibold text-slate-400">Peringkat #{rank} dari {totalRanked} orang</p>}
+            {rank && (
+                <p className="inline-block mt-2.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full" style={{ background: "#f8fafc", color: "#64748b" }}>
+                    Peringkat #{rank} dari {totalRanked} orang
+                </p>
+            )}
             {personalBest && (
                 <div className="mt-3 pt-3 border-t border-slate-50 flex items-center gap-1.5">
                     {isRecord ? <Trophy className="w-3.5 h-3.5" style={{ color: "#d97706" }} /> : <Flame className="w-3.5 h-3.5 text-slate-300" />}
@@ -941,30 +945,23 @@ function AchievementCard({
 
 function RankBadge({ rank }: { rank: number }) {
     const tier: "gold" | "silver" | "bronze" = rank === 1 ? "gold" : rank <= 3 ? "silver" : "bronze";
-    const stops: Record<typeof tier, [string, string, string]> = {
-        gold: ["#fde047", "#f59e0b", "#b45309"],
-        silver: ["#f8fafc", "#94a3b8", "#475569"],
-        bronze: ["#fdba74", "#c2410c", "#7c2d12"],
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #fde047, #f59e0b, #b45309)",
+        silver: "linear-gradient(135deg, #f8fafc, #94a3b8, #475569)",
+        bronze: "linear-gradient(135deg, #fdba74, #c2410c, #7c2d12)",
     };
-    const [c1, c2, c3] = stops[tier];
-    const gradId = `rank-grad-${tier}-${rank}`;
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(245,158,11,0.35)",
+        silver: "rgba(148,163,184,0.35)",
+        bronze: "rgba(194,65,12,0.35)",
+    };
 
     return (
-        <div className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0" title={`Peringkat #${rank} bulan ini`}>
-            <svg viewBox="0 0 100 100" className="w-full h-full" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.25))" }}>
-                <defs>
-                    <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor={c1} />
-                        <stop offset="55%" stopColor={c2} />
-                        <stop offset="100%" stopColor={c3} />
-                    </linearGradient>
-                </defs>
-                <polygon points="50,3 90,25 90,70 50,97 10,70 10,25" fill={`url(#${gradId})`} stroke="rgba(255,255,255,0.65)" strokeWidth="2" />
-                <polygon points="50,15 78,32 78,64 50,85 22,64 22,32" fill="rgba(255,255,255,0.18)" />
-                <text x="50" y="60" textAnchor="middle" fontSize="36" fontWeight="900" fill="#fff">
-                    {rank}
-                </text>
-            </svg>
+        <div className="relative w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 rounded-full flex items-center justify-center ring-2 ring-white"
+            style={{ background: gradients[tier], boxShadow: `0 4px 12px -2px ${glow[tier]}` }}
+            title={`Peringkat #${rank} bulan ini`}>
+            <div className="absolute inset-0 rounded-full pointer-events-none" style={{ background: "radial-gradient(circle at 30% 22%, rgba(255,255,255,0.5), transparent 55%)" }} />
+            <span className="relative text-xs sm:text-sm font-black text-white">#{rank}</span>
         </div>
     );
 }
