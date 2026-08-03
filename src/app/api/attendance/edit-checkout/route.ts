@@ -22,17 +22,12 @@ function buildTodayWIBTimestamp(dateKey: string, time: { h: number; m: number })
   return new Date(`${dateKey}T${pad(time.h)}:${pad(time.m)}:00+07:00`).toISOString();
 }
 
-// ✅ NEW — koreksi jam pulang yang sudah tercatat (bug kamera/sensor, atau
-// salah input manual sebelumnya), tanpa perlu hapus lalu buat ulang dari nol.
-// Admin-only. Kalau belum ada record OUT untuk user+tanggal ini, akan dibuatkan
-// baru (dianggap "isi jam pulang yang kelupaan").
-//
-// ✅ NEW — setelah jam pulang dikoreksi, draft lemburan AFTER_OUT/HOLIDAY yang
-// masih PENDING (belum di-ACC kepala divisi) otomatis dihitung ulang: dibuat
-// baru kalau sekarang ternyata lembur, disesuaikan menitnya kalau berubah,
-// atau dihapus kalau ternyata sudah tidak lembur lagi. Draft yang sudah di-ACC/
-// diaudit TIDAK PERNAH disentuh otomatis — admin akan diberi peringatan untuk
-// mengecek/menyesuaikan nominalnya secara manual lewat menu Lembur.
+// Poin 1 lanjutan — koreksi jam pulang: bisa isi/ubah jam pulang, ATAU
+// mengosongkannya kembali (misal salah catat karena bug sensor/kamera).
+// Admin-only. Setelah koreksi, draft lemburan AFTER_OUT/HOLIDAY yang masih
+// PENDING otomatis disesuaikan/dihapus mengikuti kondisi baru. Draft yang
+// sudah di-ACC/diaudit TIDAK PERNAH disentuh otomatis — hanya diberi
+// peringatan lewat field `warning` di response.
 export async function PATCH(request: Request) {
   try {
     const admin = await getCurrentUser();
@@ -44,19 +39,16 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { user_id, date, checkout_time } = body; // date: YYYY-MM-DD (WIB), checkout_time: HH:MM
+    const { user_id, date, checkout_time, clear } = body; // clear: true → kosongkan jam pulang
 
-    if (!user_id || !date || !checkout_time) {
+    if (!user_id || !date) {
+      return NextResponse.json({ success: false, message: "user_id dan date wajib diisi." }, { status: 400 });
+    }
+    if (!clear && !checkout_time) {
       return NextResponse.json(
-        { success: false, message: "user_id, date, dan checkout_time wajib diisi." },
+        { success: false, message: "checkout_time wajib diisi (atau kirim clear: true untuk mengosongkan)." },
         { status: 400 }
       );
-    }
-
-    const fmtTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
-    const newCheckoutISO = new Date(`${date}T${fmtTime(checkout_time)}+07:00`).toISOString();
-    if (Number.isNaN(new Date(newCheckoutISO).getTime())) {
-      return NextResponse.json({ success: false, message: "Format tanggal/jam tidak valid." }, { status: 400 });
     }
 
     const dayStart = `${date}T00:00:00+07:00`;
@@ -69,7 +61,6 @@ export async function PATCH(request: Request) {
     }
     const userRole = (Array.isArray(targetUser.roles) && targetUser.roles[0]) || targetUser.role;
 
-    // ── Cari record IN & OUT existing untuk user+tanggal ini (WIB) ─────────
     const [{ data: todayIn }, { data: existingOut }] = await Promise.all([
       supabaseAdmin.from("face_verifications").select("id, created_at")
         .eq("user_id", user_id).eq("status", "SUCCESS").eq("direction", "IN")
@@ -79,7 +70,49 @@ export async function PATCH(request: Request) {
         .gte("created_at", dayStart).lte("created_at", dayEnd).maybeSingle(),
     ]);
 
-    // ── Simpan/perbarui record OUT-nya dulu ─────────────────────────────────
+    // Dipakai baik jalur "clear" maupun jalur isi/koreksi jam di bawah.
+    const findLinkedDraft = async (faceVerificationId: string) => {
+      const { data } = await supabaseAdmin
+        .from("overtime_requests")
+        .select("id, status, audit_status")
+        .eq("source_face_verification_id", faceVerificationId)
+        .in("direction", ["AFTER_OUT", "HOLIDAY"])
+        .maybeSingle();
+      return data;
+    };
+
+    // ── Jalur "Kosongkan" — hapus record OUT, kembalikan ke belum-pulang ───
+    if (clear) {
+      if (!existingOut) {
+        return NextResponse.json({ success: true, mode: "already_empty" });
+      }
+
+      const linkedDraft = await findLinkedDraft(existingOut.id);
+      let overtimeWarning: string | undefined;
+
+      if (linkedDraft) {
+        const draftIsLocked = linkedDraft.status !== "PENDING" || linkedDraft.audit_status === "AUDITED";
+        if (draftIsLocked) {
+          overtimeWarning = "Lemburan untuk tanggal ini sudah di-ACC/diaudit — TIDAK ikut terhapus otomatis. Hapus/sesuaikan manual lewat menu Lembur kalau perlu.";
+        } else {
+          await supabaseAdmin.from("overtime_requests").delete().eq("id", linkedDraft.id);
+        }
+      }
+
+      const { error } = await supabaseAdmin.from("face_verifications").delete().eq("id", existingOut.id);
+      if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+
+      console.log(`[edit-checkout] Admin ${admin.name} mengosongkan jam pulang user ${user_id} @ ${date}`);
+      return NextResponse.json({ success: true, mode: "cleared", warning: overtimeWarning });
+    }
+
+    // ── Jalur isi/koreksi jam pulang ─────────────────────────────────────────
+    const fmtTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
+    const newCheckoutISO = new Date(`${date}T${fmtTime(checkout_time)}+07:00`).toISOString();
+    if (Number.isNaN(new Date(newCheckoutISO).getTime())) {
+      return NextResponse.json({ success: false, message: "Format tanggal/jam tidak valid." }, { status: 400 });
+    }
+
     let outRecordId: string;
     let mode: "updated" | "created";
 
@@ -109,12 +142,10 @@ export async function PATCH(request: Request) {
 
     console.log(`[edit-checkout] Admin ${admin.name} ${mode === "updated" ? "mengoreksi" : "menambahkan"} jam pulang user ${user_id} @ ${date} → ${newCheckoutISO}`);
 
-    // ── PKL tidak punya sistem lemburan — selesai di sini ───────────────────
     if (isPKLRole(userRole)) {
       return NextResponse.json({ success: true, mode });
     }
 
-    // ── Tentukan hari libur (sama seperti attendanceVerification.ts) ────────
     const nowWIB = new Date(new Date(newCheckoutISO).getTime() + 7 * 3600_000);
     const todayDow = nowWIB.getUTCDay();
 
@@ -126,7 +157,6 @@ export async function PATCH(request: Request) {
     ]);
     const isDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !dateWork);
 
-    // ── Hitung ulang menit lembur yang seharusnya berdasarkan jam baru ──────
     const [baseSchedule, scheduleOverride] = await Promise.all([
       resolveShiftConfigFromDB(user_id, supabaseAdmin),
       resolveScheduleOverride(supabaseAdmin, user_id, date),
@@ -149,24 +179,14 @@ export async function PATCH(request: Request) {
       correctMinutes = computeAfterOutOvertimeMinutes(newCheckoutISO, schedule);
     }
 
-    // ── Cari draft lemburan yang sebelumnya tersambung ke record OUT ini ────
-    const { data: existingDraft } = await supabaseAdmin
-      .from("overtime_requests")
-      .select("id, status, audit_status, duration_minutes")
-      .eq("source_face_verification_id", outRecordId)
-      .in("direction", ["AFTER_OUT", "HOLIDAY"])
-      .maybeSingle();
-
+    const existingDraft = await findLinkedDraft(outRecordId);
     let overtimeWarning: string | undefined;
-
     const draftIsLocked = existingDraft && (existingDraft.status !== "PENDING" || existingDraft.audit_status === "AUDITED");
 
     if (draftIsLocked) {
-      // Lemburan sudah di-ACC/diaudit — JANGAN diubah otomatis, cuma peringatan.
       overtimeWarning = "Lemburan untuk tanggal ini sudah di-ACC/diaudit sebelumnya — nominalnya TIDAK ikut berubah otomatis. Cek dan sesuaikan manual lewat menu Lembur kalau perlu.";
     } else if (correctMinutes > 0) {
       if (existingDraft) {
-        // Masih PENDING — aman disesuaikan.
         await supabaseAdmin.from("overtime_requests").update({
           direction: correctDirection,
           duration_minutes: correctMinutes,
@@ -176,7 +196,6 @@ export async function PATCH(request: Request) {
           updated_at: new Date().toISOString(),
         }).eq("id", existingDraft.id);
       } else {
-        // Belum ada draft — buat baru (misal koreksi bikin jadi lembur padahal sebelumnya tidak).
         await supabaseAdmin.from("overtime_requests").insert({
           user_id, request_date: date, direction: correctDirection, status: "PENDING",
           duration_minutes: correctMinutes, actual_start: correctActualStart, actual_end: correctActualEnd,
@@ -184,7 +203,6 @@ export async function PATCH(request: Request) {
         });
       }
     } else if (existingDraft) {
-      // Koreksi membuat lemburan jadi tidak berlaku lagi & masih PENDING — hapus.
       await supabaseAdmin.from("overtime_requests").delete().eq("id", existingDraft.id);
     }
 
