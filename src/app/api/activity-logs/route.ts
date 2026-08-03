@@ -13,6 +13,7 @@ export const GET = withAuth(
     const page = parseInt(searchParams.get("page") ?? "1");
     const limit = parseInt(searchParams.get("limit") ?? "20");
     const entity = searchParams.get("entity");
+    const entityId = searchParams.get("entity_id");
     const action = searchParams.get("action");
     const search = searchParams.get("search");
     const dateFrom = searchParams.get("date_from"); // format: YYYY-MM-DD
@@ -27,6 +28,7 @@ export const GET = withAuth(
       .range(from, to);
 
     if (entity) query = query.eq("entity", entity);
+    if (entityId) query = query.eq("entity_id", entityId);
     if (action) query = query.eq("action", action);
     if (search) {
       const term = `%${search}%`;
