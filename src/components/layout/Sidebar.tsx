@@ -976,7 +976,7 @@ function SidebarContent({
         )}
       </nav>
 
-      <div className={`pb-5 border-t border-gray-100 flex-shrink-0 ${rail ? "p-2" : "p-3"}`}>
+      <div className={`border-t border-gray-100 flex-shrink-0 ${rail ? "p-2 pb-5" : "p-3 pb-24 md:pb-5"}`}>
         <button onClick={onLogout} title={rail ? "Keluar" : undefined} className={`w-full group flex items-center rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all ${rail ? "justify-center py-2.5" : "gap-3 px-3 py-2"}`}>
           <span className="flex-shrink-0 group-hover:text-red-500">{Icons.logout}</span>
           {!rail && <span>Keluar</span>}

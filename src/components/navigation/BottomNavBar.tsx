@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Users, LayoutGrid, MessageCircle, User } from "lucide-react";
+import { useChatContext } from "@/contexts/ChatContext";
 
 interface NavItem {
   label: string;
@@ -11,20 +12,20 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Sosial", href: "/dashboard/social", icon: Users },
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
-  { label: "Group Chat", href: "/dashboard/chat", icon: MessageCircle },
+  { label: "Sosial", href: "/dashboard/social", icon: Users },
+  { label: "Group Chat", href: "#", icon: MessageCircle },
   { label: "Profil", href: "/dashboard/profile", icon: User },
 ];
 
 function isActive(pathname: string, href: string) {
-  // "/dashboard" harus exact match, biar ga selalu aktif di semua sub-route
   if (href === "/dashboard") return pathname === "/dashboard";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export default function BottomNavBar() {
   const pathname = usePathname();
+  const { openGroupChat, setOpenGroupChat } = useChatContext();
 
   return (
     <nav
@@ -38,12 +39,19 @@ export default function BottomNavBar() {
     >
       <div className="flex items-center justify-around h-16">
         {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-          const active = isActive(pathname, href);
+          const isGroupChat = label === "Group Chat";
+          const active = isGroupChat ? openGroupChat : isActive(pathname, href);
 
           return (
             <Link
-              key={href}
-              href={href}
+              key={label}
+              href={isGroupChat ? "#" : href}
+              onClick={(e) => {
+                if (isGroupChat) {
+                  e.preventDefault();
+                  setOpenGroupChat(!openGroupChat);
+                }
+              }}
               className="flex flex-col items-center justify-center gap-1 flex-1 h-full"
             >
               <div
