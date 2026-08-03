@@ -2956,8 +2956,24 @@ export default function AttendanceDashboardPage() {
     const [showManualModal, setShowManualModal] = useState(false);
     const [showManualCheckoutModal, setShowManualCheckoutModal] = useState(false);
     const [showEarlyCheckoutModal, setShowEarlyCheckoutModal] = useState(false);
-    const [editCheckoutData, setEditCheckoutData] = useState<{ userId: string; userName: string; dateKey: string; currentCheckoutIso: string | null } | null>(null);
-    const [showSalaryModal, setShowSalaryModal] = useState(false);
+    const [editCheckoutData, setEditCheckoutData] = useState<{ userId: string; userName: string; dateKey: string; currentCheckoutIso: string | null } | null>(null); // ✅ NEW — koreksi jam pulang
+    const [pendingEarlyCheckoutCount, setPendingEarlyCheckoutCount] = useState(0); // ✅ NEW — badge jumlah pengajuan izin pulang cepat yang menunggu ACC
+
+    useEffect(() => {
+        let mounted = true;
+        const fetchPendingCount = async () => {
+            try {
+                const r = await fetch("/api/attendance/early-checkout?status=PENDING");
+                const d = await r.json();
+                if (mounted && d.success) setPendingEarlyCheckoutCount((d.data || []).length);
+            } catch { /* gagal fetch: biarkan angka lama, jangan direset ke 0 */ }
+        };
+        fetchPendingCount();
+        const interval = setInterval(fetchPendingCount, 60000); // refresh tiap 1 menit
+        const onFocus = () => fetchPendingCount(); // refresh begitu kembali dari halaman approval
+        window.addEventListener("focus", onFocus);
+        return () => { mounted = false; clearInterval(interval); window.removeEventListener("focus", onFocus); };
+    }, []); const [showSalaryModal, setShowSalaryModal] = useState(false);
     const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [editManualData, setEditManualData] = useState<ManualAttendance | null>(null);
     const [manualPrefillDate, setManualPrefillDate] = useState<string | null>(null);
@@ -4276,13 +4292,17 @@ export default function AttendanceDashboardPage() {
                         >
                             <Trophy className="w-3.5 h-3.5" /> Leaderboard
                         </button>
-                        {/* ✅ NEW — poin 1: kepala divisi/admin approve izin pulang cepat */}
                         {canManage && (
                             <button
                                 onClick={() => router.push("/dashboard/attendance/early-checkout")}
-                                className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl hover:bg-amber-100 transition-all active:scale-95"
+                                className="relative flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl hover:bg-amber-100 transition-all active:scale-95"
                             >
                                 <Clock className="w-3.5 h-3.5" /> Izin Pulang Cepat
+                                {pendingEarlyCheckoutCount > 0 && (
+                                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-black leading-none shadow-sm">
+                                        {pendingEarlyCheckoutCount > 99 ? "99+" : pendingEarlyCheckoutCount}
+                                    </span>
+                                )}
                             </button>
                         )}
                         {isAdmin && (
@@ -4683,12 +4703,23 @@ export default function AttendanceDashboardPage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
-                                                {selectedAttendances.map(a => {
+                                                {selectedAttendances.map((a, idx) => {
                                                     const userId = a.user_id ?? "";
                                                     const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
                                                     const manualRec = manualMap[`${userId}_${dateKey}`];
+                                                  const rowStatusKey: string | undefined = manualRec?.status ?? a.displayStatus;
+                                                    const ACCENT_COLOR_MAP: Record<string, string> = {
+                                                        PRESENT: "border-l-emerald-400",
+                                                        LATE: "border-l-amber-400",
+                                                        SKIP: "border-l-gray-300",
+                                                        SICK: "border-l-blue-400",
+                                                        PERMIT: "border-l-violet-400",
+                                                        ABSENT: "border-l-red-400",
+                                                        LEAVE: "border-l-cyan-400",
+                                                    };
+                                                    const accentColor = (rowStatusKey && ACCENT_COLOR_MAP[rowStatusKey]) || "border-l-transparent";
                                                     return (
-                                                        <tr key={a.id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${a.source === "MANUAL" ? "bg-blue-50/40" : ""}`}>
+                                                        <tr key={a.id} className={`border-l-4 ${accentColor} hover:bg-gray-50/60 transition-colors duration-200 ${a.source === "MANUAL" ? "bg-blue-50/40" : idx % 2 === 1 ? "bg-gray-50/30" : ""}`}>
                                                             <td className="px-6 py-4">
                                                                 <div className="flex items-center gap-3">
                                                                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-[11px] font-black flex-shrink-0 shadow-md ${a.displayStatus === "PRESENT" ? "bg-gradient-to-br from-[#1a1a2e] to-[#16213e]" : "bg-gradient-to-br from-amber-500 to-orange-500"}`}>{initials(a.user_name)}</div>
@@ -4747,27 +4778,12 @@ export default function AttendanceDashboardPage() {
                                                                 })()}
                                                             </td>
                                                             <td className="px-4 py-4">
-                                                                {(() => {
-                                                                    const eff = effectiveShiftFor(userId, dateKey);
-                                                                    return (
-                                                                        <div className="flex flex-col gap-1">
-                                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg w-fit whitespace-nowrap">
-                                                                                Telat &gt; {minToHHMM(eff.late)}
-                                                                            </span>
-                                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-1 rounded-lg w-fit whitespace-nowrap">
-                                                                                Tutup {minToHHMM(eff.close)}
-                                                                            </span>
-                                                                        </div>
-                                                                    );
-                                                                })()}
-                                                            </td>
-                                                            <td className="px-4 py-4">
                                                                 {manualRec ? (
-                                                                    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${MANUAL_STATUS_LABELS[manualRec.status]?.bg} ${MANUAL_STATUS_LABELS[manualRec.status]?.color} ${MANUAL_STATUS_LABELS[manualRec.status]?.border}`}>
+                                                                    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border shadow-sm ${MANUAL_STATUS_LABELS[manualRec.status]?.bg} ${MANUAL_STATUS_LABELS[manualRec.status]?.color} ${MANUAL_STATUS_LABELS[manualRec.status]?.border}`}>
                                                                         {renderStatusEmoji(MANUAL_STATUS_LABELS[manualRec.status]?.emoji)} {MANUAL_STATUS_LABELS[manualRec.status]?.label}
                                                                     </span>
                                                                 ) : (
-                                                                    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${a.displayStatus === "PRESENT" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : a.displayStatus === "SKIP" ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-amber-100 text-amber-700 border-amber-200"}`}>
+                                                                    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border shadow-sm ${a.displayStatus === "PRESENT" ? "bg-emerald-100 text-emerald-700 border-emerald-200" : a.displayStatus === "SKIP" ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-amber-100 text-amber-700 border-amber-200"}`}>
                                                                         {a.displayStatus === "PRESENT" ? <Check className="w-3 h-3 text-emerald-600" /> : a.displayStatus === "SKIP" ? <X className="w-3 h-3 text-gray-500" /> : <Clock className="w-3 h-3 text-amber-600" />} {a.displayStatus === "PRESENT" ? "Tepat" : a.displayStatus === "SKIP" ? "Skip" : "Terlambat"}
                                                                     </span>
                                                                 )}
