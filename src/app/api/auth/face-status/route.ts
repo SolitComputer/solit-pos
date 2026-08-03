@@ -39,9 +39,6 @@ export async function GET() {
       });
     }
 
-    const faceVerified = (await verifyAttendanceCookie(
-      cookieStore.get("face_verified")?.value, user.id
-    )) ? user.id : undefined;
     const faceAttended = (await verifyAttendanceCookie(
       cookieStore.get("face_attended")?.value, user.id
     )) ? user.id : undefined;
@@ -221,8 +218,7 @@ export async function GET() {
       }
     }
 
-    const alreadyFromCookie = faceVerified === user.id || faceAttended === user.id;
-    const alreadyAttended = alreadyFromCookie || alreadyAttendedDB;
+    const alreadyAttended = alreadyAttendedDB;
 
     const getMidnightWIB = () => new Date(Date.UTC(
       nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(),
