@@ -12,7 +12,7 @@ export default function Layout({
 }) {
   return (
     <ChatProvider>
-      <main className="pb-16 md:pb-0">
+      <main className="pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
         {children}
       </main>
 
