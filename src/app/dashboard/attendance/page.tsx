@@ -1679,6 +1679,90 @@ function EarlyCheckoutRequestModal({ checkoutAt, onClose, onSaved }: {
     );
 }
 
+// ─── Modal: Edit/Koreksi Jam Pulang ────────────────────────────────────────────
+// ✅ NEW — perbaikan jam pulang yang salah tercatat (bug sensor/kamera, atau
+// absen manual yang keliru), tanpa perlu hapus lalu buat ulang dari nol.
+function EditCheckoutModal({ userName, dateKey, currentCheckoutIso, onClose, onSave }: {
+    userName: string;
+    dateKey: string;
+    currentCheckoutIso: string | null;
+    onClose: () => void;
+    onSave: (time: string) => Promise<void>;
+}) {
+    const parseTime = (iso: string | null): string => {
+        if (!iso) return "17:00";
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return "17:00";
+        return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).substring(0, 5);
+    };
+
+    const [time, setTime] = useState(parseTime(currentCheckoutIso));
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    const submit = async () => {
+        if (!time) { setError("Jam pulang wajib diisi"); return; }
+        setSaving(true); setError("");
+        try {
+            await onSave(time);
+        } catch (err: any) {
+            setError(err?.message || "Gagal menyimpan");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-6 py-5 flex items-start justify-between">
+                    <div>
+                        <p className="font-bold text-white text-base">
+                            {currentCheckoutIso ? "Koreksi Jam Pulang" : "Tambahkan Jam Pulang"}
+                        </p>
+                        <p className="text-xs text-white/70 mt-1">
+                            {userName} · {new Date(dateKey + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">{error}</div>}
+                    {currentCheckoutIso && (
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Jam Pulang Saat Ini</p>
+                            <p className="text-sm font-mono font-bold text-gray-700">{parseTime(currentCheckoutIso)} WIB</p>
+                        </div>
+                    )}
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Jam Pulang Baru (WIB) *</label>
+                        <input
+                            type="time"
+                            value={time}
+                            onChange={e => setTime(e.target.value)}
+                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 transition-all font-mono"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1.5">
+                            Perubahan ini langsung tercatat sebagai koreksi manual oleh admin. Tidak otomatis membuat ulang lemburan — atur lewat Input Manual kalau perlu.
+                        </p>
+                    </div>
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
+                    <button onClick={submit} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "Simpan"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Month Selector ────────────────────────────────────────────────────────────
 function MonthSelector({ onSelect }: { onSelect: (year: number, month: number) => void }) {
     const today = new Date();
@@ -2841,6 +2925,7 @@ export default function AttendanceDashboardPage() {
     const [showManualModal, setShowManualModal] = useState(false);
     const [showManualCheckoutModal, setShowManualCheckoutModal] = useState(false);
     const [showEarlyCheckoutModal, setShowEarlyCheckoutModal] = useState(false);
+    const [editCheckoutData, setEditCheckoutData] = useState<{ userId: string; userName: string; dateKey: string; currentCheckoutIso: string | null } | null>(null);
     const [showSalaryModal, setShowSalaryModal] = useState(false);
     const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [editManualData, setEditManualData] = useState<ManualAttendance | null>(null);
@@ -4505,7 +4590,6 @@ export default function AttendanceDashboardPage() {
                                                                     )}
                                                                 </div>
                                                             </td>
-                                                            {/* NEW: Tombol Edit di tabel */}
                                                             {isAdminRole(currentUser?.role)
                                                                 && (
                                                                     <td className="px-4 py-4 text-center">
@@ -4567,6 +4651,20 @@ export default function AttendanceDashboardPage() {
                                                                                     </button>
                                                                                 </>
                                                                             )}
+                                                                            {/* ✅ NEW — koreksi/isi jam pulang, terlepas dari sumber absen masuknya */}
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setEditCheckoutData({
+                                                                                        userId,
+                                                                                        userName: a.user_name,
+                                                                                        dateKey,
+                                                                                        currentCheckoutIso: checkoutTimes[`${userId}_${dateKey}`] ?? null,
+                                                                                    });
+                                                                                }}
+                                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 hover:border-violet-300 transition-all duration-200"
+                                                                                title="Edit/koreksi jam pulang">
+                                                                                Edit Pulang
+                                                                            </button>
                                                                         </div>
                                                                     </td>
                                                                 )}
@@ -6244,6 +6342,27 @@ export default function AttendanceDashboardPage() {
                     checkoutAt={todayStatus?.checkoutAt}
                     onClose={() => setShowEarlyCheckoutModal(false)}
                     onSaved={() => { fetchTodayStatus(); }}
+                />
+            )}
+            {editCheckoutData && (
+                <EditCheckoutModal
+                    userName={editCheckoutData.userName}
+                    dateKey={editCheckoutData.dateKey}
+                    currentCheckoutIso={editCheckoutData.currentCheckoutIso}
+                    onClose={() => setEditCheckoutData(null)}
+                    onSave={async (time) => {
+                        const res = await fetch("/api/attendance/edit-checkout", {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ user_id: editCheckoutData.userId, date: editCheckoutData.dateKey, checkout_time: time }),
+                        });
+                        const d = await res.json();
+                        if (!d.success) throw new Error(d.message || "Gagal menyimpan jam pulang");
+                        if (d.warning) alert(d.warning); 
+                        await refreshAll();
+                        fetchTodayStatus();
+                        setEditCheckoutData(null);
+                    }}
                 />
             )}
             {showManualModal && isAdminRole(currentUser?.role) && (
