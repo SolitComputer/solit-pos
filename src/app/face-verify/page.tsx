@@ -7,7 +7,8 @@ import { startAuthentication, browserSupportsWebAuthn, platformAuthenticatorIsAv
 type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
   | "enrolling" | "verifying" | "success" | "error"
-  | "out-of-range" | "out-of-time" | "no-camera" | "day-off" | "gps-denied";
+  | "out-of-range" | "out-of-time" | "no-camera" | "day-off" | "gps-denied"
+  | "early-checkout-request";
 
 const MAX_ATTEMPTS = 5;
 const AUTO_CAPTURE_CONFIDENCE = 0.75;
@@ -87,6 +88,12 @@ export default function FaceVerifyPage() {
   const [timeInfo, setTimeInfo] = useState<{
     reason: "TOO_EARLY" | "TOO_LATE"; openAt: string; closeAt: string;
   } | null>(null);
+
+  const [earlyCheckoutMsg, setEarlyCheckoutMsg] = useState<string>("");
+  const [earlyCheckoutReason, setEarlyCheckoutReason] = useState("");
+  const [earlyCheckoutSubmitting, setEarlyCheckoutSubmitting] = useState(false);
+  const [earlyCheckoutSubmitted, setEarlyCheckoutSubmitted] = useState(false);
+  const [earlyCheckoutError, setEarlyCheckoutError] = useState("");
 
   const [userShift, setUserShift] = useState<ShiftType>("PAGI");
   const [needEnrollState, setNeedEnrollState] = useState(false);
@@ -259,7 +266,7 @@ export default function FaceVerifyPage() {
           setBiometricDeviceSupported(false);
         }
 
-       // ✅ FIX (poin 1): "selesai hari ini" sekarang berarti sudah absen
+        // ✅ FIX (poin 1): "selesai hari ini" sekarang berarti sudah absen
         // MASUK **dan** PULANG. Kalau baru absen masuk, halaman ini tetap
         // dibuka lagi nanti untuk absen pulang.
         const direction: "IN" | "OUT" = statusResult.needsCheckout ? "OUT" : "IN";
@@ -465,7 +472,7 @@ export default function FaceVerifyPage() {
               });
               const enrollData = await enrollRes.json();
 
-             if (enrollData.success) {
+              if (enrollData.success) {
                 addLog("enrollment berhasil ", "ok");
                 const vd = await doVerify(embedding, 1, coords);
                 if (vd.success) {
@@ -501,7 +508,7 @@ export default function FaceVerifyPage() {
               addLog(`mencoba verifikasi [${currentAttempt}/${MAX_ATTEMPTS}]...`, "info");
               const vd = await doVerify(embedding, currentAttempt, coords);
 
-             if (vd.success) {
+              if (vd.success) {
                 setStage("success");
                 setMessage(
                   vd.direction === "OUT"
@@ -512,11 +519,13 @@ export default function FaceVerifyPage() {
                   ? `/dashboard/attendance/overtime?fillDetail=${vd.overtime.id}`
                   : redirectTo;
                 setTimeout(() => (window.location.href = target), 1500);
+              } else if (vd.code === "EARLY_CHECKOUT_NOT_APPROVED") {
+                setEarlyCheckoutMsg(vd.message ?? "Belum waktunya pulang.");
+                setStage("early-checkout-request");
               } else if (vd.outOfTime) {
                 setTimeInfo({
                   reason: vd.reason === "TOO_EARLY" ? "TOO_EARLY" : "TOO_LATE",
-                  openAt: scheduleInfo?.openAt ?? "",
-                  closeAt: scheduleInfo?.closeAt ?? "",
+                  openAt: scheduleInfo?.openAt ?? "", closeAt: scheduleInfo?.closeAt ?? "",
                 });
                 setStage("out-of-time");
               } else if (vd.needEnroll) {
@@ -603,6 +612,33 @@ export default function FaceVerifyPage() {
     window.location.href = redirectTo;
   }, [redirectTo, gpsCoords]);
 
+  // ✅ NEW (poin 1) — kirim pengajuan izin pulang cepat ke admin/kepala divisi
+  const submitEarlyCheckoutRequest = useCallback(async () => {
+    if (!earlyCheckoutReason.trim()) {
+      setEarlyCheckoutError("Alasan wajib diisi");
+      return;
+    }
+    setEarlyCheckoutSubmitting(true);
+    setEarlyCheckoutError("");
+    try {
+      const res = await fetch("/api/attendance/early-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: earlyCheckoutReason.trim() }),
+      });
+      const d = await res.json();
+      if (!d.success) {
+        setEarlyCheckoutError(d.message || "Gagal mengirim pengajuan");
+        return;
+      }
+      setEarlyCheckoutSubmitted(true);
+    } catch {
+      setEarlyCheckoutError("Gagal mengirim pengajuan");
+    } finally {
+      setEarlyCheckoutSubmitting(false);
+    }
+  }, [earlyCheckoutReason]);
+
   const handleBiometricAttendance = useCallback(async () => {
     if (!biometricEnrolled) {
       // ✅ FIX: dulu di sini langsung register-options → startRegistration →
@@ -639,7 +675,7 @@ export default function FaceVerifyPage() {
           accuracy: gpsCoords?.accuracy ?? null,
         }),
       });
-     const verifyData2 = await verifyRes2.json();
+      const verifyData2 = await verifyRes2.json();
       if (verifyData2.success) {
         setStage("success");
         setMessage(
@@ -651,6 +687,9 @@ export default function FaceVerifyPage() {
           ? `/dashboard/attendance/overtime?fillDetail=${verifyData2.overtime.id}`
           : redirectTo;
         setTimeout(() => (window.location.href = target), 1500);
+      } else if (verifyData2.code === "EARLY_CHECKOUT_NOT_APPROVED") {
+        setEarlyCheckoutMsg(verifyData2.message ?? "Belum waktunya pulang.");
+        setStage("early-checkout-request");
       } else if (verifyData2.outOfTime) {
         setTimeInfo({
           reason: verifyData2.reason === "TOO_EARLY" ? "TOO_EARLY" : "TOO_LATE",
@@ -866,7 +905,7 @@ export default function FaceVerifyPage() {
               <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
                 Hari Ini Kamu Libur
               </div>
-             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
                 Absen tidak wajib di hari libur.<br />
                 {/* ✅ FIX (poin 12): kalau tetap absen, sekarang dihitung lembur penuh */}
                 Tapi kalau tetap masuk, jam kerjamu <span style={{ color: "rgba(251,146,60,0.8)", fontWeight: 600 }}>akan dihitung lembur penuh</span>.
@@ -918,6 +957,61 @@ export default function FaceVerifyPage() {
                   Mengalihkan...
                 </span>
               ) : "Lanjut ke Dashboard →"}
+            </button>
+          </div>
+        )}
+
+        {/* Early checkout — belum waktunya pulang, minta izin admin */}
+        {stage === "early-checkout-request" && (
+          <div style={{ padding: "8px 0 16px" }}>
+            <div className="time-gate-card">
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
+                Belum Waktunya Pulang
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7, marginBottom: 16 }}>
+                {earlyCheckoutMsg}
+              </div>
+            </div>
+
+            {earlyCheckoutSubmitted ? (
+              <div style={{ marginTop: 16, textAlign: "center" }}>
+                <div style={{ fontSize: 13, color: "rgba(74,222,128,0.85)", marginBottom: 12 }}>
+                  Pengajuan izin terkirim. Tunggu persetujuan admin/atasan, lalu coba absen pulang lagi.
+                </div>
+                <button className="btn-main" onClick={() => window.location.reload()}>Coba Absen Lagi</button>
+              </div>
+            ) : (
+              <div style={{ marginTop: 16 }}>
+                <label style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", display: "block", marginBottom: 6 }}>
+                  Alasan pulang cepat *
+                </label>
+                <textarea
+                  value={earlyCheckoutReason}
+                  onChange={e => setEarlyCheckoutReason(e.target.value)}
+                  placeholder="Contoh: keperluan keluarga mendadak..."
+                  rows={3}
+                  style={{
+                    width: "100%", background: "#0d0d14", border: "0.5px solid rgba(255,255,255,0.1)",
+                    borderRadius: 10, padding: "10px 12px", color: "rgba(255,255,255,0.85)",
+                    fontSize: 12, fontFamily: "inherit", resize: "none", marginBottom: 10,
+                  }}
+                />
+                {earlyCheckoutError && (
+                  <div style={{ fontSize: 11, color: "#f87171", marginBottom: 10 }}>{earlyCheckoutError}</div>
+                )}
+                <button className="btn-main" disabled={earlyCheckoutSubmitting} onClick={submitEarlyCheckoutRequest}>
+                  {earlyCheckoutSubmitting ? "Mengirim..." : "Ajukan Izin Pulang Cepat"}
+                </button>
+              </div>
+            )}
+
+            <button className="btn-ghost" style={{ marginTop: 12, width: "100%", textAlign: "center" }} disabled={skipping} onClick={handleSkipToRedirect}>
+              {skipping ? "Mengalihkan..." : "Kembali ke Dashboard →"}
             </button>
           </div>
         )}
@@ -1280,7 +1374,7 @@ export default function FaceVerifyPage() {
         )}
 
         {/* Terminal log */}
-        {!["loading", "checking", "out-of-time", "day-off"].includes(stage) && (
+        {!["loading", "checking", "out-of-time", "day-off", "early-checkout-request"].includes(stage) && (
           <div style={{ marginTop: 14, marginBottom: 14 }}>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", letterSpacing: 0.5, marginBottom: 5 }}>system log</div>
             <div className="t-log">
@@ -1296,7 +1390,7 @@ export default function FaceVerifyPage() {
         )}
 
         {/* Footer */}
-        {!["loading", "checking", "success", "out-of-time"].includes(stage) && (
+        {!["loading", "checking", "success", "out-of-time", "early-checkout-request"].includes(stage) && (
           <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.05)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <button className="btn-ghost" onClick={handleLogout}>Bukan Anda? Ganti akun</button>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.15)", letterSpacing: 0.4 }}>biometric only · wib</div>

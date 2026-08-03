@@ -97,7 +97,6 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
     ? { ...baseSchedule, ...overrideShape, checkout: overrideShape.checkout ?? baseSchedule.checkout }
     : baseSchedule;
 
-  // ── IN: batas terakhir absen masuk tetap berlaku, KECUALI hari libur ────
   if (direction === "IN" && !isDayOff) {
     const timeCheck = isAttendanceTimeForSchedule(schedule);
     if (!timeCheck.allowed) {
@@ -105,9 +104,34 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
     }
   }
 
-  // ── OUT: wajib sudah absen masuk (safety net kedua selain forceDirection) ─
   if (direction === "OUT" && !todayIn) {
     return { ok: false, status: 400, code: "NO_CHECKIN", message: "Kamu belum absen masuk hari ini, tidak bisa absen pulang." };
+  }
+
+  if (direction === "OUT" && !isDayOff && p.method !== "MANUAL_ADMIN") {
+    const scheduledCheckoutISO = buildTodayWIBTimestamp(todayDate, schedule.checkout);
+    const isEarly = new Date(nowISO).getTime() < new Date(scheduledCheckoutISO).getTime();
+
+    if (isEarly) {
+      const { data: approval } = await supabaseAdmin
+        .from("early_checkout_requests")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("request_date", todayDate)
+        .eq("status", "APPROVED")
+        .maybeSingle();
+
+      if (!approval) {
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const checkoutLabel = `${pad(schedule.checkout.h)}:${pad(schedule.checkout.m)} WIB`;
+        return {
+          ok: false,
+          status: 403,
+          code: "EARLY_CHECKOUT_NOT_APPROVED",
+          message: `Belum waktunya pulang (jadwal ${checkoutLabel}). Ajukan izin pulang cepat ke admin terlebih dahulu.`,
+        };
+      }
+    }
   }
 
   const weight = direction === "IN" ? calcAttendanceWeightFromSchedule(nowISO, schedule).weight : null;

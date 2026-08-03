@@ -34,6 +34,7 @@ export interface AuthUser {
    */
   roles: string[];
   shift?: "PAGI" | "SORE";
+  iat?: number;
 }
 
 export const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
@@ -125,10 +126,10 @@ function normalizeAuthPayload(payload: Record<string, any>): AuthUser {
       role: payload.roles[0] as import("@/lib/permissions").UserRole,
       roles: payload.roles as string[],
       shift: payload.shift,
+      iat: typeof payload.iat === "number" ? payload.iat : undefined,
     };
   }
 
-  // Token lama: hanya ada role string
   const singleRole = (payload.role ?? "CREW_SALES") as string;
   return {
     id: payload.id,
@@ -136,6 +137,7 @@ function normalizeAuthPayload(payload: Record<string, any>): AuthUser {
     role: singleRole as import("@/lib/permissions").UserRole,
     roles: [singleRole],
     shift: payload.shift,
+    iat: typeof payload.iat === "number" ? payload.iat : undefined,
   };
 }
 
@@ -237,7 +239,7 @@ export async function resolveShiftConfigFromDB(
   const todayDow = nowWIB.getUTCDay();
   const todayDate = nowWIB.toISOString().slice(0, 10);
 
- const [
+  const [
     { data: userData },
     { data: dateSchedule },
     { data: weeklySchedule },
