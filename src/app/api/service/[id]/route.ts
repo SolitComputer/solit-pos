@@ -82,6 +82,9 @@ export async function PATCH(
     payment_note,
     payment_method,
     accessories_used,
+    payment_status, //  NEW
+    total_tagihan, //  NEW
+    cicilan_amount, //  NEW
   } = body as {
     action: string;
     alasan?: string;
@@ -92,6 +95,9 @@ export async function PATCH(
     payment_note?: string;
     payment_method?: string;
     accessories_used?: { accessory_id: string; unit_id?: string; qty: number }[];
+    payment_status?: "LUNAS" | "DP"; //  NEW
+    total_tagihan?: number; //  NEW
+    cicilan_amount?: number; //  NEW
   };
 
   const supabase = getAdmin();
@@ -227,22 +233,93 @@ export async function PATCH(
     case "diambil":
       if (oldStatus !== "DONE" && oldStatus !== "GAGAL_DIPERBAIKI")
         return NextResponse.json({ success: false, message: "Status tidak valid untuk diambil" }, { status: 400 });
+
+      if (payment_status === "DP") {
+        //  NEW — bayar DP: order TETAP di status semula (DONE/GAGAL_DIPERBAIKI), belum diambil
+        if (!payment_amount || payment_amount <= 0)
+          return NextResponse.json({ success: false, message: "Nominal DP wajib diisi" }, { status: 400 });
+        newStatus = oldStatus;
+        updatePayload = {
+          payment_status: "DP",
+          total_tagihan: total_tagihan ?? payment_amount,
+          payment_amount,
+          payment_note: payment_note || null,
+          payment_method: "DP",
+          payment_by: user.id,
+          payment_confirmed_at: new Date().toISOString(),
+        };
+        logCatatan = `DP diterima · Rp ${payment_amount.toLocaleString("id-ID")} dari total Rp ${Number(total_tagihan ?? payment_amount).toLocaleString("id-ID")}`;
+      } else {
+        newStatus = "SUDAH_DIAMBIL";
+        updatePayload = {
+          diambil_by: user.id,
+          tanggal_diambil: new Date().toISOString(),
+          ...(payment_amount !== undefined && payment_amount > 0 ? {
+            payment_amount,
+            payment_status: "LUNAS", //  NEW
+            total_tagihan: total_tagihan ?? payment_amount, //  NEW
+            payment_note: payment_note || null,
+            payment_method: payment_method || "CASH",
+            payment_by: user.id,
+            payment_confirmed_at: new Date().toISOString(),
+          } : {}),
+        };
+        logCatatan = payment_amount
+          ? `Laptop sudah diambil · Biaya: Rp ${payment_amount.toLocaleString("id-ID")}`
+          : "Laptop sudah diambil pelanggan";
+      }
+      break;
+
+    //  NEW — pelunasan sisa DP sekaligus
+    case "bayar_lunas": {
+      if (current.payment_status !== "DP")
+        return NextResponse.json({ success: false, message: "Order ini tidak dalam status DP" }, { status: 400 });
+      if (oldStatus !== "DONE" && oldStatus !== "GAGAL_DIPERBAIKI")
+        return NextResponse.json({ success: false, message: "Status tidak valid" }, { status: 400 });
+
+      const totalTagihanLunas = Number(current.total_tagihan ?? 0);
+      const sisaLunas = totalTagihanLunas - Number(current.payment_amount ?? 0);
       newStatus = "SUDAH_DIAMBIL";
       updatePayload = {
         diambil_by: user.id,
         tanggal_diambil: new Date().toISOString(),
-        ...(payment_amount !== undefined && payment_amount > 0 ? {
-          payment_amount,
-          payment_note: payment_note || null,
-          payment_method: payment_method || "CASH",
-          payment_by: user.id,
+        payment_amount: totalTagihanLunas,
+        payment_status: "LUNAS",
+        payment_confirmed_at: new Date().toISOString(),
+      };
+      logCatatan = `Pelunasan sisa DP · Rp ${sisaLunas.toLocaleString("id-ID")} · Total lunas Rp ${totalTagihanLunas.toLocaleString("id-ID")}`;
+      break;
+    }
+
+    //  NEW — cicilan sebagian dari sisa DP
+    case "bayar_cicilan": {
+      if (current.payment_status !== "DP")
+        return NextResponse.json({ success: false, message: "Order ini tidak dalam status DP" }, { status: 400 });
+      if (oldStatus !== "DONE" && oldStatus !== "GAGAL_DIPERBAIKI")
+        return NextResponse.json({ success: false, message: "Status tidak valid" }, { status: 400 });
+      if (!cicilan_amount || cicilan_amount <= 0)
+        return NextResponse.json({ success: false, message: "Nominal cicilan wajib diisi" }, { status: 400 });
+
+      const totalTagihanCicil = Number(current.total_tagihan ?? 0);
+      const sudahDibayar = Number(current.payment_amount ?? 0);
+      const totalBaru = sudahDibayar + cicilan_amount;
+      const sudahLunas = totalBaru >= totalTagihanCicil;
+
+      newStatus = sudahLunas ? "SUDAH_DIAMBIL" : oldStatus;
+      updatePayload = {
+        payment_amount: totalBaru,
+        payment_status: sudahLunas ? "LUNAS" : "DP",
+        ...(sudahLunas ? {
+          diambil_by: user.id,
+          tanggal_diambil: new Date().toISOString(),
           payment_confirmed_at: new Date().toISOString(),
         } : {}),
       };
-      logCatatan = payment_amount
-        ? `Laptop sudah diambil · Biaya: Rp ${payment_amount.toLocaleString("id-ID")}`
-        : "Laptop sudah diambil pelanggan";
+      logCatatan = sudahLunas
+        ? `Cicilan Rp ${cicilan_amount.toLocaleString("id-ID")} · Lunas total Rp ${totalBaru.toLocaleString("id-ID")}`
+        : `Cicilan Rp ${cicilan_amount.toLocaleString("id-ID")} · Sisa Rp ${(totalTagihanCicil - totalBaru).toLocaleString("id-ID")}`;
       break;
+    }
 
     case "tidak_jadi":
       if (oldStatus !== "DONE")

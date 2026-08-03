@@ -43,9 +43,11 @@ export interface ServiceOrder {
 
   payment_amount?: number;
   payment_note?: string;
-  payment_method?: "CASH" | "TRANSFER" | "QRIS";
+  payment_method?: "CASH" | "TRANSFER" | "QRIS" | "DP";
   payment_confirmed_at?: string;
   payment_by?: string;
+  payment_status?: "LUNAS" | "DP"; //  NEW — LUNAS = default, DP = masih ada sisa tagihan
+  total_tagihan?: number | null; //  NEW — total biaya servis yang disepakati
 
   // User tracking
   created_by?: string;
