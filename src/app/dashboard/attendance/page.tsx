@@ -14,6 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
 import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Inbox, CalendarDays, GraduationCap, Briefcase, Trophy } from "lucide-react";
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
+import ExcelJS from "exceljs";
 
 function isPKLRole(role?: string): boolean {
     if (!role) return false;
@@ -3949,6 +3950,185 @@ export default function AttendanceDashboardPage() {
         }
     }, [salaryMap, overtimeTotal, calYear, calMonth]);
 
+    // ✅ NEW — export tabel Rekap Gaji (tab "salary", karyawan non-PKL) ke Excel.
+    // Angka dihitung ulang pakai computeMonthlySalary yang sama dengan tabel/footer,
+    // jadi tidak ada logic gaji baru — cuma bikin file .xlsx dengan tampilan tabel
+    // 2-level header (PENGHASILAN / POTONGAN / TOTAL), mirip struktur tabel di layar.
+    const exportSalaryRecapToExcel = useCallback(async () => {
+        const filtered = userSummary.filter(u => {
+            const uInfo = allUsers.find(au => au.id === u.userId);
+            return uInfo ? !isPKLRole(uInfo.role) : true;
+        });
+
+        if (filtered.length === 0) {
+            alert("Tidak ada data karyawan untuk di-export bulan ini");
+            return;
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = "Solit 03";
+        workbook.created = new Date();
+        const sheet = workbook.addWorksheet("Rekap Gaji", {
+            views: [{ state: "frozen", xSplit: 2, ySplit: 5 }],
+        });
+
+        // Kolom A..K
+        const colWidths = [6, 26, 16, 16, 16, 14, 14, 14, 18, 16, 18];
+        colWidths.forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
+
+        // ── Baris 1: Judul ──
+        sheet.mergeCells("A1:K1");
+        const titleCell = sheet.getCell("A1");
+        titleCell.value = `REKAP GAJI KARYAWAN — ${MONTH_NAMES[calMonth].toUpperCase()} ${calYear}`;
+        titleCell.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
+        titleCell.alignment = { vertical: "middle", horizontal: "center" };
+        titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4338CA" } };
+        sheet.getRow(1).height = 26;
+
+        // ── Baris 2: Subjudul ──
+        sheet.mergeCells("A2:K2");
+        const subtitleCell = sheet.getCell("A2");
+        subtitleCell.value = `Solit 03 · Diexport ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}`;
+        subtitleCell.font = { italic: true, size: 10, color: { argb: "FF6B7280" } };
+        subtitleCell.alignment = { vertical: "middle", horizontal: "center" };
+        sheet.getRow(2).height = 18;
+        sheet.getRow(3).height = 6; // spacer
+
+        // ── Baris 4-5: Header grup + sub-kolom ──
+        sheet.mergeCells("A4:A5");
+        sheet.mergeCells("B4:B5");
+        sheet.mergeCells("C4:F4"); // Penghasilan
+        sheet.mergeCells("G4:H4"); // Potongan
+        sheet.mergeCells("I4:K4"); // Total
+
+        const noCell = sheet.getCell("A4"); noCell.value = "No";
+        const namaCell = sheet.getCell("B4"); namaCell.value = "Nama Karyawan";
+        const penghasilanCell = sheet.getCell("C4"); penghasilanCell.value = "PENGHASILAN";
+        const potonganCell = sheet.getCell("G4"); potonganCell.value = "POTONGAN";
+        const totalCell = sheet.getCell("I4"); totalCell.value = "TOTAL";
+
+        [noCell, namaCell].forEach(cell => {
+            cell.font = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4338CA" } };
+            cell.alignment = { vertical: "middle", horizontal: "center" };
+        });
+
+        const groupStyles: Array<[typeof penghasilanCell, string]> = [
+            [penghasilanCell, "FF059669"], // hijau — Penghasilan
+            [potonganCell, "FFDC2626"],    // merah — Potongan
+            [totalCell, "FF2563EB"],       // biru — Total
+        ];
+        groupStyles.forEach(([cell, color]) => {
+            cell.font = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } };
+            cell.alignment = { vertical: "middle", horizontal: "center" };
+        });
+
+        const subHeaderLabels = ["Gaji Pokok", "Tunjangan Istri", "Tunjangan Anak", "Lemburan", "Kasbon", "Pensiun", "Gross", "Total Potongan", "Gaji Bersih (Net)"];
+        subHeaderLabels.forEach((label, i) => {
+            const cell = sheet.getCell(5, i + 3); // mulai kolom C
+            cell.value = label;
+            cell.font = { bold: true, size: 10, color: { argb: "FFFFFFFF" } };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF6366F1" } };
+            cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        });
+
+        sheet.getRow(4).height = 20;
+        sheet.getRow(5).height = 28;
+
+        for (let r = 4; r <= 5; r++) {
+            for (let c = 1; c <= 11; c++) {
+                sheet.getCell(r, c).border = {
+                    top: { style: "thin", color: { argb: "FFFFFFFF" } },
+                    left: { style: "thin", color: { argb: "FFFFFFFF" } },
+                    bottom: { style: "thin", color: { argb: "FFFFFFFF" } },
+                    right: { style: "thin", color: { argb: "FFFFFFFF" } },
+                };
+            }
+        }
+
+        // ── Data rows (mulai baris 6) ──
+        const currencyColIndexes = [3, 4, 5, 6, 7, 8, 9, 10, 11]; // C..K
+        const totals = new Array(currencyColIndexes.length).fill(0);
+
+        filtered.forEach((u, idx) => {
+            const sal = salaryMap[u.userId];
+            const allow = allowanceMap[u.userId];
+            const overtime = overtimeTotal[u.userId] || 0;
+            const calc = computeMonthlySalary(sal, allow, overtime, u);
+            const values = [
+                idx + 1,
+                u.name,
+                calc.salaryIncome,
+                calc.allowanceWife,
+                calc.allowanceChild,
+                calc.overtime,
+                calc.deductionLoan,
+                calc.deductionPension,
+                calc.grossIncome,
+                calc.totalDeduction,
+                calc.netSalary,
+            ];
+            const row = sheet.addRow(values);
+            const isEven = idx % 2 === 1;
+
+            row.eachCell((cell, colNumber) => {
+                cell.border = {
+                    top: { style: "thin", color: { argb: "FFE5E7EB" } },
+                    left: { style: "thin", color: { argb: "FFE5E7EB" } },
+                    bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+                    right: { style: "thin", color: { argb: "FFE5E7EB" } },
+                };
+                if (isEven) {
+                    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+                }
+                if (colNumber === 1) cell.alignment = { horizontal: "center" };
+                if (colNumber === 2) cell.alignment = { horizontal: "left" };
+                if (currencyColIndexes.includes(colNumber)) {
+                    cell.numFmt = "#,##0";
+                    cell.alignment = { horizontal: "right" };
+                }
+            });
+
+            // Highlight kolom Gaji Bersih (Net) — kolom ke-11
+            const netCell = row.getCell(11);
+            netCell.font = { bold: true, color: { argb: "FF047857" } };
+            netCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFECFDF5" } };
+
+            currencyColIndexes.forEach((c, i) => { totals[i] += values[c - 1] as number; });
+        });
+
+        // ── Baris TOTAL ──
+        const totalRow = sheet.addRow(["", "TOTAL", ...totals]);
+        totalRow.eachCell((cell, colNumber) => {
+            cell.font = { bold: true, size: 11 };
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+            cell.border = {
+                top: { style: "double", color: { argb: "FF4338CA" } },
+                left: { style: "thin", color: { argb: "FFD1D5DB" } },
+                bottom: { style: "thin", color: { argb: "FFD1D5DB" } },
+                right: { style: "thin", color: { argb: "FFD1D5DB" } },
+            };
+            if (currencyColIndexes.includes(colNumber)) {
+                cell.numFmt = "#,##0";
+                cell.alignment = { horizontal: "right" };
+            }
+        });
+        totalRow.getCell(11).font = { bold: true, size: 11, color: { argb: "FF047857" } };
+        totalRow.getCell(11).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFA7F3D0" } };
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Rekap_Gaji_${MONTH_NAMES[calMonth]}_${calYear}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+    }, [userSummary, allUsers, salaryMap, allowanceMap, overtimeTotal, calMonth, calYear]);
+
     const buildAttendanceDetail = useCallback((
         userName: string,
         type: "present" | "late"
@@ -4980,6 +5160,13 @@ export default function AttendanceDashboardPage() {
                                 </p>
                             </div>
                             <div className="flex gap-2">
+                                <button
+                                    onClick={exportSalaryRecapToExcel}
+                                    disabled={loading}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 transition-all disabled:opacity-60"
+                                >
+                                    <FileText className="w-3.5 h-3.5" /> Export Excel
+                                </button>
                                 <button onClick={() => { if (allUsers.length === 0) fetchAllUsers(); setSalaryModalPklOnly(false); setShowSalaryModal(true); }} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-100 transition-all">Atur Gaji</button>
                             </div>
                         </div>

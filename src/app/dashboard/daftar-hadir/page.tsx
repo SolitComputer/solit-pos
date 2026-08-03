@@ -18,6 +18,9 @@ import {
   Copy,
   Check,
   ArrowUpDown,
+  CalendarDays,
+  Clock,
+  Percent,
 } from "lucide-react";
 
 type AttendanceEntry = {
@@ -91,9 +94,9 @@ const SECTIONS: {
     label: "Masuk Pagi",
     shortLabel: "Pagi",
     icon: <Sun className="w-5 h-5 text-amber-500" />,
-    gradient: "from-amber-50 to-yellow-50",
-    iconBg: "bg-amber-100",
-    barColor: "bg-amber-400",
+    gradient: "from-amber-50 via-orange-50/60 to-yellow-50",
+    iconBg: "bg-gradient-to-br from-amber-100 to-orange-100",
+    barColor: "bg-gradient-to-r from-amber-400 to-orange-400",
     emptyText: "Belum ada data kehadiran pagi ini.",
     borderAccent: "border-l-[3px] border-l-amber-300",
   },
@@ -102,9 +105,9 @@ const SECTIONS: {
     label: "Masuk Siang",
     shortLabel: "Siang",
     icon: <Cloud className="w-5 h-5 text-sky-500" />,
-    gradient: "from-sky-50 to-blue-50",
-    iconBg: "bg-sky-100",
-    barColor: "bg-sky-400",
+    gradient: "from-sky-50 via-blue-50/60 to-cyan-50",
+    iconBg: "bg-gradient-to-br from-sky-100 to-blue-100",
+    barColor: "bg-gradient-to-r from-sky-400 to-blue-400",
     emptyText: "Belum ada data kehadiran siang ini.",
     borderAccent: "border-l-[3px] border-l-sky-300",
   },
@@ -113,9 +116,9 @@ const SECTIONS: {
     label: "Masuk Sore",
     shortLabel: "Sore",
     icon: <Moon className="w-5 h-5 text-indigo-500" />,
-    gradient: "from-indigo-50 to-violet-50",
-    iconBg: "bg-indigo-100",
-    barColor: "bg-indigo-400",
+    gradient: "from-indigo-50 via-violet-50/60 to-purple-50",
+    iconBg: "bg-gradient-to-br from-indigo-100 to-violet-100",
+    barColor: "bg-gradient-to-r from-indigo-400 to-violet-400",
     emptyText: "Belum ada data kehadiran sore ini.",
     borderAccent: "border-l-[3px] border-l-indigo-300",
   },
@@ -233,27 +236,36 @@ export default function DaftarHadirPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 sm:space-y-6">
         {/* Header — sticky di mobile biar tetap keliatan pas scroll list panjang */}
         <div
-          className={`sticky top-0 z-20 -mx-4 px-4 sm:mx-0 sm:px-0 pt-1 pb-2 sm:pt-0 sm:pb-0 transition-shadow duration-200 ${
-            scrolled ? "bg-white/90 backdrop-blur-sm shadow-sm sm:bg-transparent sm:backdrop-blur-0 sm:shadow-none" : ""
+          className={`sticky top-0 z-20 -mx-4 px-4 sm:mx-0 sm:px-0 pt-1 pb-3 sm:pt-0 sm:pb-0 transition-shadow duration-300 ${
+            scrolled ? "bg-white/90 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.05)] sm:bg-transparent sm:backdrop-blur-0 sm:shadow-none" : ""
           }`}
         >
           <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-[#1a1a2e] to-[#16213e] bg-clip-text text-transparent">
-                Daftar Hadir
-              </h1>
-              <p className="text-xs text-gray-400 mt-1">{todayLabel()}</p>
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex w-11 h-11 rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] items-center justify-center shadow-lg shadow-[#1a1a2e]/20 flex-shrink-0">
+                <Users className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight bg-gradient-to-r from-[#1a1a2e] to-[#16213e] bg-clip-text text-transparent">
+                  Daftar Hadir
+                </h1>
+                <p className="flex items-center gap-1.5 text-xs text-gray-400 mt-1">
+                  <CalendarDays className="w-3.5 h-3.5 text-gray-300" />
+                  {todayLabel()}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-gray-400">
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 bg-white border border-gray-100 rounded-full px-3 py-1.5 shadow-sm">
                 <span className={`w-1.5 h-1.5 rounded-full bg-emerald-400 ${refreshing ? "animate-pulse" : ""}`} />
-                Update {lastUpdated} WIB
-                <span className="text-gray-300">· refresh {countdown}s</span>
+                <Clock className="w-3 h-3 text-gray-300" />
+                {lastUpdated} WIB
+                <span className="text-gray-300">· {countdown}s</span>
               </span>
               <button
                 onClick={() => fetchData(true)}
                 disabled={refreshing}
-                className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2.5 sm:py-2 rounded-xl bg-white hover:shadow-md transition-all active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-1.5 text-xs font-bold text-white px-4 py-2.5 sm:py-2 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] hover:shadow-lg hover:shadow-[#1a1a2e]/25 transition-all active:scale-95 disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
                 Refresh
@@ -267,7 +279,7 @@ export default function DaftarHadirPage() {
               <button
                 key={s.key}
                 onClick={() => scrollToSection(s.key)}
-                className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-2 shadow-sm active:scale-95 transition-transform"
+                className="flex-shrink-0 flex items-center gap-1.5 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-2 shadow-sm hover:shadow-md hover:border-gray-300 active:scale-95 transition-all"
               >
                 {s.icon}
                 {s.shortLabel}
@@ -282,10 +294,11 @@ export default function DaftarHadirPage() {
           {SECTIONS.map((s) => (
             <div
               key={s.key}
-              className={`bg-gradient-to-br ${s.gradient} rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-4 transition-transform hover:-translate-y-0.5 hover:shadow-md`}
+              className={`relative overflow-hidden bg-gradient-to-br ${s.gradient} rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-md`}
             >
+              <div className={`absolute top-0 left-0 right-0 h-1 ${s.barColor}`} />
               <div className="flex items-center justify-between mb-2">
-                <span className={`w-8 h-8 rounded-xl ${s.iconBg} flex items-center justify-center shadow-sm`}>
+                <span className={`w-9 h-9 rounded-xl ${s.iconBg} flex items-center justify-center shadow-sm`}>
                   {s.icon}
                 </span>
               </div>
@@ -295,13 +308,17 @@ export default function DaftarHadirPage() {
               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mt-0.5">{s.shortLabel}</p>
             </div>
           ))}
-          <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-4 transition-transform hover:-translate-y-0.5 hover:shadow-md">
+          <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-teal-50/60 to-green-50 rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-400" />
             <div className="flex items-center justify-between mb-2">
-              <span className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center shadow-sm">
+              <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shadow-sm">
                 <Users className="w-4 h-4 text-emerald-600" />
               </span>
               {!loading && pctHadir !== null && (
-                <span className="text-[10px] font-bold text-emerald-600">{pctHadir}%</span>
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded-full">
+                  <Percent className="w-2.5 h-2.5" />
+                  {pctHadir}
+                </span>
               )}
             </div>
             <p className="text-xl sm:text-2xl font-black text-gray-800 tabular-nums">
@@ -313,12 +330,12 @@ export default function DaftarHadirPage() {
 
         {/* Distribusi Pagi/Siang/Sore dalam satu bar */}
         {!loading && totalHadir > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-2">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-2.5">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Distribusi Kehadiran</p>
-              <p className="text-[10px] text-gray-400">{totalHadir} orang</p>
+              <p className="text-[10px] text-gray-400 font-semibold">{totalHadir} orang</p>
             </div>
-            <div className="w-full h-2.5 rounded-full overflow-hidden bg-gray-100 flex">
+            <div className="w-full h-2.5 rounded-full overflow-hidden bg-gray-100 flex gap-px">
               {SECTIONS.map((s) => {
                 const count = data[s.key].length;
                 const pct = (count / totalHadir) * 100;
@@ -333,7 +350,7 @@ export default function DaftarHadirPage() {
                 );
               })}
             </div>
-            <div className="flex items-center gap-4 mt-2 flex-wrap">
+            <div className="flex items-center gap-4 mt-3 flex-wrap">
               {SECTIONS.map((s) => (
                 <span key={s.key} className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs text-gray-500 font-medium">
                   <span className={`w-2 h-2 rounded-full ${s.barColor}`} />
@@ -345,7 +362,7 @@ export default function DaftarHadirPage() {
         )}
 
         {/* Search + Sort — filter & urutkan cepat lintas 3 kotak */}
-        <div className="flex flex-col sm:flex-row gap-2.5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2.5 sm:p-3 flex flex-col sm:flex-row gap-2.5">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-gray-300 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -353,7 +370,7 @@ export default function DaftarHadirPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari nama atau role..."
-              className="w-full h-11 border border-gray-200 rounded-xl pl-10 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 transition-all"
+              className="w-full h-11 border border-gray-200 rounded-xl pl-10 pr-10 text-sm bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-gray-300 transition-all"
             />
             {search && (
               <button
@@ -367,7 +384,7 @@ export default function DaftarHadirPage() {
           </div>
           <button
             onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-            className="flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 h-11 rounded-xl bg-white hover:shadow-sm transition-all active:scale-95 whitespace-nowrap"
+            className="flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 px-4 h-11 rounded-xl bg-gray-50/60 hover:bg-white hover:shadow-sm transition-all active:scale-95 whitespace-nowrap"
           >
             <ArrowUpDown className="w-3.5 h-3.5" />
             {sortDir === "asc" ? "Terlama → Terbaru" : "Terbaru → Terlama"}
@@ -390,10 +407,11 @@ export default function DaftarHadirPage() {
                 ref={(el) => {
                   sectionRefs.current[section.key] = el;
                 }}
-                className={`bg-gradient-to-br ${section.gradient} rounded-2xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-24`}
+                className={`relative bg-gradient-to-br ${section.gradient} rounded-2xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-24 transition-shadow duration-300 hover:shadow-md`}
               >
+                <div className={`h-1 w-full ${section.barColor}`} />
                 <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100/70">
-                  <div className={`w-9 h-9 rounded-xl ${section.iconBg} flex items-center justify-center shadow-sm flex-shrink-0`}>
+                  <div className={`w-10 h-10 rounded-xl ${section.iconBg} flex items-center justify-center shadow-sm flex-shrink-0`}>
                     {section.icon}
                   </div>
                   <div>
@@ -411,7 +429,7 @@ export default function DaftarHadirPage() {
                     ))
                   ) : entries.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
-                      <span className="opacity-40">{section.icon}</span>
+                      <span className="w-10 h-10 rounded-full bg-white/70 flex items-center justify-center opacity-50">{section.icon}</span>
                       <p className="text-xs text-gray-400 font-medium">
                         {search.trim() ? "Tidak ada yang cocok." : section.emptyText}
                       </p>
@@ -420,7 +438,7 @@ export default function DaftarHadirPage() {
                     entries.map((e) => (
                       <div
                         key={e.user_id}
-                        className={`flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 shadow-sm border border-gray-50 ${section.borderAccent} hover:shadow-md transition-shadow`}
+                        className={`flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 shadow-sm border border-gray-50 ${section.borderAccent} hover:shadow-md hover:-translate-y-0.5 transition-all duration-200`}
                       >
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
                           {initials(e.name)}
@@ -430,7 +448,7 @@ export default function DaftarHadirPage() {
                           <p className="text-[10px] text-gray-400">{humanizeRoleKey(e.role)}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
-                          <p className="text-xs font-mono font-bold text-gray-700">{toWIBTime(e.check_in_time)}</p>
+                          <p className="text-xs font-mono font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded-lg">{toWIBTime(e.check_in_time)}</p>
                         </div>
                       </div>
                     ))
@@ -454,8 +472,8 @@ export default function DaftarHadirPage() {
               className="w-full flex items-center justify-between gap-3 px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <UserX className="w-4 h-4 text-gray-400" />
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-50 to-orange-50 flex items-center justify-center flex-shrink-0">
+                  <UserX className="w-4 h-4 text-rose-400" />
                 </div>
                 <div className="text-left min-w-0">
                   <p className="text-sm font-bold text-gray-700">Belum Tercatat Hari Ini</p>
@@ -477,7 +495,11 @@ export default function DaftarHadirPage() {
                     {copied ? "Tersalin" : "Salin nama"}
                   </button>
                 )}
-                {showBelum ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                {showBelum ? (
+                  <ChevronUp className="w-4 h-4 text-gray-400 transition-transform" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-gray-400 transition-transform" />
+                )}
               </div>
             </div>
             {showBelum && (
@@ -497,7 +519,7 @@ export default function DaftarHadirPage() {
                       {belumTercatat.filter((u) => filterMatch(u.name, u.role)).map((u) => (
                         <span
                           key={u.id}
-                          className="inline-flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl pl-1.5 pr-3 py-1.5"
+                          className="inline-flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl pl-1.5 pr-3 py-1.5 hover:bg-gray-100 transition-colors"
                         >
                           <span className="w-6 h-6 rounded-lg bg-gray-300 flex items-center justify-center text-white text-[9px] font-black">
                             {initials(u.name)}
@@ -523,7 +545,7 @@ export default function DaftarHadirPage() {
         <button
           onClick={scrollToTop}
           aria-label="Kembali ke atas"
-          className="md:hidden fixed bottom-5 right-5 z-30 w-11 h-11 rounded-full bg-gradient-to-br from-[#1a1a2e] to-[#16213e] text-white shadow-lg flex items-center justify-center active:scale-90 transition-transform"
+          className="md:hidden fixed bottom-5 right-5 z-30 w-12 h-12 rounded-full bg-gradient-to-br from-[#1a1a2e] to-[#16213e] text-white shadow-lg shadow-[#1a1a2e]/30 flex items-center justify-center active:scale-90 hover:shadow-xl transition-all"
         >
           <ChevronUp className="w-5 h-5" />
         </button>
