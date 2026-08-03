@@ -1679,15 +1679,12 @@ function EarlyCheckoutRequestModal({ checkoutAt, onClose, onSaved }: {
     );
 }
 
-// ─── Modal: Edit/Koreksi Jam Pulang ────────────────────────────────────────────
-// ✅ NEW — perbaikan jam pulang yang salah tercatat (bug sensor/kamera, atau
-// absen manual yang keliru), tanpa perlu hapus lalu buat ulang dari nol.
 function EditCheckoutModal({ userName, dateKey, currentCheckoutIso, onClose, onSave }: {
     userName: string;
     dateKey: string;
     currentCheckoutIso: string | null;
     onClose: () => void;
-    onSave: (time: string) => Promise<void>;
+    onSave: (time: string | null) => Promise<void>; // ✅ NEW — null = kosongkan jam pulang
 }) {
     const parseTime = (iso: string | null): string => {
         if (!iso) return "17:00";
@@ -1696,15 +1693,16 @@ function EditCheckoutModal({ userName, dateKey, currentCheckoutIso, onClose, onS
         return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).substring(0, 5);
     };
 
+    const [hasCheckout, setHasCheckout] = useState(true); // ✅ NEW — toggle "Ada Jam Pulang" vs "Kosongkan"
     const [time, setTime] = useState(parseTime(currentCheckoutIso));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
     const submit = async () => {
-        if (!time) { setError("Jam pulang wajib diisi"); return; }
+        if (hasCheckout && !time) { setError("Jam pulang wajib diisi"); return; }
         setSaving(true); setError("");
         try {
-            await onSave(time);
+            await onSave(hasCheckout ? time : null);
         } catch (err: any) {
             setError(err?.message || "Gagal menyimpan");
         } finally {
@@ -1739,23 +1737,55 @@ function EditCheckoutModal({ userName, dateKey, currentCheckoutIso, onClose, onS
                             <p className="text-sm font-mono font-bold text-gray-700">{parseTime(currentCheckoutIso)} WIB</p>
                         </div>
                     )}
-                    <div>
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Jam Pulang Baru (WIB) *</label>
-                        <input
-                            type="time"
-                            value={time}
-                            onChange={e => setTime(e.target.value)}
-                            className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 transition-all font-mono"
-                        />
-                        <p className="text-[10px] text-gray-400 mt-1.5">
-                            Perubahan ini langsung tercatat sebagai koreksi manual oleh admin. Tidak otomatis membuat ulang lemburan — atur lewat Input Manual kalau perlu.
-                        </p>
+
+                    {/* ✅ NEW — pilihan: isi/ubah jam pulang, atau kosongkan lagi */}
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setHasCheckout(true)}
+                            className={`flex-1 h-10 rounded-xl text-xs font-bold border transition-all ${hasCheckout ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
+                        >
+                            Ada Jam Pulang
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setHasCheckout(false)}
+                            className={`flex-1 h-10 rounded-xl text-xs font-bold border transition-all ${!hasCheckout ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
+                        >
+                            Tidak Ada (Kosongkan)
+                        </button>
                     </div>
+
+                    {hasCheckout ? (
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Jam Pulang Baru (WIB) *</label>
+                            <input
+                                type="time"
+                                value={time}
+                                onChange={e => setTime(e.target.value)}
+                                className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 transition-all font-mono"
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1.5">
+                                Perubahan ini langsung tercatat sebagai koreksi manual oleh admin. Draft lemburan yang belum di-ACC ikut disesuaikan otomatis.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                            <p className="text-xs text-red-700 font-semibold mb-1">Jam pulang akan dikosongkan</p>
+                            <p className="text-[11px] text-red-500">
+                                Karyawan ini akan dianggap belum absen pulang untuk tanggal ini. Draft lemburan terkait yang belum di-ACC juga ikut dihapus.
+                            </p>
+                        </div>
+                    )}
                 </div>
                 <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
                     <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">Batal</button>
-                    <button onClick={submit} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-violet-600 to-purple-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : "Simpan"}
+                    <button
+                        onClick={submit}
+                        disabled={saving}
+                        className={`flex-1 h-11 rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 text-white ${hasCheckout ? "bg-gradient-to-r from-violet-600 to-purple-700" : "bg-gradient-to-r from-red-600 to-rose-700"}`}
+                    >
+                        {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</> : hasCheckout ? "Simpan" : "Kosongkan"}
                     </button>
                 </div>
             </div>
@@ -6354,11 +6384,15 @@ export default function AttendanceDashboardPage() {
                         const res = await fetch("/api/attendance/edit-checkout", {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ user_id: editCheckoutData.userId, date: editCheckoutData.dateKey, checkout_time: time }),
+                            body: JSON.stringify(
+                                time === null
+                                    ? { user_id: editCheckoutData.userId, date: editCheckoutData.dateKey, clear: true } // ✅ NEW — kosongkan jam pulang
+                                    : { user_id: editCheckoutData.userId, date: editCheckoutData.dateKey, checkout_time: time }
+                            ),
                         });
                         const d = await res.json();
                         if (!d.success) throw new Error(d.message || "Gagal menyimpan jam pulang");
-                        if (d.warning) alert(d.warning); 
+                        if (d.warning) alert(d.warning);
                         await refreshAll();
                         fetchTodayStatus();
                         setEditCheckoutData(null);
