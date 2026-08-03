@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google"; // 1. Ubah import menjadi Plus Jakarta Sans
 import { Toaster } from "sonner";
 import "./globals.css";
+import "@/lib/patchPointerCapture";
 import NetworkStatus from "@/components/ui/NetworkStatus";
 import ServiceWorkerUpdater from "@/components/ui/ServiceWorkerUpdater";
 
