@@ -70,7 +70,7 @@ export async function GET() {
       supabase.from("user_monthly_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
       supabase.from("attendance_manual").select("id, status, created_by")
         .eq("user_id", user.id).eq("attendance_date", todayDate).maybeSingle(),
-     supabase.from("face_verifications").select("id, created_at")
+      supabase.from("face_verifications").select("id, created_at")
         .eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "IN")
         .gte("created_at", `${todayDate}T00:00:00+07:00`)
         .lte("created_at", `${todayDate}T23:59:59+07:00`)
@@ -171,11 +171,11 @@ export async function GET() {
       return response;
     }
 
-   const isTodayDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !Boolean(dateWork));
+    const isTodayDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !Boolean(dateWork));
     const alreadyAttendedDB = Boolean(todaySuccess); // ini sekarang khusus status absen MASUK
     const alreadyCheckedOut = Boolean(todayOutRow);  // ✅ NEW — status absen PULANG
 
-   const baseSchedule = await resolveShiftConfigFromDB(user.id, supabase);
+    const baseSchedule = await resolveShiftConfigFromDB(user.id, supabase);
     const override = await resolveScheduleOverride(supabase, user.id, todayDate);
 
     const overrideShape = override ? toAuthScheduleShape(override) : null;
@@ -195,11 +195,31 @@ export async function GET() {
     const closeAt = `${pad(schedule.end.h)}:${pad(schedule.end.m)} WIB`;
     const lateAt = `${pad(schedule.lateFrom.h)}:${pad(schedule.lateFrom.m)} WIB`;
 
-    // ✅ FIX: EARLY_OVERTIME sekarang juga dianggap "waktu absen terbuka"
-    // (cuma informasinya beda — akan dihitung lembur, bukan diblokir)
     const isAttendanceTimeNow = timeStatus.reason === "OPEN" || timeStatus.reason === "EARLY_OVERTIME";
     const reason = timeStatus.reason;
     const needEnroll = !(userData as any)?.face_embedding;
+
+    const needsCheckoutNow = alreadyAttendedDB && !alreadyCheckedOut;
+    let isEarlyCheckout = false;
+    let earlyCheckoutStatus: "NONE" | "PENDING" | "APPROVED" | "REJECTED" = "NONE";
+    if (needsCheckoutNow && !isTodayDayOff) {
+      const scheduledCheckoutISO = new Date(
+        `${todayDate}T${pad(schedule.checkout.h)}:${pad(schedule.checkout.m)}:00+07:00`
+      ).toISOString();
+      isEarlyCheckout = nowUTC.getTime() < new Date(scheduledCheckoutISO).getTime();
+
+      if (isEarlyCheckout) {
+        const { data: ecoRow } = await supabase
+          .from("early_checkout_requests")
+          .select("status")
+          .eq("user_id", user.id)
+          .eq("request_date", todayDate)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        earlyCheckoutStatus = (ecoRow?.status as typeof earlyCheckoutStatus) ?? "NONE";
+      }
+    }
 
     const alreadyFromCookie = faceVerified === user.id || faceAttended === user.id;
     const alreadyAttended = alreadyFromCookie || alreadyAttendedDB;
@@ -214,7 +234,7 @@ export async function GET() {
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id);
 
-   const response = NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       alreadyAttended,
       needEnroll,
@@ -243,6 +263,8 @@ export async function GET() {
       manualAlreadyExists: false,
       biometricEligible: (userData as any)?.biometric_enabled ?? false,
       biometricEnrolled: (biometricCredCount ?? 0) > 0,
+      isEarlyCheckout, 
+      earlyCheckoutStatus, 
     });
 
     if (isTodayDayOff && dayOffCookie !== user.id) {
