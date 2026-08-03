@@ -5,6 +5,7 @@ import ServiceConfirmDialog from "@/components/service/ServiceConfirmDialog";
 import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import ServiceDetailModal from "@/components/service/ServiceDetailModal";
 import ServicePaymentModal from "@/components/service/ServicePaymentModal";
+import ServiceCicilanModal from "@/components/service/ServiceCicilanModal";
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 
@@ -34,7 +35,7 @@ function fmtRupiah(n?: number) {
 type DialogState = {
   open: boolean;
   orderId: string;
-  action: "tidak_jadi" | "diambil_langsung" | "";
+  action: "tidak_jadi" | "diambil_langsung" | "bayar_lunas" | ""; //  NEW — bayar_lunas
   title: string;
   description: string;
   confirmLabel: string;
@@ -197,7 +198,7 @@ function StatCard({
 }
 
 // ── Action Types & Button ──────────────────────────────────────────────────────
-type ActionColor = "emerald" | "rose";
+type ActionColor = "emerald" | "rose" | "amber"; //  NEW — amber untuk tombol "Cicil"
 
 type ActionItem = {
   key: string;
@@ -210,6 +211,7 @@ type ActionItem = {
 const ACTION_VARIANTS: Record<ActionColor, string> = {
   emerald: "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200 focus-visible:ring-emerald-300",
   rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200 focus-visible:ring-rose-300",
+  amber: "bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200 focus-visible:ring-amber-300", //  NEW
 };
 
 function ActionBtn({
@@ -291,6 +293,22 @@ function ActionGroup({
 function PaymentValue({ order, align = "left" }: { order: ServiceOrder; align?: "left" | "right" }) {
   const alignCls = align === "right" ? "items-end text-right" : "";
 
+  if (order.payment_status === "DP") { //  NEW — tampilkan progress DP
+    const total = Number(order.total_tagihan ?? 0);
+    const paid = Number(order.payment_amount ?? 0);
+    const sisa = Math.max(total - paid, 0);
+    return (
+      <div className={`flex flex-col ${alignCls}`}>
+        <p className="text-xs font-black tabular-nums text-amber-600">
+          {fmtRupiah(paid)} / {fmtRupiah(total)}
+        </p>
+        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-500">
+          DP · sisa {fmtRupiah(sisa)}
+        </p>
+      </div>
+    );
+  }
+
   if (order.payment_amount) {
     return (
       <div className={`flex flex-col ${alignCls}`}>
@@ -363,6 +381,7 @@ export default function DonePage() {
   const [dialog, setDialog] = useState<DialogState>(DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<ServiceOrder | null>(null);
+  const [cicilanOrder, setCicilanOrder] = useState<ServiceOrder | null>(null); //  NEW — order yang lagi diisi cicilan
   const [pickupChoice, setPickupChoice] = useState<PickupChoiceState>({ open: false, order: null });
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
@@ -414,6 +433,8 @@ export default function DonePage() {
     showToast(
       dialog.action === "diambil_langsung"
         ? " Laptop berhasil ditandai sudah diambil."
+        : dialog.action === "bayar_lunas" //  NEW
+        ? " Pelunasan berhasil, laptop sudah diambil."
         : " Order ditandai tidak jadi."
     );
     refresh();
@@ -432,13 +453,71 @@ export default function DonePage() {
     });
   };
 
+ //  NEW — klik "Lunas": konfirmasi lalu lunasi sisa DP sekaligus (masuk Riwayat)
+  const handleLunasClick = (order: ServiceOrder) => {
+    const sisa = Number(order.total_tagihan ?? 0) - Number(order.payment_amount ?? 0);
+    setDialog({
+      open: true,
+      orderId: order.id,
+      action: "bayar_lunas",
+      title: "Konfirmasi Pelunasan",
+      description: `Lunasi sisa tagihan "${order.nama} — ${order.type_laptop}" sebesar ${fmtRupiah(sisa)}?`,
+      confirmLabel: "Ya, Lunas",
+      confirmClass: "bg-emerald-600 hover:bg-emerald-700",
+    });
+  };
+
+  //  NEW — klik "Cicil": buka popup input nominal cicilan
+  const handleCicilClick = (order: ServiceOrder) => {
+    setCicilanOrder(order);
+  };
+
+  //  NEW — submit nominal cicilan dari ServiceCicilanModal
+  const handleCicilanConfirm = async (cicilanAmount: number) => {
+    if (!cicilanOrder) return;
+    const res = await fetch(`/api/service/${cicilanOrder.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bayar_cicilan", cicilan_amount: cicilanAmount }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Gagal");
+    setCicilanOrder(null);
+    showToast(
+      json.data?.payment_status === "LUNAS"
+        ? " Cicilan diterima, laptop sudah lunas & diambil."
+        : " Cicilan diterima, sisa tagihan diperbarui."
+    );
+    refresh();
+  };
+
   /**
    * Sumber tunggal daftar tombol aksi per order.
    * Kombinasi tombol PERSIS sama seperti sebelumnya:
    * - "Diambil" selalu ada
    * - "Tidak Jadi" hanya untuk status DONE
+   *  NEW — kalau order lagi DP, tombolnya jadi "Lunas" & "Cicil"
    */
   const getActions = (o: ServiceOrder): ActionItem[] => {
+    if (o.payment_status === "DP") { //  NEW
+      return [
+        {
+          key: "lunas",
+          label: "Lunas",
+          color: "emerald",
+          icon: <IconCheckLg />,
+          onClick: () => handleLunasClick(o),
+        },
+        {
+          key: "cicil",
+          label: "Cicil",
+          color: "amber",
+          icon: <IconDollar />,
+          onClick: () => handleCicilClick(o),
+        },
+      ];
+    }
+
     const actions: ActionItem[] = [
       {
         key: "diambil",
@@ -465,8 +544,10 @@ export default function DonePage() {
   const handlePaymentConfirm = async (payment: {
     payment_amount: number;
     payment_note: string;
-    payment_method: "CASH" | "TRANSFER" | "QRIS";
+    payment_method: "CASH" | "TRANSFER" | "QRIS" | "DP"; //  NEW
     hasil_analisa?: string;
+    payment_status?: "LUNAS" | "DP"; //  NEW
+    total_tagihan?: number; //  NEW
   }) => {
     if (!paymentOrder) return;
     const res = await fetch(`/api/service/${paymentOrder.id}`, {
@@ -713,7 +794,7 @@ export default function DonePage() {
                 {/* Footer */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gradient-to-r from-slate-50/40 to-white px-5 py-3">
                   <p className="text-xs font-medium text-gray-400">
-                     Klik baris untuk melihat detail lengkap
+                    Klik baris untuk melihat detail lengkap
                   </p>
                   <p className="text-xs font-bold text-gray-400">
                     Total: <span className="tabular-nums text-slate-800">{orders.length}</span> order
@@ -821,11 +902,19 @@ export default function DonePage() {
           onConfirm={handleConfirmDialog}
         />
 
-        <ServicePaymentModal
+       <ServicePaymentModal
           open={!!paymentOrder}
           order={paymentOrder}
           onClose={() => setPaymentOrder(null)}
           onConfirm={handlePaymentConfirm}
+        />
+
+        {/*  NEW — Popup nominal cicilan */}
+        <ServiceCicilanModal
+          open={!!cicilanOrder}
+          order={cicilanOrder}
+          onClose={() => setCicilanOrder(null)}
+          onConfirm={handleCicilanConfirm}
         />
 
         {/* ── Pickup Choice Modal (GAGAL_DIPERBAIKI) ────────────────────────── */}

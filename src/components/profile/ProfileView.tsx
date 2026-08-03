@@ -446,7 +446,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 {(isSelf || isAdmin) && (
                                     <div className="flex items-center justify-center gap-4 mt-4">
                                         {isSelf && (
-                                            <button onClick={() => { handleClosePopup(); songPicker.openSearch(); setShowSongPicker(true); }} 
+                                            <button onClick={() => { handleClosePopup(); songPicker.openSearch(); setShowSongPicker(true); }}
                                                 className="text-xs font-semibold hover:text-white transition-colors"
                                                 style={{ color: "rgba(255,255,255,0.5)" }}>
                                                 Edit lagu
@@ -914,31 +914,35 @@ function AchievementCard({
     const hasAchievement = rank !== null && rank <= 5;
 
     return (
-        <div className="group bg-white rounded-2xl p-4 sm:p-5 lg:p-6 relative overflow-hidden border border-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg h-full"
-            style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+        <div className="group rounded-2xl p-4 sm:p-5 lg:p-6 relative overflow-hidden border border-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl h-full"
+            style={{ background: `linear-gradient(160deg, ${accentSoft} 0%, #ffffff 45%)`, boxShadow: "0 2px 12px rgba(0,0,0,0.05)" }}>
             <div className="absolute top-0 left-0 right-0 h-1" style={{ background: accentBar }} />
-           <div className="flex items-start justify-between mb-4">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110" style={{ background: accentSoft, color: accentSolid }}>
-                    {icon}
+            <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none opacity-[0.14] transition-transform duration-500 group-hover:scale-110" style={{ background: accentSolid }} />
+            <div className="relative">
+                <div className="flex items-start justify-between mb-4">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 text-white transition-transform duration-300 group-hover:scale-110"
+                        style={{ background: `linear-gradient(135deg, ${accentSolid}, ${accentSolid}cc)`, boxShadow: `0 6px 16px -4px ${accentSoft}` }}>
+                        {icon}
+                    </div>
+                    {hasAchievement && <RankBadge rank={rank as number} />}
                 </div>
-                {hasAchievement && <RankBadge rank={rank as number} />}
-            </div>
-            <p className="text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>{title} · {monthLabel}</p>
-            <p className="text-3xl sm:text-4xl font-black mt-1 tabular-nums" style={{ color: "#0f172a" }}>{value}</p>
-            <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>{sub}</p>
-            {rank && (
-                <p className="inline-block mt-2.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full" style={{ background: "#f8fafc", color: "#64748b" }}>
-                    Peringkat #{rank} dari {totalRanked} orang
-                </p>
-            )}
-            {personalBest && (
-                <div className="mt-3 pt-3 border-t border-slate-50 flex items-center gap-1.5">
-                    {isRecord ? <Trophy className="w-3.5 h-3.5" style={{ color: "#d97706" }} /> : <Flame className="w-3.5 h-3.5 text-slate-300" />}
-                    <p className="text-[10.5px] font-semibold" style={{ color: isRecord ? "#d97706" : "#94a3b8" }}>
-                        {personalBest}{isRecord ? " — Rekor Perusahaan!" : ""}
+                <p className="text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>{title} · {monthLabel}</p>
+                <p className="text-3xl sm:text-4xl font-black mt-1 tabular-nums" style={{ color: "#0f172a" }}>{value}</p>
+                <p className="text-xs mt-0.5" style={{ color: "#94a3b8" }}>{sub}</p>
+                {rank && (
+                    <p className="inline-block mt-2.5 text-[10.5px] font-bold px-2.5 py-1 rounded-full" style={{ background: accentSoft, color: accentSolid }}>
+                        Peringkat #{rank} dari {totalRanked} orang
                     </p>
-                </div>
-            )}
+                )}
+                {personalBest && (
+                    <div className="mt-3 pt-3 border-t flex items-center gap-1.5" style={{ borderColor: "rgba(15,23,42,0.05)" }}>
+                        {isRecord ? <Trophy className="w-3.5 h-3.5" style={{ color: "#d97706" }} /> : <Flame className="w-3.5 h-3.5 text-slate-300" />}
+                        <p className="text-[10.5px] font-semibold" style={{ color: isRecord ? "#d97706" : "#94a3b8" }}>
+                            {personalBest}{isRecord ? " — Rekor Perusahaan!" : ""}
+                        </p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
