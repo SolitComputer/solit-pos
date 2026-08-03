@@ -1402,7 +1402,7 @@ function DayOffModal({ users, dayOffs, onClose, onSaved }: {
     );
 }
 
-function TodayAttendanceCard({ status, loading, onRefresh }: {
+function TodayAttendanceCard({ status, loading, onRefresh, onRequestEarlyCheckout }: {
     status: {
         alreadyAttended: boolean;
         needEnroll: boolean;
@@ -1420,8 +1420,11 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
         checkedOut?: boolean;     // ✅ NEW
         needsCheckout?: boolean;  // ✅ NEW
         checkoutAt?: string;      // ✅ NEW
+        isEarlyCheckout?: boolean; // ✅ NEW (poin 1)
+        earlyCheckoutStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED"; // ✅ NEW (poin 1)
     } | null;
     loading: boolean; onRefresh: () => void;
+    onRequestEarlyCheckout: () => void; // ✅ NEW (poin 1)
 }) {
     if (loading) return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 animate-pulse">
@@ -1435,10 +1438,12 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
     const closeAt = status.closeAt ?? "—";
     const needEnroll = status.needEnroll;
 
-    type CardState = "EXEMPT" | "MANUAL" | "NEEDS_CHECKOUT" | "ATTENDED" | "DAY_OFF" | "TOO_EARLY" | "TOO_LATE" | "OPEN";
+    type CardState = "EXEMPT" | "MANUAL" | "NEEDS_CHECKOUT_EARLY" | "NEEDS_CHECKOUT_PENDING" | "NEEDS_CHECKOUT" | "ATTENDED" | "DAY_OFF" | "TOO_EARLY" | "TOO_LATE" | "OPEN";
     let state: CardState;
     if (status.isExempt) state = "EXEMPT";
     else if (status.manualAlreadyExists) state = "MANUAL";
+    else if (status.needsCheckout && status.isEarlyCheckout && status.earlyCheckoutStatus === "PENDING") state = "NEEDS_CHECKOUT_PENDING";
+    else if (status.needsCheckout && status.isEarlyCheckout && status.earlyCheckoutStatus !== "APPROVED") state = "NEEDS_CHECKOUT_EARLY";
     else if (status.needsCheckout) state = "NEEDS_CHECKOUT";
     else if (status.alreadyAttended) state = "ATTENDED";
     else if (status.isDayOff) state = "DAY_OFF";
@@ -1485,8 +1490,33 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                 showBtn: false,
             };
             break;
-        // ✅ NEW — tanpa case ini, orang yang udah absen masuk gak akan pernah
-        // lihat ada yang perlu dilakukan lagi, jadi gak pernah absen pulang.
+        case "NEEDS_CHECKOUT_EARLY":
+            cfg = {
+                icon: <Clock className="w-6 h-6 text-amber-600" />, gradient: "from-amber-50 to-yellow-50", iconBg: "bg-amber-100",
+                badge: "bg-amber-100 text-amber-700 border-amber-200", dot: "bg-amber-400 animate-pulse",
+                badgeText: "Belum Waktunya Pulang",
+                title: status.earlyCheckoutStatus === "REJECTED" ? "Izin Pulang Cepat Ditolak" : "Belum Waktunya Absen Pulang",
+                sub: status.checkoutAt
+                    ? `Jadwal pulang ${status.checkoutAt} · ${status.earlyCheckoutStatus === "REJECTED" ? "Ajukan izin lagi kalau masih perlu pulang cepat" : "Ajukan izin ke admin untuk pulang cepat"}`
+                    : "Ajukan izin ke admin untuk pulang cepat",
+                showBtn: true,
+                btnLabel: status.earlyCheckoutStatus === "REJECTED" ? "Ajukan Izin Lagi →" : "Ajukan Izin Pulang Cepat →",
+                btnColor: "bg-gradient-to-r from-amber-500 to-orange-600",
+                btnAction: onRequestEarlyCheckout,
+            };
+            break;
+        // ✅ NEW (poin 1) — sudah ajukan izin, masih menunggu ACC admin.
+        case "NEEDS_CHECKOUT_PENDING":
+            cfg = {
+                icon: <Clock className="w-6 h-6 text-blue-600" />, gradient: "from-blue-50 to-indigo-50", iconBg: "bg-blue-100",
+                badge: "bg-blue-100 text-blue-700 border-blue-200", dot: "bg-blue-400 animate-pulse",
+                badgeText: "Menunggu Persetujuan",
+                title: "Izin Pulang Cepat Sedang Diproses",
+                sub: "Menunggu ACC admin/kepala divisi — tekan refresh untuk cek status terbaru",
+                showBtn: false,
+            };
+            break;
+
         case "NEEDS_CHECKOUT":
             cfg = {
                 icon: <Clock className="w-6 h-6 text-orange-600" />, gradient: "from-orange-50 to-amber-50", iconBg: "bg-orange-100",
@@ -1560,6 +1590,89 @@ function TodayAttendanceCard({ status, loading, onRefresh }: {
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     </button>
                     {cfg.showBtn && <button onClick={cfg.btnAction} className={`${cfg.btnColor} text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all whitespace-nowrap`}>{cfg.btnLabel}</button>}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Modal: Ajukan Izin Pulang Cepat ───────────────────────────────────────────
+// ✅ NEW (poin 1) — dipanggil langsung dari kartu absensi hari ini, tanpa
+// perlu masuk ke halaman /face-verify dulu untuk tahu belum bisa absen pulang.
+function EarlyCheckoutRequestModal({ checkoutAt, onClose, onSaved }: {
+    checkoutAt?: string;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const [reason, setReason] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+    const [submitted, setSubmitted] = useState(false);
+
+    const submit = async () => {
+        if (!reason.trim()) { setError("Alasan wajib diisi"); return; }
+        setSaving(true); setError("");
+        try {
+            const res = await fetch("/api/attendance/early-checkout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason: reason.trim() }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal mengirim pengajuan"); return; }
+            setSubmitted(true);
+            onSaved();
+        } catch {
+            setError("Gagal mengirim pengajuan");
+        } finally { setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-5 flex items-start justify-between">
+                    <div>
+                        <p className="font-bold text-white text-base">Ajukan Izin Pulang Cepat</p>
+                        <p className="text-xs text-white/70 mt-1">
+                            {checkoutAt ? `Jadwal pulang kamu ${checkoutAt}` : "Belum waktunya jadwal pulang"}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="px-6 py-5 space-y-4">
+                    {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">{error}</div>}
+                    {submitted ? (
+                        <div className="text-center py-4">
+                            <p className="text-sm font-bold text-emerald-700 mb-1">Pengajuan terkirim</p>
+                            <p className="text-xs text-gray-400">Tunggu persetujuan admin/kepala divisi, lalu absen pulang seperti biasa.</p>
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Alasan Pulang Cepat *</label>
+                            <textarea
+                                value={reason}
+                                onChange={e => setReason(e.target.value)}
+                                rows={3}
+                                placeholder="Contoh: keperluan keluarga mendadak..."
+                                className="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-400/20 resize-none"
+                            />
+                        </div>
+                    )}
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+                    <button onClick={onClose} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition-all">
+                        {submitted ? "Tutup" : "Batal"}
+                    </button>
+                    {!submitted && (
+                        <button onClick={submit} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                            {saving ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Mengirim...</> : "Kirim Pengajuan"}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -2726,7 +2839,8 @@ export default function AttendanceDashboardPage() {
     // Modal state
     const [showDayOffModal, setShowDayOffModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
-    const [showManualCheckoutModal, setShowManualCheckoutModal] = useState(false); // ✅ NEW poin 8
+    const [showManualCheckoutModal, setShowManualCheckoutModal] = useState(false);
+    const [showEarlyCheckoutModal, setShowEarlyCheckoutModal] = useState(false);
     const [showSalaryModal, setShowSalaryModal] = useState(false);
     const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [editManualData, setEditManualData] = useState<ManualAttendance | null>(null);
@@ -2984,6 +3098,8 @@ export default function AttendanceDashboardPage() {
                 checkedOut: d.checkedOut ?? false,
                 needsCheckout: d.needsCheckout ?? false,
                 checkoutAt: d.checkoutAt,
+                isEarlyCheckout: d.isEarlyCheckout ?? false,
+                earlyCheckoutStatus: d.earlyCheckoutStatus ?? "NONE",
             });
         } catch { }
         finally { setStatusLoading(false); }
@@ -3921,7 +4037,7 @@ export default function AttendanceDashboardPage() {
                 </div>
 
                 <OvertimeSOPBanner compact />
-                <TodayAttendanceCard status={todayStatus} loading={statusLoading} onRefresh={fetchTodayStatus} />
+                <TodayAttendanceCard status={todayStatus} loading={statusLoading} onRefresh={fetchTodayStatus} onRequestEarlyCheckout={() => setShowEarlyCheckoutModal(true)} />
 
                 {/* ── Stat Cards ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -6121,6 +6237,13 @@ export default function AttendanceDashboardPage() {
                     users={allUsers}
                     onClose={() => setShowManualCheckoutModal(false)}
                     onSaved={() => { refreshAll(); fetchTodayStatus(); }}
+                />
+            )}
+            {showEarlyCheckoutModal && (
+                <EarlyCheckoutRequestModal
+                    checkoutAt={todayStatus?.checkoutAt}
+                    onClose={() => setShowEarlyCheckoutModal(false)}
+                    onSaved={() => { fetchTodayStatus(); }}
                 />
             )}
             {showManualModal && isAdminRole(currentUser?.role) && (
