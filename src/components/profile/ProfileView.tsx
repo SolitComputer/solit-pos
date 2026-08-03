@@ -113,6 +113,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [removingSong, setRemovingSong] = useState(false);
     const [playingPreview, setPlayingPreview] = useState(false);
     const [showInfoPopup, setShowInfoPopup] = useState(false);
+    const [showSongPicker, setShowSongPicker] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
 
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
@@ -133,6 +134,7 @@ export default function ProfileView({ userId }: { userId: string }) {
             } : p));
             setPlayingPreview(false);
             showToast("Lagu berhasil ditambahkan", "ok");
+            setShowSongPicker(false);
         },
         (msg) => showToast(msg, "err")
     );
@@ -442,11 +444,20 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 )}
 
                                 {(isSelf || isAdmin) && (
-                                    <button onClick={() => { handleRemoveSong(); handleClosePopup(); }} disabled={removingSong}
-                                        className="mt-4 text-xs font-semibold hover:text-red-400 disabled:opacity-50"
-                                        style={{ color: "rgba(255,255,255,0.5)" }}>
-                                        {removingSong ? "Menghapus..." : "Hapus lagu"}
-                                    </button>
+                                    <div className="flex items-center justify-center gap-4 mt-4">
+                                        {isSelf && (
+                                            <button onClick={() => { handleClosePopup(); songPicker.openSearch(); setShowSongPicker(true); }} 
+                                                className="text-xs font-semibold hover:text-white transition-colors"
+                                                style={{ color: "rgba(255,255,255,0.5)" }}>
+                                                Edit lagu
+                                            </button>
+                                        )}
+                                        <button onClick={() => { handleRemoveSong(); handleClosePopup(); }} disabled={removingSong}
+                                            className="text-xs font-semibold hover:text-red-400 disabled:opacity-50 transition-colors"
+                                            style={{ color: "rgba(255,255,255,0.5)" }}>
+                                            {removingSong ? "Menghapus..." : "Hapus lagu"}
+                                        </button>
+                                    </div>
                                 )}
                             </>
                         )}
@@ -866,6 +877,27 @@ export default function ProfileView({ userId }: { userId: string }) {
                     <style jsx>{`
                         .no-scrollbar::-webkit-scrollbar { display: none; }
                     `}</style>
+                </div>
+            )}
+
+            {showSongPicker && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/70" style={{ backdropFilter: "blur(6px)" }} onClick={() => { setShowSongPicker(false); songPicker.closeSearch(); songPicker.handleCancelCrop(); }} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+                        <div className="p-5 flex items-center justify-between" style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <Music className="w-4 h-4 text-white flex-shrink-0" />
+                                <p className="text-sm font-bold text-white truncate">Ganti Lagu</p>
+                            </div>
+                            <button onClick={() => { setShowSongPicker(false); songPicker.closeSearch(); songPicker.handleCancelCrop(); }} className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                                style={{ background: "rgba(255,255,255,0.1)" }}>
+                                <X className="w-4 h-4 text-white" />
+                            </button>
+                        </div>
+                        <div className="p-5">
+                            <SongPickerPanel picker={songPicker} />
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
