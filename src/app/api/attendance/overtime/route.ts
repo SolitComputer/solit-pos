@@ -215,7 +215,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-   // ── Enrich dengan data user ────────────────────────────────────────────
+// ── Enrich dengan data user ────────────────────────────────────────────
     const userIds = [
       ...new Set([
         ...overtimes.map((o: any) => o.user_id),
@@ -232,14 +232,9 @@ export async function GET(request: Request) {
     const usersMap: Record<string, any> = {};
     (usersData ?? []).forEach((u: any) => { usersMap[u.id] = u; });
 
-    // ✅ Poin 16: lembur cuma untuk karyawan non-PKL. Data lama milik PKL
-    // (kalau ada, dari sistem sebelumnya) disaring keluar di sini.
-    const nonPklOvertimes = overtimes.filter((o: any) => {
-      const role = usersMap[o.user_id]?.role;
-      return !role || !isPKLRole(role);
-    });
-
-    const result = nonPklOvertimes.map((o: any) => ({
+    // ✅ FIX: PKL sekarang punya sistem lemburan sendiri (lihat tab Gaji PKL
+    // & Input Manual) — filter yang dulu menyaring keluar data PKL dihapus.
+    const result = overtimes.map((o: any) => ({
       ...o,
       users:    usersMap[o.user_id]    ?? null,
       approver: o.approved_by ? usersMap[o.approved_by] ?? null : null,
@@ -334,11 +329,11 @@ export async function POST(request: Request) {
         );
       }
 
-      // ✅ NEW — poin 16: lembur cuma untuk karyawan non-PKL
-      const { data: targetUserForOT } = await supabase.from("users").select("role").eq("id", target_user_id).maybeSingle();
-      if (targetUserForOT && isPKLRole(targetUserForOT.role)) {
-        return NextResponse.json({ success: false, message: "PKL tidak memiliki sistem lemburan." }, { status: 400 });
-      }
+      // // ✅ NEW — poin 16: lembur cuma untuk karyawan non-PKL
+      // const { data: targetUserForOT } = await supabase.from("users").select("role").eq("id", target_user_id).maybeSingle();
+      // if (targetUserForOT && isPKLRole(targetUserForOT.role)) {
+      //   return NextResponse.json({ success: false, message: "PKL tidak memiliki sistem lemburan." }, { status: 400 });
+      // }
 
       const { category: manualCategory } = body;
       if (manualCategory && !isValidOvertimeCategory(manualCategory)) {

@@ -715,17 +715,17 @@ export default function JurnalUmum({ period }: { period: string }) {
 
             {/* ── Tabel Jurnal Umum ── */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="overflow-auto max-h-[calc(100vh-220px)]">
                     <DragDropContext onDragEnd={handleDragEnd}>
                         <Droppable droppableId="journal-entries">
                             {(provided) => (
                                 <table
-                                    className="w-full border-collapse"
+                                    className="w-full border-collapse relative"
                                     style={{ minWidth: "760px" }}
                                     ref={provided.innerRef}
                                     {...provided.droppableProps}
                                 >
-                                    <thead>
+                                    <thead className="sticky top-0 z-30 ring-1 ring-gray-100 shadow-sm">
                                         <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
                                             <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[95px] sm:w-[110px]">Tanggal</th>
                                             <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
