@@ -20,6 +20,7 @@ interface LineRow {
   account_code: string;
   side: "DEBIT" | "KREDIT";
   nominal: number;
+  keterangan?: string | null;
 }
 
 interface EntryRow {
@@ -119,7 +120,7 @@ export const GET = withAuth(async (req) => {
       while (true) {
         const { data: page, error: lineErr } = await supabase
           .from("journal_lines")
-          .select("id, entry_id, account_code, side, nominal, journal_entries!inner(period)")
+          .select("id, entry_id, account_code, side, nominal, keterangan, journal_entries!inner(period)")
           .eq("journal_entries.period", period)
           .order("id", { ascending: true })
           .range(from, from + PAGE_SIZE - 1);
@@ -199,7 +200,7 @@ export const GET = withAuth(async (req) => {
       return {
         id: l.id,
         tanggal: entry.tanggal,
-        keterangan: entry.keterangan,
+        keterangan: l.keterangan || entry.keterangan,
         ref,
         side: l.side, // (baru) — dipakai frontend buat nentuin baris sintetis nominal 0 harus tampil di kolom Debit atau Kredit
         debit,
