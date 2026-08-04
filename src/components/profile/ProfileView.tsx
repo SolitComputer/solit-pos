@@ -852,9 +852,8 @@ export default function ProfileView({ userId }: { userId: string }) {
             </div>
 
             {achievements && (
-                <div className="no-scrollbar flex sm:grid sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-5 overflow-x-auto sm:overflow-visible snap-x snap-mandatory sm:snap-none -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0"
-                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
-                    <div className="min-w-[82%] sm:min-w-0 snap-center">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-5">
+                    <div>
                         <AchievementCard
                             icon={<CalendarCheck className="w-5 h-5" />} title="Kehadiran Bulan Ini" monthLabel={monthLabel(achievements.month)}
                             value={`${achievements.attendance.daysThisMonth} hari`} sub={`${achievements.attendance.onTimeThisMonth} kali tepat waktu`}
@@ -864,7 +863,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                             accentSolid="#059669" accentSoft="rgba(5,150,105,0.12)" accentBar="linear-gradient(90deg, #34d399, #059669)"
                         />
                     </div>
-                    <div className="min-w-[82%] sm:min-w-0 snap-center">
+                    <div>
                         <AchievementCard
                             icon={<Clock className="w-5 h-5" />} title="Lembur Bulan Ini" monthLabel={monthLabel(achievements.month)}
                             value={`${achievements.overtime.hoursThisMonth} jam`} sub={`${achievements.overtime.sessionsThisMonth} sesi lembur`}
@@ -874,11 +873,9 @@ export default function ProfileView({ userId }: { userId: string }) {
                             accentSolid="#d97706" accentSoft="rgba(217,119,6,0.12)" accentBar="linear-gradient(90deg, #fbbf24, #d97706)"
                         />
                     </div>
-                    <style jsx>{`
-                        .no-scrollbar::-webkit-scrollbar { display: none; }
-                    `}</style>
                 </div>
             )}
+
 
             {showSongPicker && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
