@@ -27,20 +27,36 @@ export default function BottomNavBar() {
   const pathname = usePathname();
   const { openGroupChat, setOpenGroupChat } = useChatContext();
 
+  const activeIndex = NAV_ITEMS.findIndex(({ label, href }) => {
+    const isGroupChat = label === "Group Chat";
+    return isGroupChat ? openGroupChat : isActive(pathname, href);
+  });
+
   return (
     <nav
       className="
         md:hidden
-        fixed bottom-0 left-0 right-0 z-40
-        bg-white
-        border-t border-gray-200
-        pb-[env(safe-area-inset-bottom)]
+        fixed bottom-0 left-0 right-0 z-[9999]
+        px-5 pt-2
+        pb-[calc(0.75rem+env(safe-area-inset-bottom))]
       "
     >
-      <div className="flex items-center justify-around h-16">
-        {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
+      <div className="relative flex items-center justify-around h-[60px] px-2 bg-white rounded-full shadow-[0_10px_30px_-6px_rgba(0,0,0,0.2)]">
+        {activeIndex >= 0 && (
+          <div
+            className="absolute inset-y-0 left-0 flex items-center justify-center pointer-events-none transition-transform duration-300 ease-out"
+            style={{
+              width: `${100 / NAV_ITEMS.length}%`,
+              transform: `translateX(${activeIndex * 100}%)`,
+            }}
+          >
+            <div className="w-11 h-11 rounded-full bg-black shadow-md shadow-black/30" />
+          </div>
+        )}
+
+        {NAV_ITEMS.map(({ label, href, icon: Icon }, idx) => {
           const isGroupChat = label === "Group Chat";
-          const active = isGroupChat ? openGroupChat : isActive(pathname, href);
+          const active = idx === activeIndex;
 
           return (
             <Link
@@ -52,30 +68,14 @@ export default function BottomNavBar() {
                   setOpenGroupChat(!openGroupChat);
                 }
               }}
-              className="flex flex-col items-center justify-center gap-1 flex-1 h-full"
+              title={label}
+              className="relative z-10 flex flex-1 h-full items-center justify-center"
             >
-              <div
-                className={`
-                  flex items-center justify-center
-                  w-10 h-10 rounded-2xl
-                  transition-colors
-                  ${active ? "bg-violet-100" : "bg-transparent"}
-                `}
-              >
-                <Icon
-                  size={22}
-                  strokeWidth={active ? 2.5 : 2}
-                  className={active ? "text-violet-600" : "text-gray-400"}
-                />
-              </div>
-              <span
-                className={`
-                  text-[10px] font-black
-                  ${active ? "text-violet-600" : "text-gray-400"}
-                `}
-              >
-                {label}
-              </span>
+              <Icon
+                size={active ? 20 : 21}
+                strokeWidth={active ? 2.5 : 2}
+                className={`transition-colors duration-300 ${active ? "text-white" : "text-gray-400"}`}
+              />
             </Link>
           );
         })}
