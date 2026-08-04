@@ -77,11 +77,14 @@ async function hasApprovedContract(userId: string): Promise<boolean> {
       .eq("id", userId)
       .maybeSingle();
 
-    if (data?.contract_status !== "APPROVED") return false;
+   const status = data?.contract_status ?? "NONE";
+    if (status === "NONE") return true;
+    if (status !== "APPROVED") return false;
 
-    if (data.contract_valid_until) {
+    const validUntil = data?.contract_valid_until ?? null;
+    if (validUntil) {
       const todayWIB = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      if (data.contract_valid_until < todayWIB) {
+      if (validUntil < todayWIB) {
         supabase.from("users").update({ contract_status: "EXPIRED" }).eq("id", userId).then(() => {});
         return false;
       }

@@ -26,7 +26,7 @@ export default function ContractPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-const load = async () => {
+  const load = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/contracts/me");
