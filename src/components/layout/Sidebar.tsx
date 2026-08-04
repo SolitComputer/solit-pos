@@ -170,6 +170,7 @@ const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi
 const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
+const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
@@ -1024,6 +1025,8 @@ export default function Sidebar() {
   }, [user?.id]);
 
   const [needsBiometricEnroll, setNeedsBiometricEnroll] = useState(false);
+  const [contractStatus, setContractStatus] = useState<string | null>(null);
+  const [contractWarningDays, setContractWarningDays] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1052,6 +1055,18 @@ export default function Sidebar() {
       window.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("focus", fetchBiometricStatus);
     };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetch("/api/contracts/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.success) return;
+        setContractStatus(d.contract_status);
+        setContractWarningDays(d.warning ? d.days_left : null);
+      })
+      .catch(() => { });
   }, [user?.id]);
 
   const [rail, setRail] = useState(false);
@@ -1127,6 +1142,7 @@ export default function Sidebar() {
       : [];
 
   const groups: MenuGroup[] = dedupeGroups([
+    ...(contractStatus && contractStatus !== "APPROVED" ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT] }] : []),
     ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
     ...staticGroups,
     ...dynamicGroups.map((g) => ({
@@ -1266,6 +1282,21 @@ export default function Sidebar() {
           <button onClick={() => router.push("/dashboard/attendance/overtime")} className="w-full bg-violet-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-violet-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
             <span className="text-sm font-black">{overtimeNotify.count} lemburan menunggu ACC</span>
+          </button>
+        </div>
+      )}
+
+      {/* ✅ NEW — kontrak akan berakhir dalam N hari; akun masih bisa dipakai,
+          cuma diberi peringatan supaya sempat diperpanjang sebelum terkunci. */}
+      {contractWarningDays !== null && (
+        <div className="fixed left-1/2 -translate-x-1/2 z-[57] w-full max-w-sm px-2" style={{
+          top: (!onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12)
+            + (!onSiapKirim && prep.siapKirimUnacked.length > 0 ? 52 : 0)
+            + (!onOvertimePage && overtimeNotify.count > 0 ? 52 : 0),
+        }}>
+          <button onClick={() => router.push("/contract")} className="w-full bg-amber-500 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-amber-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
+            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+            <span className="text-sm font-black">Kontrak berakhir {contractWarningDays} hari lagi</span>
           </button>
         </div>
       )}

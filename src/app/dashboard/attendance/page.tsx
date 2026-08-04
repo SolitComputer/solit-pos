@@ -15,6 +15,8 @@ import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shift
 import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Inbox, CalendarDays, GraduationCap, Briefcase, Trophy } from "lucide-react";
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
 import ExcelJS from "exceljs";
+import { ContractBadge } from "@/components/contracts/ContractBadge";
+import SendContractModal from "@/components/contracts/SendContractModal";
 
 function isPKLRole(role?: string): boolean {
     if (!role) return false;
@@ -130,7 +132,7 @@ type SwapDayOff = {
     work_date: string;
     note?: string | null;
 };
-type UserInfo = { id: string; name: string; role: string; created_at?: string | null; shift?: "PAGI" | "SORE" | null };
+type UserInfo = { id: string; name: string; role: string; created_at?: string | null; shift?: "PAGI" | "SORE" | null; contract_status?: string | null; contract_valid_until?: string | null };
 type AbsenceReason = "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE";
 type AbsenceItem = { date: string; reason: AbsenceReason; note: string | null };
 type AttendanceDetailItem = {
@@ -3008,6 +3010,7 @@ export default function AttendanceDashboardPage() {
     const [showMonthlyOffModal, setShowMonthlyOffModal] = useState(false);
     const [monthlyOffs, setMonthlyOffs] = useState<MonthlyOff[]>([]);
     const [showShiftScheduleModal, setShowShiftScheduleModal] = useState(false);
+    const [sendContractUser, setSendContractUser] = useState<UserInfo | null>(null);
     const [shiftSchedules, setShiftSchedules] = useState<ShiftScheduleRow[]>([]);
     const [shiftConfigs, setShiftConfigs] = useState<any[]>([]);
 
@@ -4979,6 +4982,9 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
                                             {isAdmin && (
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kontrak</th>
+                                            )}
+                                            {isAdmin && (
                                                 <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Generate & Edit</th>
                                             )}
                                             {canManage && (
@@ -5092,6 +5098,22 @@ export default function AttendanceDashboardPage() {
                                                             <span className={`text-sm font-black w-16 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
                                                         </div>
                                                     </td>
+{isAdmin && (
+                                                        <td className="px-4 py-4 text-center">
+                                                            <div className="flex flex-col items-center gap-1.5">
+                                                               <ContractBadge status={allUsers.find(au => au.id === u.userId)?.contract_status} validUntil={allUsers.find(au => au.id === u.userId)?.contract_valid_until} />
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const target = allUsers.find(au => au.id === u.userId);
+                                                                        if (target) setSendContractUser(target);
+                                                                    }}
+                                                                    className="text-[9px] font-bold text-violet-500 hover:text-violet-700 border border-violet-200 hover:border-violet-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
+                                                                >
+                                                                    Kirim
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    )}
                                                     {isAdmin && (
                                                         <td className="px-4 py-4 text-center">
                                                             <div className="flex items-center gap-1.5 justify-center flex-wrap">
@@ -6543,6 +6565,13 @@ export default function AttendanceDashboardPage() {
                         fetchAllDateWorks();
                         fetchDayOffs();
                     }}
+                />
+            )}
+            {sendContractUser && isAdmin && (
+                <SendContractModal
+                    user={{ id: sendContractUser.id, name: sendContractUser.name }}
+                    onClose={() => setSendContractUser(null)}
+                    onSent={() => { fetchAllUsers(); setSendContractUser(null); }}
                 />
             )}
             {showShiftScheduleModal && canManage && (
