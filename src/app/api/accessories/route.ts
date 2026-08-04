@@ -1,22 +1,9 @@
 // src/app/api/accessories/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { withAuth } from "@/lib/auth";
-import { UserRole } from "@/lib/permissions";
-
-const ALLOWED_ROLES: UserRole[] = [
-    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
-    "TEKNISI", "KEPALA_TEKNISI",
-    "KEPALA_SALES", "CREW_SALES",
-    "ACCOUNTING",
-];
-
-const CREATE_ROLES: UserRole[] = [
-    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
-    "TEKNISI", "KEPALA_TEKNISI",
-];
+import { withAuth, AuthUser } from "@/lib/auth";
+import { ACCESSORY_VIEW_ROLES, ACCESSORY_CREATE_ROLES, expandRolesWithParents } from "@/lib/permissions";
+import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
 // ─── GET /api/accessories ─────────────────────────────────────────────────────
 export const GET = withAuth(async (req: NextRequest) => {
@@ -51,10 +38,19 @@ export const GET = withAuth(async (req: NextRequest) => {
     }));
 
     return NextResponse.json({ success: true, data: enriched, total: count ?? 0, page, limit });
-}, ALLOWED_ROLES);
+}, ACCESSORY_VIEW_ROLES);
 
 // ─── POST /api/accessories ────────────────────────────────────────────────────
-export const POST = withAuth(async (req: NextRequest) => {
+async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
+    const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
+    const hasStaticAccess = effectiveRoles.some(r => (ACCESSORY_CREATE_ROLES as string[]).includes(r));
+    if (!hasStaticAccess) {
+        const dyn = await checkDynamicPageAccess(effectiveRoles, "/dashboard/data-barang", "create");
+        if (!dyn.allowed) {
+            return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+        }
+    }
+
     let body: unknown;
     try { body = await req.json(); }
     catch { return NextResponse.json({ success: false, error: "Body tidak valid" }, { status: 400 }); }
@@ -84,4 +80,6 @@ export const POST = withAuth(async (req: NextRequest) => {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
     return NextResponse.json({ success: true, data }, { status: 201 });
-}, CREATE_ROLES);
+}
+
+export const POST = withAuth(postHandler);

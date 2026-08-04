@@ -10,6 +10,8 @@ import {
     type LucideIcon,
 } from "lucide-react";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { usePagePermission } from "@/hooks/usePagePermission";
+import { ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES } from "@/lib/permissions";
 
 // ─── Types──────────────────────────────────────────────────────────────────
 interface Accessory {
@@ -170,7 +172,7 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: { open: boo
 // ═══════════════════════════════════════════════════════════════════════════
 // MODAL: Detail Aksesori
 // ═══════════════════════════════════════════════════════════════════════════
-function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete }: { accessory: Accessory | null; onClose: () => void; onEdit: () => void; onDelete: () => void; }) {
+function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete, canEdit, canDelete }: { accessory: Accessory | null; onClose: () => void; onEdit: () => void; onDelete: () => void; canEdit: boolean; canDelete: boolean; }) {
     useEffect(() => { if (!accessory) return; const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [accessory, onClose]);
     if (!accessory) return null;
     const stock = accessory.stock ?? 0; const margin = (accessory.sell_price || 0) - (accessory.buy_price || 0); const CatIcon = CATEGORY_ICON[accessory.category] ?? Wrench;
@@ -193,7 +195,7 @@ function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete }: { access
                     <div><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Informasi</p><div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">{[{ label: "Kategori", value: accessory.category }, { label: "Merk", value: accessory.brand }, { label: "Spesifikasi", value: accessory.spec }].map(({ label, value }) => (<div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p><p className="text-sm font-semibold text-gray-800 break-all leading-tight">{value || <span className="text-gray-300 font-normal">—</span>}</p></div>))}</div></div>
                     {accessory.notes && (<div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5"><p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">Keterangan</p><p className="text-sm text-amber-900">{accessory.notes}</p></div>)}
                 </div>
-                <div className="flex items-center justify-between gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0 flex-wrap"><p className="text-xs text-gray-400">{new Date(accessory.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}</p><div className="flex gap-2"><button onClick={onEdit} className="h-9 px-4 text-sm font-semibold text-white bg-gray-800 rounded-xl hover:bg-gray-900 active:scale-[0.97] transition-all duration-150">Edit</button><button onClick={onDelete} className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">Hapus</button></div></div>
+                <div className="flex items-center justify-between gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0 flex-wrap"><p className="text-xs text-gray-400">{new Date(accessory.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}</p><div className="flex gap-2">{canEdit && <button onClick={onEdit} className="h-9 px-4 text-sm font-semibold text-white bg-gray-800 rounded-xl hover:bg-gray-900 active:scale-[0.97] transition-all duration-150">Edit</button>}{canDelete && <button onClick={onDelete} className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">Hapus</button>}</div></div>
             </div>
         </div>
     );
@@ -308,6 +310,13 @@ function AccessoriesContent() {
         ? (user as any).roles
         : user?.role ? [user.role] : [];
     const isAdmin = userRoles.includes("ADMIN");
+
+    // Additive: tombol muncul kalau role sudah diizinkan lewat array hardcode
+    // ATAU matrix "Role & Hak Akses" (halaman data-barang) sudah mengizinkannya.
+    const { can: matrixCan } = usePagePermission("data-barang");
+    const canCreateAcc = userRoles.some(r => (ACCESSORY_CREATE_ROLES as string[]).includes(r)) || matrixCan.create;
+    const canEditAcc = userRoles.some(r => (ACCESSORY_EDIT_ROLES as string[]).includes(r)) || matrixCan.edit;
+    const canDeleteAcc = userRoles.some(r => (ACCESSORY_EDIT_ROLES as string[]).includes(r)) || matrixCan.delete;
 
     const LIMIT = 9999;
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -427,11 +436,13 @@ function AccessoriesContent() {
                             className="inline-flex items-center gap-1.5 h-9 px-4 text-sm font-semibold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded-xl active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed">
                             {isExporting ? (<><svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg><span className="hidden sm:inline">Mengexport...</span></>) : (<><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg><span className="hidden sm:inline">Export Excel</span><span className="sm:hidden">Excel</span></>)}
                         </button>
-                        <button onClick={() => { setEditAcc(null); setAccModalOpen(true); }}
-                            className="inline-flex items-center gap-2 h-9 px-4 bg-gray-800 rounded-xl text-sm font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-gray-800/25">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-                            Tambah Aksesori
-                        </button>
+                        {canCreateAcc && (
+                            <button onClick={() => { setEditAcc(null); setAccModalOpen(true); }}
+                                className="inline-flex items-center gap-2 h-9 px-4 bg-gray-800 rounded-xl text-sm font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-gray-800/25">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                                Tambah Aksesori
+                            </button>
+                        )}
                     </div>
 
                     {/* STAT CARDS */}
@@ -489,7 +500,7 @@ function AccessoriesContent() {
                                                             </button>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}><div className="flex items-center justify-end gap-1"><button onClick={() => { setEditAcc(item); setAccModalOpen(true); }} className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button><button onClick={() => setDeleteAcc(item)} className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button></div></td>
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}><div className="flex items-center justify-end gap-1">{canEditAcc && <button onClick={() => { setEditAcc(item); setAccModalOpen(true); }} className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>}{canDeleteAcc && <button onClick={() => setDeleteAcc(item)} className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>}</div></td>
                                                 </tr>
                                             );
                                         })}
@@ -505,7 +516,7 @@ function AccessoriesContent() {
             </main>
 
             <AccessoryModal open={accModalOpen} onClose={() => { setAccModalOpen(false); setEditAcc(null); }} onSave={handleSaveAcc} initial={editAcc} loading={savingAcc} />
-            {view === "detail" && (<AccessoryDetailModal accessory={selectedAcc} onClose={() => { setView(null); setSelectedAcc(null); }} onEdit={() => { setEditAcc(selectedAcc); setView(null); setAccModalOpen(true); }} onDelete={() => setDeleteAcc(selectedAcc)} />)}
+            {view === "detail" && (<AccessoryDetailModal accessory={selectedAcc} onClose={() => { setView(null); setSelectedAcc(null); }} onEdit={() => { setEditAcc(selectedAcc); setView(null); setAccModalOpen(true); }} onDelete={() => setDeleteAcc(selectedAcc)} canEdit={canEditAcc} canDelete={canDeleteAcc} />)}
             <DeleteConfirm open={!!deleteAcc} title="Hapus Aksesori" name={deleteAcc?.name ?? ""} onClose={() => setDeleteAcc(null)} onConfirm={handleDeleteAcc} loading={deletingAcc} />
             <AuditHistoryModal accessory={historyAcc} onClose={() => setHistoryAcc(null)} />
         </>

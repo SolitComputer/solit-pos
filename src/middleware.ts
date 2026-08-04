@@ -371,8 +371,12 @@ export async function middleware(request: NextRequest) {
     const allowed = ROUTE_PERMISSIONS[matchedRoute];
     hasRouteAccess = effectiveRoles.some((r: string) => (allowed as string[]).includes(r));
 
-
-    if (!hasRouteAccess && hasDynamicRole) {
+    // Additive-only: kalau ROUTE_PERMISSIONS bilang tidak boleh, cek juga matrix
+    // role_page_permissions (Role & Hak Akses di /dashboard/users) — berlaku buat
+    // SEMUA role (bukan cuma yang punya dynamic role), tapi cuma bisa NAMBAH akses,
+    // tidak pernah menguranginya (baris ini gak pernah dieksekusi kalau hasRouteAccess
+    // sudah true dari ROUTE_PERMISSIONS).
+    if (!hasRouteAccess) {
       const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, "view");
       if (dyn.matched) hasRouteAccess = dyn.allowed;
     }
