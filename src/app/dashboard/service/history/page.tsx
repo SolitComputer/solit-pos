@@ -293,25 +293,22 @@ function HistoryDetailModal({
 
         {/* ── HERO HEADER ─────────────────────────────────────────────────── */}
         <div
-          className={`relative shrink-0 overflow-hidden px-5 pb-6 pt-4 sm:pt-5 ${
-            isBad
+          className={`relative shrink-0 overflow-hidden px-5 pb-6 pt-4 sm:pt-5 ${isBad
               ? "bg-gradient-to-br from-rose-50 via-rose-50/60 to-white"
               : "bg-gradient-to-br from-[#1a1a2e]/[0.03] via-blue-50/40 to-white"
-          }`}
+            }`}
         >
           {/* Dekoratif circle blur di pojok */}
           <div
-            className={`pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full opacity-20 blur-2xl ${
-              isBad ? "bg-rose-400" : "bg-blue-400"
-            }`}
+            className={`pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full opacity-20 blur-2xl ${isBad ? "bg-rose-400" : "bg-blue-400"
+              }`}
           />
 
           {/* Top bar: close button */}
           <div className="mb-4 flex items-center justify-between">
             <span
-              className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
-                isBad ? "bg-rose-100 text-rose-500" : "bg-[#1a1a2e]/8 text-[#1a1a2e]/50"
-              }`}
+              className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${isBad ? "bg-rose-100 text-rose-500" : "bg-[#1a1a2e]/8 text-[#1a1a2e]/50"
+                }`}
             >
               Riwayat Servis
             </span>
@@ -328,9 +325,8 @@ function HistoryDetailModal({
           {/* Avatar + nama */}
           <div className="flex items-center gap-3.5">
             <div
-              className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-[15px] font-black shadow-sm ${
-                isBad ? "bg-rose-500 text-white" : "bg-[#1a1a2e] text-white"
-              }`}
+              className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-[15px] font-black shadow-sm ${isBad ? "bg-rose-500 text-white" : "bg-[#1a1a2e] text-white"
+                }`}
             >
               {initials}
             </div>
@@ -443,8 +439,8 @@ function HistoryDetailModal({
               {/* Visual timeline */}
               <div className="space-y-0">
                 {[
-                  { dot: "bg-blue-400",    label: "Masuk",   value: formatDate(order.tanggal_masuk) },
-                  { dot: "bg-violet-400",  label: "Selesai", value: formatDate(order.tanggal_selesai) },
+                  { dot: "bg-blue-400", label: "Masuk", value: formatDate(order.tanggal_masuk) },
+                  { dot: "bg-violet-400", label: "Selesai", value: formatDate(order.tanggal_selesai) },
                   { dot: "bg-emerald-400", label: "Diambil", value: formatDate(order.tanggal_diambil) },
                 ].map((item, i, arr) => (
                   <div key={i} className="flex gap-3">
@@ -521,9 +517,9 @@ function HistoryDetailModal({
                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-300">Tim</span>
               </div>
               <div className="space-y-2.5">
-                <TeamRow label="Dibuat oleh"     name={order.created_by_user?.name}     color="blue" />
-                <TeamRow label="Dikerjakan oleh" name={order.dikerjakan_by_user?.name}  color="violet" />
-                <TeamRow label="Diambil oleh"    name={order.diambil_by_user?.name}     color="emerald" />
+                <TeamRow label="Dibuat oleh" name={order.created_by_user?.name} color="blue" />
+                <TeamRow label="Dikerjakan oleh" name={order.dikerjakan_by_user?.name} color="violet" />
+                <TeamRow label="Diambil oleh" name={order.diambil_by_user?.name} color="emerald" />
               </div>
             </div>
           </div>
@@ -758,14 +754,14 @@ export default function HistoryPage() {
             <>
               {/* Desktop skeleton */}
               <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm lg:block">
-                <div className="overflow-x-auto">
+                <div className="max-h-[65vh] overflow-auto"> {/*  NEW — freeze header */}
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <tr className="border-b border-gray-100">
                         {COLUMNS.map(h => (
                           <th
                             key={h}
-                            className="whitespace-nowrap px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-400 first:pl-5 last:pr-5"
+                            className="sticky top-0 z-10 whitespace-nowrap bg-gray-50 px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-400 first:pl-5 last:pr-5"
                           >
                             {h}
                           </th>
@@ -811,8 +807,8 @@ export default function HistoryPage() {
           ) : (
             <>
               {/* ══ Desktop / Laptop: Table ══════════════════════════════════ */}
-              <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm lg:block">
-                {/* Hint bar */}
+            <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm lg:block">
+                {/* Hint bar — sengaja di luar area scroll biar tetap nempel di atas */}
                 <div className="flex items-center gap-2 border-b border-gray-50 bg-gray-50/60 px-5 py-2">
                   <span className="shrink-0 text-gray-300">
                     <IconInfoSm />
@@ -822,15 +818,15 @@ export default function HistoryPage() {
                   </p>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="max-h-[65vh] overflow-auto"> {/*  NEW — dibatasi tinggi + scroll 2 arah, header freeze di dalam sini */}
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/60">
+                      <tr className="border-b border-gray-100">
                         {COLUMNS.map((h, i) => (
                           <th
                             key={h}
                             className={`
-                              whitespace-nowrap px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-gray-400
+                              sticky top-0 z-10 whitespace-nowrap bg-gray-50 px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-gray-400
                               ${i === 0 ? "pl-5" : ""}
                               ${i === COLUMNS.length - 1 ? "pr-5 text-right" : "text-left"}
                             `}
@@ -849,8 +845,8 @@ export default function HistoryPage() {
                         const rowBg = isTidakJadi
                           ? "bg-red-50/40 hover:bg-red-50/70"
                           : isFromGagal
-                          ? "bg-rose-50/20 hover:bg-rose-50/40"
-                          : "hover:bg-blue-50/30";
+                            ? "bg-rose-50/20 hover:bg-rose-50/40"
+                            : "hover:bg-blue-50/30";
 
                         return (
                           <tr
@@ -984,8 +980,8 @@ export default function HistoryPage() {
                   const cardTone = isTidakJadi
                     ? "border-red-100 bg-red-50/40"
                     : isFromGagal
-                    ? "border-rose-100 bg-rose-50/30"
-                    : "border-gray-100 bg-white";
+                      ? "border-rose-100 bg-rose-50/30"
+                      : "border-gray-100 bg-white";
 
                   return (
                     <div
