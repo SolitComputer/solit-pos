@@ -16,6 +16,7 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import { ALL_STATIC_ROLES } from "@/lib/permissions";
 import { checkDynamicPageAccess, expandDynamicParents } from "@/lib/dynamicPermissions";
+import { CONTRACT_GATE_ENABLED } from "@/lib/featureFlags";
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
@@ -53,10 +54,6 @@ const PKL_BLOCKED_ROUTES = ["/dashboard/users"];
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"];
 const CONTRACT_EXEMPT_ROLES = ["PROGRAMMER"];
-
-// 🔴 SAKLAR SEMENTARA — set true lagi kalau sudah siap kirim kontrak ke semua
-// karyawan. Selama false, tidak ada yang di-redirect ke /contract sama sekali.
-const CONTRACT_GATE_ENABLED = false;
 
 function isAttendanceExempt(role?: string): boolean {
   return !!role && ATTENDANCE_EXEMPT_ROLES.includes(role);

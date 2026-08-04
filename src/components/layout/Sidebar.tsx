@@ -1062,7 +1062,7 @@ export default function Sidebar() {
     fetch("/api/contracts/me")
       .then((r) => r.json())
       .then((d) => {
-        if (!d.success) return;
+        if (!d.success || d.gate_enabled === false) { setContractStatus(null); setContractWarningDays(null); return; }
         setContractStatus(d.contract_status);
         setContractWarningDays(d.warning ? d.days_left : null);
       })

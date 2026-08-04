@@ -26,11 +26,15 @@ export default function ContractPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const load = async () => {
+const load = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/contracts/me");
       const data = await res.json();
+      if (data.success && data.gate_enabled === false) {
+        window.location.href = "/dashboard";
+        return;
+      }
       if (data.success) {
         setContract(data.contract);
         setStatus(data.contract_status);
