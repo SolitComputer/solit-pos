@@ -111,7 +111,7 @@ export default function AkuntansiTabs({ period }: { period: string }) {
         <button
           onClick={handleExport}
           disabled={exporting}
-          title="Export seluruh akuntansi (Jurnal Umum, Buku Besar, Neraca) ke Excel"
+          title="Export seluruh akuntansi (Jurnal Umum, Buku Besar, Laba Rugi, Neraca) ke 1 file Excel"
           className="relative h-10 px-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 hover:shadow-lg hover:shadow-emerald-600/25 active:scale-[0.96] transition-all duration-150 disabled:opacity-40 disabled:active:scale-100 shrink-0 whitespace-nowrap"
         >
           {exporting ? (
