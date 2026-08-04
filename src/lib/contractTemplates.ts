@@ -9,7 +9,7 @@ export const CONTRACT_TYPE_LABELS: Record<ContractType, string> = {
 };
 
 export const CONTRACT_STATUS_META: Record<ContractStatus, { label: string; color: string; bg: string; border: string }> = {
-  NONE: { label: "Belum Ada Kontrak", color: "text-gray-500", bg: "bg-gray-100", border: "border-gray-200" },
+NONE: { label: "Belum Dikirim", color: "text-gray-500", bg: "bg-gray-100", border: "border-gray-200" },
   PENDING: { label: "Menunggu Persetujuan", color: "text-amber-700", bg: "bg-amber-100", border: "border-amber-200" },
   APPROVED: { label: "Disetujui", color: "text-emerald-700", bg: "bg-emerald-100", border: "border-emerald-200" },
   REJECTED: { label: "Ditolak", color: "text-red-700", bg: "bg-red-100", border: "border-red-200" },
@@ -17,6 +17,7 @@ export const CONTRACT_STATUS_META: Record<ContractStatus, { label: string; color
 };
 
 export const CONTRACT_DURATION_OPTIONS: { label: string; months: number | null }[] = [
+  { label: "1 Bulan", months: 1 },
   { label: "3 Bulan", months: 3 },
   { label: "6 Bulan", months: 6 },
   { label: "1 Tahun", months: 12 },
@@ -32,6 +33,13 @@ export function computeValidUntil(validFrom: string, months: number | null): str
   d.setMonth(d.getMonth() + months);
   return d.toISOString().slice(0, 10);
 }
+const GENERAL_OBLIGATIONS = `KEWAJIBAN UMUM & KEPATUHAN
+- Karyawan wajib mematuhi seluruh Standar Operasional Prosedur (SOP) yang berlaku di Perusahaan, baik yang sudah ditetapkan maupun yang diterbitkan/diperbarui selama masa kerja berlangsung, termasuk SOP operasional, SOP keselamatan kerja, dan SOP penggunaan sistem Solit POS.
+- Karyawan wajib menjaga kerahasiaan data Perusahaan, data pelanggan, dan informasi internal lainnya, baik selama maupun setelah masa kerja berakhir.
+- Iuran/dana pensiun dan potongan lain (kasbon, pinjaman, dsb — jika berlaku) mengikuti kebijakan yang tercatat pada sistem payroll Perusahaan dan dapat disesuaikan sewaktu-waktu sesuai peraturan yang berlaku.
+- Karyawan wajib segera melaporkan kepada atasan/HR apabila mengetahui adanya pelanggaran SOP, kecurangan, atau hal lain yang merugikan Perusahaan.
+- Pelanggaran terhadap SOP dan/atau ketentuan dalam perjanjian ini dapat dikenakan sanksi administratif, teguran tertulis, hingga pemutusan hubungan kerja sesuai kebijakan Perusahaan yang berlaku.`;
+
 function baseTemplate(name: string, body: string) {
   return `PERJANJIAN KERJA
 Solit 03
@@ -39,6 +47,8 @@ Solit 03
 Perjanjian ini dibuat antara Solit 03 ("Perusahaan") dengan ${name || "[Nama Karyawan]"} ("Karyawan").
 
 ${body}
+
+${GENERAL_OBLIGATIONS}
 
 Dengan menekan tombol "Saya Setuju" pada aplikasi ini, Karyawan menyatakan telah membaca, memahami, dan menyetujui seluruh isi perjanjian ini sebagai dasar hubungan kerja dengan Perusahaan.`;
 }

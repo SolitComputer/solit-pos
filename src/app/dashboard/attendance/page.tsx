@@ -17,6 +17,7 @@ import { ShiftScheduleTab } from "./ShiftScheduleTab";
 import ExcelJS from "exceljs";
 import { ContractBadge } from "@/components/contracts/ContractBadge";
 import SendContractModal from "@/components/contracts/SendContractModal";
+import ContractDetailModal from "@/components/contracts/ContractDetailModal";
 
 function isPKLRole(role?: string): boolean {
     if (!role) return false;
@@ -3011,6 +3012,7 @@ export default function AttendanceDashboardPage() {
     const [monthlyOffs, setMonthlyOffs] = useState<MonthlyOff[]>([]);
     const [showShiftScheduleModal, setShowShiftScheduleModal] = useState(false);
     const [sendContractUser, setSendContractUser] = useState<UserInfo | null>(null);
+    const [contractDetailUser, setContractDetailUser] = useState<UserInfo | null>(null);
     const [shiftSchedules, setShiftSchedules] = useState<ShiftScheduleRow[]>([]);
     const [shiftConfigs, setShiftConfigs] = useState<any[]>([]);
 
@@ -4846,7 +4848,7 @@ export default function AttendanceDashboardPage() {
                                                                                                     alert(d.message || "Gagal menghapus");
                                                                                                     return;
                                                                                                 }
-                                                                                                if (d.warning) alert(d.warning); 
+                                                                                                if (d.warning) alert(d.warning);
                                                                                                 refreshAll(); // Refresh data
                                                                                             } catch (err) {
                                                                                                 console.error("Delete error:", err);
@@ -5098,19 +5100,32 @@ export default function AttendanceDashboardPage() {
                                                             <span className={`text-sm font-black w-16 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
                                                         </div>
                                                     </td>
-{isAdmin && (
+                                                    {isAdmin && (
                                                         <td className="px-4 py-4 text-center">
                                                             <div className="flex flex-col items-center gap-1.5">
-                                                               <ContractBadge status={allUsers.find(au => au.id === u.userId)?.contract_status} validUntil={allUsers.find(au => au.id === u.userId)?.contract_valid_until} />
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const target = allUsers.find(au => au.id === u.userId);
-                                                                        if (target) setSendContractUser(target);
-                                                                    }}
-                                                                    className="text-[9px] font-bold text-violet-500 hover:text-violet-700 border border-violet-200 hover:border-violet-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
-                                                                >
-                                                                    Kirim
-                                                                </button>
+                                                                <ContractBadge status={allUsers.find(au => au.id === u.userId)?.contract_status} validUntil={allUsers.find(au => au.id === u.userId)?.contract_valid_until} />
+                                                                <div className="flex items-center gap-1">
+                                                                    {allUsers.find(au => au.id === u.userId)?.contract_status && allUsers.find(au => au.id === u.userId)?.contract_status !== "NONE" && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const target = allUsers.find(au => au.id === u.userId);
+                                                                                if (target) setContractDetailUser(target);
+                                                                            }}
+                                                                            className="text-[9px] font-bold text-slate-500 hover:text-slate-700 border border-slate-200 hover:border-slate-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
+                                                                        >
+                                                                            Lihat
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const target = allUsers.find(au => au.id === u.userId);
+                                                                            if (target) setSendContractUser(target);
+                                                                        }}
+                                                                        className="text-[9px] font-bold text-violet-500 hover:text-violet-700 border border-violet-200 hover:border-violet-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
+                                                                    >
+                                                                        Kirim
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         </td>
                                                     )}
@@ -6572,6 +6587,13 @@ export default function AttendanceDashboardPage() {
                     user={{ id: sendContractUser.id, name: sendContractUser.name }}
                     onClose={() => setSendContractUser(null)}
                     onSent={() => { fetchAllUsers(); setSendContractUser(null); }}
+                />
+            )}
+            {contractDetailUser && isAdmin && (
+                <ContractDetailModal
+                    userId={contractDetailUser.id}
+                    userName={contractDetailUser.name}
+                    onClose={() => setContractDetailUser(null)}
                 />
             )}
             {showShiftScheduleModal && canManage && (
