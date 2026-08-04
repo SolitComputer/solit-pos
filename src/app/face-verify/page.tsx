@@ -174,50 +174,54 @@ export default function FaceVerifyPage() {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      handleGpsSuccess,
-      (err) => {
-        addLog(`GPS error [code ${err.code}]: ${err.message}`, "err");
+    let watchId: number;
+    let timeoutId: NodeJS.Timeout;
+    let bestAccuracy = Infinity;
 
-        // ✅ FIX: PERMISSION_DENIED (code 1) — izin lokasi diblokir di browser
-        // ATAU Location Services HP mati. Sebelumnya ini dilempar ke stage
-        // "error" generik yang cuma punya tombol "Refresh halaman" — padahal
-        // refresh TIDAK menyelesaikan masalah izin yang diblokir.
+    const clearGPS = () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+
+    // Timeout maksimal 15 detik untuk mendapatkan lokasi akurat
+    timeoutId = setTimeout(() => {
+      clearGPS();
+      setGpsLoading(false);
+      if (bestAccuracy !== Infinity) {
+        setStage("error");
+        setMessage(`Sinyal GPS terlalu lemah/kasar (Akurasi: ±${Math.round(bestAccuracy)}m). Tolong cari area terbuka/dekat jendela.`);
+      } else {
+        setStage("error");
+        setMessage("Gagal mendapatkan sinyal GPS (Timeout). Pastikan GPS aktif dan Anda berada di area terbuka.");
+      }
+    }, 15000);
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const accuracy = position.coords.accuracy;
+        bestAccuracy = Math.min(bestAccuracy, accuracy);
+
+        // Batas toleransi akurasi disamakan dengan 80m (MAX_DISTANCE_METERS)
+        if (accuracy <= 80) {
+          clearGPS();
+          handleGpsSuccess(position);
+        } else {
+          // Hanya log, biarkan watchPosition terus mencari sinyal yang lebih baik
+          addLog(`Akurasi masih lemah: ±${Math.round(accuracy)}m (butuh <= 80m)...`, "warn");
+        }
+      },
+      (err) => {
+        // Jika diblokir, langsung hentikan
         if (err.code === err.PERMISSION_DENIED) {
+          clearGPS();
           setGpsLoading(false);
           setStage("gps-denied");
           setMessage("Izin lokasi diblokir. Ikuti panduan di bawah untuk mengaktifkan.");
-          return;
+        } else {
+          addLog(`GPS retry [code ${err.code}]: ${err.message}`, "warn");
         }
-
-        // ✅ FIX: TIMEOUT (code 3) — coba sekali lagi dengan akurasi lebih
-        // rendah, ini sering berhasil di area indoor/sinyal GPS lemah.
-        if (err.code === err.TIMEOUT) {
-          addLog("timeout — mencoba ulang dengan akurasi rendah...", "warn");
-          navigator.geolocation.getCurrentPosition(
-            handleGpsSuccess,
-            (fallbackErr) => {
-              setGpsLoading(false);
-              addLog(`GPS fallback gagal [code ${fallbackErr.code}]: ${fallbackErr.message}`, "err");
-              if (fallbackErr.code === fallbackErr.PERMISSION_DENIED) {
-                setStage("gps-denied");
-                setMessage("Izin lokasi diblokir. Ikuti panduan di bawah untuk mengaktifkan.");
-              } else {
-                setStage("error");
-                setMessage("Gagal mendapatkan lokasi. Pastikan GPS aktif dan coba lagi.");
-              }
-            },
-            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
-          );
-          return;
-        }
-
-        // POSITION_UNAVAILABLE (code 2) atau kasus lain
-        setGpsLoading(false);
-        setStage("error");
-        setMessage("Lokasi tidak tersedia. Pastikan GPS/lokasi perangkat menyala.");
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
   }, [addLog, handleGpsSuccess]);
 

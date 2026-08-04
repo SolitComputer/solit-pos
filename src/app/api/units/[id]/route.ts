@@ -3,15 +3,27 @@ import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
-import { BARANG_FULL_ACCESS_ROLES, hasAnyRole } from "@/lib/permissions";
+import { BARANG_FULL_ACCESS_ROLES, hasAnyRole, expandRolesWithParents } from "@/lib/permissions";
+import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
+async function hasUnitAccess(user: AuthUser, staticRoles: string[], action: "edit" | "delete"): Promise<boolean> {
+  const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
+  if (effectiveRoles.some(r => staticRoles.includes(r))) return true;
+  const dyn = await checkDynamicPageAccess(effectiveRoles, "/dashboard/units", action);
+  return dyn.allowed;
+}
+
 // ── PUT: Update unit (serial number, grade, harga, dll) ──────────────────────
 async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
+    if (!(await hasUnitAccess(user, BARANG_FULL_ACCESS_ROLES as string[], "edit"))) {
+      return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    }
+
     const { id } = await props.params;
     const body = await req.json();
 
@@ -164,6 +176,10 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 //
 async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
+    if (!(await hasUnitAccess(user, PERMISSIONS.EDIT_UNITS as string[], "edit"))) {
+      return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    }
+
     const { id: unitId } = await props.params;
     const body = await req.json();
 
@@ -313,6 +329,10 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
 // ── DELETE: Hapus unit ────────────────────────────────────────────────────────
 async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
+    if (!(await hasUnitAccess(user, PERMISSIONS.EDIT_UNITS as string[], "delete"))) {
+      return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    }
+
     const { id } = await props.params;
 
     // Ambil data unit sebelum dihapus (untuk log)
@@ -381,9 +401,6 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const PUT = withAuth(putHandler, BARANG_FULL_ACCESS_ROLES);
-export const PATCH = withAuth(patchHandler, PERMISSIONS.EDIT_UNITS);
-
-
-
-export const DELETE = withAuth(deleteHandler, PERMISSIONS.EDIT_UNITS);
+export const PUT = withAuth(putHandler);
+export const PATCH = withAuth(patchHandler);
+export const DELETE = withAuth(deleteHandler);
