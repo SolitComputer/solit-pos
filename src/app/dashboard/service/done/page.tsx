@@ -391,7 +391,18 @@ export default function DonePage() {
   };
 
   const handleDiambilClick = (order: ServiceOrder) => {
-    if (order.status === "DONE") {
+    if (order.payment_status === "LUNAS") {
+      //  NEW — sudah lunas dari pembayaran di muka, tinggal konfirmasi pengambilan fisik (gak perlu bayar lagi)
+      setDialog({
+        open: true,
+        orderId: order.id,
+      action: "diambil_langsung",
+        title: "Konfirmasi Laptop Diambil",
+        description: `Laptop "${order.nama} — ${order.type_laptop}" sudah lunas dibayar di muka. Konfirmasi laptop sudah diambil pelanggan?`,
+        confirmLabel: "Ya, Sudah Diambil",
+        confirmClass: "bg-emerald-600 hover:bg-emerald-700",
+      });
+    } else if (order.status === "DONE") {
       setPaymentOrder(order);
     } else {
       setPickupChoice({ open: true, order });
@@ -643,16 +654,16 @@ export default function DonePage() {
           {/* ── Content ─────────────────────────────────────────────────────── */}
           {loading ? (
             <>
-              {/* Desktop skeleton */}
+             {/* Desktop skeleton */}
               <div className="hidden overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm lg:block">
-                <div className="overflow-x-auto">
+                <div className="max-h-[65vh] overflow-auto"> {/*  NEW — freeze header */}
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gradient-to-r from-slate-50/80 to-white">
+                      <tr className="border-b border-gray-100">
                         {COLUMNS.map(h => (
                           <th
                             key={h}
-                            className="whitespace-nowrap px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-400 first:pl-5 last:pr-5"
+                            className="sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3.5 text-left text-[10px] font-black uppercase tracking-wider text-gray-400 first:pl-5 last:pr-5"
                           >
                             {h}
                           </th>
@@ -686,17 +697,17 @@ export default function DonePage() {
             </div>
           ) : (
             <>
-              {/* ── Desktop / Laptop: Table ─────────────────────────────────── */}
+            {/* ── Desktop / Laptop: Table ─────────────────────────────────── */}
               <div className="hidden overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm lg:block">
-                <div className="overflow-x-auto">
+                <div className="max-h-[65vh] overflow-auto"> {/*  NEW — dibatasi tinggi + scroll 2 arah, header freeze di dalam sini */}
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gradient-to-r from-slate-50/80 to-white">
+                      <tr className="border-b border-gray-100">
                         {COLUMNS.map((h, i) => (
                           <th
                             key={h}
                             className={`
-                              whitespace-nowrap px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-gray-400
+                              sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-gray-400
                               ${i === 0 ? "pl-5" : ""}
                               ${i === COLUMNS.length - 1 ? "pr-5 text-right" : "text-left"}
                             `}
