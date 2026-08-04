@@ -3,7 +3,8 @@ import { supabase } from "@/services/supabase";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
-import { ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
+import { ITEM_OUTFLOW_ROLES, expandRolesWithParents } from "@/lib/permissions";
+import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
 const VALID_TYPES = ["SERVICE", "KEBUTUHAN"] as const;
 type OutflowType = (typeof VALID_TYPES)[number];
@@ -110,6 +111,15 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
 // ── POST ──────────────────────────────────────────────────────────────────
 async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
     try {
+        const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
+        const hasStaticAccess = effectiveRoles.some(r => (ITEM_OUTFLOW_ROLES as string[]).includes(r));
+        if (!hasStaticAccess) {
+            const dyn = await checkDynamicPageAccess(effectiveRoles, "/dashboard/data-barang", "create");
+            if (!dyn.allowed) {
+                return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+            }
+        }
+
         const body = await req.json();
 
         const outflow_type = String(body.outflow_type ?? "").toUpperCase() as OutflowType;
@@ -275,4 +285,4 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
 }
 
 export const GET = withAuth(getHandler, ITEM_OUTFLOW_ROLES);
-export const POST = withAuth(postHandler, ITEM_OUTFLOW_ROLES);
+export const POST = withAuth(postHandler);

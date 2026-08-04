@@ -3,6 +3,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useAuthUser } from "@/hooks/useAuthUser";
+import { usePagePermission } from "@/hooks/usePagePermission";
+import { ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
 
 type OutflowType = "SERVICE" | "KEBUTUHAN" | "TRANSAKSI";
 type ItemKind = "LAPTOP" | "ACCESSORY";
@@ -99,6 +102,13 @@ export default function OutflowsContent() {
             } catch { setCurrentUserName(""); }
         })();
     }, []);
+
+    // Additive: tombol muncul kalau role sudah diizinkan lewat array hardcode
+    // ATAU matrix "Role & Hak Akses" (halaman data-barang) sudah mengizinkannya.
+    const { user } = useAuthUser();
+    const userRoles: string[] = user?.roles?.length ? user.roles : user?.role ? [user.role] : [];
+    const { can: matrixCan } = usePagePermission("data-barang");
+    const canCreateOutflow = userRoles.some(r => (ITEM_OUTFLOW_ROLES as string[]).includes(r)) || matrixCan.create;
 
     // ── Filter state ──
     const [filterType, setFilterType] = useState<OutflowType | "">("");
@@ -205,15 +215,17 @@ export default function OutflowsContent() {
                         <p className="text-[12px] text-gray-400">Catat komponen &amp; sparepart yang keluar dari stok</p>
                     </div>
                 </div>
-                <button
-                    onClick={() => setModalOpen(true)}
-                    className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md transition active:scale-[0.98]"
-                >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    Tambah Pengambilan
-                </button>
+                {canCreateOutflow && (
+                    <button
+                        onClick={() => setModalOpen(true)}
+                        className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md transition active:scale-[0.98]"
+                    >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Tambah Pengambilan
+                    </button>
+                )}
             </div>
 
             {/* ── Filter bar ── */}

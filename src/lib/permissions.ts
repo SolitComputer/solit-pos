@@ -932,3 +932,19 @@ export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
   "PKL_TEKNISI",
   "KEPALA_ZENITH",
 ];
+
+// ── Data Barang: Aksesoris (CRUD) — dipusatkan di sini supaya client
+// (AccessoriesContent.tsx) dan server (api/accessories/*) pakai sumber yang sama,
+// dipakai juga sebagai baseline "additive" saat OR dengan matrix Role & Hak Akses.
+// Nilai persis sama seperti ALLOWED_ROLES/CREATE_ROLES/EDIT_ROLES yang tadinya
+// duplikat lokal di src/app/api/accessories/**, TIDAK termasuk ACCOUNTING di
+// create/edit (cuma ada di view) — supaya perilaku existing tidak berubah.
+export const ACCESSORY_CREATE_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "TEKNISI", "KEPALA_TEKNISI",
+];
+export const ACCESSORY_VIEW_ROLES: UserRole[] = [
+  ...ACCESSORY_CREATE_ROLES, "KEPALA_SALES", "CREW_SALES", "ACCOUNTING",
+];
+export const ACCESSORY_EDIT_ROLES: UserRole[] = [...ACCESSORY_CREATE_ROLES];
