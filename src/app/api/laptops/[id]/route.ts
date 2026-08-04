@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
-import { LAPTOP_DELETE_ROLES } from "@/lib/permissions";
-
+import { LAPTOP_DELETE_ROLES, expandRolesWithParents } from "@/lib/permissions";
+import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
 interface Props {
   params: Promise<{ id: string }>;
+}
+
+async function hasLaptopAccess(user: AuthUser, staticRoles: string[], action: "edit" | "delete"): Promise<boolean> {
+  const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
+  if (effectiveRoles.some(r => staticRoles.includes(r))) return true;
+  const dyn = await checkDynamicPageAccess(effectiveRoles, "/dashboard/laptops", action);
+  return dyn.allowed;
 }
 
 async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
@@ -34,6 +41,10 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
 
 async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
+    if (!(await hasLaptopAccess(user, PERMISSIONS.EDIT_LAPTOP as string[], "edit"))) {
+      return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    }
+
     const { id } = await props.params;
     const body = await req.json();
 
@@ -119,6 +130,10 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 
 async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
+    if (!(await hasLaptopAccess(user, LAPTOP_DELETE_ROLES as string[], "delete"))) {
+      return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    }
+
     const { id } = await props.params;
 
     const { data: laptop } = await supabase
@@ -205,5 +220,5 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
 }
 
 export const GET = withAuth(getHandler);
-export const PUT = withAuth(putHandler, PERMISSIONS.EDIT_LAPTOP);
-export const DELETE = withAuth(deleteHandler, LAPTOP_DELETE_ROLES);
+export const PUT = withAuth(putHandler);
+export const DELETE = withAuth(deleteHandler);

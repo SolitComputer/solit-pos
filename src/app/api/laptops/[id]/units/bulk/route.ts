@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { expandRolesWithParents } from "@/lib/permissions";
+import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 import { logActivity } from "@/lib/activityLogger";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
 
@@ -10,6 +12,15 @@ interface Props {
 
 async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
+    const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
+    const hasStaticAccess = effectiveRoles.some(r => (PERMISSIONS.CREATE_LAPTOP as string[]).includes(r));
+    if (!hasStaticAccess) {
+      const dyn = await checkDynamicPageAccess(effectiveRoles, "/dashboard/units", "create");
+      if (!dyn.allowed) {
+        return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+      }
+    }
+
     const { id: laptopId } = await props.params;
     const body = await req.json();
 
@@ -110,4 +121,4 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const POST = withAuth(postHandler, PERMISSIONS.CREATE_LAPTOP);
+export const POST = withAuth(postHandler);
