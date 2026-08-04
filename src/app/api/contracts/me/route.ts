@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 import { CONTRACT_WARNING_DAYS } from "@/lib/contractTemplates";
+import { CONTRACT_GATE_ENABLED } from "@/lib/featureFlags";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,6 +10,10 @@ const supabase = createClient(
 );
 
 async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
+  if (!CONTRACT_GATE_ENABLED) {
+    return NextResponse.json({ success: true, contract: null, contract_status: "NONE", gate_enabled: false, days_left: null, warning: false });
+  }
+
   const { data: userRow, error: userError } = await supabase
     .from("users")
     .select("contract_status, active_contract_id, contract_valid_until")
@@ -19,7 +24,7 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: userError.message }, { status: 500 });
   }
   if (!userRow || !userRow.active_contract_id) {
-    return NextResponse.json({ success: true, contract: null, contract_status: userRow?.contract_status ?? "NONE" });
+    return NextResponse.json({ success: true, contract: null, contract_status: userRow?.contract_status ?? "NONE", gate_enabled: true });
   }
 
   const { data: contract, error: contractError } = await supabase
@@ -48,6 +53,7 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
     valid_until: userRow.contract_valid_until,
     days_left: daysLeft,
     warning,
+    gate_enabled: true,
   });
 }
 
