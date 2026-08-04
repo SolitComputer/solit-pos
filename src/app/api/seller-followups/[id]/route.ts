@@ -312,13 +312,53 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-async function deleteHandler(req: NextRequest, props: Props, _user: AuthUser) {
+async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
+
+    // GATE — hanya Admin & Kepala Marketing yang boleh hapus permanen
+    const roles = expandRolesWithParents(user.roles ?? [user.role]);
+    if (!hasAnyRole(roles, PERMS.DELETE_SELLER_FOLLOWUP)) {
+      return NextResponse.json(
+        { success: false, message: "Hanya Admin & Kepala Marketing yang bisa menghapus data" },
+        { status: 403 }
+      );
+    }
+
+    // Ambil data dulu buat activity log (before-data) sebelum dihapus
+    const { data: existing, error: fetchErr } = await supabase
+      .from("seller_followups")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (fetchErr || !existing) {
+      return NextResponse.json(
+        { success: false, message: "Data follow-up tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
     const { error } = await supabase.from("seller_followups").delete().eq("id", id);
     if (error) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
+
+    try {
+      await logActivity({
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        action: "EDIT", // TODO: ganti ke "DELETE" kalau enum activityLogger support
+        entity: "seller_followup",
+        entityId: id,
+        entityLabel: `Hapus — ${existing.customer_name} (${existing.seller_type})`,
+        beforeData: existing,
+      });
+    } catch (logErr: any) {
+      console.error("[activity log seller_followup delete]", logErr?.message ?? logErr);
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("[DELETE /api/seller-followups/[id]]", err);
@@ -328,4 +368,4 @@ async function deleteHandler(req: NextRequest, props: Props, _user: AuthUser) {
 
 // PATCH dibuka untuk semua role yang bisa VIEW; otorisasi detail dicek di dalam handler.
 export const PATCH = withAuth(patchHandler, PERMISSIONS.VIEW_SELLER_FOLLOWUP);
-export const DELETE = withAuth(deleteHandler, PERMISSIONS.MANAGE_SELLER_FOLLOWUP);
+export const DELETE = withAuth(deleteHandler, PERMISSIONS.VIEW_SELLER_FOLLOWUP);

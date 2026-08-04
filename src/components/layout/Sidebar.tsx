@@ -1258,16 +1258,23 @@ export default function Sidebar() {
           </button>
         </div>
       )}
-      {/* ✅ NEW — poin 9: kepala divisi (atau Admin, kalau kepala divisi yang lembur) diberi tahu ada lemburan menunggu ACC */}
+{/* ✅ Poin 9 (redesign): lemburan menunggu ACC — mobile only sebagai icon bell + badge di kanan atas.
+          Desktop gak perlu ini karena sidebar-nya selalu terbuka & badge count-nya sudah nempel
+          di menu item "Lembur" lewat prop `badges` di bawah. */}
       {!onOvertimePage && overtimeNotify.count > 0 && (
-        <div className="fixed left-1/2 -translate-x-1/2 z-[58] w-full max-w-sm px-2" style={{
-          top: (!onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12) + (!onSiapKirim && prep.siapKirimUnacked.length > 0 ? 52 : 0),
-        }}>
-          <button onClick={() => router.push("/dashboard/attendance/overtime")} className="w-full bg-violet-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-violet-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">{overtimeNotify.count} lemburan menunggu ACC</span>
-          </button>
-        </div>
+        <button
+          onClick={() => router.push("/dashboard/attendance/overtime")}
+          className="lg:hidden fixed top-2 right-3 z-[58] w-9 h-9 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center active:scale-95 transition"
+          aria-label={`${overtimeNotify.count} lemburan menunggu ACC`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-[#1a1a2e]">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-violet-600 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+            {overtimeNotify.count > 9 ? "9+" : overtimeNotify.count}
+          </span>
+        </button>
       )}
 
       <button onClick={() => setOpen(true)} className="lg:hidden fixed top-0 left-0 z-50 w-12 h-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition" aria-label="Buka menu">
