@@ -54,6 +54,10 @@ const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"];
 const CONTRACT_EXEMPT_ROLES = ["PROGRAMMER"];
 
+// 🔴 SAKLAR SEMENTARA — set true lagi kalau sudah siap kirim kontrak ke semua
+// karyawan. Selama false, tidak ada yang di-redirect ke /contract sama sekali.
+const CONTRACT_GATE_ENABLED = false;
+
 function isAttendanceExempt(role?: string): boolean {
   return !!role && ATTENDANCE_EXEMPT_ROLES.includes(role);
 }
@@ -63,6 +67,7 @@ function isContractExempt(role?: string): boolean {
 }
 
 async function hasApprovedContract(userId: string): Promise<boolean> {
+  if (!CONTRACT_GATE_ENABLED) return true; // 🔴 gate dimatikan sementara
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
