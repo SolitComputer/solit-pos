@@ -10,6 +10,7 @@
 // Role non-Full-Access (Sales) hanya melihat SN + Status; sisanya disembunyikan.
 
 import { useEffect, useState } from "react";
+import { useRegisterOverlay } from "@/contexts/OverlayContext";
 
 export interface UnitDetailData {
     id: string;
@@ -94,6 +95,7 @@ export default function UnitDetailModal({
     unit, laptopName, laptopMeta, laptopSpecs, canEdit, canSeePrivate, onClose, onSaved, onEditLaptop,
     defaultSellingPrice, onCreated, onBack,
 }: Props) {
+    useRegisterOverlay();
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");

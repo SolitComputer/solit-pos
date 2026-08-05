@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRegisterOverlay } from "@/contexts/OverlayContext";
 
 interface SalesDetail {
   today: { count: number; revenue: number; profit: number };
@@ -25,6 +26,7 @@ const fmtShort = (n: number): string => {
 };
 
 export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  useRegisterOverlay(isOpen);
   const [data, setData] = useState<SalesDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedSales, setExpandedSales] = useState<string | null>(null);

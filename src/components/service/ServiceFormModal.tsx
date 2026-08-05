@@ -2,6 +2,7 @@
 // src/components/service/ServiceFormModal.tsx
 
 import { useState } from "react";
+import { useRegisterOverlay } from "@/contexts/OverlayContext";
 
 interface ServiceFormModalProps {
   open: boolean;
@@ -49,6 +50,7 @@ const FIELDS: Array<{
 ];
 
 export default function ServiceFormModal({ open, onClose, onSuccess }: ServiceFormModalProps) {
+  useRegisterOverlay(open);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
