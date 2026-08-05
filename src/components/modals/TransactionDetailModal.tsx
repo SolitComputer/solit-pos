@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRegisterOverlay } from "@/contexts/OverlayContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface LaptopEntry {
@@ -397,6 +398,7 @@ export function TransactionDetailModal({
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("daily");
   const [visible, setVisible] = useState(false);
+  useRegisterOverlay(isOpen);
 
   useEffect(() => {
     if (isOpen) setTimeout(() => setVisible(true), 10);
