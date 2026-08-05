@@ -9,7 +9,7 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { expandRolesWithParents } from "@/lib/permissions";
 import { expandDynamicParents, getPermissionMapForRoles } from "@/lib/dynamicPermissions";
 
-async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
+async function getHandler(_req: NextRequest, _ctx: unknown, user: AuthUser) {
   const userRoles = user.roles ?? [user.role];
   const effectiveStatic = expandRolesWithParents(userRoles);
   const effectiveAll = await expandDynamicParents(effectiveStatic);

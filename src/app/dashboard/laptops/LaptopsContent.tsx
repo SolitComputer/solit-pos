@@ -4,12 +4,13 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import ExcelJS from "exceljs";
 import Link from "next/link";
 import BarcodeModal from "@/components/ui/BarcodeModal";
-import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, LAPTOP_DELETE_ROLES } from "@/lib/permissions";
 import { Laptop } from "lucide-react";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
 import LaptopUnitsPreview, { PreviewUnit } from "@/components/inventory/LaptopUnitsPreview";
 import { exportInventoryExcel } from "@/lib/inventoryExport";
+import { usePagePermission } from "@/hooks/usePagePermission";
 
 interface LaptopUnit {
     id: string;
@@ -377,8 +378,15 @@ export function LaptopsContent() {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
 
     //  Semua permission check sekarang pakai hasAnyRole(userRoles, ...)
-    const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP);
-    const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP);
+    // Additive: aksi muncul kalau role sudah diizinkan lewat array hardcode
+    // ATAU matrix "Role & Hak Akses" (halaman laptops) sudah mengizinkannya.
+    // canEditLaptop & canDeleteLaptop sengaja DIPISAH — server DELETE dijaga
+    // LAPTOP_DELETE_ROLES, bukan EDIT_LAPTOP (beda role set: KEPALA_TEKNISI
+    // boleh hapus tapi tidak termasuk EDIT_LAPTOP, ACCOUNTING sebaliknya).
+    const { can: matrixCan } = usePagePermission("laptops");
+    const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP) || matrixCan.edit;
+    const canDeleteLaptop = hasAnyRole(userRoles, LAPTOP_DELETE_ROLES) || matrixCan.delete;
+    const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP) || matrixCan.create;
     const canExport = hasAnyRole(userRoles, [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "KEPALA_SOTECH",
@@ -1406,16 +1414,16 @@ export function LaptopsContent() {
                                     </Link>
                                 )}
                                 {canEditLaptop && (
-                                    <>
-                                        <button onClick={() => { closeModal(); setTimeout(() => openEdit(selectedLaptop!), 60); }}
-                                            className="h-9 px-4 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all duration-150">
-                                            Edit
-                                        </button>
-                                        <button onClick={() => handleDelete(selectedLaptop.id)}
-                                            className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">
-                                            Hapus
-                                        </button>
-                                    </>
+                                    <button onClick={() => { closeModal(); setTimeout(() => openEdit(selectedLaptop!), 60); }}
+                                        className="h-9 px-4 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all duration-150">
+                                        Edit
+                                    </button>
+                                )}
+                                {canDeleteLaptop && (
+                                    <button onClick={() => handleDelete(selectedLaptop.id)}
+                                        className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">
+                                        Hapus
+                                    </button>
                                 )}
                             </div>
                         </div>

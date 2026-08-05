@@ -15,6 +15,9 @@ import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shift
 import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Inbox, CalendarDays, GraduationCap, Briefcase, Trophy } from "lucide-react";
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
 import ExcelJS from "exceljs";
+import { ContractBadge } from "@/components/contracts/ContractBadge";
+import SendContractModal from "@/components/contracts/SendContractModal";
+import ContractDetailModal from "@/components/contracts/ContractDetailModal";
 
 function isPKLRole(role?: string): boolean {
     if (!role) return false;
@@ -130,7 +133,7 @@ type SwapDayOff = {
     work_date: string;
     note?: string | null;
 };
-type UserInfo = { id: string; name: string; role: string; created_at?: string | null; shift?: "PAGI" | "SORE" | null };
+type UserInfo = { id: string; name: string; role: string; created_at?: string | null; shift?: "PAGI" | "SORE" | null; contract_status?: string | null; contract_valid_until?: string | null };
 type AbsenceReason = "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE";
 type AbsenceItem = { date: string; reason: AbsenceReason; note: string | null };
 type AttendanceDetailItem = {
@@ -3008,6 +3011,8 @@ export default function AttendanceDashboardPage() {
     const [showMonthlyOffModal, setShowMonthlyOffModal] = useState(false);
     const [monthlyOffs, setMonthlyOffs] = useState<MonthlyOff[]>([]);
     const [showShiftScheduleModal, setShowShiftScheduleModal] = useState(false);
+    const [sendContractUser, setSendContractUser] = useState<UserInfo | null>(null);
+    const [contractDetailUser, setContractDetailUser] = useState<UserInfo | null>(null);
     const [shiftSchedules, setShiftSchedules] = useState<ShiftScheduleRow[]>([]);
     const [shiftConfigs, setShiftConfigs] = useState<any[]>([]);
 
@@ -3052,14 +3057,12 @@ export default function AttendanceDashboardPage() {
         setCheckoutTimes(co);
     }, []);
 
-    // ✅ NEW — inilah penyebab 3 error: fungsi + effect ini belum sempat
-    // ketambahan, padahal dipanggil dari tabel Jam Pulang.
     const fetchAfterOutOvertime = useCallback(async (year: number, month: number) => {
         try {
-            const r = await fetch("/api/attendance/overtime");
+            const r = await fetch(`/api/attendance/overtime?year=${year}&month=${month + 1}`);
             const d = await r.json();
             if (!d.success) return;
-            const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
+            const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
             const map: Record<string, { minutes: number; status: string; auditStatus: string }> = {};
             (d.data || []).forEach((o: any) => {
                 if (o.direction !== "AFTER_OUT") return;
@@ -4709,7 +4712,7 @@ export default function AttendanceDashboardPage() {
                                                     const userId = a.user_id ?? "";
                                                     const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
                                                     const manualRec = manualMap[`${userId}_${dateKey}`];
-                                                  const rowStatusKey: string | undefined = manualRec?.status ?? a.displayStatus;
+                                                    const rowStatusKey: string | undefined = manualRec?.status ?? a.displayStatus;
                                                     const ACCENT_COLOR_MAP: Record<string, string> = {
                                                         PRESENT: "border-l-emerald-400",
                                                         LATE: "border-l-amber-400",
@@ -4835,7 +4838,7 @@ export default function AttendanceDashboardPage() {
                                                                                 <>
                                                                                     <button
                                                                                         onClick={async () => {
-                                                                                            if (!confirm("Hapus absen wajah ini? Akan dihapus dari sistem.")) return;
+                                                                                            if (!confirm("Hapus absen wajah ini? Absen pulang di hari yang sama juga akan ikut terhapus.")) return;
                                                                                             try {
                                                                                                 const res = await fetch(`/api/attendance?id=${a.id}`, {
                                                                                                     method: "DELETE"
@@ -4845,6 +4848,7 @@ export default function AttendanceDashboardPage() {
                                                                                                     alert(d.message || "Gagal menghapus");
                                                                                                     return;
                                                                                                 }
+                                                                                                if (d.warning) alert(d.warning);
                                                                                                 refreshAll(); // Refresh data
                                                                                             } catch (err) {
                                                                                                 console.error("Delete error:", err);
@@ -4980,6 +4984,9 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
                                             {isAdmin && (
+                                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Kontrak</th>
+                                            )}
+                                            {isAdmin && (
                                                 <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Generate & Edit</th>
                                             )}
                                             {canManage && (
@@ -5093,6 +5100,35 @@ export default function AttendanceDashboardPage() {
                                                             <span className={`text-sm font-black w-16 text-right flex-shrink-0 ${pctColor}`}>{formatPct(u.pct)}%</span>
                                                         </div>
                                                     </td>
+                                                    {isAdmin && (
+                                                        <td className="px-4 py-4 text-center">
+                                                            <div className="flex flex-col items-center gap-1.5">
+                                                                <ContractBadge status={allUsers.find(au => au.id === u.userId)?.contract_status} validUntil={allUsers.find(au => au.id === u.userId)?.contract_valid_until} />
+                                                                <div className="flex items-center gap-1">
+                                                                    {allUsers.find(au => au.id === u.userId)?.contract_status && allUsers.find(au => au.id === u.userId)?.contract_status !== "NONE" && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const target = allUsers.find(au => au.id === u.userId);
+                                                                                if (target) setContractDetailUser(target);
+                                                                            }}
+                                                                            className="text-[9px] font-bold text-slate-500 hover:text-slate-700 border border-slate-200 hover:border-slate-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
+                                                                        >
+                                                                            Lihat
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const target = allUsers.find(au => au.id === u.userId);
+                                                                            if (target) setSendContractUser(target);
+                                                                        }}
+                                                                        className="text-[9px] font-bold text-violet-500 hover:text-violet-700 border border-violet-200 hover:border-violet-300 px-2 py-0.5 rounded-lg transition-all whitespace-nowrap"
+                                                                    >
+                                                                        Kirim
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    )}
                                                     {isAdmin && (
                                                         <td className="px-4 py-4 text-center">
                                                             <div className="flex items-center gap-1.5 justify-center flex-wrap">
@@ -6544,6 +6580,20 @@ export default function AttendanceDashboardPage() {
                         fetchAllDateWorks();
                         fetchDayOffs();
                     }}
+                />
+            )}
+            {sendContractUser && isAdmin && (
+                <SendContractModal
+                    user={{ id: sendContractUser.id, name: sendContractUser.name }}
+                    onClose={() => setSendContractUser(null)}
+                    onSent={() => { fetchAllUsers(); setSendContractUser(null); }}
+                />
+            )}
+            {contractDetailUser && isAdmin && (
+                <ContractDetailModal
+                    userId={contractDetailUser.id}
+                    userName={contractDetailUser.name}
+                    onClose={() => setContractDetailUser(null)}
                 />
             )}
             {showShiftScheduleModal && canManage && (

@@ -8,12 +8,14 @@ import { getCurrentUserClient } from "@/lib/auth-client";
 import { useChatContext } from "@/contexts/ChatContext";
 import { NotificationToggle } from "@/components/ui/NotificationToggle";
 import RoleAccessManager from "@/components/users/RoleAccessManager";
+import { ContractBadge } from "@/components/contracts/ContractBadge";
+import SendContractModal from "@/components/contracts/SendContractModal";
 import {
   Crown, Code2, Handshake, BarChart3, Target, Wrench, Briefcase, DollarSign,
-  Package, Truck, Smartphone, Sparkles, Factory, Building2, FileText, MapPin,
+  Package, Truck, Smartphone, Sparkles, Factory, Building2, MapPin,
   Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
   Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
-  ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint,
+  ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint, FileText,
 } from "lucide-react";
 
 interface User {
@@ -37,6 +39,8 @@ interface User {
   song_title: string | null;
   song_artist: string | null;
   song_artwork_url: string | null;
+  contract_status?: string | null;
+  contract_valid_until?: string | null;
 }
 
 interface CustomRoleRow {
@@ -829,7 +833,8 @@ export default function UsersPage() {
   const [confirmReset, setConfirmReset] = useState<User | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
-  const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+  const [sendContractUser, setSendContractUser] = useState<User | null>(null);
+   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState("Semua");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -1103,6 +1108,13 @@ export default function UsersPage() {
       {isAdmin && editUser && (
         <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }} />
       )}
+      {isAdmin && sendContractUser && (
+        <SendContractModal
+          user={{ id: sendContractUser.id, name: sendContractUser.name }}
+          onClose={() => setSendContractUser(null)}
+          onSent={() => { fetchUsers(); showToast(`Kontrak berhasil dikirim ke ${sendContractUser.name}`, "ok"); }}
+        />
+      )}
 
       <div className="min-h-screen bg-[#F7F7F8]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-5">
@@ -1336,7 +1348,7 @@ export default function UsersPage() {
                       </div>
 
                     ) : (
-                     <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 260px)", minHeight: "420px" }}>
+                      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 260px)", minHeight: "420px" }}>
                         {filtered.map((user, idx) => {
                           const avatarColor = getAvatarColor(user.role);
                           const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
@@ -1351,9 +1363,9 @@ export default function UsersPage() {
                                 <div
                                   className="relative flex-shrink-0 cursor-pointer"
                                   onClick={() => router.push(`/dashboard/profile/${user.id}`)}
-                                title={`Lihat profil ${user.name}`}
+                                  title={`Lihat profil ${user.name}`}
                                 >
-                                 {user.status_note && (
+                                  {user.status_note && (
                                     <div className="absolute -top-2.5 left-0 z-10 max-w-[150px] sm:max-w-[190px]">
                                       <div className="px-2 py-1 rounded-xl text-[9px] font-semibold truncate shadow-sm"
                                         style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#5b21b6" }}>
@@ -1406,6 +1418,7 @@ export default function UsersPage() {
                                         <KeyRound className="w-2.5 h-2.5" /> Belum PW
                                       </span>
                                     )}
+                                    {isAdmin && <ContractBadge status={user.contract_status} validUntil={user.contract_valid_until} />}
                                     {isAdmin && user.biometric_enabled && (
                                       <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                                         style={user.biometric_enrolled
@@ -1427,7 +1440,7 @@ export default function UsersPage() {
                                       </span>
                                     )}
                                   </div>
-                                 {user.song_title && (
+                                  {user.song_title && (
                                     <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                                       {user.song_artwork_url && (
                                         <img src={user.song_artwork_url} alt={user.song_title} className="w-4 h-4 rounded flex-shrink-0 object-cover" />
@@ -1471,6 +1484,11 @@ export default function UsersPage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                           d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                       </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && (
+                                    <ActionBtn onClick={() => setSendContractUser(user)} title="Kirim kontrak kerja" bg="#f5f3ff" color="#6d28d9">
+                                      <FileText className="w-3.5 h-3.5" />
                                     </ActionBtn>
                                   )}
                                   {isAdmin && user.face_embedding && (

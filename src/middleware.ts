@@ -16,6 +16,7 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import { ALL_STATIC_ROLES } from "@/lib/permissions";
 import { checkDynamicPageAccess, expandDynamicParents } from "@/lib/dynamicPermissions";
+import { CONTRACT_GATE_ENABLED } from "@/lib/featureFlags";
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
@@ -52,9 +53,47 @@ const PKL_BLOCKED_ROUTES = ["/dashboard/users"];
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"];
+const CONTRACT_EXEMPT_ROLES = ["PROGRAMMER"];
 
 function isAttendanceExempt(role?: string): boolean {
   return !!role && ATTENDANCE_EXEMPT_ROLES.includes(role);
+}
+
+function isContractExempt(role?: string): boolean {
+  return !!role && CONTRACT_EXEMPT_ROLES.includes(role);
+}
+
+async function hasApprovedContract(userId: string): Promise<boolean> {
+  if (!CONTRACT_GATE_ENABLED) return true; // 🔴 gate dimatikan sementara
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+    const { data } = await supabase
+      .from("users")
+      .select("contract_status, contract_valid_until")
+      .eq("id", userId)
+      .maybeSingle();
+
+   const status = data?.contract_status ?? "NONE";
+    if (status === "NONE") return true;
+    if (status !== "APPROVED") return false;
+
+    const validUntil = data?.contract_valid_until ?? null;
+    if (validUntil) {
+      const todayWIB = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      if (validUntil < todayWIB) {
+        supabase.from("users").update({ contract_status: "EXPIRED" }).eq("id", userId).then(() => {});
+        return false;
+      }
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const SYSTEM_OPEN_HOUR = 6;
@@ -182,6 +221,13 @@ export async function middleware(request: NextRequest) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
       if (user) {
+        if (!isContractExempt(user.role as string)) {
+          const contractOk = await hasApprovedContract(user.id);
+          if (!contractOk) {
+            return NextResponse.redirect(new URL("/contract", request.url));
+          }
+        }
+
         const exempt = isAttendanceExempt(user.role as string);
         const hasAttended = await hasAttendanceBypass(request, user.id);
         if (!exempt && isWithinSystemHours() && !hasAttended) {
@@ -215,6 +261,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/biometric-enroll")) {
+    if (!token) return NextResponse.redirect(new URL("/login", request.url));
+    return forward();
+  }
+
+  if (pathname.startsWith("/contract")) {
     if (!token) return NextResponse.redirect(new URL("/login", request.url));
     return forward();
   }
@@ -332,9 +383,16 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  let shouldStampAttendanceCookie = false; // ✅ NEW
+  let shouldStampAttendanceCookie = false;
 
   if (PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
+    if (!isContractExempt(user.role as string)) {
+      const contractOk = await hasApprovedContract(user.id);
+      if (!contractOk) {
+        return NextResponse.redirect(new URL("/contract", request.url));
+      }
+    }
+
     const exempt = isAttendanceExempt(user.role as string);
     let hasAttended = await hasAttendanceBypass(request, user.id);
 
@@ -371,8 +429,12 @@ export async function middleware(request: NextRequest) {
     const allowed = ROUTE_PERMISSIONS[matchedRoute];
     hasRouteAccess = effectiveRoles.some((r: string) => (allowed as string[]).includes(r));
 
-
-    if (!hasRouteAccess && hasDynamicRole) {
+    // Additive-only: kalau ROUTE_PERMISSIONS bilang tidak boleh, cek juga matrix
+    // role_page_permissions (Role & Hak Akses di /dashboard/users) — berlaku buat
+    // SEMUA role (bukan cuma yang punya dynamic role), tapi cuma bisa NAMBAH akses,
+    // tidak pernah menguranginya (baris ini gak pernah dieksekusi kalau hasRouteAccess
+    // sudah true dari ROUTE_PERMISSIONS).
+    if (!hasRouteAccess) {
       const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, "view");
       if (dyn.matched) hasRouteAccess = dyn.allowed;
     }
@@ -442,6 +504,8 @@ export const config = {
     "/login",
     "/face-verify",
     "/biometric-enroll",
+    "/contract",
+    "/api/contracts/:path*",
     "/api/auth/:path*",
     "/api/laptops/:path*",
     "/api/dashboard/:path*",

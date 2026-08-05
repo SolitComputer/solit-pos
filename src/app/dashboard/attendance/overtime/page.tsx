@@ -1562,9 +1562,8 @@ export default function OvertimePage() {
   const fillDetailIdFromUrl = searchParams.get("fillDetail");
   const [fillDetailOvertime, setFillDetailOvertime] = useState<{ id: string; minutes: number; direction: string } | null>(null);
   const autoCompletingIds = useRef<Set<string>>(new Set());
-  // FIX: simpan posisi scroll window sebelum user buka detail karyawan,
-  // supaya pas back, halaman balik ke posisi semula (bukan ke paling atas)
   const listScrollPositionRef = useRef<number>(0);
+  const lastOvertimeRefreshRef = useRef<number>(Date.now());
 
   useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); }, []);
 
@@ -1613,14 +1612,38 @@ export default function OvertimePage() {
     ]).finally(() => setLoading(false));
   }, [fetchOvertimes, fetchAllUsers, currentUser?.role, calendarMonth]);
 
-  // ✅ NEW — buka modal isi-detail otomatis kalau datang dari redirect absen
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) return;
+      const now = Date.now();
+      if (now - lastOvertimeRefreshRef.current < 15_000) return; // throttle 15 detik
+      lastOvertimeRefreshRef.current = now;
+      refetch();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
+    };
+  }, [refetch]);
+
   useEffect(() => {
     if (!fillDetailIdFromUrl) return;
     const found = overtimes.find((o) => o.id === fillDetailIdFromUrl);
-    if (found) {
-      setFillDetailOvertime({ id: found.id, minutes: (found as any).duration_minutes ?? 0, direction: (found as any).direction ?? "MANUAL" });
+    if (!found) return;
+
+    const alreadySubmitted = !!(found as any).category && !!found.work_description;
+    if (alreadySubmitted) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("fillDetail");
+      router.replace(params.toString() ? `?${params.toString()}` : "?", { scroll: false });
+      return;
     }
-  }, [fillDetailIdFromUrl, overtimes]);
+
+    setFillDetailOvertime({ id: found.id, minutes: (found as any).duration_minutes ?? 0, direction: (found as any).direction ?? "MANUAL" });
+  }, [fillDetailIdFromUrl, overtimes, searchParams, router]);
 
   useEffect(() => {
     if (!currentUser) return;

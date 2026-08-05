@@ -1014,6 +1014,104 @@ function ConfirmFollowupModal({
   );
 }
 
+// ── Confirm Delete Modal — hapus permanen data follow-up ─────────────────────
+function DeleteConfirmModal({
+  followup,
+  onConfirm,
+  onCancel,
+  processing,
+}: {
+  followup: Followup | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+  processing: boolean;
+}) {
+  useEffect(() => {
+    if (!followup) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [followup]);
+
+  useEffect(() => {
+    if (!followup || processing) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [followup, processing, onCancel]);
+
+  if (!followup) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-delete-title"
+    >
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={!processing ? onCancel : undefined}
+      />
+
+      <div className="relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
+        <button
+          type="button"
+          onClick={!processing ? onCancel : undefined}
+          aria-label="Tutup"
+          className="sm:hidden w-full flex justify-center pt-3 pb-1.5"
+        >
+          <span className="w-10 h-1 rounded-full bg-gray-200" />
+        </button>
+
+        <div className="px-5 pt-3 sm:pt-6 pb-5">
+          <div className="w-11 h-11 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center mb-3">
+            <TrashIcon />
+          </div>
+
+          <h2 id="confirm-delete-title" className="text-sm font-black text-gray-900 mb-1">
+            Hapus data customer ini?
+          </h2>
+          <p className="text-xs text-gray-500 leading-relaxed mb-4">
+            <span className="font-bold text-gray-700">{followup.customer_name}</span> beserta
+            seluruh riwayat follow-up-nya akan dihapus permanen dan{" "}
+            <span className="font-bold text-red-600">tidak bisa dikembalikan</span>.
+          </p>
+
+          <div className="flex gap-2">
+            <button
+              onClick={onCancel}
+              disabled={processing}
+              className={cx(
+                "flex-1 h-11 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 active:scale-[0.98] transition-all disabled:opacity-40",
+                FOCUS_RING
+              )}
+            >
+              Batal
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={processing}
+              className={cx(
+                "flex-1 h-11 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2",
+                FOCUS_RING,
+                processing ? "bg-red-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+              )}
+            >
+              {processing ? <Spinner /> : <TrashIcon />}
+              <span>{processing ? "Menghapus..." : "Ya, Hapus"}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── PIC block di dalam kartu ──────────────────────────────────────────────────
 function PicBlock({ f }: { f: Followup }) {
   // picName: pakai closed_by atau last_followup_by sebagai fallback data lama
@@ -1173,25 +1271,28 @@ function EditablePhoneCell({
   );
 }
 
-// ── FollowupCard ──────────────────────────────────────────────────────────────
 function FollowupCard({
   f,
   scope,
   processing,
   canManage,
+  canDelete,
   onFollowup,
   onArchive,
   onReactivate,
   onEditPhone,
+  onDelete,
 }: {
   f: Followup;
   scope: Scope;
   processing: boolean;
   canManage: boolean;
+  canDelete: boolean;
   onFollowup: (id: string) => void;
   onArchive: (id: string) => void;
   onReactivate: (id: string) => void;
   onEditPhone?: (id: string, phone: string) => void;
+  onDelete?: (id: string) => void;
 }) {
   const diff = daysDiff(f.next_followup_at);
   const isPedagang = f.seller_type === "PEDAGANG";
@@ -1355,6 +1456,21 @@ function FollowupCard({
                 <ArchiveIcon />
               </button>
             )}
+
+            {canDelete && (
+              <button
+                onClick={() => onDelete?.(f.id)}
+                disabled={processing}
+                title="Hapus permanen"
+                aria-label="Hapus"
+                className={cx(
+                  "h-11 w-11 sm:h-10 sm:w-10 inline-flex items-center justify-center rounded-xl border border-red-200 bg-white text-red-400 hover:text-red-600 hover:bg-red-50 hover:border-red-300 active:scale-[0.98] transition-all duration-150 disabled:opacity-40 flex-shrink-0",
+                  FOCUS_RING
+                )}
+              >
+                <TrashIcon />
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -1372,6 +1488,20 @@ function FollowupCard({
                   {processing ? <Spinner /> : <RefreshIcon />}
                 </span>
                 <span className="truncate">Aktifkan Lagi</span>
+              </button>
+            )}
+            {canDelete && (
+              <button
+                onClick={() => onDelete?.(f.id)}
+                disabled={processing}
+                title="Hapus permanen"
+                aria-label="Hapus"
+                className={cx(
+                  "h-11 w-11 sm:h-10 sm:w-10 inline-flex items-center justify-center rounded-xl border border-red-200 bg-white text-red-400 hover:text-red-600 hover:bg-red-50 hover:border-red-300 active:scale-[0.98] transition-all duration-150 disabled:opacity-40 flex-shrink-0",
+                  FOCUS_RING
+                )}
+              >
+                <TrashIcon />
               </button>
             )}
           </>
@@ -1523,6 +1653,7 @@ export default function ManagementSellerPage() {
   const [filterStatus, setFilterStatus] = useState<"ALL" | "SUDAH" | "BELUM">("ALL");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [confirmFu, setConfirmFu] = useState<Followup | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Followup | null>(null);
 
   // ── PIC checklist state ──
   const [pics, setPics] = useState<PicCandidate[]>([]);
@@ -1570,10 +1701,11 @@ export default function ManagementSellerPage() {
       .catch(() => setAuthUser(null));
   }, []);
 
-  const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
+const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
 
   const canView = hasAnyRole(userRoles, PERMISSIONS.VIEW_SELLER_FOLLOWUP);
   const canManage = hasAnyRole(userRoles, PERMISSIONS.MANAGE_SELLER_FOLLOWUP);
+  const canDelete = hasAnyRole(userRoles, PERMISSIONS.DELETE_SELLER_FOLLOWUP);
 
   //  Visibilitas tombol checklist ditentukan dari ROLE user (client-side),
   //    bukan dari hasil API. Enforcement asli tetap di server (PUT /api/seller-pics).
@@ -1705,6 +1837,30 @@ export default function ManagementSellerPage() {
   const onReactivate = (id: string) => runAction(id, { action: "reactivate" });
   const onEditPhone = (id: string, phone: string) =>
     runAction(id, { action: "update_phone", customer_phone: phone });
+
+  const onDeleteRequest = (id: string) => {
+    const target = items.find((i) => i.id === id) ?? null;
+    setDeleteTarget(target);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setProcessingId(deleteTarget.id);
+    try {
+      const res = await fetch(`/api/seller-followups/${deleteTarget.id}`, { method: "DELETE" });
+      const result = await res.json();
+      if (!result.success) {
+        alert(result.message || "Gagal menghapus data");
+        return;
+      }
+      await loadData(true);
+    } catch {
+      alert("Terjadi kesalahan koneksi");
+    } finally {
+      setProcessingId(null);
+      setDeleteTarget(null);
+    }
+  };
 
   // ── Derived ──
   const userItems = useMemo(() => items.filter((i) => i.seller_type === "USER"), [items]);
@@ -2065,10 +2221,12 @@ export default function ManagementSellerPage() {
                   scope={scope}
                   processing={processingId === f.id}
                   canManage={canManage}
+                  canDelete={canDelete}
                   onFollowup={onFollowup}
                   onArchive={onArchive}
                   onReactivate={onReactivate}
                   onEditPhone={onEditPhone}
+                  onDelete={onDeleteRequest}
                 />
               ))}
             </div>
@@ -2081,6 +2239,13 @@ export default function ManagementSellerPage() {
         onConfirm={handleConfirmFollowup}
         onCancel={() => setConfirmFu(null)}
         processing={processingId === confirmFu?.id}
+      />
+
+      <DeleteConfirmModal
+        followup={deleteTarget}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+        processing={processingId === deleteTarget?.id}
       />
     </DashboardLayout>
   );

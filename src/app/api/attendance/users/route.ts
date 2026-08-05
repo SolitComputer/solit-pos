@@ -15,7 +15,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   if (scope.all) {
     const { data, error } = await supabase
       .from("users")
-      .select("id, name, role, shift, created_at")
+      .select("id, name, role, shift, created_at, contract_status, contract_valid_until")
       .eq("is_active", true)
       .order("name", { ascending: true });
 
@@ -26,10 +26,9 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     return NextResponse.json({ success: true, data: data ?? [] });
   }
 
-  // ✅ PKL / Kepala divisi / User biasa → filtered by visibleIds
   const { data, error } = await supabase
     .from("users")
-    .select("id, name, role, shift, created_at")
+    .select("id, name, role, shift, created_at, contract_status, contract_valid_until")
     .in("id", scope.visibleIds)
     .eq("is_active", true)
     .order("name", { ascending: true });
