@@ -12,6 +12,7 @@ import { hasAnyRole, CC_REPORT_MANAGE_ROLES } from "@/lib/permissions";
 import type { UserRole } from "@/lib/auth";
 import CCReportModal from "@/components/cc/CCReportModal";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 type Filter = "ALL" | CCStatus;
 
@@ -92,7 +93,7 @@ export default function CCLaporanPage() {
   useEffect(() => {
     (async () => {
       try {
-        const me = await fetch("/api/auth/me").then((r) => r.json());
+        const me = await getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })).then((r) => r.json());
         const roles: string[] = me?.user?.roles ?? (me?.user?.role ? [me.user.role] : []);
         setCanManage(hasAnyRole(roles, CC_REPORT_MANAGE_ROLES as UserRole[]));
       } catch {

@@ -1095,10 +1095,18 @@ export default function Sidebar() {
     hasFetched.current = true;
     const fetchUser = async () => {
       try {
-        const res = await fetch("/api/auth/me");
-        if (!res.ok) { window.location.href = "/login"; return; }
-        const result = await res.json();
-        const fresh = result.user ?? null;
+        // Pakai shared cache — tidak fetch terpisah ke /api/auth/me
+        const { getAuthUser } = await import("@/hooks/useAuthUser");
+        const authUser = await getAuthUser();
+        if (!authUser) { window.location.href = "/login"; return; }
+        const fresh = {
+          id: authUser.id,
+          name: authUser.name,
+          role: authUser.role,
+          roles: authUser.roles,
+          shift: authUser.shift,
+          profile_photo_url: authUser.profile_photo_url,
+        };
         setUser(fresh);
         setCachedUser(fresh);
       } catch { } finally { setLoading(false); }

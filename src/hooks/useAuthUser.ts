@@ -3,11 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import type { UserRole } from "@/lib/permissions";
 
-interface AuthUser {
+export interface AuthUser {
   id: string;
   name: string;
   role: UserRole;
   roles: UserRole[];
+  shift?: "PAGI" | "SORE";
+  profile_photo_url?: string | null;
 }
 
 // Module-level cache — shared & persistent across components
@@ -43,6 +45,23 @@ async function fetchUser(): Promise<AuthUser | null> {
   return _promise;
 }
 
+/**
+ * Ambil user tanpa hook — bisa dipanggil dari useEffect, event handler, dll.
+ * Tetap sharing satu cache dengan useAuthUser().
+ * Hanya melakukan fetch jika belum ada cache.
+ */
+export async function getAuthUser(): Promise<AuthUser | null> {
+  return fetchUser();
+}
+
+/**
+ * Ambil cached user secara synchronous (return null jika belum di-fetch).
+ * Cocok untuk cek instan tanpa async.
+ */
+export function getCachedAuthUser(): AuthUser | null {
+  return _cached;
+}
+
 /** Invalidate cache — pakai ini setelah logout */
 export function invalidateAuthCache() {
   _cached = null;
@@ -56,6 +75,9 @@ export function useAuthUser() {
   const [loading, setLoading] = useState<boolean>(!_cached);
 
   const refresh = useCallback(async () => {
+    // Force re-fetch: invalidate dulu supaya fetchUser() benar-benar fetch ulang
+    _cached = null;
+    _promise = null;
     setLoading(true);
     const u = await fetchUser();
     setUser(u);

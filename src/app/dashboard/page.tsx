@@ -31,6 +31,7 @@ import {
   Legend,
 } from "chart.js";
 import { Line, Bar } from "react-chartjs-2";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -441,7 +442,7 @@ export default function Page() {
       const [statsRes, transRes, meRes] = await Promise.all([
         fetch("/api/dashboard/stats"),
         fetch("/api/dashboard/transactions"),
-        fetch("/api/auth/me"),
+        getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
       ]);
       const [statsResult, transResult, meResult] = await Promise.all([
         statsRes.json(), transRes.json(), meRes.json()

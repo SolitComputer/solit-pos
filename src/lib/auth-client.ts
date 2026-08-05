@@ -1,5 +1,7 @@
 // src/lib/auth-client.ts
 
+import { getAuthUser, type AuthUser } from "@/hooks/useAuthUser";
+
 export interface ClientUser {
   id: string;
   name: string;
@@ -8,30 +10,21 @@ export interface ClientUser {
   shift?: "PAGI" | "SORE";
 }
 
+/**
+ * Ambil current user dari client side.
+ * Delegate ke shared cache di useAuthUser.ts — tidak melakukan fetch terpisah.
+ */
 export async function getCurrentUserClient(): Promise<ClientUser | null> {
-  try {
-    const res = await fetch("/api/auth/me", {
-      method: "GET",
-      credentials: "include",
-    });
-    const data = await res.json();
-    if (!data.success || !data.user) return null;
-
-    const raw = data.user;
-
-    // ✅ Normalize: JWT lama hanya punya role string, JWT baru punya roles[]
-    const roles: string[] =
-      Array.isArray(raw.roles) && raw.roles.length > 0
-        ? raw.roles
-        : [raw.role].filter(Boolean);
-    return {
-      id: raw.id,
-      name: raw.name,
-      role: roles[0] ?? raw.role,  // primary role
-      roles,
-      shift: raw.shift,
-    };
-  } catch {
-    return null;
-  }
+  const user = await getAuthUser();
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    role: user.roles[0] ?? user.role,
+    roles: user.roles as string[],
+    shift: user.shift,
+  };
 }
+
+// Re-export untuk backward compat (beberapa file import AuthUser dari sini)
+export type { AuthUser };

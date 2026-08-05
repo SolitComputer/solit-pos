@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { getAuthUser } from "@/hooks/useAuthUser";
 import {
   RefreshCw, Pause, Ban, Skull, Search, CheckCircle2, FileText,
   Package, Wrench, ClipboardList, Clock, AlertTriangle, type LucideIcon,
@@ -359,8 +360,7 @@ function MinusContent() {
     : false;
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then(r => r.json())
+    getAuthUser().then(u => ({ success: true, user: u }))
       .then(r => setUserRole(r.user?.role ?? null))
       .catch(() => setUserRole(null));
   }, []);

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import { User, Laptop, Wallet, Package, FileText, RefreshCw, Handshake, Pencil, X, type LucideIcon } from "lucide-react";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Transaction {
@@ -105,8 +106,7 @@ export default function EditTransactionPage() {
   const [isFetchingAccs, setIsFetchingAccs] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
+    getAuthUser().then(u => ({ success: true, user: u }))
       .then((r) => setUserRole(r.user?.role ?? null))
       .catch(() => setUserRole(null));
   }, []);

@@ -11,6 +11,7 @@ import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTa
 import LaptopUnitsPreview, { PreviewUnit } from "@/components/inventory/LaptopUnitsPreview";
 import { exportInventoryExcel } from "@/lib/inventoryExport";
 import { usePagePermission } from "@/hooks/usePagePermission";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface LaptopUnit {
     id: string;
@@ -471,8 +472,7 @@ export function LaptopsContent() {
 
     //  Multi-role: ambil array roles dari /api/auth/me, fallback ke role tunggal
     useEffect(() => {
-        fetch("/api/auth/me")
-            .then(r => r.json())
+        getAuthUser().then(u => ({ success: true, user: u }))
             .then(r => {
                 const roles: string[] =
                     Array.isArray(r.user?.roles) && r.user.roles.length > 0
