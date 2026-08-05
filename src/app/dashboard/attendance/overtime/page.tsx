@@ -1567,9 +1567,6 @@ export default function OvertimePage() {
 
   useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); }, []);
 
-  // FIX: setiap kali selectedUserId balik jadi null (user pencet back dari
-  // EmployeeDetailView), scroll window dikembalikan ke posisi sebelum dia
-  // buka detail — bukan direset ke atas
   useEffect(() => {
     if (selectedUserId) return; // lagi buka detail, jangan diapa-apain
     const raf = requestAnimationFrame(() => {
