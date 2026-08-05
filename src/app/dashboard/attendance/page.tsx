@@ -166,6 +166,8 @@ type MonthlyOff = {
 const PKL_DAILY_RATE = 10000;
 const PKL_LATE_RATE = 5000;
 
+const CHECKOUT_REQUIRED_FROM = "2026-08-06";
+
 // ─── Constants ─────────────────────────────────────────────────────────────
 const OFFICE_LAT = -6.402593;
 const OFFICE_LNG = 106.787233;
@@ -1602,9 +1604,92 @@ function TodayAttendanceCard({ status, loading, onRefresh, onRequestEarlyCheckou
     );
 }
 
-// ─── Modal: Ajukan Izin Pulang Cepat ───────────────────────────────────────────
-// ✅ NEW (poin 1) — dipanggil langsung dari kartu absensi hari ini, tanpa
-// perlu masuk ke halaman /face-verify dulu untuk tahu belum bisa absen pulang.
+// ─── Kartu Pilihan Lembur (Awal/Akhir/Awal-Akhir/Hari Libur/Tidak Mau) ─────────
+// ✅ NEW — muncul di bawah TodayAttendanceCard begitu karyawan (termasuk PKL)
+// sudah absen pulang DAN ada potensi lembur. "Tidak Mau Lembur" cuma menutup
+// kartu ini di sesi ini, tidak memanggil API apa pun.
+function OvertimeChoiceCard({ options, isDayOff }: {
+    options: { beforeInMinutes: number; afterOutMinutes: number; holidayMinutes: number };
+    isDayOff: boolean;
+}) {
+    const router = useRouter();
+    const [dismissed, setDismissed] = useState(false);
+    const [submitting, setSubmitting] = useState<string | null>(null);
+    const [error, setError] = useState("");
+
+    if (dismissed) return null;
+    const { beforeInMinutes, afterOutMinutes, holidayMinutes } = options;
+    if (beforeInMinutes <= 0 && afterOutMinutes <= 0 && holidayMinutes <= 0) return null;
+
+    const submit = async (direction: "BEFORE_IN" | "AFTER_OUT" | "BOTH" | "HOLIDAY") => {
+        setSubmitting(direction); setError("");
+        try {
+            const res = await fetch("/api/attendance/overtime", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_self_declare: true, declare_direction: direction }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal mengajukan lembur"); setSubmitting(null); return; }
+            router.push(`/dashboard/attendance/overtime?fillDetail=${d.data.id}`);
+        } catch {
+            setError("Gagal mengajukan lembur");
+            setSubmitting(null);
+        }
+    };
+
+    return (
+        <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-2xl border border-violet-100 shadow-sm p-4 sm:p-5 space-y-3">
+            <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                    <Clock className="w-5 h-5 text-violet-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-800 text-sm leading-snug">Kamu Berpotensi Dapat Lembur</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">Pilih mau ajukan yang mana, atau tidak sama sekali.</p>
+                </div>
+            </div>
+
+            {error && <div className="bg-red-50 border border-red-200 text-red-600 text-[11px] px-3.5 py-2.5 rounded-xl">{error}</div>}
+
+            <div className="flex flex-col gap-2">
+                {isDayOff && holidayMinutes > 0 && (
+                    <button onClick={() => submit("HOLIDAY")} disabled={!!submitting}
+                        className="w-full h-11 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                        {submitting === "HOLIDAY" && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        Ajukan Lembur Hari Libur ({formatOvertimeMinutes(holidayMinutes)})
+                    </button>
+                )}
+                {!isDayOff && beforeInMinutes > 0 && (
+                    <button onClick={() => submit("BEFORE_IN")} disabled={!!submitting}
+                        className="w-full h-11 bg-white border border-violet-200 text-violet-700 rounded-xl text-xs font-bold hover:bg-violet-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                        {submitting === "BEFORE_IN" && <div className="w-4 h-4 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin" />}
+                        Ajukan Lembur Awal ({formatOvertimeMinutes(beforeInMinutes)})
+                    </button>
+                )}
+                {!isDayOff && afterOutMinutes > 0 && (
+                    <button onClick={() => submit("AFTER_OUT")} disabled={!!submitting}
+                        className="w-full h-11 bg-white border border-violet-200 text-violet-700 rounded-xl text-xs font-bold hover:bg-violet-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                        {submitting === "AFTER_OUT" && <div className="w-4 h-4 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin" />}
+                        Ajukan Lembur Akhir ({formatOvertimeMinutes(afterOutMinutes)})
+                    </button>
+                )}
+                {!isDayOff && beforeInMinutes > 0 && afterOutMinutes > 0 && (
+                    <button onClick={() => submit("BOTH")} disabled={!!submitting}
+                        className="w-full h-11 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                        {submitting === "BOTH" && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        Ajukan Awal & Akhir ({formatOvertimeMinutes(beforeInMinutes + afterOutMinutes)})
+                    </button>
+                )}
+                <button onClick={() => setDismissed(true)} disabled={!!submitting}
+                    className="w-full h-10 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all disabled:opacity-50">
+                    Tidak Mau Lembur
+                </button>
+            </div>
+        </div>
+    );
+}
+
 function EarlyCheckoutRequestModal({ checkoutAt, onClose, onSaved }: {
     checkoutAt?: string;
     onClose: () => void;
@@ -3237,6 +3322,7 @@ export default function AttendanceDashboardPage() {
                 checkoutAt: d.checkoutAt,
                 isEarlyCheckout: d.isEarlyCheckout ?? false,
                 earlyCheckoutStatus: d.earlyCheckoutStatus ?? "NONE",
+                overtimeOptions: d.overtimeOptions ?? null, // ✅ NEW
             });
         } catch { }
         finally { setStatusLoading(false); }
@@ -3601,8 +3687,11 @@ export default function AttendanceDashboardPage() {
         thisMonthAtt.forEach(a => {
             if (a.source !== "AUTO") return;
             const dk = toWIBDateKey(a.check_in_time || a.created_at);
+            const hasCheckout = !!checkoutTimes[`${a.user_id}_${dk}`];
+            const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && !hasCheckout;
             setEff(a.user_name, dk,
-                a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "ABSENT");
+                noCheckoutPenalty ? "ABSENT"
+                    : a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "ABSENT");
         });
 
         const manualByName: Record<string, Record<string, ManualAttendance>> = {};
@@ -3740,7 +3829,7 @@ export default function AttendanceDashboardPage() {
         });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
-    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, monthlyOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser, allDateWorks, leaveData]);
+    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, monthlyOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser, allDateWorks, leaveData, checkoutTimes]);
 
     const thisMonthPresent = thisMonthAtt.filter(a => a.displayStatus === "PRESENT").length;
     const thisMonthLate = thisMonthAtt.filter(a => a.displayStatus === "LATE").length;
@@ -4358,6 +4447,9 @@ export default function AttendanceDashboardPage() {
 
                 <OvertimeSOPBanner compact />
                 <TodayAttendanceCard status={todayStatus} loading={statusLoading} onRefresh={fetchTodayStatus} onRequestEarlyCheckout={() => setShowEarlyCheckoutModal(true)} />
+                {todayStatus?.overtimeOptions && (
+                    <OvertimeChoiceCard options={todayStatus.overtimeOptions} isDayOff={todayStatus.isDayOff} />
+                )}
 
                 {/* ── Stat Cards ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
