@@ -123,6 +123,9 @@ export const SELLER_FOLLOWUP_ACTOR_ROLES: UserRole[] = ["CREW_SALES", "KEPALA_MA
 /** Archive / reactivate / assign ulang PIC */
 export const SELLER_FOLLOWUP_MANAGE_ROLES: UserRole[] = [...FULL_ACCESS];
 
+/** Hapus permanen data follow-up — HANYA Admin & Kepala Marketing (lebih ketat dari MANAGE) */
+export const SELLER_FOLLOWUP_DELETE_ROLES: UserRole[] = ["ADMIN", "KEPALA_MARKETING"];
+
 /** Hanya Admin & Programmer yang boleh ubah checklist akses PIC */
 export const SELLER_PIC_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
@@ -615,10 +618,11 @@ export const PERMISSIONS = {
   COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   CONFIRM_SERVICE_PICKUP: [...SERVICE_VIEW_ROLES] as UserRole[],
 
-  // ── Management Seller ──────────────────────────────────────────────────────
+// ── Management Seller ──────────────────────────────────────────────────────
   VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
   VIEW_ALL_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_SUPERVISOR_ROLES] as UserRole[],
   MANAGE_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_MANAGE_ROLES] as UserRole[],
+  DELETE_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_DELETE_ROLES] as UserRole[],
   FOLLOWUP_SELLER: [...SELLER_FOLLOWUP_ACTOR_ROLES] as UserRole[],
   VIEW_SELLER_PIC: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
   MANAGE_SELLER_PIC: [...SELLER_PIC_MANAGE_ROLES] as UserRole[],
@@ -932,3 +936,19 @@ export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
   "PKL_TEKNISI",
   "KEPALA_ZENITH",
 ];
+
+// ── Data Barang: Aksesoris (CRUD) — dipusatkan di sini supaya client
+// (AccessoriesContent.tsx) dan server (api/accessories/*) pakai sumber yang sama,
+// dipakai juga sebagai baseline "additive" saat OR dengan matrix Role & Hak Akses.
+// Nilai persis sama seperti ALLOWED_ROLES/CREATE_ROLES/EDIT_ROLES yang tadinya
+// duplikat lokal di src/app/api/accessories/**, TIDAK termasuk ACCOUNTING di
+// create/edit (cuma ada di view) — supaya perilaku existing tidak berubah.
+export const ACCESSORY_CREATE_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "TEKNISI", "KEPALA_TEKNISI",
+];
+export const ACCESSORY_VIEW_ROLES: UserRole[] = [
+  ...ACCESSORY_CREATE_ROLES, "KEPALA_SALES", "CREW_SALES", "ACCOUNTING",
+];
+export const ACCESSORY_EDIT_ROLES: UserRole[] = [...ACCESSORY_CREATE_ROLES];

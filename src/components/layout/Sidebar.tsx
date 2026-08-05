@@ -170,6 +170,7 @@ const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi
 const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
+const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
@@ -1024,6 +1025,8 @@ export default function Sidebar() {
   }, [user?.id]);
 
   const [needsBiometricEnroll, setNeedsBiometricEnroll] = useState(false);
+  const [contractStatus, setContractStatus] = useState<string | null>(null);
+  const [contractWarningDays, setContractWarningDays] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1052,6 +1055,18 @@ export default function Sidebar() {
       window.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("focus", fetchBiometricStatus);
     };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetch("/api/contracts/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.success || d.gate_enabled === false) { setContractStatus(null); setContractWarningDays(null); return; }
+        setContractStatus(d.contract_status);
+        setContractWarningDays(d.warning ? d.days_left : null);
+      })
+      .catch(() => { });
   }, [user?.id]);
 
   const [rail, setRail] = useState(false);
@@ -1127,6 +1142,7 @@ export default function Sidebar() {
       : [];
 
   const groups: MenuGroup[] = dedupeGroups([
+    ...(contractStatus && contractStatus !== "APPROVED" ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT] }] : []),
     ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
     ...staticGroups,
     ...dynamicGroups.map((g) => ({
@@ -1258,14 +1274,36 @@ export default function Sidebar() {
           </button>
         </div>
       )}
-      {/* ✅ NEW — poin 9: kepala divisi (atau Admin, kalau kepala divisi yang lembur) diberi tahu ada lemburan menunggu ACC */}
+{/* ✅ Poin 9 (redesign): lemburan menunggu ACC — mobile only sebagai icon bell + badge di kanan atas.
+          Desktop gak perlu ini karena sidebar-nya selalu terbuka & badge count-nya sudah nempel
+          di menu item "Lembur" lewat prop `badges` di bawah. */}
       {!onOvertimePage && overtimeNotify.count > 0 && (
-        <div className="fixed left-1/2 -translate-x-1/2 z-[58] w-full max-w-sm px-2" style={{
-          top: (!onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12) + (!onSiapKirim && prep.siapKirimUnacked.length > 0 ? 52 : 0),
+        <button
+          onClick={() => router.push("/dashboard/attendance/overtime")}
+          className="lg:hidden fixed top-2 right-3 z-[58] w-9 h-9 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center active:scale-95 transition"
+          aria-label={`${overtimeNotify.count} lemburan menunggu ACC`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-[#1a1a2e]">
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-violet-600 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+            {overtimeNotify.count > 9 ? "9+" : overtimeNotify.count}
+          </span>
+        </button>
+      )}
+
+      {/* ✅ NEW — kontrak akan berakhir dalam N hari; akun masih bisa dipakai,
+          cuma diberi peringatan supaya sempat diperpanjang sebelum terkunci. */}
+      {contractWarningDays !== null && (
+        <div className="fixed left-1/2 -translate-x-1/2 z-[57] w-full max-w-sm px-2" style={{
+          top: (!onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12)
+            + (!onSiapKirim && prep.siapKirimUnacked.length > 0 ? 52 : 0)
+            + (!onOvertimePage && overtimeNotify.count > 0 ? 52 : 0),
         }}>
-          <button onClick={() => router.push("/dashboard/attendance/overtime")} className="w-full bg-violet-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-violet-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
+          <button onClick={() => router.push("/contract")} className="w-full bg-amber-500 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-amber-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
             <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">{overtimeNotify.count} lemburan menunggu ACC</span>
+            <span className="text-sm font-black">Kontrak berakhir {contractWarningDays} hari lagi</span>
           </button>
         </div>
       )}

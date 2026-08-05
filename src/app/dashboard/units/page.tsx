@@ -10,6 +10,7 @@ import UnitFormModal, { LaptopUnit as BaseLaptopUnit } from "@/components/invent
 import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
 import LaptopPickerModal, { PickableLaptop } from "@/components/inventory/LaptopPickerModal";
 import AddLaptopModal from "@/components/inventory/AddLaptopModal";
+import { usePagePermission } from "@/hooks/usePagePermission";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -452,7 +453,8 @@ function EditableModalCell({
 function UnitCard({
     unit,
     canSeePriceInfo,
-    canManageUnits,
+    canEditUnit,
+    canDeleteUnit,
     onEdit,
     onDelete,
     onPriceSaved,
@@ -460,7 +462,8 @@ function UnitCard({
 }: {
     unit: GlobalUnit;
     canSeePriceInfo: boolean;
-    canManageUnits: boolean;
+    canEditUnit: boolean;
+    canDeleteUnit: boolean;
     onEdit: (u: GlobalUnit) => void;
     onDelete: (u: GlobalUnit) => void;
     onPriceSaved: (unitId: string, newValue: number) => void;
@@ -512,7 +515,7 @@ function UnitCard({
                     <>
                         <div className="flex items-center justify-between gap-3">
                             <span className="text-[11px] text-gray-400 flex-shrink-0">Harga Modal</span>
-                            {canManageUnits ? (
+                            {canEditUnit ? (
                                 <EditableModalCell unitId={unit.id} value={unit.purchase_price} onSaved={onPriceSaved} />
                             ) : (
                                 <span className="text-xs text-gray-500 tabular-nums">{fmt(unit.purchase_price)}</span>
@@ -521,7 +524,7 @@ function UnitCard({
 
                         <div className="flex items-center justify-between gap-3">
                             <span className="text-[11px] text-gray-400 flex-shrink-0">Harga Sparepart</span>
-                            {canManageUnits && !isSold ? (
+                            {canEditUnit && !isSold ? (
                                 <EditableSparepartCell unitId={unit.id} value={unit.sparepart_cost || 0} onSaved={onSparepartSaved} />
                             ) : (
                                 <span className="text-xs text-blue-600 font-medium tabular-nums">{fmt(unit.sparepart_cost || 0)}</span>
@@ -555,20 +558,22 @@ function UnitCard({
             </div>
 
             {/* Aksi */}
-            {canManageUnits && (
+            {(canEditUnit || canDeleteUnit) && (
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                    {!isSold && (
+                    {canEditUnit && !isSold && (
                         <button onClick={() => onEdit(unit)}
                             className="flex-1 h-9 rounded-lg text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition active:scale-[0.98]">
                             Edit Unit
                         </button>
                     )}
-                    <button onClick={() => onDelete(unit)}
-                        className={`h-9 rounded-lg text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 transition flex items-center justify-center gap-1.5 text-xs font-medium active:scale-[0.98] ${isSold ? "flex-1" : "w-11"}`}
-                        title="Hapus Unit">
-                        <Trash2 className="w-4 h-4" />
-                        {isSold && <span>Hapus</span>}
-                    </button>
+                    {canDeleteUnit && (
+                        <button onClick={() => onDelete(unit)}
+                            className={`h-9 rounded-lg text-red-500 bg-red-50 hover:bg-red-100 border border-red-200 transition flex items-center justify-center gap-1.5 text-xs font-medium active:scale-[0.98] ${isSold || !canEditUnit ? "flex-1" : "w-11"}`}
+                            title="Hapus Unit">
+                            <Trash2 className="w-4 h-4" />
+                            {(isSold || !canEditUnit) && <span>Hapus</span>}
+                        </button>
+                    )}
                 </div>
             )}
         </div>
@@ -605,6 +610,15 @@ export default function AllUnitsPage() {
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING",
     ] as UserRole[]);
+
+    // Additive: aksi muncul kalau role sudah diizinkan lewat array hardcode
+    // (persis seperti canManageUnits) ATAU matrix "Role & Hak Akses" (halaman
+    // units) sudah mengizinkannya. "Tambah Laptop" sengaja TIDAK ikut sini —
+    // itu bikin model laptop baru (resource beda), tetap pakai canManageUnits saja.
+    const { can: matrixCan } = usePagePermission("units");
+    const canCreateUnit = canManageUnits || matrixCan.create;
+    const canEditUnit = canManageUnits || matrixCan.edit;
+    const canDeleteUnit = canManageUnits || matrixCan.delete;
 
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -944,15 +958,17 @@ export default function AllUnitsPage() {
                                 </button>
                             )}
                             {canManageUnits && (
+                                <button onClick={() => setShowAddLaptopModal(true)}
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 h-10 sm:h-9 bg-white border border-gray-200 rounded-lg text-xs sm:text-sm font-medium text-gray-600 hover:bg-gray-50 transition shadow-sm active:scale-[0.98]">
+                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                                        <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+                                    </svg>
+                                    Tambah Laptop
+                                </button>
+                            )}
+                            {canCreateUnit && (
                                 <>
-                                    <button onClick={() => setShowAddLaptopModal(true)}
-                                        className="inline-flex items-center justify-center gap-1.5 px-3 h-10 sm:h-9 bg-white border border-gray-200 rounded-lg text-xs sm:text-sm font-medium text-gray-600 hover:bg-gray-50 transition shadow-sm active:scale-[0.98]">
-                                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <rect x="2" y="3" width="20" height="14" rx="2" />
-                                            <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
-                                        </svg>
-                                        Tambah Laptop
-                                    </button>
                                     <button onClick={() => setPickerMode("unit")}
                                         className="inline-flex items-center justify-center gap-1.5 px-3 h-10 sm:h-9 bg-[#1a1a2e] rounded-lg text-xs sm:text-sm font-medium text-white hover:bg-[#16213e] transition shadow-sm active:scale-[0.98]">
                                         <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1222,7 +1238,7 @@ export default function AllUnitsPage() {
                                                 {canSeePriceInfo && (
                                                     <>
                                                         <Th right>
-                                                            {canManageUnits ? (
+                                                            {canEditUnit ? (
                                                                 <span className="flex items-center justify-end gap-1">
                                                                     Harga Modal
                                                                     <span className="text-violet-400 font-bold normal-case tracking-normal">(editable)</span>
@@ -1230,7 +1246,7 @@ export default function AllUnitsPage() {
                                                             ) : "Harga Modal"}
                                                         </Th>
                                                         <Th right>
-                                                            {canManageUnits ? (
+                                                            {canEditUnit ? (
                                                                 <span className="flex items-center justify-end gap-1">
                                                                     Harga Sparepart
                                                                     <span className="text-blue-400 font-bold normal-case tracking-normal">(editable)</span>
@@ -1284,7 +1300,7 @@ export default function AllUnitsPage() {
                                                             <>
                                                                 {/* Harga Modal — editable (termasuk unit SOLD, biar profit transaksi bisa dikoreksi) */}
                                                                 <td className="px-4 py-3.5 whitespace-nowrap">
-                                                                    {canManageUnits ? (
+                                                                    {canEditUnit ? (
                                                                         <EditableModalCell
                                                                             unitId={unit.id}
                                                                             value={unit.purchase_price}
@@ -1298,7 +1314,7 @@ export default function AllUnitsPage() {
                                                                 </td>
                                                                 {/* Harga Sparepart — editable */}
                                                                 <td className="px-4 py-3.5 whitespace-nowrap">
-                                                                    {canManageUnits && !isSold ? (
+                                                                    {canEditUnit && !isSold ? (
                                                                         <EditableSparepartCell
                                                                             unitId={unit.id}
                                                                             value={unit.sparepart_cost || 0}
@@ -1346,13 +1362,13 @@ export default function AllUnitsPage() {
                                                         </td>
                                                         <td className="px-4 py-3.5">
                                                             <div className="flex items-center justify-end gap-1">
-                                                                {canManageUnits && !isSold && (
+                                                                {canEditUnit && !isSold && (
                                                                     <button onClick={() => openEdit(unit)}
                                                                         className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
                                                                         Edit
                                                                     </button>
                                                                 )}
-                                                                {canManageUnits && (
+                                                                {canDeleteUnit && (
                                                                     <button onClick={() => handleDelete(unit)}
                                                                         className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center"
                                                                         title="Hapus Unit">
@@ -1398,7 +1414,8 @@ export default function AllUnitsPage() {
                                         key={unit.id}
                                         unit={unit}
                                         canSeePriceInfo={canSeePriceInfo}
-                                        canManageUnits={canManageUnits}
+                                        canEditUnit={canEditUnit}
+                                        canDeleteUnit={canDeleteUnit}
                                         onEdit={openEdit}
                                         onDelete={handleDelete}
                                         onPriceSaved={handlePriceSaved}

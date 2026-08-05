@@ -1,22 +1,16 @@
 // src/app/api/accessories/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { withAuth } from "@/lib/auth";
-import { UserRole } from "@/lib/permissions";
+import { withAuth, AuthUser } from "@/lib/auth";
+import { ACCESSORY_VIEW_ROLES, ACCESSORY_EDIT_ROLES, expandRolesWithParents } from "@/lib/permissions";
+import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
-const VIEW_ROLES: UserRole[] = [
-    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
-    "TEKNISI", "KEPALA_TEKNISI",
-    "KEPALA_SALES", "CREW_SALES",
-    "ACCOUNTING",
-];
-
-const EDIT_ROLES: UserRole[] = [
-    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
-    "TEKNISI", "KEPALA_TEKNISI",
-];
+async function hasEditAccess(user: AuthUser, action: "edit" | "delete"): Promise<boolean> {
+    const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
+    if (effectiveRoles.some(r => (ACCESSORY_EDIT_ROLES as string[]).includes(r))) return true;
+    const dyn = await checkDynamicPageAccess(effectiveRoles, "/dashboard/data-barang", action);
+    return dyn.allowed;
+}
 
 // ─── GET /api/accessories/[id] ────────────────────────────────────────────────
 export const GET = withAuth(async (_req, { params }) => {
@@ -26,10 +20,13 @@ export const GET = withAuth(async (_req, { params }) => {
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ success: false, error: "Tidak ditemukan" }, { status: 404 });
     return NextResponse.json({ success: true, data });
-}, VIEW_ROLES);
+}, ACCESSORY_VIEW_ROLES);
 
 // ─── PATCH /api/accessories/[id] ─────────────────────────────────────────────
-export const PATCH = withAuth(async (req, { params }) => {
+async function patchHandler(req: NextRequest, { params }: { params: Promise<{ id: string }> }, user: AuthUser) {
+    if (!(await hasEditAccess(user, "edit"))) {
+        return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
     const { id } = await params;
     let body: unknown;
     try { body = await req.json(); }
@@ -58,9 +55,14 @@ export const PATCH = withAuth(async (req, { params }) => {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
     return NextResponse.json({ success: true, data });
-}, EDIT_ROLES);
+}
 
-export const DELETE = withAuth(async (_req, { params }) => {
+export const PATCH = withAuth(patchHandler);
+
+async function deleteHandler(_req: NextRequest, { params }: { params: Promise<{ id: string }> }, user: AuthUser) {
+    if (!(await hasEditAccess(user, "delete"))) {
+        return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
     const { id } = await params;
 
     const { data: acc } = await supabaseAdmin
@@ -76,4 +78,6 @@ export const DELETE = withAuth(async (_req, { params }) => {
     const { error } = await supabaseAdmin.from("accessories").delete().eq("id", id);
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
-}, EDIT_ROLES);
+}
+
+export const DELETE = withAuth(deleteHandler);

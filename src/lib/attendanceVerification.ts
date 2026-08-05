@@ -207,6 +207,12 @@ function buildTodayWIBTimestamp(dateKey: string, time: { h: number; m: number })
   return new Date(`${dateKey}T${pad(time.h)}:${pad(time.m)}:00+07:00`).toISOString();
 }
 
+function toWIBTimeString(iso: string): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const wib = new Date(new Date(iso).getTime() + 7 * 3600_000);
+  return `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())}:${pad(wib.getUTCSeconds())}`;
+}
+
 async function createOvertimeDraft(
   supabaseAdmin: any,
   args: {
@@ -214,12 +220,29 @@ async function createOvertimeDraft(
     actualStart: string; actualEnd: string; sourceFaceVerificationId: string; isHoliday: boolean;
   }
 ): Promise<{ id: string; minutes: number; direction: OvertimeDirection } | null> {
+  // ✅ FIX: kolom `reason` di tabel overtime_requests itu NOT NULL, tapi
+  // insert di sini sebelumnya TIDAK PERNAH mengisi field ini sama sekali.
+  // Akibatnya SETIAP draft lembur otomatis (BEFORE_IN/AFTER_OUT/HOLIDAY)
+  // selalu gagal disimpan dengan error:
+  // "null value in column reason ... violates not-null constraint".
+  // Ini akar masalah kenapa lembur tidak pernah kedeteksi walau absen
+  // pulang sudah lewat berapa menit pun dari jadwal — bukan logikanya
+  // yang salah, tapi insert-nya selalu gagal diam-diam.
+  const AUTO_REASON_BY_DIRECTION: Record<OvertimeDirection, string> = {
+    BEFORE_IN: "Deteksi otomatis — absen masuk lebih awal dari jadwal",
+    AFTER_OUT: "Deteksi otomatis — absen pulang lebih larut dari jadwal",
+    HOLIDAY: "Deteksi otomatis — lembur di hari libur",
+    MANUAL: "Input manual admin",
+  };
+
   const { data, error } = await supabaseAdmin
     .from("overtime_requests")
     .insert({
       user_id: args.userId,
       request_date: args.requestDate,
       direction: args.direction,
+      reason: AUTO_REASON_BY_DIRECTION[args.direction], // ✅ FIX — wajib diisi
+      requested_start: toWIBTimeString(args.actualStart), // ✅ FIX — wajib diisi, kolom NOT NULL
       status: "PENDING",
       duration_minutes: args.minutes,
       actual_start: args.actualStart,

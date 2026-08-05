@@ -299,10 +299,9 @@ export default function BukuBesar({ period }: { period: string }) {
                     )}
                 </div>
             )}
-
             {/* ── Cari baris buku besar ── */}
             {data && (
-                <div className="relative">
+                <div className="sticky top-0 z-20 bg-white py-2">
                     <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                         value={tableSearch}
