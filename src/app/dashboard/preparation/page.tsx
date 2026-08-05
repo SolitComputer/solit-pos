@@ -9,6 +9,7 @@ import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
 import { isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
 import { Clock, AlertCircle, Inbox, Camera, X, CheckCircle2, CalendarDays, Package, Wrench, Truck, FileText, Bike, List } from "lucide-react";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 function BarcodeScanModal({
   onScan,
@@ -681,8 +682,7 @@ export default function PreparationPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
+    getAuthUser().then(u => ({ success: true, user: u }))
       .then((r) => {
         setUserRole(r.user?.role ?? null);
         setUserId(r.user?.id ?? null);

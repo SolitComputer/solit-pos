@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import QuickScan from "@/components/ui/QuickScan";
 import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface User {
     id: string;
@@ -23,7 +24,7 @@ export default function ScanPage() {
 
     const fetchUser = async () => {
         try {
-            const res = await fetch("/api/auth/me");
+            const res = await getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) }));
             const result = await res.json();
 
             if (result?.user) {

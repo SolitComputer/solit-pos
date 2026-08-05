@@ -102,7 +102,10 @@ let query = supabase
       category: o.category,
     }));
 
-    return NextResponse.json({ success: true, data: result });
+    const res = NextResponse.json({ success: true, data: result });
+    // Cache 30 detik — poll interval sudah 60 detik, jadi aman
+    res.headers.set("Cache-Control", "private, max-age=30");
+    return res;
   } catch (err: any) {
     console.error("[pending-acc] exception:", err);
     return NextResponse.json({ success: false, message: err?.message ?? "Server error" }, { status: 500 });

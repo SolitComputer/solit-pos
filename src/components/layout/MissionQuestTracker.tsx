@@ -36,10 +36,10 @@ export default function MissionQuestTracker() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then(r => r.json())
-      .then(r => setUserId(r?.user?.id ?? r?.id ?? r?.data?.id ?? null))
-      .catch(() => setUserId(null));
+    // Pakai shared cache — tidak fetch terpisah ke /api/auth/me
+    import("@/hooks/useAuthUser").then(({ getAuthUser }) =>
+      getAuthUser().then(u => setUserId(u?.id ?? null))
+    ).catch(() => setUserId(null));
   }, []);
 
   useEffect(() => {

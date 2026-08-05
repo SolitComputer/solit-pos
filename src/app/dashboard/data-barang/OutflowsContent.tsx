@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { usePagePermission } from "@/hooks/usePagePermission";
 import { ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 type OutflowType = "SERVICE" | "KEBUTUHAN" | "TRANSAKSI";
 type ItemKind = "LAPTOP" | "ACCESSORY";
@@ -96,7 +97,7 @@ export default function OutflowsContent() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch("/api/auth/me");
+                const res = await getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) }));
                 const json = await res.json();
                 setCurrentUserName(json?.user?.name ?? "");
             } catch { setCurrentUserName(""); }

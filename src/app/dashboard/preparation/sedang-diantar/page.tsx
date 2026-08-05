@@ -10,6 +10,7 @@ import { useHTCall } from "@/contexts/HTCallContext";
 import { hasAnyRole, PERMISSIONS } from "@/lib/permissions";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Inbox, User, Clock } from "lucide-react";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null }
 interface ActiveOrder extends LiveOrder {
@@ -36,7 +37,7 @@ export default function PreparationSedangDiantarPage() {
     const [forcingId, setForcingId] = useState<string | null>(null);
 
     useEffect(() => {
-        fetch("/api/auth/me").then(r => r.json())
+        getAuthUser().then(u => ({ success: true, user: u }))
             .then(r => {
                 const roles: string[] = r.user?.roles ?? (r.user?.role ? [r.user.role] : []);
                 setCanForce(hasAnyRole(roles, PERMISSIONS.FORCE_COMPLETE_PREPARATION));
