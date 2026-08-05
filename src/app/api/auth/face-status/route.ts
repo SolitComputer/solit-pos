@@ -1,9 +1,9 @@
-// src/app/api/auth/face-status/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyToken, resolveShiftConfigFromDB, isAttendanceTimeForSchedule, signAttendanceCookie, verifyAttendanceCookie, type DaySchedule } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 import { resolveScheduleOverride, toAuthScheduleShape } from "@/lib/shiftSchedule";
+import { computeBeforeInOvertimeMinutes, computeAfterOutOvertimeMinutes, computeHolidayOvertimeMinutes } from "@/lib/overtimeEngine";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -221,6 +221,32 @@ export async function GET() {
       }
     }
 
+    let overtimeOptions: { beforeInMinutes: number; afterOutMinutes: number; holidayMinutes: number } | null = null;
+    if (alreadyCheckedOut && todaySuccess && todayOutRow) {
+      const beforeInMinutes = isTodayDayOff ? 0 : computeBeforeInOvertimeMinutes(todaySuccess.created_at, schedule);
+      const afterOutMinutes = isTodayDayOff ? 0 : computeAfterOutOvertimeMinutes(todayOutRow.created_at, schedule);
+      const holidayMinutes = isTodayDayOff ? computeHolidayOvertimeMinutes(todaySuccess.created_at, todayOutRow.created_at) : 0;
+
+      if (beforeInMinutes > 0 || afterOutMinutes > 0 || holidayMinutes > 0) {
+        const { data: existingToday } = await supabase
+          .from("overtime_requests")
+          .select("direction")
+          .eq("user_id", user.id)
+          .eq("request_date", todayDate)
+          .not("status", "in", "(REJECTED,CANCELLED)");
+        const submitted = new Set((existingToday ?? []).map((r: any) => r.direction));
+
+        overtimeOptions = {
+          beforeInMinutes: submitted.has("BEFORE_IN") || submitted.has("BOTH") ? 0 : beforeInMinutes,
+          afterOutMinutes: submitted.has("AFTER_OUT") || submitted.has("BOTH") ? 0 : afterOutMinutes,
+          holidayMinutes: submitted.has("HOLIDAY") ? 0 : holidayMinutes,
+        };
+        if (overtimeOptions.beforeInMinutes <= 0 && overtimeOptions.afterOutMinutes <= 0 && overtimeOptions.holidayMinutes <= 0) {
+          overtimeOptions = null;
+        }
+      }
+    }
+
     const alreadyFromCookie = faceVerified === user.id || faceAttended === user.id;
     const alreadyAttended = alreadyFromCookie || alreadyAttendedDB;
 
@@ -264,7 +290,8 @@ export async function GET() {
       biometricEligible: (userData as any)?.biometric_enabled ?? false,
       biometricEnrolled: (biometricCredCount ?? 0) > 0,
       isEarlyCheckout, 
-      earlyCheckoutStatus, 
+      earlyCheckoutStatus,
+      overtimeOptions, // ✅ NEW
     });
 
     if (isTodayDayOff && dayOffCookie !== user.id) {

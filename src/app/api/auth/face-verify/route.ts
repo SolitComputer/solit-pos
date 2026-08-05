@@ -115,8 +115,8 @@ export async function POST(request: Request) {
       message: result.message,
       direction: result.direction,
       distance,
-      overtimeDetected: !!result.overtime,
-      overtime: result.overtime,
+      overtimeDetected: !!result.overtimeOptions,
+      overtimeOptions: result.overtimeOptions,
     });
     // Cookie "sudah absen hari ini" tetap dipasang setelah OUT juga, supaya
     // halaman lain (middleware, sidebar) tahu sesi absen hari ini sudah selesai.

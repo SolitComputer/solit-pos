@@ -166,8 +166,8 @@ export async function POST(request: Request) {
             success: true,
             message: result.message,
             direction: result.direction,
-            overtimeDetected: !!result.overtime,
-            overtime: result.overtime,
+            overtimeDetected: !!result.overtimeOptions,
+            overtimeOptions: result.overtimeOptions,
         });
         await setAttendanceCookies(response, user.id, expiry);
         return response;

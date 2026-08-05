@@ -6,7 +6,6 @@ import {
   type DaySchedule,
 } from "@/lib/auth";
 import { resolveScheduleOverride, toAuthScheduleShape } from "@/lib/shiftSchedule";
-import { isPKLRole } from "@/lib/permissions";
 import {
   computeBeforeInOvertimeMinutes,
   computeAfterOutOvertimeMinutes,
@@ -36,11 +35,16 @@ export type AttendanceOutcome =
       ok: true;
       direction: "IN" | "OUT";
       message: string;
-      overtime: { id: string; minutes: number; direction: OvertimeDirection } | null;
+      overtimeOptions: {
+        beforeInMinutes: number;
+        afterOutMinutes: number;
+        holidayMinutes: number;
+        sourceFaceVerificationId: string;
+      } | null;
     };
 
 export async function processAttendanceVerification(p: ProcessAttendanceParams): Promise<AttendanceOutcome> {
-  const { supabaseAdmin, userId, userRole } = p;
+  const { supabaseAdmin, userId } = p;
   const nowISO = p.overrideNowISO ?? new Date().toISOString();
   const nowWIB = new Date(new Date(nowISO).getTime() + 7 * 3600_000);
   const todayDow = nowWIB.getUTCDay();
@@ -157,48 +161,35 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
     return { ok: false, status: 500, code: "INSERT_FAILED", message: `Absen ${direction === "IN" ? "masuk" : "pulang"} gagal disimpan: ${insertError?.message ?? "unknown error"}` };
   }
 
-  // ── Hitung lembur (poin 16: hanya karyawan non-PKL) ──────────────────────
-  let overtimeResult: { id: string; minutes: number; direction: OvertimeDirection } | null = null;
-  const eligibleForOvertime = !isPKLRole(userRole);
+  let overtimeOptions: {
+    beforeInMinutes: number; afterOutMinutes: number; holidayMinutes: number;
+    sourceFaceVerificationId: string;
+  } | null = null;
+  const eligibleForOvertime = true;
 
   if (eligibleForOvertime) {
+    let beforeInMinutes = 0, afterOutMinutes = 0, holidayMinutes = 0;
+
     if (direction === "IN" && !isDayOff) {
-      const minutes = computeBeforeInOvertimeMinutes(nowISO, schedule);
-      if (minutes > 0) {
-        overtimeResult = await createOvertimeDraft(supabaseAdmin, {
-          userId, requestDate: todayDate, direction: "BEFORE_IN", minutes,
-          actualStart: nowISO, actualEnd: buildTodayWIBTimestamp(todayDate, schedule.start),
-          sourceFaceVerificationId: inserted.id, isHoliday: false,
-        });
-      }
+      beforeInMinutes = computeBeforeInOvertimeMinutes(nowISO, schedule);
     }
     if (direction === "OUT") {
       if (isDayOff && todayIn) {
-        const minutes = computeHolidayOvertimeMinutes(todayIn.created_at, nowISO);
-        if (minutes > 0) {
-          overtimeResult = await createOvertimeDraft(supabaseAdmin, {
-            userId, requestDate: todayDate, direction: "HOLIDAY", minutes,
-            actualStart: todayIn.created_at, actualEnd: nowISO,
-            sourceFaceVerificationId: inserted.id, isHoliday: true,
-          });
-        }
+        holidayMinutes = computeHolidayOvertimeMinutes(todayIn.created_at, nowISO);
       } else if (!isDayOff) {
-        const minutes = computeAfterOutOvertimeMinutes(nowISO, schedule);
-        if (minutes > 0) {
-          overtimeResult = await createOvertimeDraft(supabaseAdmin, {
-            userId, requestDate: todayDate, direction: "AFTER_OUT", minutes,
-            actualStart: buildTodayWIBTimestamp(todayDate, schedule.checkout), actualEnd: nowISO,
-            sourceFaceVerificationId: inserted.id, isHoliday: false,
-          });
-        }
+        afterOutMinutes = computeAfterOutOvertimeMinutes(nowISO, schedule);
       }
+    }
+
+    if (beforeInMinutes > 0 || afterOutMinutes > 0 || holidayMinutes > 0) {
+      overtimeOptions = { beforeInMinutes, afterOutMinutes, holidayMinutes, sourceFaceVerificationId: inserted.id };
     }
   }
 
   return {
     ok: true, direction,
     message: direction === "IN" ? "Absen masuk berhasil" : "Absen pulang berhasil",
-    overtime: overtimeResult,
+    overtimeOptions,
   };
 }
 
@@ -213,7 +204,7 @@ function toWIBTimeString(iso: string): string {
   return `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())}:${pad(wib.getUTCSeconds())}`;
 }
 
-async function createOvertimeDraft(
+export async function createOvertimeDraft(
   supabaseAdmin: any,
   args: {
     userId: string; requestDate: string; direction: OvertimeDirection; minutes: number;
@@ -229,9 +220,10 @@ async function createOvertimeDraft(
   // pulang sudah lewat berapa menit pun dari jadwal — bukan logikanya
   // yang salah, tapi insert-nya selalu gagal diam-diam.
   const AUTO_REASON_BY_DIRECTION: Record<OvertimeDirection, string> = {
-    BEFORE_IN: "Deteksi otomatis — absen masuk lebih awal dari jadwal",
-    AFTER_OUT: "Deteksi otomatis — absen pulang lebih larut dari jadwal",
-    HOLIDAY: "Deteksi otomatis — lembur di hari libur",
+    BEFORE_IN: "Diajukan karyawan — lembur awal (sebelum jam masuk)",
+    AFTER_OUT: "Diajukan karyawan — lembur akhir (sesudah jam pulang)",
+    BOTH: "Diajukan karyawan — gabungan lembur awal & akhir",
+    HOLIDAY: "Diajukan karyawan — lembur di hari libur",
     MANUAL: "Input manual admin",
   };
 
