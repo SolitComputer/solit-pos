@@ -21,6 +21,7 @@ import {
   CalendarDays,
   Clock,
   Percent,
+  Pencil,
 } from "lucide-react";
 
 type AttendanceEntry = {
@@ -28,7 +29,16 @@ type AttendanceEntry = {
   name: string;
   role: string;
   check_in_time: string;
-  method: "FACE";
+  method: "FACE" | "MANUAL";
+};
+
+type ManualRecord = {
+  id: string;
+  user_id: string;
+  attendance_date: string;
+  check_in_time: string;
+  status: "PRESENT" | "LATE" | "SICK" | "PERMIT" | "ABSENT" | "LEAVE";
+  users?: { id: string; name: string; role: string };
 };
 
 type GroupedAttendance = {
@@ -76,6 +86,23 @@ function todayLabel(): string {
     year: "numeric",
     timeZone: "Asia/Jakarta",
   });
+}
+
+function toWIBDateKey(iso: string): string {
+  return new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function getWIBToday(): string {
+  return toWIBDateKey(new Date().toISOString());
+}
+
+// Disamakan persis dengan bucketFromHour() di api/attendance/today/route.ts
+function classifyDaySection(iso: string): keyof GroupedAttendance {
+  const wib = new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000);
+  const hour = wib.getUTCHours();
+  if (hour < 11) return "pagi";
+  if (hour < 15) return "siang";
+  return "sore";
 }
 
 const SECTIONS: {
@@ -144,15 +171,53 @@ export default function DaftarHadirPage() {
     if (silent) setRefreshing(true);
     else setLoading(true);
     try {
-      const [attRes, usersRes] = await Promise.all([
+      const now = new Date();
+      const todayKey = getWIBToday();
+
+      const [attRes, usersRes, manualRes] = await Promise.all([
         fetch("/api/attendance/today", { cache: "no-store" }),
         fetch("/api/attendance/users", { cache: "no-store" }),
+        fetch(`/api/attendance/manual?year=${now.getFullYear()}&month=${now.getMonth() + 1}`, { cache: "no-store" }),
       ]);
+
       const attJson = await attRes.json();
-      if (attJson.success) setData(attJson.data);
+      const baseData: GroupedAttendance = attJson.success ? attJson.data : EMPTY;
 
       const usersJson = await usersRes.json();
       if (usersJson.success) setAllUsers(usersJson.data || []);
+
+      const manualJson = await manualRes.json();
+      if (manualJson.success) {
+        // user yang sudah punya absen otomatis (wajah) hari ini — jangan dobel sama manual
+        const autoIds = new Set(
+          [...baseData.pagi, ...baseData.siang, ...baseData.sore].map((e) => e.user_id)
+        );
+
+        const merged: GroupedAttendance = {
+          pagi: [...baseData.pagi],
+          siang: [...baseData.siang],
+          sore: [...baseData.sore],
+        };
+
+        (manualJson.data || []).forEach((m: ManualRecord) => {
+          if (m.attendance_date !== todayKey) return;
+          if (m.status !== "PRESENT" && m.status !== "LATE") return; // SICK/IZIN/CUTI/dll bukan "hadir"
+          if (autoIds.has(m.user_id)) return;
+
+          const entry: AttendanceEntry = {
+            user_id: m.user_id,
+            name: m.users?.name || "Unknown",
+            role: m.users?.role || "",
+            check_in_time: m.check_in_time,
+            method: "MANUAL",
+          };
+          merged[classifyDaySection(m.check_in_time)].push(entry);
+        });
+
+        setData(merged);
+      } else {
+        setData(baseData);
+      }
 
       setLastUpdated(nowWIBTime());
     } catch (err) {
@@ -438,13 +503,20 @@ export default function DaftarHadirPage() {
                     entries.map((e) => (
                       <div
                         key={e.user_id}
-                        className={`flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 shadow-sm border border-gray-50 ${section.borderAccent} hover:shadow-md hover:-translate-y-0.5 transition-all duration-200`}
+                        className={`flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 shadow-sm border ${
+                          e.method === "MANUAL" ? "border-blue-100 bg-blue-50/30" : "border-gray-50"
+                        } ${section.borderAccent} hover:shadow-md hover:-translate-y-0.5 transition-all duration-200`}
                       >
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">
                           {initials(e.name)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-gray-800 truncate">{e.name}</p>
+                          <p className="text-xs font-bold text-gray-800 truncate flex items-center gap-1">
+                            {e.name}
+                            {e.method === "MANUAL" && (
+                              <Pencil className="w-2.5 h-2.5 text-blue-500 flex-shrink-0" aria-label="Absen manual" />
+                            )}
+                          </p>
                           <p className="text-[10px] text-gray-400">{humanizeRoleKey(e.role)}</p>
                         </div>
                         <div className="text-right flex-shrink-0">
