@@ -1896,10 +1896,10 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         return acc;
     }, []), [messages]);
 
-    return (
+     return (
         <div
-            className="fixed inset-0 z-[9998] flex items-center justify-center p-0 md:p-4"
-            style={{ backdropFilter: "blur(8px)", backgroundColor: "rgba(15,23,42,0.45)" }}>
+    className="fixed inset-0 z-[99998] flex items-center justify-center p-0 md:p-4"
+    style={{ backdropFilter: "blur(8px)", backgroundColor: "rgba(15,23,42,0.45)" }}>
             <div
                 className="relative flex overflow-hidden w-full h-full rounded-none md:w-[min(1160px,100%)] md:h-[min(800px,95vh)] md:rounded-2xl"
                 style={{

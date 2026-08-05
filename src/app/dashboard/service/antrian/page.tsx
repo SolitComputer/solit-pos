@@ -8,6 +8,8 @@ import ServicePriceDialog from "@/components/service/ServicePriceDialog";
 import ServiceSparepartDialog from "@/components/service/ServiceSparepartDialog";
 import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import ServiceDetailModal from "@/components/service/ServiceDetailModal";
+import ServicePrepaymentModal from "@/components/service/ServicePrepaymentModal"; //  NEW — bayar di muka
+import ServiceCicilanModal from "@/components/service/ServiceCicilanModal"; //  NEW — cicil DP di muka
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { SERVICE_CREATE_ROLES, SERVICE_TEKNISI_ROLES, hasPermission } from "@/lib/permissions";
@@ -47,7 +49,7 @@ function fmtRupiah(n?: number | null) {
 type DialogState = {
   open: boolean;
   orderId: string;
-  action: "mulai" | "sparepart" | "gagal_diperbaiki" | "done" | "";
+  action: "mulai" | "sparepart" | "gagal_diperbaiki" | "done" | "bayar_lunas" | ""; //  NEW — bayar_lunas
   title: string;
   description: string;
   confirmLabel: string;
@@ -236,7 +238,7 @@ function StatCard({
 }
 
 // ── Action Types & Button ─────────────────────────────────────────────────────
-type ActionColor = "blue" | "green" | "orange" | "rose" | "purple";
+type ActionColor = "blue" | "green" | "orange" | "rose" | "purple" | "indigo"; //  NEW — indigo untuk tombol Bayar
 
 type ActionItem = {
   label: string;
@@ -250,6 +252,7 @@ const ACTION_VARIANTS: Record<ActionColor, string> = {
   orange: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200 focus-visible:ring-orange-300",
   rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200 focus-visible:ring-rose-300",
   purple: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 focus-visible:ring-purple-300",
+  indigo: "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 focus-visible:ring-indigo-300", //  NEW
 };
 
 function ActionBtn({
@@ -359,6 +362,37 @@ function SkeletonCard() {
 
 // ── Estimasi cell (dipakai tabel & card) ──────────────────────────────────────
 function EstimasiValue({ order, align = "left" }: { order: ServiceOrder; align?: "left" | "right" }) {
+  const alignCls = align === "right" ? "items-end text-right" : "";
+
+  //  NEW — kalau sudah ada pembayaran di muka (DP), tampilkan progresnya duluan
+  if (order.payment_status === "DP" && order.payment_amount) { //  FIX
+    const total = Number(order.total_tagihan ?? 0);
+    const paid = Number(order.payment_amount ?? 0);
+    const sisa = Math.max(total - paid, 0);
+    return (
+      <div className={`flex flex-col ${alignCls}`}>
+        <p className="text-xs font-black tabular-nums text-amber-600">
+          {fmtRupiah(paid)} / {fmtRupiah(total)}
+        </p>
+        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-500">
+          DP di muka · sisa {fmtRupiah(sisa)}
+        </p>
+      </div>
+    );
+  }
+
+  //  NEW — kalau sudah lunas dibayar di muka
+  if (order.payment_status === "LUNAS" && order.payment_amount) { //  FIX
+    return (
+      <div className={`flex flex-col ${alignCls}`}>
+        <p className="text-xs font-black tabular-nums text-emerald-600">{fmtRupiah(order.payment_amount)}</p>
+        <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-500">
+          Lunas di muka
+        </p>
+      </div>
+    );
+  }
+
   const est = Number(order.estimasi_harga ?? 0);
   const sp = Number(order.biaya_sparepart ?? 0);
   const total = est + sp;
@@ -366,7 +400,7 @@ function EstimasiValue({ order, align = "left" }: { order: ServiceOrder; align?:
   if (total <= 0) return <span className="text-xs font-medium text-gray-300">—</span>;
 
   return (
-    <div className={`flex flex-col ${align === "right" ? "items-end text-right" : ""}`}>
+    <div className={`flex flex-col ${alignCls}`}>
       <span className="text-xs font-black tabular-nums text-indigo-600">{fmtRupiah(total)}</span>
       {sp > 0 && (
         <span className="mt-0.5 text-[10px] font-medium text-gray-400">
@@ -386,6 +420,8 @@ export default function AntrianPage() {
   const [priceDialog, setPriceDialog] = useState<PriceDialogState>(PRICE_DIALOG_CLOSED);
   const [sparepartDialog, setSparepartDialog] = useState<SparepartDialogState>(SPAREPART_DIALOG_CLOSED);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [prepaymentOrder, setPrepaymentOrder] = useState<ServiceOrder | null>(null); //  NEW — order yang lagi dibuka popup bayar di muka
+  const [cicilanOrder, setCicilanOrder] = useState<ServiceOrder | null>(null); //  NEW — order yang lagi dibuka popup cicil
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
   const userRoles = user?.roles ?? (user?.role ? [user.role] : []);
@@ -459,34 +495,118 @@ export default function AntrianPage() {
     }
   };
 
+  //  NEW — buka popup input pembayaran di muka (order belum punya payment_status sama sekali)
+  const handleBayarClick = (order: ServiceOrder) => {
+    setPrepaymentOrder(order);
+  };
+
+  //  NEW — submit pembayaran di muka dari ServicePrepaymentModal
+  const handlePrepaymentConfirm = async (payload: {
+    payment_amount: number;
+    payment_status: "LUNAS" | "DP";
+    total_tagihan?: number;
+    payment_method: "CASH" | "TRANSFER" | "QRIS";
+    payment_note?: string;
+  }) => {
+    if (!prepaymentOrder) return;
+    const res = await fetch(`/api/service/${prepaymentOrder.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bayar_dimuka", ...payload }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Gagal");
+    setPrepaymentOrder(null);
+    showToast(
+      payload.payment_status === "LUNAS"
+        ? " Pembayaran lunas di muka berhasil dicatat!"
+        : " DP di muka berhasil dicatat."
+    );
+    refresh();
+  };
+
+  //  NEW — klik "Lunas" (pelunasan sisa DP yang dibayar di muka, servis masih jalan)
+  const handleLunasDimukaClick = (order: ServiceOrder) => {
+    const sisa = Number(order.total_tagihan ?? 0) - Number(order.payment_amount ?? 0);
+    setDialog({
+      open: true,
+      orderId: order.id,
+      action: "bayar_lunas",
+      title: "Konfirmasi Pelunasan",
+      description: `Lunasi sisa tagihan "${order.nama} — ${order.type_laptop}" sebesar ${fmtRupiah(sisa) ?? "Rp 0"}? Servis akan tetap lanjut seperti biasa.`,
+      confirmLabel: "Ya, Lunas",
+      confirmClass: "bg-emerald-600 hover:bg-emerald-700",
+    });
+  };
+
+  //  NEW — klik "Cicil" (buka popup input nominal cicilan, reuse komponen dari halaman Selesai)
+  const handleCicilDimukaClick = (order: ServiceOrder) => {
+    setCicilanOrder(order);
+  };
+
+  //  NEW — submit nominal cicilan dari ServiceCicilanModal
+  const handleCicilanConfirm = async (cicilanAmount: number) => {
+    if (!cicilanOrder) return;
+    const res = await fetch(`/api/service/${cicilanOrder.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bayar_cicilan", cicilan_amount: cicilanAmount }),
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Gagal");
+    setCicilanOrder(null);
+    showToast(
+      json.data?.payment_status === "LUNAS"
+        ? " Cicilan diterima, pembayaran lunas!"
+        : " Cicilan diterima, sisa tagihan diperbarui."
+    );
+    refresh();
+  };
+
   /**
    * Sumber tunggal daftar tombol aksi per status.
    * Kombinasi tombol PERSIS sama dengan versi sebelumnya — hanya dipindah ke satu tempat
    * supaya tabel (desktop) dan card (mobile) selalu konsisten.
    */
   const getActions = (o: ServiceOrder): ActionItem[] => {
-    if (!canAction) return [];
+    const actions: ActionItem[] = [];
 
-    switch (o.status) {
-      case "ANTRIAN":
-        return [
-          { label: "Mulai", color: "blue", onClick: () => openPriceDialog(o, "mulai") },
-          { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
-        ];
-      case "SEDANG_DIKERJAKAN":
-        return [
-          { label: "Sparepart", color: "orange", onClick: () => openPriceDialog(o, "sparepart") },
-          { label: "Selesai", color: "green", onClick: () => openDialog(o, "done") },
-          { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
-        ];
-      case "MENUNGGU_SPAREPART":
-        return [
-          { label: "Lanjut", color: "purple", onClick: () => openPriceDialog(o, "mulai") },
-          { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
-        ];
-      default:
-        return [];
+    // Aksi pengerjaan servis — khusus teknisi
+    if (canAction) {
+      switch (o.status) {
+        case "ANTRIAN":
+          actions.push(
+            { label: "Mulai", color: "blue", onClick: () => openPriceDialog(o, "mulai") },
+            { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
+          );
+          break;
+        case "SEDANG_DIKERJAKAN":
+          actions.push(
+            { label: "Sparepart", color: "orange", onClick: () => openPriceDialog(o, "sparepart") },
+            { label: "Selesai", color: "green", onClick: () => openDialog(o, "done") },
+            { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
+          );
+          break;
+        case "MENUNGGU_SPAREPART":
+          actions.push(
+            { label: "Lanjut", color: "purple", onClick: () => openPriceDialog(o, "mulai") },
+            { label: "Gagal", color: "rose", onClick: () => openDialog(o, "gagal_diperbaiki") },
+          );
+          break;
+      }
     }
+
+    //  NEW — aksi pembayaran di muka, terpisah dari aksi pengerjaan servis (semua role bisa akses)
+    if (o.payment_status === "DP" && o.payment_amount) { //  FIX — pastikan beneran ada nominal, bukan cuma status default
+      actions.push(
+        { label: "Lunas", color: "green", onClick: () => handleLunasDimukaClick(o) },
+        { label: "Cicil", color: "orange", onClick: () => handleCicilDimukaClick(o) },
+      );
+    } else if (!o.payment_amount) { //  FIX — payment_status bisa default "LUNAS" walau belum ada duit masuk
+      actions.push({ label: "Bayar", color: "indigo", onClick: () => handleBayarClick(o) });
+    }
+
+    return actions;
   };
 
   const handlePriceConfirm = async (price: number, reason?: string) => {
@@ -509,7 +629,7 @@ export default function AntrianPage() {
   };
 
   const handleSparepartConfirm = async (payload: { price: number; reason?: string; accessory_id?: string; unit_id?: string }) => {
-    const body: Record<string, unknown> = { 
+    const body: Record<string, unknown> = {
       action: "sparepart",
       biaya_sparepart: payload.price,
       alasan: payload.reason,
@@ -544,7 +664,9 @@ export default function AntrianPage() {
     showToast(
       dialog.action === "done"
         ? " Order ditandai selesai! Payment dikonfirmasi saat pelanggan mengambil."
-        : " Status berhasil diperbarui!"
+        : dialog.action === "bayar_lunas" //  NEW
+          ? " Pelunasan berhasil dicatat!"
+          : " Status berhasil diperbarui!"
     );
     refresh();
   };
@@ -558,7 +680,7 @@ export default function AntrianPage() {
   const queue = [...orders].sort(
     (a, b) => new Date(a.tanggal_masuk).getTime() - new Date(b.tanggal_masuk).getTime()
   );
-  const COLUMNS = ["No", "Pelanggan", "Laptop", "Keluhan", "Masuk", "Durasi", "Teknisi", "Estimasi", "Status", "Aksi"];
+  const COLUMNS = ["No", "Pelanggan", "Laptop", "Keluhan", "Masuk", "Durasi", "Teknisi", "Estimasi / Bayar", "Status", "Aksi"];
 
   return (
     <DashboardLayout>
@@ -714,17 +836,17 @@ export default function AntrianPage() {
             </div>
           ) : (
             <>
-              {/* ── Desktop / Laptop: Table ─────────────────────────────────── */}
+             {/* ── Desktop / Laptop: Table ─────────────────────────────────── */}
               <div className="hidden overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm lg:block">
-                <div className="overflow-x-auto">
+                <div className="max-h-[65vh] overflow-auto"> {/*  NEW — dibatasi tinggi + scroll 2 arah, header bisa freeze di dalam sini */}
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gradient-to-r from-gray-50/90 to-white">
+                      <tr className="border-b border-gray-100">
                         {COLUMNS.map((h, i) => (
                           <th
                             key={h}
                             className={`
-                              whitespace-nowrap px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-gray-400
+                              sticky top-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3.5 text-[10px] font-black uppercase tracking-wider text-gray-400
                               ${i === 0 ? "pl-5" : ""}
                               ${i === COLUMNS.length - 1 ? "pr-5 text-right" : "text-left"}
                             `}
@@ -826,7 +948,7 @@ export default function AntrianPage() {
 
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/40 px-5 py-3">
                   <p className="text-xs font-medium text-gray-400">
-                     Klik baris untuk melihat detail lengkap
+                    Klik baris untuk melihat detail lengkap
                   </p>
                   <p className="text-xs font-bold text-gray-400">
                     Total: <span className="tabular-nums text-[#1a1a2e]">{orders.length}</span> order
@@ -965,6 +1087,22 @@ export default function AntrianPage() {
           defaultPrice={sparepartDialog.defaultPrice}
           onCancel={() => setSparepartDialog(SPAREPART_DIALOG_CLOSED)}
           onConfirm={handleSparepartConfirm}
+        />
+
+        {/*  NEW — Popup input pembayaran di muka */}
+        <ServicePrepaymentModal
+          open={!!prepaymentOrder}
+          order={prepaymentOrder}
+          onClose={() => setPrepaymentOrder(null)}
+          onConfirm={handlePrepaymentConfirm}
+        />
+
+        {/*  NEW — Popup cicilan untuk DP di muka */}
+        <ServiceCicilanModal
+          open={!!cicilanOrder}
+          order={cicilanOrder}
+          onClose={() => setCicilanOrder(null)}
+          onConfirm={handleCicilanConfirm}
         />
 
         <ServiceDetailModal orderId={detailId} onClose={() => setDetailId(null)} />

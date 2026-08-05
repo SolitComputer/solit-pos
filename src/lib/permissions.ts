@@ -123,6 +123,9 @@ export const SELLER_FOLLOWUP_ACTOR_ROLES: UserRole[] = ["CREW_SALES", "KEPALA_MA
 /** Archive / reactivate / assign ulang PIC */
 export const SELLER_FOLLOWUP_MANAGE_ROLES: UserRole[] = [...FULL_ACCESS];
 
+/** Hapus permanen data follow-up — HANYA Admin & Kepala Marketing (lebih ketat dari MANAGE) */
+export const SELLER_FOLLOWUP_DELETE_ROLES: UserRole[] = ["ADMIN", "KEPALA_MARKETING"];
+
 /** Hanya Admin & Programmer yang boleh ubah checklist akses PIC */
 export const SELLER_PIC_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
@@ -615,10 +618,11 @@ export const PERMISSIONS = {
   COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   CONFIRM_SERVICE_PICKUP: [...SERVICE_VIEW_ROLES] as UserRole[],
 
-  // ── Management Seller ──────────────────────────────────────────────────────
+// ── Management Seller ──────────────────────────────────────────────────────
   VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
   VIEW_ALL_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_SUPERVISOR_ROLES] as UserRole[],
   MANAGE_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_MANAGE_ROLES] as UserRole[],
+  DELETE_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_DELETE_ROLES] as UserRole[],
   FOLLOWUP_SELLER: [...SELLER_FOLLOWUP_ACTOR_ROLES] as UserRole[],
   VIEW_SELLER_PIC: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
   MANAGE_SELLER_PIC: [...SELLER_PIC_MANAGE_ROLES] as UserRole[],
