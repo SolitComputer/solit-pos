@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { ALL_STATIC_ROLES, humanizeRoleKey } from "@/lib/permissions";
+import { ALL_STATIC_ROLES, humanizeRoleKey, CASHFLOW_ROLES } from "@/lib/permissions";
+import { fetchAllRows } from "@/lib/supabaseFetch";
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -159,36 +160,43 @@ interface ToolContext {
     conversationId: string | null;
 }
 
-// Beberapa platform hosting mengizinkan self-fetch lewat loopback (cepat,
-// hemat), tapi ada juga (termasuk sandbox Hostinger tertentu) yang memblokir
-// koneksi outbound ke port dirinya sendiri demi keamanan. Daripada nebak satu
-// origin yang "pasti benar", kita coba beberapa kandidat berurutan — origin
-// mana pun yang berhasil duluan langsung dipakai, tanpa perlu tau di muka
-// platform mana yang sedang menjalankan app ini.
 function resolveInternalOriginCandidates(req: NextRequest): string[] {
     const candidates: string[] = [];
     if (process.env.INTERNAL_API_BASE_URL) candidates.push(process.env.INTERNAL_API_BASE_URL);
     if (process.env.PORT) candidates.push(`http://127.0.0.1:${process.env.PORT}`);
+
+    const fwdHost = req.headers.get("x-forwarded-host");
+    const fwdProto = req.headers.get("x-forwarded-proto") ?? "https";
+    if (fwdHost) candidates.push(`${fwdProto}://${fwdHost}`);
+
     candidates.push(req.nextUrl.origin);
-    return Array.from(new Set(candidates));
+
+    return Array.from(new Set(candidates)).filter((c) => {
+        try {
+            return new URL(c).hostname !== "0.0.0.0";
+        } catch {
+            return false;
+        }
+    });
 }
 
 async function fetchInternal(req: NextRequest, path: string): Promise<any> {
     const token = req.cookies.get("token")?.value;
     const candidates = resolveInternalOriginCandidates(req);
-    const headers = {
-        ...(token ? { Cookie: `token=${token}` } : {}),
-        "User-Agent": "solit-pos-ai-ceo-internal/1.0",
-        Host: req.headers.get("host") ?? "",
-    };
+    const originalHost = req.headers.get("host") ?? "";
 
     let res: Response | null = null;
     let lastErr: any = null;
 
     for (const base of candidates) {
+        const isLoopback = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/i.test(base);
         try {
             res = await fetch(`${base}${path}`, {
-                headers,
+                headers: {
+                    ...(token ? { Cookie: `token=${token}` } : {}),
+                    "User-Agent": "solit-pos-ai-ceo-internal/1.0",
+                    ...(isLoopback ? { Host: originalHost } : {}),
+                },
                 cache: "no-store",
                 signal: AbortSignal.timeout(15000),
             });
@@ -231,6 +239,168 @@ function toIntSafe(value: any, fallback: number, max?: number): number {
     return max !== undefined ? Math.min(result, max) : result;
 }
 
+// Baca role efektif user dari header yang sudah divalidasi & disuntik middleware
+// (x-user-roles / x-user-role) — supaya tool yang datanya sensitif (mis. cashflow)
+// tetap kena gate permission yang sama walau sekarang query langsung ke Supabase
+// (bukan lewat fetch ke route yang dibungkus withAuth).
+function getUserRolesFromRequest(req: NextRequest): string[] {
+    const raw = req.headers.get("x-user-roles") || req.headers.get("x-user-role") || "";
+    return raw.split(",").map((r) => r.trim()).filter(Boolean);
+}
+
+// ── Statistik dashboard, di-port dari /api/dashboard/stats supaya AI CEO tidak
+// bergantung pada self-fetch HTTP (yang gagal di hosting berbasis Passenger/socket
+// seperti Hostinger — lihat catatan di resolveInternalOriginCandidates di atas).
+function dashGetTodayWIB(): string {
+    return new Date(Date.now() + WIB_OFFSET_MS).toISOString().split("T")[0];
+}
+function dashGetYesterdayWIB(): string {
+    const d = new Date(Date.now() + WIB_OFFSET_MS);
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().split("T")[0];
+}
+function dashGetLast7DaysWIB(): string {
+    const d = new Date(Date.now() + WIB_OFFSET_MS);
+    d.setUTCDate(d.getUTCDate() - 6);
+    return d.toISOString().split("T")[0];
+}
+function dashDealPrice(item: any): number {
+    return Number(item.deal_price || item.amount || 0);
+}
+function dashCountUnitsSold(item: any): number {
+    if (Array.isArray(item.unit_ids) && item.unit_ids.length > 0) return item.unit_ids.length;
+    if (item.unit_id) return 1;
+    return Number(item.qty || item.quantity || 1);
+}
+function dashMargin(item: any, unitMap: Map<string, number>): number {
+    const dealPrice = dashDealPrice(item);
+    let totalPurchasePrice = 0;
+    if (Array.isArray(item.unit_ids) && item.unit_ids.length > 0) {
+        for (const uid of item.unit_ids) totalPurchasePrice += unitMap.get(uid) ?? 0;
+    } else if (item.unit_id) {
+        totalPurchasePrice = unitMap.get(item.unit_id) ?? 0;
+    }
+    return totalPurchasePrice > 0 ? dealPrice - totalPurchasePrice : 0;
+}
+function dashWibDateToUTCRange(dateWIB: string): { start: string; end: string } {
+    const [y, m, d] = dateWIB.split("-").map(Number);
+    const startWIB = new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - WIB_OFFSET_MS);
+    const endWIB = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0) - WIB_OFFSET_MS);
+    return { start: startWIB.toISOString(), end: endWIB.toISOString() };
+}
+
+async function computeDashboardStatsDirect(): Promise<any> {
+    const today = dashGetTodayWIB();
+    const yesterday = dashGetYesterdayWIB();
+    const weekStart = dashGetLast7DaysWIB();
+
+    const todayRange = dashWibDateToUTCRange(today);
+    const yesterdayRange = dashWibDateToUTCRange(yesterday);
+    const weekStartRange = dashWibDateToUTCRange(weekStart);
+    const weekEndRange = dashWibDateToUTCRange(today);
+
+    const [todayTransactions, laptops, weeklyTransactions, yesterdayTransactions] = await Promise.all([
+        fetchAllRows<any>((f, t) => supabaseAdmin.from("transactions").select("*").eq("status", "PAID")
+            .gte("paid_at", todayRange.start).lt("paid_at", todayRange.end).range(f, t)),
+        fetchAllRows<any>((f, t) => supabaseAdmin.from("laptops").select("*").eq("status", "SIAP_JUAL").gt("qty", 0).range(f, t)),
+        fetchAllRows<any>((f, t) => supabaseAdmin.from("transactions").select("*").eq("status", "PAID")
+            .gte("paid_at", weekStartRange.start).lt("paid_at", weekEndRange.end).range(f, t)),
+        fetchAllRows<any>((f, t) => supabaseAdmin.from("transactions").select("*").eq("status", "PAID")
+            .gte("paid_at", yesterdayRange.start).lt("paid_at", yesterdayRange.end).range(f, t)),
+    ]);
+
+    const allTransactions = [...(todayTransactions ?? []), ...(weeklyTransactions ?? []), ...(yesterdayTransactions ?? [])];
+    const allUnitIds = new Set<string>();
+    for (const trx of allTransactions) {
+        if (trx.unit_id) allUnitIds.add(trx.unit_id);
+        if (Array.isArray(trx.unit_ids)) for (const uid of trx.unit_ids) { if (uid) allUnitIds.add(uid); }
+    }
+
+    const unitMap = new Map<string, number>();
+    if (allUnitIds.size > 0) {
+        const { data: units } = await supabaseAdmin.from("laptop_units").select("id, purchase_price").in("id", Array.from(allUnitIds));
+        for (const unit of units ?? []) unitMap.set(unit.id, Number(unit.purchase_price ?? 0));
+    }
+
+    const todayRevenue = todayTransactions?.reduce((acc, item) => acc + dashDealPrice(item), 0) || 0;
+    const todayGrossProfit = todayTransactions?.reduce((acc, item) => acc + dashMargin(item, unitMap), 0) || 0;
+    const yesterdayRevenue = yesterdayTransactions?.reduce((acc, item) => acc + dashDealPrice(item), 0) || 0;
+    const yesterdayGrossProfit = yesterdayTransactions?.reduce((acc, item) => acc + dashMargin(item, unitMap), 0) || 0;
+    const yesterdayTrxCount = yesterdayTransactions?.length || 0;
+
+    const revenueChange = yesterdayRevenue > 0 ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100) : null;
+    const profitChange = yesterdayGrossProfit > 0 ? Math.round(((todayGrossProfit - yesterdayGrossProfit) / yesterdayGrossProfit) * 100) : null;
+    const trxChange = yesterdayTrxCount > 0 ? Math.round((((todayTransactions?.length || 0) - yesterdayTrxCount) / yesterdayTrxCount) * 100) : null;
+
+    const stockTotal = laptops?.reduce((acc, item) => acc + (item.qty || 0), 0) || 0;
+
+    const trendMap: Record<string, { revenue: number; profit: number; trxCount: number; laptopSold: number }> = {};
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(Date.now() + WIB_OFFSET_MS);
+        d.setUTCDate(d.getUTCDate() - i);
+        trendMap[d.toISOString().split("T")[0]] = { revenue: 0, profit: 0, trxCount: 0, laptopSold: 0 };
+    }
+    weeklyTransactions?.forEach((item) => {
+        if (!item.paid_at) return;
+        const dateKey = new Date(new Date(item.paid_at).getTime() + WIB_OFFSET_MS).toISOString().split("T")[0];
+        if (trendMap[dateKey]) {
+            trendMap[dateKey].revenue += dashDealPrice(item);
+            trendMap[dateKey].profit += dashMargin(item, unitMap);
+            trendMap[dateKey].trxCount += 1;
+            trendMap[dateKey].laptopSold += dashCountUnitsSold(item);
+        }
+    });
+    const weeklyTrend = Object.entries(trendMap).map(([date, data]) => {
+        const [y, m, d] = date.split("-").map(Number);
+        const label = new Date(y, m - 1, d).toLocaleDateString("id-ID", { weekday: "short", day: "numeric" });
+        return { date, label, ...data };
+    });
+
+    const salesMap: Record<string, { total: number; profit: number }> = {};
+    todayTransactions?.forEach((item) => {
+        const sales = item.sales_name || "Unknown";
+        if (!salesMap[sales]) salesMap[sales] = { total: 0, profit: 0 };
+        salesMap[sales].total += 1;
+        salesMap[sales].profit += dashMargin(item, unitMap);
+    });
+    const topSales = Object.entries(salesMap).map(([name, data]) => ({ name, total: data.total, profit: data.profit }))
+        .sort((a, b) => b.total - a.total).slice(0, 5);
+
+    const sourceMap: Record<string, number> = {};
+    weeklyTransactions?.forEach((item) => {
+        const source = item.source_platform || "Unknown";
+        sourceMap[source] = (sourceMap[source] || 0) + 1;
+    });
+    const topSources = Object.entries(sourceMap).map(([name, total]) => ({ name, total }))
+        .sort((a, b) => b.total - a.total).slice(0, 6);
+
+    const laptopMap: Record<string, number> = {};
+    todayTransactions?.forEach((item) => {
+        const laptop = item.laptop_name || "Unknown";
+        laptopMap[laptop] = (laptopMap[laptop] || 0) + dashCountUnitsSold(item);
+    });
+    const topLaptop = Object.entries(laptopMap).map(([name, total]) => ({ name, total }))
+        .sort((a, b) => b.total - a.total).slice(0, 5);
+
+    const todayLaptopSold = todayTransactions?.reduce((acc, item) => acc + dashCountUnitsSold(item), 0) || 0;
+
+    return {
+        todayRevenue,
+        todayProfit: todayGrossProfit,
+        todayTransactions: todayTransactions?.length || 0,
+        todayLaptopSold,
+        laptopReady: laptops?.length || 0,
+        stockTotal,
+        revenueChange,
+        profitChange,
+        trxChange,
+        weeklyTrend,
+        topSales,
+        topSources,
+        topLaptop,
+    };
+}
+
 export async function runToolCall(
     name: string,
     args: Record<string, any>,
@@ -238,9 +408,11 @@ export async function runToolCall(
 ): Promise<any> {
     switch (name) {
         case "get_dashboard_stats": {
-            const json = await fetchInternal(ctx.req, "/api/dashboard/stats");
-            if (json?.error) return json;
-            return json.data ?? json;
+            try {
+                return await computeDashboardStatsDirect();
+            } catch (err: any) {
+                return { error: `Gagal mengambil statistik dashboard: ${err?.message ?? err}` };
+            }
         }
 
         case "get_ready_stock": {
@@ -298,8 +470,27 @@ export async function runToolCall(
             return { total: rows.length, shown: lean.length, data: lean };
         }
 
-        case "get_minus_stock":
-            return fetchInternal(ctx.req, "/api/laptops/minus");
+        case "get_minus_stock": {
+            const { data, error } = await supabaseAdmin
+                .from("laptop_units")
+                .select(`*, laptop:laptops (id, laptop_name, brand, cpu, ram, storage, selling_price)`)
+                .in("status", ["SERVICE", "BELUM_SIAP"])
+                .order("created_at", { ascending: false });
+            if (error) return { error: `Gagal mengambil data laptop bermasalah: ${error.message}` };
+            const rows = data ?? [];
+            return {
+                total: rows.length,
+                data: rows.slice(0, 60).map((u: any) => ({
+                    serial_number: u.serial_number,
+                    status: u.status,
+                    repair_status: u.repair_status,
+                    analisa: u.analisa,
+                    laptop_name: u.laptop?.laptop_name,
+                    brand: u.laptop?.brand,
+                    cpu: u.laptop?.cpu,
+                })),
+            };
+        }
 
         case "get_accessory_stock": {
             let accQuery = supabaseAdmin
@@ -326,18 +517,77 @@ export async function runToolCall(
         }
 
         case "get_cashflow_summary": {
-            const json = await fetchInternal(ctx.req, "/api/cashflow");
-            if (json?.error) return json;
-            return { summary: json?.summary ?? null };
+            const userRoles = getUserRolesFromRequest(ctx.req);
+            const allowed = userRoles.some((r) => (CASHFLOW_ROLES as string[]).includes(r));
+            if (!allowed) {
+                return { error: "Akun kamu tidak punya izin untuk melihat data cashflow." };
+            }
+
+            try {
+                const rows = await fetchAllRows<any>((from, to) =>
+                    supabaseAdmin
+                        .from("cashflow_entries")
+                        .select("direction, nominal, is_audited, source_type, source_id")
+                        .order("tanggal", { ascending: false })
+                        .range(from, to)
+                );
+
+                // Entry dari transaksi yang statusnya sudah bukan PAID (dibatalkan) tidak
+                // ikut dihitung ke saldo — mirror logic "is_voided" di /api/cashflow.
+                const txSourceIds = Array.from(new Set(
+                    rows.filter((e) => e.source_type === "TRANSACTION" && e.source_id).map((e) => e.source_id as string)
+                ));
+                const voidedInvoices = new Set<string>();
+                if (txSourceIds.length > 0) {
+                    const { data: txRows } = await supabaseAdmin
+                        .from("transactions")
+                        .select("invoice_number, status")
+                        .in("invoice_number", txSourceIds);
+                    for (const t of txRows ?? []) {
+                        if (t.status !== "PAID") voidedInvoices.add(t.invoice_number);
+                    }
+                }
+
+                let totalMasuk = 0;
+                let totalKeluar = 0;
+                let belumAudit = 0;
+                for (const e of rows) {
+                    const isVoided = e.source_type === "TRANSACTION" && voidedInvoices.has(e.source_id);
+                    if (e.direction === "IN") {
+                        if (!isVoided) totalMasuk += Number(e.nominal || 0);
+                    } else {
+                        totalKeluar += Number(e.nominal || 0);
+                    }
+                    if (!e.is_audited && !isVoided) belumAudit += 1;
+                }
+
+                return {
+                    summary: {
+                        total_masuk: totalMasuk,
+                        total_keluar: totalKeluar,
+                        saldo: totalMasuk - totalKeluar,
+                        belum_audit: belumAudit,
+                    },
+                };
+            } catch (err: any) {
+                return { error: `Gagal mengambil data cashflow: ${err?.message ?? err}` };
+            }
         }
 
         case "get_recent_transactions": {
             const limit = toIntSafe(args?.limit, 10, 50);
-            const json = await fetchInternal(ctx.req, `/api/transaction?limit=${limit}&sortOrder=newest`);
-            if (json?.error) return json;
-            const rows = Array.isArray(json?.data) ? json.data : [];
+            const { data, error, count } = await supabaseAdmin
+                .from("transactions")
+                .select(
+                    "invoice_number, status, customer_name, laptop_name, deal_price, amount, sales_name, payment_method, source_platform, created_at, paid_at",
+                    { count: "exact" }
+                )
+                .order("created_at", { ascending: false })
+                .limit(limit);
+            if (error) return { error: `Gagal mengambil data transaksi: ${error.message}` };
+            const rows = data ?? [];
             return {
-                total: json?.total ?? rows.length,
+                total: count ?? rows.length,
                 data: rows.map((t: any) => ({
                     invoice_number: t.invoice_number,
                     status: t.status,
