@@ -833,7 +833,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                             <div className="pt-3 border-t border-slate-50">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Tentang</p>
                                 <div className="flex items-start justify-between gap-2">
-                                    <p className="text-sm text-slate-500 leading-relaxed">
+                                    <p className="text-sm text-slate-500 leading-relaxed line-clamp-4 break-words" title={profile.bio || undefined}>
                                         {profile.bio || <span className="italic text-slate-300">Belum ada bio</span>}
                                     </p>
                                     {isSelf && (
