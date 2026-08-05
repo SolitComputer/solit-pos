@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import ProfileView from "@/components/profile/ProfileView";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 export default function MyProfilePage() {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
+    getAuthUser().then(u => ({ success: true, user: u }))
       .then((d) => { if (d.user) setUserId(d.user.id); });
   }, []);
 

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban } from "lucide-react";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface PendingTransaction {
     id: string;
@@ -770,7 +771,7 @@ export default function PendingOrdersPage() {
     };
 
     useEffect(() => {
-        fetch("/api/auth/me").then(r => r.json()).then(r => {
+        getAuthUser().then(u => ({ success: true, user: u })).then(r => {
             const role = r.user?.role ?? null;
             const roles: string[] = Array.isArray(r.user?.roles) && r.user.roles.length > 0 ? r.user.roles : role ? [role] : [];
             setUserRole(role);

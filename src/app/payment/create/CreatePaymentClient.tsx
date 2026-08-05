@@ -9,6 +9,7 @@ import { supabase } from "@/services/supabase";
 import imageCompression from "browser-image-compression";
 import { useSearchParams } from "next/navigation";
 import { UserRole, PERMISSIONS, hasPermission, ACCESSORY_ONLY_SALES_ROLES } from "@/lib/permissions";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface LaptopOption {
@@ -229,8 +230,7 @@ export default function CreatePaymentPage() {
     }, [isEcommerce, setValue]);
 
     useEffect(() => {
-        fetch("/api/auth/me")
-            .then(r => r.json())
+        getAuthUser().then(u => ({ success: true, user: u }))
             .then(r => setUserRole(r.user?.role ?? null))
             .catch(() => setUserRole(null));
     }, []);

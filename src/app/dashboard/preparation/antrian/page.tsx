@@ -8,6 +8,7 @@ import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
 import { usePrepAlarm, ALARM_KEYS, isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 export default function PreparationAntrianPage() {
   const [orders, setOrders] = useState<PrepOrder[]>([]);
@@ -63,7 +64,7 @@ export default function PreparationAntrianPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/me").then(r => r.json()).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
+    getAuthUser().then(u => ({ success: true, user: u })).then(r => setUserRole(r.user?.role ?? null)).catch(() => setUserRole(null));
   }, []);
 
   const fetchOrders = useCallback(async () => {

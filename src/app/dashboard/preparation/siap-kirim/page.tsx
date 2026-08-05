@@ -7,6 +7,7 @@ import { supabase } from "@/services/supabase";
 import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 export default function PreparationSiapKirimPage() {
     const [orders, setOrders] = useState<PrepOrder[]>([]);
@@ -22,7 +23,7 @@ export default function PreparationSiapKirimPage() {
     const [userRole, setUserRole] = useState<string | null>(null);
 
     useEffect(() => {
-        fetch("/api/auth/me").then(r => r.json())
+        getAuthUser().then(u => ({ success: true, user: u }))
             .then(r => { setUserId(r.user?.id ?? null); setUserRole(r.user?.role ?? null); })
             .catch(() => { setUserId(null); setUserRole(null); });
     }, []);

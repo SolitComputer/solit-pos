@@ -91,16 +91,17 @@ export default function DataBarangPage() {
   const topRef = useRef<HTMLDivElement>(null);
   // ── Load roles
   useEffect(() => {
-    const controller = new AbortController();
+    let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/auth/me", { signal: controller.signal });
-        const data = await res.json();
+        const { getAuthUser } = await import("@/hooks/useAuthUser");
+        const user = await getAuthUser();
+        if (cancelled) return;
         const roles: string[] =
-          Array.isArray(data.user?.roles) && data.user.roles.length > 0
-            ? data.user.roles
-            : data.user?.role
-              ? [data.user.role]
+          Array.isArray(user?.roles) && user.roles.length > 0
+            ? (user.roles as string[])
+            : user?.role
+              ? [user.role as string]
               : [];
         setUserRoles(roles as UserRole[]);
       } catch {
@@ -109,7 +110,7 @@ export default function DataBarangPage() {
         setRolesLoaded(true);
       }
     })();
-    return () => controller.abort();
+    return () => { cancelled = true; };
   }, []);
 
   // ── Reset posisi scroll ke atas tiap kali halaman ini mount

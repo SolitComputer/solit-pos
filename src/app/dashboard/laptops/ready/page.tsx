@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
 import { Laptop, CheckCircle2, Lock, Trophy, ThumbsUp, AlertTriangle, Camera } from "lucide-react";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface LaptopUnit {
@@ -411,8 +412,7 @@ function ReadyContent() {
     const canConfirmTx = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) && !isPKL : false;
 
     useEffect(() => {
-        fetch("/api/auth/me")
-            .then(r => r.json())
+        getAuthUser().then(u => ({ success: true, user: u }))
             .then(r => setUserRole(r.user?.role ?? null))
             .catch(() => setUserRole(null));
     }, []);
