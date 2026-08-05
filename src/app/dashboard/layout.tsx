@@ -1,4 +1,5 @@
 import { ChatProvider } from "@/contexts/ChatContext";
+import { OverlayProvider } from "@/contexts/OverlayContext";
 import { ChatManagerWrapper } from "@/components/ui/ChatManagerWrapper";
 import { NotificationBanner } from "@/components/ui/NotificationBanner";
 import ChatBarBackground from "@/components/ui/ChatBarBackground";
@@ -11,11 +12,11 @@ export default function Layout({
   children: React.ReactNode;
 }) {
   return (
+    <OverlayProvider>
     <ChatProvider>
       <main className="pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
         {children}
       </main>
-
       {/* Bottom navigation — mobile only, role-based (lihat BottomNavBar.tsx) */}
       <BottomNavBar />
 
@@ -31,5 +32,6 @@ export default function Layout({
       {/* Chat panels (DM + GroupChat) — tanpa bottom bar strip */}
       <ChatManagerWrapper />
     </ChatProvider>
+    </OverlayProvider>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Ban, X, RefreshCw } from "lucide-react";
+import { useRegisterOverlay } from "@/contexts/OverlayContext";
 import {
   type CCReport, type CCPosting, type CCBrand,
   CC_STATUS_META, CC_PLATFORMS, PLATFORM_COLOR, CC_BRANDS, BRAND_META, DEFAULT_BRAND,
@@ -22,6 +23,7 @@ const INPUT =
   "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition focus:border-gray-300 focus:ring-4 focus:ring-gray-900/5";
 
 export default function CCReportModal({ report, canManage, onClose, onChanged }: Props) {
+  useRegisterOverlay();
   const status = report.status ?? computeStatus(report);
   const meta = CC_STATUS_META[status];
 
