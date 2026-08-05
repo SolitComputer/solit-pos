@@ -286,19 +286,20 @@ function VerifikasiBox({
                 {cocok ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
             </span>
             <span className={`text-xs font-semibold leading-relaxed ${cocok ? "text-emerald-700" : "text-amber-800"}`}>
-                {cocok ? (
-                    <>Cocok dengan akun <b className="font-mono">{accountLabel}</b> di Neraca.</>
+               {cocok ? (
+                    <>Saldo Awal Manual akun <b className="font-mono">{accountLabel}</b> sudah sinkron dengan Laba Ditahan di laporan ini.</>
                 ) : belumDijurnal ? (
                     <>
-                        Akun <b className="font-mono">{accountLabel}</b> masih kosong di Neraca — jurnal closing laba
-                        periode ini belum dibuat. Buat jurnal manual: Debit akun pendapatan/beban, Kredit{" "}
-                        <b className="font-mono">{accountLabel}</b> sebesar Total Laba di bawah.
+                        Akun <b className="font-mono">{accountLabel}</b> masih kosong di Neraca — Saldo Awal Manual
+                        (Laba Ditahan) untuk periode ini belum diinput. Buka tab Buku Besar → pilih akun ini → "Set
+                        Saldo Awal".
                     </>
                 ) : (
                     <>
-                        Selisih <b className="font-mono">{rp(Math.abs(selisih))}</b> antara Total Laba hasil hitung dengan
-                        saldo akun <b className="font-mono">{accountLabel}</b> di Neraca (
-                        <b className="font-mono">{rp(saldoAkun)}</b>). Cek lagi jurnal closing periode ini.
+                        Selisih <b className="font-mono">{rp(Math.abs(selisih))}</b> antara Laba Ditahan yang dipakai di
+                        laporan ini dengan saldo akun <b className="font-mono">{accountLabel}</b> di Neraca (
+                        <b className="font-mono">{rp(saldoAkun)}</b>). Kemungkinan ada jurnal lain yang ikut nyentuh
+                        akun ini di luar Saldo Awal Manual — cek lagi di Buku Besar.
                     </>
                 )}
             </span>

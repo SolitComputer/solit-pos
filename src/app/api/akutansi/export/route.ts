@@ -3,7 +3,14 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { isValidPeriod, ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER } from "@/lib/accounting";
+import {
+  isValidPeriod,
+  ACCOUNT_TYPE_LABEL,
+  ACCOUNT_TYPE_ORDER,
+  LABA_RUGI_GROUP_LABEL,
+  periodLabel,
+} from "@/lib/accounting";
+import { computeNeraca, computeLabaRugi, LabaRugiResult, LabaRugiSection, NeracaResult } from "@/lib/akutansi-reports";
 import ExcelJS from "exceljs";
 
 // Route ini butuh Node runtime (ExcelJS pakai Buffer/stream).
@@ -352,15 +359,16 @@ function buildAccountTypeSheetHorizontal(
 }
 
 // ─── Sheet Neraca Saldo (Trial Balance) ─────────────────────────────────────
-// Saldo akhir semua akun s/d akhir periode, dipisah kolom Debit/Kredit.
-// Kolom dari tanda saldoAkhir (sama seperti saldo_debit/saldo_kredit di buku
-// besar): >= 0 → Debit, < 0 → Kredit. Akun saldo 0 di-skip. Total D & K sama.
-function buildNeracaSheet(sheet: ExcelJS.Worksheet, accounts: AccountRow[], period: string, ctx: LedgerCtx) {
+// Baris & total di sheet ini PERSIS sama dengan tabel di tab Neraca (dihitung
+// lewat @/lib/akutansi-reports) — akun 410-540 sudah dilipat & disembunyikan
+// di sana, jadi tidak dihitung ulang dari ledger mentah di sini supaya tidak
+// pernah selisih dari yang ditampilkan di layar.
+function buildNeracaSheet(sheet: ExcelJS.Worksheet, period: string, data: NeracaResult) {
   sheet.columns = [{ width: 10 }, { width: 42 }, { width: 18 }, { width: 18 }];
 
   sheet.mergeCells(1, 1, 1, 4);
   const titleCell = sheet.getCell(1, 1);
-  titleCell.value = `NERACA SALDO — Periode ${period}`;
+  titleCell.value = `NERACA — Periode ${period}`;
   titleCell.font = { bold: true, size: 13 };
 
   const headerRow = sheet.getRow(3);
@@ -372,31 +380,20 @@ function buildNeracaSheet(sheet: ExcelJS.Worksheet, accounts: AccountRow[], peri
   });
 
   let r = 4;
-  let totalDebit = 0;
-  let totalKredit = 0;
-
-  for (const acc of accounts) {
-    const { saldoAkhir } = computeAccountLedger(acc.code, ctx);
-    if (Math.round(saldoAkhir) === 0) continue; // skip akun bersaldo 0
-
-    const debit = saldoAkhir >= 0 ? saldoAkhir : 0;
-    const kredit = saldoAkhir < 0 ? Math.abs(saldoAkhir) : 0;
-    totalDebit += debit;
-    totalKredit += kredit;
-
-    const row = sheet.getRow(r);
-    row.getCell(1).value = acc.code;
-    row.getCell(1).font = { bold: true, color: { argb: "FF6B7280" } };
-    row.getCell(2).value = acc.name;
-    if (debit > 0) {
-      row.getCell(3).value = debit;
-      row.getCell(3).numFmt = '"Rp"#,##0';
-      row.getCell(3).font = { color: { argb: "FF1D4ED8" } };
+  for (const row of data.rows) {
+    const excelRow = sheet.getRow(r);
+    excelRow.getCell(1).value = row.code;
+    excelRow.getCell(1).font = { bold: true, color: { argb: "FF6B7280" } };
+    excelRow.getCell(2).value = row.name;
+    if (row.debit > 0) {
+      excelRow.getCell(3).value = row.debit;
+      excelRow.getCell(3).numFmt = '"Rp"#,##0';
+      excelRow.getCell(3).font = { color: { argb: row.is_abnormal ? "FFB91C1C" : "FF1D4ED8" } };
     }
-    if (kredit > 0) {
-      row.getCell(4).value = kredit;
-      row.getCell(4).numFmt = '"Rp"#,##0';
-      row.getCell(4).font = { color: { argb: "FF047857" } };
+    if (row.kredit > 0) {
+      excelRow.getCell(4).value = row.kredit;
+      excelRow.getCell(4).numFmt = '"Rp"#,##0';
+      excelRow.getCell(4).font = { color: { argb: row.is_abnormal ? "FFB91C1C" : "FF047857" } };
     }
     r++;
   }
@@ -404,23 +401,108 @@ function buildNeracaSheet(sheet: ExcelJS.Worksheet, accounts: AccountRow[], peri
   const totalRow = sheet.getRow(r);
   totalRow.getCell(2).value = "TOTAL";
   totalRow.getCell(2).alignment = { horizontal: "right" };
-  totalRow.getCell(3).value = totalDebit;
+  totalRow.getCell(3).value = data.totals.debit;
   totalRow.getCell(3).numFmt = '"Rp"#,##0';
-  totalRow.getCell(4).value = totalKredit;
+  totalRow.getCell(4).value = data.totals.kredit;
   totalRow.getCell(4).numFmt = '"Rp"#,##0';
   totalRow.eachCell((cell) => {
     cell.font = { bold: true, ...(cell.font ?? {}) };
     cell.border = { top: { style: "double", color: { argb: "FF374151" } } };
   });
 
-  const selisih = totalDebit - totalKredit;
-  const balanced = Math.abs(selisih) < 1;
   sheet.mergeCells(r + 2, 1, r + 2, 4);
   const statusCell = sheet.getCell(r + 2, 1);
-  statusCell.value = balanced
+  statusCell.value = data.totals.balanced
     ? "✓ Balance — total Debit sama dengan total Kredit"
-    : `✕ Tidak balance — selisih Rp${Math.abs(selisih).toLocaleString("id-ID")}`;
-  statusCell.font = { bold: true, color: { argb: balanced ? "FF047857" : "FFB91C1C" } };
+    : `✕ Tidak balance — selisih Rp${Math.abs(data.totals.selisih).toLocaleString("id-ID")}`;
+  statusCell.font = { bold: true, color: { argb: data.totals.balanced ? "FF047857" : "FFB91C1C" } };
+}
+
+// ─── Sheet Laba Rugi ─────────────────────────────────────────────────────────
+// Persis sama dengan tabel di tab Laba Rugi (dihitung lewat
+// @/lib/akutansi-reports) — supaya export gak pernah selisih dari yang
+// ditampilkan di layar.
+const RP_FMT = '"Rp"#,##0';
+
+function buildLabaRugiSheet(sheet: ExcelJS.Worksheet, period: string, data: LabaRugiResult) {
+  sheet.columns = [{ width: 42 }, { width: 20 }, { width: 20 }];
+
+  sheet.mergeCells(1, 1, 1, 3);
+  const titleCell = sheet.getCell(1, 1);
+  titleCell.value = `LABA RUGI — Periode ${periodLabel(period)}`;
+  titleCell.font = { bold: true, size: 13 };
+
+  const headerRow = sheet.getRow(3);
+  headerRow.values = ["Keterangan", "Nominal", "Jumlah"];
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, size: 10, color: { argb: "FF4B5563" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+    cell.border = { bottom: { style: "thin", color: { argb: "FFD1D5DB" } } };
+  });
+
+  let r = 4;
+
+  const writeSection = (title: string, section: LabaRugiSection, showRows: boolean) => {
+    if (showRows) {
+      if (section.rows.length === 0) {
+        const row = sheet.getRow(r);
+        row.getCell(1).value = "—";
+        row.getCell(1).font = { italic: true, color: { argb: "FF9CA3AF" } };
+        r++;
+      } else {
+        for (const acc of section.rows) {
+          const row = sheet.getRow(r);
+          row.getCell(1).value = `${acc.code} · ${acc.name}`;
+          row.getCell(2).value = acc.nominal;
+          row.getCell(2).numFmt = RP_FMT;
+          r++;
+        }
+      }
+    }
+
+    const totalRow = sheet.getRow(r);
+    totalRow.getCell(1).value = title;
+    totalRow.getCell(1).font = { bold: true };
+    totalRow.getCell(3).value = section.total;
+    totalRow.getCell(3).numFmt = RP_FMT;
+    totalRow.getCell(3).font = { bold: true };
+    r++;
+    r++; // spacer
+  };
+
+  writeSection(`Total ${LABA_RUGI_GROUP_LABEL.PENDAPATAN}`, data.pendapatan, true);
+  writeSection(`Total ${LABA_RUGI_GROUP_LABEL.MODAL_KELUAR}`, data.modal_keluar, true);
+  writeSection(`Total ${LABA_RUGI_GROUP_LABEL.OPERASIONAL}`, data.operasional, true);
+  writeSection(`Total ${LABA_RUGI_GROUP_LABEL.LUAR_OPERASIONAL}`, data.luar_operasional, true);
+
+  const labaRow = sheet.getRow(r);
+  labaRow.getCell(1).value = "Laba Periode Berjalan";
+  labaRow.getCell(1).font = { bold: true };
+  labaRow.getCell(3).value = data.laba_operasional;
+  labaRow.getCell(3).numFmt = RP_FMT;
+  labaRow.getCell(3).font = { bold: true };
+  r += 2;
+
+  writeSection(`Total ${LABA_RUGI_GROUP_LABEL.LABA_DITAHAN}`, data.laba_ditahan, false);
+
+  const totalRow = sheet.getRow(r);
+  totalRow.getCell(1).value = "TOTAL LABA";
+  totalRow.getCell(1).font = { bold: true, size: 11 };
+  totalRow.getCell(3).value = data.total_laba;
+  totalRow.getCell(3).numFmt = RP_FMT;
+  totalRow.getCell(3).font = { bold: true, size: 11 };
+  totalRow.eachCell((cell) => { cell.border = { top: { style: "double", color: { argb: "FF374151" } } }; });
+  r += 2;
+
+  if (data.akun_laba_periode) {
+    const cocok = Math.abs(data.selisih_verifikasi ?? 0) < 1;
+    sheet.mergeCells(r, 1, r, 3);
+    const noteCell = sheet.getCell(r, 1);
+    noteCell.value = cocok
+      ? `✓ Saldo Awal Manual akun ${data.akun_laba_periode.code} · ${data.akun_laba_periode.name} sudah sinkron dengan Laba Ditahan di laporan ini.`
+      : `✕ Selisih Rp${Math.abs(data.selisih_verifikasi ?? 0).toLocaleString("id-ID")} antara Laba Ditahan di laporan ini dengan saldo akun ${data.akun_laba_periode.code} · ${data.akun_laba_periode.name} di Neraca.`;
+    noteCell.font = { bold: true, italic: true, color: { argb: cocok ? "FF047857" : "FFB91C1C" } };
+  }
 }
 
 // ─── Handler ────────────────────────────────────────────────────────────────
@@ -547,7 +629,16 @@ export const GET = withAuth(async (req) => {
 
     const ctx: LedgerCtx = { openingMap, mutasiSebelumMap, linesByAccount, entryMap, entryAccountsMap, checkedMap };
 
-    // ── Bangun workbook ──
+    // Data Laba Rugi & Neraca dihitung lewat fungsi yang SAMA dengan yang
+    // dipakai tab Laba Rugi & Neraca di UI (@/lib/akutansi-reports) — supaya
+    // sheet-nya dijamin selalu sama persis dengan yang ditampilkan di layar.
+    const [labaRugiData, neracaData] = await Promise.all([
+      computeLabaRugi(supabase, period),
+      computeNeraca(supabase, period),
+    ]);
+
+    // ── Bangun workbook — 1 file Excel utuh: Jurnal Umum, Buku Besar per
+    //    kategori, Laba Rugi, dan Neraca ──
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Solit POS";
     workbook.created = new Date();
@@ -565,9 +656,13 @@ export const GET = withAuth(async (req) => {
       buildAccountTypeSheetHorizontal(sheet, accsInType, period, typeLabel, ctx);
     }
 
-    // Sheet terakhir: Neraca Saldo
+    // Sheet Laba Rugi
+    const labaRugiSheet = workbook.addWorksheet("Laba Rugi");
+    buildLabaRugiSheet(labaRugiSheet, period, labaRugiData);
+
+    // Sheet terakhir: Neraca
     const neracaSheet = workbook.addWorksheet("Neraca");
-    buildNeracaSheet(neracaSheet, accounts, period, ctx);
+    buildNeracaSheet(neracaSheet, period, neracaData);
 
     const buffer = await workbook.xlsx.writeBuffer();
 
