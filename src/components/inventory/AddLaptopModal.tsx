@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRegisterOverlay } from "@/contexts/OverlayContext";
 
 export interface CreatedLaptop {
     id: string;
@@ -15,6 +16,7 @@ export default function AddLaptopModal({
     onClose: () => void;
     onSuccess: (laptop: CreatedLaptop) => void;
 }) {
+    useRegisterOverlay();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [form, setForm] = useState({

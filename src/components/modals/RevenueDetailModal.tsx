@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRegisterOverlay } from "@/contexts/OverlayContext";
 
 interface RevenueDetail {
   today: { revenue: number; profit: number; count: number };
@@ -48,6 +49,7 @@ function Skeleton() {
 }
 
 export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  useRegisterOverlay(isOpen);
   const [data, setData] = useState<RevenueDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"daily" | "weekly" | "monthly">("daily");

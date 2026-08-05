@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import type { ServiceOrder, ServiceOrderLog } from "@/types/service";
+import { useRegisterOverlay } from "@/contexts/OverlayContext";
 import { STATUS_LABEL, STATUS_COLOR } from "@/types/service";
 import ServiceStatusBadge from "./ServiceStatusBadge";
 
@@ -13,7 +14,7 @@ interface Props {
 
 function formatDate(iso?: string) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("id-ID", {
+return new Date(iso).toLocaleString("id-ID", {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit", hour12: false,
   });
@@ -43,6 +44,7 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
 export default function ServiceDetailModal({ orderId, onClose }: Props) {
   const [data, setData] = useState<(ServiceOrder & { logs: ServiceOrderLog[] }) | null>(null);
   const [loading, setLoading] = useState(false);
+  useRegisterOverlay(!!orderId);
 
   useEffect(() => {
     if (!orderId) { setData(null); return; }

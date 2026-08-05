@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, FileText, Loader2 } from "lucide-react";
 import { ContractBadge } from "./ContractBadge";
+import { useRegisterOverlay } from "@/contexts/OverlayContext";
 
 interface ContractRow {
   id: string;
@@ -21,6 +22,7 @@ interface ContractRow {
 export default function ContractDetailModal({ userId, userName, onClose }: {
   userId: string; userName: string; onClose: () => void;
 }) {
+  useRegisterOverlay();
   const [loading, setLoading] = useState(true);
   const [contracts, setContracts] = useState<ContractRow[]>([]);
 

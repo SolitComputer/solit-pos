@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Users, LayoutGrid, MessageCircle, User } from "lucide-react";
 import { useChatContext } from "@/contexts/ChatContext";
+import { useOverlay } from "@/contexts/OverlayContext";
 
 interface NavItem {
   label: string;
@@ -26,6 +27,9 @@ function isActive(pathname: string, href: string) {
 export default function BottomNavBar() {
   const pathname = usePathname();
   const { openGroupChat, setOpenGroupChat } = useChatContext();
+  const { isOverlayOpen } = useOverlay();
+
+  if (isOverlayOpen) return null;
 
   const activeIndex = NAV_ITEMS.findIndex(({ label, href }) => {
     const isGroupChat = label === "Group Chat";
@@ -36,7 +40,7 @@ export default function BottomNavBar() {
     <nav
       className="
         md:hidden
-        fixed bottom-0 left-0 right-0 z-[9999]
+      fixed bottom-0 left-0 right-0 z-30
         w-full bg-white border-t border-gray-200
         pb-[env(safe-area-inset-bottom)]
       "
