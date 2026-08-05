@@ -221,7 +221,7 @@ export default function UnitDetailModal({
     const specs = (laptopSpecs ?? []).filter(s => s.value);
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+       <div className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => !saving && !addSaving && onClose()} />
 
             <div className="relative bg-white w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
