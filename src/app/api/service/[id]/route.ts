@@ -115,6 +115,10 @@ export async function PATCH(
   let updatePayload: Record<string, unknown> = {};
   let logCatatan = "";
 
+  //  NEW — dipakai buat cek boleh/tidaknya aksi bayar-di-muka & pelunasan
+  const isOrderSelesai = oldStatus === "DONE" || oldStatus === "GAGAL_DIPERBAIKI";
+  const isOrderAktif = oldStatus === "ANTRIAN" || oldStatus === "SEDANG_DIKERJAKAN" || oldStatus === "MENUNGGU_SPAREPART";
+
   switch (action) {
     case "mulai":
       if (!SERVICE_TEKNISI_ROLES.includes(user.role as UserRole))
@@ -270,32 +274,36 @@ export async function PATCH(
       }
       break;
 
-    //  NEW — pelunasan sisa DP sekaligus
+    //  NEW — pelunasan sisa DP (bisa dari halaman Selesai ATAU dari Antrian/bayar di muka)
     case "bayar_lunas": {
       if (current.payment_status !== "DP")
         return NextResponse.json({ success: false, message: "Order ini tidak dalam status DP" }, { status: 400 });
-      if (oldStatus !== "DONE" && oldStatus !== "GAGAL_DIPERBAIKI")
+      if (!isOrderSelesai && !isOrderAktif)
         return NextResponse.json({ success: false, message: "Status tidak valid" }, { status: 400 });
 
       const totalTagihanLunas = Number(current.total_tagihan ?? 0);
       const sisaLunas = totalTagihanLunas - Number(current.payment_amount ?? 0);
-      newStatus = "SUDAH_DIAMBIL";
+
+      //  NEW — cuma tandai "diambil" kalau servisnya memang SUDAH selesai dikerjakan
+      newStatus = isOrderSelesai ? "SUDAH_DIAMBIL" : oldStatus;
       updatePayload = {
-        diambil_by: user.id,
-        tanggal_diambil: new Date().toISOString(),
         payment_amount: totalTagihanLunas,
         payment_status: "LUNAS",
         payment_confirmed_at: new Date().toISOString(),
+        ...(isOrderSelesai ? {
+          diambil_by: user.id,
+          tanggal_diambil: new Date().toISOString(),
+        } : {}),
       };
       logCatatan = `Pelunasan sisa DP · Rp ${sisaLunas.toLocaleString("id-ID")} · Total lunas Rp ${totalTagihanLunas.toLocaleString("id-ID")}`;
       break;
     }
 
-    //  NEW — cicilan sebagian dari sisa DP
+   //  NEW — cicilan sebagian dari sisa DP (bisa dari halaman Selesai ATAU Antrian/bayar di muka)
     case "bayar_cicilan": {
       if (current.payment_status !== "DP")
         return NextResponse.json({ success: false, message: "Order ini tidak dalam status DP" }, { status: 400 });
-      if (oldStatus !== "DONE" && oldStatus !== "GAGAL_DIPERBAIKI")
+      if (!isOrderSelesai && !isOrderAktif)
         return NextResponse.json({ success: false, message: "Status tidak valid" }, { status: 400 });
       if (!cicilan_amount || cicilan_amount <= 0)
         return NextResponse.json({ success: false, message: "Nominal cicilan wajib diisi" }, { status: 400 });
@@ -304,12 +312,13 @@ export async function PATCH(
       const sudahDibayar = Number(current.payment_amount ?? 0);
       const totalBaru = sudahDibayar + cicilan_amount;
       const sudahLunas = totalBaru >= totalTagihanCicil;
+      const tandaiDiambil = sudahLunas && isOrderSelesai; //  NEW — cuma tandai diambil kalau servis memang sudah selesai
 
-      newStatus = sudahLunas ? "SUDAH_DIAMBIL" : oldStatus;
+      newStatus = tandaiDiambil ? "SUDAH_DIAMBIL" : oldStatus;
       updatePayload = {
         payment_amount: totalBaru,
         payment_status: sudahLunas ? "LUNAS" : "DP",
-        ...(sudahLunas ? {
+        ...(tandaiDiambil ? {
           diambil_by: user.id,
           tanggal_diambil: new Date().toISOString(),
           payment_confirmed_at: new Date().toISOString(),
@@ -318,6 +327,34 @@ export async function PATCH(
       logCatatan = sudahLunas
         ? `Cicilan Rp ${cicilan_amount.toLocaleString("id-ID")} · Lunas total Rp ${totalBaru.toLocaleString("id-ID")}`
         : `Cicilan Rp ${cicilan_amount.toLocaleString("id-ID")} · Sisa Rp ${(totalTagihanCicil - totalBaru).toLocaleString("id-ID")}`;
+      break;
+    }
+
+   //  NEW — bayar di muka: servis masih ANTRIAN/dikerjakan, tapi uangnya sudah masuk (lunas atau DP)
+    case "bayar_dimuka": {
+      if (!isOrderAktif)
+        return NextResponse.json({ success: false, message: "Bayar di muka hanya untuk order yang masih dalam antrian/dikerjakan" }, { status: 400 });
+      if (current.payment_amount) //  FIX — payment_status bisa default "LUNAS" di DB walau belum ada duit masuk sama sekali
+        return NextResponse.json({ success: false, message: "Order ini sudah punya catatan pembayaran. Gunakan tombol Lunas/Cicil." }, { status: 400 });
+      if (!payment_amount || payment_amount <= 0)
+        return NextResponse.json({ success: false, message: "Nominal pembayaran wajib diisi" }, { status: 400 });
+
+      const statusBayarDimuka = payment_status === "DP" ? "DP" : "LUNAS";
+      const totalTagihanDimuka = statusBayarDimuka === "DP" ? Number(total_tagihan ?? payment_amount) : payment_amount;
+
+      newStatus = oldStatus; // status servis TIDAK berubah — cuma catat pembayarannya
+      updatePayload = {
+        payment_amount,
+        payment_status: statusBayarDimuka,
+        total_tagihan: totalTagihanDimuka,
+        payment_note: payment_note || null,
+        payment_method: payment_method || "CASH",
+        payment_by: user.id,
+        payment_confirmed_at: new Date().toISOString(),
+      };
+      logCatatan = statusBayarDimuka === "LUNAS"
+        ? `Bayar di muka (LUNAS) · Rp ${payment_amount.toLocaleString("id-ID")}`
+        : `DP di muka · Rp ${payment_amount.toLocaleString("id-ID")} dari total Rp ${totalTagihanDimuka.toLocaleString("id-ID")}`;
       break;
     }
 

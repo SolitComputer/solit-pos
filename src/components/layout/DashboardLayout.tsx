@@ -16,6 +16,7 @@ import { unlockReminderAudio } from "@/lib/reminderSound";
 import PatchNoteFab from "@/components/ui/PatchNoteFab";
 import BackButton from "@/components/ui/BackButton";
 
+
 function ScrollRestorer() {
   const pathname = usePathname();
   const positions = useRef<Record<string, number>>({});
