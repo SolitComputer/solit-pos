@@ -6,6 +6,7 @@ import { humanizeRoleKey } from "@/lib/permissions";
 import ImageCropModal from "./ImageCropModal";
 import { useSongPicker, SavedSong } from "@/components/social/song/useSongPicker";
 import SongPickerPanel from "@/components/social/song/SongPickerPanel";
+import { getAuthUser } from "@/hooks/useAuthUser";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
     Loader2, Pencil, Check, X, Music, Play, Pause,
@@ -143,7 +144,7 @@ export default function ProfileView({ userId }: { userId: string }) {
         setLoading(true);
         try {
             const [meRes, profileRes, achRes] = await Promise.all([
-                fetch("/api/auth/me"),
+                getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
                 fetch(`/api/profile?userId=${userId}`),
                 fetch(`/api/achievements?userId=${userId}`),
             ]);

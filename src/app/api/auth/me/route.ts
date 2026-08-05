@@ -33,7 +33,7 @@ export async function GET() {
       .eq("id", raw.id)
       .maybeSingle();
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       user: {
         id: raw.id,
@@ -46,6 +46,9 @@ export async function GET() {
         exp: raw.exp,
       },
     });
+    // Cache 30 detik — aman karena endpoint dilindungi cookie token (per-user unique)
+    res.headers.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+    return res;
   } catch {
     return NextResponse.json({ success: false }, { status: 401 });
   }

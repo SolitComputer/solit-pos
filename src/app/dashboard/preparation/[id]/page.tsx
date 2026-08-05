@@ -17,6 +17,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import ReassignModal from "@/components/preparation/ReassignModal";
 import ManualStatusModal from "@/components/preparation/ManualStatusModal";
 import { CheckCircle2, FileText, Clock, Inbox, AlertCircle, User, Bike, Package } from "lucide-react";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface PrepItem {
     id: string; serial_number: string; laptop_name: string | null;
@@ -519,7 +520,7 @@ export default function PreparationDetailPage() {
     const [cancelItemTarget, setCancelItemTarget] = useState<PrepItem | null>(null);
 
     useEffect(() => {
-        fetch("/api/auth/me").then(r => r.json())
+        getAuthUser().then(u => ({ success: true, user: u }))
             .then(r => {
                 const roles: string[] = r.user?.roles ?? (r.user?.role ? [r.user.role] : []);
                 setUserRoles(roles);

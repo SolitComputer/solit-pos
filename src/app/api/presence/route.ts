@@ -8,9 +8,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Sinkron dengan HEARTBEAT_INTERVAL_MS (15s) di usePresence.ts
-// 35 detik = 15s interval + toleransi jaringan lambat ~20s
-const ONLINE_THRESHOLD_MS = 35 * 1000;
+// Sinkron dengan HEARTBEAT_INTERVAL_MS (30s) di usePresence.ts
+// 65 detik = 30s interval + toleransi jaringan lambat ~35s
+const ONLINE_THRESHOLD_MS = 65 * 1000;
 
 // ─── POST: Heartbeat dari client ──────────────────────────────────────────────
 export async function POST(request: NextRequest) {
