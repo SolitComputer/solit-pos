@@ -13,9 +13,7 @@ export interface PendingOvertimeItem {
   category: string;
 }
 
-const POLL_MS = 60_000; // 60 detik — overtime request jarang berubah, 1 menit cukup responsif
-// ⚠️ Sesuaikan path ini dengan file suara yang kamu punya, atau taruh file
-// mp3 baru di /public/sounds/overtime-alert.mp3
+const POLL_MS = 60_000; 
 const SOUND_URL = "/sounds/overtime-alert.mp3";
 
 export function useOvertimeNotify(userRoles: string[], userId?: string) {
