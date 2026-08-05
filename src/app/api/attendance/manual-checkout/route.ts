@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
-import { processAttendanceVerification } from "@/lib/attendanceVerification";
+import { processAttendanceVerification, createOvertimeDraft } from "@/lib/attendanceVerification";
 import { isValidOvertimeCategory } from "@/lib/overtimeEngine";
 
 const supabaseAdmin = createClient(
@@ -67,13 +67,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: result.message, code: result.code }, { status: result.status });
     }
 
-    // Kalau admin sekalian isi kategori & keterangan, langsung simpan supaya
-    // kepala divisi tidak perlu menunggu karyawan mengisi manual.
-    if (result.overtime && (category || work_description)) {
-      await supabaseAdmin.from("overtime_requests").update({
-        category: category ?? null,
-        work_description: work_description?.trim() || null,
-      }).eq("id", result.overtime.id);
+    // ✅ REWORK: processAttendanceVerification tidak lagi auto-insert ke
+    // overtime_requests — cuma mengembalikan POTENSI menit lembur lewat
+    // result.overtimeOptions. Kalau admin sekalian isi kategori & keterangan
+    // saat bikin absen pulang manual, kita BUAT baris lemburnya di sini
+    // (dulu cuma UPDATE baris yang sudah otomatis ke-insert; sekarang baris
+    // itu memang belum ada sampai kita buat sendiri).
+    let createdOvertime: { id: string; minutes: number; direction: string } | null = null;
+    if (result.overtimeOptions && (category || work_description)) {
+      const { afterOutMinutes, holidayMinutes, sourceFaceVerificationId } = result.overtimeOptions;
+      const direction: "HOLIDAY" | "AFTER_OUT" | null =
+        holidayMinutes > 0 ? "HOLIDAY" : afterOutMinutes > 0 ? "AFTER_OUT" : null;
+      const minutes = holidayMinutes > 0 ? holidayMinutes : afterOutMinutes;
+
+      if (direction && minutes > 0) {
+        // Aproksimasi actualStart (mundur `minutes` dari waktu checkout) — cuma
+        // penanda waktu untuk tampilan, nominal tetap dihitung dari `minutes`.
+        const actualStart = new Date(new Date(overrideNowISO).getTime() - minutes * 60000).toISOString();
+        createdOvertime = await createOvertimeDraft(supabaseAdmin, {
+          userId: user_id,
+          requestDate: checkout_date,
+          direction,
+          minutes,
+          actualStart,
+          actualEnd: overrideNowISO,
+          sourceFaceVerificationId,
+          isHoliday: direction === "HOLIDAY",
+        });
+        if (createdOvertime) {
+          await supabaseAdmin.from("overtime_requests").update({
+            category: category ?? null,
+            work_description: work_description?.trim() || null,
+          }).eq("id", createdOvertime.id);
+        }
+      }
     }
 
     console.log(`[manual-checkout] Admin ${admin.name} (${admin.id}) buat absen pulang manual untuk ${targetUser.name} (${user_id}) @ ${overrideNowISO}`);
@@ -81,7 +108,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       message: `Absen pulang manual untuk ${targetUser.name} berhasil disimpan.`,
-      overtime: result.overtime,
+      overtimeOptions: result.overtimeOptions,
+      overtimeCreated: createdOvertime,
     });
   } catch (err: any) {
     console.error("[manual-checkout] error:", err);
