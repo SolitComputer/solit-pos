@@ -123,7 +123,7 @@ export function OvertimeTable({
                     <p className="text-[10px] text-gray-400">{new Date(o.request_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
                   </td>
                   <td className="px-4 py-3 max-w-[220px]">
-                    <p className="text-xs text-gray-700 truncate" title={o.work_description ?? ""}>{o.work_description || "— belum diisi —"}</p>
+                    <p className="text-xs text-gray-700 whitespace-normal break-words" title={o.work_description ?? ""}>{o.work_description || "— belum diisi —"}</p>
                     {o.direction && <p className="text-[10px] text-gray-400 mt-0.5">{OVERTIME_DIRECTION_LABELS[o.direction as keyof typeof OVERTIME_DIRECTION_LABELS] ?? o.direction}</p>}
                   </td>
                   <td className="px-4 py-3">
