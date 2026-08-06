@@ -95,7 +95,7 @@ export const CONTRACT_TEMPLATES: Record<Exclude<ContractType, "CUSTOM">, (name: 
 3. Mendapatkan waktu istirahat dan cuti sesuai kebijakan Perusahaan.
 4. Mendapatkan makan siang yang disediakan oleh Perusahaan.
 5. Berhak atas evaluasi kinerja untuk kenaikan tingkatan atau perpanjangan kontrak.`,
-      `8. Wajib melakukan konfirmasi status pengantaran (dispatch, diterima, gagal) melalui sistem Solit POS secara real-time, mematuhi rute dan SOP keselamatan berkendara, serta menjaga keamanan barang selama proses pengantaran hingga diterima pelanggan.`
+      `6. Menerima insentif/bonus pengantaran sesuai kebijakan yang berlaku di sistem, dan dapat berubah sewaktu-waktu dengan pemberitahuan.`
     ),
   GAJI_FLAT: (name) =>
     baseTemplate(
