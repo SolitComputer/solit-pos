@@ -538,7 +538,7 @@ function PriceListPedagangContent() {
                   <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">HDD/SSD</th>
                   <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest">Siap Jual</th>
                   {canSeeModal && (
-                    <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Harga Modal</th>
+                    <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Total Modal</th>
                   )}
                   <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest whitespace-nowrap">Price Store</th>
                 </tr>

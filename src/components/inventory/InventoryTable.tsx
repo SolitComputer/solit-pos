@@ -25,6 +25,10 @@ export interface InventoryRow {
     sparepart_modal?: number | null;
     sparepart_note?: string;
 
+    /** Total Modal = Harga Modal + Modal Sparepart */
+    total_modal?: number | null;
+    total_modal_note?: string;
+
     harga_jual: number;
 
     /** Harga Official — harga yang sudah di-mark up, terpisah dari Harga Store */
@@ -110,7 +114,7 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
 );
 
-type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "SO" | "AKSI";
+type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "TOTAL_MODAL" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "SO" | "AKSI";
 //  Badge "NEW" — dipakai di kolom Nama Laptop saat row.is_new === true.
 //  Nilai is_new sudah dihitung di pemanggil (LaptopsContent.tsx / ready/page.tsx),
 //  jadi komponen ini murni presentasional, tidak menghitung TTL sendiri.
@@ -159,6 +163,7 @@ export default function InventoryTable({
                 case "STORAGE": valA = a.storage || ""; valB = b.storage || ""; break;
                 case "MODAL": valA = a.harga_modal ?? 0; valB = b.harga_modal ?? 0; break;
                 case "SPAREPART": valA = a.sparepart_modal ?? 0; valB = b.sparepart_modal ?? 0; break;
+                case "TOTAL_MODAL": valA = a.total_modal ?? 0; valB = b.total_modal ?? 0; break;
                 case "PRICE": valA = a.harga_jual ?? 0; valB = b.harga_jual ?? 0; break;
                 case "OFFICIAL": valA = (a.harga_jual ?? 0) + OFFICIAL_PRICE_MARKUP; valB = (b.harga_jual ?? 0) + OFFICIAL_PRICE_MARKUP; break;
                 case "GROSS_PROFIT": valA = a.gross_profit ?? 0; valB = b.gross_profit ?? 0; break;
@@ -202,6 +207,7 @@ export default function InventoryTable({
                         <Th sortKey="STORAGE" activeSort={sortBy} onSort={onSort}>Storage</Th>
                         {canSeePrivate && <Th right sortKey="MODAL" activeSort={sortBy} onSort={onSort}>Modal Laptop</Th>}
                         {canSeePrivate && showSparepart && <Th right sortKey="SPAREPART" activeSort={sortBy} onSort={onSort}>Modal Sparepart</Th>}
+                        {canSeePrivate && showSparepart && <Th right sortKey="TOTAL_MODAL" activeSort={sortBy} onSort={onSort}>Total Modal</Th>}
                         <Th right sortKey="PRICE" activeSort={sortBy} onSort={onSort}>Harga Setor</Th>
                         <Th right sortKey="OFFICIAL" activeSort={sortBy} onSort={onSort}>Harga Official</Th>
                         {canSeePrivate && <Th right sortKey="GROSS_PROFIT" activeSort={sortBy} onSort={onSort}>Gross Profit</Th>}
@@ -264,12 +270,22 @@ export default function InventoryTable({
                                 </td>
                             )}
 
-                            {canSeePrivate && showSparepart && (
+                          {canSeePrivate && showSparepart && (
                                 <td className="px-3 py-3.5 text-right whitespace-nowrap">
                                     {row.sparepart_modal != null ? (
                                         <span className="text-xs font-semibold text-gray-600 tabular-nums">{fmt(row.sparepart_modal)}</span>
                                     ) : row.sparepart_note ? (
                                         <Note>{row.sparepart_note}</Note>
+                                    ) : <Dash />}
+                                </td>
+                            )}
+
+                            {canSeePrivate && showSparepart && (
+                                <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                    {row.total_modal != null ? (
+                                        <span className="text-xs font-bold text-gray-700 tabular-nums">{fmt(row.total_modal)}</span>
+                                    ) : row.total_modal_note ? (
+                                        <Note>{row.total_modal_note}</Note>
                                     ) : <Dash />}
                                 </td>
                             )}
