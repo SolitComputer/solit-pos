@@ -18,7 +18,7 @@ const DETECTION_INPUT_SIZE = 224;
 const COMPANY_LAT = -6.402123;
 const COMPANY_LNG = 106.787296;
 const MAX_DISTANCE_METERS = 80;
-
+const GPS_ACCURACY_FALLBACK_METERS = 150;
 const SHIFT_CONFIG_CLIENT = {
   PAGI: { startH: 7, startM: 30, endH: 12, endM: 0 },
   SORE: { startH: 14, startM: 0, endH: 18, endM: 0 },
@@ -175,44 +175,47 @@ export default function FaceVerifyPage() {
       return;
     }
 
-    let watchId: number;
+  let watchId: number;
     let timeoutId: NodeJS.Timeout;
     let bestAccuracy = Infinity;
+    let bestPosition: GeolocationPosition | null = null; // ✅ NEW — simpan posisi terbaik, bukan cuma angka akurasinya
 
     const clearGPS = () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
       if (timeoutId) clearTimeout(timeoutId);
     };
 
-    // Timeout maksimal 15 detik untuk mendapatkan lokasi akurat
     timeoutId = setTimeout(() => {
       clearGPS();
       setGpsLoading(false);
-      if (bestAccuracy !== Infinity) {
+      if (bestPosition && bestAccuracy <= GPS_ACCURACY_FALLBACK_METERS) {
+        addLog(`Timeout — pakai akurasi terbaik: ±${Math.round(bestAccuracy)}m`, "warn");
+        handleGpsSuccess(bestPosition);
+      } else if (bestPosition) {
         setStage("error");
-        setMessage(`Sinyal GPS terlalu lemah/kasar (Akurasi: ±${Math.round(bestAccuracy)}m). Tolong cari area terbuka/dekat jendela.`);
+        setMessage(`Akurasi GPS terlalu buruk (±${Math.round(bestAccuracy)}m). Aktifkan mode lokasi "Akurasi Tinggi / Precise Location" di Setelan HP → Lokasi, lalu coba lagi.`);
       } else {
         setStage("error");
         setMessage("Gagal mendapatkan sinyal GPS (Timeout). Pastikan GPS aktif dan Anda berada di area terbuka.");
       }
-    }, 15000);
+    }, 25000);
 
     watchId = navigator.geolocation.watchPosition(
       (position) => {
         const accuracy = position.coords.accuracy;
-        bestAccuracy = Math.min(bestAccuracy, accuracy);
+        if (accuracy < bestAccuracy) {
+          bestAccuracy = accuracy;
+          bestPosition = position;
+        }
 
-        // Batas toleransi akurasi disamakan dengan 80m (MAX_DISTANCE_METERS)
         if (accuracy <= 80) {
           clearGPS();
           handleGpsSuccess(position);
         } else {
-          // Hanya log, biarkan watchPosition terus mencari sinyal yang lebih baik
           addLog(`Akurasi masih lemah: ±${Math.round(accuracy)}m (butuh <= 80m)...`, "warn");
         }
       },
       (err) => {
-        // Jika diblokir, langsung hentikan
         if (err.code === err.PERMISSION_DENIED) {
           clearGPS();
           setGpsLoading(false);
@@ -222,7 +225,7 @@ export default function FaceVerifyPage() {
           addLog(`GPS retry [code ${err.code}]: ${err.message}`, "warn");
         }
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     );
   }, [addLog, handleGpsSuccess]);
 
