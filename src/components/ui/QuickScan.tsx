@@ -41,8 +41,33 @@ interface AccessoryUnitResult {
     };
 }
 
+// Hasil saat SN yang dicari cuma partial match & nyangkut ke >1 unit
+interface LaptopGroupResult {
+    type: "LAPTOP_GROUP";
+    query: string;
+    groups: {
+        laptop: {
+            id: string;
+            laptop_name: string;
+            brand: string;
+            cpu: string;
+            ram: string;
+            storage: string;
+        };
+        units: {
+            id: string;
+            serial_number: string;
+            grade: "A" | "B" | "C";
+            condition_note: string;
+            selling_price: number;
+            status: string;
+            notes: string;
+        }[];
+    }[];
+}
+
 // Union — nama tetap UnitResult biar state & referensi lain nggak berubah
-type UnitResult = LaptopUnitResult | AccessoryUnitResult;
+type UnitResult = LaptopUnitResult | AccessoryUnitResult | LaptopGroupResult;
 
 interface AuthUser {
     id: string;
@@ -236,8 +261,59 @@ export default function QuickScan({ user }: { user: AuthUser | null }) {
                         </div>
                     )}
 
-                    {/* Success result */}
+                   {/* Success result */}
                     {!loading && result && (() => {
+                        // ── Cabang: Grup (SN cocok sebagian → banyak unit) ──
+                        if (result.type === "LAPTOP_GROUP") {
+                            const totalUnits = result.groups.reduce((s, g) => s + g.units.length, 0);
+                            return (
+                                <div className="bg-white">
+                                    <div className="flex items-start justify-between px-4 pt-4">
+                                        <p className="text-xs text-gray-500">
+                                            SN <span className="font-mono font-semibold text-gray-700">{sn}</span> cocok dengan{" "}
+                                            <span className="font-semibold text-gray-700">{totalUnits} unit</span>. Pilih salah satu:
+                                        </p>
+                                        <button onClick={closeResult} className="text-gray-300 hover:text-gray-500 transition p-1 flex-shrink-0">
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    <div className="p-4 space-y-4">
+                                        {result.groups.map(group => (
+                                            <div key={group.laptop.id}>
+                                                <p className="text-xs font-semibold text-[#1a1a2e] mb-2">
+                                                    {group.laptop.laptop_name}
+                                                    <span className="ml-1.5 text-[10px] font-normal text-gray-400">
+                                                        {[group.laptop.cpu, group.laptop.ram].filter(Boolean).join(" · ")}
+                                                    </span>
+                                                </p>
+                                                <div className="space-y-1.5">
+                                                    {group.units.map(u => {
+                                                        const st = STATUS_CONFIG[u.status] || STATUS_CONFIG.BELUM_SIAP;
+                                                        return (
+                                                            <button
+                                                                key={u.id}
+                                                                onClick={() => handleSearch(u.serial_number)}
+                                                                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-100 transition text-left"
+                                                            >
+                                                                <span className="font-mono text-xs text-gray-700">{u.serial_number}</span>
+                                                                <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${st.badge}`}>
+                                                                    <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+                                                                    {st.label}
+                                                                </span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        }
+
                         // ── Cabang: Aksesoris ──
                         if (result.type === "ACCESSORY") {
                             const accStatus = ACC_STATUS_CONFIG[result.status] || {

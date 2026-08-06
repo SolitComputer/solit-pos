@@ -53,8 +53,34 @@ interface AccessoryUnitData {
   };
 }
 
+interface LaptopGroupData {
+  type: "LAPTOP_GROUP";
+  query: string;
+  groups: {
+    laptop: {
+      id: string;
+      laptop_name: string;
+      brand: string;
+      cpu: string;
+      ram: string;
+      storage: string;
+      gpu: string;
+      display: string;
+    };
+    units: {
+      id: string;
+      serial_number: string;
+      grade: "A" | "B" | "C";
+      condition_note: string;
+      selling_price: number;
+      status: string;
+      notes: string;
+    }[];
+  }[];
+}
+
 // Nama tetap UnitData biar useState & referensi lain nggak berubah
-type UnitData = LaptopUnitData | AccessoryUnitData;
+type UnitData = LaptopUnitData | AccessoryUnitData | LaptopGroupData;
 
 interface AuthUser {
   id: string;
@@ -137,6 +163,11 @@ export default function ScanPage() {
   // ── Cabang: Aksesoris (early-return, sebelum kode laptop) ──
   if (unit.type === "ACCESSORY") {
     return <AccessoryScanView decodedSn={decodedSn} unit={unit} user={user} />;
+  }
+
+  // ── Cabang: Grup (SN cocok sebagian → banyak unit, early-return juga) ──
+  if (unit.type === "LAPTOP_GROUP") {
+    return <LaptopGroupScanView decodedSn={decodedSn} data={unit} user={user} />;
   }
 
   // ── Di bawah sini `unit` sudah pasti LaptopUnitData (TS narrowing) ──
@@ -453,6 +484,107 @@ function AccessoryScanView({
             {" "}untuk mengakses opsi lainnya
           </p>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Laptop Group Scan View (SN cocok sebagian → banyak unit) ────────────────
+function LaptopGroupScanView({
+  decodedSn,
+  data,
+  user,
+}: {
+  decodedSn: string;
+  data: LaptopGroupData;
+  user: AuthUser | null;
+}) {
+  const unitRowStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid #f1f5f9",
+    background: "#f8fafc",
+    textDecoration: "none",
+  };
+
+  return (
+    <div style={styles.root}>
+      <div style={styles.bgCircle1} />
+      <div style={styles.bgCircle2} />
+
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div style={styles.scanIcon}>
+            <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 4v1m0 14v1M4 12H3m18 0h-1M6.343 6.343l-.707-.707m13.728 13.728l-.707-.707M6.343 17.657l-.707.707M17.657 6.343l-.707.707" />
+            </svg>
+          </div>
+          <div>
+            <p style={styles.headerLabel}>Hasil Scan</p>
+            <p style={styles.headerSn}>{decodedSn}</p>
+          </div>
+          {user && (
+            <div style={styles.userBadge}>
+              <span style={styles.userRole}>{user.role}</span>
+              <span style={styles.userName}>{user.name}</span>
+            </div>
+          )}
+        </div>
+
+        <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 14 }}>
+          SN &quot;{decodedSn}&quot; cocok dengan {data.groups.reduce((s, g) => s + g.units.length, 0)} unit.
+          Pilih salah satu unit di bawah untuk melihat detailnya.
+        </p>
+
+        {data.groups.map((group) => (
+          <div key={group.laptop.id} style={styles.card}>
+            <div style={styles.laptopHeader}>
+              <div style={styles.laptopIcon}></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2 style={styles.laptopName}>{group.laptop.laptop_name}</h2>
+                <p style={styles.laptopBrand}>
+                  {[group.laptop.brand, group.laptop.cpu, group.laptop.ram].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a2e", background: "#e0e7ff", padding: "3px 9px", borderRadius: 99, flexShrink: 0 }}>
+                {group.units.length} unit
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+              {group.units.map((u) => {
+                const st = STATUS_CONFIG[u.status] ?? { label: u.status, color: "#6b7280", dot: "#9ca3af" };
+                return (
+                  <Link key={u.id} href={`/scan/${encodeURIComponent(u.serial_number)}`} style={unitRowStyle}>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: "#1a1a2e", margin: 0 }}>
+                        {u.serial_number}
+                      </p>
+                      <p style={{ fontSize: 11, color: "#9ca3af", margin: "2px 0 0" }}>
+                        Grade {u.grade} · {fmt(u.selling_price)}
+                      </p>
+                    </div>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: st.color, flexShrink: 0 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: st.dot }} />
+                      {st.label}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        <div style={styles.actions}>
+          <Link href="/dashboard/laptops" style={styles.btnView}>
+            ← Ke Data Barang
+          </Link>
+        </div>
       </div>
     </div>
   );
