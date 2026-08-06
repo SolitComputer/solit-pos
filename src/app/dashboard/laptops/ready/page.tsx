@@ -470,7 +470,13 @@ function ReadyContent() {
         }
         if (filterSN.trim()) {
             const snQ = filterSN.trim().toLowerCase();
-            list = list.filter(u => u.serial_number?.toLowerCase().includes(snQ));
+            const matchedGroupIds = new Set(
+                units
+                    .filter(u => u.serial_number?.toLowerCase().includes(snQ))
+                    .map(u => u.laptop_id)
+                    .filter(Boolean)
+            );
+            list = list.filter(u => u.laptop_id && matchedGroupIds.has(u.laptop_id));
         }
         if (filterStatus !== "ALL") {
             list = list.filter(u => u.status === filterStatus);

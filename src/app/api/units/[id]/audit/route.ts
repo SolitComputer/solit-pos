@@ -38,16 +38,26 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       ? { audited_at: null, audited_by: null }
       : { audited_at: new Date().toISOString(), audited_by: user.name };
 
-    const { data, error } = await supabase
-      .from("laptop_units")
-      .update(payload)
-      .eq("id", id)
-      .select("id, audited_at, audited_by")
-      .single();
-
-    if (error) {
-      return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+    // Audit per-kelompok: Update seluruh unit di kelompok laptop_id ini dan parent laptop
+    if (current.laptop_id) {
+      await Promise.all([
+        supabase
+          .from("laptop_units")
+          .update(payload)
+          .eq("laptop_id", current.laptop_id),
+        supabase
+          .from("laptops")
+          .update(payload)
+          .eq("id", current.laptop_id),
+      ]);
+    } else {
+      await supabase
+        .from("laptop_units")
+        .update(payload)
+        .eq("id", id);
     }
+
+    const data = { id, ...payload };
 
     await logActivity({
       userId: user.id,
