@@ -366,6 +366,8 @@ export default function UnitsPage() {
         setToast("Harga modal berhasil diperbarui!");
     }, []);
 
+    const [soPromptTarget, setSoPromptTarget] = useState<{ unit: LaptopUnit; isActive: boolean } | null>(null);
+
     const toggleUnitAudit = async (unit: LaptopUnit) => {
         setAuditingUnitId(unit.id);
         try {
@@ -373,8 +375,9 @@ export default function UnitsPage() {
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal update audit");
             const wasActive = isUnitAuditActive(unit);
-            setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, ...json.data } : u));
-            setToast(wasActive ? "Audit unit dibatalkan" : "Unit ditandai sudah diaudit");
+            // Audit per-kelompok: Update seluruh unit di kelompok ini
+            setUnits(prev => prev.map(u => ({ ...u, ...json.data })));
+            setToast(wasActive ? "Audit kelompok dibatalkan" : "Seluruh kelompok ditandai sudah diaudit");
         } catch (e) {
             setAlertModal(e instanceof Error ? e.message : "Gagal update audit");
         } finally {
@@ -383,14 +386,23 @@ export default function UnitsPage() {
     };
 
     const toggleUnitSO = async (unit: LaptopUnit) => {
+        setSoPromptTarget({ unit, isActive: isUnitSOActive(unit) });
+    };
+
+    const handleConfirmUnitSO = async (unit: LaptopUnit, note: string) => {
         setSoUnitId(unit.id);
         try {
-            const res = await fetch(`/api/units/${unit.id}/so`, { method: "PATCH" });
+            const res = await fetch(`/api/units/${unit.id}/so`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ notes: note }),
+            });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal update SO");
             const wasActive = isUnitSOActive(unit);
             setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, ...json.data } : u));
             setToast(wasActive ? "SO unit dibatalkan" : "Unit ditandai sudah SO");
+            setSoPromptTarget(null);
         } catch (e) {
             setAlertModal(e instanceof Error ? e.message : "Gagal update SO");
         } finally {
@@ -399,11 +411,16 @@ export default function UnitsPage() {
     };
 
     const filteredUnits = useMemo(() => {
+        const searchSNTrim = searchSN.trim().toLowerCase();
+        const hasMatchInGroup = searchSNTrim
+            ? activeUnits.some(u => u.serial_number.toLowerCase().includes(searchSNTrim))
+            : true;
+
         const list = sortUnits(
             activeUnits.filter(u => {
                 if (filterStatus !== "ALL" && u.status !== filterStatus) return false;
                 if (filterGradeTab !== "ALL" && u.grade !== filterGradeTab) return false;
-                if (searchSN && !u.serial_number.toLowerCase().includes(searchSN.toLowerCase())) return false;
+                if (searchSNTrim && !hasMatchInGroup) return false;
                 if (filterPriceMin && u.selling_price < Number(filterPriceMin)) return false;
                 if (filterPriceMax && u.selling_price > Number(filterPriceMax)) return false;
                 if (filterAudit === "AUDITED" && !isUnitAuditActive(u)) return false;
@@ -1132,6 +1149,15 @@ export default function UnitsPage() {
                     onClose={() => setSoHistoryTarget(null)}
                 />
             )}
+            {soPromptTarget && (
+                <SoNotePromptModal
+                    title={soPromptTarget.isActive ? "Batalkan Stok Opname (SO)" : "Proses Stok Opname (SO)"}
+                    label={`SN: ${soPromptTarget.unit.serial_number}`}
+                    onConfirm={(note) => handleConfirmUnitSO(soPromptTarget.unit, note)}
+                    onClose={() => setSoPromptTarget(null)}
+                    loading={soUnitId === soPromptTarget.unit.id}
+                />
+            )}
             {showBulkModal && (
                 <BulkAddUnitModal
                     laptopId={laptopId}
@@ -1529,6 +1555,54 @@ interface SoHistoryEntry {
     action: "SO" | "UNSO";
     so_by: string;
     so_at: string;
+    notes?: string | null;
+}
+
+function SoNotePromptModal({ title, label, initialNote = "", onConfirm, onClose, loading }: {
+    title: string;
+    label: string;
+    initialNote?: string;
+    onConfirm: (note: string) => void;
+    onClose: () => void;
+    loading: boolean;
+}) {
+    const [note, setNote] = useState(initialNote);
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-5 animate-popIn">
+                <h3 className="text-sm font-bold text-gray-900 mb-1">{title}</h3>
+                <p className="text-xs text-gray-500 mb-3 truncate">{label}</p>
+                <div className="mb-4">
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">Catatan SO (Opsional)</label>
+                    <textarea
+                        value={note}
+                        onChange={e => setNote(e.target.value)}
+                        placeholder="Masukkan catatan stok opname (misal: kondisi fisik, kelengkapan, lokasi rak...)"
+                        className="w-full text-xs p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[70px]"
+                        rows={3}
+                        autoFocus
+                    />
+                </div>
+                <div className="flex gap-2 justify-end">
+                    <button
+                        onClick={onClose}
+                        disabled={loading}
+                        className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={() => onConfirm(note)}
+                        disabled={loading}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                    >
+                        {loading ? "Menyimpan..." : "Proses SO"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function SoHistoryModal({ unitId, unitLabel, onClose }: {
@@ -1587,10 +1661,15 @@ function SoHistoryModal({ unitId, unitLabel, onClose }: {
                             {history.map(h => (
                                 <li key={h.id} className="flex items-start gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
                                     <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${h.action === "SO" ? "bg-blue-500" : "bg-gray-300"}`} />
-                                    <div className="min-w-0">
+                                    <div className="min-w-0 flex-1">
                                         <p className="text-xs font-semibold text-gray-700">
                                             {h.action === "SO" ? "Ditandai sudah SO" : "SO dibatalkan"}
                                         </p>
+                                        {h.notes && (
+                                            <p className="text-[11px] text-gray-600 bg-white border border-gray-200 rounded-lg px-2 py-1 my-1 italic">
+                                                "{h.notes}"
+                                            </p>
+                                        )}
                                         <p className="text-[11px] text-gray-400 mt-0.5">
                                             {h.so_by} · {fmtWhen(h.so_at)}
                                         </p>

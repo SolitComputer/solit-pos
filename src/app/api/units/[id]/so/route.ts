@@ -14,6 +14,13 @@ const SO_TTL_MS = 1 * 24 * 60 * 60 * 1000;
 async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
+    let notes: string | undefined = undefined;
+    try {
+      const body = await req.json();
+      notes = typeof body?.notes === "string" ? body.notes.trim() : undefined;
+    } catch {
+      // Body opsional
+    }
 
     const { data: current, error: readErr } = await supabase
       .from("laptop_units")
@@ -55,6 +62,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       entity: "unit",
       entityId: id,
       entityLabel: `SN: ${current.serial_number}`,
+      reason: notes || null,
     });
 
     await supabase.from("laptop_unit_so_logs").insert({
@@ -62,6 +70,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       action: isActive ? "UNSO" : "SO",
       so_by: user.name,
       so_at: new Date().toISOString(),
+      notes: notes || null,
     });
 
     return NextResponse.json({ success: true, data });
@@ -89,7 +98,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const { data: history, error: historyErr } = await supabase
       .from("laptop_unit_so_logs")
-      .select("id, action, so_by, so_at")
+      .select("id, action, so_by, so_at, notes")
       .eq("unit_id", id)
       .order("so_at", { ascending: false })
       .limit(20);
