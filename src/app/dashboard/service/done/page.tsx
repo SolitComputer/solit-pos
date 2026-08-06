@@ -324,15 +324,13 @@ function PaymentValue({ order, align = "left" }: { order: ServiceOrder; align?: 
     return <span className="text-xs font-medium text-gray-300">—</span>;
   }
 
-  const est = Number(order.estimasi_harga ?? 0);
-  const sp = Number(order.biaya_sparepart ?? 0);
-  const total = est + sp;
+  const sp = Number(order.biaya_sparepart ?? 0); //  FIX — cuma tampilkan biaya sparepart, gak dijumlah sama estimasi_harga
 
-  if (total > 0) {
+  if (sp > 0) {
     return (
       <div className={`flex flex-col ${alignCls}`}>
-        <p className="text-xs font-black tabular-nums text-indigo-600">{fmtRupiah(total)}</p>
-        <p className="mt-0.5 text-[10px] font-medium text-amber-500">estimasi · belum dibayar</p>
+        <p className="text-xs font-black tabular-nums text-indigo-600">{fmtRupiah(sp)}</p>
+        <p className="mt-0.5 text-[10px] font-medium text-amber-500">sparepart · belum dibayar</p>
       </div>
     );
   }
@@ -391,7 +389,7 @@ export default function DonePage() {
   };
 
   const handleDiambilClick = (order: ServiceOrder) => {
-    if (order.payment_status === "LUNAS") {
+    if (order.payment_status === "LUNAS" && order.payment_amount) { //  FIX — payment_status bisa default "LUNAS" walau belum ada duit masuk sama sekali
       //  NEW — sudah lunas dari pembayaran di muka, tinggal konfirmasi pengambilan fisik (gak perlu bayar lagi)
       setDialog({
         open: true,
