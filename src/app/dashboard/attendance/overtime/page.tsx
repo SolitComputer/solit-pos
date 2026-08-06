@@ -7,8 +7,9 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2, AlertTriangle, Camera, Inbox, Pencil, Play, Check, X, Ban, ClipboardList, Circle, HelpCircle, Trophy, type LucideIcon } from "lucide-react";
 import { OvertimeTable, type OvertimeTableRow } from "@/components/attendance/OvertimeTable"; // ✅ NEW poin 15
 import { OvertimeFillDetailModal } from "@/components/attendance/OvertimeFillDetailModal"; // ✅ NEW
-import { OvertimeSOPBanner } from "@/components/attendance/OvertimeSOPBanner"; // ✅ NEW poin 14
-import { isPKLRole as isPklRoleShared } from "@/lib/permissions"; // ✅ NEW poin 16
+import { OvertimeSOPBanner } from "@/components/attendance/OvertimeSOPBanner";
+import { useOvertimeNotify } from "@/hooks/useOvertimeNotify"; 
+import { OvertimePendingPopup } from "@/components/attendance/OvertimePendingPopup";
 
 type OvertimeRequest = {
   id: string; user_id: string; request_date: string;
@@ -237,10 +238,9 @@ function ModalFoot({ children }: { children: React.ReactNode }) {
   return <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/60 flex gap-2.5">{children}</div>;
 }
 
-// ─── DETAIL MODAL ──────────────────────────────────────────────────────────
-function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser, onApprove, onComplete, onSetPay, onProofPhoto, onEdit, onDelete }: {
+function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser, onApprove, onReject, onComplete, onSetPay, onProofPhoto, onEdit, onDelete }: {
   overtime: OvertimeRequest; onClose: () => void; userCanViewPay: boolean; currentUser: any;
-  onApprove: () => void; onComplete: () => void; onSetPay: () => void; onProofPhoto: () => void; onEdit: () => void; onDelete: () => void;
+  onApprove: () => void; onReject: () => void; onComplete: () => void; onSetPay: () => void; onProofPhoto: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const dateStr = new Date(o.request_date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const duration = calcDuration(o.actual_start ?? o.scheduled_start, o.actual_end ?? o.scheduled_end);
@@ -342,7 +342,10 @@ function OvertimeDetailModal({ overtime: o, onClose, userCanViewPay, currentUser
             <button onClick={() => { onClose(); setTimeout(onComplete, 100); }} className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Selesai</button>
           )}
           {canApproveTarget(currentUser?.roles ?? currentUser?.role, o.users?.role) && o.status === "PENDING" && (
-            <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="w-full h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Setujui</button>
+            <div className="flex gap-2 w-full">
+              <button onClick={() => { onClose(); setTimeout(onReject, 100); }} className="flex-1 h-10 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-semibold hover:bg-red-50 transition-all flex items-center justify-center gap-1.5"> Tolak</button>
+              <button onClick={() => { onClose(); setTimeout(onApprove, 100); }} className="flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm"> Setujui</button>
+            </div>
           )}
           {/* Bayaran hanya boleh diatur kalau lembur selesai DAN foto bukti sudah ada */}
           {canSetPay(currentUser?.role) && o.status === "COMPLETED" && !!o.proof_photo_url && (
@@ -482,29 +485,31 @@ function ProofPhotoModal({ overtime: o, onClose, canViewPay: showPay }: { overti
   );
 }
 
-// ─── APPROVE MODAL ─────────────────────────────────────────────────────────
 function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
   const [scheduledStart, setScheduledStart] = useState(o.requested_start?.substring(0, 5) || "09:00");
   const [scheduledEnd, setScheduledEnd] = useState("17:00");
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmStep, setConfirmStep] = useState(false);
 
-  //  FIX: deteksi overnight — jam selesai <= jam mulai = lembur lewat tengah malam (selesai besok)
   const isOvernight = useMemo(() => {
     if (!scheduledStart || !scheduledEnd) return false;
     return scheduledEnd <= scheduledStart;
   }, [scheduledStart, scheduledEnd]);
 
-  //  FIX: tanggal selesai = request_date + 1 hari kalau overnight
   const endDateResolved = useMemo(
     () => (isOvernight ? addDaysToDateStr(o.request_date, 1) : o.request_date),
     [isOvernight, o.request_date]
   );
 
-  const approve = async () => {
+  const goToConfirm = () => {
     if (!scheduledStart || !scheduledEnd) { setError("Jam mulai & selesai wajib diisi"); return; }
-    //  FIX: dulu nolak end <= start (selalu salah untuk overnight). Sekarang cuma tolak kalau SAMA PERSIS (durasi 0).
     if (scheduledStart === scheduledEnd) { setError("Jam mulai dan selesai tidak boleh sama"); return; }
+    setError("");
+    setConfirmStep(true);
+  };
+
+  const approve = async () => {
     setApproving(true); setError("");
     try {
       const fmt = (t: string) => (t.length === 5 ? `${t}:00` : t);
@@ -515,15 +520,39 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
           id: o.id,
           action: "APPROVE",
           scheduled_start: `${o.request_date}T${fmt(scheduledStart)}+07:00`,
-          //  FIX: pakai endDateResolved (tanggal+1 saat overnight), bukan o.request_date yang sama
           scheduled_end: `${endDateResolved}T${fmt(scheduledEnd)}+07:00`,
         }),
       });
       const d = await res.json();
-      if (!res.ok || !d.success) { setError(d.message || `Error ${res.status}`); return; }
+      if (!res.ok || !d.success) { setError(d.message || `Error ${res.status}`); setConfirmStep(false); return; }
       onSaved(); onClose();
-    } catch (err: any) { setError(err.message || "Gagal"); } finally { setApproving(false); }
+    } catch (err: any) { setError(err.message || "Gagal"); setConfirmStep(false); } finally { setApproving(false); }
   };
+
+  // ✅ NEW — langkah ke-2: layar konfirmasi final
+  if (confirmStep) {
+    return (
+      <ModalWrapper onClose={onClose} preventClose={approving}>
+        <ModalHead icon="" title="Konfirmasi ACC" sub="Langkah terakhir — pastikan datanya benar" onClose={onClose} noClose={approving} />
+        <div className="px-5 py-4 space-y-3.5">
+          {error && <ErrorBanner msg={error} />}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
+            <p className="text-xs font-semibold text-amber-800 mb-1"> Tindakan ini langsung mengunci lemburan</p>
+            <p className="text-[11px] text-amber-700">Setelah di-ACC, karyawan wajib upload foto bukti dan pengajuan ini tidak bisa dibatalkan dari sini.</p>
+          </div>
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5 space-y-2">
+            <div className="flex justify-between text-xs"><span className="text-gray-400">Karyawan</span><span className="font-semibold text-gray-800">{o.users?.name}</span></div>
+            <div className="flex justify-between text-xs"><span className="text-gray-400">Tanggal</span><span className="font-semibold text-gray-800">{new Date(o.request_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span></div>
+            <div className="flex justify-between text-xs"><span className="text-gray-400">Jam Lembur</span><span className="font-mono font-semibold text-gray-800">{scheduledStart} – {scheduledEnd}{isOvernight ? " (+1 hari)" : ""}</span></div>
+          </div>
+        </div>
+        <ModalFoot>
+          <button onClick={() => setConfirmStep(false)} disabled={approving} className={secondaryBtn}>← Kembali</button>
+          <button onClick={approve} disabled={approving} className={primaryBtn}>{approving ? <Spinner /> : " Ya, ACC Sekarang"}</button>
+        </ModalFoot>
+      </ModalWrapper>
+    );
+  }
 
   return (
     <ModalWrapper onClose={onClose}>
@@ -556,7 +585,6 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
           <div><label className={lbl}>Jam Mulai *</label><input type="time" value={scheduledStart} onChange={e => setScheduledStart(e.target.value)} className={inp} /></div>
           <div><label className={lbl}>Jam Selesai *</label><input type="time" value={scheduledEnd} onChange={e => setScheduledEnd(e.target.value)} className={inp} /></div>
         </div>
-        {/*  FIX: indikator overnight, konsisten dgn Edit & Manual modal */}
         {isOvernight && (
           <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
             <span className="text-sm"><CalendarDays className="w-4 h-4 text-violet-600" /></span>
@@ -569,7 +597,86 @@ function ApproveModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeReq
       </div>
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
-        <button onClick={approve} disabled={approving} className={primaryBtn}>{approving ? <Spinner /> : " Setujui & Mulai"}</button>
+        <button onClick={goToConfirm} className={primaryBtn}> Lanjut ke Konfirmasi</button>
+      </ModalFoot>
+    </ModalWrapper>
+  );
+}
+
+// ─── REJECT MODAL ──────────────────────────────────────────────────────────
+// ✅ NEW — penolakan oleh atasan/kepala divisi/admin, juga 2 langkah.
+function RejectModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
+  const [rejectionNote, setRejectionNote] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [error, setError] = useState("");
+  const [confirmStep, setConfirmStep] = useState(false);
+
+  const goToConfirm = () => {
+    if (!rejectionNote.trim()) { setError("Alasan penolakan wajib diisi"); return; }
+    setError("");
+    setConfirmStep(true);
+  };
+
+  const reject = async () => {
+    setRejecting(true); setError("");
+    try {
+      const res = await fetch("/api/attendance/overtime", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: o.id, action: "REJECT", rejection_note: rejectionNote.trim() }),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.success) { setError(d.message || `Error ${res.status}`); setConfirmStep(false); return; }
+      onSaved(); onClose();
+    } catch (err: any) { setError(err.message || "Gagal"); setConfirmStep(false); } finally { setRejecting(false); }
+  };
+
+  if (confirmStep) {
+    return (
+      <ModalWrapper onClose={onClose} preventClose={rejecting}>
+        <ModalHead icon="" title="Konfirmasi Penolakan" sub={o.users?.name} onClose={onClose} noClose={rejecting} />
+        <div className="px-5 py-4 space-y-3.5">
+          {error && <ErrorBanner msg={error} />}
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3.5">
+            <p className="text-xs font-semibold text-red-800 mb-1"> Yakin tolak lemburan ini?</p>
+            <p className="text-[11px] text-red-700">Karyawan akan melihat alasannya, dan pengajuan ini tidak dihitung lembur.</p>
+          </div>
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5">
+            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Alasan Penolakan</p>
+            <p className="text-xs text-gray-800">{rejectionNote}</p>
+          </div>
+        </div>
+        <ModalFoot>
+          <button onClick={() => setConfirmStep(false)} disabled={rejecting} className={secondaryBtn}>← Kembali</button>
+          <button onClick={reject} disabled={rejecting} className="flex-1 h-10 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-40 shadow-sm">
+            {rejecting ? <Spinner /> : " Ya, Tolak Sekarang"}
+          </button>
+        </ModalFoot>
+      </ModalWrapper>
+    );
+  }
+
+  return (
+    <ModalWrapper onClose={onClose}>
+      <ModalHead icon="" title="Tolak Lemburan" sub={o.users?.name} onClose={onClose} />
+      <div className="px-5 py-4 space-y-3.5">
+        {error && <ErrorBanner msg={error} />}
+        <div>
+          <label className={lbl}>Alasan Penolakan *</label>
+          <textarea
+            value={rejectionNote}
+            onChange={e => setRejectionNote(e.target.value)}
+            rows={3}
+            placeholder="Jelaskan kenapa pengajuan ini ditolak..."
+            className="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 transition-all resize-none placeholder:text-gray-300"
+          />
+        </div>
+      </div>
+      <ModalFoot>
+        <button onClick={onClose} className={secondaryBtn}>Batal</button>
+        <button onClick={goToConfirm} className="flex-1 h-10 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-40 shadow-sm">
+          Lanjut ke Konfirmasi
+        </button>
       </ModalFoot>
     </ModalWrapper>
   );
@@ -1553,6 +1660,7 @@ export default function OvertimePage() {
   const [setPayData, setSetPayData] = useState<OvertimeRequest | null>(null);
   const [completeData, setCompleteData] = useState<OvertimeRequest | null>(null);
   const [approveData, setApproveData] = useState<OvertimeRequest | null>(null);
+  const [rejectData, setRejectData] = useState<OvertimeRequest | null>(null);
   const [proofPhotoData, setProofPhotoData] = useState<OvertimeRequest | null>(null);
   const [editData, setEditData] = useState<OvertimeRequest | null>(null);
   const [deleteData, setDeleteData] = useState<OvertimeRequest | null>(null);
@@ -1567,9 +1675,6 @@ export default function OvertimePage() {
 
   useEffect(() => { getCurrentUserClient().then(u => setCurrentUser(u)); }, []);
 
-  // FIX: setiap kali selectedUserId balik jadi null (user pencet back dari
-  // EmployeeDetailView), scroll window dikembalikan ke posisi sebelum dia
-  // buka detail — bukan direset ke atas
   useEffect(() => {
     if (selectedUserId) return; // lagi buka detail, jangan diapa-apain
     const raf = requestAnimationFrame(() => {
@@ -1704,7 +1809,7 @@ export default function OvertimePage() {
   const tableRows: OvertimeTableRow[] = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return filtered
-      .filter((o) => o.users && !isPklRoleShared(o.users.role))
+      .filter((o) => o.users)
       .filter((o) => !q || o.users!.name.toLowerCase().includes(q))
       .sort((a, b) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime()) as unknown as OvertimeTableRow[];
   }, [filtered, searchQuery]);
@@ -1750,6 +1855,12 @@ export default function OvertimePage() {
   ];
 
   const userCanViewPay = canViewPay(currentUser?.roles ?? currentUser?.role);
+
+  const notifyRoles = useMemo<string[]>(
+    () => Array.isArray(currentUser?.roles) && currentUser.roles.length > 0 ? currentUser.roles : currentUser?.role ? [currentUser.role] : [],
+    [currentUser]
+  );
+  const { pending: pendingAccOvertimes } = useOvertimeNotify(notifyRoles, currentUser?.id);
 
   return (
     <DashboardLayout>
@@ -1965,6 +2076,7 @@ export default function OvertimePage() {
       {showRequestModal && <RequestOvertimeModal onClose={() => setShowRequestModal(false)} onSaved={() => { refetch(); setShowRequestModal(false); }} currentUser={currentUser} />}
       {showManualModal && <ManualOvertimeModal onClose={() => setShowManualModal(false)} onSaved={() => { refetch(); setShowManualModal(false); }} allUsers={allUsers} currentUser={currentUser} />}
       {approveData && <ApproveModal overtime={approveData} onClose={() => setApproveData(null)} onSaved={() => { refetch(); setApproveData(null); }} />}
+      {rejectData && <RejectModal overtime={rejectData} onClose={() => setRejectData(null)} onSaved={() => { refetch(); setRejectData(null); }} />}
       {setPayData && <SetPayModal overtime={setPayData} onClose={() => setSetPayData(null)} onSaved={() => { refetch(); setSetPayData(null); }} />}
       {completeData && <CompleteModal overtime={completeData} onClose={() => setCompleteData(null)} onSaved={() => { refetch(); setCompleteData(null); }} isAutoCompleted={completeData.auto_completed} />}
       {proofPhotoData && <ProofPhotoModal overtime={proofPhotoData} onClose={() => setProofPhotoData(null)} canViewPay={userCanViewPay} />}
@@ -1988,12 +2100,14 @@ export default function OvertimePage() {
         detailData && (
           <OvertimeDetailModal
             overtime={detailData} onClose={() => setDetailData(null)} userCanViewPay={userCanViewPay} currentUser={currentUser}
-            onApprove={() => setApproveData(detailData)} onComplete={() => setCompleteData(detailData)}
+            onApprove={() => setApproveData(detailData)} onReject={() => setRejectData(detailData)} onComplete={() => setCompleteData(detailData)}
             onSetPay={() => setSetPayData(detailData)} onProofPhoto={() => setProofPhotoData(detailData)}
             onEdit={() => setEditData(detailData)} onDelete={() => setDeleteData(detailData)}
           />
         )
       }
+
+      <OvertimePendingPopup pending={pendingAccOvertimes} />
 
       <style jsx global>{`
           @keyframes modalUp {

@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
 import { toast } from "sonner";
+import { getAuthUser } from "@/hooks/useAuthUser";
 import {
   Hand,
   Archive,
@@ -1685,15 +1686,14 @@ export default function ManagementSellerPage() {
 
   // ── Auth ──
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
+    getAuthUser().then(u => ({ success: true, user: u }))
       .then((r) => {
         if (!r.user) return;
         const roles: UserRole[] =
           Array.isArray(r.user.roles) && r.user.roles.length > 0 ? r.user.roles : [r.user.role];
         setAuthUser({
           id: r.user.id,
-          name: r.user.name ?? r.user.username ?? "",
+          name: r.user.name ?? "",
           role: r.user.role,
           roles,
         });

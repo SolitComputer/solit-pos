@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Sparkles, X, Minus, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle, Bell } from "lucide-react";
 import DraggableFab from "@/components/ui/DraggableFab";
 import { useAuthUser } from "@/hooks/useAuthUser";
@@ -49,12 +49,21 @@ export default function PatchNoteFab() {
     return false;
   }, [getDismissStorageKey]);
 
+  const lastFetchRef = useRef(0);
+  const FETCH_COOLDOWN_MS = 5 * 60 * 1000; // 5 menit — patch notes jarang berubah
+
   const fetchUnread = useCallback(async () => {
     if (!user) return;
     if (checkIsDismissed()) {
       setIsDismissedForDay(true);
       return;
     }
+
+    // Cooldown: skip jika belum cukup jeda sejak fetch terakhir
+    const now = Date.now();
+    if (now - lastFetchRef.current < FETCH_COOLDOWN_MS) return;
+    lastFetchRef.current = now;
+
     setIsDismissedForDay(false);
 
     try {
@@ -79,13 +88,12 @@ export default function PatchNoteFab() {
   }, [fetchUnread]);
 
   useEffect(() => {
+    // Hanya listen visibilitychange (bukan focus) — dengan cooldown 5 menit
     const onVisible = () => {
       if (document.visibilityState === "visible") void fetchUnread();
     };
-    window.addEventListener("focus", fetchUnread);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      window.removeEventListener("focus", fetchUnread);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [fetchUnread]);

@@ -4,7 +4,7 @@
 // samping/DB call) supaya aman dipakai di server maupun di komponen client.
 // ─────────────────────────────────────────────────────────────────────────
 
-export type OvertimeDirection = "BEFORE_IN" | "AFTER_OUT" | "HOLIDAY" | "MANUAL";
+export type OvertimeDirection = "BEFORE_IN" | "AFTER_OUT" | "BOTH" | "HOLIDAY" | "MANUAL";
 export type OvertimeCategory = "ATASAN" | "PENGAJUAN_ACC" | "MENDESAK";
 export type OvertimeColor = "BLUE" | "AMBER" | "GREEN";
 
@@ -17,8 +17,9 @@ export const OVERTIME_CATEGORY_LABELS: Record<OvertimeCategory, string> = {
 export const OVERTIME_CATEGORIES: OvertimeCategory[] = ["ATASAN", "PENGAJUAN_ACC", "MENDESAK"];
 
 export const OVERTIME_DIRECTION_LABELS: Record<OvertimeDirection, string> = {
-  BEFORE_IN: "Sebelum Jam Masuk",
-  AFTER_OUT: "Sesudah Jam Pulang",
+  BEFORE_IN: "Lembur Awal (Sebelum Jam Masuk)",
+  AFTER_OUT: "Lembur Akhir (Sesudah Jam Pulang)",
+  BOTH: "Lembur Awal & Akhir",
   HOLIDAY: "Hari Libur",
   MANUAL: "Input Manual Admin",
 };
@@ -32,14 +33,19 @@ function toWIBMinutesOfDay(iso: string): number {
   return wib.getUTCHours() * 60 + wib.getUTCMinutes();
 }
 
-/** Menit lembur karena absen MASUK lebih awal dari jadwal. 0 kalau tidak lebih awal. */
+/**
+ * Menit lembur karena absen MASUK lebih awal dari jadwal.
+ * ⚠️ Patokannya JAM TERLAMBAT (lateFrom), BUKAN jam buka (start) — jam buka
+ * cuma menandai kapan absen boleh mulai dilakukan, bukan jam mulai kerja
+ * resminya. Divalidasi ke contoh: in 06:17, lateFrom 08:00 → 1j43m.
+ */
 export function computeBeforeInOvertimeMinutes(
   checkInISO: string,
-  schedule: { start: { h: number; m: number } }
+  schedule: { lateFrom: { h: number; m: number } }
 ): number {
   const actual = toWIBMinutesOfDay(checkInISO);
-  const scheduledStart = schedule.start.h * 60 + schedule.start.m;
-  const delta = scheduledStart - actual;
+  const scheduledLate = schedule.lateFrom.h * 60 + schedule.lateFrom.m;
+  const delta = scheduledLate - actual;
   return delta > 0 ? delta : 0;
 }
 
@@ -54,10 +60,13 @@ export function computeAfterOutOvertimeMinutes(
   return delta > 0 ? delta : 0;
 }
 
-/** Hari libur: seluruh durasi IN→OUT dianggap lembur. */
 export function computeHolidayOvertimeMinutes(checkInISO: string, checkOutISO: string): number {
   const diffMs = new Date(checkOutISO).getTime() - new Date(checkInISO).getTime();
   return diffMs > 0 ? Math.round(diffMs / 60000) : 0;
+}
+
+export function computeCombinedOvertimeMinutes(beforeInMinutes: number, afterOutMinutes: number): number {
+  return Math.max(0, beforeInMinutes) + Math.max(0, afterOutMinutes);
 }
 
 export interface OvertimeNominalInput {

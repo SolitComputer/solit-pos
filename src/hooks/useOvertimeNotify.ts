@@ -13,9 +13,7 @@ export interface PendingOvertimeItem {
   category: string;
 }
 
-const POLL_MS = 15000;
-// ⚠️ Sesuaikan path ini dengan file suara yang kamu punya, atau taruh file
-// mp3 baru di /public/sounds/overtime-alert.mp3
+const POLL_MS = 60_000; 
 const SOUND_URL = "/sounds/overtime-alert.mp3";
 
 export function useOvertimeNotify(userRoles: string[], userId?: string) {
@@ -25,6 +23,8 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
 
   const fetchPending = useCallback(async () => {
     if (!userId || userRoles.length === 0) return;
+    // Skip fetch saat tab hidden — hemat request
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
     try {
       const res = await fetch("/api/attendance/overtime/pending-acc");
       const d = await res.json();
@@ -37,7 +37,17 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
   useEffect(() => {
     fetchPending();
     const id = setInterval(fetchPending, POLL_MS);
-    return () => clearInterval(id);
+
+    // Saat tab kembali visible, langsung fetch (bukan nunggu interval berikutnya)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchPending();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [fetchPending]);
 
  useEffect(() => {

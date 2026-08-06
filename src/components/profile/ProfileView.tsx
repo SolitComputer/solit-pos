@@ -6,6 +6,8 @@ import { humanizeRoleKey } from "@/lib/permissions";
 import ImageCropModal from "./ImageCropModal";
 import { useSongPicker, SavedSong } from "@/components/social/song/useSongPicker";
 import SongPickerPanel from "@/components/social/song/SongPickerPanel";
+import { getAuthUser } from "@/hooks/useAuthUser";
+import { ContractBadge } from "@/components/contracts/ContractBadge";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
     Loader2, Pencil, Check, X, Music, Play, Pause,
@@ -116,10 +118,13 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [showSongPicker, setShowSongPicker] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
 
+    const [contractInfo, setContractInfo] = useState<{ status: string; valid_until: string | null } | null>(null);
+
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
     const callerRoles = currentUser?.roles?.length ? currentUser.roles : [currentUser?.role].filter(Boolean) as string[];
     const isAdmin = callerRoles.some((r) => ADMIN_ROLES.includes(r));
+    const canViewOthersContract = callerRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
 
     const songPicker = useSongPicker(
         (song: SavedSong) => {
@@ -143,7 +148,7 @@ export default function ProfileView({ userId }: { userId: string }) {
         setLoading(true);
         try {
             const [meRes, profileRes, achRes] = await Promise.all([
-                fetch("/api/auth/me"),
+                getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
                 fetch(`/api/profile?userId=${userId}`),
                 fetch(`/api/achievements?userId=${userId}`),
             ]);
@@ -161,6 +166,30 @@ export default function ProfileView({ userId }: { userId: string }) {
     }, [userId]);
 
     useEffect(() => { load(); }, [load]);
+
+    useEffect(() => {
+        if (!currentUser) return;
+        if (isSelf) {
+            fetch("/api/contracts/me")
+                .then((r) => r.json())
+                .then((d) => {
+                    if (d.success && d.gate_enabled !== false) {
+                        setContractInfo({ status: d.contract_status ?? "NONE", valid_until: d.valid_until ?? null });
+                    }
+                })
+                .catch(() => { });
+        } else if (canViewOthersContract) {
+            fetch(`/api/contracts?user_id=${userId}`)
+                .then((r) => r.json())
+                .then((d) => {
+                    if (d.success) {
+                        const latest = (d.data || [])[0];
+                        setContractInfo({ status: latest?.status ?? "NONE", valid_until: latest?.valid_until ?? null });
+                    }
+                })
+                .catch(() => { });
+        }
+    }, [currentUser, isSelf, canViewOthersContract, userId]);
 
     useEffect(() => {
         if (!isSelf || !profile?.status_note) { setViewers([]); return; }
@@ -848,6 +877,27 @@ export default function ProfileView({ userId }: { userId: string }) {
                             </div>
                         )}
                     </div>
+
+                    {contractInfo && (isSelf ? contractInfo.status !== "NONE" : true) && (
+                        <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between gap-3 flex-wrap">
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                                    {isSelf ? "Status Kontrak Kerja" : "Masa Aktif Kontrak"}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <ContractBadge status={contractInfo.status} validUntil={contractInfo.valid_until} />
+                                    {contractInfo.status === "APPROVED" && contractInfo.valid_until && (
+                                        <span className="text-xs text-slate-400">s/d {contractInfo.valid_until}</span>
+                                    )}
+                                </div>
+                            </div>
+                            {isSelf && (
+                                <a href="/contract" className="text-xs font-semibold text-violet-500 hover:text-violet-600">
+                                    Lihat Detail
+                                </a>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 

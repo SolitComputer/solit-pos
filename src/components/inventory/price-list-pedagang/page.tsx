@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { UserRole, hasAnyRole } from "@/lib/permissions";
 import { Tags, Package, Wallet, Download, RefreshCw } from "lucide-react";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 // Disamakan dengan PRICELIST_MODAL_VIEW_ROLES di pricelistPedagang.ts —
 // di-inline di sini supaya tidak import module yang transitif ke server code.
@@ -180,8 +181,7 @@ function PriceListPedagangContent() {
   const canSeeModal = hasAnyRole(userRoles, MODAL_VIEW_ROLES);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
+    getAuthUser().then(u => ({ success: true, user: u }))
       .then((r) => {
         const roles: string[] =
           Array.isArray(r.user?.roles) && r.user.roles.length > 0

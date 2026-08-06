@@ -8,6 +8,7 @@ import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
 import { AlertCircle, Clock, Inbox, Package, Bike, CheckCircle2, Smartphone, Ruler, Target, MapPin, Home, type LucideIcon } from "lucide-react";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface PrepItem { id: string; serial_number: string; laptop_name: string | null; is_checked: boolean }
 interface MyDelivery {
@@ -182,7 +183,7 @@ export default function MyDeliveryPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/me").then((r) => r.json()).then((r) => setUserId(r.user?.id ?? null)).catch(() => setUserId(null));
+    getAuthUser().then(u => ({ success: true, user: u })).then((r) => setUserId(r.user?.id ?? null)).catch(() => setUserId(null));
   }, []);
 
   const fetchDeliveries = useCallback(async () => {

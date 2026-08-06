@@ -34,7 +34,10 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
     .filter((n) => isPatchNoteVisibleToUser(n.target_roles ?? [], roles))
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 
-  return NextResponse.json({ success: true, data: unread, count: unread.length });
+  const res = NextResponse.json({ success: true, data: unread, count: unread.length });
+  // Patch notes jarang berubah — cache 5 menit
+  res.headers.set("Cache-Control", "private, max-age=300");
+  return res;
 }
 
 export const GET = withAuth(getHandler);

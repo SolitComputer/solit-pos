@@ -6,6 +6,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissions";
 import DateRangeCalendarPicker from "@/components/ui/DateRangeCalendarPicker";
 import { createPortal } from "react-dom";
+import { getAuthUser } from "@/hooks/useAuthUser";
 import {
   ImageIcon, Pencil, CheckCircle2, Receipt, Inbox,
   Store, Building2, User, Landmark, Banknote, QrCode, CreditCard,
@@ -1788,7 +1789,7 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/me").then(r => r.json()).then(r => {
+    getAuthUser().then(u => ({ success: true, user: u })).then(r => {
       const role = r.user?.role ?? null;
       const roles: UserRole[] = Array.isArray(r.user?.roles) && r.user.roles.length > 0 ? r.user.roles : role ? [role] : [];
       setUserRole(role); setUserRoles(roles);
