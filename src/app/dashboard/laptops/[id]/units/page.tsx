@@ -275,7 +275,7 @@ export default function UnitsPage() {
     const [toast, setToast] = useState("");
     const [auditingUnitId, setAuditingUnitId] = useState<string | null>(null);
     const [soUnitId, setSoUnitId] = useState<string | null>(null);
-   const [filterAudit, setFilterAudit] = useState<"ALL" | "AUDITED" | "UNAUDITED">("ALL");
+    const [filterAudit, setFilterAudit] = useState<"ALL" | "AUDITED" | "UNAUDITED">("ALL");
     const [filterSO, setFilterSO] = useState<"ALL" | "SO" | "BELUM_SO">("ALL");
     //  Riwayat audit/SO per unit — dibuka lewat tombol jam di kolom Audit/SO
     const [historyTarget, setHistoryTarget] = useState<{ id: string; name: string } | null>(null);
@@ -422,8 +422,10 @@ export default function UnitsPage() {
             case "TOTAL_JUAL_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
             case "MODAL_ASC": list.sort((a, b) => (a.purchase_price || 0) - (b.purchase_price || 0)); break;
             case "MODAL_DESC": list.sort((a, b) => (b.purchase_price || 0) - (a.purchase_price || 0)); break;
-            case "SPAREPART_ASC": list.sort((a, b) => (a.sparepart_cost || 0) - (b.sparepart_cost || 0)); break;
+           case "SPAREPART_ASC": list.sort((a, b) => (a.sparepart_cost || 0) - (b.sparepart_cost || 0)); break;
             case "SPAREPART_DESC": list.sort((a, b) => (b.sparepart_cost || 0) - (a.sparepart_cost || 0)); break;
+            case "TOTAL_MODAL_ASC": list.sort((a, b) => ((a.purchase_price || 0) + (a.sparepart_cost || 0)) - ((b.purchase_price || 0) + (b.sparepart_cost || 0))); break;
+            case "TOTAL_MODAL_DESC": list.sort((a, b) => ((b.purchase_price || 0) + (b.sparepart_cost || 0)) - ((a.purchase_price || 0) + (a.sparepart_cost || 0))); break;
             case "SUMBER_ASC": list.sort((a, b) => (a.source || "").localeCompare(b.source || "", "id")); break;
             case "SUMBER_DESC": list.sort((a, b) => (b.source || "").localeCompare(a.source || "", "id")); break;
             case "TANGGAL_ASC": list.sort((a, b) => (a.created_at || "").localeCompare(b.created_at || "")); break;
@@ -490,8 +492,9 @@ export default function UnitsPage() {
 
     //  Total Keseluruhan untuk bar ringkasan di atas tabel — dihitung dari
     //  filteredUnits (ikut filter aktif), pola sama dgn LaptopsContent.tsx
-    const totalModalLaptop = filteredUnits.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
+   const totalModalLaptop = filteredUnits.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
     const totalModalSparepart = filteredUnits.reduce((s, u) => s + (u.sparepart_cost ?? 0), 0);
+    const totalModal = totalModalLaptop + totalModalSparepart;
     const totalGrossProfit = filteredUnits.reduce((s, u) => s + ((u.selling_price || 0) - (u.sparepart_cost || 0) - (u.purchase_price || 0)), 0);
     const totalHargaJual = filteredUnits.reduce((s, u) => s + (u.selling_price || 0), 0);
     const totalNilaiJual = totalHargaJual; //  qty per unit selalu 1, jadi sama dgn Harga Jual
@@ -506,6 +509,7 @@ export default function UnitsPage() {
         storage: laptop?.storage ?? "",
         harga_modal: u.purchase_price ?? 0,
         sparepart_modal: u.sparepart_cost ?? 0,
+        total_modal: (u.purchase_price ?? 0) + (u.sparepart_cost ?? 0),
         harga_jual: u.selling_price ?? 0,
         official_price: u.official_price ?? 0,
         gross_profit: (u.selling_price ?? 0) - (u.sparepart_cost ?? 0) - (u.purchase_price ?? 0),
@@ -873,8 +877,10 @@ export default function UnitsPage() {
                                 <option value="PRICE_DESC">Harga Jual: Tinggi → Rendah</option>
                                 {canSeePriceInfo && <option value="MODAL_ASC">Harga Modal: Rendah → Tinggi</option>}
                                 {canSeePriceInfo && <option value="MODAL_DESC">Harga Modal: Tinggi → Rendah</option>}
-                                {canSeePriceInfo && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
+                               {canSeePriceInfo && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
                                 {canSeePriceInfo && <option value="SPAREPART_DESC">Modal Sparepart: Tinggi → Rendah</option>}
+                                {canSeePriceInfo && <option value="TOTAL_MODAL_ASC">Total Modal: Rendah → Tinggi</option>}
+                                {canSeePriceInfo && <option value="TOTAL_MODAL_DESC">Total Modal: Tinggi → Rendah</option>}
                                 {canSeePriceInfo && <option value="SUMBER_ASC">Sumber: A → Z</option>}
                                 {canSeePriceInfo && <option value="SUMBER_DESC">Sumber: Z → A</option>}
                                 {canSeePriceInfo && <option value="TANGGAL_ASC">Tanggal Masuk: Lama → Baru</option>}
@@ -978,6 +984,7 @@ export default function UnitsPage() {
                                         <>
                                             <TotalPill label="Modal Laptop" value={fmt(totalModalLaptop)} color="text-gray-800" />
                                             <TotalPill label="Modal Sparepart" value={fmt(totalModalSparepart)} color="text-gray-800" />
+                                            <TotalPill label="Total Modal" value={fmt(totalModal)} color="text-gray-800" />
                                             <TotalPill label="Gross Profit" value={fmt(totalGrossProfit)} color={totalGrossProfit >= 0 ? "text-emerald-700" : "text-red-600"} />
                                         </>
                                     )}
@@ -997,7 +1004,7 @@ export default function UnitsPage() {
                                     const u = filteredUnits.find(x => x.id === row.id);
                                     if (u) setDetailUnit(u);
                                 }}
-                               renderAudit={canAuditUnits ? (row) => {
+                                renderAudit={canAuditUnits ? (row) => {
                                     const u = filteredUnits.find(x => x.id === row.id);
                                     if (!u) return null;
                                     return (
@@ -1107,7 +1114,7 @@ export default function UnitsPage() {
                 />
             )}
 
-           {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
+            {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
             {confirmModal && (
                 <ConfirmModal message={confirmModal.message} onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(null)} />
             )}

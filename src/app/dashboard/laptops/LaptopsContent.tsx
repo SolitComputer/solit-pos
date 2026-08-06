@@ -119,6 +119,8 @@ const SORT_LABELS: Record<string, string> = {
     MODAL_DESC: "Modal Laptop: Tinggi → Rendah",
     SPAREPART_ASC: "Modal Sparepart: Rendah → Tinggi",
     SPAREPART_DESC: "Modal Sparepart: Tinggi → Rendah",
+    TOTAL_MODAL_ASC: "Total Modal: Rendah → Tinggi",
+    TOTAL_MODAL_DESC: "Total Modal: Tinggi → Rendah",
     TOTAL_JUAL_ASC: "Total Jual: Rendah → Tinggi",
     TOTAL_JUAL_DESC: "Total Jual: Tinggi → Rendah",
     SUMBER_ASC: "Sumber: A → Z",
@@ -613,8 +615,16 @@ export function LaptopsContent() {
             case "PRICE_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
             case "MODAL_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0) - (b.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0)); break;
             case "MODAL_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0) - (a.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0)); break;
-            case "SPAREPART_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0) - (b.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0)); break;
+           case "SPAREPART_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0) - (b.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0)); break;
             case "SPAREPART_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0) - (a.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0)); break;
+            case "TOTAL_MODAL_ASC": list.sort((a, b) => {
+                const ua = a.laptop_units?.find(u => u.status !== "SOLD"); const ub = b.laptop_units?.find(u => u.status !== "SOLD");
+                return ((ua?.purchase_price ?? 0) + (ua?.sparepart_cost ?? 0)) - ((ub?.purchase_price ?? 0) + (ub?.sparepart_cost ?? 0));
+            }); break;
+            case "TOTAL_MODAL_DESC": list.sort((a, b) => {
+                const ua = a.laptop_units?.find(u => u.status !== "SOLD"); const ub = b.laptop_units?.find(u => u.status !== "SOLD");
+                return ((ub?.purchase_price ?? 0) + (ub?.sparepart_cost ?? 0)) - ((ua?.purchase_price ?? 0) + (ua?.sparepart_cost ?? 0));
+            }); break;
             case "TOTAL_JUAL_ASC": list.sort((a, b) => ((a.selling_price || 0) * (a.stok_tersedia || 0)) - ((b.selling_price || 0) * (b.stok_tersedia || 0))); break;
             case "TOTAL_JUAL_DESC": list.sort((a, b) => ((b.selling_price || 0) * (b.stok_tersedia || 0)) - ((a.selling_price || 0) * (a.stok_tersedia || 0))); break;
             case "SUMBER_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.source || "").localeCompare(b.laptop_units?.find(u => u.status !== "SOLD")?.source || "", "id")); break;
@@ -820,9 +830,15 @@ export function LaptopsContent() {
         const max = modals.length ? Math.max(...modals) : 0;
         const jt = (n: number) => (n / 1_000_000).toFixed(1).replace(".", ",");
 
-        const spareparts = aktif.map(u => u.sparepart_cost).filter((n): n is number => n != null && n > 0);
+       const spareparts = aktif.map(u => u.sparepart_cost).filter((n): n is number => n != null && n > 0);
         const spMin = spareparts.length ? Math.min(...spareparts) : 0;
         const spMax = spareparts.length ? Math.max(...spareparts) : 0;
+
+        //  Total Modal = Harga Modal + Modal Sparepart, dihitung PER UNIT dulu
+        //  baru diambil min/max — biar rangenya akurat kalau stok > 1.
+        const totalModals = aktif.map(u => (u.purchase_price ?? 0) + (u.sparepart_cost ?? 0)).filter(n => n > 0);
+        const tmMin = totalModals.length ? Math.min(...totalModals) : 0;
+        const tmMax = totalModals.length ? Math.max(...totalModals) : 0;
 
         const officials = aktif.map(u => u.official_price).filter((n): n is number => n != null && n > 0);
         const ofMin = officials.length ? Math.min(...officials) : 0;
@@ -863,6 +879,7 @@ export function LaptopsContent() {
                 unit_id: u.id,
                 harga_modal: u.purchase_price ?? 0,
                 sparepart_modal: u.sparepart_cost ?? 0,
+                total_modal: (u.purchase_price ?? 0) + (u.sparepart_cost ?? 0),
                 official_price: u.official_price ?? 0,
                 gross_profit: (u.selling_price || 0) - (u.sparepart_cost || 0) - (u.purchase_price || 0),
                 sumber: u.source ?? null,
@@ -890,6 +907,11 @@ export function LaptopsContent() {
             sparepart_note: one ? undefined
                 : spareparts.length === 0 ? undefined
                     : spMin === spMax ? fmt(spMin) : `${fmt(spMin)} – ${fmt(spMax)}`,
+
+            total_modal: one ? (one.purchase_price ?? 0) + (one.sparepart_cost ?? 0) : null,
+            total_modal_note: one ? undefined
+                : totalModals.length === 0 ? undefined
+                    : tmMin === tmMax ? `Rp ${jt(tmMin)} jt` : `Rp ${jt(tmMin)}–${jt(tmMax)} jt`,
 
             official_price: one ? (one.official_price ?? 0) : null,
             official_price_note: one ? undefined
@@ -1071,8 +1093,10 @@ export function LaptopsContent() {
                                 <option value="PRICE_DESC">Harga Jual: Tinggi → Rendah</option>
                                 {canSeePrivateBarang && <option value="MODAL_ASC">Modal Laptop: Rendah → Tinggi</option>}
                                 {canSeePrivateBarang && <option value="MODAL_DESC">Modal Laptop: Tinggi → Rendah</option>}
-                                {canSeePrivateBarang && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
+                              {canSeePrivateBarang && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
                                 {canSeePrivateBarang && <option value="SPAREPART_DESC">Modal Sparepart: Tinggi → Rendah</option>}
+                                {canSeePrivateBarang && <option value="TOTAL_MODAL_ASC">Total Modal: Rendah → Tinggi</option>}
+                                {canSeePrivateBarang && <option value="TOTAL_MODAL_DESC">Total Modal: Tinggi → Rendah</option>}
                                 <option value="TOTAL_JUAL_ASC">Total Jual: Rendah → Tinggi</option>
                                 <option value="TOTAL_JUAL_DESC">Total Jual: Tinggi → Rendah</option>
                                 {canSeePrivateBarang && <option value="SUMBER_ASC">Sumber: A → Z</option>}
