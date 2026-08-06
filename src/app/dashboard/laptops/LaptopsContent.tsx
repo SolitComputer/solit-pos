@@ -451,11 +451,23 @@ export function LaptopsContent() {
         }
     };
 
+    const [soPromptLaptop, setSoPromptLaptop] = useState<{ id: string; name: string; isActive: boolean } | null>(null);
+
     //  Toggle SO 1 model laptop — server yang menentukan set/clear, sama pola dgn toggleAudit
     const toggleSo = async (id: string) => {
+        const laptop = laptops.find(l => l.id === id);
+        if (!laptop) return;
+        setSoPromptLaptop({ id, name: laptop.laptop_name, isActive: isSoActive(laptop.so_at) });
+    };
+
+    const handleConfirmLaptopSo = async (id: string, note: string) => {
         setSoingId(id);
         try {
-            const res = await fetch(`/api/laptops/${id}/so`, { method: "PATCH" });
+            const res = await fetch(`/api/laptops/${id}/so`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ notes: note }),
+            });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal memperbarui SO");
             setLaptops(prev => prev.map(l =>
@@ -463,6 +475,7 @@ export function LaptopsContent() {
                     ? { ...l, so_at: json.data.so_at, so_by: json.data.so_by }
                     : l
             ));
+            setSoPromptLaptop(null);
         } catch (e) {
             showAlert(e instanceof Error ? e.message : "Gagal memperbarui SO");
         } finally {
@@ -871,10 +884,11 @@ export function LaptopsContent() {
             belum_lunas_label: belumLunasLabel,
         };
 
-        //  ── Mode EXPLODE: Cari SN cocok >1 unit di model ini ──
-        //  1 baris per unit hasil pencarian, bukan 1 baris agregat.
-        if (matchedUnits && matchedUnits.length > 1) {
-            return matchedUnits.map(u => ({
+        //  ── Mode EXPLODE: Cari SN cocok di kelompok ini ──
+        //  Jika pencarian SN cocok ke salah satu unit dalam kelompok ini,
+        //  tampilkan SELURUH unit dalam kelompok ini secara utuh (bukan cuma unit yang dicari doang).
+        if (matchedUnits && matchedUnits.length > 0) {
+            return aktif.map(u => ({
                 ...base,
                 unit_id: u.id,
                 harga_modal: u.purchase_price ?? 0,
@@ -1559,6 +1573,15 @@ export function LaptopsContent() {
                     onClose={() => setSoHistoryTarget(null)}
                 />
             )}
+            {soPromptLaptop && (
+                <SoNotePromptModal
+                    title={soPromptLaptop.isActive ? "Batalkan Stok Opname (SO)" : "Proses Stok Opname (SO)"}
+                    label={soPromptLaptop.name}
+                    onConfirm={(note) => handleConfirmLaptopSo(soPromptLaptop.id, note)}
+                    onClose={() => setSoPromptLaptop(null)}
+                    loading={soingId === soPromptLaptop.id}
+                />
+            )}
             {deleteConfirmModal && (
                 <DeleteConfirmModal
                     laptop={deleteConfirmModal.laptop}
@@ -1871,6 +1894,54 @@ interface SoHistoryEntry {
     action: "SO" | "UNSO";
     so_by: string;
     so_at: string;
+    notes?: string | null;
+}
+
+function SoNotePromptModal({ title, label, initialNote = "", onConfirm, onClose, loading }: {
+    title: string;
+    label: string;
+    initialNote?: string;
+    onConfirm: (note: string) => void;
+    onClose: () => void;
+    loading: boolean;
+}) {
+    const [note, setNote] = useState(initialNote);
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-5 animate-popIn">
+                <h3 className="text-sm font-bold text-gray-900 mb-1">{title}</h3>
+                <p className="text-xs text-gray-500 mb-3 truncate">{label}</p>
+                <div className="mb-4">
+                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">Catatan SO (Opsional)</label>
+                    <textarea
+                        value={note}
+                        onChange={e => setNote(e.target.value)}
+                        placeholder="Masukkan catatan stok opname (misal: kondisi fisik, kelengkapan, lokasi rak...)"
+                        className="w-full text-xs p-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[70px]"
+                        rows={3}
+                        autoFocus
+                    />
+                </div>
+                <div className="flex gap-2 justify-end">
+                    <button
+                        onClick={onClose}
+                        disabled={loading}
+                        className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={() => onConfirm(note)}
+                        disabled={loading}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                    >
+                        {loading ? "Menyimpan..." : "Proses SO"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 //  Riwayat SO — dibaca dari tabel laptop_so_logs lewat GET /api/laptops/[id]/so
@@ -1930,10 +2001,15 @@ function SoHistoryModal({ laptopId, laptopName, onClose }: {
                             {history.map(h => (
                                 <li key={h.id} className="flex items-start gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
                                     <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${h.action === "SO" ? "bg-blue-500" : "bg-gray-300"}`} />
-                                    <div className="min-w-0">
+                                    <div className="min-w-0 flex-1">
                                         <p className="text-xs font-semibold text-gray-700">
                                             {h.action === "SO" ? "Ditandai sudah SO" : "SO dibatalkan"}
                                         </p>
+                                        {h.notes && (
+                                            <p className="text-[11px] text-gray-600 bg-white border border-gray-200 rounded-lg px-2 py-1 my-1 italic">
+                                                "{h.notes}"
+                                            </p>
+                                        )}
                                         <p className="text-[11px] text-gray-400 mt-0.5">
                                             {h.so_by} · {fmtWhen(h.so_at)}
                                         </p>

@@ -16,6 +16,13 @@ const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOStr
 async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
     const { id } = await props.params;
+    let notes: string | undefined = undefined;
+    try {
+      const body = await req.json();
+      notes = typeof body?.notes === "string" ? body.notes.trim() : undefined;
+    } catch {
+      // Body opsional (misal request tanpa JSON body)
+    }
 
     // Cek status SO sekarang untuk memutuskan set atau clear
     const { data: current, error: readErr } = await supabase
@@ -31,7 +38,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-   // SO dianggap aktif hanya jika masih di tanggal WIB yang sama dengan hari
+    // SO dianggap aktif hanya jika masih di tanggal WIB yang sama dengan hari
     // ini — begitu lewat jam 00:00 WIB, otomatis dianggap tidak aktif walau
     // belum genap 24 jam sejak ditandai.
     const isActive =
@@ -63,6 +70,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       entity: "laptop",
       entityId: id,
       entityLabel: current.laptop_name,
+      reason: notes || null,
     });
 
     // Catat juga ke laptop_so_logs — riwayat ini TIDAK ikut ter-reset
@@ -72,6 +80,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       action: isActive ? "UNSO" : "SO",
       so_by: user.name,
       so_at: new Date().toISOString(),
+      notes: notes || null,
     });
 
     return NextResponse.json({ success: true, data });
@@ -100,7 +109,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
     // Riwayat lengkap (SO & UNSO), terbaru dulu — tidak terpengaruh TTL.
     const { data: history, error: historyErr } = await supabase
       .from("laptop_so_logs")
-      .select("id, action, so_by, so_at")
+      .select("id, action, so_by, so_at, notes")
       .eq("laptop_id", id)
       .order("so_at", { ascending: false })
       .limit(20);
