@@ -40,8 +40,9 @@ export default function BottomNavBar() {
     <nav
       className="
         md:hidden
-      fixed bottom-0 left-0 right-0 z-30
-        w-full bg-white border-t border-gray-200
+        fixed bottom-0 left-0 right-0 z-30
+        w-full bg-white
+        rounded-t-2xl shadow-[0_-6px_20px_rgba(0,0,0,0.08)]
         pb-[env(safe-area-inset-bottom)]
       "
     >
