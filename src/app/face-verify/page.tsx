@@ -8,6 +8,7 @@ type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
   | "enrolling" | "verifying" | "success" | "error"
   | "out-of-range" | "out-of-time" | "no-camera" | "day-off" | "gps-denied"
+  | "gps-weak"
   | "early-checkout-request";
 
 const MAX_ATTEMPTS = 5;
@@ -21,6 +22,8 @@ const MAX_DISTANCE_METERS = 80;
 const GPS_ACCEPT_ACCURACY_METERS = 100;
 const GPS_ACCURACY_FALLBACK_METERS = 200;
 const GPS_MAX_WAIT_MS = 12000;
+const GPS_NETWORK_ONLY_THRESHOLD_METERS = 800;
+const GPS_EARLY_BAIL_SAMPLES = 3;
 const SHIFT_CONFIG_CLIENT = {
   PAGI: { startH: 7, startM: 30, endH: 12, endM: 0 },
   SORE: { startH: 14, startM: 0, endH: 18, endM: 0 },
@@ -30,6 +33,14 @@ type ShiftType = keyof typeof SHIFT_CONFIG_CLIENT;
 
 function ts() {
   return new Date().toLocaleTimeString("id-ID", { hour12: false });
+}
+
+function detectOS(): "android" | "ios" | "other" {
+  if (typeof navigator === "undefined") return "other";
+  const ua = navigator.userAgent || "";
+  if (/android/i.test(ua)) return "android";
+  if (/iphone|ipad|ipod/i.test(ua)) return "ios";
+  return "other";
 }
 
 type AttendanceTimeResult =
@@ -87,6 +98,7 @@ export default function FaceVerifyPage() {
   const [currentDistance, setCurrentDistance] = useState<number | null>(null);
   const [gpsCoords, setGpsCoords] = useState<GpsCoords | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [weakGpsAccuracy, setWeakGpsAccuracy] = useState<number | null>(null);
   const [skipping, setSkipping] = useState(false);
   const [timeInfo, setTimeInfo] = useState<{
     reason: "TOO_EARLY" | "TOO_LATE"; openAt: string; closeAt: string;
@@ -180,7 +192,8 @@ export default function FaceVerifyPage() {
     let watchId: number;
     let timeoutId: NodeJS.Timeout;
     let bestAccuracy = Infinity;
-    let bestPosition: GeolocationPosition | null = null; // ✅ NEW — simpan posisi terbaik, bukan cuma angka akurasinya
+    let bestPosition: GeolocationPosition | null = null;
+    let poorSampleCount = 0; // ✅ NEW — hitung bacaan berturut-turut yang masih buruk & gak membaik
 
     const clearGPS = () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
@@ -194,8 +207,11 @@ export default function FaceVerifyPage() {
         addLog(`Timeout — pakai akurasi terbaik: ±${Math.round(bestAccuracy)}m`, "warn");
         handleGpsSuccess(bestPosition);
       } else if (bestPosition) {
-        setStage("error");
-        setMessage(`Akurasi GPS terlalu buruk (±${Math.round(bestAccuracy)}m). Aktifkan mode lokasi "Akurasi Tinggi / Precise Location" di Setelan HP → Lokasi, lalu coba lagi.`);
+        // ✅ FIX: dulu "error" (cuma teks + tombol reload halaman penuh).
+        // Sekarang "gps-weak" — layar instruksi khusus + tombol coba lagi
+        // cepat (tanpa reload) + fallback sidik jari.
+        setWeakGpsAccuracy(Math.round(bestAccuracy));
+        setStage("gps-weak");
       } else {
         setStage("error");
         setMessage("Gagal mendapatkan sinyal GPS (Timeout). Pastikan GPS aktif dan Anda berada di area terbuka.");
@@ -205,7 +221,8 @@ export default function FaceVerifyPage() {
     watchId = navigator.geolocation.watchPosition(
       (position) => {
         const accuracy = position.coords.accuracy;
-        if (accuracy < bestAccuracy) {
+        const improved = accuracy < bestAccuracy;
+        if (improved) {
           bestAccuracy = accuracy;
           bestPosition = position;
         }
@@ -213,8 +230,21 @@ export default function FaceVerifyPage() {
         if (accuracy <= GPS_ACCEPT_ACCURACY_METERS) {
           clearGPS();
           handleGpsSuccess(position);
+          return;
+        }
+
+        addLog(`Akurasi masih lemah: ±${Math.round(accuracy)}m (butuh <= ${GPS_ACCEPT_ACCURACY_METERS}m)...`, "warn");
+
+        if (accuracy > GPS_NETWORK_ONLY_THRESHOLD_METERS && !improved) {
+          poorSampleCount += 1;
+          if (poorSampleCount >= GPS_EARLY_BAIL_SAMPLES) {
+            clearGPS();
+            setGpsLoading(false);
+            setWeakGpsAccuracy(Math.round(bestAccuracy));
+            setStage("gps-weak");
+          }
         } else {
-          addLog(`Akurasi masih lemah: ±${Math.round(accuracy)}m (butuh <= ${GPS_ACCEPT_ACCURACY_METERS}m)...`, "warn");
+          poorSampleCount = 0;
         }
       },
       (err) => {
@@ -584,7 +614,7 @@ export default function FaceVerifyPage() {
         }
       });
     }
-    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera", "day-off", "gps-denied"].includes(stage)) {
+    if (["loading", "checking", "success", "error", "location", "out-of-range", "out-of-time", "no-camera", "day-off", "gps-denied", "gps-weak"].includes(stage)) {
       stopCamera();
     }
   }, [stage]);
@@ -1198,6 +1228,69 @@ export default function FaceVerifyPage() {
                 </span>
               ) : "Sudah Diaktifkan — Coba Lagi"}
             </button>
+            <button className="btn-ghost" style={{ marginTop: 10, color: "rgba(248,113,113,0.55)" }}
+              onClick={handleRejectAttendance} disabled={skipping}>
+              {skipping ? "Mengalihkan..." : "Lewati absen →"}
+            </button>
+          </div>
+        )}
+
+        {/* ✅ NEW — GPS akurasi terlalu buruk (device kemungkinan pakai lokasi jaringan, bukan GPS chip) */}
+        {stage === "gps-weak" && (
+          <div style={{ padding: "8px 0 0" }}>
+            <div className="state-card" style={{ background: "rgba(251,191,36,0.06)", border: "0.5px solid rgba(251,191,36,0.25)" }}>
+              <div className="state-icon" style={{ background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)" }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div className="state-title">Akurasi GPS Terlalu Rendah</div>
+              <div className="state-body" style={{ marginBottom: 16 }}>
+                {weakGpsAccuracy != null && (
+                  <>Akurasi saat ini <span style={{ color: "#fbbf24", fontWeight: 600 }}>±{weakGpsAccuracy}m</span> — jauh di atas batas wajar.<br /></>
+                )}
+                Ini biasanya berarti HP memakai lokasi jaringan (WiFi/seluler), bukan chip GPS asli.
+              </div>
+
+              <div style={{ textAlign: "left", background: "rgba(255,255,255,0.03)", border: "0.5px solid var(--line)", borderRadius: 11, padding: "14px 16px" }}>
+                {detectOS() === "android" ? (
+                  <>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
+                      Android — aktifkan Lokasi Akurat
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.7 }}>
+                      Buka <b>Setelan → Lokasi</b>, pastikan <b>Google Location Accuracy / Lokasi Akurat</b> aktif. Cek juga mode lokasi bukan <b>"Hemat Baterai"</b> — pilih <b>"Akurasi Tinggi"</b>.
+                    </div>
+                  </>
+                ) : detectOS() === "ios" ? (
+                  <>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
+                      iPhone — aktifkan Precise Location
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.7 }}>
+                      Buka <b>Settings → Privacy & Security → Location Services</b> → cari browser yang dipakai (Chrome/Safari) → aktifkan <b>Precise Location</b>.
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.7 }}>
+                    Aktifkan mode lokasi <b>"Akurasi Tinggi / Precise Location"</b> di Setelan HP → Lokasi, lalu coba lagi.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button className="btn-main" onClick={checkLocation} disabled={gpsLoading}>
+              {gpsLoading ? (
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid var(--accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                  Mengecek ulang...
+                </span>
+              ) : "Sudah Diaktifkan — Coba Lagi"}
+            </button>
+
+            {renderBiometricOption()}
+
             <button className="btn-ghost" style={{ marginTop: 10, color: "rgba(248,113,113,0.55)" }}
               onClick={handleRejectAttendance} disabled={skipping}>
               {skipping ? "Mengalihkan..." : "Lewati absen →"}
