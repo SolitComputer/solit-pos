@@ -531,10 +531,9 @@ export default function RoleAccessManager() {
         />
       )}
 
-      <div className="flex gap-5 items-start">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 items-start">
         {/* ── Daftar role (Bawaan + Custom) ── */}
-        <div className="w-72 flex-shrink-0 space-y-3">
-          {/* Role Bawaan (legacy, auto-detect) */}
+       <div className="w-full lg:w-72 flex-shrink-0 space-y-3">          {/* Role Bawaan (legacy, auto-detect) */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             <div className="px-4 py-3.5 border-b border-slate-100">
               <p className="text-[11px] font-bold text-slate-500">Role Bawaan Sistem ({legacyRoles.length})</p>
@@ -639,7 +638,7 @@ export default function RoleAccessManager() {
         </div>
 
         {/* ── Matrix permission ── */}
-        <div className="flex-1 min-w-0 bg-white rounded-2xl border border-slate-100 overflow-hidden">
+        <div className="flex-1 min-w-0 w-full bg-white rounded-2xl border border-slate-100 overflow-hidden">
           {!selectedRole ? (
             <div className="p-10 text-center text-sm text-slate-400">
               Pilih role di sebelah kiri untuk lihat/atur hak akses halaman & aksi.
