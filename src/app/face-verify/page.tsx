@@ -729,11 +729,11 @@ export default function FaceVerifyPage() {
     if (!biometricEligible) return null;
     const supported = biometricDeviceSupported === true;
     return (
-      <div style={{ marginTop: 12, marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
-          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", letterSpacing: 0.5 }}>ATAU</span>
-          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+      <div style={{ marginTop: 14, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
+          <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--text-faint)", letterSpacing: 1 }}>ATAU</span>
+          <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
         </div>
         <button
           className="btn-main"
@@ -743,7 +743,7 @@ export default function FaceVerifyPage() {
         >
           {bioBusy ? (
             <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid rgba(255,255,255,0.7)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+              <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid var(--accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
               Memproses sidik jari...
             </span>
           ) : supported ? (
@@ -752,7 +752,7 @@ export default function FaceVerifyPage() {
             "Sidik Jari (device tidak mendukung)"
           )}
         </button>
-        {bioError && <div style={{ fontSize: 11, color: "#f87171", textAlign: "center", marginTop: 8 }}>{bioError}</div>}
+        {bioError && <div style={{ fontSize: 11, color: "var(--err)", textAlign: "center", marginTop: 8 }}>{bioError}</div>}
       </div>
     );
   };
@@ -766,11 +766,11 @@ export default function FaceVerifyPage() {
   const isProcessing = ["enrolling", "verifying"].includes(stage);
 
   const confColor =
-    confidence > 75 ? "rgba(255,255,255,0.75)"
+    confidence > 75 ? "#2dd4bf"
       : confidence > 50 ? "#f59e0b" : "#f87171";
 
   const logColor: Record<LogType, string> = {
-    info: "rgba(255,255,255,0.3)", ok: "rgba(255,255,255,0.75)", warn: "#f59e0b", err: "#f87171",
+    info: "rgba(255,255,255,0.32)", ok: "#2dd4bf", warn: "#f59e0b", err: "#f87171",
   };
 
   const shiftCfg = SHIFT_CONFIG_CLIENT[userShift];
@@ -782,105 +782,153 @@ export default function FaceVerifyPage() {
   return (
     <main style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", padding: "12px", fontFamily: "'Inter', -apple-system, sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        :root {
+          --ink: #0a0a0f;
+          --panel: #111118;
+          --panel-2: #0d0d14;
+          --line: rgba(255,255,255,0.08);
+          --line-soft: rgba(255,255,255,0.05);
+          --text: rgba(255,255,255,0.88);
+          --text-dim: rgba(255,255,255,0.42);
+          --text-faint: rgba(255,255,255,0.24);
+          --mono: 'JetBrains Mono','SF Mono','Fira Code',monospace;
+          --accent: #2dd4bf;
+          --accent-dim: rgba(45,212,191,0.4);
+          --accent-glow: rgba(45,212,191,0.2);
+          --ok: #4ade80;
+          --warn: #f59e0b;
+          --err: #f87171;
+        }
+
         @keyframes scanY { 0% { top: -1px; } 100% { top: 100%; } }
         @keyframes scanFace { 0%, 100% { top: 8%; } 50% { top: 90%; } }
         @keyframes rot { to { transform: rotate(360deg); } }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
         @keyframes pulse-green { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
         @keyframes pulse-amber { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        @keyframes fadeSlide { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes successRing { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.12); } 50% { box-shadow: 0 0 0 12px rgba(255,255,255,0); } }
+        @keyframes pulse-accent { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes fadeSlide { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes successRing { 0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); } 50% { box-shadow: 0 0 0 14px rgba(45,212,191,0); } }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes gps-ping { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2.5); opacity: 0; } }
         @keyframes clock-tick { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.4; } }
-        .fv-card { width: 100%; max-width: 400px; background: #111118; border: 0.5px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 22px; position: relative; overflow: hidden; }
+
+        .fv-card { width: 100%; max-width: 400px; background: var(--panel); border: 0.5px solid var(--line); border-radius: 18px; padding: 24px; position: relative; overflow: hidden; box-shadow: 0 24px 60px -24px rgba(0,0,0,0.65); }
         .fv-card::after { content: ''; position: absolute; top: -0.5px; left: 15%; right: 15%; height: 0.5px; background: rgba(255,255,255,0.12); }
-        .fv-card::before { content: ''; position: absolute; top: -0.5px; left: 0; right: 0; height: 0.5px; background: rgba(255,255,255,0.04); animation: scanY 4s linear infinite; }
-        .cam-box { position: relative; background: #08080e; border-radius: 10px; border: 0.5px solid rgba(255,255,255,0.06); aspect-ratio: 4/3; overflow: hidden; margin-bottom: 12px; }
+        .fv-card::before { content: ''; position: absolute; top: -0.5px; left: 0; right: 0; height: 0.5px; background: linear-gradient(90deg, transparent, var(--accent-dim), transparent); animation: scanY 4s linear infinite; }
+
+        .cam-box { position: relative; background: #08080e; border-radius: 12px; border: 0.5px solid var(--line-soft); aspect-ratio: 4/3; overflow: hidden; margin-bottom: 12px; }
         .cam-box video, .cam-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
         .cam-grid { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 36px 36px; }
         .cam-scanline { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.06); animation: scanFace 3s ease-in-out infinite; pointer-events: none; }
-        .face-oval { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 110px; height: 136px; pointer-events: none; }
-        @media (max-width: 360px) { .face-oval { width: 82px; height: 102px; } }
-        .face-oval-ring { position: absolute; inset: 0; border-radius: 50%; transition: border-color 0.4s, opacity 0.4s; }
-        .face-oval-ring.on  { border: 1.5px solid rgba(255,255,255,0.7); }
-        .face-oval-ring.off { border: 1px dashed rgba(255,255,255,0.18); }
-        .face-oval-spin1 { position: absolute; inset: -6px; border-radius: 50%; border: 0.5px dashed rgba(255,255,255,0.1); animation: rot 7s linear infinite; }
-        .face-oval-spin2 { position: absolute; inset: -12px; border-radius: 50%; border: 0.5px dashed rgba(255,255,255,0.05); animation: rot 11s linear infinite reverse; }
-        .hud { position: absolute; font-size: 9px; line-height: 1.65; letter-spacing: 0.3px; }
-        .hud-tl { top: 8px; left: 10px; color: rgba(255,255,255,0.25); }
-        .hud-tr { top: 8px; right: 10px; text-align: right; color: rgba(255,255,255,0.25); }
+
+        .face-oval { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 116px; height: 142px; pointer-events: none; }
+        @media (max-width: 360px) { .face-oval { width: 86px; height: 106px; } }
+        .face-target { position: absolute; inset: 0; border-radius: 18px; transition: box-shadow 0.4s ease; }
+        .face-target.off { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14); }
+        .face-target.on { box-shadow: inset 0 0 0 1px var(--accent-dim), 0 0 26px var(--accent-glow); }
+        .fc { position: absolute; width: 20px; height: 20px; border-color: rgba(255,255,255,0.22); transition: border-color 0.4s ease, filter 0.4s ease; }
+        .face-target.on .fc { border-color: var(--accent); filter: drop-shadow(0 0 3px var(--accent-glow)); }
+        .fc-tl { top: -2px; left: -2px; border-top: 1.5px solid; border-left: 1.5px solid; border-radius: 8px 0 0 0; }
+        .fc-tr { top: -2px; right: -2px; border-top: 1.5px solid; border-right: 1.5px solid; border-radius: 0 8px 0 0; }
+        .fc-bl { bottom: -2px; left: -2px; border-bottom: 1.5px solid; border-left: 1.5px solid; border-radius: 0 0 0 8px; }
+        .fc-br { bottom: -2px; right: -2px; border-bottom: 1.5px solid; border-right: 1.5px solid; border-radius: 0 0 8px 0; }
+        .face-oval-spin1 { position: absolute; inset: -8px; border-radius: 22px; border: 0.5px dashed rgba(255,255,255,0.1); animation: rot 8s linear infinite; }
+        .face-oval-spin2 { position: absolute; inset: -16px; border-radius: 28px; border: 0.5px dashed rgba(255,255,255,0.05); animation: rot 12s linear infinite reverse; }
+
+        .hud { position: absolute; font-family: var(--mono); font-size: 9px; line-height: 1.65; letter-spacing: 0.3px; }
+        .hud-tl { top: 8px; left: 10px; color: var(--text-faint); }
+        .hud-tr { top: 8px; right: 10px; text-align: right; color: var(--text-faint); }
         .hud-bl { bottom: 8px; left: 10px; }
-        .hud-br { bottom: 8px; right: 10px; text-align: right; color: rgba(255,255,255,0.2); }
+        .hud-br { bottom: 8px; right: 10px; text-align: right; color: rgba(255,255,255,0.22); }
         .blink { animation: blink 1.2s step-end infinite; }
-        .hold-bar-wrap { position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.04); }
-        .hold-bar-fill { height: 100%; transition: width 0.18s, background 0.3s; }
-        .proc-overlay { position: absolute; inset: 0; background: rgba(8,8,14,0.75); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
-        .spinner { width: 28px; height: 28px; border: 1px solid rgba(255,255,255,0.1); border-top: 1px solid rgba(255,255,255,0.6); border-radius: 50%; animation: spin 0.7s linear infinite; }
-        .status-chip { display: flex; align-items: center; gap: 8px; background: #0d0d14; border: 0.5px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+        .hold-bar-wrap { position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.05); }
+        .hold-bar-fill { height: 100%; transition: width 0.18s ease, background 0.3s ease; }
+        .proc-overlay { position: absolute; inset: 0; background: rgba(8,8,14,0.78); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+        .spinner { width: 28px; height: 28px; border: 1px solid rgba(255,255,255,0.1); border-top: 1px solid var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+        .status-chip { display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 0.5px solid var(--line); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; }
         .s-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-        .s-dot-green { background: #4ade80; animation: pulse-green 1.8s ease infinite; }
-        .s-dot-amber { background: #f59e0b; animation: pulse-amber 0.5s ease infinite; }
+        .s-dot-green { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); animation: pulse-accent 1.8s ease infinite; }
+        .s-dot-amber { background: var(--warn); animation: pulse-amber 0.5s ease infinite; }
         .s-dot-gray  { background: rgba(255,255,255,0.3); }
-        .pbar-wrap { height: 2px; background: rgba(255,255,255,0.05); overflow: hidden; }
-        .pbar-fill { height: 100%; transition: width 0.2s, background 0.3s; }
-        .t-log { background: #0a0a0f; border: 0.5px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px 10px; height: 72px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.08) transparent; }
-        .t-log-entry { display: flex; gap: 8px; font-size: 10px; line-height: 1.75; font-family: 'SF Mono','Fira Code',monospace; animation: fadeSlide 0.15s ease; }
-        .t-time { color: rgba(255,255,255,0.2); flex-shrink: 0; white-space: nowrap; }
-        .btn-main { width: 100%; background: rgba(255,255,255,0.06); border: 0.5px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.85); font-family: 'Inter',sans-serif; font-size: 13px; font-weight: 500; padding: 11px; border-radius: 10px; cursor: pointer; letter-spacing: 0.2px; transition: background 0.15s, border-color 0.15s; }
-        .btn-main:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.25); }
+        .pbar-wrap { height: 2px; background: rgba(255,255,255,0.06); overflow: hidden; border-radius: 2px; }
+        .pbar-fill { height: 100%; transition: width 0.2s ease, background 0.3s ease; border-radius: 2px; }
+        .t-log { background: var(--ink); border: 0.5px solid var(--line-soft); border-radius: 10px; padding: 9px 11px; height: 74px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent; }
+        .t-log-entry { display: flex; gap: 8px; font-size: 10px; line-height: 1.75; font-family: var(--mono); animation: fadeSlide 0.15s ease; }
+        .t-time { color: var(--text-faint); flex-shrink: 0; white-space: nowrap; }
+        .btn-main { width: 100%; background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025)); border: 0.5px solid var(--line); color: var(--text); font-family: 'Inter',sans-serif; font-size: 13px; font-weight: 500; padding: 12px; border-radius: 11px; cursor: pointer; letter-spacing: 0.2px; transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; }
+        .btn-main:hover { background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04)); border-color: rgba(255,255,255,0.24); box-shadow: 0 0 0 1px var(--accent-glow); }
         .btn-main:active { transform: scale(0.98); }
-        .btn-ghost { background: none; border: none; color: rgba(255,255,255,0.25); font-family: inherit; font-size: 11px; cursor: pointer; padding: 5px; transition: color 0.15s; letter-spacing: 0.2px; }
-        .btn-ghost:hover { color: rgba(255,255,255,0.6); }
-        .success-circle { width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.04); border: 0.5px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; animation: successRing 2s ease-in-out infinite; }
-        .fail-badge { display: flex; align-items: center; gap: 8px; background: rgba(248,113,113,0.08); border: 0.5px solid rgba(248,113,113,0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; animation: fadeSlide 0.2s ease; }
-        .fail-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #f87171; flex-shrink: 0; }
-        .fail-badge-text { font-size: 12px; color: #f87171; flex: 1; letter-spacing: 0.2px; }
-        .fail-badge-count { font-size: 11px; color: rgba(248,113,113,0.6); }
-        .gps-info-box { background: rgba(74,222,128,0.06); border: 0.5px solid rgba(74,222,128,0.2); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; animation: fadeSlide 0.2s ease; }
+        .btn-main:disabled { cursor: not-allowed; }
+        .btn-main:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
+        .btn-ghost { background: none; border: none; color: var(--text-faint); font-family: inherit; font-size: 11px; cursor: pointer; padding: 5px; transition: color 0.15s ease; letter-spacing: 0.2px; }
+        .btn-ghost:hover { color: rgba(255,255,255,0.65); }
+        .btn-ghost:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; border-radius: 4px; }
+        .success-circle { width: 58px; height: 58px; border-radius: 50%; background: var(--accent-glow); border: 0.5px solid var(--accent-dim); display: flex; align-items: center; justify-content: center; animation: successRing 2s ease-in-out infinite; }
+        .fail-badge { display: flex; align-items: center; gap: 8px; background: rgba(248,113,113,0.08); border: 0.5px solid rgba(248,113,113,0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; animation: fadeSlide 0.2s ease; }
+        .fail-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--err); flex-shrink: 0; }
+        .fail-badge-text { font-size: 12px; color: var(--err); flex: 1; letter-spacing: 0.2px; }
+        .fail-badge-count { font-size: 11px; color: rgba(248,113,113,0.6); font-family: var(--mono); }
+        .gps-info-box { background: rgba(74,222,128,0.06); border: 0.5px solid rgba(74,222,128,0.2); border-radius: 11px; padding: 10px 14px; margin-bottom: 12px; animation: fadeSlide 0.2s ease; }
         .gps-ping { position: relative; width: 8px; height: 8px; flex-shrink: 0; }
-        .gps-ping-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; position: absolute; }
+        .gps-ping-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); position: absolute; }
         .gps-ping-ring { width: 8px; height: 8px; border-radius: 50%; background: rgba(74,222,128,0.4); position: absolute; animation: gps-ping 1.5s ease-out infinite; }
-        .time-gate-card { width: 100%; background: rgba(251,191,36,0.06); border: 0.5px solid rgba(251,191,36,0.25); border-radius: 14px; padding: 20px; text-align: center; animation: fadeSlide 0.25s ease; }
+        .time-gate-card { width: 100%; background: rgba(251,191,36,0.06); border: 0.5px solid rgba(251,191,36,0.25); border-radius: 16px; padding: 22px 20px; text-align: center; animation: fadeSlide 0.25s ease; }
         .clock-colon { animation: clock-tick 1s step-end infinite; }
-        .tip-box { background: rgba(255,255,255,0.03); border: 0.5px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+        .tip-box { background: rgba(255,255,255,0.03); border: 0.5px solid var(--line); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; }
+        .state-card { width: 100%; border-radius: 16px; padding: 22px 20px; text-align: center; margin-bottom: 16px; animation: fadeSlide 0.25s ease; }
+        .state-icon { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+        .state-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; letter-spacing: 0.1px; }
+        .state-body { font-size: 12px; color: var(--text-dim); line-height: 1.7; }
+        .fv-textarea { width: 100%; background: var(--panel-2); border: 0.5px solid var(--line); border-radius: 11px; padding: 10px 12px; color: rgba(255,255,255,0.85); font-size: 12px; font-family: inherit; resize: none; margin-bottom: 10px; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+        .fv-textarea:focus { outline: none; border-color: var(--accent-dim); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .schedule-pill { background: rgba(255,255,255,0.04); border: 0.5px solid var(--line); border-radius: 10px; padding: 10px 16px; display: inline-flex; align-items: center; gap: 10px; }
+
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
       `}</style>
 
       <div className="fv-card">
 
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 26, height: 26, borderRadius: 6, background: "#1a1a24", border: "0.5px solid rgba(255,255,255,0.1)", overflow: "hidden" }}>
+            <div style={{ width: 27, height: 27, borderRadius: 7, background: "#1a1a24", border: "0.5px solid var(--line)", overflow: "hidden" }}>
               <img src="/assets/solit03.jpeg" alt="Solit" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
-            <span style={{ fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.8)", letterSpacing: 0.2 }}>Solit POS</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", letterSpacing: 0.2 }}>Solit POS</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#4ade80", animation: "pulse-green 2s ease infinite" }} />
-            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: 0.3 }}>sys online</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--accent)", boxShadow: "0 0 6px var(--accent-glow)", animation: "pulse-accent 2s ease infinite" }} />
+            <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--text-faint)", letterSpacing: 0.5 }}>sys online</span>
           </div>
         </div>
 
         {/* Title */}
-        <div style={{ textAlign: "center", marginBottom: 18 }}>
-          <div style={{ fontSize: 16, fontWeight: 500, color: "rgba(255,255,255,0.88)", letterSpacing: 0.2, marginBottom: 3 }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 17, fontWeight: 600, color: "var(--text)", letterSpacing: 0.1, marginBottom: 4 }}>
             {stage === "enroll" || stage === "enrolling"
               ? "Daftarkan Wajah"
               : attendanceDirection === "OUT" ? "Absen Pulang" : "Absen Masuk"}
           </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: 0.3 }}>
-            Solit POS — Absensi Biometrik · Shift {userShift}
-            {isHolidayToday && <span style={{ color: "rgba(251,146,60,0.7)" }}> · Hari Libur (Lembur)</span>}
+          <div style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--text-faint)", letterSpacing: 0.4 }}>
+            Solit POS · Absensi Biometrik · Shift {userShift}
+            {isHolidayToday && <span style={{ color: "rgba(251,146,60,0.75)" }}> · Hari Libur (Lembur)</span>}
           </div>
         </div>
 
         {/* Loading / Checking */}
         {(stage === "loading" || stage === "checking") && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "36px 0" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "38px 0" }}>
             <div className="spinner" />
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", letterSpacing: 0.3 }}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", letterSpacing: 0.3 }}>
               {gpsLoading ? "Mendeteksi lokasi GPS..." : message}
             </div>
           </div>
@@ -888,32 +936,20 @@ export default function FaceVerifyPage() {
 
         {/* Day Off */}
         {stage === "day-off" && (
-          <div style={{ padding: "8px 0 16px" }}>
-            <div style={{
-              width: "100%",
-              background: "rgba(251,146,60,0.06)",
-              border: "0.5px solid rgba(251,146,60,0.25)",
-              borderRadius: 14,
-              padding: "24px 20px",
-              textAlign: "center",
-              marginBottom: 16,
-            }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: "50%",
-                background: "rgba(251,146,60,0.1)",
-                border: "0.5px solid rgba(251,146,60,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                margin: "0 auto 16px", fontSize: 26,
-              }}>
-
+          <div style={{ padding: "8px 0 0" }}>
+            <div className="state-card" style={{ background: "rgba(251,146,60,0.06)", border: "0.5px solid rgba(251,146,60,0.25)" }}>
+              <div className="state-icon" style={{ background: "rgba(251,146,60,0.1)", border: "0.5px solid rgba(251,146,60,0.3)" }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth={1.5}>
+                  <rect x="3" y="5" width="18" height="16" rx="3" strokeLinejoin="round" />
+                  <path strokeLinecap="round" d="M3 10h18M8 3v4M16 3v4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 15.5l2 2 4-4.5" />
+                </svg>
               </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
-                Hari Ini Kamu Libur
-              </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+              <div className="state-title">Hari Ini Kamu Libur</div>
+              <div className="state-body">
                 Absen tidak wajib di hari libur.<br />
                 {/* ✅ FIX (poin 12): kalau tetap absen, sekarang dihitung lembur penuh */}
-                Tapi kalau tetap masuk, jam kerjamu <span style={{ color: "rgba(251,146,60,0.8)", fontWeight: 600 }}>akan dihitung lembur penuh</span>.
+                Tapi kalau tetap masuk, jam kerjamu <span style={{ color: "rgba(251,146,60,0.85)", fontWeight: 600 }}>akan dihitung lembur penuh</span>.
               </div>
             </div>
             <button className="btn-main" onClick={() => { setStage("location"); setMessage("Cek lokasi untuk absen lembur hari libur"); }}>
@@ -927,38 +963,38 @@ export default function FaceVerifyPage() {
 
         {/* Out of time */}
         {stage === "out-of-time" && (
-          <div style={{ padding: "8px 0 16px" }}>
+          <div style={{ padding: "8px 0 0" }}>
             <div className="time-gate-card">
-              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <div className="state-icon" style={{ background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)" }}>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
+              <div className="state-title">
                 {timeInfo?.reason === "TOO_EARLY" ? "Absen Belum Dibuka" : "Waktu Absen Berakhir"}
               </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.6, marginBottom: 16 }}>
+              <div className="state-body" style={{ marginBottom: 16 }}>
                 {timeInfo?.reason === "TOO_EARLY"
                   ? <span>Absen dibuka pukul <span style={{ color: "#fbbf24", fontWeight: 600 }}>{openAtStr} WIB</span></span>
                   : <span>Batas absen pukul <span style={{ color: "#fbbf24", fontWeight: 600 }}>{closeAtStr} WIB</span></span>
                 }
               </div>
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "10px 16px", display: "inline-flex", alignItems: "center", gap: 10 }}>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+              <div className="schedule-pill">
+                <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
                   Jam absen shift {userShift}:{" "}
                   <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{openAtStr}</span>
                   <span className="clock-colon"> – </span>
                   <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{closeAtStr} WIB</span>
                 </div>
               </div>
-              <div style={{ marginTop: 10, fontSize: 10, color: "rgba(255,255,255,0.25)" }}>
-                Waktu sekarang: <span style={{ fontFamily: "monospace" }}>{clockStr} WIB</span>
+              <div style={{ marginTop: 10, fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)" }}>
+                Waktu sekarang: <span>{clockStr} WIB</span>
               </div>
             </div>
             <button className="btn-main" style={{ marginTop: 16 }} disabled={skipping} onClick={handleSkipToRedirect}>
               {skipping ? (
                 <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid rgba(255,255,255,0.7)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid var(--accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
                   Mengalihkan...
                 </span>
               ) : "Lanjut ke Dashboard →"}
@@ -968,19 +1004,15 @@ export default function FaceVerifyPage() {
 
         {/* Early checkout — belum waktunya pulang, minta izin admin */}
         {stage === "early-checkout-request" && (
-          <div style={{ padding: "8px 0 16px" }}>
+          <div style={{ padding: "8px 0 0" }}>
             <div className="time-gate-card">
-              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <div className="state-icon" style={{ background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)" }}>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
-                Belum Waktunya Pulang
-              </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7, marginBottom: 16 }}>
-                {earlyCheckoutMsg}
-              </div>
+              <div className="state-title">Belum Waktunya Pulang</div>
+              <div className="state-body">{earlyCheckoutMsg}</div>
             </div>
 
             {earlyCheckoutSubmitted ? (
@@ -992,22 +1024,18 @@ export default function FaceVerifyPage() {
               </div>
             ) : (
               <div style={{ marginTop: 16 }}>
-                <label style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", display: "block", marginBottom: 6 }}>
+                <label style={{ fontSize: 11, color: "var(--text-dim)", display: "block", marginBottom: 6 }}>
                   Alasan pulang cepat *
                 </label>
                 <textarea
+                  className="fv-textarea"
                   value={earlyCheckoutReason}
                   onChange={e => setEarlyCheckoutReason(e.target.value)}
                   placeholder="Contoh: keperluan keluarga mendadak..."
                   rows={3}
-                  style={{
-                    width: "100%", background: "#0d0d14", border: "0.5px solid rgba(255,255,255,0.1)",
-                    borderRadius: 10, padding: "10px 12px", color: "rgba(255,255,255,0.85)",
-                    fontSize: 12, fontFamily: "inherit", resize: "none", marginBottom: 10,
-                  }}
                 />
                 {earlyCheckoutError && (
-                  <div style={{ fontSize: 11, color: "#f87171", marginBottom: 10 }}>{earlyCheckoutError}</div>
+                  <div style={{ fontSize: 11, color: "var(--err)", marginBottom: 10 }}>{earlyCheckoutError}</div>
                 )}
                 <button className="btn-main" disabled={earlyCheckoutSubmitting} onClick={submitEarlyCheckoutRequest}>
                   {earlyCheckoutSubmitting ? "Mengirim..." : "Ajukan Izin Pulang Cepat"}
@@ -1023,32 +1051,32 @@ export default function FaceVerifyPage() {
 
         {/* Success */}
         {stage === "success" && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "30px 0" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "32px 0" }}>
             <div className="success-circle">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth={1.5}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "rgba(255,255,255,0.85)", textAlign: "center" }}>{message}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", textAlign: "center" }}>{message}</div>
             {gpsCoords && currentDistance !== null && (
-              <div style={{ fontSize: 11, color: "rgba(74,222,128,0.7)", display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{ fontSize: 11, color: "rgba(74,222,128,0.75)", display: "flex", alignItems: "center", gap: 5 }}>
                 <div className="gps-ping"><div className="gps-ping-dot" /><div className="gps-ping-ring" /></div>
                 {currentDistance}m dari kantor · ±{Math.round(gpsCoords.accuracy)}m
               </div>
             )}
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Mengalihkan ke dashboard...</div>
+            <div style={{ fontSize: 11, color: "var(--text-faint)" }}>Mengalihkan ke dashboard...</div>
           </div>
         )}
 
         {/* Error */}
         {stage === "error" && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "28px 0" }}>
-            <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(248,113,113,0.06)", border: "0.5px solid rgba(248,113,113,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth={1.5}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "30px 0" }}>
+            <div className="state-icon" style={{ background: "rgba(248,113,113,0.06)", border: "0.5px solid rgba(248,113,113,0.25)" }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--err)" strokeWidth={1.5}>
                 <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
             </div>
-            <div style={{ fontSize: 13, color: "#f87171", textAlign: "center" }}>{message}</div>
+            <div style={{ fontSize: 13, color: "var(--err)", textAlign: "center" }}>{message}</div>
             <button className="btn-main" onClick={() => window.location.reload()} style={{ maxWidth: 180 }}>Refresh halaman</button>
             {renderBiometricOption()}
           </div>
@@ -1056,25 +1084,9 @@ export default function FaceVerifyPage() {
 
         {/* No Camera */}
         {stage === "no-camera" && (
-          <div style={{ padding: "8px 0 16px" }}>
-            {/* Info box */}
-            <div style={{
-              width: "100%",
-              background: "rgba(251,191,36,0.06)",
-              border: "0.5px solid rgba(251,191,36,0.25)",
-              borderRadius: 14,
-              padding: "20px",
-              textAlign: "center",
-              marginBottom: 16,
-            }}>
-              {/* Icon */}
-              <div style={{
-                width: 56, height: 56, borderRadius: "50%",
-                background: "rgba(251,191,36,0.1)",
-                border: "0.5px solid rgba(251,191,36,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                margin: "0 auto 16px",
-              }}>
+          <div style={{ padding: "8px 0 0" }}>
+            <div className="state-card" style={{ background: "rgba(251,191,36,0.06)", border: "0.5px solid rgba(251,191,36,0.25)" }}>
+              <div className="state-icon" style={{ background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)" }}>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round"
                     d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
@@ -1082,22 +1094,14 @@ export default function FaceVerifyPage() {
                 </svg>
               </div>
 
-              <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
-                Kamera Tidak Tersedia
-              </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7, marginBottom: 16 }}>
+              <div className="state-title">Kamera Tidak Tersedia</div>
+              <div className="state-body" style={{ marginBottom: 16 }}>
                 Perangkat ini tidak memiliki kamera.<br />
                 Absensi wajah tidak dapat dilakukan.
               </div>
 
-              {/* Info shift tetap tampil */}
-              <div style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "0.5px solid rgba(255,255,255,0.07)",
-                borderRadius: 10, padding: "10px 16px",
-                display: "inline-flex", alignItems: "center", gap: 10,
-              }}>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+              <div className="schedule-pill">
+                <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
                   Shift {userShift}:{" "}
                   <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{openAtStr}</span>
                   <span className="clock-colon"> – </span>
@@ -1127,7 +1131,7 @@ export default function FaceVerifyPage() {
             >
               {skipping ? (
                 <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid rgba(255,255,255,0.7)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid var(--accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
                   Mengalihkan...
                 </span>
               ) : (
@@ -1141,57 +1145,41 @@ export default function FaceVerifyPage() {
             </button>
 
             {renderBiometricOption()}
-            <div style={{ marginTop: 10, textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.2)" }}>
-              Kehadiran akan tercatat sebagai <span style={{ color: "rgba(251,191,36,0.6)" }}>SKIPPED</span>
+            <div style={{ marginTop: 10, textAlign: "center", fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)" }}>
+              Kehadiran akan tercatat sebagai <span style={{ color: "rgba(251,191,36,0.65)" }}>SKIPPED</span>
             </div>
           </div>
         )}
 
-        {/* GPS Permission Denied — NEW */}
+        {/* GPS Permission Denied */}
         {stage === "gps-denied" && (
-          <div style={{ padding: "8px 0 16px" }}>
-            <div style={{
-              width: "100%",
-              background: "rgba(248,113,113,0.06)",
-              border: "0.5px solid rgba(248,113,113,0.25)",
-              borderRadius: 14,
-              padding: "20px",
-              textAlign: "center",
-              marginBottom: 16,
-            }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: "50%",
-                background: "rgba(248,113,113,0.1)",
-                border: "0.5px solid rgba(248,113,113,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                margin: "0 auto 16px",
-              }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth={1.5}>
+          <div style={{ padding: "8px 0 0" }}>
+            <div className="state-card" style={{ background: "rgba(248,113,113,0.06)", border: "0.5px solid rgba(248,113,113,0.25)" }}>
+              <div className="state-icon" style={{ background: "rgba(248,113,113,0.1)", border: "0.5px solid rgba(248,113,113,0.3)" }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--err)" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <line x1="4" y1="4" x2="20" y2="20" stroke="#f87171" strokeWidth={1.5} strokeLinecap="round" />
+                  <line x1="4" y1="4" x2="20" y2="20" stroke="var(--err)" strokeWidth={1.5} strokeLinecap="round" />
                 </svg>
               </div>
 
-              <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.85)", marginBottom: 6 }}>
-                Izin Lokasi Diblokir
-              </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.7, marginBottom: 16 }}>
+              <div className="state-title">Izin Lokasi Diblokir</div>
+              <div className="state-body" style={{ marginBottom: 16 }}>
                 Browser atau HP kamu menolak akses lokasi.<br />
                 Ikuti salah satu langkah di bawah ini:
               </div>
 
-              <div style={{ textAlign: "left", background: "rgba(255,255,255,0.03)", border: "0.5px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "14px 16px" }}>
+              <div style={{ textAlign: "left", background: "rgba(255,255,255,0.03)", border: "0.5px solid var(--line)", borderRadius: 11, padding: "14px 16px" }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
                   1. Cek Location Services HP
                 </div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.7, marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.7, marginBottom: 12 }}>
                   Buka <b>Setelan HP → Lokasi</b>, pastikan tombol lokasi dalam keadaan <b>ON/Aktif</b>.
                 </div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
                   2. Cek izin lokasi di browser
                 </div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.7 }}>
+                <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.7 }}>
                   Tap ikon di sebelah kiri alamat website (address bar) → <b>Site settings/Permissions</b> → <b>Location</b> → ubah ke <b>Allow/Izinkan</b>.
                 </div>
               </div>
@@ -1200,12 +1188,12 @@ export default function FaceVerifyPage() {
             <button className="btn-main" onClick={checkLocation} disabled={gpsLoading}>
               {gpsLoading ? (
                 <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid rgba(255,255,255,0.7)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid var(--accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
                   Mengecek ulang...
                 </span>
               ) : "Sudah Diaktifkan — Coba Lagi"}
             </button>
-            <button className="btn-ghost" style={{ marginTop: 10, color: "rgba(248,113,113,0.5)" }}
+            <button className="btn-ghost" style={{ marginTop: 10, color: "rgba(248,113,113,0.55)" }}
               onClick={handleRejectAttendance} disabled={skipping}>
               {skipping ? "Mengalihkan..." : "Lewati absen →"}
             </button>
@@ -1214,22 +1202,22 @@ export default function FaceVerifyPage() {
 
         {/* Location stage */}
         {stage === "location" && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "28px 0" }}>
-            <div style={{ position: "relative", width: 64, height: 64, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "30px 0" }}>
+            <div style={{ position: "relative", width: 64, height: 64, marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <div style={{ position: "absolute", width: 64, height: 64, borderRadius: "50%", background: "rgba(74,222,128,0.08)", border: "0.5px solid rgba(74,222,128,0.2)" }} />
               <div style={{ position: "absolute", width: 48, height: 48, borderRadius: "50%", background: "rgba(74,222,128,0.06)", animation: "gps-ping 2s ease-out infinite" }} />
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth={1.5} style={{ position: "relative", zIndex: 1 }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth={1.5} style={{ position: "relative", zIndex: 1 }}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 500, color: "rgba(255,255,255,0.85)", marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
               {needEnrollState ? "Cek Lokasi Sebelum Daftar" : "Cek Lokasi Absen"}
             </div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 28, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 30, lineHeight: 1.6 }}>
               {needEnrollState
-                ? <span>Wajib cek lokasi sebelum mendaftarkan wajah.<br />Pastikan dalam radius <span style={{ color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>{MAX_DISTANCE_METERS}m</span> dari kantor</span>
-                : <span>Pastikan berada dalam radius <span style={{ color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>{MAX_DISTANCE_METERS}m</span> dari kantor</span>
+                ? <span>Wajib cek lokasi sebelum mendaftarkan wajah.<br />Pastikan dalam radius <span style={{ color: "rgba(255,255,255,0.68)", fontWeight: 600 }}>{MAX_DISTANCE_METERS}m</span> dari kantor</span>
+                : <span>Pastikan berada dalam radius <span style={{ color: "rgba(255,255,255,0.68)", fontWeight: 600 }}>{MAX_DISTANCE_METERS}m</span> dari kantor</span>
               }
             </div>
             <button className="btn-main" style={{ maxWidth: 220 }} onClick={checkLocation}>
@@ -1241,7 +1229,7 @@ export default function FaceVerifyPage() {
                 Cek Lokasi Saya
               </span>
             </button>
-            <button className="btn-ghost" style={{ marginTop: 12, color: "rgba(248,113,113,0.5)" }}
+            <button className="btn-ghost" style={{ marginTop: 12, color: "rgba(248,113,113,0.55)" }}
               onClick={handleRejectAttendance} disabled={skipping}>
               {skipping ? "Mengalihkan..." : "Lewati absen →"}
             </button>
@@ -1250,35 +1238,35 @@ export default function FaceVerifyPage() {
 
         {/* Out of range */}
         {stage === "out-of-range" && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "24px 0" }}>
-            <div style={{ width: "100%", background: "rgba(248,113,113,0.07)", border: "0.5px solid rgba(248,113,113,0.2)", borderRadius: 12, padding: "16px 20px", marginBottom: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "26px 0" }}>
+            <div style={{ width: "100%", background: "rgba(248,113,113,0.07)", border: "0.5px solid rgba(248,113,113,0.2)", borderRadius: 14, padding: "18px 20px", marginBottom: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
                 <div>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: 0.5, marginBottom: 4 }}>JARAK KAMU</div>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: "#f87171", lineHeight: 1 }}>{currentDistance}<span style={{ fontSize: 14, color: "rgba(248,113,113,0.6)", marginLeft: 4 }}>m</span></div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)", letterSpacing: 0.5, marginBottom: 4 }}>JARAK KAMU</div>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: "var(--err)", lineHeight: 1 }}>{currentDistance}<span style={{ fontSize: 14, color: "rgba(248,113,113,0.6)", marginLeft: 4 }}>m</span></div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: 0.5, marginBottom: 4 }}>BATAS MAKS</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)", letterSpacing: 0.5, marginBottom: 4 }}>BATAS MAKS</div>
                   <div style={{ fontSize: 32, fontWeight: 700, color: "rgba(255,255,255,0.3)", lineHeight: 1 }}>{MAX_DISTANCE_METERS}<span style={{ fontSize: 14, color: "rgba(255,255,255,0.2)", marginLeft: 4 }}>m</span></div>
                 </div>
               </div>
               <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
                 <div style={{ height: "100%", borderRadius: 2, width: `${Math.min(((currentDistance ?? 0) / (MAX_DISTANCE_METERS * 2)) * 100, 100)}%`, background: "linear-gradient(90deg,#f87171,#ef4444)", transition: "width 0.5s ease" }} />
               </div>
-              <div style={{ fontSize: 10, color: "rgba(248,113,113,0.5)", marginTop: 8 }}>
+              <div style={{ fontSize: 10, color: "rgba(248,113,113,0.55)", marginTop: 8 }}>
                 Terlalu jauh {currentDistance != null ? `+${currentDistance - MAX_DISTANCE_METERS}m` : ""} dari batas
               </div>
             </div>
             {gpsCoords && (
               <a href={`https://maps.google.com/?q=${gpsCoords.latitude},${gpsCoords.longitude}`} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, color: "rgba(96,165,250,0.7)", marginBottom: 20, display: "flex", alignItems: "center", gap: 5, textDecoration: "none" }}>
+                style={{ fontSize: 11, color: "rgba(96,165,250,0.75)", marginBottom: 20, display: "flex", alignItems: "center", gap: 5, textDecoration: "none" }}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                 {gpsCoords.latitude.toFixed(5)}, {gpsCoords.longitude.toFixed(5)}
-                <span style={{ color: "rgba(255,255,255,0.2)" }}>±{Math.round(gpsCoords.accuracy)}m</span>
+                <span style={{ color: "var(--text-faint)" }}>±{Math.round(gpsCoords.accuracy)}m</span>
               </a>
             )}
             <button className="btn-ghost" style={{ marginTop: 4 }} onClick={checkLocation}>Coba cek ulang →</button>
-            <button className="btn-ghost" style={{ marginTop: 6, color: "rgba(248,113,113,0.5)" }}
+            <button className="btn-ghost" style={{ marginTop: 6, color: "rgba(248,113,113,0.55)" }}
               onClick={handleRejectAttendance} disabled={skipping}>
               {skipping ? "Mengalihkan..." : "Lewati absen →"}
             </button>
@@ -1294,17 +1282,17 @@ export default function FaceVerifyPage() {
                   <div className="gps-ping"><div className="gps-ping-dot" /><div className="gps-ping-ring" /></div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: "rgba(74,222,128,0.9)", fontWeight: 500 }}>{currentDistance}m dari kantor · ±{Math.round(gpsCoords.accuracy)}m</div>
-                    <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", marginTop: 1 }}>{gpsCoords.latitude.toFixed(5)}, {gpsCoords.longitude.toFixed(5)}</div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)", marginTop: 1 }}>{gpsCoords.latitude.toFixed(5)}, {gpsCoords.longitude.toFixed(5)}</div>
                   </div>
-                  <a href={`https://maps.google.com/?q=${gpsCoords.latitude},${gpsCoords.longitude}`} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(96,165,250,0.6)", fontSize: 10 }}>maps ↗</a>
+                  <a href={`https://maps.google.com/?q=${gpsCoords.latitude},${gpsCoords.longitude}`} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(96,165,250,0.65)", fontSize: 10 }}>maps ↗</a>
                 </div>
               </div>
             )}
 
             {!isProcessing && (
               <div className="tip-box">
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", lineHeight: 1.7 }}>
-                  Tips: Pastikan <span style={{ color: "rgba(255,255,255,0.6)" }}>cahaya cukup</span>, wajah <span style={{ color: "rgba(255,255,255,0.6)" }}>menghadap kamera</span>, dan tidak tertutup masker
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", lineHeight: 1.7 }}>
+                  Tips: Pastikan <span style={{ color: "rgba(255,255,255,0.62)" }}>cahaya cukup</span>, wajah <span style={{ color: "rgba(255,255,255,0.62)" }}>menghadap kamera</span>, dan tidak tertutup masker
                 </div>
               </div>
             )}
@@ -1321,10 +1309,10 @@ export default function FaceVerifyPage() {
 
             <div className="status-chip">
               <div className={`s-dot ${isProcessing ? "s-dot-amber" : faceDetected ? "s-dot-green" : "s-dot-gray"}`} />
-              <div style={{ flex: 1, fontSize: 11, color: isProcessing ? "#f59e0b" : faceDetected ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.35)", letterSpacing: 0.2 }}>
-                {isProcessing ? message : faceDetected ? "Wajah terdeteksi — tahan sebentar" : "Arahkan wajah ke oval"}
+              <div style={{ flex: 1, fontSize: 11, color: isProcessing ? "var(--warn)" : faceDetected ? "rgba(255,255,255,0.72)" : "var(--text-dim)", letterSpacing: 0.2 }}>
+                {isProcessing ? message : faceDetected ? "Wajah terdeteksi — tahan sebentar" : "Arahkan wajah ke bingkai"}
               </div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>{attempts}/{MAX_ATTEMPTS}</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)" }}>{attempts}/{MAX_ATTEMPTS}</div>
             </div>
 
             <div className="cam-box">
@@ -1332,20 +1320,23 @@ export default function FaceVerifyPage() {
               <canvas ref={canvasRef} />
               <div className="cam-grid" /><div className="cam-scanline" />
               <div className="face-oval">
-                <div className={`face-oval-ring ${faceDetected ? "on" : "off"}`} />
                 <div className="face-oval-spin1" />
                 <div className="face-oval-spin2" />
+                <div className={`face-target ${faceDetected ? "on" : "off"}`}>
+                  <span className="fc fc-tl" /><span className="fc fc-tr" />
+                  <span className="fc fc-bl" /><span className="fc fc-br" />
+                </div>
               </div>
               <div className="hud hud-tl"><div>cam·0</div><div className="blink" style={{ color: "rgba(255,255,255,0.45)" }}>● rec</div></div>
               <div className="hud hud-tr"><div>640×480</div><div style={{ color: confColor }}>{confidence}%</div></div>
               <div className="hud hud-bl" style={{ color: confColor, fontSize: 9 }}>{confidence >= AUTO_CAPTURE_CONFIDENCE * 100 ? "conf: lock " : "conf: scan"}</div>
               <div className="hud hud-br">{currentDistance != null ? ` ${currentDistance}m` : clockStr}</div>
-              <div className="hold-bar-wrap"><div className="hold-bar-fill" style={{ width: `${holdProgress}%`, background: holdProgress > 80 ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)" }} /></div>
-              {isProcessing && (<div className="proc-overlay"><div className="spinner" /><div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: 0.3 }}>{message}</div></div>)}
+              <div className="hold-bar-wrap"><div className="hold-bar-fill" style={{ width: `${holdProgress}%`, background: holdProgress > 80 ? "var(--accent)" : "rgba(255,255,255,0.3)" }} /></div>
+              {isProcessing && (<div className="proc-overlay"><div className="spinner" /><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", letterSpacing: 0.3 }}>{message}</div></div>)}
             </div>
 
             <div style={{ marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.25)", marginBottom: 4, letterSpacing: 0.3 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)", marginBottom: 4, letterSpacing: 0.3 }}>
                 <span>confidence</span>
                 <span style={{ color: confColor }}>{confidence}%{confidence >= AUTO_CAPTURE_CONFIDENCE * 100 ? " — ready " : ""}</span>
               </div>
@@ -1354,16 +1345,16 @@ export default function FaceVerifyPage() {
 
             {holdProgress > 0 && (
               <div style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.25)", marginBottom: 4, letterSpacing: 0.3 }}>
-                  <span>auto-capture</span><span style={{ color: "rgba(255,255,255,0.55)" }}>{holdProgress}%</span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)", marginBottom: 4, letterSpacing: 0.3 }}>
+                  <span>auto-capture</span><span style={{ color: "var(--accent)" }}>{holdProgress}%</span>
                 </div>
-                <div className="pbar-wrap"><div className="pbar-fill" style={{ width: `${holdProgress}%`, background: "rgba(255,255,255,0.45)" }} /></div>
+                <div className="pbar-wrap"><div className="pbar-fill" style={{ width: `${holdProgress}%`, background: "var(--accent)" }} /></div>
               </div>
             )}
 
             {attempts >= 3 && !isProcessing && (
               <button className="btn-ghost"
-                style={{ width: "100%", textAlign: "center", color: "rgba(248,113,113,0.5)", fontSize: 10 }}
+                style={{ width: "100%", textAlign: "center", color: "rgba(248,113,113,0.55)", fontSize: 10 }}
                 onClick={async () => {
                   addLog("re-enrollment requested", "warn");
                   await fetch("/api/auth/face-enroll", { method: "PUT" });
@@ -1381,7 +1372,7 @@ export default function FaceVerifyPage() {
         {/* Terminal log */}
         {!["loading", "checking", "out-of-time", "day-off", "early-checkout-request"].includes(stage) && (
           <div style={{ marginTop: 14, marginBottom: 14 }}>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", letterSpacing: 0.5, marginBottom: 5 }}>system log</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--text-faint)", letterSpacing: 0.5, marginBottom: 5 }}>system log</div>
             <div className="t-log">
               {logs.map((l, i) => (
                 <div key={i} className="t-log-entry">
@@ -1396,9 +1387,9 @@ export default function FaceVerifyPage() {
 
         {/* Footer */}
         {!["loading", "checking", "success", "out-of-time", "early-checkout-request"].includes(stage) && (
-          <div style={{ borderTop: "0.5px solid rgba(255,255,255,0.05)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ borderTop: "0.5px solid var(--line-soft)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <button className="btn-ghost" onClick={handleLogout}>Bukan Anda? Ganti akun</button>
-            <div style={{ fontSize: 9, color: "rgba(255,255,255,0.15)", letterSpacing: 0.4 }}>biometric only · wib</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "rgba(255,255,255,0.16)", letterSpacing: 0.4 }}>biometric only · wib</div>
           </div>
         )}
       </div>
