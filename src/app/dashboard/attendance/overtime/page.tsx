@@ -1644,6 +1644,7 @@ export default function OvertimePage() {
   const [showManualModal, setShowManualModal] = useState(false);
   const [showRecap, setShowRecap] = useState(false); // ✅ NEW — toggle rekap bulanan
   const [recapUserId, setRecapUserId] = useState<string>(""); // ✅ NEW
+  const [expandedRecapUsers, setExpandedRecapUsers] = useState<Set<string>>(new Set()); // ✅ NEW — buat mode "Semua Karyawan"
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2021,11 +2022,34 @@ export default function OvertimePage() {
                   </select>
                 </div>
               )}
-              {recapUserId === "ALL" && (
-                <div className="space-y-4">
-                  {[...allUsers].sort((a, b) => a.name.localeCompare(b.name, "id-ID")).map(u => (
-                    <OvertimeRecapTable key={u.id} userId={u.id} />
-                  ))}
+             {recapUserId === "ALL" && (
+                <div className="space-y-2">
+                  {[...allUsers].sort((a, b) => a.name.localeCompare(b.name, "id-ID")).map(u => {
+                    const isOpen = expandedRecapUsers.has(u.id);
+                    return (
+                      <div key={u.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <button
+                          onClick={() => setExpandedRecapUsers(prev => {
+                            const next = new Set(prev);
+                            if (next.has(u.id)) next.delete(u.id); else next.add(u.id);
+                            return next;
+                          })}
+                          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50/80 transition-colors"
+                        >
+                          <div>
+                            <p className="font-semibold text-gray-800 text-sm">{u.name}</p>
+                            <p className="text-[10px] text-gray-400">{u.role.replace(/_/g, " ")}</p>
+                          </div>
+                          <svg className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {isOpen && <div className="border-t border-gray-100">
+                          <OvertimeRecapTable userId={u.id} />
+                        </div>}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               {recapUserId && recapUserId !== "ALL" && <OvertimeRecapTable userId={recapUserId} />}
