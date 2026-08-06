@@ -49,6 +49,21 @@ export function computeBeforeInOvertimeMinutes(
   return delta > 0 ? delta : 0;
 }
 
+/**
+ * Menit TERLAMBAT — actual masuk lebih telat dari lateFrom. 0 kalau tidak telat.
+ * Kebalikan dari computeBeforeInOvertimeMinutes (yang menghitung early/lembur awal).
+ * Dipakai untuk kolom "Terlambat" di rekap bulanan.
+ */
+export function computeLateMinutes(
+  checkInISO: string,
+  schedule: { lateFrom: { h: number; m: number } }
+): number {
+  const actual = toWIBMinutesOfDay(checkInISO);
+  const scheduledLate = schedule.lateFrom.h * 60 + schedule.lateFrom.m;
+  const delta = actual - scheduledLate;
+  return delta > 0 ? delta : 0;
+}
+
 /** Menit lembur karena absen PULANG lebih larut dari jadwal. 0 kalau tidak lebih larut. */
 export function computeAfterOutOvertimeMinutes(
   checkOutISO: string,
