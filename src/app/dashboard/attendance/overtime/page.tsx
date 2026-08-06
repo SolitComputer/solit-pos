@@ -10,6 +10,7 @@ import { OvertimeFillDetailModal } from "@/components/attendance/OvertimeFillDet
 import { OvertimeSOPBanner } from "@/components/attendance/OvertimeSOPBanner";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify"; 
 import { OvertimePendingPopup } from "@/components/attendance/OvertimePendingPopup";
+import { OvertimeRecapTable } from "@/components/attendance/OvertimeRecapTable"; // ✅ NEW — rekap bulanan
 
 type OvertimeRequest = {
   id: string; user_id: string; request_date: string;
@@ -1641,6 +1642,8 @@ export default function OvertimePage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
+  const [showRecap, setShowRecap] = useState(false); // ✅ NEW — toggle rekap bulanan
+  const [recapUserId, setRecapUserId] = useState<string>(""); // ✅ NEW
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1879,9 +1882,13 @@ export default function OvertimePage() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button onClick={() => router.push("/dashboard/attendance/overtime/leaderboard")}
+             <button onClick={() => router.push("/dashboard/attendance/overtime/leaderboard")}
                 className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow">
                 <Trophy size={16} /><span className="hidden sm:inline">Leaderboard</span>
+              </button>
+              <button onClick={() => { setShowRecap(v => !v); if (!recapUserId && currentUser?.id) setRecapUserId(currentUser.id); }}
+                className={`h-9 px-4 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow border ${showRecap ? "bg-gray-900 text-white border-gray-900" : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"}`}>
+                <CalendarDays size={16} /><span className="hidden sm:inline">Rekap Bulanan</span>
               </button>
               {canInputManual(currentUser?.roles ?? (currentUser?.role ? [currentUser.role] : [])) && (
                 <button onClick={() => setShowManualModal(true)}
@@ -1996,8 +2003,34 @@ export default function OvertimePage() {
             </div>
           )}
 
-          {/* ── Poin 14: SOP wajib tampil di halaman lembur ── */}
+        {/* ── Poin 14: SOP wajib tampil di halaman lembur ── */}
           <OvertimeSOPBanner />
+
+          {/* ✅ NEW — Rekap Bulanan per karyawan (dihitung ulang dari face_verifications) */}
+          {showRecap && (
+            <div className="space-y-3">
+              {(isAdminRole(currentUser?.roles ?? currentUser?.role) || canInputManual(currentUser?.roles ?? (currentUser?.role ? [currentUser.role] : []))) && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                  <label className={lbl}>Pilih Karyawan</label>
+                  <select value={recapUserId} onChange={e => setRecapUserId(e.target.value)} className={inp + " cursor-pointer"}>
+                    <option value="">— Pilih karyawan —</option>
+                    <option value="ALL">— Semua Karyawan —</option>
+                    {[...allUsers].sort((a, b) => a.name.localeCompare(b.name, "id-ID")).map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {recapUserId === "ALL" && (
+                <div className="space-y-4">
+                  {[...allUsers].sort((a, b) => a.name.localeCompare(b.name, "id-ID")).map(u => (
+                    <OvertimeRecapTable key={u.id} userId={u.id} />
+                  ))}
+                </div>
+              )}
+              {recapUserId && recapUserId !== "ALL" && <OvertimeRecapTable userId={recapUserId} />}
+            </div>
+          )}
 
           {/* ── Search + Status filter — khusus tab Karyawan; tab PKL punya filter sendiri di EmployeeListPanel ── */}
           {activeTab === "KARYAWAN" && (
