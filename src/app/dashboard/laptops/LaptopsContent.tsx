@@ -666,10 +666,13 @@ export function LaptopsContent() {
     //  Router aksi klik baris berdasarkan jumlah stok:
     //    stok = 1  → langsung buka Pop-up Detail unit (editable)
     //    stok ≠ 1  → buka Detail Laptop (untuk stok > 1, breakdown via tombol Units)
-    const handleRowClick = async (item: Laptop) => {
+    //  forceUnitId: kalau diisi (baris hasil pencarian SN yang di-explode jadi
+    //  per-unit), LANGSUNG buka unit itu — tidak peduli berapa total stok aktif
+    //  model ini.
+    const handleRowClick = async (item: Laptop, forceUnitId?: string) => {
         const activeUnits = (item.laptop_units || []).filter(u => u.status !== "SOLD");
 
-        if (activeUnits.length !== 1) { openDetail(item); return; }
+        if (!forceUnitId && activeUnits.length !== 1) { openDetail(item); return; }
 
         setUnitDetailLoading(true);
         try {
@@ -677,7 +680,8 @@ export function LaptopsContent() {
             // supaya modal tidak menampilkan field kosong.
             const res = await fetch(`/api/laptops/${item.id}/units`);
             const result = await res.json();
-            const full = (result.data || []).find((u: UnitDetailData) => u.id === activeUnits[0].id);
+            const targetId = forceUnitId ?? activeUnits[0].id;
+            const full = (result.data || []).find((u: UnitDetailData) => u.id === targetId);
             setUnitDetailFromLaptopDetail(false); //  entry langsung dari baris tabel, bukan dari Detail Laptop
             if (full) setUnitDetail({ unit: full, laptop: item });
             else openDetail(item);
@@ -788,9 +792,18 @@ export function LaptopsContent() {
     //  Mapping model laptop → baris tabel (layout papan tulis).
     //  Kolom per-unit (Harga Modal / Sumber / Tgl Masuk / SN) hanya punya nilai
     //  tunggal kalau stok = 1. Kalau >1, diisi ringkasan abu-abu + arahkan ke Units.
-   const tableRows: InventoryRow[] = useMemo(() => filteredLaptops.map(l => {
+    //  KECUALI: kalau kotak "Cari Serial Number" lagi dipakai dan cocok ke >1
+    //  unit dalam 1 model, model itu di-"explode" jadi 1 baris PER UNIT yang
+    //  cocok (bukan 1 baris agregat "X SN") — makanya pakai flatMap, bukan map.
+    const snQueryTrim = filterSN.trim().toLowerCase();
+
+    const tableRows: InventoryRow[] = useMemo(() => filteredLaptops.flatMap((l): InventoryRow[] => {
         const aktif = (l.laptop_units || []).filter(u => u.status !== "SOLD");
-        const one = aktif.length === 1 ? aktif[0] : null;
+
+        // Unit-unit di model ini yang cocok kotak Cari SN (null kalau kotak kosong).
+        const matchedUnits = snQueryTrim
+            ? aktif.filter(u => u.serial_number.toLowerCase().includes(snQueryTrim))
+            : null;
 
         // Breakdown "terjual belum lunas" per model, buat tooltip badge.
         const reservedCount = aktif.filter(u => u.status === "RESERVED").length;
@@ -807,31 +820,66 @@ export function LaptopsContent() {
         const max = modals.length ? Math.max(...modals) : 0;
         const jt = (n: number) => (n / 1_000_000).toFixed(1).replace(".", ",");
 
-        //  Modal Sparepart per-unit — 1 unit: nilai pas; >1 unit: rentang min–max
-        //  (pakai fmt penuh, bukan "jt", karena nominal sparepart biasanya kecil).
         const spareparts = aktif.map(u => u.sparepart_cost).filter((n): n is number => n != null && n > 0);
         const spMin = spareparts.length ? Math.min(...spareparts) : 0;
         const spMax = spareparts.length ? Math.max(...spareparts) : 0;
 
-        //  Harga Official per-unit — pola sama dengan Modal Sparepart di atas.
         const officials = aktif.map(u => u.official_price).filter((n): n is number => n != null && n > 0);
         const ofMin = officials.length ? Math.min(...officials) : 0;
         const ofMax = officials.length ? Math.max(...officials) : 0;
 
-        //  Gross Profit per-unit = Harga Store - Harga Sparepart - Harga Modal,
-        //  dihitung per-unit dulu baru diagregasi biar akurat.
         const grossProfits = aktif.map(u => (u.selling_price || 0) - (u.sparepart_cost || 0) - (u.purchase_price || 0));
         const gpMin = grossProfits.length ? Math.min(...grossProfits) : 0;
         const gpMax = grossProfits.length ? Math.max(...grossProfits) : 0;
 
         const sumberSet = new Set(aktif.map(u => u.source).filter(Boolean));
 
-        return {
+        //  Field yang SAMA buat model ini, dipakai baik baris agregat maupun
+        //  tiap baris hasil explode per-unit — ST/SJ/M/Audit/SO tetap level
+        //  model (bukan per-unit), jadi tidak ikut di-explode.
+        const base = {
             id: l.id,
             laptop_name: l.laptop_name,
             cpu: l.cpu,
             ram: l.ram,
             storage: l.storage,
+            harga_jual: l.selling_price,
+            stok_tersisa: l.stok_tersedia ?? 0,
+            siap_jual: l.siap_jual ?? 0,
+            minus: l.stok_minus ?? 0,
+            is_audited: isAuditActive(l.audited_at),
+            audited_at: l.audited_at ?? null,
+            is_so_active: isSoActive(l.so_at),
+            so_at: l.so_at ?? null,
+            belum_lunas: l.belum_lunas ?? 0,
+            belum_lunas_label: belumLunasLabel,
+        };
+
+        //  ── Mode EXPLODE: Cari SN cocok >1 unit di model ini ──
+        //  1 baris per unit hasil pencarian, bukan 1 baris agregat.
+        if (matchedUnits && matchedUnits.length > 1) {
+            return matchedUnits.map(u => ({
+                ...base,
+                unit_id: u.id,
+                harga_modal: u.purchase_price ?? 0,
+                sparepart_modal: u.sparepart_cost ?? 0,
+                official_price: u.official_price ?? 0,
+                gross_profit: (u.selling_price || 0) - (u.sparepart_cost || 0) - (u.purchase_price || 0),
+                sumber: u.source ?? null,
+                tanggal_masuk: u.created_at ?? null,
+                sn: u.serial_number,
+            }));
+        }
+
+        //  ── Mode normal: 1 baris per model ──
+        //  Kalau Cari SN aktif dan pas 1 unit yang cocok, pakai unit itu
+        //  (bukan cek total stok model). Kalau kotak kosong, balik ke
+        //  perilaku lama: unit tunggal kalau stok model = 1.
+        const one = matchedUnits ? (matchedUnits[0] ?? null) : (aktif.length === 1 ? aktif[0] : null);
+
+        return [{
+            ...base,
+            unit_id: one ? one.id : undefined,
 
             harga_modal: one ? (one.purchase_price ?? 0) : null,
             harga_modal_note: one ? undefined
@@ -842,8 +890,6 @@ export function LaptopsContent() {
             sparepart_note: one ? undefined
                 : spareparts.length === 0 ? undefined
                     : spMin === spMax ? fmt(spMin) : `${fmt(spMin)} – ${fmt(spMax)}`,
-
-            harga_jual: l.selling_price,
 
             official_price: one ? (one.official_price ?? 0) : null,
             official_price_note: one ? undefined
@@ -865,18 +911,8 @@ export function LaptopsContent() {
 
             sn: one ? one.serial_number : null,
             sn_note: one ? undefined : aktif.length > 1 ? `${aktif.length} SN` : undefined,
-
-            stok_tersisa: l.stok_tersedia ?? 0,
-            siap_jual: l.siap_jual ?? 0,
-            minus: l.stok_minus ?? 0,
-            is_audited: isAuditActive(l.audited_at),
-            audited_at: l.audited_at ?? null,
-            is_so_active: isSoActive(l.so_at),
-            so_at: l.so_at ?? null,
-            belum_lunas: l.belum_lunas ?? 0,
-            belum_lunas_label: belumLunasLabel,
-        };
-    }), [filteredLaptops]);
+        }];
+    }), [filteredLaptops, snQueryTrim]);
 
     const totalSisa = filteredLaptops.reduce((s, l) => s + (l.stok_tersedia ?? 0), 0);
     const totalSiapJual = filteredLaptops.reduce((s, l) => s + (l.siap_jual ?? 0), 0);
@@ -1116,9 +1152,9 @@ export function LaptopsContent() {
                                 showTotalJual
                                 sortBy={sortBy}
                                 onSort={handleSort}
-                                onRowClick={(row) => {
+                               onRowClick={(row) => {
                                     const l = filteredLaptops.find(x => x.id === row.id);
-                                    if (l) handleRowClick(l);
+                                    if (l) handleRowClick(l, row.unit_id);
                                 }}
                                 renderAudit={canSeePrivateBarang ? (row) => {
                                     const l = filteredLaptops.find(x => x.id === row.id);
