@@ -13,7 +13,7 @@ export const CONTRACT_TYPE_LABELS: Record<ContractType, string> = {
 export const CONTRACT_DEFAULT_TITLE = "Kontrak Kerja Karyawan";
 
 export const CONTRACT_STATUS_META: Record<ContractStatus, { label: string; color: string; bg: string; border: string }> = {
-NONE: { label: "Belum Dikirim", color: "text-gray-500", bg: "bg-gray-100", border: "border-gray-200" },
+  NONE: { label: "Belum Dikirim", color: "text-gray-500", bg: "bg-gray-100", border: "border-gray-200" },
   PENDING: { label: "Menunggu Persetujuan", color: "text-amber-700", bg: "bg-amber-100", border: "border-amber-200" },
   APPROVED: { label: "Disetujui", color: "text-emerald-700", bg: "bg-emerald-100", border: "border-emerald-200" },
   REJECTED: { label: "Ditolak", color: "text-red-700", bg: "bg-red-100", border: "border-red-200" },
@@ -91,11 +91,10 @@ export const CONTRACT_TEMPLATES: Record<Exclude<ContractType, "CUSTOM">, (name: 
       name,
       `Pasal 2 - Hak Karyawan
 1. Menerima gaji pokok sesuai nominal yang ditetapkan Perusahaan per bulan.
-2. Menerima insentif/bonus pengantaran sesuai kebijakan yang berlaku di sistem, dan dapat berubah sewaktu-waktu dengan pemberitahuan.
-3. Penggantian biaya bensin diberikan sesuai kebijakan Perusahaan dengan syarat menyerahkan bukti struk asli (foto) dan jujur dalam pelaporan; pemalsuan struk atau manipulasi dikenakan sanksi pelanggaran sangat berat.
-4. Mendapatkan waktu istirahat dan cuti sesuai kebijakan Perusahaan.
-5. Mendapatkan makan siang yang disediakan oleh Perusahaan.
-6. Berhak atas evaluasi kinerja untuk kenaikan tingkatan atau perpanjangan kontrak.`,
+2. Penggantian biaya bensin diberikan sesuai kebijakan Perusahaan dengan syarat menyerahkan bukti struk asli (foto) dan jujur dalam pelaporan; pemalsuan struk atau manipulasi dikenakan sanksi pelanggaran sangat berat.
+3. Mendapatkan waktu istirahat dan cuti sesuai kebijakan Perusahaan.
+4. Mendapatkan makan siang yang disediakan oleh Perusahaan.
+5. Berhak atas evaluasi kinerja untuk kenaikan tingkatan atau perpanjangan kontrak.`,
       `8. Wajib melakukan konfirmasi status pengantaran (dispatch, diterima, gagal) melalui sistem Solit POS secara real-time, mematuhi rute dan SOP keselamatan berkendara, serta menjaga keamanan barang selama proses pengantaran hingga diterima pelanggan.`
     ),
   GAJI_FLAT: (name) =>
