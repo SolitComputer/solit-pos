@@ -62,6 +62,13 @@ export interface InventoryRow {
     belum_lunas?: number;
     /** Rincian breakdown belum lunas, misal "2 DP · 1 Ambil Dulu" */
     belum_lunas_label?: string;
+
+    /** ID unit spesifik — dipakai saat 1 baris = 1 unit hasil pencarian SN
+     *  (bukan agregat per model). Dipakai untuk React key (biar unik walau
+     *  beberapa baris berbagi `id` model yang sama) dan untuk tahu unit
+     *  mana yang harus dibuka saat baris diklik. Opsional — kalau kosong,
+     *  perilakunya sama seperti sebelumnya. */
+    unit_id?: string;
 }
 
 interface Props {
@@ -183,13 +190,6 @@ export default function InventoryTable({
         }
     };
 
-    const handleResetSort = () => {
-        setLocalSort(null);
-        if (onSort) {
-            onSort("DEFAULT", "DEFAULT");
-        }
-    };
-
     return (
         <div className="overflow-x-auto table-scroll max-h-[calc(100dvh-220px)] overflow-y-auto">
             <table className="w-full text-sm border-collapse">
@@ -220,7 +220,7 @@ export default function InventoryTable({
                 <tbody className="divide-y divide-gray-50">
                     {sortedRows.map((row, idx) => (
                         <tr
-                            key={row.id}
+                            key={row.unit_id ?? row.id}
                             onClick={onRowClick ? () => onRowClick(row) : undefined}
                             className={`group data-row border-b border-gray-50 last:border-0 hover:bg-gray-50/60 ${onRowClick ? "cursor-pointer" : ""}`}
                         >
