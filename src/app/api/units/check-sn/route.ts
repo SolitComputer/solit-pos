@@ -79,7 +79,62 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       });
     }
 
-    // ── 3) Nggak ketemu di dua-duanya ──
+    // ── 3) Fallback: partial match di laptop_units (grup/kelompok) ──
+    // Kalau SN yang dicari cuma SEBAGIAN dari serial number satu/lebih unit
+    // (bukan exact match), kembalikan semua unit yang cocok, dikelompokkan
+    // per model laptop — biar frontend bisa nampilin daftar unit ASLI,
+    // bukan cuma "ketemu 1" atau "tidak ditemukan".
+    // Guard length >= 3 biar nggak nge-scan seisi tabel kalau SN yang
+    // diketik/discan cuma 1-2 karakter.
+    if (sn.length >= 3) {
+      const { data: partialUnits, error: partialErr } = await supabaseAdmin
+        .from("laptop_units")
+        .select(`
+          id, serial_number, grade, condition_note, selling_price, status, notes,
+          laptop:laptops (
+            id, laptop_name, brand, cpu, ram, storage, gpu, display
+          )
+        `)
+        .ilike("serial_number", `%${sn}%`)
+        .order("serial_number", { ascending: true })
+        .limit(50);
+
+      if (partialErr) console.error("[check-sn] partial laptop_units:", partialErr);
+
+      if (partialUnits && partialUnits.length > 0) {
+        // Cuma 1 unit ketemu → perlakukan sama seperti exact match biasa
+        if (partialUnits.length === 1) {
+          return NextResponse.json({
+            success: true,
+            data: { ...partialUnits[0], type: "LAPTOP" },
+          });
+        }
+
+        // >1 unit ketemu → kelompokkan per model laptop
+        const groupMap = new Map<string, { laptop: any; units: any[] }>();
+        for (const u of partialUnits) {
+          const lap = Array.isArray(u.laptop) ? u.laptop[0] : u.laptop;
+          const key = lap?.id ?? "unknown";
+          if (!groupMap.has(key)) groupMap.set(key, { laptop: lap, units: [] });
+          groupMap.get(key)!.units.push({
+            id: u.id,
+            serial_number: u.serial_number,
+            grade: u.grade,
+            condition_note: u.condition_note,
+            selling_price: u.selling_price,
+            status: u.status,
+            notes: u.notes,
+          });
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: { type: "LAPTOP_GROUP", query: sn, groups: Array.from(groupMap.values()) },
+        });
+      }
+    }
+
+    // ── 4) Nggak ketemu di mana pun ──
     return NextResponse.json(
       { success: false, message: `Serial number "${sn}" tidak ditemukan` },
       { status: 404 }
