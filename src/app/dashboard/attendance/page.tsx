@@ -3688,7 +3688,10 @@ export default function AttendanceDashboardPage() {
             if (a.source !== "AUTO") return;
             const dk = toWIBDateKey(a.check_in_time || a.created_at);
             const hasCheckout = !!checkoutTimes[`${a.user_id}_${dk}`];
-            const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && !hasCheckout;
+            // ✅ FIX: penalti "tidak absen pulang" cuma berlaku untuk tanggal yang SUDAH LEWAT
+            // (dk < todayWIB). Untuk HARI INI, jam kerja mungkin belum selesai — jadi jangan
+            // langsung dianggap ABSENT, biarkan status PRESENT/LATE dari absen masuk tetap dipakai.
+            const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && dk < todayWIB && !hasCheckout;
             setEff(a.user_name, dk,
                 noCheckoutPenalty ? "ABSENT"
                     : a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "ABSENT");
