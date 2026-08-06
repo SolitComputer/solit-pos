@@ -26,7 +26,10 @@ export default function DeliveryAlertListener() {
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   useEffect(() => {
-    fetch("/api/auth/me").then((r) => r.json()).then((r) => setUserId(r.user?.id ?? null)).catch(() => { });
+    // Pakai shared cache — tidak fetch terpisah ke /api/auth/me
+    import("@/hooks/useAuthUser").then(({ getAuthUser }) =>
+      getAuthUser().then(u => setUserId(u?.id ?? null))
+    ).catch(() => { });
   }, []);
 
   useEffect(() => {

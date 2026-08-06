@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface Warranty {
   id: string;
@@ -130,8 +131,7 @@ export default function WarrantyPage() {
   const canEdit = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_WARRANTY) : false;
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then(r => r.json())
+    getAuthUser().then(u => ({ success: true, user: u }))
       .then(r => setUserRole(r.user?.role ?? null))
       .catch(() => setUserRole(null));
   }, []);

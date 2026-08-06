@@ -12,6 +12,7 @@ import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
 import UnitFormModal from "@/components/inventory/UnitFormModal";
 import EditablePriceCell from "@/components/inventory/EditablePriceCell";
 import { exportInventoryExcel } from "@/lib/inventoryExport";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface LaptopUnit {
     id: string;
@@ -299,8 +300,7 @@ export default function UnitsPage() {
 
 
     useEffect(() => {
-        fetch("/api/auth/me")
-            .then(r => r.json())
+        getAuthUser().then(u => ({ success: true, user: u }))
             .then(r => {
                 const roles: string[] =
                     Array.isArray(r.user?.roles) && r.user.roles.length > 0

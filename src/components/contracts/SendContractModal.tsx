@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X, FileText, Loader2 } from "lucide-react";
-import { CONTRACT_TEMPLATES, CONTRACT_TYPE_LABELS, ContractType, CONTRACT_DURATION_OPTIONS, computeValidUntil } from "@/lib/contractTemplates";
+import { CONTRACT_TEMPLATES, CONTRACT_TYPE_LABELS, CONTRACT_DEFAULT_TITLE, ContractType, CONTRACT_DURATION_OPTIONS, computeValidUntil } from "@/lib/contractTemplates";
 
 export default function SendContractModal({
     user, onClose, onSent,
@@ -12,7 +12,7 @@ export default function SendContractModal({
     onSent: () => void;
 }) {
     const [type, setType] = useState<ContractType>("GAJI_FLAT");
-    const [title, setTitle] = useState(CONTRACT_TYPE_LABELS.GAJI_FLAT);
+    const [title, setTitle] = useState(CONTRACT_DEFAULT_TITLE);
     const [content, setContent] = useState(CONTRACT_TEMPLATES.GAJI_FLAT(user.name));
     const [validFrom, setValidFrom] = useState(() => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10));
     const [durationMonths, setDurationMonths] = useState<number | null | "CUSTOM_DATE">(12);
@@ -22,7 +22,6 @@ export default function SendContractModal({
 
     const handleTypeChange = (t: ContractType) => {
         setType(t);
-        setTitle(CONTRACT_TYPE_LABELS[t]);
         if (t !== "CUSTOM") setContent(CONTRACT_TEMPLATES[t](user.name));
     };
 

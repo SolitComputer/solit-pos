@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, resolveShiftConfigFromDB } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 import { isPKLRole } from "@/lib/permissions";
 import {
   isValidOvertimeCategory,
   computeOvertimeNominal,
   countEffectiveWorkdaysInMonth,
+  computeBeforeInOvertimeMinutes,
+  computeAfterOutOvertimeMinutes,
+  computeHolidayOvertimeMinutes,
+  computeCombinedOvertimeMinutes,
+  type OvertimeDirection,
 } from "@/lib/overtimeEngine";
+import { resolveScheduleOverride, toAuthScheduleShape } from "@/lib/shiftSchedule";
+import { createOvertimeDraft } from "@/lib/attendanceVerification";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,10 +48,9 @@ const DIVISION_HEAD_MAP: Record<string, string[]> = {
     "SOTECH",
     "KEPALA_SOTECH", "PKL_SOTECH", "PKL",
   ],
-KEPALA_PENGELOLA_BARANG: [
-    "PENGELOLA_BARANG", "TEKNISI",
-    "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
-    "KEPALA_PENGELOLA_BARANG", "PKL_PENGELOLA_BARANG", "PKL_TEKNISI", "PKL",
+  KEPALA_PENGELOLA_BARANG: [
+    "PENGELOLA_BARANG",
+    "KEPALA_PENGELOLA_BARANG", "PKL_PENGELOLA_BARANG", "PKL",
   ],
 };
 
@@ -89,14 +95,14 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
-    const year  = searchParams.get("year")  ?? new Date().getFullYear().toString();
+    const year = searchParams.get("year") ?? new Date().getFullYear().toString();
     const month = searchParams.get("month") ?? String(new Date().getMonth() + 1);
     const status = searchParams.get("status");
 
     const paddedMonth = String(month).padStart(2, "0");
-    const startDate   = `${year}-${paddedMonth}-01`;
-    const lastDay     = new Date(Number(year), Number(month), 0).getDate();
-    const endDate     = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
+    const startDate = `${year}-${paddedMonth}-01`;
+    const lastDay = new Date(Number(year), Number(month), 0).getDate();
+    const endDate = `${year}-${paddedMonth}-${String(lastDay).padStart(2, "0")}`;
 
     // ── Legacy correction: COMPLETED tanpa foto → NEED_PROOF ──────────────
     await supabase
@@ -116,12 +122,12 @@ export async function GET(request: Request) {
 
     if (expiredOvertimes && expiredOvertimes.length > 0) {
       for (const expired of expiredOvertimes) {
-        const actualEnd    = expired.scheduled_end;
-        const startMs      = expired.actual_start ? new Date(expired.actual_start).getTime() : NaN;
-        const endMs        = new Date(actualEnd).getTime();
+        const actualEnd = expired.scheduled_end;
+        const startMs = expired.actual_start ? new Date(expired.actual_start).getTime() : NaN;
+        const endMs = new Date(actualEnd).getTime();
         const durationMins = Number.isNaN(startMs) ? 0 : Math.round((endMs - startMs) / 60000);
-        const billedHours  = Math.floor(durationMins / 60);
-        const ratePerHour  = expired.rate_per_hour ?? 0;
+        const billedHours = Math.floor(durationMins / 60);
+        const ratePerHour = expired.rate_per_hour ?? 0;
         const calculatedPay = billedHours * ratePerHour;
 
         await supabase
@@ -215,7 +221,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: [] });
     }
 
-// ── Enrich dengan data user ────────────────────────────────────────────
+    // ── Enrich dengan data user ────────────────────────────────────────────
     const userIds = [
       ...new Set([
         ...overtimes.map((o: any) => o.user_id),
@@ -236,9 +242,9 @@ export async function GET(request: Request) {
     // & Input Manual) — filter yang dulu menyaring keluar data PKL dihapus.
     const result = overtimes.map((o: any) => ({
       ...o,
-      users:    usersMap[o.user_id]    ?? null,
+      users: usersMap[o.user_id] ?? null,
       approver: o.approved_by ? usersMap[o.approved_by] ?? null : null,
-      auditor:  o.audited_by  ? usersMap[o.audited_by]  ?? null : null, // ✅ NEW
+      auditor: o.audited_by ? usersMap[o.audited_by] ?? null : null, // ✅ NEW
     }));
 
     // ── Strip bayaran untuk role yang tidak berwenang ──────────────────────
@@ -246,12 +252,12 @@ export async function GET(request: Request) {
     const finalResult = canSeePay
       ? result
       : result.map(({ rate_per_hour, total_pay, per_minute_rate, base_salary_snapshot, ...rest }: any) => ({
-          ...rest,
-          rate_per_hour: null,
-          total_pay: null,
-          per_minute_rate: null,
-          base_salary_snapshot: null,
-        }));
+        ...rest,
+        rate_per_hour: null,
+        total_pay: null,
+        per_minute_rate: null,
+        base_salary_snapshot: null,
+      }));
 
     return NextResponse.json({ success: true, data: finalResult });
   } catch (err: any) {
@@ -273,6 +279,8 @@ export async function POST(request: Request) {
       requested_start,
       work_description: reqWorkDesc,
       is_manual,
+      is_self_declare, // ✅ NEW — karyawan mengajukan lemburnya sendiri
+      declare_direction, // ✅ NEW — "BEFORE_IN" | "AFTER_OUT" | "BOTH" | "HOLIDAY"
       target_user_id,
       actual_start_time,
       actual_end_time,
@@ -283,7 +291,105 @@ export async function POST(request: Request) {
       is_holiday = false,
     } = body;
 
-    // ── MANUAL INPUT ───────────────────────────────────────────────────────
+    // ── SELF-DECLARE — karyawan mengajukan sendiri lembur miliknya ─────────
+    // Dipanggil dari halaman Absensi saat karyawan pilih Awal/Akhir/Awal-Akhir/
+    // Libur. "Tidak Mau Lembur" = tidak pernah memanggil endpoint ini.
+    if (is_self_declare === true) {
+      const validDirections: OvertimeDirection[] = ["BEFORE_IN", "AFTER_OUT", "BOTH", "HOLIDAY"];
+      if (!validDirections.includes(declare_direction)) {
+        return NextResponse.json({ success: false, message: "Kategori lembur tidak valid." }, { status: 400 });
+      }
+
+      // ✅ PKL disamakan dengan karyawan — tidak ada lagi pengecualian role di sini.
+      const nowWIB = new Date(Date.now() + 7 * 3600_000);
+      const todayDate = nowWIB.toISOString().slice(0, 10);
+      const todayDow = nowWIB.getUTCDay();
+
+      // Cegah pengajuan dobel untuk tanggal + arah yang sama
+      const { data: existingReq } = await supabase
+        .from("overtime_requests")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("request_date", todayDate)
+        .eq("direction", declare_direction)
+        .not("status", "in", "(REJECTED,CANCELLED)")
+        .maybeSingle();
+      if (existingReq) {
+        return NextResponse.json({ success: false, message: "Kamu sudah pernah mengajukan lembur ini untuk hari ini." }, { status: 400 });
+      }
+
+      // Ambil absen masuk & pulang HARI INI milik user sendiri — jangan pernah
+      // percaya menit dari client, selalu hitung ulang dari data absen asli.
+      const [{ data: todayIn }, { data: todayOut }, { data: weeklyOff }, { data: specificOff }, { data: dateWork }, { data: monthlyOff }] = await Promise.all([
+        supabase.from("face_verifications").select("id, created_at").eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "IN")
+          .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`).maybeSingle(),
+        supabase.from("face_verifications").select("id, created_at").eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "OUT")
+          .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`).maybeSingle(),
+        supabase.from("user_day_off").select("id").eq("user_id", user.id).eq("day_of_week", todayDow).maybeSingle(),
+        supabase.from("user_date_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
+        supabase.from("user_date_work").select("id").eq("user_id", user.id).eq("work_date", todayDate).maybeSingle(),
+        supabase.from("user_monthly_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
+      ]);
+
+      if (!todayIn) {
+        return NextResponse.json({ success: false, message: "Belum ada absen masuk hari ini." }, { status: 400 });
+      }
+      const isDayOffToday = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !dateWork);
+
+      const baseSchedule = await resolveShiftConfigFromDB(user.id, supabase);
+      const scheduleOverride = await resolveScheduleOverride(supabase, user.id, todayDate);
+      const overrideShape = scheduleOverride ? toAuthScheduleShape(scheduleOverride) : null;
+      const schedule = overrideShape
+        ? { ...baseSchedule, ...overrideShape, checkout: overrideShape.checkout ?? baseSchedule.checkout }
+        : baseSchedule;
+
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const buildTS = (time: { h: number; m: number }) => new Date(`${todayDate}T${pad(time.h)}:${pad(time.m)}:00+07:00`).toISOString();
+
+      let minutes = 0, actualStart = "", actualEnd = "";
+
+      if (declare_direction === "HOLIDAY") {
+        if (!isDayOffToday) return NextResponse.json({ success: false, message: "Hari ini bukan hari libur kamu." }, { status: 400 });
+        if (!todayOut) return NextResponse.json({ success: false, message: "Belum ada absen pulang hari ini." }, { status: 400 });
+        minutes = computeHolidayOvertimeMinutes(todayIn.created_at, todayOut.created_at);
+        actualStart = todayIn.created_at; actualEnd = todayOut.created_at;
+      } else {
+        if (isDayOffToday) return NextResponse.json({ success: false, message: "Hari ini hari libur — ajukan sebagai kategori Hari Libur." }, { status: 400 });
+        const beforeIn = computeBeforeInOvertimeMinutes(todayIn.created_at, schedule);
+        const afterOut = todayOut ? computeAfterOutOvertimeMinutes(todayOut.created_at, schedule) : 0;
+
+        if (declare_direction === "BEFORE_IN") {
+          minutes = beforeIn;
+          actualStart = todayIn.created_at; actualEnd = buildTS(schedule.lateFrom);
+        } else if (declare_direction === "AFTER_OUT") {
+          if (!todayOut) return NextResponse.json({ success: false, message: "Belum ada absen pulang hari ini." }, { status: 400 });
+          minutes = afterOut;
+          actualStart = buildTS(schedule.checkout); actualEnd = todayOut.created_at;
+        } else if (declare_direction === "BOTH") {
+          if (!todayOut) return NextResponse.json({ success: false, message: "Belum ada absen pulang hari ini." }, { status: 400 });
+          minutes = computeCombinedOvertimeMinutes(beforeIn, afterOut);
+          actualStart = todayIn.created_at; actualEnd = todayOut.created_at;
+        }
+      }
+
+      if (minutes <= 0) {
+        return NextResponse.json({ success: false, message: "Tidak ada potensi lembur untuk kategori ini." }, { status: 400 });
+      }
+
+      const created = await createOvertimeDraft(supabase, {
+        userId: user.id, requestDate: todayDate, direction: declare_direction, minutes,
+        actualStart, actualEnd,
+        sourceFaceVerificationId: (todayOut ?? todayIn).id,
+        isHoliday: declare_direction === "HOLIDAY",
+      });
+
+      if (!created) {
+        return NextResponse.json({ success: false, message: "Gagal menyimpan pengajuan lembur." }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, data: created });
+    }
+
     if (is_manual === true) {
       const userRoles: string[] = Array.isArray(user.roles) && user.roles.length > 0
         ? user.roles
@@ -322,7 +428,7 @@ export async function POST(request: Request) {
         }
       }
 
-     if (!target_user_id || !request_date || !actual_start_time || !actual_end_time) {
+      if (!target_user_id || !request_date || !actual_start_time || !actual_end_time) {
         return NextResponse.json(
           { success: false, message: "target_user_id, request_date, actual_start_time, actual_end_time wajib" },
           { status: 400 }
@@ -375,10 +481,10 @@ export async function POST(request: Request) {
 
       if (hasManualPay) {
         finalRate = rate_per_hour ? Math.round(Number(rate_per_hour)) : 0;
-        totalPay  = Math.round(Number(manualTotalPay));
+        totalPay = Math.round(Number(manualTotalPay));
       } else if (is_holiday === true) {
         finalRate = 0;
-        totalPay  = 0;
+        totalPay = 0;
       } else {
         finalRate = rate_per_hour ?? 0;
         if (!finalRate) {
@@ -408,27 +514,27 @@ export async function POST(request: Request) {
 
       const insertStatus = proof_photo_url ? "COMPLETED" : "NEED_PROOF";
 
-     const { data, error } = await supabase
+      const { data, error } = await supabase
         .from("overtime_requests")
         .insert({
-          user_id:          target_user_id,
+          user_id: target_user_id,
           request_date,
-          reason:           reason?.trim() || "Input manual oleh admin",
-          requested_start:  actual_start_time,
-          status:           insertStatus,
-          approved_by:      user.id,
-          approved_at:      new Date().toISOString(),
-          actual_start:     actualStart,
-          actual_end:       actualEnd,
-          direction:        "MANUAL", // ✅ NEW
-          category:         manualCategory ?? null, // ✅ NEW
+          reason: reason?.trim() || "Input manual oleh admin",
+          requested_start: actual_start_time,
+          status: insertStatus,
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+          actual_start: actualStart,
+          actual_end: actualEnd,
+          direction: "MANUAL", // ✅ NEW
+          category: manualCategory ?? null, // ✅ NEW
           work_description: work_description?.trim() || null,
-          proof_photo_url:  proof_photo_url || null,
+          proof_photo_url: proof_photo_url || null,
           duration_minutes: durationMins,
-          completed_at:     proof_photo_url ? new Date().toISOString() : null,
-          auto_completed:   false,
-          is_holiday:       is_holiday === true,
-          is_late:          manualIsLate,
+          completed_at: proof_photo_url ? new Date().toISOString() : null,
+          auto_completed: false,
+          is_holiday: is_holiday === true,
+          is_late: manualIsLate,
           // ✅ rate_per_hour/total_pay TIDAK diisi manual lagi — nominal
           // selalu dihitung otomatis lewat action AUDIT (poin 4).
         })
@@ -441,7 +547,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, data });
     }
 
-   // ── NORMAL REQUEST — SUDAH TIDAK DIPAKAI (poin 2) ───────────────────────
+    // ── NORMAL REQUEST — SUDAH TIDAK DIPAKAI (poin 2) ───────────────────────
     // Lembur sekarang murni otomatis dari absen masuk lebih awal / pulang
     // lebih larut (lihat lib/attendanceVerification.ts). Karyawan tidak lagi
     // mengajukan lembur manual lewat form ini.
@@ -502,7 +608,7 @@ export async function PATCH(request: Request) {
     console.log("[PATCH] Action:", action, "User:", user.id, "UserRoles:", userRoles);
     console.log("[PATCH] Overtime user_id:", overtime.user_id, "Status:", overtime.status);
 
-   // ── SUBMIT_DETAIL — karyawan (pemilik) isi kategori + keterangan ───────
+    // ── SUBMIT_DETAIL — karyawan (pemilik) isi kategori + keterangan ───────
     // dipanggil otomatis dari halaman face-verify setelah lembur kedeteksi
     if (action === "SUBMIT_DETAIL") {
       const isOwner = overtime.user_id === user.id;
@@ -699,11 +805,11 @@ export async function PATCH(request: Request) {
       const { data, error } = await supabase
         .from("overtime_requests")
         .update({
-          status:         "REJECTED",
-          approved_by:    user.id,
-          approved_at:    new Date().toISOString(),
+          status: "REJECTED",
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
           rejection_note: rejection_note ?? null,
-          updated_at:     new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .eq("id", id)
         .select()
@@ -725,22 +831,22 @@ export async function PATCH(request: Request) {
 
         const updatePayload: Record<string, any> = {
           proof_photo_url: finalProof,
-          status:          finalProof ? "COMPLETED" : "NEED_PROOF",
-          updated_at:      new Date().toISOString(),
+          status: finalProof ? "COMPLETED" : "NEED_PROOF",
+          updated_at: new Date().toISOString(),
         };
 
         if (!overtime.actual_end && overtime.scheduled_end && overtime.actual_start) {
-          const lockedEnd    = overtime.scheduled_end;
-          const startMs      = new Date(overtime.actual_start).getTime();
-          const endMs        = new Date(lockedEnd).getTime();
+          const lockedEnd = overtime.scheduled_end;
+          const startMs = new Date(overtime.actual_start).getTime();
+          const endMs = new Date(lockedEnd).getTime();
           if (endMs > startMs) {
             const durationMins = Math.round((endMs - startMs) / 60000);
-            const billedHours  = Math.floor(durationMins / 60);
-            const ratePerHour  = overtime.rate_per_hour ?? 0;
-            updatePayload.actual_end       = lockedEnd;
-            updatePayload.completed_at     = lockedEnd;
+            const billedHours = Math.floor(durationMins / 60);
+            const ratePerHour = overtime.rate_per_hour ?? 0;
+            updatePayload.actual_end = lockedEnd;
+            updatePayload.completed_at = lockedEnd;
             updatePayload.duration_minutes = durationMins;
-            updatePayload.total_pay        = billedHours * ratePerHour;
+            updatePayload.total_pay = billedHours * ratePerHour;
           }
         }
 
@@ -765,7 +871,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: false, message: "actual_start tidak ditemukan." }, { status: 400 });
       }
 
-      const nowIso         = new Date().toISOString();
+      const nowIso = new Date().toISOString();
       const scheduledEndIso = overtime.scheduled_end;
 
       let actualEnd: string;
@@ -778,26 +884,26 @@ export async function PATCH(request: Request) {
       }
 
       const startMs = new Date(startReference).getTime();
-      const endMs   = new Date(actualEnd).getTime();
+      const endMs = new Date(actualEnd).getTime();
 
       if (endMs <= startMs) {
         return NextResponse.json({ success: false, message: "Waktu selesai tidak valid" }, { status: 400 });
       }
 
-      const durationMins  = Math.round((endMs - startMs) / 60000);
-      const ratePerHour   = overtime.rate_per_hour ?? 0;
-      const billedHours   = Math.floor(durationMins / 60);
+      const durationMins = Math.round((endMs - startMs) / 60000);
+      const ratePerHour = overtime.rate_per_hour ?? 0;
+      const billedHours = Math.floor(durationMins / 60);
       const calculatedPay = billedHours * ratePerHour;
-      const finalProof    = proof_photo_url ?? null;
+      const finalProof = proof_photo_url ?? null;
 
       const updates: any = {
-        actual_end:       actualEnd,
-        status:           finalProof ? "COMPLETED" : "NEED_PROOF",
-        proof_photo_url:  finalProof,
-        completed_at:     actualEnd,
+        actual_end: actualEnd,
+        status: finalProof ? "COMPLETED" : "NEED_PROOF",
+        proof_photo_url: finalProof,
+        completed_at: actualEnd,
         duration_minutes: durationMins,
-        total_pay:        calculatedPay,
-        updated_at:       new Date().toISOString(),
+        total_pay: calculatedPay,
+        updated_at: new Date().toISOString(),
       };
 
       if (auto_completed === true) updates.auto_completed = true;
@@ -825,7 +931,7 @@ export async function PATCH(request: Request) {
         );
       }
 
-if (overtime.status !== "COMPLETED") {
+      if (overtime.status !== "COMPLETED") {
         return NextResponse.json(
           { success: false, message: "Bayaran hanya bisa diatur setelah lembur selesai" },
           { status: 400 }
@@ -855,8 +961,8 @@ if (overtime.status !== "COMPLETED") {
         .from("overtime_requests")
         .update({
           rate_per_hour: Math.round(rate_per_hour),
-          total_pay:     Math.round(total_pay),
-          updated_at:    new Date().toISOString(),
+          total_pay: Math.round(total_pay),
+          updated_at: new Date().toISOString(),
         })
         .eq("id", id)
         .select()
@@ -896,47 +1002,47 @@ if (overtime.status !== "COMPLETED") {
       }
 
       const {
-        request_date:     newDate,
-        scheduled_start:  newSchedStart,
-        scheduled_end:    newSchedEnd,
-        actual_start:     newActualStart,
-        actual_end:       newActualEnd,
-        reason:           newReason,
+        request_date: newDate,
+        scheduled_start: newSchedStart,
+        scheduled_end: newSchedEnd,
+        actual_start: newActualStart,
+        actual_end: newActualEnd,
+        reason: newReason,
         work_description: newWorkDesc,
-        proof_photo_url:  newProofUrl,
-        rate_per_hour:    newRate,
-        status:           newStatus,
+        proof_photo_url: newProofUrl,
+        rate_per_hour: newRate,
+        status: newStatus,
       } = body;
 
       const resolvedStart = newActualStart ?? overtime.actual_start;
-      const resolvedEnd   = newActualEnd   ?? overtime.actual_end;
-      const resolvedRate  = newRate        ?? overtime.rate_per_hour ?? 0;
+      const resolvedEnd = newActualEnd ?? overtime.actual_end;
+      const resolvedRate = newRate ?? overtime.rate_per_hour ?? 0;
 
       let durationMins: number | undefined;
-      let computedPay:  number | undefined;
+      let computedPay: number | undefined;
 
       if (resolvedStart && resolvedEnd) {
         const startMs = new Date(resolvedStart).getTime();
-        const endMs   = new Date(resolvedEnd).getTime();
+        const endMs = new Date(resolvedEnd).getTime();
         if (endMs > startMs) {
           durationMins = Math.round((endMs - startMs) / 60000);
-          computedPay  = Math.floor(durationMins / 60) * resolvedRate;
+          computedPay = Math.floor(durationMins / 60) * resolvedRate;
         }
       }
 
       const updatePayload: Record<string, any> = { updated_at: new Date().toISOString() };
-      if (newDate        !== undefined) updatePayload.request_date      = newDate;
-      if (newSchedStart  !== undefined) updatePayload.scheduled_start   = newSchedStart;
-      if (newSchedEnd    !== undefined) updatePayload.scheduled_end     = newSchedEnd;
-      if (newActualStart !== undefined) updatePayload.actual_start      = newActualStart;
-      if (newActualEnd   !== undefined) updatePayload.actual_end        = newActualEnd;
-      if (newReason      !== undefined) updatePayload.reason            = newReason;
-      if (newWorkDesc    !== undefined) updatePayload.work_description  = newWorkDesc;
-      if (newProofUrl    !== undefined) updatePayload.proof_photo_url   = newProofUrl;
-      if (newRate        !== undefined) updatePayload.rate_per_hour     = Math.round(newRate);
-      if (newStatus      !== undefined) updatePayload.status            = newStatus;
-      if (durationMins   !== undefined) updatePayload.duration_minutes  = durationMins;
-      if (computedPay    !== undefined) updatePayload.total_pay         = Math.round(computedPay);
+      if (newDate !== undefined) updatePayload.request_date = newDate;
+      if (newSchedStart !== undefined) updatePayload.scheduled_start = newSchedStart;
+      if (newSchedEnd !== undefined) updatePayload.scheduled_end = newSchedEnd;
+      if (newActualStart !== undefined) updatePayload.actual_start = newActualStart;
+      if (newActualEnd !== undefined) updatePayload.actual_end = newActualEnd;
+      if (newReason !== undefined) updatePayload.reason = newReason;
+      if (newWorkDesc !== undefined) updatePayload.work_description = newWorkDesc;
+      if (newProofUrl !== undefined) updatePayload.proof_photo_url = newProofUrl;
+      if (newRate !== undefined) updatePayload.rate_per_hour = Math.round(newRate);
+      if (newStatus !== undefined) updatePayload.status = newStatus;
+      if (durationMins !== undefined) updatePayload.duration_minutes = durationMins;
+      if (computedPay !== undefined) updatePayload.total_pay = Math.round(computedPay);
 
       const { data, error } = await supabase
         .from("overtime_requests")

@@ -67,6 +67,7 @@ export default function FaceVerifyPage() {
   const holdCountRef = useRef(0);
   const isCapturingRef = useRef(false);
   const isDetectingRef = useRef(false);
+  const detectionErrLoggedRef = useRef(false);
   const logEndRef = useRef<HTMLDivElement>(null);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptsRef = useRef(0);
@@ -338,16 +339,6 @@ export default function FaceVerifyPage() {
 
   const startCamera = useCallback(async () => {
     try {
-      // Cek apakah device punya kamera sama sekali
-      if (navigator.mediaDevices?.enumerateDevices) {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const hasCamera = devices.some(d => d.kind === "videoinput");
-        if (!hasCamera) {
-          addLog("no camera device found", "warn");
-          return "no-camera"; // ← return string khusus
-        }
-      }
-
       addLog("initializing camera...", "info");
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
@@ -356,7 +347,9 @@ export default function FaceVerifyPage() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play().catch(() => { });
+        videoRef.current.play().catch((err: any) => {
+          addLog(`video play() gagal: ${err?.name ?? "unknown"}`, "err");
+        });
       }
       addLog("camera active ", "ok");
       return "ok";
@@ -414,9 +407,13 @@ export default function FaceVerifyPage() {
     holdCountRef.current = 0;
     isCapturingRef.current = false;
     isDetectingRef.current = false; // ✅ NEW
+    detectionErrLoggedRef.current = false; // ✅ reset tiap kali loop baru dimulai
 
     intervalRef.current = setInterval(async () => {
-      if (!videoRef.current || !canvasRef.current || isCapturingRef.current || isDetectingRef.current) return;
+      if (
+        !videoRef.current || !canvasRef.current || isCapturingRef.current || isDetectingRef.current ||
+        videoRef.current.readyState < 2 || videoRef.current.videoWidth === 0 // ✅ video belum punya frame — skip, jangan dipaksa deteksi
+      ) return;
       isDetectingRef.current = true;
       try {
         const detections = await faceapi
@@ -556,7 +553,11 @@ export default function FaceVerifyPage() {
           holdCountRef.current = Math.max(0, holdCountRef.current - 1);
           setHoldProgress(p => Math.max(0, p - 5));
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (!detectionErrLoggedRef.current) {
+          detectionErrLoggedRef.current = true;
+          addLog(`face detection error: ${err?.name ?? ""} ${err?.message ?? "unknown"}`, "err");
+        }
         console.error("Detection loop error:", err);
       } finally {
         isDetectingRef.current = false; // ✅ NEW
@@ -1327,7 +1328,7 @@ export default function FaceVerifyPage() {
             </div>
 
             <div className="cam-box">
-              <video ref={videoRef} playsInline muted />
+              <video ref={videoRef} playsInline muted autoPlay />
               <canvas ref={canvasRef} />
               <div className="cam-grid" /><div className="cam-scanline" />
               <div className="face-oval">

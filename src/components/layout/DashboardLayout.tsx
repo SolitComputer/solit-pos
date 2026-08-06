@@ -3,7 +3,7 @@
 
 import Sidebar from "./Sidebar";
 import { usePresence } from "@/hooks/usePresence";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import DeliveryAlertListener from "../preparation/DeliveryAlertListener";
 import { HTCallProvider } from "@/contexts/HTCallContext";
@@ -15,6 +15,7 @@ import { SellerReminderNotifier } from "@/components/layout/SellerReminderNotifi
 import { unlockReminderAudio } from "@/lib/reminderSound";
 import PatchNoteFab from "@/components/ui/PatchNoteFab";
 import BackButton from "@/components/ui/BackButton";
+import { useAuthUser } from "@/hooks/useAuthUser";
 
 
 function ScrollRestorer() {
@@ -51,15 +52,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isDashboardHome = pathname === "/dashboard";
 
   // ── userId untuk sound notifier ────────────────────────────────────────────
-  // Ikuti pola MissionQuestTracker yang sudah proven: fetch /api/auth/me
-  const [soundUserId, setSoundUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then(r => r.json())
-      .then(r => setSoundUserId(r?.user?.id ?? r?.data?.id ?? r?.id ?? null))
-      .catch(() => { });
-  }, []);
+  // Pakai shared cache dari useAuthUser — tidak fetch terpisah lagi
+  const { user: authUser } = useAuthUser();
+  const soundUserId = authUser?.id ?? null;
 
   // ── Mission sound ──────────────────────────────────────────────────────────
   const { playMissionSound, unlockAudio } = useMissionSound();

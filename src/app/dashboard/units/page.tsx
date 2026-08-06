@@ -11,6 +11,7 @@ import BulkAddUnitModal from "@/components/inventory/BulkAddUnitModal";
 import LaptopPickerModal, { PickableLaptop } from "@/components/inventory/LaptopPickerModal";
 import AddLaptopModal from "@/components/inventory/AddLaptopModal";
 import { usePagePermission } from "@/hooks/usePagePermission";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -633,8 +634,7 @@ export default function AllUnitsPage() {
     const [showAddLaptopModal, setShowAddLaptopModal] = useState(false);
 
     useEffect(() => {
-        fetch("/api/auth/me")
-            .then(r => r.json())
+        getAuthUser().then(u => ({ success: true, user: u }))
             .then(r => {
                 const roles: string[] =
                     Array.isArray(r.user?.roles) && r.user.roles.length > 0

@@ -22,6 +22,7 @@ import {
     applyFilters,
     CASHFLOW_START_DATE,
 } from "@/lib/cashflow";
+import { getAuthUser } from "@/hooks/useAuthUser";
 import {
     ShoppingCart,
     Wrench,
@@ -1427,8 +1428,8 @@ export default function CashflowPage() {
     const ITEMS_PER_PAGE = 70;
 
     useEffect(() => {
-        fetch("/api/auth/me").then((r) => r.json()).then((r) => {
-            const roles: string[] = r.user?.roles?.length ? r.user.roles : [r.user?.role].filter(Boolean);
+        getAuthUser().then(u => ({ success: true, user: u })).then((r) => {
+            const roles: string[] = r.user?.roles?.length ? (r.user.roles as string[]) : [r.user?.role as string].filter(Boolean);
             const isAllowed = roles.some((x) => (CASHFLOW_ROLES as string[]).includes(x));
             setAllowed(isAllowed);
             setCanAuditOut(roles.some((x) => (CASHFLOW_AUDIT_OUT_ROLES as string[]).includes(x)));

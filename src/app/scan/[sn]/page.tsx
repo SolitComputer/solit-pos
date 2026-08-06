@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { getAuthUser } from "@/hooks/useAuthUser";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface LaptopUnitData {
@@ -102,11 +103,11 @@ export default function ScanPage() {
         // Paralel: fetch unit data + auth user
         const [unitRes, authRes] = await Promise.all([
           fetch(`/api/units/check-sn?sn=${encodeURIComponent(decodedSn)}`),
-          fetch("/api/auth/me"),
+          getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
         ]);
 
         const unitData = await unitRes.json();
-        const authData = await authRes.json().catch(() => ({ success: false }));
+        const authData = await authRes.json().catch(() => ({ success: false, user: null }));
 
         if (!unitData.success) {
           setError(unitData.message || "Unit tidak ditemukan");

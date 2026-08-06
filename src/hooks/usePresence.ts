@@ -4,16 +4,24 @@
 import { useEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 
-const HEARTBEAT_INTERVAL_MS = 15_000; // 15 detik — lebih responsif
+const HEARTBEAT_INTERVAL_MS = 30_000; // 30 detik — balance antara responsif & beban server
 const INITIAL_DELAY_MS = 500;
+const THROTTLE_MS = 10_000; // minimal 10 detik antar heartbeat (cegah spam saat alt-tab berulang)
 
 export function usePresence() {
   const pathname = usePathname();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isVisibleRef = useRef(true);
+  const lastSentRef = useRef(0); // timestamp terakhir heartbeat berhasil dikirim
 
   const sendHeartbeat = useCallback(async (page: string) => {
     if (!isVisibleRef.current) return; // Jangan kirim jika tab hidden
+
+    // Throttle: skip jika belum cukup jeda sejak heartbeat terakhir
+    const now = Date.now();
+    if (now - lastSentRef.current < THROTTLE_MS) return;
+    lastSentRef.current = now;
+
     try {
       await fetch("/api/presence", {
         method: "POST",
@@ -66,7 +74,7 @@ export function usePresence() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        // Tab kembali fokus — langsung kirim heartbeat & restart interval
+        // Tab kembali fokus — kirim heartbeat (throttled) & restart interval
         isVisibleRef.current = true;
         sendHeartbeat(pathname);
         startInterval(pathname);
@@ -83,7 +91,8 @@ export function usePresence() {
       clearPresence();
     };
 
-    // Handle focus/blur window (switch ke app lain)
+    // Handle focus window (switch ke app lain) — cukup cek visibility,
+    // throttle di sendHeartbeat mencegah double-fire dengan visibilitychange
     const handleFocus = () => {
       if (!isVisibleRef.current) {
         isVisibleRef.current = true;
@@ -92,22 +101,14 @@ export function usePresence() {
       }
     };
 
-    const handleBlur = () => {
-      // Saat window blur (minimized/switch app) — jangan langsung offline,
-      // biarkan interval tetap jalan karena user mungkin masih di tab ini
-      // (handled by visibilitychange)
-    };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("focus", handleFocus);
-    window.addEventListener("blur", handleBlur);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("blur", handleBlur);
     };
   }, [pathname, sendHeartbeat, startInterval, stopInterval, clearPresence]);
 

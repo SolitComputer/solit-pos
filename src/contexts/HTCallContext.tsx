@@ -90,14 +90,15 @@ export function HTCallProvider({ children }: { children: React.ReactNode }) {
 
   const flashNote = useCallback((s: string) => { setNote(s); setTimeout(() => setNote(null), 3500); }, []);
 
-  // current user
+  // current user — pakai shared cache, tidak fetch terpisah
   useEffect(() => {
     let alive = true;
-    fetch("/api/auth/me").then(r => r.json()).then(r => {
-      if (!alive) return;
-      const u = r?.user;
-      if (u && ELIGIBLE.has(u.role)) setMe({ userId: u.id, name: u.name, role: u.role });
-    }).catch(() => { });
+    import("@/hooks/useAuthUser").then(({ getAuthUser }) =>
+      getAuthUser().then(u => {
+        if (!alive || !u) return;
+        if (ELIGIBLE.has(u.role as string)) setMe({ userId: u.id, name: u.name, role: u.role as string });
+      })
+    ).catch(() => { });
     return () => { alive = false; };
   }, []);
 
