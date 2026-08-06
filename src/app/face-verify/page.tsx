@@ -18,7 +18,9 @@ const DETECTION_INPUT_SIZE = 224;
 const COMPANY_LAT = -6.402123;
 const COMPANY_LNG = 106.787296;
 const MAX_DISTANCE_METERS = 80;
-const GPS_ACCURACY_FALLBACK_METERS = 150;
+const GPS_ACCEPT_ACCURACY_METERS = 100;
+const GPS_ACCURACY_FALLBACK_METERS = 200;
+const GPS_MAX_WAIT_MS = 12000;
 const SHIFT_CONFIG_CLIENT = {
   PAGI: { startH: 7, startM: 30, endH: 12, endM: 0 },
   SORE: { startH: 14, startM: 0, endH: 18, endM: 0 },
@@ -175,7 +177,7 @@ export default function FaceVerifyPage() {
       return;
     }
 
-  let watchId: number;
+    let watchId: number;
     let timeoutId: NodeJS.Timeout;
     let bestAccuracy = Infinity;
     let bestPosition: GeolocationPosition | null = null; // ✅ NEW — simpan posisi terbaik, bukan cuma angka akurasinya
@@ -198,7 +200,7 @@ export default function FaceVerifyPage() {
         setStage("error");
         setMessage("Gagal mendapatkan sinyal GPS (Timeout). Pastikan GPS aktif dan Anda berada di area terbuka.");
       }
-    }, 25000);
+    }, GPS_MAX_WAIT_MS);
 
     watchId = navigator.geolocation.watchPosition(
       (position) => {
@@ -208,11 +210,11 @@ export default function FaceVerifyPage() {
           bestPosition = position;
         }
 
-        if (accuracy <= 80) {
+        if (accuracy <= GPS_ACCEPT_ACCURACY_METERS) {
           clearGPS();
           handleGpsSuccess(position);
         } else {
-          addLog(`Akurasi masih lemah: ±${Math.round(accuracy)}m (butuh <= 80m)...`, "warn");
+          addLog(`Akurasi masih lemah: ±${Math.round(accuracy)}m (butuh <= ${GPS_ACCEPT_ACCURACY_METERS}m)...`, "warn");
         }
       },
       (err) => {
@@ -225,7 +227,7 @@ export default function FaceVerifyPage() {
           addLog(`GPS retry [code ${err.code}]: ${err.message}`, "warn");
         }
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 8000 }
     );
   }, [addLog, handleGpsSuccess]);
 
