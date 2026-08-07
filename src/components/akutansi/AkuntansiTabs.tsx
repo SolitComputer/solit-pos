@@ -3,27 +3,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Fraunces, Outfit } from "next/font/google";
 import { periodLabel } from "@/lib/accounting";
 import JurnalUmum from "./JurnalUmum";
 import BukuBesar from "./BukuBesar";
 import Neraca from "./Neraca";
 import LabaRugi from "./LabaRugi";
 import AkunManager from "./AkunManager";
-import { Inbox, FileSpreadsheet } from "lucide-react";
-
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  weight: ["600", "900"],
-  style: ["normal", "italic"],
-  display: "swap",
-});
-
-const outfit = Outfit({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "900"],
-  display: "swap",
-});
+import { Inbox, FileSpreadsheet, ChevronLeft, ChevronRight, ArrowLeft } from "lucide-react";
 
 type TabKey = "jurnal" | "buku-besar" | "neraca" | "laba-rugi" | "akun";
 
@@ -40,8 +26,14 @@ export default function AkuntansiTabs({ period }: { period: string }) {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
 
+  // Navigasi periode bulan (sebelumnya / berikutnya)
+  const [y, m] = period.split("-").map(Number);
+  const prevDate = new Date(y, m - 2, 1);
+  const prevPeriod = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
+  const nextDate = new Date(y, m, 1);
+  const nextPeriod = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`;
+
   // Export SELURUH akuntansi (Jurnal Umum + Buku Besar per kategori + Neraca)
-  // ke satu file Excel — tidak tergantung tab yang sedang aktif.
   const handleExport = async () => {
     if (exporting) return;
     setExporting(true);
@@ -78,41 +70,60 @@ export default function AkuntansiTabs({ period }: { period: string }) {
   };
 
   return (
-    <div className={`${outfit.className} max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-0`}>
-      {/* Header — "sampul ledger" */}
-      <div className="ledger-cover relative overflow-hidden bg-gradient-to-br from-[#FBF7EC] to-[#F3ECD8] border border-[#E4DCC8] rounded-2xl px-5 sm:px-6 py-5 flex items-center justify-between gap-4 flex-wrap">
-        <div className="relative flex items-center gap-3">
+    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-5">
+      {/* Header — Modern Minimalist Card */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-xs flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Link
             href="/dashboard/akutansi"
-            className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0f0c29] to-[#1a1545] flex items-center justify-center text-white shadow-md hover:opacity-90 active:scale-90 transition-all duration-150 shrink-0"
-            title="Ganti bulan"
+            className="w-9 h-9 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-700 flex items-center justify-center transition-all shrink-0"
+            title="Pilih Bulan dari Grid"
           >
-            ‹
+            <ArrowLeft className="w-4 h-4 text-slate-600" />
           </Link>
+
           <div>
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="w-5 h-[2px] bg-gradient-to-r from-[#9C7420] to-transparent" />
-              <span className="text-[9px] font-semibold tracking-[0.2em] uppercase text-[#9C7420]">
-                Pembukuan
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="w-2 h-2 rounded-full bg-blue-600" />
+              <span className="text-[10px] font-bold tracking-widest uppercase text-slate-400">
+                Pembukuan Internal
               </span>
             </div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className={`${fraunces.className} text-2xl font-bold italic text-gray-900 leading-tight`}>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
                 Akuntansi
               </h1>
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wide text-[#6b5730] bg-white/70 border border-[#E4DCC8] rounded-md px-2 py-1">
-                {periodLabel(period)}
-              </span>
+
+              {/* Segmented Month Switcher Pill */}
+              <div className="bg-slate-100/90 border border-slate-200/80 rounded-full px-1.5 py-1 flex items-center gap-1 shrink-0">
+                <Link
+                  href={`/dashboard/akutansi/${prevPeriod}`}
+                  className="w-7 h-7 rounded-full bg-white hover:bg-slate-200/70 text-slate-700 font-bold flex items-center justify-center shadow-2xs active:scale-90 transition-all shrink-0"
+                  title={`Bulan sebelumnya (${periodLabel(prevPeriod)})`}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Link>
+                <span className="text-xs sm:text-sm font-bold uppercase tracking-wide text-slate-800 px-2.5">
+                  {periodLabel(period)}
+                </span>
+                <Link
+                  href={`/dashboard/akutansi/${nextPeriod}`}
+                  className="w-7 h-7 rounded-full bg-white hover:bg-slate-200/70 text-slate-700 font-bold flex items-center justify-center shadow-2xs active:scale-90 transition-all shrink-0"
+                  title={`Bulan berikutnya (${periodLabel(nextPeriod)})`}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Export global — semua laporan akuntansi dalam 1 file Excel */}
+        {/* Export Excel Button */}
         <button
           onClick={handleExport}
           disabled={exporting}
-          title="Export seluruh akuntansi (Jurnal Umum, Buku Besar, Laba Rugi, Neraca) ke 1 file Excel"
-          className="relative h-10 px-4 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 hover:shadow-lg hover:shadow-emerald-600/25 active:scale-[0.96] transition-all duration-150 disabled:opacity-40 disabled:active:scale-100 shrink-0 whitespace-nowrap"
+          title="Export seluruh akuntansi ke 1 file Excel"
+          className="h-10 px-4 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] text-white text-xs font-semibold shadow-xs hover:shadow transition-all disabled:opacity-40 shrink-0 whitespace-nowrap"
         >
           {exporting ? (
             <span className="inline-block animate-spin">⟳</span>
@@ -125,43 +136,33 @@ export default function AkuntansiTabs({ period }: { period: string }) {
 
       {/* Error export */}
       {exportError && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700 mt-4">
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700 font-medium">
           {exportError}
         </div>
       )}
 
-      {/* Tabs — kayak tab index buku besar */}
-      <div className="relative flex gap-1 overflow-x-auto mt-5 px-1">
-        {TABS.map((t, i) => {
+      {/* Segmented Control Bar Nav Tabs */}
+      <div className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/60 inline-flex flex-wrap gap-1">
+        {TABS.map((t) => {
           const active = tab === t.key;
           return (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              style={{ animationDelay: `${i * 40}ms` }}
-              className={`ledger-tab relative shrink-0 ${active ? "h-11" : "h-10"
-                } min-w-[112px] flex items-center justify-center active:scale-[0.96] transition-all duration-200 ${active ? "" : "hover:-translate-y-0.5"
-                }`}
+              className={`px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 whitespace-nowrap ${
+                active
+                  ? "bg-white text-slate-900 font-bold shadow-xs"
+                  : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
+              }`}
             >
-              <span
-                className={`ledger-tab-shape absolute inset-0 transition-colors duration-200 ${active
-                  ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] shadow-lg shadow-black/20"
-                  : "bg-white border border-gray-200 hover:bg-gray-50"
-                  }`}
-              />
-              <span
-                className={`relative z-10 text-xs font-bold whitespace-nowrap px-3 ${active ? "text-white" : "text-gray-500"
-                  }`}
-              >
-                {t.label}
-              </span>
+              {t.label}
             </button>
           );
         })}
       </div>
 
-      {/* Content */}
-      <div className="relative bg-white border border-gray-200 rounded-b-2xl rounded-tr-2xl -mt-px pt-5 px-1">
+      {/* Main Content Container */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 sm:p-6">
         {tab === "jurnal" ? (
           <JurnalUmum period={period} />
         ) : tab === "buku-besar" ? (
@@ -173,44 +174,14 @@ export default function AkuntansiTabs({ period }: { period: string }) {
         ) : tab === "akun" ? (
           <AkunManager />
         ) : (
-          <div className="bg-white rounded-xl p-16 text-center">
-            <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10" /></div>
-            <p className="text-sm font-semibold text-gray-600">
+          <div className="py-16 text-center">
+            <div className="flex justify-center mb-3 opacity-40"><Inbox className="w-10 h-10 text-slate-400" /></div>
+            <p className="text-sm font-semibold text-slate-600">
               {TABS.find((t) => t.key === tab)?.label} — belum dikerjakan
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Akan dibangun di atas data Jurnal Umum periode ini.
             </p>
           </div>
         )}
       </div>
-
-      <style jsx global>{`
-        .ledger-cover {
-          background-image: radial-gradient(rgba(15, 12, 41, 0.06) 1px, transparent 1px);
-          background-size: 16px 16px;
-        }
-        .ledger-tab-shape {
-          clip-path: polygon(6% 0%, 94% 0%, 100% 100%, 0% 100%);
-          border-radius: 10px 10px 0 0;
-        }
-        .ledger-tab {
-          animation: tabFadeIn 0.35s ease backwards;
-        }
-        @keyframes tabFadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .ledger-tab {
-            animation: none !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
