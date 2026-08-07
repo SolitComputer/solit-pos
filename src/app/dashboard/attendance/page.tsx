@@ -6472,7 +6472,6 @@ export default function AttendanceDashboardPage() {
                                                 <div className="flex items-center justify-between gap-3 flex-wrap">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-lg shadow-md flex-shrink-0">
-
                                                         </div>
                                                         <div>
                                                             <p className="font-bold text-gray-800 text-sm">
