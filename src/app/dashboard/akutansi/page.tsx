@@ -3,17 +3,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Fraunces } from "next/font/google";
 import { Camera, Loader2 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { MONTH_LABELS } from "@/lib/accounting";
 
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  weight: ["500", "700", "900"],
-  style: ["normal", "italic"],
-  display: "swap",
-});
 
 function stampRipple(e: React.MouseEvent<HTMLButtonElement>, color: string) {
   const button = e.currentTarget;
@@ -184,7 +177,7 @@ export default function AkuntansiPeriodPickerPage() {
                 </span>
               </div>
               <h1
-                className={`${fraunces.className} text-4xl font-black italic tracking-tight bg-gradient-to-r from-[#3A3528] via-[#5C6B5E] to-[#8A6A2F] bg-clip-text text-transparent`}
+                className="text-4xl font-black tracking-tight bg-gradient-to-r from-[#3A3528] via-[#5C6B5E] to-[#8A6A2F] bg-clip-text text-transparent"
               >
                 Akuntansi
               </h1>
@@ -249,7 +242,7 @@ export default function AkuntansiPeriodPickerPage() {
                 </button>
                 <span
                   key={year}
-                  className={`year-pop ${fraunces.className} px-3 text-sm font-bold text-gray-900 tabular-nums`}
+                  className="year-pop px-3 text-sm font-bold text-gray-900 tabular-nums"
                 >
                   {year}
                 </span>
@@ -279,10 +272,10 @@ export default function AkuntansiPeriodPickerPage() {
                   onClick={(e) => open(m, e, isFuture)}
                   aria-label={`Buka pembukuan ${MONTH_LABELS[m - 1]} ${year}`}
                   style={{ animationDelay: `${i * 45}ms`, ["--tilt" as string]: tilt }}
-                  className={`ledger-card group relative aspect-[4/5] rounded-lg overflow-hidden transition-all duration-200 flex flex-col items-center justify-center active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9C7420] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F7F8]
+                  className={`ledger-card group relative aspect-[4/5] rounded-2xl overflow-hidden transition-all duration-200 flex flex-col items-center justify-center active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2
                     ${isFuture
-                      ? "bg-white/60 border border-dashed border-gray-200 text-gray-300 hover:border-gray-300"
-                      : "paper bg-[#FBF7EC] border border-black/5 text-[#3A3528] shadow-sm hover:-translate-y-1.5 hover:shadow-lg hover:shadow-[#8FBFA0]/20 hover:border-[#BFE8CE]/60"
+                      ? "bg-slate-50/60 border border-dashed border-slate-200 text-slate-300 hover:border-slate-300"
+                      : "bg-white border border-slate-200/80 text-slate-900 shadow-xs hover:-translate-y-1.5 hover:shadow-md hover:border-slate-300"
                     }`}
                 >
                   <div
@@ -317,7 +310,7 @@ export default function AkuntansiPeriodPickerPage() {
                   )}
 
                   <span
-                    className={`${fraunces.className} text-3xl font-bold tabular-nums leading-none transition-transform duration-200 group-hover:scale-110`}
+                    className="text-3xl font-bold tabular-nums leading-none transition-transform duration-200 group-hover:scale-110"
                   >
                     {String(m).padStart(2, "0")}
                   </span>
