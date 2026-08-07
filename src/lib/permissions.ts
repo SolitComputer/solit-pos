@@ -284,6 +284,7 @@ export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
 export const AI_CEO_ROLES: UserRole[] = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER"];
+export const ROLE_ACCESS_MANAGER_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
 // ─── Notification Sound Settings — atur suara notif pengantaran per akun ─────
 export const NOTIFICATION_SETTINGS_ROLES: UserRole[] = [...FULL_ACCESS];
@@ -505,6 +506,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/notification-settings": [...NOTIFICATION_SETTINGS_ROLES],
   "/dashboard/ai-ceo": [...AI_CEO_ROLES],
   "/api/ai-ceo": [...AI_CEO_ROLES],
+  "/api/admin/pages": [...ROLE_ACCESS_MANAGER_ROLES],
+  "/api/admin/role-permissions": [...ROLE_ACCESS_MANAGER_ROLES],
 
   "/dashboard/profile": [...ALL_ROLES],
   "/dashboard/social": [...ALL_ROLES],
