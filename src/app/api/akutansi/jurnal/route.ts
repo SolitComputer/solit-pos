@@ -109,11 +109,37 @@ export const GET = withAuth(async (req) => {
     0
   );
 
+  const allLineIds = entriesWithMeta.flatMap((e: any) => (e.lines ?? []).map((l: any) => l.id));
+  const checkedMap = new Map<string, string>();
+
+  if (allLineIds.length > 0) {
+    const { data: checksData } = await supabase
+      .from("journal_line_checks")
+      .select("line_id, checked_at")
+      .in("line_id", allLineIds);
+
+    for (const c of (checksData ?? []) as any[]) {
+      checkedMap.set(c.line_id, c.checked_at);
+    }
+  }
+
+  const entriesWithChecks = entriesWithMeta.map((e: any) => ({
+    ...e,
+    lines: (e.lines ?? []).map((l: any) => {
+      const checkedAt = checkedMap.get(l.id);
+      return {
+        ...l,
+        checked: Boolean(checkedAt),
+        checked_at: checkedAt ?? null,
+      };
+    }),
+  }));
+
   return NextResponse.json({
     success: true,
-    data: entriesWithMeta,
+    data: entriesWithChecks,
     summary: {
-      total_entry: entriesWithMeta.length,
+      total_entry: entriesWithChecks.length,
       total_debit: totalDebit,
       total_kredit: totalKredit,
       balanced: totalDebit === totalKredit,

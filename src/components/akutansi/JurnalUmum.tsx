@@ -25,6 +25,8 @@ interface JournalLine {
     nominal: number;
     keterangan?: string | null;
     line_order: number;
+    checked?: boolean;
+    checked_at?: string | null;
 }
 
 interface WarningLog {
@@ -285,6 +287,43 @@ export default function JurnalUmum({ period }: { period: string }) {
             load();
         }
     };
+
+    // Toggle status "sudah dicek" untuk SELURUH baris dalam satu entry sekaligus
+    const toggleEntryChecked = useCallback(async (entry: JournalEntry, next: boolean) => {
+        const validLines = entry.lines.filter((l) => !l.id.endsWith("-missing"));
+        if (validLines.length === 0) return;
+
+        const validLineIds = new Set(validLines.map((l) => l.id));
+
+        setEntries((prev) =>
+            prev.map((e) =>
+                e.id === entry.id
+                    ? {
+                          ...e,
+                          lines: e.lines.map((l) =>
+                              validLineIds.has(l.id)
+                                  ? { ...l, checked: next, checked_at: next ? new Date().toISOString() : null }
+                                  : l
+                          ),
+                      }
+                    : e
+            )
+        );
+
+        try {
+            await Promise.all(
+                validLines.map((l) =>
+                    fetch("/api/akutansi/buku-besar/check", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ line_id: l.id, checked: next }),
+                    })
+                )
+            );
+        } catch {
+            load(false);
+        }
+    }, [load]);
 
     // Helper & hitung jumlah penanda (khusus entry yang ditandai manual lewat tombol Penanda di kolom AKSI)
     const hasWarning = useCallback((e: JournalEntry) => Boolean(e.has_warning), []);
@@ -647,13 +686,12 @@ export default function JurnalUmum({ period }: { period: string }) {
                         <button
                             onClick={() => setShowOnlyWarnings((v) => !v)}
                             title={showOnlyWarnings ? "Tampilkan semua data" : "Filter hanya data dengan penanda (Modal Rp0 / diedit)"}
-                            className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${
-                                showOnlyWarnings
+                            className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyWarnings
                                     ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300"
                                     : warningCount > 0
-                                    ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                                    : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
-                            }`}
+                                        ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                                        : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                                }`}
                         >
                             <AlertTriangle className={`w-3.5 h-3.5 ${showOnlyWarnings ? "text-white" : warningCount > 0 ? "text-red-600" : "text-slate-400"}`} />
                             <span>Penanda</span>
@@ -726,11 +764,10 @@ export default function JurnalUmum({ period }: { period: string }) {
                             Kredit&nbsp; <span className="font-extrabold text-slate-900">{rp(totalKredit)}</span>
                         </span>
                         <span
-                            className={`text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 shrink-0 ${
-                                totalDebit === totalKredit
+                            className={`text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 shrink-0 ${totalDebit === totalKredit
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
                                     : "bg-red-50 text-red-700 border border-red-200/80"
-                            }`}
+                                }`}
                         >
                             {totalDebit === totalKredit ? (
                                 <>
@@ -923,6 +960,9 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                 ? displayLines.filter((l) => accountCodeFilter.has(l.account_code))
                                                 : displayLines;
 
+                                            const validLinesForCheck = entry.lines.filter((l) => !l.id.endsWith("-missing"));
+                                            const isEntryChecked = validLinesForCheck.length > 0 && validLinesForCheck.every((l) => l.checked);
+
                                             return (
                                                 <Draggable key={entry.id} draggableId={entry.id} index={index}>
                                                     {(provided, snapshot) => (
@@ -1057,6 +1097,21 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                         title="Hapus"
                                                                                     >
                                                                                         <Trash2 className="w-4 h-4" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => toggleEntryChecked(entry, !isEntryChecked)}
+                                                                                        title={
+                                                                                            isEntryChecked
+                                                                                                ? "Sudah dicek (Klik untuk batalkan)"
+                                                                                                : "Tandai sudah dicek"
+                                                                                        }
+                                                                                        className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${
+                                                                                            isEntryChecked
+                                                                                                ? "bg-green-600 border-green-600 text-white shadow-2xs"
+                                                                                                : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"
+                                                                                        }`}
+                                                                                    >
+                                                                                        <Check className="w-3.5 h-3.5 mx-auto" />
                                                                                     </button>
                                                                                 </div>
                                                                             )}
