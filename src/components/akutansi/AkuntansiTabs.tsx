@@ -149,11 +149,10 @@ export default function AkuntansiTabs({ period }: { period: string }) {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 whitespace-nowrap ${
-                active
+              className={`px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-all duration-200 whitespace-nowrap ${active
                   ? "bg-white text-slate-900 font-bold shadow-xs"
                   : "text-slate-500 hover:text-slate-800 hover:bg-white/40"
-              }`}
+                }`}
             >
               {t.label}
             </button>

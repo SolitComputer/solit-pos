@@ -122,7 +122,7 @@ export default function AkuntansiPeriodPickerPage() {
 
         <div className="relative max-w-[1100px] mx-auto px-6 py-10 space-y-8">
           {/* Header — glass hero panel, foto & year switcher digabung jadi satu widget */}
-        <div className="relative rounded-[28px] border border-white/70 bg-white/50 backdrop-blur-sm shadow-[0_10px_35px_rgba(70,120,170,0.10)] px-6 py-6 sm:px-8 sm:py-7 flex items-start justify-between flex-wrap gap-6">
+          <div className="relative rounded-[28px] border border-white/70 bg-white/50 backdrop-blur-sm shadow-[0_10px_35px_rgba(70,120,170,0.10)] px-6 py-6 sm:px-8 sm:py-7 flex items-start justify-between flex-wrap gap-6">
             <span aria-hidden="true" className="butterfly butterfly-1">
               <svg viewBox="0 0 32 24" className="w-5 h-4 sm:w-6 sm:h-5">
                 <g className="butterfly-wing-l" style={{ transformOrigin: "16px 12px" }}>
@@ -355,7 +355,7 @@ export default function AkuntansiPeriodPickerPage() {
               <p className="text-xs text-gray-500 font-mono">
                 Data jurnal dipisah per bulan. Bulan yang belum lewat tetap bisa dibuka untuk input berjalan.
               </p>
-<button
+              <button
                 type="button"
                 onClick={() => watermarkInputRef.current?.click()}
                 disabled={uploadingWatermark}
