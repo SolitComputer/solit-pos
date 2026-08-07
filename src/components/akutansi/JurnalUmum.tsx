@@ -135,6 +135,7 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [filterDropdownPos, setFilterDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // default: terbaru dulu
+    const [showOnlyWarnings, setShowOnlyWarnings] = useState(false); // filter khusus entry warning (Modal Rp0 / diedit)
     const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
     const [showManual, setShowManual] = useState(false);
     const [logEntry, setLogEntry] = useState<JournalEntry | null>(null);
@@ -285,10 +286,18 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
     };
 
+    // Helper & hitung jumlah penanda (khusus entry yang ditandai manual lewat tombol Penanda di kolom AKSI)
+    const hasWarning = useCallback((e: JournalEntry) => Boolean(e.has_warning), []);
+    const warningCount = useMemo(() => entries.filter(hasWarning).length, [entries, hasWarning]);
+
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         const qNom = searchNominal.trim();
         let result = entries;
+
+        if (showOnlyWarnings) {
+            result = result.filter(hasWarning);
+        }
 
         if (q || qNom) {
             const qNomDigits = qNom.replace(/[^0-9]/g, "");
@@ -316,14 +325,19 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
 
         return result;
-    }, [entries, search, searchNominal, accountCodeFilter]);
+    }, [entries, search, searchNominal, accountCodeFilter, showOnlyWarnings, hasWarning]);
 
     // Search untuk daftar PENDING (data yang belum dikonfirmasi ke jurnal umum) —
     // terpisah dari `filtered` di atas karena sumber datanya beda (PendingDraft, bukan JournalEntry).
     const filteredPending = useMemo(() => {
+        let pendingResult = pending;
+        if (showOnlyWarnings) {
+            // Data pending belum masuk ke jurnal umum (belum memiliki penanda manual AKSI)
+            pendingResult = [];
+        }
         const q = pendingSearch.trim().toLowerCase();
-        if (!q) return pending;
-        return pending.filter((d) => {
+        if (!q) return pendingResult;
+        return pendingResult.filter((d) => {
             const badge = SOURCE_BADGE[d.source_type];
             const companyBadge = d.source_type === "TRANSACTION" ? getCompanyBadge(d.meta?.company_name) : null;
             const specParts = [d.meta?.cpu, d.meta?.ram, d.meta?.storage].filter(Boolean) as string[];
@@ -334,7 +348,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                 specParts.some((s) => s.toLowerCase().includes(q))
             );
         });
-    }, [pending, pendingSearch]);
+    }, [pending, pendingSearch, showOnlyWarnings]);
 
     // Buka/tutup dropdown filter akun. Posisinya dihitung dari posisi tombol "Ref" di layar
     // (pakai position: fixed) supaya dropdown tidak terpotong oleh area scroll tabel.
@@ -457,7 +471,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         }, 0);
     }, [filtered, accountCodeFilter]);
 
-    const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0;
+    const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || showOnlyWarnings;
 
     useEffect(() => {
         if (!toast) return;
@@ -473,33 +487,13 @@ export default function JurnalUmum({ period }: { period: string }) {
                 </div>
             )}
 
-            {/* ── Summary ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                <Stat
-                    label={isFiltered ? "Total Entry (Filtered)" : "Total Entry"}
-                    value={isFiltered ? `${filtered.length} / ${entries.length}` : String(entries.length)}
-                    subvalue={isFiltered ? `${totalLinesFiltered} / ${totalLinesAll} baris` : `${totalLinesAll} total baris`}
-                    tone="gray"
-                />
-                <Stat label="Total Debit" value={rp(totalDebit)} tone="blue" />
-                <Stat label="Total Kredit" value={rp(totalKredit)} tone="emerald" />
-                <Stat
-                    label="Status"
-                    value={
-                        totalDebit === totalKredit
-                            ? <span className="inline-flex items-center gap-1">Balance <Check className="w-3.5 h-3.5" /></span>
-                            : "Tidak Balance"
-                    }
-                    tone={totalDebit === totalKredit ? "emerald" : "red"}
-                />
-            </div>
 
             {/* ── Pending panel ── */}
             {pending.length > 0 && (
-                <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
+                <div className="bg-amber-50/60 rounded-2xl border border-amber-200/80 overflow-hidden transition-all">
                     <button
                         onClick={() => setShowPending((v) => !v)}
-                        className="w-full px-4 py-3 flex items-center justify-between bg-amber-50 hover:bg-amber-100/60 active:scale-[0.995] transition-all duration-150"
+                        className="w-full px-4 sm:px-5 py-3 flex items-center justify-between hover:bg-amber-100/40 active:scale-[0.995] transition-all duration-150"
                     >
                         <div className="flex flex-col items-start gap-1">
                             <div className="flex items-center gap-2">
@@ -510,11 +504,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                                     (belum masuk jurnal umum)
                                 </span>
                             </div>
-                            {pendingSummary && (
-                                <span className="text-[10px] text-amber-700/70 font-semibold">
-                                    Transaksi: {pendingSummary.transaction} · Service: {pendingSummary.service} · Cashflow: {pendingSummary.cashflow}
-                                </span>
-                            )}
                         </div>
                         <span className={`text-amber-600 text-xs transition-transform duration-200 ${showPending ? "" : "-rotate-90"}`}>▲</span>
                     </button>
@@ -576,8 +565,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                 </span>
                                             )}
                                             {modalMissing && (
-                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-0.5" title="Harga modal belum diinput di transaksi ini">
-                                                    <AlertTriangle className="w-2.5 h-2.5" /> Modal Rp0
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200 inline-flex items-center gap-1" title="Harga modal belum diinput di transaksi ini">
+                                                    <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Modal Rp0
                                                 </span>
                                             )}
                                             <div className="w-full sm:contents">
@@ -596,11 +585,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 })}
                             </div>
 
-                            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                            <div className="px-4 py-3 border-t border-amber-100 bg-amber-50/50">
                                 <button
                                     onClick={() => confirmItems(pending.filter((d) => selected.has(key(d))))}
                                     disabled={busy || selected.size === 0}
-                                    className="w-full h-9 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-bold hover:opacity-90 active:scale-[0.98] transition-all duration-150 disabled:opacity-40 disabled:active:scale-100"
+                                    className="w-full h-9 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all duration-150 disabled:opacity-40 disabled:active:scale-100 shadow-xs"
                                 >
                                     Konfirmasi Terpilih ({selected.size})
                                 </button>
@@ -611,36 +600,36 @@ export default function JurnalUmum({ period }: { period: string }) {
             )}
 
             {/* ── Toolbar ── */}
-            <div className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
                 <div className="flex-1 flex flex-col sm:flex-row gap-2">
                     <div className="relative flex-1">
-                        <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Cari keterangan, akun, ref..."
-                            className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                            className="w-full h-10 border border-slate-200 bg-white rounded-xl pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition"
                         />
                     </div>
                     <div className="relative flex-1">
-                        <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <input
                             value={searchNominal}
                             onChange={(e) => setSearchNominal(e.target.value)}
                             placeholder="Cari nominal..."
-                            className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+                            className="w-full h-10 border border-slate-200 bg-white rounded-xl pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition"
                         />
                     </div>
                 </div>
 
                 <div className="flex gap-2">
-                    <div className="flex items-center gap-0.5 border border-gray-200 rounded-lg p-1 shrink-0">
+                    <div className="flex items-center gap-1 border border-slate-200/80 bg-slate-100/80 rounded-xl p-1 shrink-0">
                         <button
                             onClick={() => setSortOrder("desc")}
                             title="Terbaru ke terlama"
-                            className={`h-8 px-2.5 rounded-md text-[11px] font-bold flex items-center gap-1 active:scale-95 transition-all duration-150 ${sortOrder === "desc"
-                                ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white"
-                                : "text-gray-400 hover:bg-gray-50"
+                            className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${sortOrder === "desc"
+                                ? "bg-slate-900 text-white shadow-2xs font-bold"
+                                : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
                                 }`}
                         >
                             <ArrowUpDown className="w-3 h-3" /> Terbaru
@@ -648,29 +637,56 @@ export default function JurnalUmum({ period }: { period: string }) {
                         <button
                             onClick={() => setSortOrder("asc")}
                             title="Terlama ke terbaru"
-                            className={`h-8 px-2.5 rounded-md text-[11px] font-bold active:scale-95 transition-all duration-150 ${sortOrder === "asc"
-                                ? "bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white"
-                                : "text-gray-400 hover:bg-gray-50"
+                            className={`h-8 px-3 rounded-lg text-xs font-semibold active:scale-95 transition-all duration-150 ${sortOrder === "asc"
+                                ? "bg-slate-900 text-white shadow-2xs font-bold"
+                                : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
                                 }`}
                         >
                             Terlama
+                        </button>
+                        <button
+                            onClick={() => setShowOnlyWarnings((v) => !v)}
+                            title={showOnlyWarnings ? "Tampilkan semua data" : "Filter hanya data dengan penanda (Modal Rp0 / diedit)"}
+                            className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${
+                                showOnlyWarnings
+                                    ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300"
+                                    : warningCount > 0
+                                    ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                                    : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                            }`}
+                        >
+                            <AlertTriangle className={`w-3.5 h-3.5 ${showOnlyWarnings ? "text-white" : warningCount > 0 ? "text-red-600" : "text-slate-400"}`} />
+                            <span>Penanda</span>
+                            {warningCount > 0 && (
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${showOnlyWarnings ? "bg-white/20 text-white" : "bg-red-600 text-white"}`}>
+                                    {warningCount}
+                                </span>
+                            )}
                         </button>
                     </div>
 
                     <button
                         onClick={() => setShowManual(true)}
-                        className="flex-1 sm:flex-none h-10 px-4 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-bold hover:opacity-90 active:scale-[0.96] transition-all duration-150 whitespace-nowrap"
+                        className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
                     >
                         + Jurnal Manual
                     </button>
                 </div>
             </div>
 
-            {/* ── Filter akun aktif — muncul kalau ada kode akun yang diklik di kolom Ref ── */}
-            {accountCodeFilter.size > 0 && (
+            {/* ── Filter akun / warning aktif — muncul kalau ada filter yang diaktifkan ── */}
+            {(accountCodeFilter.size > 0 || showOnlyWarnings) && (
                 <div className="flex flex-wrap items-center justify-between gap-2 -mt-1 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2">
                     <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Filter akun:</span>
+                        <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Filter aktif:</span>
+                        {showOnlyWarnings && (
+                            <button
+                                onClick={() => setShowOnlyWarnings(false)}
+                                className="inline-flex items-center gap-1 text-[11px] font-bold bg-red-600 text-white px-2.5 py-0.5 rounded-full hover:bg-red-700 active:scale-95 transition-all duration-150 shadow-sm"
+                            >
+                                <AlertTriangle className="w-3 h-3 text-white" /> Penanda Only ({warningCount}) <X className="w-3 h-3" />
+                            </button>
+                        )}
                         {Array.from(accountCodeFilter).map((code) => (
                             <button
                                 key={code}
@@ -681,7 +697,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                             </button>
                         ))}
                         <button
-                            onClick={() => setAccountCodeFilter(new Set())}
+                            onClick={() => { setAccountCodeFilter(new Set()); setShowOnlyWarnings(false); }}
                             className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 underline ml-1"
                         >
                             Hapus semua
@@ -695,26 +711,41 @@ export default function JurnalUmum({ period }: { period: string }) {
 
             {/* ── Total — di ATAS, di luar tabel (bar ringkasan) ── */}
             {!loading && filtered.length > 0 && (
-                <div className="bg-gray-100 border border-gray-300 border-t-2 border-t-[#D9A94A]/50 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
-                    <span className="text-xs font-semibold text-gray-600">
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-x-4 sm:gap-x-6 gap-y-2">
+                    <span className="text-xs font-semibold text-slate-500">
                         {isFiltered
                             ? `Menampilkan ${filtered.length} dari ${entries.length} entry (${totalLinesFiltered} / ${totalLinesAll} baris)`
                             : `Menampilkan semua ${entries.length} entry (${totalLinesAll} total baris)`}
                     </span>
-                    <div className="flex items-center gap-x-6">
-                        <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total</span>
-                        <span className="text-sm font-black text-gray-900 font-mono">
-                            Debit&nbsp; {rp(totalDebit)}
+                    <div className="flex items-center gap-x-4 sm:gap-x-6 flex-wrap gap-y-1">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 font-mono">
+                            Debit&nbsp; <span className="font-extrabold text-slate-900">{rp(totalDebit)}</span>
                         </span>
-                        <span className="text-sm font-black text-gray-900 font-mono">
-                            Kredit&nbsp; {rp(totalKredit)}
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 font-mono">
+                            Kredit&nbsp; <span className="font-extrabold text-slate-900">{rp(totalKredit)}</span>
+                        </span>
+                        <span
+                            className={`text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 shrink-0 ${
+                                totalDebit === totalKredit
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
+                                    : "bg-red-50 text-red-700 border border-red-200/80"
+                            }`}
+                        >
+                            {totalDebit === totalKredit ? (
+                                <>
+                                    Balance <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                </>
+                            ) : (
+                                "Tidak Balance"
+                            )}
                         </span>
                     </div>
                 </div>
             )}
 
             {/* ── Tabel Jurnal Umum ── */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
                 <div className="overflow-auto max-h-[calc(100vh-220px)]">
                     <DragDropContext onDragEnd={handleDragEnd}>
                         <Droppable droppableId="journal-entries">
@@ -725,11 +756,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                                     ref={provided.innerRef}
                                     {...provided.droppableProps}
                                 >
-                                    <thead className="sticky top-0 z-30 ring-1 ring-gray-100 shadow-sm">
-                                        <tr className="border-b-2 border-[#D9A94A]/25 bg-gray-50">
-                                            <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[95px] sm:w-[110px]">Tanggal</th>
-                                            <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wider">Keterangan</th>
-                                            <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[70px] sm:w-[80px]">
+                                    <thead className="sticky top-0 z-30 ring-1 ring-slate-100 shadow-2xs">
+                                        <tr className="border-b border-slate-200/80 bg-slate-50/90 backdrop-blur-xs">
+                                            <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[95px] sm:w-[110px]">Tanggal</th>
+                                            <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
+                                            <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[70px] sm:w-[80px]">
                                                 <div ref={accountFilterRef} className="inline-block">
                                                     <button
                                                         ref={accountFilterButtonRef}
@@ -819,9 +850,9 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                     )}
                                                 </div>
                                             </th>
-                                            <th className="px-2 sm:px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[120px] sm:w-[150px]">Debit</th>
-                                            <th className="px-2 sm:px-4 py-3 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[120px] sm:w-[150px]">Kredit</th>
-                                            <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wider w-[90px] sm:w-[110px]">Aksi</th>
+                                            <th className="px-2 sm:px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[120px] sm:w-[150px]">Debit</th>
+                                            <th className="px-2 sm:px-4 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[120px] sm:w-[150px]">Kredit</th>
+                                            <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[90px] sm:w-[110px]">Aksi</th>
                                         </tr>
                                     </thead>
 
@@ -924,25 +955,39 @@ export default function JurnalUmum({ period }: { period: string }) {
 
                                                                         <td className="px-4 py-2 align-top">
                                                                             {first && (
-                                                                                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
-                                                                                        {badge.label}
-                                                                                    </span>
-                                                                                    {companyBadge && (
-                                                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
-                                                                                            {companyBadge.label}
+                                                                                <>
+                                                                                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
+                                                                                            {badge.label}
                                                                                         </span>
-                                                                                    )}
-                                                                                    {entry.is_edited && (
-                                                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
-                                                                                            diedit · {entry.updated_by_user?.name ?? "—"}
-                                                                                        </span>
-                                                                                    )}
-                                                                                    <span className="text-[11px] font-bold text-gray-900">{entry.keterangan}</span>
-                                                                                </div>
+                                                                                        {companyBadge && (
+                                                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
+                                                                                                {companyBadge.label}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        {entry.is_edited && (
+                                                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
+                                                                                                diedit · {entry.updated_by_user?.name ?? "—"}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        {entry.has_warning && (
+                                                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1 shrink-0">
+                                                                                                <AlertTriangle className="w-2.5 h-2.5 text-red-600" /> Penanda
+                                                                                            </span>
+                                                                                        )}
+                                                                                        {modalMissing && (
+                                                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1 shrink-0" title="Harga modal belum diinput di transaksi ini">
+                                                                                                <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Modal Rp0
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div className="text-sm font-bold text-gray-900 mt-1 mb-0.5 leading-snug">
+                                                                                        {entry.keterangan}
+                                                                                    </div>
+                                                                                </>
                                                                             )}
                                                                             {first && specParts.length > 0 && (
-                                                                                <div className="text-[10px] text-gray-400 mb-1">{specParts.join(" · ")}</div>
+                                                                                <div className="text-[10px] text-gray-400 mb-1.5">{specParts.join(" · ")}</div>
                                                                             )}
                                                                             <div className={`text-[11px] ${isKredit ? "pl-10 text-emerald-800" : "pl-1 text-blue-800"} font-medium`}>
                                                                                 {line.account_name}
@@ -1167,26 +1212,26 @@ function WarningToggle({
                     onMouseEnter={() => { computePos(); setShowHistory(true); }}
                     onMouseLeave={() => setShowHistory(false)}
                     disabled={busy}
-                    title="Klik untuk nonaktifkan warning"
-                    className="p-1.5 rounded-lg text-amber-500 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
+                    title="Klik untuk nonaktifkan penanda"
+                    className="p-1.5 rounded-lg text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-90 transition-all duration-150"
                 >
-                    <AlertTriangle className="w-4 h-4" />
+                    <AlertTriangle className="w-4 h-4 text-red-600" />
                 </button>
                 {showHistory && popPos && (
                     <div
                         onMouseEnter={() => setShowHistory(true)}
                         onMouseLeave={() => setShowHistory(false)}
-                        className="fixed z-[95] w-64 bg-white border border-amber-200 rounded-xl shadow-xl p-3 text-left"
+                        className="fixed z-[95] w-64 bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
                         style={{ top: popPos.top, left: popPos.left }}
                     >
-                        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">Riwayat Warning</p>
+                        <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1.5">Riwayat Penanda</p>
                         <div className="space-y-2 max-h-48 overflow-y-auto">
                             {(!entry.warning_logs || entry.warning_logs.length === 0) ? (
                                 <p className="text-[11px] text-gray-400">Belum ada riwayat.</p>
                             ) : (
                                 [...entry.warning_logs].reverse().map((w) => (
                                     <div key={w.id} className="text-[11px] border-b border-gray-50 pb-1.5 last:border-0 last:pb-0">
-                                        <p className={`font-bold ${w.action === "ACTIVATE" ? "text-amber-700" : "text-gray-400"}`}>
+                                        <p className={`font-bold ${w.action === "ACTIVATE" ? "text-red-700" : "text-gray-400"}`}>
                                             {w.action === "ACTIVATE" ? "Diaktifkan" : "Dinonaktifkan"} · {w.created_by_user?.name ?? "—"}
                                         </p>
                                         {w.reason && <p className="text-gray-600 mt-0.5">{w.reason}</p>}
@@ -1206,38 +1251,38 @@ function WarningToggle({
             <button
                 ref={btnRef}
                 onClick={() => { computePos(); setShowReasonForm((v) => !v); }}
-                title="Beri tanda warning"
-                className="p-1.5 rounded-lg text-gray-300 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
+                title="Beri tanda penanda"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
             >
                 <AlertTriangle className="w-4 h-4" />
             </button>
             {showReasonForm && popPos && (
                 <div
-                    className="fixed z-[95] w-64 bg-white border border-gray-200 rounded-xl shadow-xl p-3"
+                    className="fixed z-[95] w-64 bg-white border border-red-200 rounded-xl shadow-xl p-3"
                     style={{ top: popPos.top, left: popPos.left }}
                 >
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Alasan Warning</p>
+                    <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1.5">Alasan Penanda</p>
                     <textarea
                         autoFocus
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
-                        placeholder="Tulis alasan warning..."
+                        placeholder="Tulis alasan penanda..."
                         rows={2}
-                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition resize-none"
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-400/30 focus:border-red-400 transition resize-none"
                     />
                     <div className="flex gap-2 mt-2">
                         <button
                             onClick={() => { setShowReasonForm(false); setReason(""); }}
-                            className="flex-1 h-7 text-[11px] font-semibold text-gray-400 hover:text-gray-600"
+                            className="flex-1 h-7 text-[11px] font-semibold text-slate-400 hover:text-slate-600"
                         >
                             Batal
                         </button>
                         <button
                             onClick={activate}
                             disabled={busy || !reason.trim()}
-                            className="flex-1 h-7 rounded-lg bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-[11px] font-bold disabled:opacity-40"
+                            className="flex-1 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold disabled:opacity-40 shadow-2xs"
                         >
-                            {busy ? "..." : "Aktifkan"}
+                            Simpan
                         </button>
                     </div>
                 </div>
