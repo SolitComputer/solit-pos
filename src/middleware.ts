@@ -312,7 +312,20 @@ export async function middleware(request: NextRequest) {
   const fullyExpandedRoles = await expandDynamicParents(effectiveRoles);
   const hasDynamicRole = fullyExpandedRoles.some((r) => !ALL_STATIC_ROLES.includes(r));
 
-  const isPageRoute = !pathname.startsWith("/api/");
+const isPageRoute = !pathname.startsWith("/api/");
+
+  // Method HTTP nentuin action yang dicek ke matrix Role & Hak Akses
+  // (GET = view, POST = create, PUT/PATCH = edit, DELETE = delete).
+  // Sebelumnya selalu "view" di checkDynamicPageAccess(), jadi kolom
+  // Create/Edit/Delete di matrix gak pernah kebaca sama sekali.
+  const dynamicAction: "view" | "create" | "edit" | "delete" =
+    request.method === "POST"
+      ? "create"
+      : request.method === "PUT" || request.method === "PATCH"
+      ? "edit"
+      : request.method === "DELETE"
+      ? "delete"
+      : "view";
 
   // ── Auto logout & force logout check (page routes only) ───────────────────
   // ── Auto logout jam 3 pagi — sekarang berlaku untuk SEMUA route (page & API) ──
@@ -420,7 +433,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const matchedRoute = Object.keys(ROUTE_PERMISSIONS)
-    .filter((route) => pathname.startsWith(route))
+    .filter((route) => pathname === route || pathname.startsWith(route + "/"))
     .sort((a, b) => b.length - a.length)[0];
 
   let hasRouteAccess: boolean;
@@ -435,12 +448,12 @@ export async function middleware(request: NextRequest) {
     // tidak pernah menguranginya (baris ini gak pernah dieksekusi kalau hasRouteAccess
     // sudah true dari ROUTE_PERMISSIONS).
     if (!hasRouteAccess) {
-      const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, "view");
+      const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, dynamicAction);
       if (dyn.matched) hasRouteAccess = dyn.allowed;
     }
   } else if (hasDynamicRole) {
 
-    const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, "view");
+    const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, dynamicAction);
     hasRouteAccess = dyn.matched ? dyn.allowed : true;
   } else {
     // Role statis, halaman tidak ada di ROUTE_PERMISSIONS -> perilaku lama (izinkan).
@@ -511,8 +524,9 @@ export const config = {
     "/api/dashboard/:path*",
     "/api/transaction/:path*",
     "/api/units/:path*",
-    "/api/warranty/:path*",
+   "/api/warranty/:path*",
     "/api/reports/:path*",
+    "/api/cashflow/:path*",
     "/dashboard/warranty/:path*",
     "/api/attendance/:path*",
     "/api/pkl-reports/:path*",
@@ -520,6 +534,7 @@ export const config = {
     "/api/messages/:path*",
     "/api/presence",
     "/api/group-chat",
+    "/api/push/subscribe",
     "/api/chat-groups/:path*",
     "/api/service/:path*",
     "/api/accessories/:path*",
@@ -538,6 +553,9 @@ export const config = {
     "/api/akutansi/:path*",
     "/dashboard/ai-ceo/:path*",
     "/api/ai-ceo/:path*",
+    "/api/admin/roles/:path*",
+    "/api/admin/pages/:path*",
+    "/api/admin/role-permissions/:path*",
     "/dashboard/profile/:path*",
     "/api/profile/:path*",
     "/api/achievements/:path*",
