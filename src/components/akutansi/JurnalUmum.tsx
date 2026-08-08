@@ -149,12 +149,14 @@ export default function JurnalUmum({ period }: { period: string }) {
         return localStorage.getItem("jurnal-show-pending") === "true";
     });
 
-    const load = useCallback(async (showLoader = true) => {
+   const load = useCallback(async (showLoader = true) => {
         if (showLoader) setLoading(true);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000); // stop nunggu setelah 25 detik
         try {
             const [jRes, pRes] = await Promise.all([
-                fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}`),
-                fetch(`/api/akutansi/jurnal/pending?period=${period}`),
+                fetch(`/api/akutansi/jurnal?period=${period}&sort=${sortOrder}`, { signal: controller.signal }),
+                fetch(`/api/akutansi/jurnal/pending?period=${period}`, { signal: controller.signal }),
             ]);
             const j = await jRes.json();
             const p = await pRes.json();
@@ -171,7 +173,10 @@ export default function JurnalUmum({ period }: { period: string }) {
             setPendingSummary(p.success ? p.summary ?? null : null);
 
             if (showLoader) setSelected(new Set());
+        } catch (e: any) {
+            setToast(e?.name === "AbortError" ? "Server terlalu lama merespon, coba lagi" : "Gagal memuat data jurnal");
         } finally {
+            clearTimeout(timeoutId);
             if (showLoader) setLoading(false);
         }
     }, [period, sortOrder]);

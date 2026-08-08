@@ -173,16 +173,18 @@ async function buildTransactionDrafts(
 
   const unitMap = new Map<string, { purchase_price: number; serial_number?: string; laptop_id?: string }>();
   if (unitIds.size > 0) {
-    const { data: units } = await supabase
-      .from("laptop_units")
-      .select("id, purchase_price, serial_number, laptop_id")
-      .in("id", Array.from(unitIds));
-    for (const u of units ?? []) {
-      unitMap.set(u.id as string, {
-        purchase_price: Math.round(Number(u.purchase_price ?? 0)),
-        serial_number: (u.serial_number as string) ?? undefined,
-        laptop_id: (u.laptop_id as string) ?? undefined,
-      });
+    for (const batch of chunkArray(Array.from(unitIds), 150)) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, purchase_price, serial_number, laptop_id")
+        .in("id", batch);
+      for (const u of units ?? []) {
+        unitMap.set(u.id as string, {
+          purchase_price: Math.round(Number(u.purchase_price ?? 0)),
+          serial_number: (u.serial_number as string) ?? undefined,
+          laptop_id: (u.laptop_id as string) ?? undefined,
+        });
+      }
     }
   }
 
@@ -198,16 +200,18 @@ async function buildTransactionDrafts(
 
   const laptopSpecMap = new Map<string, { cpu?: string; ram?: string; storage?: string }>();
   if (laptopIds.size > 0) {
-    const { data: laptops } = await supabase
-      .from("laptops")
-      .select("id, cpu, ram, storage")
-      .in("id", Array.from(laptopIds));
-    for (const l of laptops ?? []) {
-      laptopSpecMap.set(l.id as string, {
-        cpu: (l.cpu as string) ?? undefined,
-        ram: (l.ram as string) ?? undefined,
-        storage: (l.storage as string) ?? undefined,
-      });
+    for (const batch of chunkArray(Array.from(laptopIds), 150)) {
+      const { data: laptops } = await supabase
+        .from("laptops")
+        .select("id, cpu, ram, storage")
+        .in("id", batch);
+      for (const l of laptops ?? []) {
+        laptopSpecMap.set(l.id as string, {
+          cpu: (l.cpu as string) ?? undefined,
+          ram: (l.ram as string) ?? undefined,
+          storage: (l.storage as string) ?? undefined,
+        });
+      }
     }
   }
 
@@ -314,6 +318,16 @@ async function buildServiceDrafts(
   supabase: SupabaseClient,
   period: string
 ): Promise<JournalDraft[]> {
+  // (fix) Batasi query ke rentang periode ini SEBELUM ambil dari database —
+  // sebelumnya query ini narik SEMUA service_orders selesai/diambil sepanjang
+  // sejarah toko setiap kali halaman dibuka, baru difilter per-periode di JS
+  // (lihat relevantServices di bawah). Filter di sini sengaja LONGGAR
+  // (superset): baris lolos kalau SALAH SATU dari 3 kolom tanggal jatuh di
+  // rentang periode ini — karena refDate yang dipakai relevantServices SELALU
+  // salah satu dari 3 kolom itu, filter ini dijamin tidak membuang baris yang
+  // seharusnya relevan. Hasil akhir 100% identik, cuma jauh lebih cepat.
+  const { startDate, endDateExclusive } = periodRange(period);
+
   const { data: svcs, error } = await supabase
     .from("service_orders")
     .select(
@@ -321,7 +335,9 @@ async function buildServiceDrafts(
     )
     .in("status", ["DONE", "SUDAH_DIAMBIL"])
     .not("payment_amount", "is", null)
-    .gt("payment_amount", 0);
+    .gt("payment_amount", 0)
+    .or(`tanggal_diambil.gte.${startDate},tanggal_selesai.gte.${startDate},tanggal_masuk.gte.${startDate}`)
+    .or(`tanggal_diambil.lt.${endDateExclusive},tanggal_selesai.lt.${endDateExclusive},tanggal_masuk.lt.${endDateExclusive}`);
 
   if (error) {
     console.error("[akuntansi] fetch service:", error.message);
