@@ -351,7 +351,7 @@ async function buildServiceDrafts(
   // Saring dulu service yang tanggalnya masuk periode ini, supaya query
   // accessory_outflows di bawah tidak perlu ambil semua service sepanjang masa.
   const relevantServices = eligibleServices.filter((s) => {
-    const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.tanggal_masuk) as string;
+    const refDate = (s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
     if (!refDate) return false;
     return periodFromDate(jakartaDate(refDate)) === period;
   });
@@ -403,7 +403,7 @@ async function buildServiceDrafts(
   const drafts: JournalDraft[] = [];
 
   for (const s of relevantServices) {
-    const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.tanggal_masuk) as string;
+    const refDate = (s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
     const tanggal = jakartaDate(refDate);
 
     const bayar = Math.round(Number(s.payment_amount ?? 0));
