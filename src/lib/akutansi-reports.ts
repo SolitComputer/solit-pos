@@ -135,6 +135,7 @@ export async function computeNeraca(supabase: SupabaseClient, period: string): P
 
   // Akun Laba periode yang lagi dibuka selalu disiapkan, walau belum ada
   // transaksi sama sekali — supaya bisa langsung diisi Saldo Awal Manual.
+  // tes
   await ensureLabaAccount(period);
 
   const allAccountsForNeraca = Array.from(allCodes).map((code) => {
