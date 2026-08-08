@@ -154,14 +154,14 @@ export async function checkDynamicPageAccess(
   effectiveRoles: string[],
   pathname: string,
   action: PageAction = "view"
-): Promise<{ matched: boolean; allowed: boolean; page?: AppPage }> {
+): Promise<{ matched: boolean; configured: boolean; allowed: boolean; page?: AppPage }> {
   const pages = await getAppPages();
   // Pilih match terpanjang (paling spesifik), sama seperti logic ROUTE_PERMISSIONS.
   const matchedPage = pages
     .filter((p) => pathname === p.route || pathname.startsWith(p.route + "/"))
     .sort((a, b) => b.route.length - a.route.length)[0];
 
-  if (!matchedPage) return { matched: false, allowed: false };
+  if (!matchedPage) return { matched: false, configured: false, allowed: false };
 
   const rows = await getAllPermissionRows();
   const relevant = rows.filter(
@@ -171,8 +171,12 @@ export async function checkDynamicPageAccess(
   const actionField =
     action === "view" ? "can_view" : action === "create" ? "can_create" : action === "edit" ? "can_edit" : "can_delete";
 
+  // configured: minimal salah satu role user ini sudah pernah eksplisit
+  // disimpan lewat UI Role & Hak Akses untuk halaman ini (baris ADA di DB,
+  // apapun nilainya) — beda dari "belum pernah diatur sama sekali".
+  const configured = relevant.length > 0;
   const allowed = relevant.some((r) => r[actionField] === true);
-  return { matched: true, allowed, page: matchedPage };
+  return { matched: true, configured, allowed, page: matchedPage };
 }
 
 /** Semua permission (per halaman) untuk sekumpulan role — dipakai di /api/me/permissions & Sidebar. */
