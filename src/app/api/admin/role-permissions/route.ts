@@ -69,17 +69,15 @@ async function putHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: "role_key dan permissions wajib" }, { status: 400 });
   }
 
-  const rowsToInsert = permissions
-    .filter((p: any) => p.can_view || p.can_create || p.can_edit || p.can_delete)
-    .map((p: any) => ({
-      role_key,
-      page_key: p.page_key,
-      can_view: !!p.can_view,
-      can_create: !!p.can_create,
-      can_edit: !!p.can_edit,
-      can_delete: !!p.can_delete,
-      updated_at: new Date().toISOString(),
-    }));
+  const rowsToInsert = permissions.map((p: any) => ({
+    role_key,
+    page_key: p.page_key,
+    can_view: !!p.can_view,
+    can_create: !!p.can_create,
+    can_edit: !!p.can_edit,
+    can_delete: !!p.can_delete,
+    updated_at: new Date().toISOString(),
+  }));
 
   const { error: delError } = await supabaseAdmin
     .from("role_page_permissions")
