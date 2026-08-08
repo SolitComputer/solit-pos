@@ -58,7 +58,7 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     let query = supabase
       .from("preparation_orders")
       .select(
-        `*, preparation_items ( id, serial_number, laptop_name, is_checked, check_note, is_cancelled, cancel_reason )`,
+       `*, preparation_items ( id, serial_number, laptop_name, laptop_id, is_checked, check_note, is_cancelled, cancel_reason )`,
         { count: "exact" }
       )
       .order("created_at", { ascending: false });
@@ -86,6 +86,33 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
 
     const { data, error, count } = await query;
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+
+    // ── Enrich preparation_items dengan spek laptop (CPU/RAM/Storage/GPU) ──
+    // laptop_id sudah tersimpan di preparation_items sejak dibuat, tapi
+    // speknya sendiri TIDAK didenormalisasi ke situ — diambil live dari
+    // tabel `laptops` tiap kali di-GET, jadi kalau spek modelnya diedit
+    // belakangan di Data Barang, yang tampil di sini ikut ke-update.
+    const laptopIds = [
+      ...new Set(
+        (data ?? []).flatMap((o: any) =>
+          (o.preparation_items ?? []).map((it: any) => it.laptop_id).filter(Boolean)
+        )
+      ),
+    ] as string[];
+
+    if (laptopIds.length > 0) {
+      const { data: laptopSpecs } = await supabase
+        .from("laptops")
+        .select("id, cpu, ram, storage, gpu")
+        .in("id", laptopIds);
+      const specMap = new Map((laptopSpecs ?? []).map((l: any) => [l.id, l]));
+      (data ?? []).forEach((o: any) => {
+        o.preparation_items = (o.preparation_items ?? []).map((it: any) => ({
+          ...it,
+          laptop_spec: it.laptop_id ? specMap.get(it.laptop_id) ?? null : null,
+        }));
+      });
+    }
 
     return NextResponse.json({
       success: true,

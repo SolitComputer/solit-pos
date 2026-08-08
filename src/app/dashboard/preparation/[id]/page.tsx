@@ -21,6 +21,8 @@ import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface PrepItem {
     id: string; serial_number: string; laptop_name: string | null;
+    laptop_id: string | null;
+    laptop_spec?: { cpu: string | null; ram: string | null; storage: string | null; gpu: string | null } | null;
     is_checked: boolean; check_note: string | null;
     is_cancelled: boolean; cancel_reason: string | null;
     cancelled_at: string | null; cancelled_by_name: string | null;
@@ -1080,6 +1082,14 @@ export default function PreparationDetailPage() {
                                                 <div className="min-w-0">
                                                     <p className={`font-mono text-sm font-bold text-gray-800 ${it.is_cancelled ? "line-through" : ""}`}>{it.serial_number}</p>
                                                     {it.laptop_name && <p className="text-xs text-gray-500 truncate">{it.laptop_name}</p>}
+                                                    {it.laptop_spec && (it.laptop_spec.cpu || it.laptop_spec.ram || it.laptop_spec.storage || it.laptop_spec.gpu) && (
+                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                            {it.laptop_spec.cpu && <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">{it.laptop_spec.cpu}</span>}
+                                                            {it.laptop_spec.ram && <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded">{it.laptop_spec.ram}</span>}
+                                                            {it.laptop_spec.storage && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">{it.laptop_spec.storage}</span>}
+                                                            {it.laptop_spec.gpu && <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">{it.laptop_spec.gpu}</span>}
+                                                        </div>
+                                                    )}
                                                     {it.is_cancelled && (
                                                         <p className="text-[10px] text-red-500 mt-0.5">
                                                             Dibatalkan{it.cancelled_by_name ? ` oleh ${it.cancelled_by_name}` : ""}{it.cancel_reason ? ` — ${it.cancel_reason}` : ""}
@@ -1331,8 +1341,8 @@ export default function PreparationDetailPage() {
                             <div className="flex items-center gap-3">
                                 <AlertCircle className="w-5 h-5 inline text-white" />
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold text-white">Override Supervisor</p>
-                                    <p className="text-[11px] text-gray-300 mt-0.5">Khusus Admin & Kepala Sales — pindah pengantar atau ubah status manual.</p>
+                                  <p className="text-sm font-bold text-white">Override Supervisor</p>
+                                    <p className="text-[11px] text-gray-300 mt-0.5">Khusus Admin, Kepala Sales, Kepala Zenith, Kepala Sotech & Kepala Onpoint — pindah pengantar atau ubah status manual.</p>
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
