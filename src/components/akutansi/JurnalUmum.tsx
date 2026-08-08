@@ -1095,7 +1095,16 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                     >
                                                                                         <Clock className="w-4 h-4" />
                                                                                     </button>
-                                                                                    <WarningToggle entry={entry} onUpdated={() => load(false)} setToast={setToast} />
+                                                                                    <WarningToggle
+                                                                                        entry={entry}
+                                                                                        onUpdated={() => load(false)}
+                                                                                        onToggleWarningState={(entryId, hasWarn) => {
+                                                                                            setEntries((prev) =>
+                                                                                                prev.map((e) => (e.id === entryId ? { ...e, has_warning: hasWarn } : e))
+                                                                                            );
+                                                                                        }}
+                                                                                        setToast={setToast}
+                                                                                    />
                                                                                     <button
                                                                                         onClick={() => handleDelete(entry)}
                                                                                         className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
@@ -1191,23 +1200,21 @@ function Stat({ label, value, subvalue, tone }: { label: string; value: React.Re
 function WarningToggle({
     entry,
     onUpdated,
+    onToggleWarningState,
     setToast,
 }: {
     entry: JournalEntry;
     onUpdated: () => void;
+    onToggleWarningState?: (entryId: string, hasWarning: boolean) => void;
     setToast: (msg: string) => void;
 }) {
     const wrapperRef = useRef<HTMLDivElement>(null);
     const btnRef = useRef<HTMLButtonElement>(null);
     const [popPos, setPopPos] = useState<{ top: number; left: number } | null>(null);
-    const [showReasonForm, setShowReasonForm] = useState(false);
-    const [showHistory, setShowHistory] = useState(false);
+    const [showPopover, setShowPopover] = useState(false);
     const [reason, setReason] = useState("");
     const [busy, setBusy] = useState(false);
 
-    // Posisi popover dihitung dari posisi tombol di layar (position: fixed) — supaya
-    // TIDAK terpotong oleh overflow-hidden/overflow-x-auto milik container tabel,
-    // sama seperti pola dropdown filter akun "Ref" di header tabel.
     const computePos = () => {
         const btn = btnRef.current;
         if (!btn) return;
@@ -1216,19 +1223,22 @@ function WarningToggle({
     };
 
     useEffect(() => {
-        if (!showReasonForm) return;
+        if (!showPopover) return;
         const handleClickOutside = (e: MouseEvent) => {
             if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-                setShowReasonForm(false);
+                setShowPopover(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [showReasonForm]);
+    }, [showPopover]);
 
     const activate = async () => {
         if (!reason.trim() || busy) return;
         setBusy(true);
+        // Optimistic update
+        onToggleWarningState?.(entry.id, true);
+        setShowPopover(false);
         try {
             const res = await fetch(`/api/akutansi/jurnal/${entry.id}/warning`, {
                 method: "POST",
@@ -1236,27 +1246,44 @@ function WarningToggle({
                 body: JSON.stringify({ reason: reason.trim() }),
             });
             const json = await res.json();
-            if (!json.success) { setToast(json.message ?? "Gagal mengaktifkan warning"); return; }
-            setShowReasonForm(false);
+            if (!json.success) {
+                // Revert if error
+                onToggleWarningState?.(entry.id, false);
+                setToast(json.message ?? "Gagal mengaktifkan warning");
+                return;
+            }
             setReason("");
             onUpdated();
         } catch {
+            onToggleWarningState?.(entry.id, false);
             setToast("Koneksi bermasalah");
         } finally {
             setBusy(false);
         }
     };
 
-    const deactivate = async () => {
+    const deactivate = async (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         if (busy) return;
-        if (!confirm("Nonaktifkan warning untuk jurnal ini?")) return;
         setBusy(true);
+        // Optimistic update
+        onToggleWarningState?.(entry.id, false);
+        setShowPopover(false);
         try {
             const res = await fetch(`/api/akutansi/jurnal/${entry.id}/warning`, { method: "DELETE" });
             const json = await res.json();
-            if (!json.success) { setToast(json.message ?? "Gagal menonaktifkan warning"); return; }
+            if (!json.success) {
+                // Revert if error
+                onToggleWarningState?.(entry.id, true);
+                setToast(json.message ?? "Gagal menonaktifkan warning");
+                return;
+            }
             onUpdated();
         } catch {
+            onToggleWarningState?.(entry.id, true);
             setToast("Koneksi bermasalah");
         } finally {
             setBusy(false);
@@ -1268,25 +1295,56 @@ function WarningToggle({
             <div ref={wrapperRef} className="inline-block">
                 <button
                     ref={btnRef}
-                    onClick={deactivate}
-                    onMouseEnter={() => { computePos(); setShowHistory(true); }}
-                    onMouseLeave={() => setShowHistory(false)}
+                    onClick={() => { computePos(); setShowPopover((v) => !v); }}
                     disabled={busy}
-                    title="Klik untuk nonaktifkan penanda"
-                    className="p-1.5 rounded-lg text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-90 transition-all duration-150"
+                    title="Klik untuk hapus atau tandai ulang penanda"
+                    className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${
+                        showPopover ? "bg-red-100 text-red-700 border-red-300" : "text-red-600 bg-red-50 border-red-200 hover:bg-red-100"
+                    }`}
                 >
                     <AlertTriangle className="w-4 h-4 text-red-600" />
                 </button>
-                {showHistory && popPos && (
+                {showPopover && popPos && (
                     <div
-                        onMouseEnter={() => setShowHistory(true)}
-                        onMouseLeave={() => setShowHistory(false)}
-                        className="fixed z-[95] w-64 bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
+                        className="fixed z-[95] w-72 bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
                         style={{ top: popPos.top, left: popPos.left }}
                     >
-                        <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1.5">Riwayat Penanda</p>
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {(!entry.warning_logs || entry.warning_logs.length === 0) ? (
+                        <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-gray-100">
+                            <p className="text-[10.5px] font-bold text-red-700 uppercase tracking-wider flex items-center gap-1">
+                                <AlertTriangle className="w-3.5 h-3.5" /> Ditandai Bermasalah
+                            </p>
+                            <button
+                                onClick={deactivate}
+                                disabled={busy}
+                                className="text-[10px] bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-md font-bold shadow-2xs active:scale-95 transition-all"
+                            >
+                                Hapus Penanda
+                            </button>
+                        </div>
+
+                        <div className="mb-3">
+                            <p className="text-[10px] font-bold text-slate-500 mb-1">Tandai Ulang / Tambah Catatan Baru:</p>
+                            <textarea
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                placeholder="Alasan / catatan baru..."
+                                rows={2}
+                                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-red-400/30 focus:border-red-400 transition resize-none"
+                            />
+                            {reason.trim() && (
+                                <button
+                                    onClick={activate}
+                                    disabled={busy}
+                                    className="w-full mt-1.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold shadow-2xs"
+                                >
+                                    Simpan Catatan Baru
+                                </button>
+                            )}
+                        </div>
+
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Riwayat Penanda</p>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                            {!entry.warning_logs || entry.warning_logs.length === 0 ? (
                                 <p className="text-[11px] text-gray-400">Belum ada riwayat.</p>
                             ) : (
                                 [...entry.warning_logs].reverse().map((w) => (
@@ -1310,13 +1368,13 @@ function WarningToggle({
         <div ref={wrapperRef} className="inline-block opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
             <button
                 ref={btnRef}
-                onClick={() => { computePos(); setShowReasonForm((v) => !v); }}
+                onClick={() => { computePos(); setShowPopover((v) => !v); }}
                 title="Beri tanda penanda"
                 className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
             >
                 <AlertTriangle className="w-4 h-4" />
             </button>
-            {showReasonForm && popPos && (
+            {showPopover && popPos && (
                 <div
                     className="fixed z-[95] w-64 bg-white border border-red-200 rounded-xl shadow-xl p-3"
                     style={{ top: popPos.top, left: popPos.left }}
@@ -1332,7 +1390,7 @@ function WarningToggle({
                     />
                     <div className="flex gap-2 mt-2">
                         <button
-                            onClick={() => { setShowReasonForm(false); setReason(""); }}
+                            onClick={() => { setShowPopover(false); setReason(""); }}
                             className="flex-1 h-7 text-[11px] font-semibold text-slate-400 hover:text-slate-600"
                         >
                             Batal

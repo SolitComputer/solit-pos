@@ -318,6 +318,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
+  "/dashboard/laptops/monitoring": [
+    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
+  ],
 
   "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
 
@@ -724,6 +727,13 @@ export const LAPTOP_READY_VIEW_ROLES: UserRole[] = [
 
 export const LAPTOP_DELETE_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "KEPALA_TEKNISI",
+];
+
+// ── Monitoring Stok: Role yang boleh akses dashboard monitoring siap jual vs terjual ──
+export const MONITORING_STOCK_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
   "KEPALA_TEKNISI",
 ];
