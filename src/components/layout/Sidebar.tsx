@@ -40,6 +40,9 @@ function isItemActive(href: string, pathname: string): boolean {
   if (href === "/dashboard/laptops/minus") {
     return pathname === "/dashboard/laptops/minus";
   }
+  if (href === "/dashboard/laptops/monitoring") {
+    return pathname === "/dashboard/laptops/monitoring";
+  }
 
   if (href === "/dashboard/preparation") {
     return (
@@ -60,7 +63,8 @@ function isItemActive(href: string, pathname: string): boolean {
       pathname === "/dashboard/laptops" ||
       (pathname.startsWith("/dashboard/laptops/") &&
         !pathname.startsWith("/dashboard/laptops/ready") &&
-        !pathname.startsWith("/dashboard/laptops/minus"))
+        !pathname.startsWith("/dashboard/laptops/minus") &&
+        !pathname.startsWith("/dashboard/laptops/monitoring"))
     );
   }
   if (href.startsWith("/dashboard/service/")) return pathname === href;
@@ -115,6 +119,7 @@ const Icons = {
   reports: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v16a2 2 0 002 2h16" /><rect x="7" y="13" width="3" height="5" rx="0.5" /><rect x="12" y="9" width="3" height="9" rx="0.5" /><rect x="17" y="6" width="3" height="12" rx="0.5" /></svg>),
   laptopReady: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M2 20h20" /><path d="M9 10l2 2 4-4" /></svg>),
   laptopMinus: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M2 20h20" /><path d="M9 10h6" /></svg>),
+  laptopMonitoring: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M2 20h20" /><path d="M7 12h2l2-4 2 6 2-3h2" /></svg>),
   pendingOrders: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l2 3h6l2-3h4" /><path d="M5.5 5h13l2.5 7v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6z" /></svg>),
   users: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" /><circle cx="9" cy="8" r="4" /><path d="M22.5 21v-2a4 4 0 00-3-3.87" /><path d="M16.5 3.2a4 4 0 010 7.6" /></svg>),
   leaderboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4h10v5a5 5 0 01-10 0z" /><path d="M7 5H4.5a2 2 0 000 4H7M17 5h2.5a2 2 0 010 4H17" /><path d="M12 14v3" /><path d="M8 21h8" /></svg>),
@@ -185,6 +190,7 @@ const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dash
 const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang?tab=laptops", icon: Icons.barang };
 const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Barang Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
 const ITEM_LAPTOP_MINUS: MenuItem = { name: "Barang Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
+const ITEM_LAPTOP_MONITORING: MenuItem = { name: "Monitoring Stok", href: "/dashboard/laptops/monitoring", icon: Icons.laptopMonitoring };
 const ITEM_LEADERBOARD_PEKERJAAN: MenuItem = { name: "Leaderboard Pekerjaan", href: "/dashboard/missions/leaderboard", icon: Icons.leaderboard };
 
 const GROUP_ABSENSI_SIMPLE: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_DAFTAR_HADIR] };
@@ -289,7 +295,7 @@ const ADMIN_CORE_GROUPS: MenuGroup[] = [
 const ADMIN_INVENTARIS: MenuGroup = {
   label: "Inventaris",
   items: [
-    ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_ALL_UNITS,
+    ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_LAPTOP_MONITORING, ITEM_ALL_UNITS,
     { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
   ],
 };
@@ -474,7 +480,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_ALL_UNITS,
+        ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_LAPTOP_MONITORING, ITEM_ALL_UNITS,
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
@@ -512,7 +518,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Utama", items: [ITEM_DASHBOARD] },
     GROUP_ABSENSI,
     { label: "Management", items: [ITEM_USERS] },
-    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_ALL_UNITS] },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_LAPTOP_MONITORING, ITEM_ALL_UNITS] },
     { label: "Transaksi", items: [{ name: "Riwayat", href: "/dashboard/transactions", icon: Icons.riwayat }] },
     { label: "Tools", items: [{ name: "Scanner", href: "/scan", icon: Icons.scanner }] },
   ],
@@ -524,7 +530,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     {
       label: "Inventaris",
       items: [
-        ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_ALL_UNITS,
+        ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_LAPTOP_MINUS, ITEM_LAPTOP_MONITORING, ITEM_ALL_UNITS,
         { name: "Garansi", href: "/dashboard/warranty", icon: Icons.garansi },
       ],
     },
