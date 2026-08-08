@@ -340,7 +340,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/users": ALL_ROLES.filter(r => !r.startsWith("PKL")),
   "/dashboard/attendance": [...ALL_ROLES],
   "/dashboard/daftar-hadir": [...ALL_ROLES],
-"/dashboard/attendance/overtime": [...ALL_ROLES],
+  "/dashboard/attendance/overtime": [...ALL_ROLES],
   "/api/attendance/today": [...ALL_ROLES],
 
   "/dashboard/service": [...SERVICE_VIEW_ROLES],
@@ -621,7 +621,7 @@ export const PERMISSIONS = {
   COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   CONFIRM_SERVICE_PICKUP: [...SERVICE_VIEW_ROLES] as UserRole[],
 
-// ── Management Seller ──────────────────────────────────────────────────────
+  // ── Management Seller ──────────────────────────────────────────────────────
   VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
   VIEW_ALL_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_SUPERVISOR_ROLES] as UserRole[],
   MANAGE_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_MANAGE_ROLES] as UserRole[],
@@ -705,7 +705,7 @@ export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
 export const LAPTOP_VIEW_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
-"KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
   "ACCOUNTING", "PURCHASING", "PENGANTARAN",
   "MARKETING", "KEPALA_MARKETING",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
