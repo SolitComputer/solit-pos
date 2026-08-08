@@ -14,7 +14,6 @@ import {
   getEffectivePrimaryRole,
 } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
-import { ALL_STATIC_ROLES } from "@/lib/permissions";
 import { checkDynamicPageAccess, expandDynamicParents } from "@/lib/dynamicPermissions";
 import { CONTRACT_GATE_ENABLED } from "@/lib/featureFlags";
 
@@ -77,7 +76,7 @@ async function hasApprovedContract(userId: string): Promise<boolean> {
       .eq("id", userId)
       .maybeSingle();
 
-   const status = data?.contract_status ?? "NONE";
+    const status = data?.contract_status ?? "NONE";
     if (status === "NONE") return true;
     if (status !== "APPROVED") return false;
 
@@ -85,7 +84,7 @@ async function hasApprovedContract(userId: string): Promise<boolean> {
     if (validUntil) {
       const todayWIB = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
       if (validUntil < todayWIB) {
-        supabase.from("users").update({ contract_status: "EXPIRED" }).eq("id", userId).then(() => {});
+        supabase.from("users").update({ contract_status: "EXPIRED" }).eq("id", userId).then(() => { });
         return false;
       }
     }
@@ -310,9 +309,8 @@ export async function middleware(request: NextRequest) {
   const effectivePrimary = getEffectivePrimaryRole(userRoles);
 
   const fullyExpandedRoles = await expandDynamicParents(effectiveRoles);
-  const hasDynamicRole = fullyExpandedRoles.some((r) => !ALL_STATIC_ROLES.includes(r));
 
-const isPageRoute = !pathname.startsWith("/api/");
+  const isPageRoute = !pathname.startsWith("/api/");
 
   // Method HTTP nentuin action yang dicek ke matrix Role & Hak Akses
   // (GET = view, POST = create, PUT/PATCH = edit, DELETE = delete).
@@ -322,10 +320,10 @@ const isPageRoute = !pathname.startsWith("/api/");
     request.method === "POST"
       ? "create"
       : request.method === "PUT" || request.method === "PATCH"
-      ? "edit"
-      : request.method === "DELETE"
-      ? "delete"
-      : "view";
+        ? "edit"
+        : request.method === "DELETE"
+          ? "delete"
+          : "view";
 
   // ── Auto logout & force logout check (page routes only) ───────────────────
   // ── Auto logout jam 3 pagi — sekarang berlaku untuk SEMUA route (page & API) ──
@@ -438,25 +436,16 @@ const isPageRoute = !pathname.startsWith("/api/");
 
   let hasRouteAccess: boolean;
 
-  if (matchedRoute) {
+  const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, dynamicAction);
+
+  if (dyn.configured) {
+    hasRouteAccess = dyn.allowed;
+  } else if (matchedRoute) {
     const allowed = ROUTE_PERMISSIONS[matchedRoute];
     hasRouteAccess = effectiveRoles.some((r: string) => (allowed as string[]).includes(r));
-
-    // Additive-only: kalau ROUTE_PERMISSIONS bilang tidak boleh, cek juga matrix
-    // role_page_permissions (Role & Hak Akses di /dashboard/users) — berlaku buat
-    // SEMUA role (bukan cuma yang punya dynamic role), tapi cuma bisa NAMBAH akses,
-    // tidak pernah menguranginya (baris ini gak pernah dieksekusi kalau hasRouteAccess
-    // sudah true dari ROUTE_PERMISSIONS).
-    if (!hasRouteAccess) {
-      const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, dynamicAction);
-      if (dyn.matched) hasRouteAccess = dyn.allowed;
-    }
-  } else if (hasDynamicRole) {
-
-    const dyn = await checkDynamicPageAccess(fullyExpandedRoles, pathname, dynamicAction);
-    hasRouteAccess = dyn.matched ? dyn.allowed : true;
+  } else if (dyn.matched) {
+    hasRouteAccess = false;
   } else {
-    // Role statis, halaman tidak ada di ROUTE_PERMISSIONS -> perilaku lama (izinkan).
     hasRouteAccess = true;
   }
 
@@ -524,7 +513,7 @@ export const config = {
     "/api/dashboard/:path*",
     "/api/transaction/:path*",
     "/api/units/:path*",
-   "/api/warranty/:path*",
+    "/api/warranty/:path*",
     "/api/reports/:path*",
     "/api/cashflow/:path*",
     "/dashboard/warranty/:path*",

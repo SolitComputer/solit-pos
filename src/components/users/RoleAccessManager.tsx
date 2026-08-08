@@ -155,9 +155,9 @@ function RoleFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
+      <div className="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="font-black text-slate-800 text-base mb-4">
           {isEdit ? "Edit Role Custom" : "Buat Role Baru"}
         </h3>
@@ -259,9 +259,9 @@ function ConfirmDeleteRoleModal({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7">
+      <div className="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-sm p-7">
         <div
           className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
           style={{ background: "#fff1f2", border: "1px solid #fecaca" }}
@@ -533,7 +533,7 @@ export default function RoleAccessManager() {
 
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 items-start">
         {/* ── Daftar role (Bawaan + Custom) ── */}
-       <div className="w-full lg:w-72 flex-shrink-0 space-y-3">          {/* Role Bawaan (legacy, auto-detect) */}
+        <div className="w-full lg:w-72 flex-shrink-0 space-y-3">          {/* Role Bawaan (legacy, auto-detect) */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             <div className="px-4 py-3.5 border-b border-slate-100">
               <p className="text-[11px] font-bold text-slate-500">Role Bawaan Sistem ({legacyRoles.length})</p>
@@ -686,9 +686,9 @@ export default function RoleAccessManager() {
               <div className="max-h-[55vh] overflow-y-auto">
                 {groupedPages.map(([groupLabel, groupPages]) => (
                   <div key={groupLabel} className="border-b border-slate-50">
-                    <div className="px-5 py-2 bg-slate-50 flex items-center justify-between">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{groupLabel}</p>
-                      <div className="flex gap-3 text-[9px] font-bold text-slate-400">
+                    <div className="px-5 py-2 bg-slate-50 flex items-center justify-between gap-2 flex-wrap">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate min-w-0">{groupLabel}</p>
+                      <div className="flex gap-3 text-[9px] font-bold text-slate-400 flex-shrink-0">
                         <button onClick={() => toggleAllInGroup(groupPages, "can_view", true)} className="hover:text-violet-600">
                           Centang semua
                         </button>
@@ -697,37 +697,39 @@ export default function RoleAccessManager() {
                         </button>
                       </div>
                     </div>
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-[10px] text-slate-400">
-                          <th className="text-left font-semibold px-5 py-1.5 w-1/3">Halaman</th>
-                          <th className="font-semibold py-1.5 w-1/6">View</th>
-                          <th className="font-semibold py-1.5 w-1/6">Create</th>
-                          <th className="font-semibold py-1.5 w-1/6">Edit</th>
-                          <th className="font-semibold py-1.5 w-1/6">Delete</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groupPages.map((p) => {
-                          const perm = permMap[p.key] ?? EMPTY_PERM;
-                          return (
-                            <tr key={p.key} className="hover:bg-slate-50/60">
-                              <td className="px-5 py-2 font-semibold text-slate-700">{p.label}</td>
-                              {(["can_view", "can_create", "can_edit", "can_delete"] as const).map((field) => (
-                                <td key={field} className="text-center py-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={perm[field]}
-                                    onChange={() => toggle(p.key, field)}
-                                    className="w-4 h-4 accent-violet-600 cursor-pointer"
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[460px] text-xs">
+                        <thead>
+                          <tr className="text-[10px] text-slate-400">
+                            <th className="text-left font-semibold px-5 py-1.5 w-1/3">Halaman</th>
+                            <th className="font-semibold py-1.5 w-1/6">View</th>
+                            <th className="font-semibold py-1.5 w-1/6">Create</th>
+                            <th className="font-semibold py-1.5 w-1/6">Edit</th>
+                            <th className="font-semibold py-1.5 w-1/6">Delete</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {groupPages.map((p) => {
+                            const perm = permMap[p.key] ?? EMPTY_PERM;
+                            return (
+                              <tr key={p.key} className="hover:bg-slate-50/60">
+                                <td className="px-5 py-2 font-semibold text-slate-700">{p.label}</td>
+                                {(["can_view", "can_create", "can_edit", "can_delete"] as const).map((field) => (
+                                  <td key={field} className="text-center py-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={perm[field]}
+                                      onChange={() => toggle(p.key, field)}
+                                      className="w-4 h-4 accent-violet-600 cursor-pointer"
+                                    />
+                                  </td>
+                                ))}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 ))}
               </div>

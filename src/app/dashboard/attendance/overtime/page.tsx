@@ -1814,6 +1814,7 @@ export default function OvertimePage() {
     const q = searchQuery.trim().toLowerCase();
     return filtered
       .filter((o) => o.users)
+      .filter((o) => !isUserPKL(o.users!.role))
       .filter((o) => !q || o.users!.name.toLowerCase().includes(q))
       .sort((a, b) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime()) as unknown as OvertimeTableRow[];
   }, [filtered, searchQuery]);
@@ -1828,7 +1829,14 @@ export default function OvertimePage() {
     [groupedByUser]
   );
 
-  const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : groupedPKL;
+const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : groupedPKL;
+
+  const recapUsers = useMemo(
+    () => [...allUsers]
+      .filter(u => (activeTab === "KARYAWAN" ? !isUserPKL(u.role) : isUserPKL(u.role)))
+      .sort((a, b) => a.name.localeCompare(b.name, "id-ID")),
+    [allUsers, activeTab]
+  );
 
   const selectedUserData = useMemo(() => {
     if (!selectedUserId) return null;
@@ -1887,7 +1895,7 @@ export default function OvertimePage() {
                 className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow">
                 <Trophy size={16} /><span className="hidden sm:inline">Leaderboard</span>
               </button>
-              <button onClick={() => { setShowRecap(v => !v); if (!recapUserId && currentUser?.id) setRecapUserId(currentUser.id); }}
+             <button onClick={() => { setShowRecap(v => !v); if (!recapUserId) setRecapUserId("ALL"); }}
                 className={`h-9 px-4 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow border ${showRecap ? "bg-gray-900 text-white border-gray-900" : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"}`}>
                 <CalendarDays size={16} /><span className="hidden sm:inline">Rekap Bulanan</span>
               </button>
@@ -1986,7 +1994,7 @@ export default function OvertimePage() {
                 return (
                   <button
                     key={tab}
-                    onClick={() => { setActiveTab(tab); setSearchQuery(""); setFilterStatus("Semua"); setSelectedUserId(null); }}
+                   onClick={() => { setActiveTab(tab); setSearchQuery(""); setFilterStatus("Semua"); setSelectedUserId(null); setRecapUserId("ALL"); }}
                     className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${active
                       ? "bg-[#0f0c29] text-white shadow-md"
                       : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
@@ -2012,19 +2020,18 @@ export default function OvertimePage() {
             <div className="space-y-3">
               {(isAdminRole(currentUser?.roles ?? currentUser?.role) || canInputManual(currentUser?.roles ?? (currentUser?.role ? [currentUser.role] : []))) && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                  <label className={lbl}>Pilih Karyawan</label>
+                  <label className={lbl}>Pilih {activeTab === "KARYAWAN" ? "Karyawan" : "PKL"}</label>
                   <select value={recapUserId} onChange={e => setRecapUserId(e.target.value)} className={inp + " cursor-pointer"}>
-                    <option value="">— Pilih karyawan —</option>
-                    <option value="ALL">— Semua Karyawan —</option>
-                    {[...allUsers].sort((a, b) => a.name.localeCompare(b.name, "id-ID")).map(u => (
+                    <option value="ALL">— Semua {activeTab === "KARYAWAN" ? "Karyawan" : "PKL"} —</option>
+                    {recapUsers.map(u => (
                       <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
                     ))}
                   </select>
                 </div>
               )}
-             {recapUserId === "ALL" && (
+           {recapUserId === "ALL" && (
                 <div className="space-y-2">
-                  {[...allUsers].sort((a, b) => a.name.localeCompare(b.name, "id-ID")).map(u => {
+                  {recapUsers.map(u => {
                     const isOpen = expandedRecapUsers.has(u.id);
                     return (
                       <div key={u.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

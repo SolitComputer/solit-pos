@@ -21,10 +21,11 @@ import {
 
 // ─── Neraca ─────────────────────────────────────────────────────────────────
 
-// Akun Pendapatan (410-430), Modal Keluar (440-460), dan Operasional/Beban
-// (510-540) sudah tercakup di laporan Laba Rugi — jadi disembunyikan dari
-// Neraca. Efek periode berjalannya (Laba Periode Berjalan) dilipat ke akun
-// "Laba <periode ini>" (mis. kode 311 Laba Juli 2026).
+// (Sudah tidak dipakai) Dulu dipakai untuk menyembunyikan akun Pendapatan/
+// Beban dari Neraca & melipat labanya ke akun "Laba <periode>". SEKARANG
+// TIDAK DIPAKAI LAGI — Neraca menampilkan SEMUA akun apa adanya, persis sama
+// dengan saldo akhir masing-masing akun di Buku Besar. Konstanta ini dibiarkan
+// (tidak dipakai) untuk jaga-jaga kalau ada file lain yang masih meng-import.
 export const NERACA_HIDDEN_CODES = new Set([
   "410", "420", "430", "440", "450", "460", "510", "520", "530", "540",
 ]);
@@ -65,19 +66,16 @@ export async function computeNeraca(supabase: SupabaseClient, period: string): P
     }
   }
 
+  // Saldo PER AKUN dihitung persis sama seperti rumus saldo akhir di Buku
+  // Besar (opening manual + seluruh mutasi jurnal s/d periode ini) — TIDAK
+  // ADA lagi pengelompokan/pelipatan akun 410-540 ke akun Laba. Setiap akun
+  // berdiri sendiri, sama seperti tampilannya di tab Buku Besar.
   const balanceMap = new Map<string, number>();
-  // Net akun 410-540 dikelompokkan PER PERIODE (bukan cuma periode yang lagi
-  // dibuka) — supaya laba tiap bulan yang sudah lewat tetap kelipat PERMANEN
-  // ke akun Laba bulannya sendiri-sendiri.
-  const hiddenNetByPeriod = new Map<string, number>();
 
   for (const e of entriesWithLines as any[]) {
     for (const l of (e.lines ?? []) as any[]) {
       const signed = l.side === "DEBIT" ? Number(l.nominal) : -Number(l.nominal);
       balanceMap.set(l.account_code, (balanceMap.get(l.account_code) ?? 0) + signed);
-      if (NERACA_HIDDEN_CODES.has(l.account_code)) {
-        hiddenNetByPeriod.set(e.period, (hiddenNetByPeriod.get(e.period) ?? 0) + signed);
-      }
     }
   }
 
@@ -103,10 +101,10 @@ export async function computeNeraca(supabase: SupabaseClient, period: string): P
 
   let allCodes = new Set<string>([...ACCOUNTS.map((a) => a.code), ...dbAccountMap.keys()]);
 
-  // Auto-provision akun "Laba <periode>" kalau belum ada — dipakai untuk
-  // periode yang lagi dibuka MAUPUN semua periode lampau yang punya
-  // aktivitas di akun 410-540, supaya laba tiap bulan selalu punya tempat
-  // dilipat PERMANEN dan gak pernah "hilang" diam-diam.
+  // Auto-provision akun "Laba <periode>" kalau belum ada — supaya akun ini
+  // selalu tersedia untuk diisi Saldo Awal Manual di Buku Besar (dipakai oleh
+  // laporan Laba Rugi). Neraca sendiri TIDAK melipat nominal apapun ke akun
+  // ini lagi — saldonya di Neraca murni dari Buku Besar akun ini sendiri.
   async function ensureLabaAccount(p: string): Promise<string | null> {
     const targetName = normalizeAccountName(labaPeriodAccountName(p));
     const existingCode = Array.from(allCodes).find((code) => {
@@ -137,17 +135,8 @@ export async function computeNeraca(supabase: SupabaseClient, period: string): P
 
   // Akun Laba periode yang lagi dibuka selalu disiapkan, walau belum ada
   // transaksi sama sekali — supaya bisa langsung diisi Saldo Awal Manual.
+  // tes
   await ensureLabaAccount(period);
-
-  // Lipat net 410-540 TIAP bulan (termasuk bulan-bulan lampau) ke akun Laba
-  // bulan itu masing-masing, PERMANEN — gak tergantung periode yang lagi
-  // dibuka.
-  for (const [p, netSigned] of hiddenNetByPeriod) {
-    if (Math.round(netSigned) === 0) continue;
-    const code = await ensureLabaAccount(p);
-    if (!code) continue;
-    balanceMap.set(code, (balanceMap.get(code) ?? 0) + netSigned);
-  }
 
   const allAccountsForNeraca = Array.from(allCodes).map((code) => {
     const dbAcc = dbAccountMap.get(code);
@@ -179,17 +168,14 @@ export async function computeNeraca(supabase: SupabaseClient, period: string): P
       return a.code.localeCompare(b.code);
     });
 
-  // Baris yang ditampilkan — akun 410-540 disembunyikan (efeknya sudah
-  // dilipat ke akun Laba periode ini di atas, dan lengkapnya sudah ada di
-  // laporan Laba Rugi).
-  const displayRows = rows.filter((r) => !NERACA_HIDDEN_CODES.has(r.code));
-
-  const totalDebit = displayRows.reduce((s, r) => s + r.debit, 0);
-  const totalKredit = displayRows.reduce((s, r) => s + r.kredit, 0);
+  // Semua baris ditampilkan apa adanya — nominal & posisi Debit/Kredit tiap
+  // akun di sini sama persis dengan saldo akhir akun tsb di tab Buku Besar.
+  const totalDebit = rows.reduce((s, r) => s + r.debit, 0);
+  const totalKredit = rows.reduce((s, r) => s + r.kredit, 0);
   const selisih = totalDebit - totalKredit;
 
   return {
-    rows: displayRows,
+    rows,
     totals: {
       debit: totalDebit,
       kredit: totalKredit,
