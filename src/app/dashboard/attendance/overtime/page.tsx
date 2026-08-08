@@ -1814,6 +1814,7 @@ export default function OvertimePage() {
     const q = searchQuery.trim().toLowerCase();
     return filtered
       .filter((o) => o.users)
+      .filter((o) => !isUserPKL(o.users!.role))
       .filter((o) => !q || o.users!.name.toLowerCase().includes(q))
       .sort((a, b) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime()) as unknown as OvertimeTableRow[];
   }, [filtered, searchQuery]);
@@ -1828,7 +1829,14 @@ export default function OvertimePage() {
     [groupedByUser]
   );
 
-  const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : groupedPKL;
+const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : groupedPKL;
+
+  const recapUsers = useMemo(
+    () => [...allUsers]
+      .filter(u => (activeTab === "KARYAWAN" ? !isUserPKL(u.role) : isUserPKL(u.role)))
+      .sort((a, b) => a.name.localeCompare(b.name, "id-ID")),
+    [allUsers, activeTab]
+  );
 
   const selectedUserData = useMemo(() => {
     if (!selectedUserId) return null;
@@ -1887,7 +1895,7 @@ export default function OvertimePage() {
                 className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow">
                 <Trophy size={16} /><span className="hidden sm:inline">Leaderboard</span>
               </button>
-              <button onClick={() => { setShowRecap(v => !v); if (!recapUserId && currentUser?.id) setRecapUserId(currentUser.id); }}
+             <button onClick={() => { setShowRecap(v => !v); if (!recapUserId) setRecapUserId("ALL"); }}
                 className={`h-9 px-4 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow border ${showRecap ? "bg-gray-900 text-white border-gray-900" : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"}`}>
                 <CalendarDays size={16} /><span className="hidden sm:inline">Rekap Bulanan</span>
               </button>
@@ -1986,7 +1994,7 @@ export default function OvertimePage() {
                 return (
                   <button
                     key={tab}
-                    onClick={() => { setActiveTab(tab); setSearchQuery(""); setFilterStatus("Semua"); setSelectedUserId(null); }}
+                   onClick={() => { setActiveTab(tab); setSearchQuery(""); setFilterStatus("Semua"); setSelectedUserId(null); setRecapUserId("ALL"); }}
                     className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${active
                       ? "bg-[#0f0c29] text-white shadow-md"
                       : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
@@ -2012,64 +2020,43 @@ export default function OvertimePage() {
             <div className="space-y-3">
               {(isAdminRole(currentUser?.roles ?? currentUser?.role) || canInputManual(currentUser?.roles ?? (currentUser?.role ? [currentUser.role] : []))) && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                  <label className={lbl}>Pilih Karyawan</label>
+                  <label className={lbl}>Pilih {activeTab === "KARYAWAN" ? "Karyawan" : "PKL"}</label>
                   <select value={recapUserId} onChange={e => setRecapUserId(e.target.value)} className={inp + " cursor-pointer"}>
-                    <option value="ALL">— Semua Karyawan —</option>
-                    <optgroup label="Karyawan">
-                      {[...allUsers]
-                        .filter(u => !isUserPKL(u.role))
-                        .sort((a, b) => a.name.localeCompare(b.name, "id-ID"))
-                        .map(u => (
-                          <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
-                        ))}
-                    </optgroup>
-                    <optgroup label="PKL">
-                      {[...allUsers]
-                        .filter(u => isUserPKL(u.role))
-                        .sort((a, b) => a.name.localeCompare(b.name, "id-ID"))
-                        .map(u => (
-                          <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
-                        ))}
-                    </optgroup>
+                    <option value="ALL">— Semua {activeTab === "KARYAWAN" ? "Karyawan" : "PKL"} —</option>
+                    {recapUsers.map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.role.replace(/_/g, " ")})</option>
+                    ))}
                   </select>
                 </div>
               )}
-            {recapUserId === "ALL" && (
-                <div className="space-y-5">
-                  {[
-                    { label: "Karyawan", users: allUsers.filter(u => !isUserPKL(u.role)) },
-                    { label: "PKL", users: allUsers.filter(u => isUserPKL(u.role)) },
-                  ].map(group => (
-                    <div key={group.label} className="space-y-2">
-                      <p className={lbl}>{group.label}</p>
-                      {[...group.users].sort((a, b) => a.name.localeCompare(b.name, "id-ID")).map(u => {
-                        const isOpen = expandedRecapUsers.has(u.id);
-                        return (
-                          <div key={u.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            <button
-                              onClick={() => setExpandedRecapUsers(prev => {
-                                const next = new Set(prev);
-                                if (next.has(u.id)) next.delete(u.id); else next.add(u.id);
-                                return next;
-                              })}
-                              className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50/80 transition-colors"
-                            >
-                              <div>
-                                <p className="font-semibold text-gray-800 text-sm">{u.name}</p>
-                                <p className="text-[10px] text-gray-400">{u.role.replace(/_/g, " ")}</p>
-                              </div>
-                              <svg className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-                            {isOpen && <div className="border-t border-gray-100">
-                              <OvertimeRecapTable userId={u.id} />
-                            </div>}
+           {recapUserId === "ALL" && (
+                <div className="space-y-2">
+                  {recapUsers.map(u => {
+                    const isOpen = expandedRecapUsers.has(u.id);
+                    return (
+                      <div key={u.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <button
+                          onClick={() => setExpandedRecapUsers(prev => {
+                            const next = new Set(prev);
+                            if (next.has(u.id)) next.delete(u.id); else next.add(u.id);
+                            return next;
+                          })}
+                          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50/80 transition-colors"
+                        >
+                          <div>
+                            <p className="font-semibold text-gray-800 text-sm">{u.name}</p>
+                            <p className="text-[10px] text-gray-400">{u.role.replace(/_/g, " ")}</p>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ))}
+                          <svg className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {isOpen && <div className="border-t border-gray-100">
+                          <OvertimeRecapTable userId={u.id} />
+                        </div>}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               {recapUserId && recapUserId !== "ALL" && <OvertimeRecapTable userId={recapUserId} />}
