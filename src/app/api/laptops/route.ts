@@ -9,9 +9,9 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     //  bisa menampilkan kolom Harga Modal / Sumber / Tanggal Masuk saat stok = 1.
     const { data, error } = await supabase
       .from("laptops")
-    .select(`
+      .select(`
         *,
-        laptop_units (
+laptop_units (
           id,
           serial_number,
           grade,
@@ -21,7 +21,8 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
           purchase_price,
           sparepart_cost,
           source,
-          created_at
+          created_at,
+          is_pedagang_listed
         )
       `)
       .order("laptop_name", { ascending: true });
@@ -30,7 +31,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
 
-   //  Field sensitif disaring DI SERVER, bukan sekadar disembunyikan di UI.
+    //  Field sensitif disaring DI SERVER, bukan sekadar disembunyikan di UI.
     //  Kalau hanya disembunyikan di frontend, Sales tetap bisa membacanya
     //  lewat Network tab DevTools.
     const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
@@ -49,8 +50,8 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     const safe = canSeePrivate
       ? withReadyFlag
       : withReadyFlag.map((l: Record<string, any>) => ({
-          ...l,
-        laptop_units: (l.laptop_units ?? []).map((u: Record<string, any>) => ({
+        ...l,
+       laptop_units: (l.laptop_units ?? []).map((u: Record<string, any>) => ({
             id: u.id,
             serial_number: u.serial_number,
             grade: u.grade,
@@ -58,8 +59,9 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
             selling_price: u.selling_price,
             official_price: u.official_price,
             is_price_complete: u.is_price_complete,
+            is_pedagang_listed: u.is_pedagang_listed,
           })),
-        }));
+      }));
 
     return NextResponse.json({ success: true, data: safe });
   } catch {

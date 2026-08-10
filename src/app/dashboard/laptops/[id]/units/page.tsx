@@ -33,6 +33,7 @@ interface LaptopUnit {
     audited_by?: string | null;
     so_at?: string | null;
     so_by?: string | null;
+    is_pedagang_listed?: boolean;
 }
 
 interface Laptop {
@@ -275,6 +276,7 @@ export default function UnitsPage() {
     const [toast, setToast] = useState("");
     const [auditingUnitId, setAuditingUnitId] = useState<string | null>(null);
     const [soUnitId, setSoUnitId] = useState<string | null>(null);
+    const [pedagangSavingId, setPedagangSavingId] = useState<string | null>(null);
     const [filterAudit, setFilterAudit] = useState<"ALL" | "AUDITED" | "UNAUDITED">("ALL");
     const [filterSO, setFilterSO] = useState<"ALL" | "SO" | "BELUM_SO">("ALL");
     //  Riwayat audit/SO per unit — dibuka lewat tombol jam di kolom Audit/SO
@@ -407,6 +409,27 @@ export default function UnitsPage() {
             setAlertModal(e instanceof Error ? e.message : "Gagal update SO");
         } finally {
             setSoUnitId(null);
+        }
+    };
+
+    //  Toggle checkbox Pricelist Pedagang — per unit, instan (tanpa modal
+    //  konfirmasi seperti SO, karena reversible & low-risk).
+    const toggleUnitPedagang = async (unit: LaptopUnit) => {
+        setPedagangSavingId(unit.id);
+        try {
+            const res = await fetch(`/api/units/${unit.id}/pedagang`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_pedagang_listed: !unit.is_pedagang_listed }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal update status pedagang");
+            setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, is_pedagang_listed: json.data.is_pedagang_listed } : u));
+            setToast(json.data.is_pedagang_listed ? "Unit ditambahkan ke Pricelist Pedagang" : "Unit dikeluarkan dari Pricelist Pedagang");
+        } catch (e) {
+            setAlertModal(e instanceof Error ? e.message : "Gagal update status pedagang");
+        } finally {
+            setPedagangSavingId(null);
         }
     };
 
@@ -1070,6 +1093,17 @@ export default function UnitsPage() {
                                             </button>
                                         </div>
                                     );
+                               } : undefined}
+                                renderPedagang={canFullAccessBarang ? (row) => {
+                                    const u = filteredUnits.find(x => x.id === row.id);
+                                    if (!u) return null;
+                                    return (
+                                        <PedagangButton
+                                            active={!!u.is_pedagang_listed}
+                                            loading={pedagangSavingId === u.id}
+                                            onClick={() => toggleUnitPedagang(u)}
+                                        />
+                                    );
                                 } : undefined}
                                 renderActions={(row) => {
                                     const u = filteredUnits.find(x => x.id === row.id);
@@ -1457,6 +1491,41 @@ function SoButton({ active, loading, soBy, soAt, onClick }: {
                         <circle cx="12" cy="12" r="10" />
                     </svg>
                     {expiredButOnceSo ? "SO Ulang" : "SO"}
+                </>
+            )}
+        </button>
+    );
+}
+
+//  Toggle Pricelist Pedagang per unit — checkbox on/off, tanpa riwayat.
+function PedagangButton({ active, loading, onClick }: {
+    active: boolean; loading: boolean; onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={loading}
+            title={active ? "Klik untuk keluarkan dari Pricelist Pedagang" : "Klik untuk masukkan ke Pricelist Pedagang"}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition
+                ${loading ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}
+                ${active
+                    ? "bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100"
+                    : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}
+        >
+            {active ? (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Pedagang
+                </>
+            ) : (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" />
+                    </svg>
+                    Pedagang
                 </>
             )}
         </button>

@@ -93,6 +93,8 @@ interface Props {
     renderAudit?: (row: InventoryRow) => React.ReactNode;
     /** Render kolom SO (Stock Opname) — independen dari Audit (opt-in — Data Barang) */
     renderSo?: (row: InventoryRow) => React.ReactNode;
+    /** Render kolom checkbox Pricelist Pedagang (opt-in — per unit) */
+    renderPedagang?: (row: InventoryRow) => React.ReactNode;
     /** Header sortable — opsional, dipakai Data Barang */
     sortBy?: string;
     onSort?: (asc: string, desc: string) => void;
@@ -142,7 +144,7 @@ const BelumLunasBadge = ({ label }: { label?: string }) => (
 
 export default function InventoryTable({
     rows, canSeePrivate, canSeeStock, showSparepart, showTotalJual, dateColumnLabel,
-    onRowClick, renderActions, renderAudit, renderSo, sortBy, onSort,
+    onRowClick, renderActions, renderAudit, renderSo, renderPedagang, sortBy, onSort,
 }: Props) {
     const [localSort, setLocalSort] = useState<{ col: SortKey; dir: "asc" | "desc" } | null>(null);
 
@@ -220,6 +222,7 @@ export default function InventoryTable({
                         {canSeeStock && <Th center sortKey="MINUS" activeSort={sortBy} onSort={onSort} title="Minus">M</Th>}
                         {renderSo && <Th center sortKey="SO" activeSort={sortBy} onSort={onSort}>SO</Th>}
                         {renderAudit && <Th center sortKey="AUDIT" activeSort={sortBy} onSort={onSort}>Audit</Th>}
+                        {renderPedagang && <Th center>Pedagang</Th>}
                         {renderActions && <Th right sortKey="AKSI" activeSort={sortBy} onSort={onSort}>Aksi</Th>}
                     </tr>
                 </thead>
@@ -371,6 +374,12 @@ export default function InventoryTable({
                             {renderAudit && (
                                 <td className="px-3 py-3.5 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
                                     {renderAudit(row)}
+                                </td>
+                            )}
+
+                            {renderPedagang && (
+                                <td className="px-3 py-3.5 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                    {renderPedagang(row)}
                                 </td>
                             )}
 
