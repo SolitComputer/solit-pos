@@ -7,6 +7,7 @@ import {
   accountName,
   cashflowKeterangan,
   expenseAccountForCashflow,
+  incomeAccountForCashflow,
   jakartaDate,
   kasAccountFromCashflow,
   kasAccountFromPaymentMethod,
@@ -164,8 +165,32 @@ async function buildTransactionDrafts(
   }
   if (!trxs || trxs.length === 0) return [];
 
-  // Ambil SN + harga modal dari laptop_units — sekaligus laptop_id per unit,
-  // untuk fallback spek kalau transaksi lama tidak menyimpan laptop_id langsung.
+  const invoiceNumbersForPiutangCheck = (trxs as any[]).map((t) => t.invoice_number as string);
+  const existingPiutangByInvoice = new Map<string, number>();
+
+  if (invoiceNumbersForPiutangCheck.length > 0) {
+    for (const batch of chunkArray(invoiceNumbersForPiutangCheck, 150)) {
+      const { data: existingEntries } = await supabase
+        .from("journal_entries")
+        .select("source_id, lines:journal_lines(account_code, side, nominal)")
+        .eq("source_type", "TRANSACTION")
+        .in("source_id", batch);
+
+      for (const e of (existingEntries ?? []) as any[]) {
+        const piutangLine = (e.lines ?? []).find(
+          (l: any) => l.account_code === AKUN.PIUTANG && l.side === "DEBIT"
+        );
+        if (piutangLine && Number(piutangLine.nominal) > 0) {
+          const cur = existingPiutangByInvoice.get(e.source_id as string) ?? 0;
+          existingPiutangByInvoice.set(
+            e.source_id as string,
+            cur + Math.round(Number(piutangLine.nominal))
+          );
+        }
+      }
+    }
+  }
+
   const unitIds = new Set<string>();
   for (const t of trxs as any[]) {
     if (t.unit_id) unitIds.add(t.unit_id);
@@ -243,8 +268,41 @@ async function buildTransactionDrafts(
     const specs = resolvedLaptopId ? laptopSpecMap.get(resolvedLaptopId) : undefined;
 
     const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
-    // Format keterangan sesuai requirement: tipe laptop - SN - nama customer
     const keterangan = `${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}`;
+
+    const existingPiutang = existingPiutangByInvoice.get(t.invoice_number as string) ?? 0;
+
+    if (existingPiutang > 0) {
+      const settlementLines = mergeLines([
+        { account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: existingPiutang },
+        { account_code: AKUN.PIUTANG, side: "KREDIT", nominal: existingPiutang },
+      ]);
+
+      drafts.push({
+        source_type: "TRANSACTION",
+        source_id: `${t.invoice_number}-PELUNASAN`,
+        source_category: "PELUNASAN_PIUTANG",
+        tanggal: jakartaDate((t.paid_at ?? t.created_at) as string),
+        sort_ts: (t.paid_at ?? t.created_at) as string,
+        keterangan: `Pelunasan · ${keterangan}`,
+        ref: t.invoice_number as string,
+        lines: settlementLines,
+        total: totalOf(settlementLines),
+        meta: {
+          status: t.status,
+          invoice: t.invoice_number,
+          deal,
+          modal: 0,
+          modal_missing: false,
+          company_name: t.company_name ?? null,
+          cpu: specs?.cpu ?? null,
+          ram: specs?.ram ?? null,
+          storage: specs?.storage ?? null,
+          is_settlement: true,
+        },
+      });
+      continue; 
+    }
 
     const lines: DraftLine[] = [];
 
@@ -449,7 +507,13 @@ async function buildServiceDrafts(
   return drafts;
 }
 
-// ── CASHFLOW (hanya uang KELUAR) ─────────────────────────────────────────────
+// ── CASHFLOW (uang KELUAR manual + uang MASUK manual) ────────────────────────
+// FIX: sebelumnya cuma tarik direction "OUT" — sekarang tarik SEMUA entry
+// dengan source_type "MANUAL" (mencakup Uang Keluar Manual DAN Uang Masuk
+// Manual: kategori Piutang/Aksesoris/Biaya Lain-lain). Entry otomatis lain
+// (TRANSACTION, TRANSACTION_PAYMENT, TRANSACTION_DP, SERVICE, MODAL_AWAL)
+// TETAP TIDAK ikut ke sini — sudah/akan dibukukan lewat jalurnya sendiri,
+// atau memang di luar cakupan Jurnal Umum otomatis (MODAL_AWAL).
 async function buildCashflowDrafts(
   supabase: SupabaseClient,
   startDate: string,
@@ -457,8 +521,8 @@ async function buildCashflowDrafts(
 ): Promise<JournalDraft[]> {
   const { data: rows, error } = await supabase
     .from("cashflow_entries")
-    .select("id, direction, category, nama, nominal, keterangan, tanggal, payment_method, created_at")
-    .eq("direction", "OUT")
+    .select("id, direction, category, nama, nominal, keterangan, tanggal, payment_method, source_type, created_at")
+    .eq("source_type", "MANUAL")
     .gte("tanggal", startDate)
     .lt("tanggal", endDateExclusive);
 
@@ -473,10 +537,20 @@ async function buildCashflowDrafts(
     const nominal = Math.round(Number(e.nominal ?? 0));
     if (nominal <= 0) continue;
 
-    const lines: DraftLine[] = [
-      { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
-      { account_code: kasAccountFromCashflow(e.payment_method), side: "KREDIT", nominal },
-    ];
+    const kasAccount = kasAccountFromCashflow(e.payment_method);
+
+    // OUT: Debit akun beban/aset sesuai kategori, Kredit Kas (uang keluar dari kas).
+    // IN : Debit Kas (uang masuk ke kas), Kredit akun sesuai kategori.
+    const lines: DraftLine[] =
+      e.direction === "OUT"
+        ? [
+            { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
+            { account_code: kasAccount, side: "KREDIT", nominal },
+          ]
+        : [
+            { account_code: kasAccount, side: "DEBIT", nominal },
+            { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
+          ];
 
     const merged = mergeLines(lines);
 
@@ -492,7 +566,7 @@ async function buildCashflowDrafts(
       ref: null,
       lines: merged,
       total: totalOf(merged),
-      meta: { category: e.category, payment_method: e.payment_method, nominal },
+      meta: { category: e.category, payment_method: e.payment_method, nominal, direction: e.direction },
     });
   }
 

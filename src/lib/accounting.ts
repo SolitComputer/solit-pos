@@ -35,6 +35,7 @@ export const AKUN = {
 
   PENJUALAN_LAPTOP: "410",
   PENJUALAN_AKSESORIS: "420",
+  PEMASUKAN_LAIN: "421",
   JASA_SERVICE: "430",
   MODAL_KELUAR: "440",
   BIAYA_PRINTILAN: "450",
@@ -76,9 +77,10 @@ export const ACCOUNTS: Account[] = [
   { code: "380", name: "Laba April 2026", type: "MODAL", normal: "KREDIT" },
   { code: "390", name: "Laba Mei 2026", type: "MODAL", normal: "KREDIT" },
 
-  // ── Pemasukan ──
+ // ── Pemasukan ──
   { code: AKUN.PENJUALAN_LAPTOP, name: "Penjualan Laptop", type: "PEMASUKAN", normal: "KREDIT" },
   { code: AKUN.PENJUALAN_AKSESORIS, name: "Penjualan Aksesoris", type: "PEMASUKAN", normal: "KREDIT" },
+  { code: AKUN.PEMASUKAN_LAIN, name: "Pendapatan Lain-lain", type: "PEMASUKAN", normal: "KREDIT" },
   { code: AKUN.JASA_SERVICE, name: "Jasa Service", type: "PEMASUKAN", normal: "KREDIT" },
   // 440/450/460 = kontra-pemasukan (HPP terjual). Normal balance DEBIT.
   { code: AKUN.MODAL_KELUAR, name: "Modal Keluar (Sold)", type: "PEMASUKAN", normal: "DEBIT" },
@@ -184,10 +186,10 @@ export const CASHFLOW_OUT_ACCOUNT: Record<string, string> = {
   OPERASIONAL_ONPOINT: AKUN.OPS_MINGGUAN,
   OPERASIONAL_DAVID: AKUN.OPS_MINGGUAN,
   OPERASIONAL_KONTEN_KREATOR: AKUN.OPS_MINGGUAN,
-  BELANJA_LAPTOP: AKUN.HPP,             
+  BELANJA_LAPTOP: AKUN.HPP,
   AKSESORIS: AKUN.AKSESORIS,
   MODAL_SERVICE: AKUN.AKSESORIS_SERVICE,
-  UTANG: AKUN.HUTANG_SUPPLIER,           
+  UTANG: AKUN.HUTANG_SUPPLIER,
   PIUTANG: AKUN.PIUTANG,
   KEUNTUNGAN_MITRA: AKUN.KEUNTUNGAN_MITRA,
   BIAYA_LAIN: AKUN.BIAYA_LAIN,
@@ -197,12 +199,23 @@ export function expenseAccountForCashflow(category: string): string {
   return CASHFLOW_OUT_ACCOUNT[category] ?? AKUN.BIAYA_LAIN;
 }
 
+export const CASHFLOW_IN_ACCOUNT: Record<string, string> = {
+  PIUTANG: AKUN.PIUTANG,
+  AKSESORIS: AKUN.PENJUALAN_AKSESORIS,
+  BIAYA_LAIN: AKUN.PEMASUKAN_LAIN,
+};
+
+export function incomeAccountForCashflow(category: string): string {
+  return CASHFLOW_IN_ACCOUNT[category] ?? AKUN.PEMASUKAN_LAIN;
+}
+
 export function cashflowKeterangan(e: {
   category: string;
   keterangan?: string | null;
   nama?: string | null;
+  direction?: "IN" | "OUT";
 }): string {
-  const label = categoryLabel("OUT", e.category);
+  const label = categoryLabel(e.direction ?? "OUT", e.category);
   const detail = e.keterangan?.trim() || e.nama?.trim() || "—";
   return `${label} · ${detail}`;
 }
@@ -211,7 +224,7 @@ export interface DraftLine {
   account_code: string;
   side: JournalSide;
   nominal: number;
-  keterangan?: string | null; 
+  keterangan?: string | null;
 }
 
 export function sumSide(lines: DraftLine[], side: JournalSide): number {
