@@ -30,7 +30,8 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
           laptop_bag_price
         )
       `)
-      .neq("status", "SOLD")
+     .neq("status", "SOLD")
+      .eq("is_pedagang_listed", true)
       .order("created_at", { ascending: false });
 
     if (error) {
