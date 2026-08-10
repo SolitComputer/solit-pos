@@ -12,9 +12,9 @@ interface Props {
   onConfirm: (payment: {
     payment_amount: number;
     payment_note: string;
-    payment_method: "CASH" | "TRANSFER" | "QRIS" | "DP";
+    payment_method: "CASH" | "TRANSFER" | "QRIS";
     hasil_analisa?: string;
-    pickup_type?: "SERVICE" | "GARANSI"; // opsional, bisa disimpan di log/note
+    pickup_type?: "SERVICE" | "GARANSI";
     payment_status?: "LUNAS" | "DP";
     total_tagihan?: number;
   }) => Promise<void>;
@@ -26,7 +26,6 @@ const METHOD_OPTIONS = [
   { value: "CASH", label: "Cash / Tunai", icon: Banknote },
   { value: "TRANSFER", label: "Transfer Bank", icon: Landmark },
   { value: "QRIS", label: "QRIS", icon: QrCode },
-  { value: "DP", label: "DP", icon: Wallet },
 ] as const;
 
 function fmtRupiah(n: number) {
@@ -44,10 +43,10 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
 
   // Form fields
   const [amount, setAmount] = useState("");
-  const [dpAmount, setDpAmount] = useState(""); //  NEW — nominal DP yang dibayar sekarang
+  const [dpAmount, setDpAmount] = useState("");
   const [note, setNote] = useState("");
-  const [method, setMethod] = useState<"CASH" | "TRANSFER" | "QRIS" | "DP">("CASH");
-  const [hasilAnalisa, setHasilAnalisa] = useState("");
+  const [method, setMethod] = useState<"CASH" | "TRANSFER" | "QRIS">("CASH");
+  const [isDpMode, setIsDpMode] = useState(false); const [hasilAnalisa, setHasilAnalisa] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -73,8 +72,8 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
 
   const handleConfirm = async () => {
     const amountNum = isGaransi ? 0 : parseRupiah(amount);
-    const isDp = !isGaransi && method === "DP"; //  NEW
-    const dpAmountNum = isDp ? parseRupiah(dpAmount) : 0; //  NEW
+    const isDp = !isGaransi && isDpMode;
+    const dpAmountNum = isDp ? parseRupiah(dpAmount) : 0;
 
     if (!isGaransi && (!amountNum || amountNum <= 0)) {
       setError("Jumlah biaya wajib diisi dan harus lebih dari 0");
@@ -114,9 +113,10 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
   const resetForm = () => {
     setPickupType(null);
     setAmount("");
-    setDpAmount(""); //  NEW
+    setDpAmount("");
     setNote("");
     setMethod("CASH");
+    setIsDpMode(false); // FIX
     setHasilAnalisa("");
     setError("");
   };
@@ -134,8 +134,8 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
 
   const amountNum = parseRupiah(amount);
   const isGaransi = pickupType === "garansi";
-  const isDp = !isGaransi && method === "DP"; //  NEW
-  const dpAmountNum = parseRupiah(dpAmount); //  NEW
+  const isDp = !isGaransi && isDpMode;
+  const dpAmountNum = parseRupiah(dpAmount);
 
   // ─────────────────────────────────────────────
   // SCREEN 1: Pilihan tipe pickup
@@ -268,8 +268,8 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
             <div className="flex items-center gap-1.5 ml-2">
               {/* Badge tipe */}
               <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wide ${isGaransi
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-[#1a1a2e]/10 text-[#1a1a2e]"
+                ? "bg-amber-100 text-amber-700"
+                : "bg-[#1a1a2e]/10 text-[#1a1a2e]"
                 }`}>
                 {isGaransi ? "Garansi" : "Service"}
               </span>
@@ -337,21 +337,21 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
           {!isGaransi && (
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-2">Metode Pembayaran</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {METHOD_OPTIONS.map(m => {
                   const Icon = m.icon;
                   return (
-                  <button
-                    key={m.value}
-                    onClick={() => setMethod(m.value)}
-                    className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-xs font-semibold transition ${method === m.value
+                    <button
+                      key={m.value}
+                      onClick={() => setMethod(m.value)}
+                      className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-xs font-semibold transition ${method === m.value
                         ? "border-[#1a1a2e] bg-[#1a1a2e]/5 text-[#1a1a2e]"
                         : "border-gray-200 text-gray-500 hover:border-gray-300"
-                      }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    {m.label}
-                  </button>
+                        }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      {m.label}
+                    </button>
                   );
                 })}
               </div>
@@ -375,7 +375,7 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
                   className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition font-mono"
                 />
               </div>
-             {amountNum > 0 && (
+              {amountNum > 0 && (
                 <p className="text-xs text-emerald-600 mt-1 font-medium">
                   {new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amountNum)}
                 </p>
@@ -389,7 +389,21 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
             </div>
           )}
 
-          {/*  Nominal DP — hanya tampil kalau metode = DP */}
+          {!isGaransi && (
+            <label className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl border-2 border-gray-200 cursor-pointer transition hover:border-amber-300">
+              <input
+                type="checkbox"
+                checked={isDpMode}
+                onChange={e => setIsDpMode(e.target.checked)}
+                className="w-4 h-4 rounded accent-amber-500"
+              />
+              <Wallet className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <span className="text-xs font-semibold text-gray-700">
+                Ini pembayaran DP (belum lunas penuh)
+              </span>
+            </label>
+          )}
+
           {isDp && (
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">
@@ -450,12 +464,12 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
           >
             Batal
           </button>
-         <button
+          <button
             onClick={handleConfirm}
             disabled={loading || (!isGaransi && !amountNum) || (isDp && !dpAmountNum)}
             className={`flex-2 px-6 py-2.5 text-sm font-semibold text-white rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2 ${isGaransi
-                ? "bg-amber-500 hover:bg-amber-600"
-                : "bg-emerald-600 hover:bg-emerald-700"
+              ? "bg-amber-500 hover:bg-amber-600"
+              : "bg-emerald-600 hover:bg-emerald-700"
               }`}
           >
             {loading ? (

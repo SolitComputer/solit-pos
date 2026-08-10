@@ -248,7 +248,7 @@ export async function PATCH(
           total_tagihan: total_tagihan ?? payment_amount,
           payment_amount,
           payment_note: payment_note || null,
-          payment_method: "DP",
+          payment_method: payment_method || "CASH",
           payment_by: user.id,
           payment_confirmed_at: new Date().toISOString(),
         };
@@ -299,7 +299,7 @@ export async function PATCH(
       break;
     }
 
-   //  NEW — cicilan sebagian dari sisa DP (bisa dari halaman Selesai ATAU Antrian/bayar di muka)
+    //  NEW — cicilan sebagian dari sisa DP (bisa dari halaman Selesai ATAU Antrian/bayar di muka)
     case "bayar_cicilan": {
       if (current.payment_status !== "DP")
         return NextResponse.json({ success: false, message: "Order ini tidak dalam status DP" }, { status: 400 });
@@ -318,7 +318,7 @@ export async function PATCH(
       updatePayload = {
         payment_amount: totalBaru,
         payment_status: sudahLunas ? "LUNAS" : "DP",
-       
+
         payment_confirmed_at: new Date().toISOString(),
         ...(tandaiDiambil ? {
           diambil_by: user.id,
@@ -331,7 +331,7 @@ export async function PATCH(
       break;
     }
 
-   //  NEW — bayar di muka: servis masih ANTRIAN/dikerjakan, tapi uangnya sudah masuk (lunas atau DP)
+    //  NEW — bayar di muka: servis masih ANTRIAN/dikerjakan, tapi uangnya sudah masuk (lunas atau DP)
     case "bayar_dimuka": {
       if (!isOrderAktif)
         return NextResponse.json({ success: false, message: "Bayar di muka hanya untuk order yang masih dalam antrian/dikerjakan" }, { status: 400 });
