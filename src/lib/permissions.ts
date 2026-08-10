@@ -431,8 +431,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
     "KEPALA_PENGELOLA_BARANG",
   ],
-  "/api/attendance/schedule": [...FULL_ACCESS],
-  "/api/attendance/users": [...ALL_ROLES],
+  "/api/attendance/schedule": [
+    ...FULL_ACCESS, "KEPALA_TEKNISI", "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING",
+    "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+    "KEPALA_PENGELOLA_BARANG",
+  ], "/api/attendance/users": [...ALL_ROLES],
   "/api/attendance/overtime": [...ALL_ROLES],
   "/api/attendance/overtime/rates": [
     ...FULL_ACCESS, "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
