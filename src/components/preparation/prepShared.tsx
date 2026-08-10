@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { type LucideIcon, User, Bike, Package } from "lucide-react";
 
-export interface PrepItem { id: string; serial_number: string; laptop_name: string | null; is_checked: boolean }
-export interface PrepOrder {
+export interface PrepItem {
+  id: string; serial_number: string; laptop_name: string | null; is_checked: boolean;
+  laptop_id?: string | null;
+  laptop_spec?: { cpu: string | null; ram: string | null; storage: string | null; gpu: string | null } | null;
+}export interface PrepOrder {
   id: string; order_number: string; customer_name: string; customer_phone: string | null;
   status: string; delivery_method: string | null;
   created_by: string | null;
@@ -59,6 +62,17 @@ export function OrderCard({ o, canReceive = false, receivingId = null, onReceive
   const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
   const showReceive = canReceive && o.status === "MENUNGGU" && !!onReceive;
 
+  // Model unik dalam pesanan ini — dedup by laptop_id (fallback laptop_name)
+  // biar kartu list gak nampilin spek yang sama berkali-kali kalau beberapa
+  // unit modelnya sama.
+  const uniqueModels = Array.from(
+    new Map(
+      o.preparation_items
+        .filter((it) => it.laptop_name || it.laptop_spec)
+        .map((it) => [it.laptop_id ?? it.laptop_name ?? it.id, it])
+    ).values()
+  );
+
   return (
     <div className={`bg-white rounded-2xl border shadow-sm p-4 transition hover:shadow-md ${isNew ? "border-emerald-300 ring-2 ring-emerald-100" : "border-gray-100"}`}>
       <div className="flex items-start justify-between gap-3 mb-2.5">
@@ -103,6 +117,21 @@ export function OrderCard({ o, canReceive = false, receivingId = null, onReceive
         ))}
         {total > 6 && <span className="text-[10px] text-gray-400 px-1 self-center">+{total - 6} lagi</span>}
       </div>
+
+      {uniqueModels.length > 0 && (
+        <div className="space-y-1 mb-3">
+          {uniqueModels.slice(0, 2).map((it) => (
+            <div key={it.id} className="flex flex-wrap items-center gap-1">
+              {it.laptop_name && <span className="text-[10px] font-bold text-gray-600 truncate max-w-[160px]">{it.laptop_name}</span>}
+              {it.laptop_spec?.cpu && <span className="text-[9px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">{it.laptop_spec.cpu}</span>}
+              {it.laptop_spec?.ram && <span className="text-[9px] font-semibold text-violet-600 bg-violet-50 border border-violet-100 px-1.5 py-0.5 rounded">{it.laptop_spec.ram}</span>}
+              {it.laptop_spec?.storage && <span className="text-[9px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">{it.laptop_spec.storage}</span>}
+              {it.laptop_spec?.gpu && <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">{it.laptop_spec.gpu}</span>}
+            </div>
+          ))}
+          {uniqueModels.length > 2 && <p className="text-[9px] text-gray-400">+{uniqueModels.length - 2} model lainnya</p>}
+        </div>
+      )}
 
       {o.delivery_address && <p className="text-[11px] text-gray-400 mb-3 truncate"> {o.delivery_address}</p>}
 

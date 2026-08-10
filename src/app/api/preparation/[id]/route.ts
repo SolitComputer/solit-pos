@@ -19,6 +19,24 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
       return NextResponse.json({ success: false, message: "Data penyiapan tidak ditemukan" }, { status: 404 });
     }
 
+    // ── Enrich preparation_items dengan spek laptop (CPU/RAM/Storage/GPU) ──
+    // Sama seperti GET /api/preparation (list) — lihat komentar di sana.
+    const specLaptopIds = [...new Set(
+      (data.preparation_items ?? []).map((it: any) => it.laptop_id).filter(Boolean)
+    )] as string[];
+
+    if (specLaptopIds.length > 0) {
+      const { data: laptopSpecs } = await supabase
+        .from("laptops")
+        .select("id, cpu, ram, storage, gpu")
+        .in("id", specLaptopIds);
+      const specMap = new Map((laptopSpecs ?? []).map((l: any) => [l.id, l]));
+      data.preparation_items = (data.preparation_items ?? []).map((it: any) => ({
+        ...it,
+        laptop_spec: it.laptop_id ? specMap.get(it.laptop_id) ?? null : null,
+      }));
+    }
+
     // ── Deteksi unit yang sudah SOLD lewat transaksi di pesanan LAIN ──────────
     // Business rule: SN yang sama boleh dipakai di lebih dari 1 penyiapan
     // sekaligus (lihat units/search-sn — sekarang tidak lagi cuma SIAP_JUAL).
