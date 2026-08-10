@@ -14,6 +14,7 @@ export type LogEntity =
   | "transaction"
   | "warranty"
   | "item_outflow"
+  | "accessory_outflow" // ✅ ADD: log audit penjualan aksesoris (accessory_outflows) di halaman Audit Barang Keluar
   | "seller_followup"
   | "seller_followup_pic"   
   | "seller_followup_reminder"   
