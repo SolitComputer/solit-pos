@@ -113,13 +113,17 @@ export const GET = withAuth(async (req) => {
   const checkedMap = new Map<string, string>();
 
   if (allLineIds.length > 0) {
-    const { data: checksData } = await supabase
-      .from("journal_line_checks")
-      .select("line_id, checked_at")
-      .in("line_id", allLineIds);
+    const chunkSize = 200;
+    for (let i = 0; i < allLineIds.length; i += chunkSize) {
+      const chunk = allLineIds.slice(i, i + chunkSize);
+      const { data: checksData } = await supabase
+        .from("journal_line_checks")
+        .select("line_id, checked_at")
+        .in("line_id", chunk);
 
-    for (const c of (checksData ?? []) as any[]) {
-      checkedMap.set(c.line_id, c.checked_at);
+      for (const c of (checksData ?? []) as any[]) {
+        checkedMap.set(c.line_id, c.checked_at);
+      }
     }
   }
 

@@ -85,9 +85,10 @@ export const DELETE = withAuth(async (req, ctx, user: any) => {
     return NextResponse.json({ success: false, message: "Jurnal tidak ditemukan" }, { status: 404 });
   }
 
-  if (!entry.has_warning)
-    return NextResponse.json({ success: false, message: "Jurnal ini tidak sedang ditandai warning" }, { status: 400 });
-
+  if (!entry.has_warning) {
+    return NextResponse.json({ success: true, message: "Sudah dinonaktifkan sebelumnya" }, { status: 200 });
+  }
+  // 1. Update status utama jurnal dulu
   const { error: updateErr } = await supabase
     .from("journal_entries")
     .update({ has_warning: false })
@@ -98,17 +99,18 @@ export const DELETE = withAuth(async (req, ctx, user: any) => {
     return NextResponse.json({ success: false, message: updateErr.message }, { status: 500 });
   }
 
-  const { error: logErr } = await supabase.from("journal_warning_logs").insert({
-    entry_id: id,
-    action: "DEACTIVATE",
-    reason: null,
-    created_by: user.id,
-  });
-
-  if (logErr) {
-    console.error("[jurnal warning DELETE log]", logErr);
-    return NextResponse.json({ success: false, message: logErr.message }, { status: 500 });
+  // 2. Insert log dibuat opsional (jangan biarkan gagal log menggagalkan hapus penanda)
+  try {
+    await supabase.from("journal_warning_logs").insert({
+      entry_id: id,
+      action: "DEACTIVATE",
+      reason: "Dinonaktifkan",
+      created_by: user?.id ?? null,
+    });
+  } catch (err) {
+    console.warn("[jurnal warning DELETE log warning]", err);
   }
 
   return NextResponse.json({ success: true });
-}, AKUNTANSI_MANAGE_ROLES);
+
+}, AKUNTANSI_MANAGE_ROLES); 

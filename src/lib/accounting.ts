@@ -176,7 +176,6 @@ export function kasAccountFromCashflow(pm?: string | null): string {
   return pm === "CASH" ? AKUN.KAS_CASH : AKUN.KAS_SALDO;
 }
 
-/** Kategori uang keluar cashflow → akun debit */
 export const CASHFLOW_OUT_ACCOUNT: Record<string, string> = {
   OPERASIONAL_HARIAN: AKUN.OPS_MINGGUAN,
   OPERASIONAL_BULANAN: AKUN.OPS_BULANAN,
@@ -185,9 +184,10 @@ export const CASHFLOW_OUT_ACCOUNT: Record<string, string> = {
   OPERASIONAL_ONPOINT: AKUN.OPS_MINGGUAN,
   OPERASIONAL_DAVID: AKUN.OPS_MINGGUAN,
   OPERASIONAL_KONTEN_KREATOR: AKUN.OPS_MINGGUAN,
-  BELANJA_LAPTOP: AKUN.HPP,               // beli laptop = nambah aset modal
+  BELANJA_LAPTOP: AKUN.HPP,             
   AKSESORIS: AKUN.AKSESORIS,
   MODAL_SERVICE: AKUN.AKSESORIS_SERVICE,
+  UTANG: AKUN.HUTANG_SUPPLIER,           
   PIUTANG: AKUN.PIUTANG,
   KEUNTUNGAN_MITRA: AKUN.KEUNTUNGAN_MITRA,
   BIAYA_LAIN: AKUN.BIAYA_LAIN,
