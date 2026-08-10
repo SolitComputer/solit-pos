@@ -28,6 +28,7 @@ interface LaptopUnit {
     notes?: string;
     created_at?: string;
     is_price_complete?: boolean;
+    is_pedagang_listed?: boolean;
 }
 
 interface Laptop {
@@ -419,8 +420,11 @@ export function LaptopsContent() {
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ laptop: Laptop; unitCount: number } | null>(null);
-    //  Audit: id laptop yang lagi diproses (biar tombolnya loading & tidak dobel klik)
+   //  Audit: id laptop yang lagi diproses (biar tombolnya loading & tidak dobel klik)
     const [auditingId, setAuditingId] = useState<string | null>(null);
+    //  Pricelist Pedagang: id UNIT yang lagi diproses (beda level dari Audit —
+    //  Audit per-model, Pedagang per-unit/SN)
+    const [pedagangSavingId, setPedagangSavingId] = useState<string | null>(null);
     //  Riwayat audit — laptop yang sedang dibuka riwayatnya di AuditHistoryModal
     const [historyTarget, setHistoryTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -475,11 +479,35 @@ export function LaptopsContent() {
                     ? { ...l, so_at: json.data.so_at, so_by: json.data.so_by }
                     : l
             ));
-            setSoPromptLaptop(null);
+           setSoPromptLaptop(null);
         } catch (e) {
             showAlert(e instanceof Error ? e.message : "Gagal memperbarui SO");
         } finally {
             setSoingId(null);
+        }
+    };
+
+    //  Toggle checkbox Pricelist Pedagang untuk 1 unit — update state lokal
+    //  di dalam laptop_units milik model yang sesuai (bukan level laptop).
+    const toggleUnitPedagang = async (laptopId: string, unitId: string, current: boolean) => {
+        setPedagangSavingId(unitId);
+        try {
+            const res = await fetch(`/api/units/${unitId}/pedagang`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_pedagang_listed: !current }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal update status pedagang");
+            setLaptops(prev => prev.map(l =>
+                l.id === laptopId
+                    ? { ...l, laptop_units: (l.laptop_units ?? []).map(u => u.id === unitId ? { ...u, is_pedagang_listed: json.data.is_pedagang_listed } : u) }
+                    : l
+            ));
+        } catch (e) {
+            showAlert(e instanceof Error ? e.message : "Gagal update status pedagang");
+        } finally {
+            setPedagangSavingId(null);
         }
     };
 
@@ -1244,6 +1272,21 @@ export function LaptopsContent() {
                                         </div>
                                     );
                                 } : undefined}
+                                renderPedagang={canFullAccessBarang ? (row) => {
+                                    if (!row.unit_id) {
+                                        return <span className="text-[10px] text-gray-300 italic">Buka Units</span>;
+                                    }
+                                    const l = filteredLaptops.find(x => x.id === row.id);
+                                    const u = l?.laptop_units?.find(x => x.id === row.unit_id);
+                                    if (!l || !u) return null;
+                                    return (
+                                        <PedagangButton
+                                            active={!!u.is_pedagang_listed}
+                                            loading={pedagangSavingId === u.id}
+                                            onClick={() => toggleUnitPedagang(l.id, u.id, !!u.is_pedagang_listed)}
+                                        />
+                                    );
+                                } : undefined}
                                 renderActions={(row) => {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (!l) return null;
@@ -1793,6 +1836,41 @@ function SoButton({ active, loading, soBy, soAt, onClick }: {
                         <circle cx="12" cy="12" r="10" />
                     </svg>
                     {expiredButOnceSo ? "SO Ulang" : "SO"}
+                </>
+            )}
+        </button>
+    );
+}
+
+//  Toggle Pricelist Pedagang per unit — checkbox on/off, tanpa riwayat.
+function PedagangButton({ active, loading, onClick }: {
+    active: boolean; loading: boolean; onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={loading}
+            title={active ? "Klik untuk keluarkan dari Pricelist Pedagang" : "Klik untuk masukkan ke Pricelist Pedagang"}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition
+                ${loading ? "opacity-50 cursor-wait" : "cursor-pointer active:scale-95"}
+                ${active
+                    ? "bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100"
+                    : "bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100 hover:text-gray-600"}`}
+        >
+            {active ? (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Pedagang
+                </>
+            ) : (
+                <>
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" />
+                    </svg>
+                    Pedagang
                 </>
             )}
         </button>
