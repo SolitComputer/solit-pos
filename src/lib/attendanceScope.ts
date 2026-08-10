@@ -18,16 +18,24 @@ export function isPKLRole(role: string): boolean {
 
 export async function getAttendanceScope(
   supabase: any,
-  user: { id: string; role: string }
+  user: { id: string; role: string; roles?: string[] }
 ): Promise<AttendanceScope> {
+  // ✅ FIX: dulu cuma baca user.role (single/primary role) — user dengan
+  // banyak role (mis. Kepala Pengelola Barang + Kepala Teknisi + Kepala
+  // Penyedia Barang) cuma dicek dari role pertamanya, jadi bawahan dari
+  // role ke-2/ke-3 gak pernah kehitung. Sekarang gabungkan semua role dulu.
+  const userRoles: string[] = Array.isArray(user.roles) && user.roles.length > 0
+    ? user.roles
+    : [user.role];
+
   // ─── FULL ACCESS (ADMIN, PROGRAMMER, ASISTEN_CEO) ─────────────────────────
   // Mereka bisa lihat SEMUA user termasuk PKL — filter PKL/non-PKL dilakukan di UI
-  if (isFullAccess(user.role)) {
+  if (userRoles.some(r => isFullAccess(r))) {
     return { all: true, pklOnly: false, visibleIds: [], manageableIds: [] };
   }
 
   // ─── PKL (semua varian): hanya bisa lihat sesama PKL ─────────────────────
-  if (isPKLRole(user.role)) {
+  if (userRoles.some(r => isPKLRole(r))) {
     const { data, error } = await supabase
       .from("users")
       .select("id")
@@ -53,8 +61,13 @@ export async function getAttendanceScope(
   }
 
   // ─── KEPALA DIVISI: dirinya + bawahannya ─────────────────────────────────
-  if (isDivisionHead(user.role)) {
-    const subordinateRoles = getSubordinateRoles(user.role);
+  // ✅ FIX: gabungkan bawahan dari SEMUA role kepala yang dimiliki user,
+  // bukan cuma dari role pertama — biar kombinasi multi-role (mis. Kepala
+  // Pengelola Barang + Kepala Teknisi) dapat bawahan dari kedua divisi.
+  if (userRoles.some(r => isDivisionHead(r))) {
+    const subordinateRoles = Array.from(
+      new Set(userRoles.flatMap(r => getSubordinateRoles(r)))
+    );
     let subIds: string[] = [];
 
     if (subordinateRoles.length > 0) {
