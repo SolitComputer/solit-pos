@@ -844,9 +844,8 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: o.id,
-          action: "SET_PAY",
-          rate_per_hour: payMode === "PER_JAM" ? Math.round(rate) : 0,
-          total_pay: Math.round(totalPay),
+          action: "AUDIT",
+          decision: "APPROVE",
         }),
       });
       const d = await res.json();
@@ -935,7 +934,7 @@ function CompleteModal({ overtime: o, onClose, onSaved, isAutoCompleted }: { ove
         if (!ur.ok) { const e = await ur.json(); throw new Error(e.message || "Upload gagal"); }
         const { url } = await ur.json(); photoUrl = url;
       }
-      const res = await fetch("/api/attendance/overtime", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: o.id, action: "COMPLETE", proof_photo_url: photoUrl }) });
+      const res = await fetch("/api/attendance/overtime", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: o.id, action: "ATTACH_PROOF", proof_photo_url: photoUrl }) });
       const d = await res.json();
       if (!d.success) { setError(d.message || "Gagal"); return; }
       onSaved(); onClose();
