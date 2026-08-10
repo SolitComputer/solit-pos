@@ -8,7 +8,7 @@ const VIEW_ROLES: UserRole[] = [
     "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
     "TEKNISI", "KEPALA_TEKNISI",
     "KEPALA_SALES", "CREW_SALES",
-    "ACCOUNTING",
+    "ACCOUNTING", "CUSTOMER_SERVICE",
 ];
 
 export const GET = withAuth(async (req: NextRequest) => {
