@@ -245,9 +245,11 @@ function SkeletonCard() {
 function HistoryDetailModal({
   order,
   onClose,
+  onEdit,
 }: {
   order: ServiceOrder | null;
   onClose: () => void;
+  onEdit: () => void;
 }) {
   useEffect(() => {
     if (!order) return;
@@ -549,12 +551,178 @@ function HistoryDetailModal({
 
         {/* ── FOOTER ──────────────────────────────────────────────────────── */}
         <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="h-11 flex-1 rounded-xl border border-[#1a1a2e]/15 bg-white text-[13px] font-black text-[#1a1a2e] outline-none transition hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/20 active:scale-[0.99]"
+            >
+              Edit Payment
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-11 flex-1 rounded-xl bg-[#1a1a2e] text-[13px] font-black text-white outline-none transition hover:bg-[#2a2a4e] focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/40 focus-visible:ring-offset-2 active:scale-[0.99]"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Edit Payment Modal ───────────────────────────────────────────────────────
+function EditPaymentModal({
+  order,
+  onClose,
+  onSaved,
+}: {
+  order: ServiceOrder;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [amount, setAmount] = useState(String(order.payment_amount ?? 0));
+  const [method, setMethod] = useState(order.payment_method || "CASH");
+  const [note, setNote] = useState(order.payment_note || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const wasZero = !order.payment_amount || order.payment_amount === 0;
+  const willBecomeNonZero = Number(amount) > 0;
+  const willAutoJournal = wasZero && willBecomeNonZero && order.status === "SUDAH_DIAMBIL";
+
+  const save = async () => {
+    const parsed = Number(amount);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError("Nominal payment tidak valid");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/service/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_payment",
+          payment_amount: parsed,
+          payment_method: method,
+          payment_note: note.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) { setError(json.message || "Gagal menyimpan"); return; }
+      onSaved();
+      onClose();
+    } catch {
+      setError("Gagal menyimpan — periksa koneksi internet");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[3px]" onClick={onClose} />
+      <div className="relative w-full max-w-sm rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div>
+            <p className="text-[14px] font-black text-[#1a1a2e]">Edit Payment</p>
+            <p className="mt-0.5 text-[11px] font-medium text-gray-400">{order.nama}</p>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="h-11 w-full rounded-xl bg-[#1a1a2e] text-[13px] font-black text-white outline-none transition hover:bg-[#2a2a4e] focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/40 focus-visible:ring-offset-2 active:scale-[0.99]"
+            className="grid h-8 w-8 place-items-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
           >
-            Tutup
+            <IconX />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-4">
+          {error && (
+            <div className="rounded-xl bg-red-50 px-3.5 py-2.5 text-[12px] font-medium text-red-600">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-gray-400">
+              Nominal Payment
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[11px] font-medium text-gray-400">Rp</span>
+              <input
+                type="number"
+                min={0}
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-3.5 text-[13px] font-mono font-bold outline-none transition focus:border-[#1a1a2e]/30 focus:bg-white focus:ring-2 focus:ring-[#1a1a2e]/10"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-gray-400">
+              Metode Pembayaran
+            </label>
+          <div className="grid grid-cols-3 gap-2">
+              {(["CASH", "TRANSFER", "QRIS"] as const).map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMethod(m)}
+                  className={`h-10 rounded-xl text-[11px] font-black transition ${method === m ? "bg-[#1a1a2e] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-gray-400">
+              Catatan <span className="font-normal normal-case text-gray-300">(opsional)</span>
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="Catatan pembayaran..."
+              className="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 text-[13px] outline-none transition focus:border-[#1a1a2e]/30 focus:bg-white focus:ring-2 focus:ring-[#1a1a2e]/10"
+            />
+          </div>
+
+          {willAutoJournal && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[11px] font-medium leading-relaxed text-emerald-700">
+              Payment ini sebelumnya Rp0 — setelah disimpan, otomatis muncul sebagai draft baru di Jurnal Umum (tab "Menunggu Konfirmasi") dan tinggal dikonfirmasi.
+            </div>
+          )}
+          {wasZero && willBecomeNonZero && order.status === "TIDAK_JADI" && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[11px] font-medium leading-relaxed text-amber-700">
+              Order berstatus "Tidak Jadi" tidak pernah masuk hitungan Jurnal Umum — payment ini tersimpan di data servis tapi tidak akan muncul di jurnal.
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2.5 border-t border-gray-100 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-11 flex-1 rounded-xl bg-gray-100 text-[13px] font-black text-gray-600 transition hover:bg-gray-200"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="h-11 flex-1 rounded-xl bg-[#1a1a2e] text-[13px] font-black text-white transition hover:bg-[#2a2a4e] disabled:opacity-50"
+          >
+            {saving ? "Menyimpan..." : "Simpan"}
           </button>
         </div>
       </div>
@@ -591,8 +759,9 @@ export default function HistoryPage() {
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<ServiceStatus | "ALL">("ALL");
+ const [filterStatus, setFilterStatus] = useState<ServiceStatus | "ALL">("ALL");
   const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
+  const [editOrder, setEditOrder] = useState<ServiceOrder | null>(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -1092,7 +1261,15 @@ export default function HistoryPage() {
       <HistoryDetailModal
         order={selectedOrder}
         onClose={() => setSelectedOrder(null)}
+        onEdit={() => { if (selectedOrder) setEditOrder(selectedOrder); }}
       />
+      {editOrder && (
+        <EditPaymentModal
+          order={editOrder}
+          onClose={() => setEditOrder(null)}
+          onSaved={() => { fetchOrders(); setSelectedOrder(null); }}
+        />
+      )}
     </DashboardLayout>
   );
 }
