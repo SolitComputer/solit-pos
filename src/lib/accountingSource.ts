@@ -365,69 +365,96 @@ async function buildServiceDrafts(
   supabase: SupabaseClient,
   period: string
 ): Promise<JournalDraft[]> {
-  // (fix) Batasi query ke rentang periode ini SEBELUM ambil dari database —
-  // sebelumnya query ini narik SEMUA service_orders selesai/diambil sepanjang
-  // sejarah toko setiap kali halaman dibuka, baru difilter per-periode di JS
-  // (lihat relevantServices di bawah). Filter di sini sengaja LONGGAR
-  // (superset): baris lolos kalau SALAH SATU dari 3 kolom tanggal jatuh di
-  // rentang periode ini — karena refDate yang dipakai relevantServices SELALU
-  // salah satu dari 3 kolom itu, filter ini dijamin tidak membuang baris yang
-  // seharusnya relevan. Hasil akhir 100% identik, cuma jauh lebih cepat.
   const { startDate, endDateExclusive } = periodRange(period);
 
+  // FIX: kolom payment_status & payment_confirmed_at ditambahkan — dipakai untuk
+  // mendeteksi pembayaran DP (belum lunas) dan tanggal aktual uang diterima.
+  // Filter status "DONE/SUDAH_DIAMBIL" DIHAPUS dari query utama — DP sekarang
+  // boleh diterima & diposting kapan saja (servis masih ANTRIAN/SEDANG_DIKERJAKAN/
+  // MENUNGGU_SPAREPART sekalipun). Filter kelayakan yang lebih detail dilakukan
+  // di JS lewat eligibleServices di bawah, supaya perilaku LAMA untuk pembayaran
+  // LUNAS tidak berubah sama sekali — cuma jalur DP yang baru.
   const { data: svcs, error } = await supabase
     .from("service_orders")
     .select(
-      "id, nama, type_laptop, payment_amount, payment_method, status, tanggal_masuk, tanggal_selesai, tanggal_diambil"
+      "id, nama, type_laptop, payment_amount, payment_status, payment_method, payment_confirmed_at, status, tanggal_masuk, tanggal_selesai, tanggal_diambil"
     )
-    .in("status", ["DONE", "SUDAH_DIAMBIL"])
     .not("payment_amount", "is", null)
     .gt("payment_amount", 0)
-    .or(`tanggal_diambil.gte.${startDate},tanggal_selesai.gte.${startDate},tanggal_masuk.gte.${startDate}`)
-    .or(`tanggal_diambil.lt.${endDateExclusive},tanggal_selesai.lt.${endDateExclusive},tanggal_masuk.lt.${endDateExclusive}`);
+    .or(`payment_confirmed_at.gte.${startDate},tanggal_diambil.gte.${startDate},tanggal_selesai.gte.${startDate},tanggal_masuk.gte.${startDate}`)
+    .or(`payment_confirmed_at.lt.${endDateExclusive},tanggal_diambil.lt.${endDateExclusive},tanggal_selesai.lt.${endDateExclusive},tanggal_masuk.lt.${endDateExclusive}`);
 
   if (error) {
     console.error("[akuntansi] fetch service:", error.message);
     throw new Error(`Gagal ambil data service: ${error.message}`);
   }
 
-  // ── Aturan baru, berlaku mulai HARI INI (WIB) ──
-  // Status DONE (selesai dikerjakan, laptop belum diambil customer) TIDAK LAGI
-  // dianggap sumber jurnal. Service baru harus menunggu sampai statusnya
-  // SUDAH_DIAMBIL (masuk Riwayat Servis) baru boleh masuk ke Jurnal Umum.
-  //
-  // Data lama TIDAK diubah/dihapus: service berstatus DONE yang tanggal
-  // selesainya SEBELUM cutoff di bawah tetap lolos pakai aturan lama, supaya
-  // data yang sudah pernah tampil sebagai pending tidak tiba-tiba hilang.
-  //
-  // Cutoff sengaja berupa STRING TANGGAL TETAP (bukan "hari ini" yang dihitung
-  // ulang tiap request) — supaya service yang macet di status DONE sejak
-  // sekarang tidak ikut lolos lagi cuma gara-gara tanggalnya jadi "masa lalu"
-  // seiring waktu berjalan.
   const SERVICE_STATUS_RULE_CUTOFF = "2026-07-27";
+
+  // ── Kelayakan posting ──────────────────────────────────────────────────
+  // - payment_status === "DP"  → SELALU boleh diposting, apapun status servisnya
+  //   (ANTRIAN/SEDANG_DIKERJAKAN/MENUNGGU_SPAREPART/DONE/GAGAL_DIPERBAIKI).
+  //   Ini bagian BARU sesuai permintaan: DP masuk begitu diterima, tidak perlu
+  //   menunggu servis selesai/diambil.
+  // - Selain itu (sudah LUNAS) → PERSIS aturan lama: hanya SUDAH_DIAMBIL, atau
+  //   DONE yang tanggal selesainya sebelum cutoff. TIDAK ADA perubahan di sini,
+  //   supaya data/perilaku lama tetap sama persis.
   const eligibleServices = ((svcs ?? []) as any[]).filter((s) => {
+    if (s.payment_status === "DP") return true;
     if (s.status === "SUDAH_DIAMBIL") return true;
-    const selesaiDate = s.tanggal_selesai ? jakartaDate(s.tanggal_selesai as string) : null;
-    return !!selesaiDate && selesaiDate < SERVICE_STATUS_RULE_CUTOFF;
+    if (s.status === "DONE") {
+      const selesaiDate = s.tanggal_selesai ? jakartaDate(s.tanggal_selesai as string) : null;
+      return !!selesaiDate && selesaiDate < SERVICE_STATUS_RULE_CUTOFF;
+    }
+    return false;
   });
 
-  // Saring dulu service yang tanggalnya masuk periode ini, supaya query
-  // accessory_outflows di bawah tidak perlu ambil semua service sepanjang masa.
+  // refDate untuk DP pakai payment_confirmed_at (tanggal uang benar-benar
+  // diterima) — baru fallback ke tanggal_diambil/selesai/masuk kalau kosong.
   const relevantServices = eligibleServices.filter((s) => {
-    const refDate = (s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
+    const refDate = (s.payment_confirmed_at || s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
     if (!refDate) return false;
     return periodFromDate(jakartaDate(refDate)) === period;
   });
 
   if (relevantServices.length === 0) return [];
 
-  // ── Modal sparepart SESUNGGUHNYA per service ──
-  // Dihitung dari accessory_outflows (qty aksesoris yang benar-benar dipakai teknisi)
-  // dikali accessories.buy_price (harga MODAL/beli) — BUKAN dari
-  // service_orders.biaya_sparepart, karena kolom itu menyimpan biaya yang
-  // ditagihkan ke customer (harga jual), bukan harga modal.
+  // ── Cek berapa nominal yang SUDAH pernah diposting per service ──────────
+  // Perlu supaya DP bertahap (DP → cicilan → lunas) tidak dobel-hitung: tiap
+  // kali fungsi ini jalan, cuma SELISIH (belum diposting) yang dibuat draft
+  // baru. Entry lama untuk service yang sama dikenali lewat source_id yang
+  // diawali id servis itu — entry utama pakai id polos, entry DP/pelunasan
+  // pakai akhiran "__DP{n}" / "__PELUNASAN" (dipisah "__" karena UUID service
+  // sendiri memuat karakter "-", jadi tidak bisa dipakai sebagai pemisah).
   const serviceIds = relevantServices.map((s) => String(s.id));
+  const alreadyPostedByService = new Map<string, number>();
+  const dpCountByService = new Map<string, number>();
 
+  for (const batch of chunkArray(serviceIds, 75)) {
+    const orFilter = batch.map((sid) => `source_id.eq.${sid},source_id.like.${sid}__*`).join(",");
+    const { data: existingEntries } = await supabase
+      .from("journal_entries")
+      .select("source_id, lines:journal_lines(account_code, side, nominal)")
+      .eq("source_type", "SERVICE")
+      .or(orFilter);
+
+    for (const e of (existingEntries ?? []) as any[]) {
+      const rawSourceId = e.source_id as string;
+      const baseId = rawSourceId.split("__")[0];
+      const jasaLine = (e.lines ?? []).find(
+        (l: any) => l.account_code === AKUN.JASA_SERVICE && l.side === "KREDIT"
+      );
+      if (jasaLine) {
+        const cur = alreadyPostedByService.get(baseId) ?? 0;
+        alreadyPostedByService.set(baseId, cur + Math.round(Number(jasaLine.nominal)));
+      }
+      if (rawSourceId.includes("__DP")) {
+        dpCountByService.set(baseId, (dpCountByService.get(baseId) ?? 0) + 1);
+      }
+    }
+  }
+
+  // ── Modal sparepart SESUNGGUHNYA per service (tidak berubah dari sebelumnya) ──
   const { data: outflows, error: outflowErr } = await supabase
     .from("accessory_outflows")
     .select("service_id, accessory_id, qty")
@@ -465,42 +492,71 @@ async function buildServiceDrafts(
 
   const drafts: JournalDraft[] = [];
 
-  for (const s of relevantServices) {
-    const refDate = (s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
-    const tanggal = jakartaDate(refDate);
-
+  for (const s of relevantServices as any[]) {
+    const idStr = String(s.id);
     const bayar = Math.round(Number(s.payment_amount ?? 0));
     if (bayar <= 0) continue;
 
-    const sparepart = modalByService.get(String(s.id)) ?? 0;
+    // Cuma posting SELISIH yang belum pernah dibukukan — kalau sudah tercatat
+    // penuh (delta <= 0), skip, tidak ada apa-apa yang baru untuk service ini.
+    const alreadyPosted = alreadyPostedByService.get(idStr) ?? 0;
+    const delta = bayar - alreadyPosted;
+    if (delta <= 0) continue;
+
+    const isDpOnly = s.payment_status === "DP";
+    // "Completion" = servis benar-benar sudah DONE/SUDAH_DIAMBIL DAN lunas
+    // penuh — cuma di titik inilah modal sparepart ikut dibukukan (sekali saja).
+    const isCompletion = !isDpOnly && (s.status === "DONE" || s.status === "SUDAH_DIAMBIL");
+
+    const refDate = (s.payment_confirmed_at || s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
+    const tanggal = jakartaDate(refDate);
+
     const lines: DraftLine[] = [
-      { account_code: kasAccountFromPaymentMethod(s.payment_method), side: "DEBIT", nominal: bayar },
-      { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: bayar },
+      { account_code: kasAccountFromPaymentMethod(s.payment_method), side: "DEBIT", nominal: delta },
+      { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: delta },
     ];
 
-    // Modal sparepart keluar dari stok aksesoris service — nilai MODAL, bukan harga jual
-    if (sparepart > 0) {
-      lines.push({ account_code: AKUN.MODAL_SERVICE_KELUAR, side: "DEBIT", nominal: sparepart });
-      lines.push({ account_code: AKUN.AKSESORIS_SERVICE, side: "KREDIT", nominal: sparepart });
+    let sparepart = 0;
+    if (isCompletion) {
+      sparepart = modalByService.get(idStr) ?? 0;
+      if (sparepart > 0) {
+        lines.push({ account_code: AKUN.MODAL_SERVICE_KELUAR, side: "DEBIT", nominal: sparepart });
+        lines.push({ account_code: AKUN.AKSESORIS_SERVICE, side: "KREDIT", nominal: sparepart });
+      }
     }
 
     const merged = mergeLines(lines);
-
-    // Timestamp presisi untuk sorting: pakai created_at kalau ada, fallback ke
-    // tanggal jam 00:00 supaya tetap konsisten kalau kolomnya null di baris tertentu.
     const sortTs = refDate || `${tanggal}T00:00:00+07:00`;
+
+    // source_id: entry pertama & satu-satunya (lunas langsung, tanpa DP) tetap
+    // pakai id polos — 100% kompatibel dengan data lama yang sudah ada. Entry
+    // DP dapat akhiran unik "__DP{n}" (n bertambah tiap DP baru dikonfirmasi).
+    // Entry pelunasan (setelah sempat ada DP) dapat akhiran "__PELUNASAN".
+    let sourceId: string;
+    let keteranganSuffix: string;
+    if (isDpOnly) {
+      const n = (dpCountByService.get(idStr) ?? 0) + 1;
+      sourceId = `${idStr}__DP${n}`;
+      keteranganSuffix = " (DP)";
+    } else if (alreadyPosted > 0) {
+      sourceId = `${idStr}__PELUNASAN`;
+      keteranganSuffix = " (Pelunasan)";
+    } else {
+      sourceId = idStr;
+      keteranganSuffix = "";
+    }
 
     drafts.push({
       source_type: "SERVICE",
-      source_id: String(s.id),
+      source_id: sourceId,
       source_category: "SERVICE",
       tanggal,
       sort_ts: sortTs,
-      keterangan: `Service · ${s.type_laptop ?? "—"} - ${s.nama ?? "—"}`,
-      ref: null,
+      keterangan: `Service · ${s.type_laptop ?? "—"} - ${s.nama ?? "—"}${keteranganSuffix}`,
+      ref: idStr,
       lines: merged,
       total: totalOf(merged),
-      meta: { status: s.status, bayar, sparepart },
+      meta: { status: s.status, bayar, sparepart, payment_status: s.payment_status, is_dp: isDpOnly },
     });
   }
 

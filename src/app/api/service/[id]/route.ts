@@ -312,16 +312,17 @@ export async function PATCH(
       const sudahDibayar = Number(current.payment_amount ?? 0);
       const totalBaru = sudahDibayar + cicilan_amount;
       const sudahLunas = totalBaru >= totalTagihanCicil;
-      const tandaiDiambil = sudahLunas && isOrderSelesai; //  NEW — cuma tandai diambil kalau servis memang sudah selesai
+      const tandaiDiambil = sudahLunas && isOrderSelesai;
 
       newStatus = tandaiDiambil ? "SUDAH_DIAMBIL" : oldStatus;
       updatePayload = {
         payment_amount: totalBaru,
         payment_status: sudahLunas ? "LUNAS" : "DP",
+       
+        payment_confirmed_at: new Date().toISOString(),
         ...(tandaiDiambil ? {
           diambil_by: user.id,
           tanggal_diambil: new Date().toISOString(),
-          payment_confirmed_at: new Date().toISOString(),
         } : {}),
       };
       logCatatan = sudahLunas
