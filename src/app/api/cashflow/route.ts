@@ -23,6 +23,9 @@ function getAdmin(): SupabaseClient {
 const jakartaDate = (iso: string) =>
     new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
+const CASHFLOW_HOLD_UNTIL_PAID_CUTOFF_ISO = "2026-08-10T00:00:00+07:00";
+const CASHFLOW_HOLD_UNTIL_PAID_CUTOFF = new Date(CASHFLOW_HOLD_UNTIL_PAID_CUTOFF_ISO);
+
 function getJoinedName(joined: any): string | null {
     if (!joined) return null;
     if (Array.isArray(joined)) {
@@ -86,7 +89,7 @@ function diffPayload(existing: any, desired: Record<string, any>): Record<string
 }
 
 async function syncTransactionEntries(supabase: SupabaseClient) {
-   const { data: transactions, error } = await supabase
+    const { data: transactions, error } = await supabase
         .from("transactions")
         .select("invoice_number, customer_name, sales_name, laptop_name, deal_price, amount, created_at, paid_at, status")
         .eq("status", "PAID")
@@ -103,7 +106,16 @@ async function syncTransactionEntries(supabase: SupabaseClient) {
         .select("invoice_number")
         .in("invoice_number", transactions.map((t: any) => t.invoice_number as string));
     const invoicesWithPayments = new Set((paidInvoicesWithPayments ?? []).map((p: any) => p.invoice_number as string));
-    const transactionsToSync = (transactions as any[]).filter((t) => !invoicesWithPayments.has(t.invoice_number as string));
+
+    // Transaksi BARU (dibuat >= cutoff) selalu di-sync PENUH sekali di sini saat PAID,
+    // meskipun sempat ada baris transaction_payments (DP/cicilan) — karena baris itu
+    // sengaja TIDAK disinkronkan lagi ke Cashflow (lihat syncTransactionPaymentEntries).
+    // Transaksi LAMA (dibuat < cutoff) tetap pakai aturan lama: kalau sudah pernah
+    // tercatat sebagian lewat transaction_payments, jangan dobel-hitung di sini.
+    const transactionsToSync = (transactions as any[]).filter((t) => {
+        if (new Date(t.created_at as string) >= CASHFLOW_HOLD_UNTIL_PAID_CUTOFF) return true;
+        return !invoicesWithPayments.has(t.invoice_number as string);
+    });
     if (transactionsToSync.length === 0) return;
 
     const invoices = transactionsToSync.map((t: any) => t.invoice_number as string);
@@ -260,11 +272,12 @@ function buildDpPayload(t: any) {
 // nanti transaksi itu dapat cicilan baru (menambah dp_amount di transactions),
 // tidak dobel-hitung dengan cicilan baru yang tercatat terpisah lewat transaction_payments.
 async function syncLegacyDpEntries(supabase: SupabaseClient) {
-   const { data: pendingTx, error } = await supabase
+    const { data: pendingTx, error } = await supabase
         .from("transactions")
         .select("id, invoice_number, customer_name, sales_name, laptop_name, dp_amount, status, created_at")
         .in("status", ["RESERVED", "HELD", "PACKING"])
-        .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`);
+        .gte("created_at", `${CASHFLOW_START_DATE}T00:00:00+07:00`)
+        .lt("created_at", CASHFLOW_HOLD_UNTIL_PAID_CUTOFF_ISO);
 
     if (error) {
         console.error("[cashflow sync] fetch legacy DP transactions error:", error.message);
@@ -337,16 +350,23 @@ async function syncTransactionPaymentEntries(supabase: SupabaseClient) {
     const missing = dedupedPayments.filter((p: any) => !existingIds.has(p.id as string));
     if (missing.length === 0) return;
 
-   const invoiceNumbers = [...new Set(missing.map((p: any) => p.invoice_number as string))];
+    const invoiceNumbers = [...new Set(missing.map((p: any) => p.invoice_number as string))];
     const { data: txRows } = await supabase
         .from("transactions")
-        .select("invoice_number, customer_name, sales_name, laptop_name")
+        .select("invoice_number, customer_name, sales_name, laptop_name, created_at")
         .in("invoice_number", invoiceNumbers);
-    const txInfoMap = new Map<string, { customer_name: string; sales_name: string; laptop_name: string }>(
+    const txInfoMap = new Map<string, { customer_name: string; sales_name: string; laptop_name: string; created_at: string }>(
         (txRows ?? []).map((t: any) => [t.invoice_number as string, t])
     );
 
-    const toInsert = missing
+    const missingForLegacyOnly = missing.filter((p: any) => {
+        const info = txInfoMap.get(p.invoice_number as string);
+        if (!info?.created_at) return true;
+        return new Date(info.created_at) < CASHFLOW_HOLD_UNTIL_PAID_CUTOFF;
+    });
+    if (missingForLegacyOnly.length === 0) return;
+
+    const toInsert = missingForLegacyOnly
         .map((p: any) => {
             const info = txInfoMap.get(p.invoice_number as string);
             return buildPaymentPayload(p, info?.customer_name ?? "—", info?.sales_name ?? "Sales", info?.laptop_name ?? "");
@@ -512,7 +532,7 @@ export const GET = withAuth(async () => {
                 e.is_audited &&
                 Number(e.nominal ?? 0) !== tx.nominal;
 
-           return { ...e, is_voided: isVoided, is_stale: isStale, source_nominal: tx?.nominal ?? null, tx_payment_method: tx?.paymentMethod ?? null, invoice_number: e.source_id as string };
+            return { ...e, is_voided: isVoided, is_stale: isStale, source_nominal: tx?.nominal ?? null, tx_payment_method: tx?.paymentMethod ?? null, invoice_number: e.source_id as string };
         }
 
         if (e.source_type === "TRANSACTION_PAYMENT" && e.source_id) {

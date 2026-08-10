@@ -150,12 +150,13 @@ async function buildTransactionDrafts(
   const { data: trxs, error } = await supabase
     .from("transactions")
     .select(
-      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, dp_amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, created_at, company_name, laptop_id"
+      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, dp_amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, created_at, paid_at, company_name, laptop_id"
     )
-    .in("status", ["PAID", "HELD", "PACKING", "RESERVED", "PENDING"])
-    .gte("created_at", startISO)
-    .lt("created_at", endISO)
-    .order("created_at", { ascending: true });
+    .eq("status", "PAID")
+    .not("paid_at", "is", null)
+    .gte("paid_at", startISO)
+    .lt("paid_at", endISO)
+    .order("paid_at", { ascending: true });
 
   if (error) {
     console.error("[akuntansi] fetch transactions:", error.message);
@@ -247,35 +248,23 @@ async function buildTransactionDrafts(
 
     const lines: DraftLine[] = [];
 
-    if (t.status === "PAID") {
-      const m2 = (t.payment_method_2 ?? "").trim();
-      const a1 = Math.round(Number(t.amount_method_1 ?? 0));
-      const a2 = Math.round(Number(t.amount_method_2 ?? 0));
+    const m2 = (t.payment_method_2 ?? "").trim();
+    const a1 = Math.round(Number(t.amount_method_1 ?? 0));
+    const a2 = Math.round(Number(t.amount_method_2 ?? 0));
 
-      const isSplitPayment = !!m2 && a1 > 0 && a2 > 0;
+    const isSplitPayment = !!m2 && a1 > 0 && a2 > 0;
 
-      if (isSplitPayment) {
-     
-        const account2 = kasAccountFromPaymentMethod(m2);
-        const account1 = account2 === AKUN.KAS_CASH ? AKUN.KAS_SALDO : AKUN.KAS_CASH;
+    if (isSplitPayment) {
+      const account2 = kasAccountFromPaymentMethod(m2);
+      const account1 = account2 === AKUN.KAS_CASH ? AKUN.KAS_SALDO : AKUN.KAS_CASH;
 
-        const a2Final = deal - a1;
-        lines.push({ account_code: account1, side: "DEBIT", nominal: a1 });
-        if (a2Final > 0) {
-          lines.push({ account_code: account2, side: "DEBIT", nominal: a2Final });
-        }
-      } else {
-        lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
+      const a2Final = deal - a1;
+      lines.push({ account_code: account1, side: "DEBIT", nominal: a1 });
+      if (a2Final > 0) {
+        lines.push({ account_code: account2, side: "DEBIT", nominal: a2Final });
       }
-    } else if (t.status === "HELD") {
-      lines.push({ account_code: AKUN.PIUTANG, side: "DEBIT", nominal: deal });
-    } else if (t.status === "PACKING" || t.status === "PENDING") {
-      lines.push({ account_code: AKUN.ECOMMERS, side: "DEBIT", nominal: deal });
-    } else if (t.status === "RESERVED") {
-      const dp = Math.min(deal, Math.round(Number(t.dp_amount ?? 0)));
-      if (dp > 0) lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: dp });
-      const sisa = deal - dp;
-      if (sisa > 0) lines.push({ account_code: AKUN.PIUTANG, side: "DEBIT", nominal: sisa });
+    } else {
+      lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
     }
 
     lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
@@ -291,8 +280,8 @@ async function buildTransactionDrafts(
       source_type: "TRANSACTION",
       source_id: t.invoice_number as string,
       source_category: "PENJUALAN_LAPTOP",
-      tanggal: jakartaDate(t.created_at as string),
-      sort_ts: t.created_at as string,
+      tanggal: jakartaDate((t.paid_at ?? t.created_at) as string),
+      sort_ts: (t.paid_at ?? t.created_at) as string,
       keterangan,
       ref: null,
       lines: merged,
