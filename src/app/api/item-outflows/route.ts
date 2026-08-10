@@ -51,7 +51,7 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
         if (wantsTransaksi) {
             const { data: accOutflows, error: accErr } = await supabaseAdmin
                 .from("accessory_outflows")
-                .select("id, accessory_id, qty, status, transaction_invoice, notes, created_at")
+               .select("id, accessory_id, qty, status, transaction_invoice, notes, created_at, is_audited, audited_by, audited_at, audit_cancel_reason, audit_cancelled_by, audit_cancelled_at")
                 .eq("source_type", "transaction")
                 .order("created_at", { ascending: false });
 
@@ -84,9 +84,12 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
                         item_name: accessoryNameMap.get(o.accessory_id) ?? "Aksesoris",
                         purpose: o.notes ?? (o.transaction_invoice ? `Penjualan ${o.transaction_invoice}` : "Penjualan"),
                         nominal: null,
-                        is_audited: false,
-                        audited_by: null,
-                        audited_at: null,
+                        is_audited: Boolean(o.is_audited),
+                        audited_by: o.audited_by ?? null,
+                        audited_at: o.audited_at ?? null,
+                        audit_cancel_reason: o.audit_cancel_reason ?? null,
+                        audit_cancelled_by: o.audit_cancelled_by ?? null,
+                        audit_cancelled_at: o.audit_cancelled_at ?? null,
                         created_by_name: tx?.sales_name ?? null,
                         created_by_role: null,
                         created_at: o.created_at,
@@ -97,7 +100,86 @@ async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
             }
         }
 
-        const combined = [...manualRows, ...transaksiRows].sort(
+        // ── Bagian 3: penjualan LAPTOP via transaksi — dari transaction_items ──
+        // Satu baris transaction_items (item_type != accessory, punya unit_id/laptop_id)
+        // = satu unit laptop yang keluar. Audit disimpan per-unit di sini.
+        let transaksiLaptopRows: any[] = [];
+        if (wantsTransaksi) {
+            const { data: laptopItems, error: liErr } = await supabaseAdmin
+                .from("transaction_items")
+                .select("id, invoice_number, unit_id, laptop_id, item_type, accessory_id, created_at, is_audited, audited_by, audited_at, audit_cancel_reason, audit_cancelled_by, audit_cancelled_at")
+                .order("created_at", { ascending: false });
+
+            if (liErr) {
+                console.error("[item-outflows][GET] gagal ambil transaction_items (laptop):", liErr.message);
+            } else if (laptopItems && laptopItems.length > 0) {
+                // Sama seperti logic di /api/transaction: baris dianggap "laptop" kalau
+                // bukan accessory dan punya unit_id/laptop_id.
+                const filtered = laptopItems.filter((it: any) => {
+                    const isAccessory = it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id);
+                    return !isAccessory && (it.unit_id || it.laptop_id);
+                });
+
+                if (filtered.length > 0) {
+                    const invoiceNumbers = [...new Set(filtered.map((it: any) => it.invoice_number).filter(Boolean))];
+                    const unitIds = [...new Set(filtered.map((it: any) => it.unit_id).filter(Boolean))];
+
+                    const [{ data: transactions }, { data: units }] = await Promise.all([
+                        invoiceNumbers.length > 0
+                            ? supabaseAdmin.from("transactions").select("invoice_number, customer_name, sales_name, status").in("invoice_number", invoiceNumbers)
+                            : Promise.resolve({ data: [] as any[] }),
+                        unitIds.length > 0
+                            ? supabaseAdmin.from("laptop_units").select("id, laptop_id, serial_number").in("id", unitIds)
+                            : Promise.resolve({ data: [] as any[] }),
+                    ]);
+
+                    const txMap = new Map((transactions ?? []).map((t: any) => [t.invoice_number, t]));
+                    const unitMap = new Map((units ?? []).map((u: any) => [u.id, u]));
+
+                    const allLaptopIds = [
+                        ...new Set([
+                            ...filtered.map((it: any) => it.laptop_id).filter(Boolean),
+                            ...(units ?? []).map((u: any) => u.laptop_id).filter(Boolean),
+                        ]),
+                    ];
+                    const { data: laptops } = allLaptopIds.length > 0
+                        ? await supabaseAdmin.from("laptops").select("id, laptop_name").in("id", allLaptopIds)
+                        : { data: [] as any[] };
+                    const laptopNameMap = new Map((laptops ?? []).map((l: any) => [l.id, l.laptop_name]));
+
+                    transaksiLaptopRows = filtered.map((it: any) => {
+                        const tx = it.invoice_number ? txMap.get(it.invoice_number) : null;
+                        const unit = it.unit_id ? unitMap.get(it.unit_id) : null;
+                        const laptopId = it.laptop_id ?? unit?.laptop_id ?? null;
+
+                        return {
+                            id: it.id,
+                            outflow_type: "TRANSAKSI",
+                            person_name: tx?.customer_name ?? "—",
+                            item_kind: "LAPTOP",
+                            item_ref_id: it.unit_id ?? it.laptop_id ?? null,
+                            item_name: (laptopId ? laptopNameMap.get(laptopId) : null) ?? "Laptop",
+                            purpose: it.invoice_number ? `Penjualan ${it.invoice_number}` : "Penjualan",
+                            nominal: null,
+                            is_audited: Boolean(it.is_audited),
+                            audited_by: it.audited_by ?? null,
+                            audited_at: it.audited_at ?? null,
+                            audit_cancel_reason: it.audit_cancel_reason ?? null,
+                            audit_cancelled_by: it.audit_cancelled_by ?? null,
+                            audit_cancelled_at: it.audit_cancelled_at ?? null,
+                            created_by_name: tx?.sales_name ?? null,
+                            created_by_role: null,
+                            created_at: it.created_at,
+                            status: tx?.status === "CANCELLED" ? "cancelled" : "active",
+                            transaction_invoice: it.invoice_number,
+                            serial_number: unit?.serial_number ?? null,
+                        };
+                    });
+                }
+            }
+        }
+
+        const combined = [...manualRows, ...transaksiRows, ...transaksiLaptopRows].sort(
             (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
