@@ -380,8 +380,8 @@ export async function PATCH(
 
     // ✅ Update payment saja (tanpa ubah status)
     case "update_payment":
-      if (payment_amount === undefined)
-        return NextResponse.json({ success: false, message: "Jumlah biaya wajib diisi" }, { status: 400 });
+      if (payment_amount === undefined || !Number.isFinite(Number(payment_amount)) || Number(payment_amount) < 0)
+        return NextResponse.json({ success: false, message: "Jumlah biaya wajib diisi dan tidak boleh negatif" }, { status: 400 });
       const { data: paid, error: payErr } = await supabase
         .from("service_orders")
         .update({
