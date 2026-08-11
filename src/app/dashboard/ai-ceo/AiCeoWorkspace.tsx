@@ -2,6 +2,7 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useRef, useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
     Sparkles,
     Plus,
@@ -100,22 +101,44 @@ function MarkdownMessage({ content }: { content: string }) {
     return (
         <div className="relative group/msg space-y-2">
             <div className="text-xs sm:text-[15px] leading-relaxed text-gray-800 font-normal
-                [&_p]:mb-2.5 [&_p:last-child]:mb-0
+                [&_p]:mb-3 [&_p:last-child]:mb-0
                 [&_strong]:font-semibold [&_strong]:text-gray-900
-                [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-2 [&_ul]:space-y-0.5
-                [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-2 [&_ol]:space-y-0.5
-                [&_li]:leading-relaxed
-                [&_h1]:text-base [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:mt-3 [&_h1]:mb-1.5
-                [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:mt-2.5 [&_h2]:mb-1
-                [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-gray-900 [&_h3]:mt-2 [&_h3]:mb-1
+                [&_em]:italic
+                [&_a]:text-[#1a1a2e] [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-gray-300 [&_a]:font-medium [&_a:hover]:decoration-[#1a1a2e]
+                [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-3 [&_ul]:space-y-1.5
+                [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-3 [&_ol]:space-y-1.5
+                [&_li]:leading-relaxed [&_li_ul]:mt-1.5 [&_li_ol]:mt-1.5
+                [&_h1]:text-base [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:mt-5 [&_h1]:mb-2
+                [&_h2]:text-[13px] sm:[&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:mt-4 [&_h2]:mb-1.5
+                [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-gray-900 [&_h3]:mt-3 [&_h3]:mb-1
+                [&_hr]:my-4 [&_hr]:border-gray-200
                 [&_code]:bg-gray-100 [&_code]:text-[#1a1a2e] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:text-[12px] [&_code]:font-mono
-                [&_blockquote]:border-l-2 [&_blockquote]:border-[#1a1a2e]/40 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-gray-600
-                [&_table]:w-full [&_table]:text-[11px] sm:[&_table]:text-xs [&_table]:border-collapse [&_table]:my-2 [&_table]:rounded-xl [&_table]:overflow-hidden [&_table]:shadow-xs
-                [&_th]:bg-gray-100 [&_th]:text-gray-800 [&_th]:text-left [&_th]:border-b [&_th]:border-gray-200 [&_th]:p-2 [&_th]:font-semibold
-                [&_td]:border-b [&_td]:border-gray-100 [&_td]:p-2 [&_td]:text-gray-700
-                [&_tr:hover]:bg-gray-50/80
+                [&_pre]:bg-[#1a1a2e] [&_pre]:text-gray-100 [&_pre]:rounded-xl [&_pre]:p-3 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:text-[12px] [&_pre]:leading-relaxed [&_pre]:shadow-xs
+                [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0
+                [&_blockquote]:border-l-2 [&_blockquote]:border-[#1a1a2e]/40 [&_blockquote]:pl-3 [&_blockquote]:py-0.5 [&_blockquote]:my-3 [&_blockquote]:italic [&_blockquote]:text-gray-600
             ">
-                <ReactMarkdown>{content}</ReactMarkdown>
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                        table: ({ children }) => (
+                            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-xs my-2 -mx-1 px-1">
+                                <table className="w-full text-[11px] sm:text-xs border-collapse min-w-max">{children}</table>
+                            </div>
+                        ),
+                        thead: ({ children }) => <thead className="bg-gray-100">{children}</thead>,
+                        th: ({ children }) => (
+                            <th className="text-gray-800 text-left border-b border-gray-200 px-2.5 py-1.5 font-semibold whitespace-nowrap">{children}</th>
+                        ),
+                        td: ({ children }) => (
+                            <td className="border-b border-gray-100 px-2.5 py-1.5 text-gray-700 whitespace-nowrap">{children}</td>
+                        ),
+                        tr: ({ children }) => (
+                            <tr className="even:bg-gray-50/60 hover:bg-gray-100/70 transition-colors">{children}</tr>
+                        ),
+                    }}
+                >
+                    {content}
+                </ReactMarkdown>
             </div>
             <div className="flex items-center gap-2 pt-1 opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 transition-opacity duration-200">
                 <button
@@ -433,8 +456,8 @@ export default function AiCeoWorkspace() {
                                     key={c.id}
                                     onClick={() => { loadConversation(c.id); setSidebarOpen(false); }}
                                     className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium cursor-pointer transition ${isActive
-                                            ? "bg-white text-[#1a1a2e] shadow-xs border border-gray-200 font-semibold"
-                                            : "text-gray-600 hover:bg-gray-200/60"
+                                        ? "bg-white text-[#1a1a2e] shadow-xs border border-gray-200 font-semibold"
+                                        : "text-gray-600 hover:bg-gray-200/60"
                                         }`}
                                 >
                                     <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? "text-[#1a1a2e]" : "text-gray-400"}`} />
@@ -486,8 +509,8 @@ export default function AiCeoWorkspace() {
                         <button
                             onClick={() => { setShowSuggestions((v) => !v); setSidebarOpen(false); }}
                             className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition ${showSuggestions
-                                    ? "bg-[#1a1a2e] text-white shadow-xs"
-                                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                                ? "bg-[#1a1a2e] text-white shadow-xs"
+                                : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
                                 }`}
                         >
                             <span className="flex items-center gap-2">
@@ -638,8 +661,8 @@ export default function AiCeoWorkspace() {
                                             <div className={`flex flex-col max-w-[92%] sm:max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
                                                 <div
                                                     className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${isUser
-                                                            ? "bg-[#1a1a2e] text-white rounded-tr-xs shadow-xs font-normal"
-                                                            : "bg-transparent text-gray-800"
+                                                        ? "bg-[#1a1a2e] text-white rounded-tr-xs shadow-xs font-normal"
+                                                        : "bg-transparent text-gray-800"
                                                         }`}
                                                 >
                                                     {isUser ? (
