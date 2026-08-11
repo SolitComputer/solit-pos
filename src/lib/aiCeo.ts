@@ -14,8 +14,10 @@ const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
-// Berapa lama provider yang baru kena rate-limit di-skip otomatis sebelum dicoba lagi.
-const PROVIDER_COOLDOWN_MS = 10 * 60 * 1000; // 10 menit
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+const DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions";
+
+const PROVIDER_COOLDOWN_MS = 10 * 60 * 1000;
 
 function getGeminiKey(): string {
     const key = process.env.GEMINI_API_KEY;
@@ -26,6 +28,12 @@ function getGeminiKey(): string {
 function getGroqKey(): string {
     const key = process.env.GROQ_API_KEY;
     if (!key) throw new Error("GROQ_API_KEY belum diset di environment variables.");
+    return key;
+}
+
+function getDeepSeekKey(): string {
+    const key = process.env.DEEPSEEK_API_KEY;
+    if (!key) throw new Error("DEEPSEEK_API_KEY belum diset di environment variables.");
     return key;
 }
 
@@ -807,12 +815,12 @@ export async function runToolCall(
     }
 }
 
-// ─── Representasi percakapan yang provider-agnostic ───────────────────────
 export interface ChatTurn {
     role: "user" | "assistant";
     content: string;
 }
-export type AiProvider = "gemini" | "groq";
+
+export type AiProvider = "gemini" | "groq" | "deepseek";
 type ToolEventCallback = (toolName: string) => void;
 
 async function isProviderBlocked(provider: AiProvider): Promise<boolean> {
@@ -1040,12 +1048,84 @@ async function runGroqTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall
     return "Maaf, terlalu banyak langkah untuk menjawab ini. Coba pertanyaan yang lebih spesifik.";
 }
 
-// ═══════════════════════════════ ORCHESTRATOR ═════════════════════════════
-// "auto"   → coba Gemini dulu; kalau lagi cooldown (baru kena limit) langsung
-//            skip ke Groq tanpa dicoba; kalau gagal di tengah jalan, tandai
-//            cooldown & lanjut otomatis ke provider berikutnya.
-// "gemini" → paksa Gemini saja (gak fallback, gak cek cooldown).
-// "groq"   → paksa Groq saja (gak fallback, gak cek cooldown).
+// ═══════════════════════════════════ DEEPSEEK ══════════════════════════════
+// Wire format-nya sama persis kayak Groq (OpenAI-compatible), jadi tinggal
+// reuse toOpenAiTools/toOpenAiHistory/OpenAiMessage/isMalformedToolCallError
+// yang sudah ada, cuma beda endpoint/API key/model.
+
+async function callDeepSeek(messages: OpenAiMessage[], toolsEnabled: boolean = true): Promise<any> {
+    let res: Response;
+    try {
+        res = await fetch(DEEPSEEK_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${getDeepSeekKey()}` },
+            body: JSON.stringify({
+                model: DEEPSEEK_MODEL,
+                messages,
+                ...(toolsEnabled ? { tools: toOpenAiTools(), tool_choice: "auto" } : {}),
+                temperature: 0.4,
+            }),
+        });
+    } catch (err: any) {
+        console.error("[ai-ceo] callDeepSeek gagal konek ke DeepSeek API:", err?.message ?? err, "| cause:", err?.cause ?? "(tidak ada info cause)");
+        const netErr: any = new Error("NETWORK_ERROR: Gagal terhubung ke server DeepSeek.");
+        netErr.isNetworkError = true;
+        throw netErr;
+    }
+
+    if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        const err: any = new Error(`DeepSeek API error (${res.status}): ${errText.slice(0, 300)}`);
+        err.status = res.status;
+        throw err;
+    }
+    return res.json();
+}
+
+async function runDeepSeekTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback): Promise<string> {
+    const messages: OpenAiMessage[] = [
+        { role: "system", content: buildAiCeoSystemPrompt() },
+        ...toOpenAiHistory(history),
+    ];
+    const MAX_STEPS = 6;
+    let hasToolData = false;
+
+    for (let step = 0; step < MAX_STEPS; step++) {
+        let data: any;
+        try {
+            data = await callDeepSeek(messages);
+        } catch (err: any) {
+            if (isMalformedToolCallError(err) && hasToolData) {
+                console.error("[ai-ceo] DeepSeek tool call rusak, retry tanpa tools:", err?.message ?? err);
+                const recovery = await callDeepSeek(messages, false);
+                const recoveryMsg = recovery?.choices?.[0]?.message;
+                return (recoveryMsg?.content ?? "").trim() || "Maaf, saya belum bisa memproses pertanyaan itu.";
+            }
+            throw err;
+        }
+
+        const message = data?.choices?.[0]?.message;
+        const toolCalls = message?.tool_calls ?? [];
+
+        if (toolCalls.length === 0) {
+            return (message?.content ?? "").trim() || "Maaf, saya belum bisa memproses pertanyaan itu.";
+        }
+
+        messages.push({ role: "assistant", content: null, tool_calls: toolCalls });
+
+        for (const tc of toolCalls) {
+            let args: Record<string, any> = {};
+            try { args = JSON.parse(tc.function.arguments || "{}"); } catch { }
+            onToolCall?.(tc.function.name);
+            const result = await runToolCall(tc.function.name, args, toolCtx);
+            messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
+        }
+        hasToolData = true;
+    }
+
+    return "Maaf, terlalu banyak langkah untuk menjawab ini. Coba pertanyaan yang lebih spesifik.";
+}
+
 export async function runAiCeoTurn(
     history: ChatTurn[],
     toolCtx: ToolContext,
@@ -1055,7 +1135,8 @@ export async function runAiCeoTurn(
     const order: AiProvider[] =
         preferredProvider === "gemini" ? ["gemini"] :
             preferredProvider === "groq" ? ["groq"] :
-                ["gemini", "groq"];
+                preferredProvider === "deepseek" ? ["deepseek"] :
+                    ["deepseek", "gemini", "groq"];
 
     let lastError: any = null;
     for (let i = 0; i < order.length; i++) {
@@ -1071,7 +1152,9 @@ export async function runAiCeoTurn(
             const reply =
                 provider === "gemini"
                     ? await runGeminiTurn(history, toolCtx, onToolCall)
-                    : await runGroqTurn(history, toolCtx, onToolCall);
+                    : provider === "deepseek"
+                        ? await runDeepSeekTurn(history, toolCtx, onToolCall)
+                        : await runGroqTurn(history, toolCtx, onToolCall);
             return { reply, providerUsed: provider };
         } catch (err: any) {
             lastError = err;

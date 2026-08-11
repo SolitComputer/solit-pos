@@ -32,11 +32,12 @@ interface Suggestion {
     severity: "info" | "warning" | "critical"; status: string; created_at: string;
 }
 
-type AiProviderChoice = "auto" | "gemini" | "groq";
+type AiProviderChoice = "auto" | "gemini" | "groq" | "deepseek";
 const PROVIDER_KEY = "solit_ai_ceo_provider";
 
 const PROVIDER_LABEL: Record<AiProviderChoice, string> = {
-    auto: "Otomatis (Gemini → Groq)",
+    auto: "Otomatis (DeepSeek → Gemini → Groq)",
+    deepseek: "DeepSeek V4 Flash",
     gemini: "Gemini 2.0 Flash",
     groq: "Groq (Llama 3.3 70B)",
 };
@@ -192,7 +193,7 @@ export default function AiCeoWorkspace() {
     useEffect(() => {
         try {
             const saved = localStorage.getItem(PROVIDER_KEY) as AiProviderChoice | null;
-            if (saved && ["auto", "gemini", "groq"].includes(saved)) setProvider(saved);
+            if (saved && ["auto", "gemini", "groq", "deepseek"].includes(saved)) setProvider(saved);
         } catch { }
     }, []);
 
@@ -400,9 +401,8 @@ export default function AiCeoWorkspace() {
 
                 {/* Left Navigation Sidebar */}
                 <aside
-                    className={`fixed inset-y-0 left-0 z-50 w-72 lg:static lg:z-auto lg:w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out ${
-                        sidebarOpen ? "translate-x-0" : "-translate-x-full lg:-ml-64"
-                    }`}
+                    className={`fixed inset-y-0 left-0 z-50 w-72 lg:static lg:z-auto lg:w-64 flex-shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:-ml-64"
+                        }`}
                 >
                     {/* Sidebar Header */}
                     <div className="p-3 flex items-center justify-between border-b border-gray-200">
@@ -432,11 +432,10 @@ export default function AiCeoWorkspace() {
                                 <div
                                     key={c.id}
                                     onClick={() => { loadConversation(c.id); setSidebarOpen(false); }}
-                                    className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium cursor-pointer transition ${
-                                        isActive
+                                    className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium cursor-pointer transition ${isActive
                                             ? "bg-white text-[#1a1a2e] shadow-xs border border-gray-200 font-semibold"
                                             : "text-gray-600 hover:bg-gray-200/60"
-                                    }`}
+                                        }`}
                                 >
                                     <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? "text-[#1a1a2e]" : "text-gray-400"}`} />
 
@@ -486,11 +485,10 @@ export default function AiCeoWorkspace() {
                     <div className="p-3 border-t border-gray-200">
                         <button
                             onClick={() => { setShowSuggestions((v) => !v); setSidebarOpen(false); }}
-                            className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                                showSuggestions
+                            className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition ${showSuggestions
                                     ? "bg-[#1a1a2e] text-white shadow-xs"
                                     : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                            }`}
+                                }`}
                         >
                             <span className="flex items-center gap-2">
                                 <Info className="w-3.5 h-3.5" />
@@ -639,11 +637,10 @@ export default function AiCeoWorkspace() {
 
                                             <div className={`flex flex-col max-w-[92%] sm:max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
                                                 <div
-                                                    className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
-                                                        isUser
+                                                    className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${isUser
                                                             ? "bg-[#1a1a2e] text-white rounded-tr-xs shadow-xs font-normal"
                                                             : "bg-transparent text-gray-800"
-                                                    }`}
+                                                        }`}
                                                 >
                                                     {isUser ? (
                                                         <span className="whitespace-pre-wrap">{m.content}</span>
@@ -706,7 +703,8 @@ export default function AiCeoWorkspace() {
                                                     className="appearance-none text-[10px] sm:text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg pl-2 pr-6 py-0.5 sm:py-1 focus:outline-none cursor-pointer transition shadow-xs max-w-[130px] sm:max-w-none truncate"
                                                     title="Pilih Model AI"
                                                 >
-                                                    <option value="auto">Otomatis (Gemini → Groq)</option>
+                                                    <option value="auto">Otomatis (DeepSeek → Gemini → Groq)</option>
+                                                    <option value="deepseek">DeepSeek V4 Flash</option>
                                                     <option value="gemini">Gemini 2.0 Flash</option>
                                                     <option value="groq">Groq (Llama 3.3 70B)</option>
                                                 </select>
