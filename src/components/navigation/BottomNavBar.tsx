@@ -44,9 +44,10 @@ export default function BottomNavBar() {
         w-full bg-white
         rounded-t-2xl shadow-[0_-6px_20px_rgba(0,0,0,0.08)]
         pb-[env(safe-area-inset-bottom)]
+        px-2
       "
     >
-      <div className="relative flex items-center justify-around h-[60px] px-2">
+      <div className="relative flex items-center justify-around h-[60px]">
         {activeIndex >= 0 && (
           <div
             className="absolute inset-y-0 left-0 flex items-center justify-center pointer-events-none transition-transform duration-300 ease-out"
