@@ -151,7 +151,7 @@ async function buildTransactionDrafts(
   const { data: trxs, error } = await supabase
     .from("transactions")
     .select(
-      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, dp_amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, created_at, paid_at, company_name, laptop_id"
+      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, dp_amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, created_at, paid_at, company_name, laptop_id, item_kind"
     )
     .eq("status", "PAID")
     .not("paid_at", "is", null)
@@ -163,7 +163,30 @@ async function buildTransactionDrafts(
     console.error("[akuntansi] fetch transactions:", error.message);
     return [];
   }
-  if (!trxs || trxs.length === 0) return [];
+ if (!trxs || trxs.length === 0) return [];
+
+  // ── (fix) Untuk transaksi "mixed" (laptop + aksesoris dalam satu invoice),
+  // ambil deal_price khusus baris aksesoris dari transaction_items supaya
+  // pendapatan bisa dipisah proporsional antara akun 410 (laptop) & 420 (aksesoris).
+  const mixedInvoiceNumbers = (trxs as any[])
+    .filter((t) => t.item_kind === "mixed")
+    .map((t) => t.invoice_number as string);
+
+  const accessoryDealByInvoice = new Map<string, number>();
+  if (mixedInvoiceNumbers.length > 0) {
+    for (const batch of chunkArray(mixedInvoiceNumbers, 150)) {
+      const { data: itemRows } = await supabase
+        .from("transaction_items")
+        .select("invoice_number, item_type, accessory_id, unit_id, deal_price")
+        .in("invoice_number", batch);
+      for (const it of (itemRows ?? []) as any[]) {
+        const isAccessoryItem = it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id);
+        if (!isAccessoryItem) continue;
+        const cur = accessoryDealByInvoice.get(it.invoice_number as string) ?? 0;
+        accessoryDealByInvoice.set(it.invoice_number as string, cur + Math.round(Number(it.deal_price ?? 0)));
+      }
+    }
+  }
 
   const invoiceNumbersForPiutangCheck = (trxs as any[]).map((t) => t.invoice_number as string);
   const existingPiutangByInvoice = new Map<string, number>();
@@ -254,7 +277,7 @@ async function buildTransactionDrafts(
           ? [t.unit_id]
           : [];
 
-    let modal = 0;
+   let modal = 0;
     const sns: string[] = [];
     let resolvedLaptopId: string | undefined = t.laptop_id ?? undefined;
     for (const id of ids) {
@@ -264,6 +287,16 @@ async function buildTransactionDrafts(
       if (u.serial_number) sns.push(u.serial_number);
       if (!resolvedLaptopId && u.laptop_id) resolvedLaptopId = u.laptop_id;
     }
+
+    // (fix) item_kind kolom transaksi = sumber kebenaran laptop/accessory/mixed.
+    // Fallback ke ids.length (persis logic yang sama dengan /api/transaction
+    // route.ts) untuk data lama yang belum punya kolom item_kind terisi.
+    const effectiveItemKind: "laptop" | "accessory" | "mixed" =
+      t.item_kind === "mixed" || t.item_kind === "accessory" || t.item_kind === "laptop"
+        ? t.item_kind
+        : ids.length > 0
+          ? "laptop"
+          : "accessory";
 
     const specs = resolvedLaptopId ? laptopSpecMap.get(resolvedLaptopId) : undefined;
 
@@ -325,7 +358,18 @@ async function buildTransactionDrafts(
       lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
     }
 
-    lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
+   // (fix) Kredit akun pendapatan sesuai jenis barang — sebelumnya SELALU
+    // Penjualan Laptop (410) walau transaksinya aksesoris-only.
+    if (effectiveItemKind === "accessory") {
+      lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
+    } else if (effectiveItemKind === "mixed") {
+      const accessoryDeal = Math.max(0, Math.min(deal, accessoryDealByInvoice.get(t.invoice_number as string) ?? 0));
+      const laptopDeal = deal - accessoryDeal;
+      if (laptopDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: laptopDeal });
+      if (accessoryDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: accessoryDeal });
+    } else {
+      lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
+    }
 
     if (modal > 0) {
       lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
