@@ -50,13 +50,14 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
   const todayDow = nowWIB.getUTCDay();
   const todayDate = nowWIB.toISOString().slice(0, 10);
 
-  const [
+ const [
     { data: todayIn },
     { data: todayOut },
     { data: weeklyOff },
     { data: specificOff },
     { data: dateWork },
     { data: monthlyOff },
+    { data: manualToday }, // ✅ NEW — absen manual (attendance_manual) hari ini, kalau ada
   ] = await Promise.all([
     supabaseAdmin.from("face_verifications").select("id, created_at")
       .eq("user_id", userId).eq("status", "SUCCESS").eq("direction", "IN")
@@ -70,11 +71,22 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
     supabaseAdmin.from("user_date_off").select("id").eq("user_id", userId).eq("off_date", todayDate).maybeSingle(),
     supabaseAdmin.from("user_date_work").select("id").eq("user_id", userId).eq("work_date", todayDate).maybeSingle(),
     supabaseAdmin.from("user_monthly_off").select("id").eq("user_id", userId).eq("off_date", todayDate).maybeSingle(),
+    supabaseAdmin.from("attendance_manual").select("id, status, check_in_time")
+      .eq("user_id", userId).eq("attendance_date", todayDate).maybeSingle(),
   ]);
 
   const isDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !dateWork);
 
-  const direction: "IN" | "OUT" | null = !todayIn ? "IN" : (!todayOut ? "OUT" : null);
+  // ✅ NEW — absen masuk manual (attendance_manual berstatus PRESENT/LATE)
+  // dianggap setara "sudah absen masuk" untuk menentukan arah IN/OUT. Tanpa
+  // ini, orang yang di-absenkan manual (bukan wajah) tidak akan pernah bisa
+  // di-absen-pulangkan — baik oleh dirinya sendiri (face-verify) maupun
+  // admin ("Absen Pulang Manual") — karena `todayIn` di face_verifications
+  // memang tidak pernah terisi untuk absen manual.
+  const manualCheckedIn = Boolean(manualToday) && ["PRESENT", "LATE"].includes((manualToday as any).status);
+  const hasCheckedInToday = Boolean(todayIn) || manualCheckedIn;
+
+  const direction: "IN" | "OUT" | null = !hasCheckedInToday ? "IN" : (!todayOut ? "OUT" : null);
 
   if (direction === null) {
     return { ok: false, status: 400, message: "Kamu sudah absen masuk dan pulang hari ini — tidak bisa absen lagi.", code: "ALREADY_DONE" };
@@ -108,7 +120,7 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
     }
   }
 
-  if (direction === "OUT" && !todayIn) {
+  if (direction === "OUT" && !hasCheckedInToday) {
     return { ok: false, status: 400, code: "NO_CHECKIN", message: "Kamu belum absen masuk hari ini, tidak bisa absen pulang." };
   }
 
@@ -174,8 +186,11 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
       beforeInMinutes = computeBeforeInOvertimeMinutes(nowISO, schedule);
     }
     if (direction === "OUT") {
-      if (isDayOff && todayIn) {
-        holidayMinutes = computeHolidayOvertimeMinutes(todayIn.created_at, nowISO);
+      // ✅ FIX: kalau absen masuknya lewat manual (bukan face_verifications),
+      // pakai check_in_time dari attendance_manual sebagai referensi jam masuk.
+      const inTimestamp = todayIn?.created_at ?? (manualToday as any)?.check_in_time ?? null;
+      if (isDayOff && inTimestamp) {
+        holidayMinutes = computeHolidayOvertimeMinutes(inTimestamp, nowISO);
       } else if (!isDayOff) {
         afterOutMinutes = computeAfterOutOvertimeMinutes(nowISO, schedule);
       }
