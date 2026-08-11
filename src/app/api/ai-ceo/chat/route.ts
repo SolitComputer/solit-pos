@@ -13,7 +13,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const body = await req.json().catch(() => null);
   const message: string = body?.message?.trim();
   let conversationId: string | null = body?.conversationId ?? null;
-  const requestedProvider = (body?.provider ?? "auto") as "auto" | "gemini" | "groq";
+const requestedProvider = (body?.provider ?? "auto") as "auto" | "gemini" | "groq" | "deepseek";
 
   if (!message) {
     return NextResponse.json({ success: false, message: "Pesan tidak boleh kosong." }, { status: 400 });
@@ -81,7 +81,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         const category = classifyAiCeoError(err);
         const friendlyMessage =
           category === "missing_key"
-            ? "Provider AI belum dikonfigurasi di server (API key kosong). Cek Variabel Environment di panel hosting kamu (GEMINI_API_KEY / GROQ_API_KEY)."
+           ? "Provider AI belum dikonfigurasi di server (API key kosong). Cek Variabel Environment di panel hosting kamu (DEEPSEEK_API_KEY / GEMINI_API_KEY / GROQ_API_KEY)."
             : category === "quota"
               ? "Kuota/limit AI untuk provider ini sudah habis. Coba pilih provider lain di dropdown kanan atas, atau tunggu beberapa menit sebelum coba lagi."
               : category === "network"
