@@ -227,7 +227,9 @@ export default function CreatePaymentPage() {
 
     useEffect(() => {
         setValue("is_ecommerce", isEcommerce);
-    }, [isEcommerce, setValue]);
+        setValue("ecommerce_platform", isEcommerce ? ecommercePlatform : undefined);
+        setValue("ecommerce_order_id", isEcommerce ? ecommerceOrderId : undefined);
+    }, [isEcommerce, ecommercePlatform, ecommerceOrderId, setValue]);
 
     useEffect(() => {
         getAuthUser().then(u => ({ success: true, user: u }))
@@ -605,12 +607,15 @@ export default function CreatePaymentPage() {
     // Sebelumnya tidak ada handler ini → kegagalan validasi senyap total,
     // modal konfirmasi tidak muncul dan tidak ada pesan apapun ke user.
     const onInvalidSubmit = (errs: Record<string, any>) => {
-        console.error("[CreatePayment] Validasi form gagal:", errs);
+        const fieldErrors = Object.entries(errs).map(
+            ([field, err]) => `${field}: ${(err as any)?.message ?? "tidak valid"}`
+        );
+        console.error("[CreatePayment] Validasi form gagal:", fieldErrors);
         const firstKey = Object.keys(errs)[0];
         const firstMsg = firstKey
             ? (errs[firstKey]?.message || `Field "${firstKey}" tidak valid`)
             : "Form tidak valid";
-        alert(`Tidak bisa lanjut — ${firstMsg}\n\n(Cek Console untuk detail lengkap semua field yang error)`);
+        alert(`Tidak bisa lanjut — ${firstMsg}\n\n(Cek Console untuk detail lengkap semua field yang error)\n\n${fieldErrors.join("\n")}`);
     };
 
     const handleConfirmedSubmit = async () => {
