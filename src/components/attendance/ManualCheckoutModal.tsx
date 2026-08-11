@@ -39,9 +39,9 @@ export function ManualCheckoutModal({ users, onClose, onSaved }: {
       // ✅ NEW — kalau server mendeteksi lemburan TAPI admin belum isi
       // kategori di form ini, jangan langsung tutup — minta isi dulu di
       // step lanjutan, biar lemburan ini nggak nyangkut tanpa kategori.
-      if (d.overtime?.id && !category) {
+      if (d.overtimeCreated?.id && !category) {
         onSaved(); // data absen pulang tetap tersimpan, refresh tabel di belakang
-        setPendingOvertime({ id: d.overtime.id, minutes: d.overtime.minutes });
+        setPendingOvertime({ id: d.overtimeCreated.id, minutes: d.overtimeCreated.minutes });
         return;
       }
 
