@@ -69,11 +69,13 @@ export const GET = withAuth(async (req) => {
     }),
   }));
 
-  // Enrich entry TRANSACTION dengan company_name & spek laptop — data live dari
-  // transactions/laptops, karena journal_entries tidak menyimpan kolom ini.
-  const trxInvoiceNumbers = entries
-    .filter((e: any) => e.source_type === "TRANSACTION" && e.source_id)
-    .map((e: any) => e.source_id as string);
+  const trxInvoiceNumbers = [
+    ...new Set(
+      entries
+        .filter((e: any) => e.source_type === "TRANSACTION" && e.source_id)
+        .map((e: any) => (e.source_id as string).split("__")[0])
+    ),
+  ];
 
   const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
 
@@ -81,19 +83,18 @@ export const GET = withAuth(async (req) => {
     if (e.source_type !== "TRANSACTION" || !e.source_id) {
       return { ...e, trx_meta: null };
     }
-    const baseMeta = trxMetaMap.get(e.source_id) ?? null;
-    // Modal dianggap belum diinput kalau jurnal ini TIDAK punya baris HPP (130) —
-    // karena buildTransactionDrafts() cuma menambahkan baris Modal Keluar/HPP saat
-    // modal > 0 (lihat accountingSource.ts). Dicek langsung dari baris jurnal yang
-    // sudah tersimpan, supaya selalu konsisten dengan apa yang benar-benar diposting —
-    // bukan query terpisah ke kolom transactions.inventory_price yang bisa berbeda.
+    const baseInvoice = (e.source_id as string).split("__")[0];
+    const baseMeta = trxMetaMap.get(baseInvoice) ?? null;
+    const isRevenueEntry = (e.lines ?? []).some(
+      (l: any) => l.account_code === AKUN.PENJUALAN_LAPTOP || l.account_code === AKUN.PENJUALAN_AKSESORIS
+    );
     const hasModalLine = (e.lines ?? []).some((l: any) => l.account_code === AKUN.HPP);
     const modalAddressed = hasModalLine || e.is_edited === true;
     return {
       ...e,
       trx_meta: {
         ...(baseMeta ?? {}),
-        modal_missing: !modalAddressed,
+        modal_missing: isRevenueEntry && !modalAddressed,
       },
     };
   });

@@ -16,7 +16,7 @@ const OWNERSHIP_EXEMPT_ROLES = [
 async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     const body = await req.json();
-    const { invoice_number, payment_photo, serial_number, amount, is_partial } = body;
+    const { invoice_number, payment_photo, serial_number, amount, is_partial, payment_method } = body;
 
     if (!invoice_number) {
       return NextResponse.json(
@@ -37,7 +37,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         { status: 404 }
       );
     }
-    
+
     const userRoles: string[] = user.roles ?? [user.role];
     const isOwnershipExempt = userRoles.some((r) => OWNERSHIP_EXEMPT_ROLES.includes(r));
 
@@ -116,6 +116,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         invoice_number,
         amount: cicilan,
         payment_type: "CICILAN",
+        payment_method: payment_method || transaction.payment_method || null,
         created_by_name: user.name,
       });
       if (payErr) {
@@ -156,7 +157,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         .select("id, laptop_id, serial_number, status")
         .in("id", unitIds);
 
-    if (!units || units.length !== unitIds.length) {
+      if (!units || units.length !== unitIds.length) {
         return NextResponse.json(
           { success: false, message: "Beberapa unit tidak ditemukan" },
           { status: 404 }
@@ -208,6 +209,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
           invoice_number,
           amount: finalPayment,
           payment_type: "PELUNASAN",
+          payment_method: payment_method || transaction.payment_method || null,
           created_by_name: user.name,
         });
         if (payErr) console.error("[confirm-payment] gagal catat pelunasan (multi-unit):", payErr.message);
@@ -358,6 +360,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
           invoice_number,
           amount: finalPayment,
           payment_type: "PELUNASAN",
+          payment_method: payment_method || transaction.payment_method || null,
           created_by_name: user.name,
         });
         if (payErr) console.error("[confirm-payment] gagal catat pelunasan:", payErr.message);

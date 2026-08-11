@@ -163,7 +163,7 @@ async function buildTransactionDrafts(
     console.error("[akuntansi] fetch transactions:", error.message);
     return [];
   }
- if (!trxs || trxs.length === 0) return [];
+  if (!trxs || trxs.length === 0) return [];
 
   // ── (fix) Untuk transaksi "mixed" (laptop + aksesoris dalam satu invoice),
   // ambil deal_price khusus baris aksesoris dari transaction_items supaya
@@ -188,28 +188,22 @@ async function buildTransactionDrafts(
     }
   }
 
-  const invoiceNumbersForPiutangCheck = (trxs as any[]).map((t) => t.invoice_number as string);
-  const existingPiutangByInvoice = new Map<string, number>();
+  const invoiceNumbersForAccrualCheck = (trxs as any[]).map((t) => t.invoice_number as string);
+  const existingAccrualInvoices = new Set<string>();
 
-  if (invoiceNumbersForPiutangCheck.length > 0) {
-    for (const batch of chunkArray(invoiceNumbersForPiutangCheck, 150)) {
+  if (invoiceNumbersForAccrualCheck.length > 0) {
+    for (const batch of chunkArray(invoiceNumbersForAccrualCheck, 150)) {
       const { data: existingEntries } = await supabase
         .from("journal_entries")
-        .select("source_id, lines:journal_lines(account_code, side, nominal)")
+        .select("source_id, lines:journal_lines(account_code, side)")
         .eq("source_type", "TRANSACTION")
         .in("source_id", batch);
 
       for (const e of (existingEntries ?? []) as any[]) {
-        const piutangLine = (e.lines ?? []).find(
+        const hasPiutangDebit = (e.lines ?? []).some(
           (l: any) => l.account_code === AKUN.PIUTANG && l.side === "DEBIT"
         );
-        if (piutangLine && Number(piutangLine.nominal) > 0) {
-          const cur = existingPiutangByInvoice.get(e.source_id as string) ?? 0;
-          existingPiutangByInvoice.set(
-            e.source_id as string,
-            cur + Math.round(Number(piutangLine.nominal))
-          );
-        }
+        if (hasPiutangDebit) existingAccrualInvoices.add(e.source_id as string);
       }
     }
   }
@@ -277,7 +271,7 @@ async function buildTransactionDrafts(
           ? [t.unit_id]
           : [];
 
-   let modal = 0;
+    let modal = 0;
     const sns: string[] = [];
     let resolvedLaptopId: string | undefined = t.laptop_id ?? undefined;
     for (const id of ids) {
@@ -303,38 +297,8 @@ async function buildTransactionDrafts(
     const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
     const keterangan = `${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}`;
 
-    const existingPiutang = existingPiutangByInvoice.get(t.invoice_number as string) ?? 0;
-
-    if (existingPiutang > 0) {
-      const settlementLines = mergeLines([
-        { account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: existingPiutang },
-        { account_code: AKUN.PIUTANG, side: "KREDIT", nominal: existingPiutang },
-      ]);
-
-      drafts.push({
-        source_type: "TRANSACTION",
-        source_id: `${t.invoice_number}-PELUNASAN`,
-        source_category: "PELUNASAN_PIUTANG",
-        tanggal: jakartaDate((t.paid_at ?? t.created_at) as string),
-        sort_ts: (t.paid_at ?? t.created_at) as string,
-        keterangan: `Pelunasan · ${keterangan}`,
-        ref: t.invoice_number as string,
-        lines: settlementLines,
-        total: totalOf(settlementLines),
-        meta: {
-          status: t.status,
-          invoice: t.invoice_number,
-          deal,
-          modal: 0,
-          modal_missing: false,
-          company_name: t.company_name ?? null,
-          cpu: specs?.cpu ?? null,
-          ram: specs?.ram ?? null,
-          storage: specs?.storage ?? null,
-          is_settlement: true,
-        },
-      });
-      continue; 
+    if (existingAccrualInvoices.has(t.invoice_number as string)) {
+      continue;
     }
 
     const lines: DraftLine[] = [];
@@ -358,7 +322,7 @@ async function buildTransactionDrafts(
       lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
     }
 
-   // (fix) Kredit akun pendapatan sesuai jenis barang — sebelumnya SELALU
+    // (fix) Kredit akun pendapatan sesuai jenis barang — sebelumnya SELALU
     // Penjualan Laptop (410) walau transaksinya aksesoris-only.
     if (effectiveItemKind === "accessory") {
       lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
@@ -398,6 +362,268 @@ async function buildTransactionDrafts(
         cpu: specs?.cpu ?? null,
         ram: specs?.ram ?? null,
         storage: specs?.storage ?? null,
+      },
+    });
+  }
+
+  return drafts;
+}
+
+// ── ACCRUAL: transaksi DP/Reservasi yang masih RESERVED/HELD/PACKING ─────────
+// Mengakui penjualan (Dr Piutang / Cr Penjualan) + modal (Dr Modal Keluar / Cr
+// HPP) SAAT transaksi DP/reservasi dibuat — bukan menunggu lunas penuh.
+// Piutangnya ditutup bertahap oleh buildTransactionPaymentDrafts() setiap ada
+// pembayaran (DP awal/cicilan/pelunasan) diterima.
+async function buildTransactionAccrualDrafts(
+  supabase: SupabaseClient,
+  startISO: string,
+  endISO: string
+): Promise<JournalDraft[]> {
+  const { data: trxs, error } = await supabase
+    .from("transactions")
+    .select(
+      "invoice_number, customer_name, laptop_name, serial_number, status, deal_price, amount, unit_id, unit_ids, created_at, company_name, laptop_id, item_kind"
+    )
+    .in("status", ["RESERVED", "HELD", "PACKING"])
+    .gte("created_at", startISO)
+    .lt("created_at", endISO)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[akuntansi] fetch transactions (accrual):", error.message);
+    return [];
+  }
+  if (!trxs || trxs.length === 0) return [];
+
+  const mixedInvoiceNumbers = (trxs as any[])
+    .filter((t) => t.item_kind === "mixed")
+    .map((t) => t.invoice_number as string);
+
+  const accessoryDealByInvoice = new Map<string, number>();
+  if (mixedInvoiceNumbers.length > 0) {
+    for (const batch of chunkArray(mixedInvoiceNumbers, 150)) {
+      const { data: itemRows } = await supabase
+        .from("transaction_items")
+        .select("invoice_number, item_type, accessory_id, unit_id, deal_price")
+        .in("invoice_number", batch);
+      for (const it of (itemRows ?? []) as any[]) {
+        const isAccessoryItem = it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id);
+        if (!isAccessoryItem) continue;
+        const cur = accessoryDealByInvoice.get(it.invoice_number as string) ?? 0;
+        accessoryDealByInvoice.set(it.invoice_number as string, cur + Math.round(Number(it.deal_price ?? 0)));
+      }
+    }
+  }
+
+  const unitIds = new Set<string>();
+  for (const t of trxs as any[]) {
+    if (t.unit_id) unitIds.add(t.unit_id);
+    if (Array.isArray(t.unit_ids)) for (const u of t.unit_ids) if (u) unitIds.add(u);
+  }
+
+  const unitMap = new Map<string, { purchase_price: number; serial_number?: string; laptop_id?: string }>();
+  if (unitIds.size > 0) {
+    for (const batch of chunkArray(Array.from(unitIds), 150)) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, purchase_price, serial_number, laptop_id")
+        .in("id", batch);
+      for (const u of units ?? []) {
+        unitMap.set(u.id as string, {
+          purchase_price: Math.round(Number(u.purchase_price ?? 0)),
+          serial_number: (u.serial_number as string) ?? undefined,
+          laptop_id: (u.laptop_id as string) ?? undefined,
+        });
+      }
+    }
+  }
+
+  const laptopIds = new Set<string>();
+  for (const t of trxs as any[]) if (t.laptop_id) laptopIds.add(t.laptop_id);
+  for (const u of unitMap.values()) if (u.laptop_id) laptopIds.add(u.laptop_id);
+
+  const laptopSpecMap = new Map<string, { cpu?: string; ram?: string; storage?: string }>();
+  if (laptopIds.size > 0) {
+    for (const batch of chunkArray(Array.from(laptopIds), 150)) {
+      const { data: laptops } = await supabase
+        .from("laptops")
+        .select("id, cpu, ram, storage")
+        .in("id", batch);
+      for (const l of laptops ?? []) {
+        laptopSpecMap.set(l.id as string, {
+          cpu: (l.cpu as string) ?? undefined,
+          ram: (l.ram as string) ?? undefined,
+          storage: (l.storage as string) ?? undefined,
+        });
+      }
+    }
+  }
+
+  const drafts: JournalDraft[] = [];
+
+  for (const t of trxs as any[]) {
+    const deal = Math.round(Number(t.deal_price ?? t.amount ?? 0));
+    if (deal <= 0) continue;
+
+    const ids: string[] =
+      Array.isArray(t.unit_ids) && t.unit_ids.length > 0
+        ? t.unit_ids
+        : t.unit_id
+          ? [t.unit_id]
+          : [];
+
+    let modal = 0;
+    const sns: string[] = [];
+    let resolvedLaptopId: string | undefined = t.laptop_id ?? undefined;
+    for (const id of ids) {
+      const u = unitMap.get(id);
+      if (!u) continue;
+      modal += u.purchase_price;
+      if (u.serial_number) sns.push(u.serial_number);
+      if (!resolvedLaptopId && u.laptop_id) resolvedLaptopId = u.laptop_id;
+    }
+
+    const effectiveItemKind: "laptop" | "accessory" | "mixed" =
+      t.item_kind === "mixed" || t.item_kind === "accessory" || t.item_kind === "laptop"
+        ? t.item_kind
+        : ids.length > 0
+          ? "laptop"
+          : "accessory";
+
+    const specs = resolvedLaptopId ? laptopSpecMap.get(resolvedLaptopId) : undefined;
+    const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
+    const keterangan = `DP/Reservasi · ${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}`;
+
+    const lines: DraftLine[] = [{ account_code: AKUN.PIUTANG, side: "DEBIT", nominal: deal }];
+
+    if (effectiveItemKind === "accessory") {
+      lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
+    } else if (effectiveItemKind === "mixed") {
+      const accessoryDeal = Math.max(0, Math.min(deal, accessoryDealByInvoice.get(t.invoice_number as string) ?? 0));
+      const laptopDeal = deal - accessoryDeal;
+      if (laptopDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: laptopDeal });
+      if (accessoryDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: accessoryDeal });
+    } else {
+      lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
+    }
+
+    if (modal > 0) {
+      lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+      lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+    }
+
+    const merged = mergeLines(lines);
+
+    drafts.push({
+      source_type: "TRANSACTION",
+      source_id: t.invoice_number as string,
+      source_category: "DP_RESERVASI",
+      tanggal: jakartaDate(t.created_at as string),
+      sort_ts: t.created_at as string,
+      keterangan,
+      ref: null,
+      lines: merged,
+      total: totalOf(merged),
+      meta: {
+        status: t.status,
+        invoice: t.invoice_number,
+        deal,
+        modal,
+        modal_missing: modal === 0,
+        company_name: t.company_name ?? null,
+        cpu: specs?.cpu ?? null,
+        ram: specs?.ram ?? null,
+        storage: specs?.storage ?? null,
+        is_accrual: true,
+      },
+    });
+  }
+
+  return drafts;
+}
+
+async function buildTransactionPaymentDrafts(
+  supabase: SupabaseClient,
+  startISO: string,
+  endISO: string
+): Promise<JournalDraft[]> {
+  const { data: payments, error } = await supabase
+    .from("transaction_payments")
+    .select("id, invoice_number, amount, payment_type, payment_method, created_at")
+    .gte("created_at", startISO)
+    .lt("created_at", endISO)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[akuntansi] fetch transaction_payments:", error.message);
+    return [];
+  }
+  if (!payments || payments.length === 0) return [];
+
+  const invoiceNumbers = [...new Set((payments as any[]).map((p) => p.invoice_number as string))];
+
+  const legacyDirectInvoices = new Set<string>();
+  for (const batch of chunkArray(invoiceNumbers, 150)) {
+    const { data: existingEntries } = await supabase
+      .from("journal_entries")
+      .select("source_id, lines:journal_lines(account_code)")
+      .eq("source_type", "TRANSACTION")
+      .in("source_id", batch);
+    for (const e of (existingEntries ?? []) as any[]) {
+      const hasPiutangLine = (e.lines ?? []).some((l: any) => l.account_code === AKUN.PIUTANG);
+      if (!hasPiutangLine) legacyDirectInvoices.add(e.source_id as string);
+    }
+  }
+
+  const trxMap = new Map<string, { customer_name: string; laptop_name: string; payment_method: string; company_name: string | null }>();
+  for (const batch of chunkArray(invoiceNumbers, 150)) {
+    const { data: trxs } = await supabase
+      .from("transactions")
+      .select("invoice_number, customer_name, laptop_name, payment_method, company_name")
+      .in("invoice_number", batch);
+    for (const t of trxs ?? []) {
+      trxMap.set(t.invoice_number as string, {
+        customer_name: (t.customer_name as string) ?? "—",
+        laptop_name: (t.laptop_name as string) ?? "—",
+        payment_method: (t.payment_method as string) ?? "CASH",
+        company_name: (t.company_name as string) ?? null,
+      });
+    }
+  }
+
+  const TYPE_LABEL: Record<string, string> = { DP: "DP", CICILAN: "Cicilan", PELUNASAN: "Pelunasan" };
+
+  const drafts: JournalDraft[] = [];
+  for (const p of payments as any[]) {
+    if (legacyDirectInvoices.has(p.invoice_number as string)) continue;
+
+    const amount = Math.round(Number(p.amount ?? 0));
+    if (amount <= 0) continue;
+
+    const trx = trxMap.get(p.invoice_number as string);
+    const paymentMethod = p.payment_method || trx?.payment_method || "CASH";
+
+    const lines = mergeLines([
+      { account_code: kasAccountFromPaymentMethod(paymentMethod), side: "DEBIT", nominal: amount },
+      { account_code: AKUN.PIUTANG, side: "KREDIT", nominal: amount },
+    ]);
+
+    drafts.push({
+      source_type: "TRANSACTION",
+      source_id: `${p.invoice_number}__PAY_${p.id}`,
+      source_category: "PEMBAYARAN_PIUTANG",
+      tanggal: jakartaDate(p.created_at as string),
+      sort_ts: p.created_at as string,
+      keterangan: `Pembayaran ${TYPE_LABEL[p.payment_type as string] ?? p.payment_type} · ${trx?.laptop_name ?? "—"} - ${trx?.customer_name ?? "—"}`,
+      ref: p.invoice_number as string,
+      lines,
+      total: totalOf(lines),
+      meta: {
+        invoice: p.invoice_number,
+        payment_type: p.payment_type,
+        amount,
+        modal_missing: false,
+        company_name: trx?.company_name ?? null,
       },
     });
   }
@@ -644,13 +870,13 @@ async function buildCashflowDrafts(
     const lines: DraftLine[] =
       e.direction === "OUT"
         ? [
-            { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
-            { account_code: kasAccount, side: "KREDIT", nominal },
-          ]
+          { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
+          { account_code: kasAccount, side: "KREDIT", nominal },
+        ]
         : [
-            { account_code: kasAccount, side: "DEBIT", nominal },
-            { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
-          ];
+          { account_code: kasAccount, side: "DEBIT", nominal },
+          { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
+        ];
 
     const merged = mergeLines(lines);
 
@@ -680,16 +906,15 @@ export async function buildDraftsForPeriod(
 ): Promise<JournalDraft[]> {
   const { startISO, endISO, startDate, endDateExclusive } = periodRange(period);
 
-  const [tx, svc, cf] = await Promise.all([
+  const [tx, accrual, pay, svc, cf] = await Promise.all([
     buildTransactionDrafts(supabase, startISO, endISO),
+    buildTransactionAccrualDrafts(supabase, startISO, endISO),
+    buildTransactionPaymentDrafts(supabase, startISO, endISO),
     buildServiceDrafts(supabase, period),
     buildCashflowDrafts(supabase, startDate, endDateExclusive),
   ]);
 
-  // Urut deterministik: tanggal dulu (ascending), lalu sort_ts (timestamp presisi,
-  // ascending) sebagai tie-break — bukan lagi bergantung urutan Promise.all yang
-  // tidak konsisten antar-request.
-  return [...tx, ...svc, ...cf].sort((a, b) => {
+  return [...tx, ...accrual, ...pay, ...svc, ...cf].sort((a, b) => {
     if (a.tanggal !== b.tanggal) return a.tanggal.localeCompare(b.tanggal);
     return a.sort_ts.localeCompare(b.sort_ts);
   });
