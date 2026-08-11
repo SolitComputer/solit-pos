@@ -43,6 +43,65 @@ function fmtTime(iso: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
 }
+function initials(name: string) {
+  return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+}
+
+type RowState = {
+  style: (typeof COLOR_STYLES)[string];
+  canAccThis: boolean;
+  canFillDetail: boolean;
+  canUploadProof: boolean;
+  canAuditThis: boolean;
+};
+
+// Menyatukan perhitungan status baris (dipakai versi tabel desktop & kartu mobile
+// biar logic hak-aksesnya cuma ada di satu tempat, gak dobel).
+function computeRowState(
+  o: OvertimeTableRow,
+  opts: { currentUserId?: string; canApprove: (targetRole: string) => boolean; canAudit: boolean }
+): RowState {
+  const color = getOvertimeColor(o);
+  const style = COLOR_STYLES[color];
+  const isOwner = o.user_id === opts.currentUserId;
+  // ✅ FIX: kepala divisi gak boleh nge-ACC lemburannya sendiri (server
+  // sudah nolak ini, tapi tombolnya sempat tetap nongol di UI karena
+  // fungsi canApprove(targetRole) di sini gak tau siapa target
+  // user-nya). Full-access (Admin) tetap boleh self-approve, sesuai server.
+  const canAccThis = o.status === "PENDING" && !!o.category && !!o.work_description && opts.canApprove(o.users?.role ?? "") && !(isOwner && !opts.canAudit);
+  const canFillDetail = o.status === "PENDING" && isOwner && (!o.category || !o.work_description);
+  const canUploadProof = o.status === "NEED_PROOF" && isOwner;
+  const canAuditThis = o.status === "COMPLETED" && o.audit_status === "PENDING" && opts.canAudit;
+  return { style, canAccThis, canFillDetail, canUploadProof, canAuditThis };
+}
+
+// Tombol aksi per baris — dipakai di kolom "Aksi" tabel desktop maupun kartu mobile.
+function RowActions({
+  align, canFillDetail, canAccThis, canUploadProof, canAuditThis, isBusy,
+  onFillDetail, onApprove, onUploadProof, onAudit,
+}: {
+  align: "center" | "start";
+  canFillDetail: boolean;
+  canAccThis: boolean;
+  canUploadProof: boolean;
+  canAuditThis: boolean;
+  isBusy: boolean;
+  onFillDetail: () => void;
+  onApprove: () => void;
+  onUploadProof: () => void;
+  onAudit: () => void;
+}) {
+  const hasAction = canFillDetail || canAccThis || canUploadProof || canAuditThis;
+  return (
+    <div className={`flex items-center gap-1.5 flex-wrap ${align === "center" ? "justify-center" : "justify-start"}`}>
+      {canFillDetail && <button onClick={onFillDetail} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100">Isi Detail</button>}
+      {canAccThis && <button disabled={isBusy} onClick={onApprove} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50">{isBusy ? "..." : "ACC"}</button>}
+      {canUploadProof && <button onClick={onUploadProof} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100">Upload Bukti</button>}
+      {canAuditThis && <button disabled={isBusy} onClick={onAudit} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50">{isBusy ? "..." : "Audit"}</button>}
+      {!hasAction && <span className="text-[10px] text-gray-300">—</span>}
+    </div>
+  );
+}
 
 export function OvertimeTable({
   rows, loading, canApprove, canAudit, currentUserId, onRefresh,
