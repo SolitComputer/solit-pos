@@ -68,7 +68,7 @@ export async function GET() {
       supabase.from("user_date_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
       supabase.from("user_date_work").select("id").eq("user_id", user.id).eq("work_date", todayDate).maybeSingle(),
       supabase.from("user_monthly_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
-      supabase.from("attendance_manual").select("id, status, created_by")
+      supabase.from("attendance_manual").select("id, status, created_by, check_in_time")
         .eq("user_id", user.id).eq("attendance_date", todayDate).maybeSingle(),
       supabase.from("face_verifications").select("id, created_at")
         .eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "IN")
@@ -88,6 +88,11 @@ export async function GET() {
       .maybeSingle();
 
     const userShift = ((userData as any)?.shift ?? (user as any).shift ?? "PAGI") as "PAGI" | "SORE";
+
+    // ✅ NEW — absen manual berstatus PRESENT/LATE dianggap "hadir" dan tetap
+    // butuh absen pulang; SICK/PERMIT/ABSENT/LEAVE tidak butuh absen pulang
+    // sama sekali (perilaku lama, tidak berubah).
+    const manualIsAttendanceType = Boolean(manualToday) && ["PRESENT", "LATE"].includes((manualToday as any).status);
 
     // Check jika ada leave (cuti) hari ini
     const { data: leaveToday } = await supabase
@@ -126,7 +131,7 @@ export async function GET() {
       return response;
     }
 
-    if (manualToday) {
+    if (manualToday && !manualIsAttendanceType) {
       const getMidnightWIB = () => new Date(Date.UTC(
         nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(),
         nowWIB.getUTCDate() + 1, 17, 0, 0
@@ -171,9 +176,25 @@ export async function GET() {
       return response;
     }
 
-    const isTodayDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !Boolean(dateWork));
-    const alreadyAttendedDB = Boolean(todaySuccess); // ini sekarang khusus status absen MASUK
+   const isTodayDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !Boolean(dateWork));
+    // ✅ FIX: absen masuk manual (PRESENT/LATE) sekarang juga dihitung "sudah
+    // absen masuk" — sebelumnya cuma face_verifications yang dicek, jadi
+    // orang yang di-absenkan manual tidak pernah dianggap perlu absen pulang.
+    const alreadyAttendedDB = Boolean(todaySuccess) || manualIsAttendanceType; // ini sekarang khusus status absen MASUK
     const alreadyCheckedOut = Boolean(todayOutRow);  // ✅ NEW — status absen PULANG
+    // Referensi jam masuk untuk hitung lembur — dari face_verifications kalau
+    // ada, atau dari jam masuk yang diisi admin saat absen manual.
+    const inTimestampForOvertime = todaySuccess?.created_at ?? (manualIsAttendanceType ? (manualToday as any).check_in_time : null);
+    const isManualCheckIn = !todaySuccess && manualIsAttendanceType;
+
+    // ✅ NEW — nama admin yang meng-absen-masukkan secara manual, dipakai
+    // untuk badge "Absen Manual" di kartu status hari ini.
+    let manualCheckInByName: string | null = null;
+    if (isManualCheckIn && (manualToday as any)?.created_by) {
+      const { data: manualCreatorData } = await supabase
+        .from("users").select("name").eq("id", (manualToday as any).created_by).maybeSingle();
+      manualCheckInByName = manualCreatorData?.name ?? null;
+    }
 
     const baseSchedule = await resolveShiftConfigFromDB(user.id, supabase);
     const override = await resolveScheduleOverride(supabase, user.id, todayDate);
@@ -221,11 +242,15 @@ export async function GET() {
       }
     }
 
-    let overtimeOptions: { beforeInMinutes: number; afterOutMinutes: number; holidayMinutes: number } | null = null;
-    if (alreadyCheckedOut && todaySuccess && todayOutRow) {
-      const beforeInMinutes = isTodayDayOff ? 0 : computeBeforeInOvertimeMinutes(todaySuccess.created_at, schedule);
+   let overtimeOptions: { beforeInMinutes: number; afterOutMinutes: number; holidayMinutes: number } | null = null;
+    if (alreadyCheckedOut && inTimestampForOvertime && todayOutRow) {
+      // ✅ FIX: beforeIn (lembur sebelum jam masuk) sengaja TIDAK dihitung
+      // kalau absen masuknya dari input manual admin — jam masuk manual cuma
+      // perkiraan/koreksi, bukan scan real-time, jadi tidak dipakai sebagai
+      // dasar klaim lembur awal otomatis.
+      const beforeInMinutes = (isTodayDayOff || isManualCheckIn) ? 0 : computeBeforeInOvertimeMinutes(inTimestampForOvertime, schedule);
       const afterOutMinutes = isTodayDayOff ? 0 : computeAfterOutOvertimeMinutes(todayOutRow.created_at, schedule);
-      const holidayMinutes = isTodayDayOff ? computeHolidayOvertimeMinutes(todaySuccess.created_at, todayOutRow.created_at) : 0;
+      const holidayMinutes = isTodayDayOff ? computeHolidayOvertimeMinutes(inTimestampForOvertime, todayOutRow.created_at) : 0;
 
       if (beforeInMinutes > 0 || afterOutMinutes > 0 || holidayMinutes > 0) {
         const { data: existingToday } = await supabase
@@ -292,6 +317,8 @@ export async function GET() {
       isEarlyCheckout, 
       earlyCheckoutStatus,
       overtimeOptions, // ✅ NEW
+      isManualCheckIn, // ✅ NEW — badge "Absen Manual" di kartu status hari ini
+      manualCheckInByName, // ✅ NEW
     });
 
     if (isTodayDayOff && dayOffCookie !== user.id) {

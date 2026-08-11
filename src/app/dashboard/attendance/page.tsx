@@ -1,6 +1,6 @@
 "use client";
 
-import { getOvertimeColor, formatOvertimeMinutes } from "@/lib/overtimeEngine";
+import { getOvertimeColor, formatOvertimeMinutes, OVERTIME_CATEGORIES, OVERTIME_CATEGORY_LABELS, type OvertimeCategory } from "@/lib/overtimeEngine";
 import React from "react";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
@@ -468,6 +468,13 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState("");
+    // ✅ NEW — opsi "Sudah Absen Pulang?" saat absen manual
+    const [hasCheckedOut, setHasCheckedOut] = useState(false);
+    const [checkoutTime, setCheckoutTime] = useState("17:00");
+    const [checkoutCategory, setCheckoutCategory] = useState<OvertimeCategory | "">("");
+    const [checkoutDesc, setCheckoutDesc] = useState("");
+    const [pendingOvertime, setPendingOvertime] = useState<{ id: string; minutes: number } | null>(null);
+    const [savingDetail, setSavingDetail] = useState(false);
 
     const [form, setForm] = useState({
         // FIX 3: gunakan filteredUsers[0]?.id, bukan users[0]?.id
@@ -522,9 +529,63 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                 });
             }
 
+            // ✅ NEW — kalau admin sekalian tandai "Sudah Absen Pulang", langsung
+            // catat absen pulangnya juga lewat endpoint yang sama dengan "Absen
+            // Pulang Manual", supaya lembur ikut kedeteksi otomatis kalau ada.
+            if ((form.status === "PRESENT" || form.status === "LATE") && hasCheckedOut && checkoutTime) {
+                const coRes = await fetch("/api/attendance/manual-checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        user_id: form.user_id,
+                        checkout_date: form.attendance_date,
+                        checkout_time: checkoutTime,
+                        category: checkoutCategory || null,
+                        work_description: checkoutDesc.trim() || null,
+                    }),
+                });
+                const coData = await coRes.json();
+                if (!coData.success) {
+                    setError(coData.message || "Absen masuk tersimpan, tapi gagal menyimpan absen pulang.");
+                    onSaved();
+                    return;
+                }
+                if (coData.overtimeCreated?.id && !checkoutCategory) {
+                    onSaved();
+                    setPendingOvertime({ id: coData.overtimeCreated.id, minutes: coData.overtimeCreated.minutes });
+                    return;
+                }
+            }
+
             onSaved(); onClose();
         } catch { setError("Gagal menyimpan"); }
         finally { setSaving(false); }
+    };
+
+    // ✅ NEW — admin isi kategori + keterangan lembur yang kedeteksi dari absen
+    // pulang manual di atas (kalau tadi dikosongkan)
+    const saveOvertimeDetail = async () => {
+        if (!pendingOvertime) return;
+        if (!checkoutCategory) { setError("Kategori wajib dipilih."); return; }
+        if (!checkoutDesc.trim()) { setError("Keterangan wajib diisi."); return; }
+        setSavingDetail(true); setError("");
+        try {
+            const res = await fetch("/api/attendance/overtime", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: pendingOvertime.id,
+                    action: "SUBMIT_DETAIL",
+                    category: checkoutCategory,
+                    work_description: checkoutDesc.trim(),
+                }),
+            });
+            const d = await res.json();
+            if (!d.success) { setError(d.message || "Gagal menyimpan detail lembur."); return; }
+            onClose();
+        } catch (err: any) {
+            setError(err?.message || "Terjadi kesalahan jaringan — coba lagi.");
+        } finally { setSavingDetail(false); }
     };
 
     const deleteRecord = async () => {
@@ -550,7 +611,7 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
 
     const selectedUser = filteredUsers.find(u => u.id === form.user_id);
 
-    // FIX 4: cek filteredUsers.length, bukan users.length
+   // FIX 4: cek filteredUsers.length, bukan users.length
     if (!isEdit && filteredUsers.length === 0) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -559,6 +620,41 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                     <div className="w-12 h-12 border-4 border-gray-200 border-t-[#1a1a2e] rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-sm font-semibold text-gray-600">Memuat daftar karyawan...</p>
                     <button onClick={onClose} className="mt-4 text-xs text-gray-400 hover:text-gray-600">Batal</button>
+                </div>
+            </div>
+        );
+    }
+
+    // ✅ NEW — step lanjutan: absen masuk & pulang sudah tersimpan, tinggal
+    // lengkapi kategori + keterangan lembur (atau biarkan diisi karyawan sendiri)
+    if (pendingOvertime) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+                <div className="bg-white rounded-2xl w-full max-w-md p-5 space-y-3.5">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3">
+                        <p className="font-bold text-sm text-amber-800">Lemburan Terdeteksi — {pendingOvertime.minutes} menit</p>
+                        <p className="text-[11px] text-amber-700 mt-1">
+                            Absen masuk & pulang sudah tersimpan. Jam pulang ini menghasilkan lemburan otomatis — isi kategori & keterangan sekarang, atau biarkan karyawan yang melengkapinya sendiri di halaman Lembur.
+                        </p>
+                    </div>
+                    {error && <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-3 rounded-xl">{error}</div>}
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Kategori Lembur *</label>
+                        <select value={checkoutCategory} onChange={(e) => setCheckoutCategory(e.target.value as OvertimeCategory)} className="w-full h-10 border border-gray-200 rounded-xl px-3 text-xs bg-white">
+                            <option value="">— Pilih kategori —</option>
+                            {OVERTIME_CATEGORIES.map((c) => <option key={c} value={c}>{OVERTIME_CATEGORY_LABELS[c]}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Keterangan Pekerjaan *</label>
+                        <textarea value={checkoutDesc} onChange={(e) => setCheckoutDesc(e.target.value)} rows={2} placeholder="Pekerjaan yang dikerjakan saat lembur..." className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs resize-none" />
+                    </div>
+                    <div className="flex gap-2.5">
+                        <button onClick={onClose} className="flex-1 h-10 bg-gray-100 rounded-xl text-xs font-semibold text-gray-600">Isi Nanti</button>
+                        <button onClick={saveOvertimeDetail} disabled={savingDetail} className="flex-1 h-10 bg-[#1a1a2e] rounded-xl text-xs font-bold text-white disabled:opacity-50">
+                            {savingDetail ? "Menyimpan..." : "Simpan Detail Lembur"}
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -664,6 +760,50 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
                         placeholder="e.g. Koreksi karena sistem error, izin keperluan mendadak..."
                         className="w-full h-11 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 transition-all" />
                 </div>
+
+                {/* ✅ NEW — Absen Pulang (cuma relevan kalau statusnya Hadir/Terlambat) */}
+                {(form.status === "PRESENT" || form.status === "LATE") && (
+                    <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 rounded-2xl p-4 space-y-3">
+                        <button type="button" onClick={() => setHasCheckedOut(v => !v)} className="w-full flex items-center gap-3 text-left">
+                            <span className={`w-9 h-5 rounded-full flex-shrink-0 relative transition-colors ${hasCheckedOut ? "bg-violet-600" : "bg-gray-200"}`}>
+                                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${hasCheckedOut ? "left-[18px]" : "left-0.5"}`} />
+                            </span>
+                            <div className="flex-1">
+                                <p className="text-xs font-bold text-gray-700">Sudah Absen Pulang?</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                    {hasCheckedOut ? "Jam pulang akan ikut dicatat sekarang" : "Kalau belum, karyawan bisa absen pulang sendiri nanti pas jamnya"}
+                                </p>
+                            </div>
+                        </button>
+
+                        {hasCheckedOut && (
+                            <div className="space-y-3 pt-1">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">Jam Pulang *</label>
+                                    <input type="time" value={checkoutTime}
+                                        onChange={e => setCheckoutTime(e.target.value)}
+                                        className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/20 transition-all font-mono" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1.5">
+                                        Kategori Lembur <span className="font-normal normal-case text-gray-400">(isi kalau jam pulang ini menghasilkan lembur)</span>
+                                    </label>
+                                    <select value={checkoutCategory} onChange={e => setCheckoutCategory(e.target.value as OvertimeCategory)}
+                                        className="w-full h-10 border border-gray-200 rounded-xl px-3 text-xs bg-white focus:outline-none">
+                                        <option value="">— Tidak diisi —</option>
+                                        {OVERTIME_CATEGORIES.map(c => <option key={c} value={c}>{OVERTIME_CATEGORY_LABELS[c]}</option>)}
+                                    </select>
+                                </div>
+                                <textarea value={checkoutDesc} onChange={e => setCheckoutDesc(e.target.value)}
+                                    rows={2} placeholder="Keterangan lembur (opsional)..."
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs bg-white resize-none" />
+                                <p className="text-[9px] text-gray-400">
+                                    Kalau tidak diisi tapi jam pulang ini ternyata menghasilkan lembur, kamu akan diminta melengkapinya — atau bisa dilengkapi belakangan oleh karyawan sendiri di halaman Lembur.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Preview */}
                 {form.user_id && form.attendance_date && form.check_in_time && (
@@ -1428,6 +1568,8 @@ function TodayAttendanceCard({ status, loading, onRefresh, onRequestEarlyCheckou
         checkoutAt?: string;      // ✅ NEW
         isEarlyCheckout?: boolean; // ✅ NEW (poin 1)
         earlyCheckoutStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED"; // ✅ NEW (poin 1)
+        isManualCheckIn?: boolean; // ✅ NEW
+        manualCheckInByName?: string | null; // ✅ NEW
     } | null;
     loading: boolean; onRefresh: () => void;
     onRequestEarlyCheckout: () => void; // ✅ NEW (poin 1)
@@ -1588,7 +1730,17 @@ function TodayAttendanceCard({ status, loading, onRefresh, onRequestEarlyCheckou
                 <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                     <div className={`w-11 h-11 sm:w-14 sm:h-14 rounded-2xl ${cfg.iconBg} flex items-center justify-center flex-shrink-0 shadow-sm`}><span className="text-xl sm:text-2xl">{cfg.icon}</span></div>
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1"><span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border ${cfg.badge}`}><span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.badgeText}</span></div>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border ${cfg.badge}`}><span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.badgeText}</span>
+                            {status.isManualCheckIn && (
+                                <span
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-blue-100 text-blue-700 border-blue-200"
+                                    title={status.manualCheckInByName ? `Diabsenkan oleh ${status.manualCheckInByName}` : "Diabsenkan manual oleh admin"}
+                                >
+                                    <Pencil className="w-2.5 h-2.5" /> Absen Manual
+                                </span>
+                            )}
+                        </div>
                         <p className="font-bold text-gray-800 text-sm leading-snug">{cfg.title}</p>
                         <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">{cfg.sub}</p>
                     </div>
@@ -3323,6 +3475,8 @@ export default function AttendanceDashboardPage() {
                 isEarlyCheckout: d.isEarlyCheckout ?? false,
                 earlyCheckoutStatus: d.earlyCheckoutStatus ?? "NONE",
                 overtimeOptions: d.overtimeOptions ?? null, // ✅ NEW
+                isManualCheckIn: d.isManualCheckIn ?? false, // ✅ NEW
+                manualCheckInByName: d.manualCheckInByName ?? null, // ✅ NEW
             });
         } catch { }
         finally { setStatusLoading(false); }
