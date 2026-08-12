@@ -331,7 +331,27 @@ export async function POST(request: Request) {
         supabase.from("user_monthly_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
       ]);
 
-      if (!todayIn) {
+      // ✅ FIX: absen manual (via Absen Manual admin) tidak pernah tercatat di
+      // face_verifications, jadi query di atas selalu null untuk karyawan yang
+      // diabsenkan manual → endpoint ini selalu nolak walau karyawan sudah hadir.
+      // Fallback: cek tabel absen manual sebelum benar-benar menolak.
+      let effectiveTodayIn: { id: string | null; created_at: string } | null = todayIn;
+
+      if (!effectiveTodayIn) {
+        const { data: manualToday } = await supabase
+          .from("manual_attendance") // ⚠️ sesuaikan kalau nama tabel beda — lihat catatan di bawah
+          .select("check_in_time")
+          .eq("user_id", user.id)
+          .eq("attendance_date", todayDate)
+          .in("status", ["PRESENT", "LATE"]) // biar SICK/PERMIT/ABSENT/LEAVE tidak dianggap "masuk"
+          .maybeSingle();
+
+        if (manualToday?.check_in_time) {
+          effectiveTodayIn = { id: null, created_at: manualToday.check_in_time };
+        }
+      }
+
+      if (!effectiveTodayIn) {
         return NextResponse.json({ success: false, message: "Belum ada absen masuk hari ini." }, { status: 400 });
       }
       const isDayOffToday = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !dateWork);
@@ -348,19 +368,19 @@ export async function POST(request: Request) {
 
       let minutes = 0, actualStart = "", actualEnd = "";
 
-      if (declare_direction === "HOLIDAY") {
+     if (declare_direction === "HOLIDAY") {
         if (!isDayOffToday) return NextResponse.json({ success: false, message: "Hari ini bukan hari libur kamu." }, { status: 400 });
         if (!todayOut) return NextResponse.json({ success: false, message: "Belum ada absen pulang hari ini." }, { status: 400 });
-        minutes = computeHolidayOvertimeMinutes(todayIn.created_at, todayOut.created_at);
-        actualStart = todayIn.created_at; actualEnd = todayOut.created_at;
+        minutes = computeHolidayOvertimeMinutes(effectiveTodayIn.created_at, todayOut.created_at);
+        actualStart = effectiveTodayIn.created_at; actualEnd = todayOut.created_at;
       } else {
         if (isDayOffToday) return NextResponse.json({ success: false, message: "Hari ini hari libur — ajukan sebagai kategori Hari Libur." }, { status: 400 });
-        const beforeIn = computeBeforeInOvertimeMinutes(todayIn.created_at, schedule);
+        const beforeIn = computeBeforeInOvertimeMinutes(effectiveTodayIn.created_at, schedule);
         const afterOut = todayOut ? computeAfterOutOvertimeMinutes(todayOut.created_at, schedule) : 0;
 
         if (declare_direction === "BEFORE_IN") {
           minutes = beforeIn;
-          actualStart = todayIn.created_at; actualEnd = buildTS(schedule.lateFrom);
+          actualStart = effectiveTodayIn.created_at; actualEnd = buildTS(schedule.lateFrom);
         } else if (declare_direction === "AFTER_OUT") {
           if (!todayOut) return NextResponse.json({ success: false, message: "Belum ada absen pulang hari ini." }, { status: 400 });
           minutes = afterOut;
@@ -368,7 +388,7 @@ export async function POST(request: Request) {
         } else if (declare_direction === "BOTH") {
           if (!todayOut) return NextResponse.json({ success: false, message: "Belum ada absen pulang hari ini." }, { status: 400 });
           minutes = computeCombinedOvertimeMinutes(beforeIn, afterOut);
-          actualStart = todayIn.created_at; actualEnd = todayOut.created_at;
+          actualStart = effectiveTodayIn.created_at; actualEnd = todayOut.created_at;
         }
       }
 
@@ -379,7 +399,10 @@ export async function POST(request: Request) {
       const created = await createOvertimeDraft(supabase, {
         userId: user.id, requestDate: todayDate, direction: declare_direction, minutes,
         actualStart, actualEnd,
-        sourceFaceVerificationId: (todayOut ?? todayIn).id,
+        // ✅ FIX: optional chaining — sebelumnya `(todayOut ?? todayIn).id` bisa
+        // crash kalau keduanya null, dan sekarang tetap aman walau todayIn
+        // berasal dari fallback absen manual (id-nya null, bukan face_verifications).
+        sourceFaceVerificationId: todayOut?.id ?? todayIn?.id ?? null,
         isHoliday: declare_direction === "HOLIDAY",
       });
 
