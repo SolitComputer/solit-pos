@@ -7,7 +7,7 @@ import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, ITEM_OUTFLOW_ROLES } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES } from "@/lib/permissions";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
 
@@ -154,6 +154,7 @@ const Icons = {
   social: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none" /></svg>),
   fingerprint: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 015 5v2" /><path d="M7 9V7a5 5 0 019.8-1.5" /><path d="M4.5 10.5V9a7.5 7.5 0 011-3.8" /><path d="M12 9v3.5a5.5 5.5 0 01-1.2 3.4" /><path d="M16 9v2.5c0 3-1 5.5-3 7" /><path d="M8.5 9v3c0 3.5-1 6-3 8" /><path d="M19.5 9v1.5c0 4.5-1.5 8-4 10.5" /></svg>),
   auditOutflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12l2 2 4-4" /></svg>),
+  fixedAsset: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -190,6 +191,7 @@ const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
 const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang?tab=laptops", icon: Icons.barang };
 const ITEM_AUDIT_OUTFLOW: MenuItem = { name: "Audit Barang Keluar", href: "/dashboard/audit-barang-keluar", icon: Icons.auditOutflow };
+const ITEM_FIXED_ASSETS: MenuItem = { name: "Data Aset Tetap", href: "/dashboard/fixed-assets", icon: Icons.fixedAsset };
 const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Barang Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
 const ITEM_LAPTOP_MINUS: MenuItem = { name: "Barang Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LAPTOP_MONITORING: MenuItem = { name: "Monitoring Stok", href: "/dashboard/laptops/monitoring", icon: Icons.laptopMonitoring };
@@ -768,6 +770,23 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   });
   if (!hasInventaris) {
     ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Inventaris", items: [ITEM_AUDIT_OUTFLOW] }];
+  }
+});
+
+// ── Data Aset Tetap: pola sama persis dengan blok Audit Barang Keluar di atas —
+// pakai .map() bikin objek grup Inventaris BARU per-role, supaya role lain yang
+// nebeng ADMIN_INVENTARIS (mis. ASISTEN_CEO) TIDAK ikut kebagian menu ini.
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (!(FIXED_ASSET_ROLES as string[]).includes(role)) return;
+  let hasInventaris = false;
+  ROLE_MENUS[role] = ROLE_MENUS[role].map((g) => {
+    if (g.label !== "Inventaris") return g;
+    hasInventaris = true;
+    if (g.items.some((it) => it.href === ITEM_FIXED_ASSETS.href)) return g;
+    return { label: g.label, items: [...g.items, ITEM_FIXED_ASSETS] };
+  });
+  if (!hasInventaris) {
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Inventaris", items: [ITEM_FIXED_ASSETS] }];
   }
 });
 

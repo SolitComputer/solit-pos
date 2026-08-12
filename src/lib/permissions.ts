@@ -140,6 +140,12 @@ export const ALL_UNITS_ROLES: UserRole[] = [
 export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 /** Yang boleh konfirmasi / edit / hapus jurnal */
 export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
+
+// ─── Data Aset Tetap (Fixed Assets) ───────────────────────────────────────────
+// Input manual murni (nama aset + nominal), tidak terhubung ke modul akutansi/inventaris lain.
+// Hapus "PROGRAMMER" di bawah kalau mau strict cuma Admin + Accounting.
+export const FIXED_ASSET_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
+
 export function humanizeRoleKey(role: string): string {
   return role
     .split("_")
@@ -511,6 +517,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/monitoring-ceo": [...MONITORING_CEO_ROLES],
   "/dashboard/admin/notifikasi-pengantaran": [...NOTIFICATION_SETTINGS_ROLES],
   "/api/akutansi": [...AKUNTANSI_ROLES],
+  "/dashboard/fixed-assets": [...FIXED_ASSET_ROLES],
+  "/api/fixed-assets": [...FIXED_ASSET_ROLES],
   "/api/notification-settings": [...NOTIFICATION_SETTINGS_ROLES],
   "/dashboard/ai-ceo": [...AI_CEO_ROLES],
   "/api/ai-ceo": [...AI_CEO_ROLES],

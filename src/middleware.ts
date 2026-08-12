@@ -540,6 +540,8 @@ export const config = {
     "/api/todos/:path*",
     "/dashboard/akuntansi/:path*",
     "/api/akutansi/:path*",
+    "/dashboard/fixed-assets/:path*",
+    "/api/fixed-assets/:path*",
     "/dashboard/ai-ceo/:path*",
     "/api/ai-ceo/:path*",
     "/api/admin/roles/:path*",
