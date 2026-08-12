@@ -16,7 +16,7 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
 
   const { data: userRow, error: userError } = await supabase
     .from("users")
-    .select("contract_status, active_contract_id, contract_valid_until")
+    .select("contract_status, active_contract_id, contract_valid_until, career_level")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -29,7 +29,7 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
 
   const { data: contract, error: contractError } = await supabase
     .from("user_contracts")
-    .select("id, contract_type, title, content, status, sent_at, responded_at, valid_from, valid_until, duration_months")
+    .select("id, contract_type, title, content, status, sent_at, responded_at, valid_from, valid_until, duration_months, career_level")
     .eq("id", userRow.active_contract_id)
     .maybeSingle();
 
@@ -51,6 +51,7 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
     contract,
     contract_status: userRow.contract_status,
     valid_until: userRow.contract_valid_until,
+    career_level: userRow.career_level,
     days_left: daysLeft,
     warning,
     gate_enabled: true,

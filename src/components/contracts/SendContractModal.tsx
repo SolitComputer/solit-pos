@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, FileText, Loader2 } from "lucide-react";
 import { CONTRACT_TEMPLATES, CONTRACT_TYPE_LABELS, CONTRACT_DEFAULT_TITLE, ContractType, CONTRACT_DURATION_OPTIONS, computeValidUntil } from "@/lib/contractTemplates";
+import { CAREER_LEVELS, CareerLevel } from "@/lib/careerLevels";
 
 export default function SendContractModal({
     user, onClose, onSent,
@@ -17,6 +18,7 @@ export default function SendContractModal({
     const [validFrom, setValidFrom] = useState(() => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10));
     const [durationMonths, setDurationMonths] = useState<number | null | "CUSTOM_DATE">(12);
     const [customValidUntil, setCustomValidUntil] = useState("");
+    const [careerLevel, setCareerLevel] = useState<CareerLevel>(CAREER_LEVELS[0]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -50,6 +52,7 @@ export default function SendContractModal({
                     contract_type: type,
                     title,
                     content,
+                    career_level: careerLevel,
                     valid_from: validFrom,
                     duration_months: isCustomDuration ? null : durationMonths,
                     valid_until: isCustomDuration ? customValidUntil : undefined,
@@ -103,6 +106,19 @@ export default function SendContractModal({
                                 </button>
                             ))}
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">Jenjang Karir</label>
+                        <select
+                            value={careerLevel}
+                            onChange={(e) => setCareerLevel(e.target.value as CareerLevel)}
+                            className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+                        >
+                            {CAREER_LEVELS.map((lvl) => (
+                                <option key={lvl} value={lvl}>{lvl}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div>

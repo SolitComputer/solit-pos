@@ -8,6 +8,7 @@ import { useSongPicker, SavedSong } from "@/components/social/song/useSongPicker
 import SongPickerPanel from "@/components/social/song/SongPickerPanel";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { ContractBadge } from "@/components/contracts/ContractBadge";
+import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
     Loader2, Pencil, Check, X, Music, Play, Pause,
@@ -118,7 +119,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [showSongPicker, setShowSongPicker] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
 
-    const [contractInfo, setContractInfo] = useState<{ status: string; valid_until: string | null } | null>(null);
+    const [contractInfo, setContractInfo] = useState<{ status: string; valid_until: string | null; career_level: string | null } | null>(null);
 
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
@@ -174,7 +175,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 .then((r) => r.json())
                 .then((d) => {
                     if (d.success && d.gate_enabled !== false) {
-                        setContractInfo({ status: d.contract_status ?? "NONE", valid_until: d.valid_until ?? null });
+                        setContractInfo({ status: d.contract_status ?? "NONE", valid_until: d.valid_until ?? null, career_level: d.career_level ?? null });
                     }
                 })
                 .catch(() => { });
@@ -184,7 +185,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 .then((d) => {
                     if (d.success) {
                         const latest = (d.data || [])[0];
-                        setContractInfo({ status: latest?.status ?? "NONE", valid_until: latest?.valid_until ?? null });
+                        setContractInfo({ status: latest?.status ?? "NONE", valid_until: latest?.valid_until ?? null, career_level: latest?.career_level ?? null });
                     }
                 })
                 .catch(() => { });
@@ -884,10 +885,13 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
                                     {isSelf ? "Status Kontrak Kerja" : "Masa Aktif Kontrak"}
                                 </p>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <ContractBadge status={contractInfo.status} validUntil={contractInfo.valid_until} />
                                     {contractInfo.status === "APPROVED" && contractInfo.valid_until && (
                                         <span className="text-xs text-slate-400">s/d {contractInfo.valid_until}</span>
+                                    )}
+                                    {contractInfo.status === "APPROVED" && contractInfo.career_level && (
+                                        <CareerLevelBadge level={contractInfo.career_level} />
                                     )}
                                 </div>
                             </div>
