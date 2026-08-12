@@ -1,8 +1,7 @@
 "use client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useRef, useState, useCallback } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { ThinkingIndicator, MarkdownMessage, CHAT_DOT_KEYFRAMES } from "@/components/ai/ChatPrimitives";
 import {
     Sparkles,
     Plus,
@@ -10,8 +9,6 @@ import {
     Trash2,
     Edit3,
     ChevronDown,
-    Check,
-    Copy,
     PanelLeft,
     PanelLeftClose,
     Package,
@@ -22,8 +19,7 @@ import {
     X,
     ArrowUp,
     Info,
-    Cpu,
-    Bot
+    Bell,
 } from "lucide-react";
 
 interface ConversationSummary { id: string; title: string; updated_at: string; }
@@ -31,6 +27,12 @@ interface ChatMessage { id?: string; role: "user" | "assistant"; content: string
 interface Suggestion {
     id: string; category: string; title: string; description: string;
     severity: "info" | "warning" | "critical"; status: string; created_at: string;
+}
+interface SentReminder {
+    id: string; title: string; message: string; target_name: string;
+    severity: "info" | "warning" | "critical"; status: string;
+    created_at: string; read_at: string | null; resolved_at: string | null;
+    whatsapp_sent: boolean; whatsapp_error: string | null;
 }
 
 type AiProviderChoice = "auto" | "gemini" | "groq" | "deepseek";
@@ -55,6 +57,14 @@ const SEVERITY_STYLE: Record<string, { bg: string; text: string; border: string 
     critical: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
 };
 
+const REMINDER_STATUS_LABEL: Record<string, string> = {
+    terkirim: "Belum dibaca",
+    dibaca: "Sudah dibaca",
+    dibalas: "Dibalas member",
+    selesai: "Selesai",
+    diabaikan: "Diabaikan",
+};
+
 const TOOL_THINKING_LABEL: Record<string, string> = {
     get_dashboard_stats: "Membaca statistik dashboard...",
     get_ready_stock: "Mengecek stok laptop ready...",
@@ -67,92 +77,9 @@ const TOOL_THINKING_LABEL: Record<string, string> = {
     get_attendance_summary: "Mengecek data absensi tim...",
     get_overtime_summary: "Mengecek data lembur karyawan...",
     catat_saran_koreksi: "Mencatat masukan untuk direview...",
+    kirim_pengingat_member: "Mengirim pengingat ke member...",
 };
 const DEFAULT_THINKING_LABEL = "Memikirkan jawaban...";
-
-function ThinkingIndicator({ label }: { label: string }) {
-    return (
-        <div className="flex items-center gap-2.5 bg-gray-100/80 border border-gray-200/80 rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5 w-fit shadow-xs">
-            <div className="w-5 h-5 rounded-lg bg-[#1a1a2e]/10 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-3 h-3 text-[#1a1a2e] animate-pulse" />
-            </div>
-            <div className="flex items-center gap-2">
-                <span className="flex gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e]" style={{ animation: "aiCeoDot 1.1s ease-in-out infinite", animationDelay: "0ms" }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e]" style={{ animation: "aiCeoDot 1.1s ease-in-out infinite", animationDelay: "150ms" }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e]" style={{ animation: "aiCeoDot 1.1s ease-in-out infinite", animationDelay: "300ms" }} />
-                </span>
-                <span key={label} className="text-[11px] sm:text-xs font-medium text-gray-700">
-                    {label}
-                </span>
-            </div>
-        </div>
-    );
-}
-
-function MarkdownMessage({ content }: { content: string }) {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(content);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    return (
-        <div className="relative group/msg space-y-2">
-            <div className="text-xs sm:text-[15px] leading-relaxed text-gray-800 font-normal
-                [&_p]:mb-3 [&_p:last-child]:mb-0
-                [&_strong]:font-semibold [&_strong]:text-gray-900
-                [&_em]:italic
-                [&_a]:text-[#1a1a2e] [&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-gray-300 [&_a]:font-medium [&_a:hover]:decoration-[#1a1a2e]
-                [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-3 [&_ul]:space-y-1.5
-                [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-3 [&_ol]:space-y-1.5
-                [&_li]:leading-relaxed [&_li_ul]:mt-1.5 [&_li_ol]:mt-1.5
-                [&_h1]:text-base [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:mt-5 [&_h1]:mb-2
-                [&_h2]:text-[13px] sm:[&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:mt-4 [&_h2]:mb-1.5
-                [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-gray-900 [&_h3]:mt-3 [&_h3]:mb-1
-                [&_hr]:my-4 [&_hr]:border-gray-200
-                [&_code]:bg-gray-100 [&_code]:text-[#1a1a2e] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:text-[12px] [&_code]:font-mono
-                [&_pre]:bg-[#1a1a2e] [&_pre]:text-gray-100 [&_pre]:rounded-xl [&_pre]:p-3 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:text-[12px] [&_pre]:leading-relaxed [&_pre]:shadow-xs
-                [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0
-                [&_blockquote]:border-l-2 [&_blockquote]:border-[#1a1a2e]/40 [&_blockquote]:pl-3 [&_blockquote]:py-0.5 [&_blockquote]:my-3 [&_blockquote]:italic [&_blockquote]:text-gray-600
-            ">
-                <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                        table: ({ children }) => (
-                            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-xs my-2 -mx-1 px-1">
-                                <table className="w-full text-[11px] sm:text-xs border-collapse min-w-max">{children}</table>
-                            </div>
-                        ),
-                        thead: ({ children }) => <thead className="bg-gray-100">{children}</thead>,
-                        th: ({ children }) => (
-                            <th className="text-gray-800 text-left border-b border-gray-200 px-2.5 py-1.5 font-semibold whitespace-nowrap">{children}</th>
-                        ),
-                        td: ({ children }) => (
-                            <td className="border-b border-gray-100 px-2.5 py-1.5 text-gray-700 whitespace-nowrap">{children}</td>
-                        ),
-                        tr: ({ children }) => (
-                            <tr className="even:bg-gray-50/60 hover:bg-gray-100/70 transition-colors">{children}</tr>
-                        ),
-                    }}
-                >
-                    {content}
-                </ReactMarkdown>
-            </div>
-            <div className="flex items-center gap-2 pt-1 opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 transition-opacity duration-200">
-                <button
-                    onClick={handleCopy}
-                    className="flex items-center gap-1 text-[11px] sm:text-xs text-gray-400 hover:text-gray-700 transition px-2 py-0.5 rounded-md hover:bg-gray-100"
-                >
-                    {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                    <span>{copied ? "Tersalin" : "Salin"}</span>
-                </button>
-            </div>
-        </div>
-    );
-}
 
 function UsageBar({ counts, blocked }: { counts: Record<string, number>; blocked: Record<string, boolean> }) {
     const deepseek = counts.deepseek ?? 0;
@@ -212,6 +139,8 @@ export default function AiCeoWorkspace() {
     const [loadingConv, setLoadingConv] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+    const [showReminders, setShowReminders] = useState(false);
+    const [sentReminders, setSentReminders] = useState<SentReminder[]>([]);
     const [provider, setProvider] = useState<AiProviderChoice>("auto");
     const [usage, setUsage] = useState<Record<string, number>>({});
     const [providerBlocked, setProviderBlocked] = useState<Record<string, boolean>>({});
@@ -245,6 +174,7 @@ export default function AiCeoWorkspace() {
     const loadConversation = useCallback(async (id: string) => {
         setLoadingConv(true);
         setShowSuggestions(false);
+        setShowReminders(false);
         try {
             const res = await fetch(`/api/ai-ceo/conversations/${id}`);
             const json = await res.json();
@@ -265,6 +195,14 @@ export default function AiCeoWorkspace() {
         } catch { }
     }, []);
 
+    const loadSentReminders = useCallback(async () => {
+        try {
+            const res = await fetch("/api/ai-ceo/reminders");
+            const json = await res.json();
+            if (json.success) setSentReminders(json.data);
+        } catch { }
+    }, []);
+
     const loadUsage = useCallback(async () => {
         try {
             const res = await fetch("/api/ai-ceo/usage");
@@ -276,13 +214,14 @@ export default function AiCeoWorkspace() {
         } catch { }
     }, []);
 
-    useEffect(() => { loadConversations(); loadSuggestions(); loadUsage(); }, [loadConversations, loadSuggestions, loadUsage]);
+    useEffect(() => { loadConversations(); loadSuggestions(); loadSentReminders(); loadUsage(); }, [loadConversations, loadSuggestions, loadSentReminders, loadUsage]);
     useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, sending]);
 
     const handleNewChat = () => {
         setActiveId(null);
         setMessages([]);
         setShowSuggestions(false);
+        setShowReminders(false);
         setSidebarOpen(false);
     };
 
@@ -336,6 +275,7 @@ export default function AiCeoWorkspace() {
                         setMessages((prev) => [...prev, { role: "assistant", content: evt.reply, provider: evt.provider }]);
                         if (!activeId) { setActiveId(evt.conversationId); loadConversations(); }
                         loadUsage();
+                        loadSentReminders();
                         finished = true;
                     } else if (evt.type === "error") {
                         setMessages((prev) => [...prev, { role: "assistant", content: `Gagal: ${evt.message}` }]);
@@ -415,10 +355,7 @@ export default function AiCeoWorkspace() {
 
     return (
         <DashboardLayout>
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                @keyframes aiCeoDot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.3; } 30% { transform: translateY(-4px); opacity: 1; } }
-            `}} />
+            <style dangerouslySetInnerHTML={{ __html: CHAT_DOT_KEYFRAMES }} />
 
             {/* Layout container optimized for both Mobile and Desktop */}
             <div className="flex h-[calc(100vh-6rem)] sm:h-[calc(100vh-3.5rem)] -mx-4 -my-4 lg:mx-0 lg:my-0 w-[calc(100%+2rem)] lg:w-full bg-white text-gray-800 overflow-hidden font-sans rounded-none sm:rounded-2xl border-0 sm:border border-gray-200 shadow-xs">
@@ -514,9 +451,9 @@ export default function AiCeoWorkspace() {
                     </div>
 
                     {/* Sidebar Footer */}
-                    <div className="p-3 border-t border-gray-200">
+                    <div className="p-3 border-t border-gray-200 space-y-1.5">
                         <button
-                            onClick={() => { setShowSuggestions((v) => !v); setSidebarOpen(false); }}
+                            onClick={() => { setShowSuggestions((v) => !v); setShowReminders(false); setSidebarOpen(false); }}
                             className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition ${showSuggestions
                                 ? "bg-[#1a1a2e] text-white shadow-xs"
                                 : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
@@ -529,6 +466,23 @@ export default function AiCeoWorkspace() {
                             {suggestions.length > 0 && (
                                 <span className="bg-rose-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.2">
                                     {suggestions.length}
+                                </span>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => { setShowReminders((v) => !v); setShowSuggestions(false); setSidebarOpen(false); }}
+                            className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition ${showReminders
+                                ? "bg-[#1a1a2e] text-white shadow-xs"
+                                : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                                }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                <Bell className="w-3.5 h-3.5" />
+                                <span>Pengingat Terkirim</span>
+                            </span>
+                            {sentReminders.length > 0 && (
+                                <span className="bg-gray-300 text-gray-700 text-[10px] font-bold rounded-full px-1.5 py-0.2">
+                                    {sentReminders.length}
                                 </span>
                             )}
                         </button>
@@ -564,7 +518,48 @@ export default function AiCeoWorkspace() {
 
                     {/* Chat Content Body */}
                     <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
-                        {showSuggestions ? (
+                        {showReminders ? (
+                            /* Sent Reminders Panel */
+                            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4 max-w-5xl mx-auto w-full">
+                                <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                                    <h2 className="text-xs sm:text-base font-bold text-gray-900 flex items-center gap-2">
+                                        <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-[#1a1a2e]" />
+                                        <span>Pengingat yang Sudah Dikirim</span>
+                                    </h2>
+                                    <span className="text-[11px] sm:text-xs text-gray-500">{sentReminders.length} total</span>
+                                </div>
+
+                                {sentReminders.length === 0 && (
+                                    <div className="text-center py-12 text-gray-400 text-xs sm:text-sm">
+                                        Belum ada pengingat yang dikirim ke member. Minta AI kirim lewat chat, mis. "ingetin Budi soal stok duplikat".
+                                    </div>
+                                )}
+
+                                {sentReminders.map((r) => {
+                                    const style = SEVERITY_STYLE[r.severity] ?? SEVERITY_STYLE.info;
+                                    return (
+                                        <div key={r.id} className={`rounded-2xl border ${style.border} ${style.bg} p-3 sm:p-4 space-y-2 shadow-xs`}>
+                                            <div className="flex items-center justify-between flex-wrap gap-1">
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${style.text} bg-white uppercase`}>
+                                                    {r.severity}
+                                                </span>
+                                                <span className="text-[10px] text-gray-500 font-semibold">
+                                                    {REMINDER_STATUS_LABEL[r.status] ?? r.status}
+                                                </span>
+                                            </div>
+                                            <h3 className="text-xs sm:text-sm font-bold text-gray-800">{r.title}</h3>
+                                            <p className="text-xs text-gray-600 leading-relaxed">{r.message}</p>
+                                            <div className="flex items-center justify-between flex-wrap gap-2 pt-1 text-[11px] text-gray-500">
+                                                <span>Ke: <strong className="text-gray-700">{r.target_name}</strong></span>
+                                                <span className={r.whatsapp_sent ? "text-emerald-600" : "text-gray-400"}>
+                                                    {r.whatsapp_sent ? "✓ WA terkirim" : r.whatsapp_error ? `WA gagal: ${r.whatsapp_error}` : "WA belum terkirim"}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : showSuggestions ? (
                             /* Review Suggestions Panel */
                             <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4 max-w-5xl mx-auto w-full">
                                 <div className="flex items-center justify-between pb-2 border-b border-gray-200">
@@ -706,7 +701,7 @@ export default function AiCeoWorkspace() {
                         )}
 
                         {/* Bottom Prompt Input Card */}
-                        {!showSuggestions && (
+                        {!showSuggestions && !showReminders && (
                             <div className="px-3 sm:px-6 py-2 bg-white border-t border-gray-100 flex-shrink-0">
                                 <div className="max-w-5xl mx-auto">
                                     <div className="relative rounded-2xl bg-white border border-gray-200 focus-within:border-[#1a1a2e] shadow-xs focus-within:shadow-md transition-all duration-200 p-2 sm:p-2.5">
