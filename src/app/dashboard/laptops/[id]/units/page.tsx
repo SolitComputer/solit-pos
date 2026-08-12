@@ -376,10 +376,10 @@ export default function UnitsPage() {
             const res = await fetch(`/api/units/${unit.id}/audit`, { method: "PATCH" });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal update audit");
-            const wasActive = isUnitAuditActive(unit);
-            // Audit per-kelompok: Update seluruh unit di kelompok ini
-            setUnits(prev => prev.map(u => ({ ...u, ...json.data })));
-            setToast(wasActive ? "Audit kelompok dibatalkan" : "Seluruh kelompok ditandai sudah diaudit");
+           const wasActive = isUnitAuditActive(unit);
+            // Audit per-unit: hanya update unit yang diklik di state lokal
+            setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, ...json.data } : u));
+            setToast(wasActive ? "Audit unit dibatalkan" : "Unit ditandai sudah diaudit");
         } catch (e) {
             setAlertModal(e instanceof Error ? e.message : "Gagal update audit");
         } finally {
