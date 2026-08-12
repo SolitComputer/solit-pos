@@ -135,7 +135,7 @@ export default function JurnalUmum({ period }: { period: string }) {
     const accountFilterRef = useRef<HTMLDivElement>(null);
     const accountFilterButtonRef = useRef<HTMLButtonElement>(null);
     const [filterDropdownPos, setFilterDropdownPos] = useState<{ top: number; left: number } | null>(null);
-   const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [selected, setSelected] = useState<Set<string>>(new Set());
     // Selection KHUSUS baris jurnal utama (bukan panel pending) — dipakai untuk
     // bulk actions: geser bareng, kasih penanda bareng, hapus bareng.
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
@@ -156,7 +156,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         return localStorage.getItem("jurnal-show-pending") === "true";
     });
 
-   const load = useCallback(async (showLoader = true) => {
+    const load = useCallback(async (showLoader = true) => {
         if (showLoader) setLoading(true);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 25000); // stop nunggu setelah 25 detik
@@ -431,13 +431,13 @@ export default function JurnalUmum({ period }: { period: string }) {
             prev.map((e) =>
                 e.id === entry.id
                     ? {
-                          ...e,
-                          lines: e.lines.map((l) =>
-                              validLineIds.has(l.id)
-                                  ? { ...l, checked: next, checked_at: next ? new Date().toISOString() : null }
-                                  : l
-                          ),
-                      }
+                        ...e,
+                        lines: e.lines.map((l) =>
+                            validLineIds.has(l.id)
+                                ? { ...l, checked: next, checked_at: next ? new Date().toISOString() : null }
+                                : l
+                        ),
+                    }
                     : e
             )
         );
@@ -819,10 +819,10 @@ export default function JurnalUmum({ period }: { period: string }) {
                             onClick={() => setShowOnlyWarnings((v) => !v)}
                             title={showOnlyWarnings ? "Tampilkan semua data" : "Filter hanya data dengan penanda (Modal Rp0 / diedit)"}
                             className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyWarnings
-                                    ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300"
-                                    : warningCount > 0
-                                        ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                                        : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                                ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300"
+                                : warningCount > 0
+                                    ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                                    : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
                                 }`}
                         >
                             <AlertTriangle className={`w-3.5 h-3.5 ${showOnlyWarnings ? "text-white" : warningCount > 0 ? "text-red-600" : "text-slate-400"}`} />
@@ -835,7 +835,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                         </button>
                     </div>
 
-                 <button
+                    <button
                         onClick={() => setShowManual(true)}
                         className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
                     >
@@ -958,8 +958,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                         </span>
                         <span
                             className={`text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 shrink-0 ${totalDebit === totalKredit
-                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
-                                    : "bg-red-50 text-red-700 border border-red-200/80"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
+                                : "bg-red-50 text-red-700 border border-red-200/80"
                                 }`}
                         >
                             {totalDebit === totalKredit ? (
@@ -1163,7 +1163,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                             ref={provided.innerRef}
                                                             {...provided.draggableProps}
                                                             {...provided.dragHandleProps}
-                                                           className={`group ${snapshot.isDragging
+                                                            className={`group ${snapshot.isDragging
                                                                 ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400"
                                                                 : isDraggingGroup && selectedEntryIds.has(entry.id)
                                                                     ? "opacity-50 ring-2 ring-blue-200"
@@ -1179,7 +1179,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                         key={line.id}
                                                                         className={`${first ? "border-t-2 border-gray-200" : ""} hover:bg-blue-50/30 transition`}
                                                                     >
-                                                                       {/* Tanggal — hanya di baris pertama */}
+                                                                        {/* Tanggal — hanya di baris pertama */}
                                                                         <td className="px-4 py-2 align-top">
                                                                             {first && (
                                                                                 <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap flex items-center gap-2">
@@ -1190,7 +1190,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                         className="w-3.5 h-3.5 rounded border-gray-300 accent-[#1a1545] shrink-0"
                                                                                         title="Pilih entry ini"
                                                                                     />
-                                                                                   <div
+                                                                                    <div
                                                                                         className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
                                                                                         title="Tahan & geser dari sini (bukan dari checkbox)"
                                                                                     >
@@ -1322,11 +1322,10 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                                 ? "Sudah dicek (Klik untuk batalkan)"
                                                                                                 : "Tandai sudah dicek"
                                                                                         }
-                                                                                        className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${
-                                                                                            isEntryChecked
+                                                                                        className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${isEntryChecked
                                                                                                 ? "bg-green-600 border-green-600 text-white shadow-2xs"
                                                                                                 : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"
-                                                                                        }`}
+                                                                                            }`}
                                                                                     >
                                                                                         <Check className="w-3.5 h-3.5 mx-auto" />
                                                                                     </button>
@@ -1501,9 +1500,8 @@ function WarningToggle({
                     onClick={() => { computePos(); setShowPopover((v) => !v); }}
                     disabled={busy}
                     title="Klik untuk hapus atau tandai ulang penanda"
-                    className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${
-                        showPopover ? "bg-red-100 text-red-700 border-red-300" : "text-red-600 bg-red-50 border-red-200 hover:bg-red-100"
-                    }`}
+                    className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${showPopover ? "bg-red-100 text-red-700 border-red-300" : "text-red-600 bg-red-50 border-red-200 hover:bg-red-100"
+                        }`}
                 >
                     <AlertTriangle className="w-4 h-4 text-red-600" />
                 </button>
