@@ -563,23 +563,28 @@ async function buildTransactionPaymentDrafts(
   const invoiceNumbers = [...new Set((payments as any[]).map((p) => p.invoice_number as string))];
 
   const legacyDirectInvoices = new Set<string>();
+  const accruedInvoices = new Set<string>();
   for (const batch of chunkArray(invoiceNumbers, 150)) {
     const { data: existingEntries } = await supabase
       .from("journal_entries")
-      .select("source_id, lines:journal_lines(account_code)")
+      .select("source_id, lines:journal_lines(account_code, side)")
       .eq("source_type", "TRANSACTION")
       .in("source_id", batch);
     for (const e of (existingEntries ?? []) as any[]) {
       const hasPiutangLine = (e.lines ?? []).some((l: any) => l.account_code === AKUN.PIUTANG);
+      const hasPiutangDebit = (e.lines ?? []).some(
+        (l: any) => l.account_code === AKUN.PIUTANG && l.side === "DEBIT"
+      );
       if (!hasPiutangLine) legacyDirectInvoices.add(e.source_id as string);
+      if (hasPiutangDebit) accruedInvoices.add(e.source_id as string);
     }
   }
 
-  const trxMap = new Map<string, { customer_name: string; laptop_name: string; payment_method: string; company_name: string | null }>();
+  const trxMap = new Map<string, { customer_name: string; laptop_name: string; payment_method: string; company_name: string | null; status: string }>();
   for (const batch of chunkArray(invoiceNumbers, 150)) {
     const { data: trxs } = await supabase
       .from("transactions")
-      .select("invoice_number, customer_name, laptop_name, payment_method, company_name")
+      .select("invoice_number, customer_name, laptop_name, payment_method, company_name, status")
       .in("invoice_number", batch);
     for (const t of trxs ?? []) {
       trxMap.set(t.invoice_number as string, {
@@ -587,7 +592,15 @@ async function buildTransactionPaymentDrafts(
         laptop_name: (t.laptop_name as string) ?? "—",
         payment_method: (t.payment_method as string) ?? "CASH",
         company_name: (t.company_name as string) ?? null,
+        status: (t.status as string) ?? "",
       });
+    }
+  }
+
+  const directInvoices = new Set<string>();
+  for (const [invoice, trx] of trxMap.entries()) {
+    if (trx.status === "PAID" && !accruedInvoices.has(invoice)) {
+      directInvoices.add(invoice);
     }
   }
 
@@ -596,6 +609,7 @@ async function buildTransactionPaymentDrafts(
   const drafts: JournalDraft[] = [];
   for (const p of payments as any[]) {
     if (legacyDirectInvoices.has(p.invoice_number as string)) continue;
+    if (directInvoices.has(p.invoice_number as string)) continue; // (fix) sudah/bakal dibukukan langsung — skip biar tidak dobel
 
     const amount = Math.round(Number(p.amount ?? 0));
     if (amount <= 0) continue;
