@@ -7,7 +7,8 @@ import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES } from "@/lib/permissions";
+import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
 
@@ -150,6 +151,7 @@ const Icons = {
   accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4.5c2.5-1 5.5-1 8 .3v14c-2.5-1.3-5.5-1.3-8-.3z" /><path d="M22 4.5c-2.5-1-5.5-1-8 .3v14c2.5-1.3 5.5-1.3 8-.3z" /></svg>),
   patchNotes: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>),
   aiCeo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8z" /><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" /></svg>),
+  tanyaCeo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11a8 8 0 01-8.5 8 8.3 8.3 0 01-3.3-.7L3 20l1.7-3.8A8 8 0 1121 11z" /><path d="M12 8.5l.8 1.9L14.7 11l-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z" /></svg>),
   profile: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" /></svg>),
   social: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none" /></svg>),
   fingerprint: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 015 5v2" /><path d="M7 9V7a5 5 0 019.8-1.5" /><path d="M4.5 10.5V9a7.5 7.5 0 011-3.8" /><path d="M12 9v3.5a5.5 5.5 0 01-1.2 3.4" /><path d="M16 9v2.5c0 3-1 5.5-3 7" /><path d="M8.5 9v3c0 3.5-1 6-3 8" /><path d="M19.5 9v1.5c0 4.5-1.5 8-4 10.5" /></svg>),
@@ -173,6 +175,7 @@ const ITEM_CUSTOMER_BIRTHDAY: MenuItem = { name: "Ultah Customer", href: "/dashb
 const ITEM_TODOS: MenuItem = { name: "To-Do List", href: "/dashboard/todos", icon: Icons.todo };
 const ITEM_PATCH_NOTES: MenuItem = { name: "Patch Notes", href: "/dashboard/admin/patch-notes", icon: Icons.patchNotes };
 const ITEM_AI_CEO: MenuItem = { name: "AI CEO", href: "/dashboard/ai-ceo", icon: Icons.aiCeo };
+const ITEM_TANYA_CEO: MenuItem = { name: "Tanya CEO", href: "/dashboard/tanya-ceo", icon: Icons.tanyaCeo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
@@ -754,11 +757,19 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   ROLE_MENUS[role].push({ label: "AI", items: [ITEM_AI_CEO] });
 });
 
-// ── Audit Barang Keluar: hanya role yang sudah punya akses ITEM_OUTFLOW_ROLES.
-// Pakai .map() bikin objek grup BARU per-role (bukan .push() ke grup yang
-// di-share banyak role, misal ADMIN_INVENTARIS dipakai ADMIN+PROGRAMMER+
-// ASISTEN_CEO+ACCOUNTING) — supaya ACCOUNTING dkk yang TIDAK ada di
-// ITEM_OUTFLOW_ROLES gak ikut kebagian menu ini gara-gara referensi objek sama.
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (!(AI_ASSISTANT_ROLES as string[]).includes(role)) return;
+  let hasAiGroup = false;
+  ROLE_MENUS[role] = ROLE_MENUS[role].map((g) => {
+    if (g.label !== "AI") return g;
+    hasAiGroup = true;
+    return { label: g.label, items: [...g.items, ITEM_TANYA_CEO] };
+  });
+  if (!hasAiGroup) {
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "AI", items: [ITEM_TANYA_CEO] }];
+  }
+});
+
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   if (!(ITEM_OUTFLOW_ROLES as string[]).includes(role)) return;
   let hasInventaris = false;
@@ -1288,11 +1299,14 @@ export default function Sidebar() {
   usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true, 4000, notifSoundKey, notifCustomUrl);
 
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
+  const reminderUnread = useReminderBadge(user?.id);
+  const onTanyaCeoPage = pathname.startsWith("/dashboard/tanya-ceo");
   const badges: Record<string, number> = {
     "/dashboard/preparation/pengantaran": deliveryBadge,
     "/dashboard/preparation/antrian": prep.menungguUnacked.length,
     "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
     "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count, // ✅ NEW — poin 9
+    "/dashboard/tanya-ceo": onTanyaCeoPage ? 0 : reminderUnread,
   };
 
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
@@ -1328,7 +1342,7 @@ export default function Sidebar() {
           </button>
         </div>
       )}
-{/* ✅ Poin 9 (redesign): lemburan menunggu ACC — mobile only sebagai icon bell + badge di kanan atas.
+      {/* ✅ Poin 9 (redesign): lemburan menunggu ACC — mobile only sebagai icon bell + badge di kanan atas.
           Desktop gak perlu ini karena sidebar-nya selalu terbuka & badge count-nya sudah nempel
           di menu item "Lembur" lewat prop `badges` di bawah. */}
       {!onOvertimePage && overtimeNotify.count > 0 && (

@@ -59,6 +59,21 @@ Peranmu:
 Gaya jawaban: Bahasa Indonesia, singkat, langsung ke inti, pakai angka nyata dari data. Jangan pernah mengklaim sudah "melakukan" perubahan apapun ke sistem.`;
 }
 
+function buildAssistantSystemPrompt(reminder: { title: string; message: string; severity: string }): string {
+    return `Kamu adalah "AI Asisten" Solit 03 — satu sistem sama dengan "AI CEO", tapi khusus ngobrol dengan SATU member soal SATU pengingat yang dikirim CEO/admin ke dia.
+
+Pengingat yang sedang dibahas:
+Judul: ${reminder.title}
+Prioritas: ${reminder.severity}
+Isi: ${reminder.message}
+
+Aturan ketat:
+1. Kamu TIDAK PUNYA akses ke data bisnis lain (stok, transaksi, cashflow, absensi, dst) di percakapan ini. Kalau member tanya di luar topik pengingat ini, jawab jujur kamu cuma bisa bahas pengingat ini di halaman ini.
+2. Kalau member bilang sudah membereskan masalahnya, panggil tool "tandai_pengingat_selesai".
+3. Kalau member butuh bantuan manusia / tidak setuju / perlu klarifikasi lanjut, panggil tool "eskalasi_ke_admin" dengan catatan jelas.
+4. Bahasa Indonesia, singkat, ramah, tidak menggurui. Jangan klaim sudah mengubah data apapun — tool di atas cuma mencatat status/pesan.`;
+}
+
 export const AI_CEO_TOOLS = [
     {
         functionDeclarations: [
@@ -158,14 +173,58 @@ export const AI_CEO_TOOLS = [
                     required: ["category", "title", "description"],
                 },
             },
+            {
+                name: "kirim_pengingat_member",
+                description: "Kirim pengingat/instruksi ke SATU member (by nama_member) atau ke SEMUA member dengan role tertentu (by role_target). Member menerimanya di halaman 'Tanya CEO' (+ notifikasi WhatsApp) dan bisa membalas langsung di sana.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        nama_member: { type: "STRING", description: "Nama member spesifik tujuan pengingat. Kosongkan kalau pakai role_target." },
+                        role_target: { type: "STRING", description: "Kirim ke SEMUA user dengan role ini (contoh: 'CREW_SALES'). Kosongkan kalau pakai nama_member." },
+                        judul: { type: "STRING", description: "Judul singkat pengingat." },
+                        pesan: { type: "STRING", description: "Isi pengingat/instruksi, jelas dan actionable." },
+                        severity: { type: "STRING", description: "info, warning, atau critical. Default info." },
+                    },
+                    required: ["judul", "pesan"],
+                },
+            },
         ],
     },
 ];
+
+const MEMBER_ASSISTANT_TOOLS = [
+    {
+        functionDeclarations: [
+            {
+                name: "tandai_pengingat_selesai",
+                description: "Tandai pengingat yang sedang dibahas ini sebagai SUDAH SELESAI dikerjakan/diperbaiki member.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: { catatan: { type: "STRING", description: "Ringkasan apa yang sudah dilakukan (opsional)." } },
+                    required: [],
+                },
+            },
+            {
+                name: "eskalasi_ke_admin",
+                description: "Kirim balasan/pertanyaan member soal pengingat ini ke daftar review Admin/CEO — dipakai kalau member butuh bantuan manusia atau tidak setuju.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: { catatan: { type: "STRING", description: "Isi balasan/pertanyaan member untuk admin." } },
+                    required: ["catatan"],
+                },
+            },
+        ],
+    },
+];
+
+const MEMBER_ASSISTANT_TOOL_NAMES = new Set(MEMBER_ASSISTANT_TOOLS[0].functionDeclarations.map((f) => f.name));
 
 interface ToolContext {
     req: NextRequest;
     userId: string;
     conversationId: string | null;
+    mode?: "ceo" | "asisten";
+    reminder?: { id: string; title: string; message: string; severity: string } | null;
 }
 
 function resolveInternalOriginCandidates(req: NextRequest): string[] {
@@ -409,11 +468,51 @@ async function computeDashboardStatsDirect(): Promise<any> {
     };
 }
 
+async function dispatchReminderWhatsApp(
+    inserted: { id: string; target_user_id: string }[],
+    targets: { id: string; name: string; phone?: string | null }[],
+    title: string,
+    message: string
+): Promise<void> {
+    const token = process.env.FONNTE_TOKEN;
+    if (!token) {
+        console.error("[ai-ceo] FONNTE_TOKEN belum diset, lewati notifikasi WA pengingat.");
+        return;
+    }
+    const reminderIdByUser = new Map(inserted.map((r) => [r.target_user_id, r.id]));
+
+    for (const target of targets) {
+        const reminderId = reminderIdByUser.get(target.id);
+        if (!reminderId) continue;
+        if (!target.phone) {
+            await supabaseAdmin.from("ai_ceo_reminders").update({ whatsapp_error: "Nomor HP tidak terdaftar" }).eq("id", reminderId);
+            continue;
+        }
+        try {
+            const res = await fetch("https://api.fonnte.com/send", {
+                method: "POST",
+                headers: { Authorization: token, "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    target: target.phone,
+                    message: `*${title}*\n\n${message}\n\n— AI CEO Solit POS, balas langsung di halaman "Tanya CEO".`,
+                }),
+            });
+            await supabaseAdmin.from("ai_ceo_reminders").update({ whatsapp_sent: res.ok, whatsapp_error: res.ok ? null : `HTTP ${res.status}` }).eq("id", reminderId);
+        } catch (err: any) {
+            await supabaseAdmin.from("ai_ceo_reminders").update({ whatsapp_error: err?.message ?? "Gagal kirim" }).eq("id", reminderId);
+        }
+    }
+}
+
 export async function runToolCall(
     name: string,
     args: Record<string, any>,
     ctx: ToolContext
 ): Promise<any> {
+    if (ctx.mode === "asisten" && !MEMBER_ASSISTANT_TOOL_NAMES.has(name)) {
+        return { error: `Tool "${name}" tidak tersedia di mode Asisten.` };
+    }
+
     switch (name) {
         case "get_dashboard_stats": {
             try {
@@ -810,6 +909,100 @@ export async function runToolCall(
             return { success: true, message: "Catatan tersimpan untuk direview manajemen." };
         }
 
+        case "kirim_pengingat_member": {
+            const namaTarget = String(args?.nama_member ?? "").trim();
+            const roleTarget = String(args?.role_target ?? "").trim().toUpperCase();
+            const title = String(args?.judul ?? "").trim() || "Pengingat dari AI CEO";
+            const message = String(args?.pesan ?? "").trim();
+            const severity = ["info", "warning", "critical"].includes(args?.severity) ? args.severity : "info";
+
+            if (!message) return { error: "Isi pesan pengingat tidak boleh kosong." };
+            if (!namaTarget && !roleTarget) return { error: "Harus isi nama_member ATAU role_target." };
+
+            // Cari user cuma pakai id+name dulu (kolom yang pasti ada) — sebelumnya select
+            // ikut minta kolom "phone", dan kalau kolom itu gagal (belum ada/beda nama),
+            // error-nya kebuang gitu aja sehingga SALAH kebaca sebagai "user tidak ditemukan".
+            let targets: { id: string; name: string; phone?: string | null }[] = [];
+            if (namaTarget) {
+                const { data, error: findErr } = await supabaseAdmin.from("users").select("id, name").ilike("name", `%${namaTarget}%`);
+                if (findErr) return { error: `Gagal mencari member: ${findErr.message}` };
+                targets = data ?? [];
+                if (targets.length === 0) return { error: `Tidak ditemukan user dengan nama mengandung "${namaTarget}".` };
+                if (targets.length > 1) {
+                    return { error: `Nama "${namaTarget}" cocok ke lebih dari satu user (${targets.map((t) => t.name).join(", ")}) — sebutkan nama lebih spesifik.` };
+                }
+            } else {
+                const { data, error: findErr } = await supabaseAdmin.from("users").select("id, name").eq("role", roleTarget);
+                if (findErr) return { error: `Gagal mencari member: ${findErr.message}` };
+                targets = data ?? [];
+                if (targets.length === 0) return { error: `Tidak ada user dengan role "${roleTarget}".` };
+            }
+
+            try {
+                const { data: phoneRows, error: phoneErr } = await supabaseAdmin
+                    .from("users")
+                    .select("id, phone:phone_number")
+                    .in("id", targets.map((t) => t.id));
+                if (phoneErr) {
+                    console.error("[ai-ceo] gagal ambil nomor HP:", phoneErr.message);
+                } else {
+                    const phoneMap = new Map((phoneRows ?? []).map((p: any) => [p.id, p.phone]));
+                    targets = targets.map((t) => ({ ...t, phone: phoneMap.get(t.id) ?? null }));
+                }
+            } catch (e: any) {
+                console.error("[ai-ceo] error ambil nomor HP:", e?.message ?? e);
+            }
+
+            const rows = targets.map((t) => ({
+                created_by: ctx.userId,
+                source: "ai",
+                target_user_id: t.id,
+                target_role: roleTarget || null,
+                title,
+                message,
+                severity,
+            }));
+            const { data: inserted, error } = await supabaseAdmin.from("ai_ceo_reminders").insert(rows).select("id, target_user_id");
+            if (error) return { error: `Gagal mengirim pengingat: ${error.message}` };
+
+            dispatchReminderWhatsApp(inserted ?? [], targets, title, message).catch((e) =>
+                console.error("[ai-ceo] gagal kirim WA pengingat:", e?.message ?? e)
+            );
+
+            return { success: true, terkirim_ke: targets.map((t) => t.name), jumlah: targets.length };
+        }
+
+        case "tandai_pengingat_selesai": {
+            if (!ctx.reminder) return { error: "Tidak ada pengingat aktif di percakapan ini." };
+            const catatan = String(args?.catatan ?? "").trim();
+            const { error } = await supabaseAdmin
+                .from("ai_ceo_reminders")
+                .update({ status: "selesai", resolved_at: new Date().toISOString() })
+                .eq("id", ctx.reminder.id);
+            if (error) return { error: error.message };
+            return { success: true, message: catatan ? `Ditandai selesai. Catatan: ${catatan}` : "Ditandai selesai." };
+        }
+
+        case "eskalasi_ke_admin": {
+            if (!ctx.reminder) return { error: "Tidak ada pengingat aktif di percakapan ini." };
+            const catatan = String(args?.catatan ?? "").trim();
+            if (!catatan) return { error: "Catatan tidak boleh kosong." };
+
+            const { error: updErr } = await supabaseAdmin.from("ai_ceo_reminders").update({ status: "dibalas" }).eq("id", ctx.reminder.id);
+            if (updErr) return { error: updErr.message };
+
+            const { error } = await supabaseAdmin.from("ai_ceo_suggestions").insert({
+                conversation_id: ctx.conversationId,
+                created_by: ctx.userId,
+                category: "balasan_member",
+                title: `Balasan soal: ${ctx.reminder.title}`,
+                description: catatan,
+                severity: "warning",
+            });
+            if (error) return { error: error.message };
+            return { success: true, message: "Balasan sudah dikirim ke daftar review Admin/CEO." };
+        }
+
         default:
             return { error: `Tool "${name}" tidak dikenal.` };
     }
@@ -870,16 +1063,16 @@ function toGeminiHistory(history: ChatTurn[]): GeminiContent[] {
     }));
 }
 
-async function callGemini(contents: GeminiContent[]): Promise<any> {
+async function callGemini(contents: GeminiContent[], tools: any = AI_CEO_TOOLS, systemPrompt: string = buildAiCeoSystemPrompt()): Promise<any> {
     let res: Response;
     try {
         res = await fetch(GEMINI_ENDPOINT, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-goog-api-key": getGeminiKey() },
             body: JSON.stringify({
-                system_instruction: { parts: [{ text: buildAiCeoSystemPrompt() }] },
+                system_instruction: { parts: [{ text: systemPrompt }] },
                 contents,
-                tools: AI_CEO_TOOLS,
+                tools,
                 generationConfig: { temperature: 0.4 },
             }),
         });
@@ -899,12 +1092,12 @@ async function callGemini(contents: GeminiContent[]): Promise<any> {
     return res.json();
 }
 
-async function runGeminiTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback): Promise<string> {
+async function runGeminiTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback, tools: any = AI_CEO_TOOLS, systemPrompt: string = buildAiCeoSystemPrompt()): Promise<string> {
     const contents: GeminiContent[] = toGeminiHistory(history);
     const MAX_STEPS = 6;
 
     for (let step = 0; step < MAX_STEPS; step++) {
-        const data = await callGemini(contents);
+        const data = await callGemini(contents, tools, systemPrompt);
         const parts: GeminiPart[] = data?.candidates?.[0]?.content?.parts ?? [];
 
         const functionCallParts = parts.filter(
@@ -946,8 +1139,8 @@ function lowerCaseSchemaTypes(schema: any): any {
     return out;
 }
 
-function toOpenAiTools() {
-    return AI_CEO_TOOLS[0].functionDeclarations.map((fn) => ({
+function toOpenAiTools(tools: any = AI_CEO_TOOLS) {
+    return tools[0].functionDeclarations.map((fn: any) => ({
         type: "function",
         function: {
             name: fn.name,
@@ -966,7 +1159,7 @@ function toOpenAiHistory(history: ChatTurn[]): OpenAiMessage[] {
     return history.map((h) => ({ role: h.role, content: h.content }));
 }
 
-async function callGroq(messages: OpenAiMessage[], toolsEnabled: boolean = true): Promise<any> {
+async function callGroq(messages: OpenAiMessage[], toolsEnabled: boolean = true, tools: any = AI_CEO_TOOLS): Promise<any> {
     let res: Response;
     try {
         res = await fetch(GROQ_ENDPOINT, {
@@ -975,7 +1168,7 @@ async function callGroq(messages: OpenAiMessage[], toolsEnabled: boolean = true)
             body: JSON.stringify({
                 model: GROQ_MODEL,
                 messages,
-                ...(toolsEnabled ? { tools: toOpenAiTools(), tool_choice: "auto" } : {}),
+                ...(toolsEnabled ? { tools: toOpenAiTools(tools), tool_choice: "auto" } : {}),
                 temperature: 0.4,
             }),
         });
@@ -999,9 +1192,9 @@ function isMalformedToolCallError(err: any): boolean {
     return /tool_use_failed|tool call validation failed|not in request\.tools/i.test(String(err?.message ?? ""));
 }
 
-async function runGroqTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback): Promise<string> {
+async function runGroqTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback, tools: any = AI_CEO_TOOLS, systemPrompt: string = buildAiCeoSystemPrompt()): Promise<string> {
     const messages: OpenAiMessage[] = [
-        { role: "system", content: buildAiCeoSystemPrompt() },
+        { role: "system", content: systemPrompt },
         ...toOpenAiHistory(history),
     ];
     const MAX_STEPS = 6;
@@ -1010,7 +1203,7 @@ async function runGroqTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall
     for (let step = 0; step < MAX_STEPS; step++) {
         let data: any;
         try {
-            data = await callGroq(messages);
+            data = await callGroq(messages, true, tools);
         } catch (err: any) {
             // Bug spesifik Llama/Groq: model kadang menggabungkan nama tool + argumen
             // jadi satu string rusak saat sebenarnya cuma mau menjawab teks biasa.
@@ -1053,7 +1246,7 @@ async function runGroqTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall
 // reuse toOpenAiTools/toOpenAiHistory/OpenAiMessage/isMalformedToolCallError
 // yang sudah ada, cuma beda endpoint/API key/model.
 
-async function callDeepSeek(messages: OpenAiMessage[], toolsEnabled: boolean = true): Promise<any> {
+async function callDeepSeek(messages: OpenAiMessage[], toolsEnabled: boolean = true, tools: any = AI_CEO_TOOLS): Promise<any> {
     let res: Response;
     try {
         res = await fetch(DEEPSEEK_ENDPOINT, {
@@ -1062,7 +1255,7 @@ async function callDeepSeek(messages: OpenAiMessage[], toolsEnabled: boolean = t
             body: JSON.stringify({
                 model: DEEPSEEK_MODEL,
                 messages,
-                ...(toolsEnabled ? { tools: toOpenAiTools(), tool_choice: "auto" } : {}),
+                ...(toolsEnabled ? { tools: toOpenAiTools(tools), tool_choice: "auto" } : {}),
                 temperature: 0.4,
             }),
         });
@@ -1082,9 +1275,9 @@ async function callDeepSeek(messages: OpenAiMessage[], toolsEnabled: boolean = t
     return res.json();
 }
 
-async function runDeepSeekTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback): Promise<string> {
+async function runDeepSeekTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback, tools: any = AI_CEO_TOOLS, systemPrompt: string = buildAiCeoSystemPrompt()): Promise<string> {
     const messages: OpenAiMessage[] = [
-        { role: "system", content: buildAiCeoSystemPrompt() },
+        { role: "system", content: systemPrompt },
         ...toOpenAiHistory(history),
     ];
     const MAX_STEPS = 6;
@@ -1093,7 +1286,7 @@ async function runDeepSeekTurn(history: ChatTurn[], toolCtx: ToolContext, onTool
     for (let step = 0; step < MAX_STEPS; step++) {
         let data: any;
         try {
-            data = await callDeepSeek(messages);
+            data = await callDeepSeek(messages, true, tools);
         } catch (err: any) {
             if (isMalformedToolCallError(err) && hasToolData) {
                 console.error("[ai-ceo] DeepSeek tool call rusak, retry tanpa tools:", err?.message ?? err);
@@ -1138,6 +1331,11 @@ export async function runAiCeoTurn(
                 preferredProvider === "deepseek" ? ["deepseek"] :
                     ["deepseek", "gemini", "groq"];
 
+    const isAssistant = toolCtx.mode === "asisten";
+    if (isAssistant && !toolCtx.reminder) throw new Error("Mode asisten butuh toolCtx.reminder.");
+    const tools = isAssistant ? MEMBER_ASSISTANT_TOOLS : AI_CEO_TOOLS;
+    const systemPrompt = isAssistant ? buildAssistantSystemPrompt(toolCtx.reminder!) : buildAiCeoSystemPrompt();
+
     let lastError: any = null;
     for (let i = 0; i < order.length; i++) {
         const provider = order[i];
@@ -1151,10 +1349,10 @@ export async function runAiCeoTurn(
         try {
             const reply =
                 provider === "gemini"
-                    ? await runGeminiTurn(history, toolCtx, onToolCall)
+                    ? await runGeminiTurn(history, toolCtx, onToolCall, tools, systemPrompt)
                     : provider === "deepseek"
-                        ? await runDeepSeekTurn(history, toolCtx, onToolCall)
-                        : await runGroqTurn(history, toolCtx, onToolCall);
+                        ? await runDeepSeekTurn(history, toolCtx, onToolCall, tools, systemPrompt)
+                        : await runGroqTurn(history, toolCtx, onToolCall, tools, systemPrompt);
             return { reply, providerUsed: provider };
         } catch (err: any) {
             lastError = err;

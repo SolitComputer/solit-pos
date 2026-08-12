@@ -293,7 +293,7 @@ export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 export const AI_CEO_ROLES: UserRole[] = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER"];
 export const ROLE_ACCESS_MANAGER_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
-// ─── Notification Sound Settings — atur suara notif pengantaran per akun ─────
+export const AI_ASSISTANT_ROLES: UserRole[] = [...ALL_ROLES];
 export const NOTIFICATION_SETTINGS_ROLES: UserRole[] = [...FULL_ACCESS];
 export const NOTIF_SOUND_KEYS = ["default", "urgent", "bell", "double_beep", "custom"] as const;
 
@@ -328,7 +328,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
   ],
 
- "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
+  "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
   "/dashboard/audit-barang-keluar": [...ITEM_OUTFLOW_ROLES],
 
   "/dashboard/warranty": [
@@ -522,6 +522,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/notification-settings": [...NOTIFICATION_SETTINGS_ROLES],
   "/dashboard/ai-ceo": [...AI_CEO_ROLES],
   "/api/ai-ceo": [...AI_CEO_ROLES],
+  "/dashboard/tanya-ceo": [...AI_ASSISTANT_ROLES],
+  "/api/ai-assistant": [...AI_ASSISTANT_ROLES],
   "/api/admin/pages": [...ROLE_ACCESS_MANAGER_ROLES],
   "/api/admin/role-permissions": [...ROLE_ACCESS_MANAGER_ROLES],
 
@@ -681,6 +683,7 @@ export const PERMISSIONS = {
 
   // ── AI CEO ───────────────────────────────────────────────────────────────────
   VIEW_AI_CEO: [...AI_CEO_ROLES] as UserRole[],
+  VIEW_AI_ASSISTANT: [...AI_ASSISTANT_ROLES] as UserRole[],
 } as const;
 
 export function hasPermission(
