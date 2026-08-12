@@ -15,7 +15,9 @@ function hasAccess(request: NextRequest): boolean {
   return roles.some((r) => (FIXED_ASSET_ROLES as string[]).includes(r));
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
   if (!hasAccess(request)) {
     return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
   }
@@ -41,7 +43,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       updated_by_name: userName || null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", params.id)
+    .eq("id", id)
     .select()
     .single();
 
@@ -52,12 +54,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   return NextResponse.json({ success: true, data });
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
   if (!hasAccess(request)) {
     return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
   }
 
-  const { error } = await supabase.from("fixed_assets").delete().eq("id", params.id);
+  const { error } = await supabase.from("fixed_assets").delete().eq("id", id);
 
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
