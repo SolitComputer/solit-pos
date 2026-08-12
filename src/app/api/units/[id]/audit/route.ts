@@ -38,23 +38,16 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       ? { audited_at: null, audited_by: null }
       : { audited_at: new Date().toISOString(), audited_by: user.name };
 
-    // Audit per-kelompok: Update seluruh unit di kelompok laptop_id ini dan parent laptop
-    if (current.laptop_id) {
-      await Promise.all([
-        supabase
-          .from("laptop_units")
-          .update(payload)
-          .eq("laptop_id", current.laptop_id),
-        supabase
-          .from("laptops")
-          .update(payload)
-          .eq("id", current.laptop_id),
-      ]);
-    } else {
-      await supabase
-        .from("laptop_units")
-        .update(payload)
-        .eq("id", id);
+    // Audit per-unit: hanya update unit yang diklik (id ini saja) — tidak
+    // menyentuh unit lain di model yang sama, dan tidak menyentuh tabel
+    // laptops (audit level-model sudah dipisah, lihat api/laptops/[id]/audit).
+    const { error: updateErr } = await supabase
+      .from("laptop_units")
+      .update(payload)
+      .eq("id", id);
+
+    if (updateErr) {
+      return NextResponse.json({ success: false, message: updateErr.message }, { status: 400 });
     }
 
     const data = { id, ...payload };
