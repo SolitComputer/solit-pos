@@ -46,15 +46,9 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       .select("id, audited_at, audited_by")
       .single();
 
-    if (error) {
+   if (error) {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
     }
-
-    // Audit per-kelompok: Update seluruh unit dalam kelompok model ini
-    await supabase
-      .from("laptop_units")
-      .update(payload)
-      .eq("laptop_id", id);
 
     // History "siapa yang audit" tercatat permanen di activity log
     await logActivity({

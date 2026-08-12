@@ -1874,7 +1874,7 @@ function PedagangButton({ active, loading, onClick }: {
                 </>
             )}
         </button>
-    );
+)
 }
 
 //  Riwayat semua audit sebuah model laptop — dibaca dari tabel laptop_audit_logs
