@@ -3,7 +3,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus } from "lucide-react";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
     ACCOUNT_TYPE_LABEL,
@@ -135,7 +135,14 @@ export default function JurnalUmum({ period }: { period: string }) {
     const accountFilterRef = useRef<HTMLDivElement>(null);
     const accountFilterButtonRef = useRef<HTMLButtonElement>(null);
     const [filterDropdownPos, setFilterDropdownPos] = useState<{ top: number; left: number } | null>(null);
-    const [selected, setSelected] = useState<Set<string>>(new Set());
+   const [selected, setSelected] = useState<Set<string>>(new Set());
+    // Selection KHUSUS baris jurnal utama (bukan panel pending) — dipakai untuk
+    // bulk actions: geser bareng, kasih penanda bareng, hapus bareng.
+    const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
+    const [isDraggingGroup, setIsDraggingGroup] = useState(false);
+    const [showBulkWarningInput, setShowBulkWarningInput] = useState(false);
+    const [bulkWarningReason, setBulkWarningReason] = useState("");
+    const [bulkBusy, setBulkBusy] = useState(false);
     const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // default: terbaru dulu
     const [showOnlyWarnings, setShowOnlyWarnings] = useState(false); // filter khusus entry warning (Modal Rp0 / diedit)
     const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
@@ -240,13 +247,62 @@ export default function JurnalUmum({ period }: { period: string }) {
             const json = await res.json();
             if (!json.success) { setToast(json.message ?? "Gagal hapus"); return; }
             setToast("Jurnal dihapus");
+            setSelectedEntryIds((prev) => {
+                if (!prev.has(entry.id)) return prev;
+                const next = new Set(prev);
+                next.delete(entry.id);
+                return next;
+            });
             await load();
         } finally {
             setBusy(false);
         }
     };
 
+    // Toggle pilih satu entry jurnal lewat checkbox di kolom Tanggal.
+    const toggleEntrySelected = (id: string) => {
+        setSelectedEntryIds((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    };
+
+    const clearEntrySelection = () => setSelectedEntryIds(new Set());
+
+    // Dipanggil saat drag mulai — kalau entry yang di-drag termasuk yang lagi dipilih
+    // (dan ada >1 yang dipilih), tandai supaya baris lain yang ikut pindah bareng dikasih highlight.
+    const handleDragStart = (start: DragStart) => {
+        setIsDraggingGroup(selectedEntryIds.has(start.draggableId) && selectedEntryIds.size > 1);
+    };
+
+    // Hitung posisi sisip untuk grup entry yang digeser bareng: simulasikan dulu
+    // pemindahan SATU entry yang di-drag (persis logic lama), lalu cari entry pertama
+    // SETELAHNYA yang BUKAN bagian dari grup — itu jadi "jangkar" tempat grup disisipkan.
+    const computeGroupInsertIndex = (
+        list: JournalEntry[],
+        sourceIndex: number,
+        destinationIndex: number,
+        idsToMoveSet: Set<string>
+    ): number => {
+        const singleMoved = Array.from(list);
+        const [movedEntry] = singleMoved.splice(sourceIndex, 1);
+        singleMoved.splice(destinationIndex, 0, movedEntry);
+
+        const pivotPos = singleMoved.findIndex((e) => e.id === movedEntry.id);
+        let anchorId: string | null = null;
+        for (let i = pivotPos + 1; i < singleMoved.length; i++) {
+            if (!idsToMoveSet.has(singleMoved[i].id)) { anchorId = singleMoved[i].id; break; }
+        }
+
+        const remaining = list.filter((e) => !idsToMoveSet.has(e.id));
+        if (!anchorId) return remaining.length;
+        const idx = remaining.findIndex((e) => e.id === anchorId);
+        return idx === -1 ? remaining.length : idx;
+    };
+
     const handleDragEnd = async (result: DropResult) => {
+        setIsDraggingGroup(false);
         if (!result.destination) return;
         const sourceIndex = result.source.index;
         const destinationIndex = result.destination.index;
@@ -257,19 +313,38 @@ export default function JurnalUmum({ period }: { period: string }) {
             return;
         }
 
-        const newEntries = Array.from(entries);
-        const [removed] = newEntries.splice(sourceIndex, 1);
+        const draggedEntry = entries[sourceIndex];
+        if (!draggedEntry) return;
 
-        const destEntry = newEntries[destinationIndex];
-        if (destEntry && destEntry.tanggal !== removed.tanggal) {
+        // Kalau entry yang di-drag termasuk yang lagi dipilih (dan ada >1 yang dipilih),
+        // pindahkan SEMUA entry terpilih sebagai satu grup — urutan relatifnya dipertahankan.
+        const isGroupDrag = selectedEntryIds.has(draggedEntry.id) && selectedEntryIds.size > 1;
+        const idsToMoveSet = isGroupDrag
+            ? new Set(entries.filter((e) => selectedEntryIds.has(e.id)).map((e) => e.id))
+            : new Set([draggedEntry.id]);
+
+        if (isGroupDrag) {
+            const adaTanggalBeda = entries.some((e) => idsToMoveSet.has(e.id) && e.tanggal !== draggedEntry.tanggal);
+            if (adaTanggalBeda) {
+                setToast("Semua entry terpilih harus di tanggal yang sama untuk digeser bersamaan.");
+                return;
+            }
+        }
+
+        const insertAt = computeGroupInsertIndex(entries, sourceIndex, destinationIndex, idsToMoveSet);
+        const remaining = entries.filter((e) => !idsToMoveSet.has(e.id));
+        const moving = entries.filter((e) => idsToMoveSet.has(e.id));
+
+        const neighborAfter = remaining[insertAt];
+        if (neighborAfter && neighborAfter.tanggal !== draggedEntry.tanggal) {
             setToast("Hanya bisa mengubah urutan di tanggal yang sama.");
             return;
         }
 
-        newEntries.splice(destinationIndex, 0, removed);
+        const newEntries = [...remaining.slice(0, insertAt), ...moving, ...remaining.slice(insertAt)];
         setEntries(newEntries);
 
-        const targetDate = removed.tanggal;
+        const targetDate = draggedEntry.tanggal;
         const sameDateEntries = newEntries.filter(e => e.tanggal === targetDate);
 
         try {
@@ -286,10 +361,62 @@ export default function JurnalUmum({ period }: { period: string }) {
             if (!json.success) {
                 setToast(json.message ?? "Gagal menyimpan urutan.");
                 load();
+            } else if (isGroupDrag) {
+                setToast(`${idsToMoveSet.size} entry dipindahkan bersama`);
             }
         } catch (e) {
             setToast("Gagal menyimpan urutan.");
             load();
+        }
+    };
+
+    // Hapus semua entry yang lagi dipilih sekaligus — pakai endpoint DELETE per-id yang sudah ada.
+    const handleBulkDelete = async () => {
+        if (selectedEntryIds.size === 0 || bulkBusy) return;
+        if (!confirm(`Hapus ${selectedEntryIds.size} jurnal terpilih?\n\nData yang berasal dari sistem akan kembali ke daftar pending.`)) return;
+        setBulkBusy(true);
+        try {
+            const ids = Array.from(selectedEntryIds);
+            const results = await Promise.all(
+                ids.map((id) =>
+                    fetch(`/api/akutansi/jurnal/${id}`, { method: "DELETE" })
+                        .then((r) => r.json())
+                        .catch(() => ({ success: false }))
+                )
+            );
+            const gagal = results.filter((r: any) => !r.success).length;
+            setToast(gagal > 0 ? `${ids.length - gagal} dihapus, ${gagal} gagal` : `${ids.length} jurnal dihapus`);
+            setSelectedEntryIds(new Set());
+            await load();
+        } finally {
+            setBulkBusy(false);
+        }
+    };
+
+    // Kasih penanda ke semua entry yang lagi dipilih sekaligus — pakai endpoint warning yang sudah ada.
+    const handleBulkWarning = async () => {
+        if (selectedEntryIds.size === 0 || bulkBusy || !bulkWarningReason.trim()) return;
+        setBulkBusy(true);
+        try {
+            const ids = Array.from(selectedEntryIds);
+            const results = await Promise.all(
+                ids.map((id) =>
+                    fetch(`/api/akutansi/jurnal/${id}/warning`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ reason: bulkWarningReason.trim() }),
+                    })
+                        .then((r) => r.json())
+                        .catch(() => ({ success: false }))
+                )
+            );
+            const gagal = results.filter((r: any) => !r.success).length;
+            setToast(gagal > 0 ? `${ids.length - gagal} ditandai, ${gagal} gagal` : `${ids.length} jurnal ditandai`);
+            setBulkWarningReason("");
+            setShowBulkWarningInput(false);
+            await load(false);
+        } finally {
+            setBulkBusy(false);
         }
     };
 
@@ -708,7 +835,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                         </button>
                     </div>
 
-                    <button
+                 <button
                         onClick={() => setShowManual(true)}
                         className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
                     >
@@ -716,6 +843,67 @@ export default function JurnalUmum({ period }: { period: string }) {
                     </button>
                 </div>
             </div>
+
+            {/* ── Bulk actions — muncul kalau ada entry jurnal (bukan pending) yang dicentang ── */}
+            {selectedEntryIds.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 bg-slate-900 text-white rounded-xl px-4 py-2.5">
+                    <span className="text-xs font-bold shrink-0">{selectedEntryIds.size} entry dipilih</span>
+
+                    {showBulkWarningInput ? (
+                        <div className="flex items-center gap-1.5 flex-1 min-w-[220px]">
+                            <input
+                                autoFocus
+                                value={bulkWarningReason}
+                                onChange={(e) => setBulkWarningReason(e.target.value)}
+                                placeholder="Alasan penanda untuk semua yang dipilih..."
+                                className="h-8 flex-1 min-w-[140px] rounded-lg px-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                            />
+                            <button
+                                onClick={handleBulkWarning}
+                                disabled={bulkBusy || !bulkWarningReason.trim()}
+                                className="h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-bold disabled:opacity-40 shrink-0"
+                            >
+                                Terapkan
+                            </button>
+                            <button
+                                onClick={() => { setShowBulkWarningInput(false); setBulkWarningReason(""); }}
+                                className="h-8 px-2 text-xs font-semibold text-slate-300 hover:text-white shrink-0"
+                            >
+                                Batal
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <button
+                                onClick={() => setSelectedEntryIds(new Set(filtered.map((e) => e.id)))}
+                                className="h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold active:scale-95 transition-all duration-150"
+                            >
+                                Pilih Semua ({filtered.length})
+                            </button>
+                            <button
+                                onClick={() => setShowBulkWarningInput(true)}
+                                disabled={bulkBusy}
+                                className="h-8 px-3 rounded-lg bg-amber-500/90 hover:bg-amber-500 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 disabled:opacity-40"
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5" /> Beri Penanda
+                            </button>
+                            <button
+                                onClick={handleBulkDelete}
+                                disabled={bulkBusy}
+                                className="h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 disabled:opacity-40"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" /> Hapus Terpilih
+                            </button>
+                            <button
+                                onClick={clearEntrySelection}
+                                className="h-8 px-3 rounded-lg text-xs font-semibold text-slate-300 hover:text-white ml-auto"
+                            >
+                                Batal Pilih
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* ── Filter akun / warning aktif — muncul kalau ada filter yang diaktifkan ── */}
             {(accountCodeFilter.size > 0 || showOnlyWarnings) && (
@@ -789,7 +977,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             {/* ── Tabel Jurnal Umum ── */}
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
                 <div className="overflow-auto max-h-[calc(100vh-220px)]">
-                    <DragDropContext onDragEnd={handleDragEnd}>
+                    <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
                         <Droppable droppableId="journal-entries">
                             {(provided) => (
                                 <table
@@ -975,7 +1163,12 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                             ref={provided.innerRef}
                                                             {...provided.draggableProps}
                                                             {...provided.dragHandleProps}
-                                                            className={`group ${snapshot.isDragging ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400" : ""}`}
+                                                           className={`group ${snapshot.isDragging
+                                                                ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400"
+                                                                : isDraggingGroup && selectedEntryIds.has(entry.id)
+                                                                    ? "opacity-50 ring-2 ring-blue-200"
+                                                                    : ""
+                                                                }`}
                                                             style={provided.draggableProps.style}
                                                         >
                                                             {linesToRender.map((line, i) => {
@@ -986,11 +1179,21 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                         key={line.id}
                                                                         className={`${first ? "border-t-2 border-gray-200" : ""} hover:bg-blue-50/30 transition`}
                                                                     >
-                                                                        {/* Tanggal — hanya di baris pertama */}
+                                                                       {/* Tanggal — hanya di baris pertama */}
                                                                         <td className="px-4 py-2 align-top">
                                                                             {first && (
                                                                                 <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap flex items-center gap-2">
-                                                                                    <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={selectedEntryIds.has(entry.id)}
+                                                                                        onChange={() => toggleEntrySelected(entry.id)}
+                                                                                        className="w-3.5 h-3.5 rounded border-gray-300 accent-[#1a1545] shrink-0"
+                                                                                        title="Pilih entry ini"
+                                                                                    />
+                                                                                   <div
+                                                                                        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+                                                                                        title="Tahan & geser dari sini (bukan dari checkbox)"
+                                                                                    >
                                                                                         <GripVertical className="w-3 h-3" />
                                                                                     </div>
                                                                                     {fmtTgl(entry.tanggal)}
