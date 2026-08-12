@@ -15,7 +15,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   if (scope.all) {
     const { data, error } = await supabase
       .from("users")
-      .select("id, name, role, shift, created_at, contract_status, contract_valid_until")
+      .select("id, name, role, shift, created_at, contract_status, contract_valid_until, career_level")
       .eq("is_active", true)
       .order("name", { ascending: true });
 
@@ -28,7 +28,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, name, role, shift, created_at, contract_status, contract_valid_until")
+    .select("id, name, role, shift, created_at, contract_status, contract_valid_until, career_level")
     .in("id", scope.visibleIds)
     .eq("is_active", true)
     .order("name", { ascending: true });

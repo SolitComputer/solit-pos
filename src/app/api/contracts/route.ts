@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 import { computeValidUntil } from "@/lib/contractTemplates";
+import { CAREER_LEVELS } from "@/lib/careerLevels";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,7 +43,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     }
 
     const body = await req.json();
-    const { user_id, contract_type, title, content, valid_from, duration_months, valid_until: customValidUntil } = body;
+    const { user_id, contract_type, title, content, career_level, valid_from, duration_months, valid_until: customValidUntil } = body;
 
     if (!user_id || !contract_type || !title || !content || !valid_from) {
         return NextResponse.json(
@@ -52,6 +53,9 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     }
     if (!["PENGANTARAN", "GAJI_FLAT", "GAJI_NON_FLAT", "CUSTOM"].includes(contract_type)) {
         return NextResponse.json({ success: false, message: "contract_type tidak valid" }, { status: 400 });
+    }
+    if (career_level && !(CAREER_LEVELS as readonly string[]).includes(career_level)) {
+        return NextResponse.json({ success: false, message: "career_level tidak valid" }, { status: 400 });
     }
     if (customValidUntil && customValidUntil <= valid_from) {
         return NextResponse.json({ success: false, message: "Tanggal berakhir harus setelah tanggal mulai" }, { status: 400 });
@@ -67,6 +71,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
             contract_type,
             title,
             content,
+            career_level: career_level ?? null,
             status: "PENDING",
             sent_by: user.id,
             valid_from,
@@ -82,7 +87,12 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     const { error: userUpdateError } = await supabase
         .from("users")
-        .update({ contract_status: "PENDING", active_contract_id: newContract.id, contract_valid_until: validUntil })
+        .update({
+            contract_status: "PENDING",
+            active_contract_id: newContract.id,
+            contract_valid_until: validUntil,
+            career_level: career_level ?? null,
+        })
         .eq("id", user_id);
 
     if (userUpdateError) {

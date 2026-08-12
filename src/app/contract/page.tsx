@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, CheckCircle2, XCircle, Loader2, ShieldAlert } from "lucide-react";
 import { ContractStatus } from "@/lib/contractTemplates";
+import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 
 interface ContractData {
   id: string;
@@ -15,6 +16,7 @@ interface ContractData {
   responded_at: string | null;
   valid_from: string | null;
   valid_until: string | null;
+  career_level: string | null;
 }
 
 export default function ContractPage() {
@@ -132,10 +134,20 @@ export default function ContractPage() {
               <p className="text-xs text-slate-400 mt-1">
                 {contract.valid_until ? `Berlaku sampai ${contract.valid_until}.` : "Berlaku tanpa batas waktu."}
               </p>
+              {contract.career_level && (
+                <div className="mt-3 flex justify-center">
+                  <CareerLevelBadge level={contract.career_level} />
+                </div>
+              )}
             </div>
           ) : (
             <>
               <p className="text-sm font-bold text-slate-800 mb-1">{contract.title}</p>
+              {contract.career_level && (
+                <div className="mb-2">
+                  <CareerLevelBadge level={contract.career_level} />
+                </div>
+              )}
               {(contract.valid_from || contract.valid_until) && (
                 <p className="text-xs text-slate-400 mb-2">
                   Masa berlaku: {contract.valid_from ?? "—"} s/d {contract.valid_until ?? "tanpa batas"}

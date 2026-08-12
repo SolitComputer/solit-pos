@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, FileText, Loader2 } from "lucide-react";
 import { ContractBadge } from "./ContractBadge";
+import { CareerLevelBadge } from "./CareerLevelBadge";
 import { useRegisterOverlay } from "@/contexts/OverlayContext";
 
 interface ContractRow {
@@ -17,6 +18,7 @@ interface ContractRow {
   valid_until: string | null;
   signature_url: string | null;
   response_note: string | null;
+  career_level: string | null;
 }
 
 export default function ContractDetailModal({ userId, userName, onClose }: {
@@ -60,7 +62,10 @@ export default function ContractDetailModal({ userId, userName, onClose }: {
               <div key={c.id} className="border border-gray-100 rounded-2xl p-4 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-bold text-gray-800">{c.title}</p>
-                  <ContractBadge status={c.status} validUntil={c.valid_until} />
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    <ContractBadge status={c.status} validUntil={c.valid_until} />
+                    {c.career_level && <CareerLevelBadge level={c.career_level} />}
+                  </div>
                 </div>
                 <p className="text-[11px] text-gray-400">
                   Dikirim {new Date(c.sent_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}

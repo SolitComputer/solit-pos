@@ -16,6 +16,7 @@ import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, M
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
 import ExcelJS from "exceljs";
 import { ContractBadge } from "@/components/contracts/ContractBadge";
+import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 import SendContractModal from "@/components/contracts/SendContractModal";
 import ContractDetailModal from "@/components/contracts/ContractDetailModal";
 
@@ -133,7 +134,7 @@ type SwapDayOff = {
     work_date: string;
     note?: string | null;
 };
-type UserInfo = { id: string; name: string; role: string; created_at?: string | null; shift?: "PAGI" | "SORE" | null; contract_status?: string | null; contract_valid_until?: string | null };
+type UserInfo = { id: string; name: string; role: string; created_at?: string | null; shift?: "PAGI" | "SORE" | null; contract_status?: string | null; contract_valid_until?: string | null; career_level?: string | null };
 type AbsenceReason = "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE";
 type AbsenceItem = { date: string; reason: AbsenceReason; note: string | null };
 type AttendanceDetailItem = {
@@ -611,7 +612,7 @@ function ManualAttendanceModal({ users, prefillDate, prefillUserId, editData, on
 
     const selectedUser = filteredUsers.find(u => u.id === form.user_id);
 
-   // FIX 4: cek filteredUsers.length, bukan users.length
+    // FIX 4: cek filteredUsers.length, bukan users.length
     if (!isEdit && filteredUsers.length === 0) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -5353,6 +5354,9 @@ export default function AttendanceDashboardPage() {
                                                         <td className="px-4 py-4 text-center">
                                                             <div className="flex flex-col items-center gap-1.5">
                                                                 <ContractBadge status={allUsers.find(au => au.id === u.userId)?.contract_status} validUntil={allUsers.find(au => au.id === u.userId)?.contract_valid_until} />
+                                                                {allUsers.find(au => au.id === u.userId)?.contract_status === "APPROVED" && allUsers.find(au => au.id === u.userId)?.career_level && (
+                                                                    <CareerLevelBadge level={allUsers.find(au => au.id === u.userId)?.career_level} />
+                                                                )}
                                                                 <div className="flex items-center gap-1">
                                                                     {allUsers.find(au => au.id === u.userId)?.contract_status && allUsers.find(au => au.id === u.userId)?.contract_status !== "NONE" && (
                                                                         <button
