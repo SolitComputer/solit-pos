@@ -542,6 +542,8 @@ export const config = {
     "/api/akutansi/:path*",
     "/dashboard/ai-ceo/:path*",
     "/api/ai-ceo/:path*",
+    "/dashboard/tanya-ceo/:path*",
+    "/api/ai-assistant/:path*",
     "/api/admin/roles/:path*",
     "/api/admin/pages/:path*",
     "/api/admin/role-permissions/:path*",
