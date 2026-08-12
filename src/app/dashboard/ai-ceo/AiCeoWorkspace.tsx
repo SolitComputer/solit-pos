@@ -44,8 +44,9 @@ const PROVIDER_LABEL: Record<AiProviderChoice, string> = {
 };
 
 const PROVIDER_COLOR: Record<string, string> = {
-    gemini: "#2563eb", // blue-600
-    groq: "#ea580c",   // orange-600
+    deepseek: "#0891b2", // cyan-600
+    gemini: "#2563eb",   // blue-600
+    groq: "#ea580c",     // orange-600
 };
 
 const SEVERITY_STYLE: Record<string, { bg: string; text: string; border: string }> = {
@@ -154,12 +155,14 @@ function MarkdownMessage({ content }: { content: string }) {
 }
 
 function UsageBar({ counts, blocked }: { counts: Record<string, number>; blocked: Record<string, boolean> }) {
+    const deepseek = counts.deepseek ?? 0;
     const gemini = counts.gemini ?? 0;
     const groq = counts.groq ?? 0;
-    const total = gemini + groq;
+    const total = deepseek + gemini + groq;
 
+    const deepseekPct = total > 0 ? Math.round((deepseek / total) * 100) : 0;
     const geminiPct = total > 0 ? Math.round((gemini / total) * 100) : 0;
-    const groqPct = total > 0 ? 100 - geminiPct : 0;
+    const groqPct = total > 0 ? Math.max(0, 100 - deepseekPct - geminiPct) : 0;
 
     return (
         <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-700">
@@ -167,17 +170,23 @@ function UsageBar({ counts, blocked }: { counts: Record<string, number>; blocked
                 <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-gray-600">
                     <span className="flex items-center gap-1">
                         <Activity className="w-3 h-3 text-[#1a1a2e]" />
-                        <span>Pemakaian Token</span>
+                        <span>Distribusi AI</span>
                     </span>
                     <span className="text-[#1a1a2e] font-bold">{total} pesan</span>
                 </div>
                 <div className="flex h-1.5 rounded-full overflow-hidden bg-gray-200">
+                    {deepseek > 0 && <div style={{ width: `${deepseekPct}%`, backgroundColor: PROVIDER_COLOR.deepseek }} />}
                     {gemini > 0 && <div style={{ width: `${geminiPct}%`, backgroundColor: PROVIDER_COLOR.gemini }} />}
                     {groq > 0 && <div style={{ width: `${groqPct}%`, backgroundColor: PROVIDER_COLOR.groq }} />}
                 </div>
             </div>
 
             <div className="hidden sm:flex items-center gap-2 text-[10px] text-gray-500 font-medium pl-2 border-l border-gray-200">
+                <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.deepseek }} />
+                    DeepSeek: <strong className="text-gray-800">{deepseek}</strong> ({deepseekPct}%)
+                    {blocked?.deepseek && <span className="text-amber-600 font-bold">· Cooldown</span>}
+                </span>
                 <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.gemini }} />
                     Gemini: <strong className="text-gray-800">{gemini}</strong> ({geminiPct}%)
