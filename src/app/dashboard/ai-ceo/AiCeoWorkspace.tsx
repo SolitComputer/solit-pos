@@ -81,7 +81,7 @@ const TOOL_THINKING_LABEL: Record<string, string> = {
 };
 const DEFAULT_THINKING_LABEL = "Memikirkan jawaban...";
 
-function UsageBar({ counts, blocked }: { counts: Record<string, number>; blocked: Record<string, boolean> }) {
+function UsageBar({ counts, blocked, tokens }: { counts: Record<string, number>; blocked: Record<string, boolean>; tokens: Record<string, { prompt: number; completion: number; total: number }> }) {
     const deepseek = counts.deepseek ?? 0;
     const gemini = counts.gemini ?? 0;
     const groq = counts.groq ?? 0;
@@ -114,6 +114,10 @@ function UsageBar({ counts, blocked }: { counts: Record<string, number>; blocked
                     DeepSeek: <strong className="text-gray-800">{deepseek}</strong> ({deepseekPct}%)
                     {blocked?.deepseek && <span className="text-amber-600 font-bold">· Cooldown</span>}
                 </span>
+                <span className="flex items-center gap-1 pl-2 border-l border-gray-200">
+                    <span className="text-gray-400">Token DeepSeek:</span>
+                    <strong className="text-gray-800">{(tokens.deepseek?.total ?? 0).toLocaleString("id-ID")}</strong>
+                </span>
                 <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.gemini }} />
                     Gemini: <strong className="text-gray-800">{gemini}</strong> ({geminiPct}%)
@@ -143,6 +147,7 @@ export default function AiCeoWorkspace() {
     const [sentReminders, setSentReminders] = useState<SentReminder[]>([]);
     const [provider, setProvider] = useState<AiProviderChoice>("auto");
     const [usage, setUsage] = useState<Record<string, number>>({});
+    const [tokens, setTokens] = useState<Record<string, { prompt: number; completion: number; total: number }>>({});
     const [providerBlocked, setProviderBlocked] = useState<Record<string, boolean>>({});
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState("");
@@ -207,8 +212,9 @@ export default function AiCeoWorkspace() {
         try {
             const res = await fetch("/api/ai-ceo/usage");
             const json = await res.json();
-            if (json.success) {
+           if (json.success) {
                 setUsage(json.counts ?? {});
+                setTokens(json.tokens ?? {});
                 setProviderBlocked(json.blocked ?? {});
             }
         } catch { }
@@ -512,7 +518,7 @@ export default function AiCeoWorkspace() {
 
                         {/* Directly Visible Pemakaian Token / Message Usage Bar */}
                         <div className="flex items-center gap-2">
-                            <UsageBar counts={usage} blocked={providerBlocked} />
+                           <UsageBar counts={usage} blocked={providerBlocked} tokens={tokens} />
                         </div>
                     </header>
 

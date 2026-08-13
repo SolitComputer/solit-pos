@@ -1016,6 +1016,13 @@ export interface ChatTurn {
 export type AiProvider = "gemini" | "groq" | "deepseek";
 type ToolEventCallback = (toolName: string) => void;
 
+export interface AiUsage {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+}
+type UsageEventCallback = (usage: AiUsage) => void;
+
 async function isProviderBlocked(provider: AiProvider): Promise<boolean> {
     const { data, error } = await supabaseAdmin
         .from("ai_ceo_provider_health")
@@ -1247,11 +1254,12 @@ async function runGroqTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall
 // yang sudah ada, cuma beda endpoint/API key/model.
 
 async function callDeepSeek(messages: OpenAiMessage[], toolsEnabled: boolean = true, tools: any = AI_CEO_TOOLS): Promise<any> {
+    const apiKey = getDeepSeekKey();
     let res: Response;
     try {
         res = await fetch(DEEPSEEK_ENDPOINT, {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${getDeepSeekKey()}` },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
             body: JSON.stringify({
                 model: DEEPSEEK_MODEL,
                 messages,
@@ -1275,8 +1283,8 @@ async function callDeepSeek(messages: OpenAiMessage[], toolsEnabled: boolean = t
     return res.json();
 }
 
-async function runDeepSeekTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback, tools: any = AI_CEO_TOOLS, systemPrompt: string = buildAiCeoSystemPrompt()): Promise<string> {
-    const messages: OpenAiMessage[] = [
+async function runDeepSeekTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback, tools: any = AI_CEO_TOOLS, systemPrompt: string = buildAiCeoSystemPrompt(), onUsage?: UsageEventCallback): Promise<string> {
+        const messages: OpenAiMessage[] = [
         { role: "system", content: systemPrompt },
         ...toOpenAiHistory(history),
     ];
@@ -1288,14 +1296,17 @@ async function runDeepSeekTurn(history: ChatTurn[], toolCtx: ToolContext, onTool
         try {
             data = await callDeepSeek(messages, true, tools);
         } catch (err: any) {
-            if (isMalformedToolCallError(err) && hasToolData) {
+           if (isMalformedToolCallError(err) && hasToolData) {
                 console.error("[ai-ceo] DeepSeek tool call rusak, retry tanpa tools:", err?.message ?? err);
                 const recovery = await callDeepSeek(messages, false);
+                if (recovery?.usage) onUsage?.(recovery.usage);
                 const recoveryMsg = recovery?.choices?.[0]?.message;
                 return (recoveryMsg?.content ?? "").trim() || "Maaf, saya belum bisa memproses pertanyaan itu.";
             }
             throw err;
         }
+
+        if (data?.usage) onUsage?.(data.usage);
 
         const message = data?.choices?.[0]?.message;
         const toolCalls = message?.tool_calls ?? [];
@@ -1324,7 +1335,7 @@ export async function runAiCeoTurn(
     toolCtx: ToolContext,
     preferredProvider: AiProvider | "auto" = "auto",
     onToolCall?: ToolEventCallback
-): Promise<{ reply: string; providerUsed: AiProvider }> {
+): Promise<{ reply: string; providerUsed: AiProvider; usage: AiUsage | null }> {
     const order: AiProvider[] =
         preferredProvider === "gemini" ? ["gemini"] :
             preferredProvider === "groq" ? ["groq"] :
@@ -1335,6 +1346,14 @@ export async function runAiCeoTurn(
     if (isAssistant && !toolCtx.reminder) throw new Error("Mode asisten butuh toolCtx.reminder.");
     const tools = isAssistant ? MEMBER_ASSISTANT_TOOLS : AI_CEO_TOOLS;
     const systemPrompt = isAssistant ? buildAssistantSystemPrompt(toolCtx.reminder!) : buildAiCeoSystemPrompt();
+
+    let usageTotal: AiUsage | null = null;
+    const accumulateUsage: UsageEventCallback = (u) => {
+        if (!usageTotal) usageTotal = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+        usageTotal.prompt_tokens += u.prompt_tokens ?? 0;
+        usageTotal.completion_tokens += u.completion_tokens ?? 0;
+        usageTotal.total_tokens += u.total_tokens ?? 0;
+    };
 
     let lastError: any = null;
     for (let i = 0; i < order.length; i++) {
@@ -1350,10 +1369,10 @@ export async function runAiCeoTurn(
             const reply =
                 provider === "gemini"
                     ? await runGeminiTurn(history, toolCtx, onToolCall, tools, systemPrompt)
-                    : provider === "deepseek"
-                        ? await runDeepSeekTurn(history, toolCtx, onToolCall, tools, systemPrompt)
+                   : provider === "deepseek"
+                        ? await runDeepSeekTurn(history, toolCtx, onToolCall, tools, systemPrompt, accumulateUsage)
                         : await runGroqTurn(history, toolCtx, onToolCall, tools, systemPrompt);
-            return { reply, providerUsed: provider };
+            return { reply, providerUsed: provider, usage: usageTotal };
         } catch (err: any) {
             lastError = err;
             if (isRateLimitError(err)) {
