@@ -646,6 +646,19 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
         ? body.unit_ids.filter((id: any) => typeof id === "string" && id.trim().length > 0)
         : body.unit_ids;
     }
+    // FIX PENCEGAHAN: transactions.unit_ids TIDAK BOLEH cuma ikut apa yang
+    // dikirim frontend — kalau edit cuma kirim serial_number (mis. fitur
+    // "Tukar SN") tanpa ikut kirim unit_ids, kolom ini nyangkut jadi stale
+    // padahal transaction_items.unit_id sudah benar. finalNewUnitIds di
+    // sini SUDAH hasil resolve final (dari unit_ids ATAU serial_numbers,
+    // lihat resolveNewUnitIds di atas), jadi selalu jadi sumber kebenaran
+    // yang dipaksa nimpa apa pun yang dikirim body.
+    // Dihapus syarat `.length > 0` — kalau edit bikin transaksi jadi nol unit
+    // laptop (mis. semua SN dilepas, sisa aksesori doang), unit_ids HARUS
+    // ikut dikosongkan juga, bukan dibiarkan nyisain array lama yang stale.
+    if (unitFieldsProvided && !isCancelling) {
+      allowedFields.unit_ids = finalNewUnitIds;
+    }
     if (body.serial_numbers !== undefined) allowedFields.serial_numbers = body.serial_numbers;
     if (body.pickup_method !== undefined) allowedFields.pickup_method = body.pickup_method;
     if (body.pickup_date !== undefined) allowedFields.pickup_date = body.pickup_date;
