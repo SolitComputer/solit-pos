@@ -44,10 +44,10 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   // parsing tiap literalnya untuk infer bentuk hasil query. Untuk select-string
   // sepanjang ini, compiler jadi "meledak" — persis error build tadi.
   const selectFields: string = isAdmin
-    ? "id, name, phone_number, email, role, roles, shift, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, biometric_enabled, contract_status, active_contract_id, contract_valid_until"
+    ? "id, name, phone_number, email, role, roles, shift, gender, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, biometric_enabled, contract_status, active_contract_id, contract_valid_until"
     : isKepala
-      ? "id, name, phone_number, role, roles, shift, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at"
-      : "id, name, role, roles, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at";
+      ? "id, name, phone_number, role, roles, shift, gender, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at"
+      : "id, name, role, roles, gender, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at";
 
   const { data, error } = await supabaseAdmin
     .from("users")
@@ -93,6 +93,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
       phone_number: (isAdmin || isKepala) ? (u.phone_number ?? null) : null,
       email: isAdmin ? (u.email ?? null) : null,
       birth_date: u.birth_date ?? null,
+      gender: u.gender ?? null,
       status_note: noteExpired ? null : (u.status_note ?? null),
       status_note_expires_at: noteExpired ? null : (u.status_note_expires_at ?? null),
       song_title: songExpired ? null : (u.song_title ?? null),
@@ -115,7 +116,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
   }
 
   const body = await req.json();
-  const { name, phone_number, roles: inputRoles, role: inputRole, shift = "PAGI", birth_date } = body;
+  const { name, phone_number, roles: inputRoles, role: inputRole, shift = "PAGI", birth_date, gender } = body;
 
   // Support input roles array ATAU role tunggal (backward compat)
   const rolesArray: string[] = Array.isArray(inputRoles) && inputRoles.length > 0
@@ -161,8 +162,9 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       password_set: false,
       created_by: user.id,
       birth_date: birth_date || null,
+      gender: gender || null,
     })
-    .select("id, name, phone_number, role, roles, shift, password_set, birth_date")
+    .select("id, name, phone_number, role, roles, shift, password_set, birth_date, gender")
     .single();
 
   if (error) {
@@ -194,6 +196,7 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     role: inputRole,
     shift,
     birth_date,
+    gender,
     _resetPassword,
     _forceLogout,
     _toggleBiometric,
@@ -291,6 +294,7 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
   }
 
   if (birth_date !== undefined) updates.birth_date = birth_date || null;
+  if (gender !== undefined) updates.gender = gender || null;
   if (phone_number !== undefined && phone_number !== null && phone_number !== "") {
     updates.phone_number = normalizePhone(String(phone_number));
   }
@@ -306,7 +310,7 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     .from("users")
     .update(updates)
     .eq("id", id)
-    .select("id, name, phone_number, role, roles, shift, birth_date")
+    .select("id, name, phone_number, role, roles, shift, birth_date, gender")
     .single();
 
   if (error) {

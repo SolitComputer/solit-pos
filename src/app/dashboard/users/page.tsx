@@ -16,6 +16,7 @@ import {
   Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
   Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
   ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint, FileText,
+  Mars, Venus,
 } from "lucide-react";
 
 interface User {
@@ -25,7 +26,8 @@ interface User {
   email: string | null;
   role: string;
   roles: string[];
-  shift: "PAGI" | "SORE";
+ shift: "PAGI" | "SORE";
+  gender: "L" | "P" | null;
   password_set: boolean;
   face_enrolled_at: string | null;
   face_embedding: boolean;
@@ -160,6 +162,12 @@ function isPKLRole(role: string) { return PKL_ROLE_SET.has(role); }
 
 function getInitials(name: string) {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+}
+
+function GenderIcon({ gender, className = "w-3.5 h-3.5" }: { gender: "L" | "P" | null | undefined; className?: string }) {
+  if (gender === "L") return <Mars className={className} style={{ color: "#2563eb" }} />;
+  if (gender === "P") return <Venus className={className} style={{ color: "#db2777" }} />;
+  return null;
 }
 
 const ROLE_AVATAR_COLOR: Record<string, string> = {
@@ -302,6 +310,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const [birthDate, setBirthDate] = useState("");
   const [roles, setRoles] = useState<string[]>(["CREW_SALES"]);
   const [shift, setShift] = useState<"PAGI" | "SORE">("PAGI");
+  const [gender, setGender] = useState<"L" | "P" | "">("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -312,7 +321,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
     try {
       const res = await fetch("/api/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), phone_number: phone.trim(), roles, shift, birth_date: birthDate || null }),
+        body: JSON.stringify({ name: name.trim(), phone_number: phone.trim(), roles, shift, birth_date: birthDate || null, gender: gender || null }),
       });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
@@ -344,8 +353,21 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
         <Field label="Nama Lengkap">
           <Input value={name} onChange={e => setName(e.target.value)} placeholder="contoh: Budi Santoso" />
         </Field>
-        <Field label="Tanggal Lahir">
+       <Field label="Tanggal Lahir">
           <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
+        </Field>
+        <Field label="Jenis Kelamin">
+          <div className="flex gap-2">
+            {([{ v: "L", label: "Laki-laki", Icon: Mars }, { v: "P", label: "Perempuan", Icon: Venus }] as const).map(({ v, label, Icon }) => (
+              <button key={v} type="button" onClick={() => setGender(v)}
+                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                style={gender === v
+                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                <span className="inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
+              </button>
+            ))}
+          </div>
         </Field>
         <Field label="Nomor WhatsApp">
           <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08123456789" />
@@ -567,6 +589,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone_number ?? "");
   const [birthDate, setBirthDate] = useState(user.birth_date ?? "");
+  const [gender, setGender] = useState<"L" | "P" | "">(user.gender ?? "");
   const [roles, setRoles] = useState<string[]>(
     Array.isArray(user.roles) && user.roles.length > 0
       ? user.roles
@@ -581,7 +604,7 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
     try {
       const res = await fetch("/api/users", {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: user.id, name, phone_number: phone, roles, shift, birth_date: birthDate || null }),
+       body: JSON.stringify({ id: user.id, name, phone_number: phone, roles, shift, birth_date: birthDate || null, gender: gender || null }),
       });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
@@ -613,6 +636,19 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
         <Field label="Nama"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
         <Field label="Tanggal Lahir">
           <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
+        </Field>
+        <Field label="Jenis Kelamin">
+          <div className="flex gap-2">
+            {([{ v: "L", label: "Laki-laki", Icon: Mars }, { v: "P", label: "Perempuan", Icon: Venus }] as const).map(({ v, label, Icon }) => (
+              <button key={v} type="button" onClick={() => setGender(v)}
+                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                style={gender === v
+                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                <span className="inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
+              </button>
+            ))}
+          </div>
         </Field>
         <Field label="Nomor WhatsApp"><Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
         <Field label="Role (bisa pilih lebih dari 1)">
@@ -1396,8 +1432,9 @@ export default function UsersPage() {
 
                                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/dashboard/profile/${user.id}`)} title={`Lihat profil ${user.name}`}>
                                   <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                    <span className="text-sm font-bold truncate max-w-full hover:underline" style={{ color: "#0f172a" }}>
+                                   <span className="text-sm font-bold truncate max-w-full hover:underline inline-flex items-center gap-1" style={{ color: "#0f172a" }}>
                                       {user.name}
+                                      <GenderIcon gender={user.gender} />
                                     </span>
                                     {(user.roles?.length > 0 ? user.roles : [user.role]).map((r, i) => {
                                       const bs = getRoleBadge(r);
