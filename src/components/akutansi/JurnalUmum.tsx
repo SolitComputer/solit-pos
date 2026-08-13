@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Layers } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -87,7 +87,6 @@ interface CustomTemplate {
     created_by_user?: { id: string; name: string } | null;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const rp = (n: number) => `Rp${Math.round(Number(n || 0)).toLocaleString("id-ID")}`;
 const fmtTgl = (d: string) =>
     new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" });
@@ -101,10 +100,15 @@ const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
     MANUAL: { label: "Manual", color: "bg-gray-100 text-gray-600 border-gray-200" },
 };
 
+const SOURCE_GROUP_RANK: Record<string, number> = {
+    MANUAL: 0,
+    SERVICE: 1,
+    TRANSACTION: 2,
+    CASHFLOW: 3,
+};
+
 const key = (d: { source_type: string; source_id: string }) => `${d.source_type}:${d.source_id}`;
 
-// Badge nama toko — replikasi persis logic getCompanyBadge() di transactions/page.tsx,
-// supaya label & warnanya konsisten dengan halaman Riwayat Transaksi.
 function getCompanyBadge(company?: string | null): { label: string; color: string } | null {
     if (!company) return null;
     const cn = company.toLowerCase();
@@ -143,14 +147,13 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [showBulkWarningInput, setShowBulkWarningInput] = useState(false);
     const [bulkWarningReason, setBulkWarningReason] = useState("");
     const [bulkBusy, setBulkBusy] = useState(false);
-    const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // default: terbaru dulu
-    const [showOnlyWarnings, setShowOnlyWarnings] = useState(false); // filter khusus entry warning (Modal Rp0 / diedit)
+    const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+    const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
+    const [groupBySource, setGroupBySource] = useState(false);
     const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
     const [showManual, setShowManual] = useState(false);
     const [logEntry, setLogEntry] = useState<JournalEntry | null>(null);
     const [toast, setToast] = useState<string | null>(null);
-    // Default TERTUTUP supaya tidak mengganggu tabel jurnal utama.
-    // Pilihan buka/tutup user diingat per browser lewat localStorage.
     const [showPending, setShowPending] = useState(() => {
         if (typeof window === "undefined") return false;
         return localStorage.getItem("jurnal-show-pending") === "true";
@@ -308,8 +311,8 @@ export default function JurnalUmum({ period }: { period: string }) {
         const destinationIndex = result.destination.index;
         if (sourceIndex === destinationIndex) return;
 
-        if (search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0) {
-            setToast("Harap kosongkan pencarian dan filter akun sebelum mengubah urutan.");
+        if (search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || groupBySource) {
+            setToast("Harap matikan mode Urutkan Sumber dan kosongkan pencarian/filter akun sebelum mengubah urutan.");
             return;
         }
 
@@ -483,8 +486,6 @@ export default function JurnalUmum({ period }: { period: string }) {
             });
         }
 
-        // Filter kode akun: OR — entry lolos kalau salah satu baris akunnya
-        // ada di dalam accountCodeFilter (jadi bisa pilih 110 saja, atau 110 + 440 sekaligus).
         if (accountCodeFilter.size > 0) {
             result = result.filter((e) => {
                 const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
@@ -495,8 +496,17 @@ export default function JurnalUmum({ period }: { period: string }) {
             });
         }
 
+        if (groupBySource) {
+            result = [...result].sort((a, b) => {
+                if (a.tanggal !== b.tanggal) {
+                    return sortOrder === "asc" ? a.tanggal.localeCompare(b.tanggal) : b.tanggal.localeCompare(a.tanggal);
+                }
+                return (SOURCE_GROUP_RANK[a.source_type] ?? 99) - (SOURCE_GROUP_RANK[b.source_type] ?? 99);
+            });
+        }
+
         return result;
-    }, [entries, search, searchNominal, accountCodeFilter, showOnlyWarnings, hasWarning]);
+    }, [entries, search, searchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, groupBySource, sortOrder]);
 
     // Search untuk daftar PENDING (data yang belum dikonfirmasi ke jurnal umum) —
     // terpisah dari `filtered` di atas karena sumber datanya beda (PendingDraft, bukan JournalEntry).
@@ -833,8 +843,18 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 </span>
                             )}
                         </button>
+                        <button
+                            onClick={() => setGroupBySource((v) => !v)}
+                            title={groupBySource ? "Matikan pengurutan per sumber (kembali ke urutan tanggal biasa)" : "Urutkan tiap tanggal: Manual, Service, Transaksi, Cashflow (dari atas ke bawah)"}
+                            className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${groupBySource
+                                ? "bg-blue-600 text-white shadow-2xs font-bold ring-2 ring-blue-300"
+                                : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                                }`}
+                        >
+                            <Layers className={`w-3.5 h-3.5 ${groupBySource ? "text-white" : "text-slate-400"}`} />
+                            <span>Urutkan Sumber</span>
+                        </button>
                     </div>
-
                     <button
                         onClick={() => setShowManual(true)}
                         className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
@@ -1323,8 +1343,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                                                                 : "Tandai sudah dicek"
                                                                                         }
                                                                                         className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${isEntryChecked
-                                                                                                ? "bg-green-600 border-green-600 text-white shadow-2xs"
-                                                                                                : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"
+                                                                                            ? "bg-green-600 border-green-600 text-white shadow-2xs"
+                                                                                            : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"
                                                                                             }`}
                                                                                     >
                                                                                         <Check className="w-3.5 h-3.5 mx-auto" />
