@@ -135,7 +135,7 @@ type SwapDayOff = {
     note?: string | null;
 };
 type UserInfo = { id: string; name: string; role: string; created_at?: string | null; shift?: "PAGI" | "SORE" | null; contract_status?: string | null; contract_valid_until?: string | null; career_level?: string | null };
-type AbsenceReason = "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE";
+type AbsenceReason = "ALPHA" | "ABSENT" | "SICK" | "PERMIT" | "LEAVE" | "NO_CHECKOUT";
 type AbsenceItem = { date: string; reason: AbsenceReason; note: string | null };
 type AttendanceDetailItem = {
     date: string;
@@ -167,7 +167,7 @@ type MonthlyOff = {
 const PKL_DAILY_RATE = 10000;
 const PKL_LATE_RATE = 5000;
 
-const CHECKOUT_REQUIRED_FROM = "2026-08-06";
+const CHECKOUT_REQUIRED_FROM = "2026-08-13";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 const OFFICE_LAT = -6.402593;
@@ -221,6 +221,7 @@ const ABSENCE_REASON_LABELS: Record<AbsenceReason, { label: string; emoji: strin
     SICK: { label: "Sakit", emoji: "frown", bg: "bg-blue-50", color: "text-blue-700", border: "border-blue-200" },
     PERMIT: { label: "Izin", emoji: "file-text", bg: "bg-violet-50", color: "text-violet-700", border: "border-violet-200" },
     LEAVE: { label: "Cuti", emoji: "umbrella", bg: "bg-cyan-50", color: "text-cyan-700", border: "border-cyan-200" },
+    NO_CHECKOUT: { label: "Tidak Absen Pulang", emoji: "clock", bg: "bg-orange-50", color: "text-orange-600", border: "border-orange-200" },
 };
 
 
@@ -2219,7 +2220,7 @@ function AbsenceDetailModal({ name, absences, offDates, monthLabel, onClose }: {
                                                 {a.note && <p className="text-[11px] text-gray-400 truncate">{a.note}</p>}
                                             </div>
                                             <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0 ${cfg.bg} ${cfg.color} ${cfg.border}`}>
-                                                {cfg.emoji} {cfg.label}
+                                                {renderStatusEmoji(cfg.emoji, "w-3 h-3")} {cfg.label}
                                             </span>
                                         </div>
                                     );
@@ -3839,6 +3840,11 @@ export default function AttendanceDashboardPage() {
             effByName[name][date] = status;
         };
 
+        // ✅ NEW — tanggal yang kena penalti "tidak absen pulang" dicatat terpisah,
+        // supaya reason di `absences` nanti bisa dibedakan jadi "NO_CHECKOUT"
+        // (bukan "ALPHA"/Tanpa Keterangan yang generik).
+        const noCheckoutByName: Record<string, Set<string>> = {};
+
         thisMonthAtt.forEach(a => {
             if (a.source !== "AUTO") return;
             const dk = toWIBDateKey(a.check_in_time || a.created_at);
@@ -3847,11 +3853,14 @@ export default function AttendanceDashboardPage() {
             // (dk < todayWIB). Untuk HARI INI, jam kerja mungkin belum selesai — jadi jangan
             // langsung dianggap ABSENT, biarkan status PRESENT/LATE dari absen masuk tetap dipakai.
             const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && dk < todayWIB && !hasCheckout;
+            if (noCheckoutPenalty) {
+                if (!noCheckoutByName[a.user_name]) noCheckoutByName[a.user_name] = new Set();
+                noCheckoutByName[a.user_name].add(dk);
+            }
             setEff(a.user_name, dk,
                 noCheckoutPenalty ? "ABSENT"
                     : a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "ABSENT");
         });
-
         const manualByName: Record<string, Record<string, ManualAttendance>> = {};
         manualRecords.forEach(mr => {
 
@@ -3966,7 +3975,15 @@ export default function AttendanceDashboardPage() {
                 else if (eff === "LATE") { late++; score += 0.5; }
                 else {
                     const mr = manualByName[name]?.[dk];
-                    absences.push({ date: dk, reason: (mr?.status as AbsenceReason) ?? "ALPHA", note: mr?.notes ?? null });
+                    // ✅ FIX: kalau absennya karena "tidak absen pulang" (bukan karena
+                    // benar-benar gak masuk & gak ada absen manual), reason-nya
+                    // "NO_CHECKOUT" — beda dari ALPHA (Tanpa Keterangan).
+                    const isNoCheckout = !mr && (noCheckoutByName[name]?.has(dk) ?? false);
+                    absences.push({
+                        date: dk,
+                        reason: (mr?.status as AbsenceReason) ?? (isNoCheckout ? "NO_CHECKOUT" : "ALPHA"),
+                        note: mr?.notes ?? null,
+                    });
                 }
             }
 
@@ -4446,11 +4463,15 @@ export default function AttendanceDashboardPage() {
                 checkInTime = toWIBTime(manualRec.check_in_time);
                 manualCreatedBy = manualRec.created_by_name ?? null;
             } else if (autoRec) {
-                dayStatus = autoRec.displayStatus === "PRESENT"
-                    ? "PRESENT"
-                    : autoRec.displayStatus === "LATE"
-                        ? "LATE"
-                        : null;
+                const hasCheckout = !!checkoutTimes[`${userId}_${dk}`];
+                const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && dk < todayWIB && !hasCheckout;
+                dayStatus = noCheckoutPenalty
+                    ? null
+                    : autoRec.displayStatus === "PRESENT"
+                        ? "PRESENT"
+                        : autoRec.displayStatus === "LATE"
+                            ? "LATE"
+                            : null;
                 checkInTime = toWIBTime(autoRec.check_in_time || autoRec.created_at);
                 method = "FACE";
             }
@@ -4469,7 +4490,7 @@ export default function AttendanceDashboardPage() {
             items,
             monthLabel: `${MONTH_NAMES[calMonth]} ${calYear}`,
         };
-    }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser]);
+   }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser, checkoutTimes]);
 
     const lastRefreshRef = useRef<number>(Date.now());
 
