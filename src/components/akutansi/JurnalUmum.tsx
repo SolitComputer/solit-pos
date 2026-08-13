@@ -14,6 +14,7 @@ import {
     MANUAL_TEMPLATES,
     accountName,
     isBalanced,
+    jakartaDate,
     sumSide,
 } from "@/lib/accounting";
 
@@ -130,8 +131,9 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [busy, setBusy] = useState(false);
     const [search, setSearch] = useState("");
     const [searchNominal, setSearchNominal] = useState("");
-    const [pendingSearch, setPendingSearch] = useState(""); // search khusus untuk daftar pending (325 data belum konfirmasi)
-    // Filter berdasarkan akun yang dipilih lewat dropdown "Ref" — bisa lebih dari satu (OR).
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [pendingSearch, setPendingSearch] = useState("");
     const [accountCodeFilter, setAccountCodeFilter] = useState<Set<string>>(new Set());
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     const [showAccountFilter, setShowAccountFilter] = useState(false);
@@ -140,8 +142,6 @@ export default function JurnalUmum({ period }: { period: string }) {
     const accountFilterButtonRef = useRef<HTMLButtonElement>(null);
     const [filterDropdownPos, setFilterDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
-    // Selection KHUSUS baris jurnal utama (bukan panel pending) — dipakai untuk
-    // bulk actions: geser bareng, kasih penanda bareng, hapus bareng.
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
     const [isDraggingGroup, setIsDraggingGroup] = useState(false);
     const [showBulkWarningInput, setShowBulkWarningInput] = useState(false);
@@ -496,17 +496,38 @@ export default function JurnalUmum({ period }: { period: string }) {
             });
         }
 
+        // Mode "Urutkan Sumber" (opt-in). PENTING: blok ini TIDAK PERNAH membuang
+        // entry — semua data tetap tampil. dateFrom/dateTo di sini cuma menentukan
+        // tanggal MANA yang urutannya disusun ulang per sumber (Manual, Service,
+        // Transaksi, Cashflow). Tanggal lain di luar rentang tetap tampil apa
+        // adanya, urutan aslinya tidak diutak-atik. Kosongkan dateFrom & dateTo
+        // untuk menerapkan penyusunan ulang ke SEMUA tanggal sekaligus.
         if (groupBySource) {
-            result = [...result].sort((a, b) => {
-                if (a.tanggal !== b.tanggal) {
-                    return sortOrder === "asc" ? a.tanggal.localeCompare(b.tanggal) : b.tanggal.localeCompare(a.tanggal);
+            const inDateScope = (tanggal: string) => {
+                if (!dateFrom && !dateTo) return true;
+                if (dateFrom && tanggal < dateFrom) return false;
+                if (dateTo && tanggal > dateTo) return false;
+                return true;
+            };
+
+            const next = [...result];
+            let i = 0;
+            while (i < next.length) {
+                let j = i + 1;
+                while (j < next.length && next[j].tanggal === next[i].tanggal) j++;
+                if (inDateScope(next[i].tanggal)) {
+                    const block = next.slice(i, j).sort(
+                        (a, b) => (SOURCE_GROUP_RANK[a.source_type] ?? 99) - (SOURCE_GROUP_RANK[b.source_type] ?? 99)
+                    );
+                    next.splice(i, j - i, ...block);
                 }
-                return (SOURCE_GROUP_RANK[a.source_type] ?? 99) - (SOURCE_GROUP_RANK[b.source_type] ?? 99);
-            });
+                i = j;
+            }
+            result = next;
         }
 
         return result;
-    }, [entries, search, searchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, groupBySource, sortOrder]);
+    }, [entries, search, searchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, groupBySource, dateFrom, dateTo]);
 
     // Search untuk daftar PENDING (data yang belum dikonfirmasi ke jurnal umum) —
     // terpisah dari `filtered` di atas karena sumber datanya beda (PendingDraft, bukan JournalEntry).
@@ -844,7 +865,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                             )}
                         </button>
                         <button
-                            onClick={() => setGroupBySource((v) => !v)}
+                            onClick={() => setGroupBySource((v) => {
+                                const next = !v;
+                                if (!next) { setDateFrom(""); setDateTo(""); } // matikan mode → reset pilihan tanggal
+                                return next;
+                            })}
                             title={groupBySource ? "Matikan pengurutan per sumber (kembali ke urutan tanggal biasa)" : "Urutkan tiap tanggal: Manual, Service, Transaksi, Cashflow (dari atas ke bawah)"}
                             className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${groupBySource
                                 ? "bg-blue-600 text-white shadow-2xs font-bold ring-2 ring-blue-300"
@@ -864,7 +889,58 @@ export default function JurnalUmum({ period }: { period: string }) {
                 </div>
             </div>
 
-            {/* ── Bulk actions — muncul kalau ada entry jurnal (bukan pending) yang dicentang ── */}
+            {/* ── Muncul HANYA saat "Urutkan Sumber" aktif. TIDAK menyembunyikan data
+                 apa pun — cuma menentukan tanggal mana yang disusun ulang per sumber.
+                 Kosongkan kedua kolom supaya berlaku ke SEMUA tanggal. ── */}
+            {groupBySource && (
+                <div className="flex flex-wrap items-center gap-2 bg-blue-50/60 border border-blue-200/80 rounded-xl px-3 py-2">
+                    <Layers className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider shrink-0">
+                        Urutkan tanggal
+                    </span>
+                    <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        max={dateTo || undefined}
+                        className="h-8 border border-blue-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                    />
+                    <span className="text-xs text-blue-400 shrink-0">s/d</span>
+                    <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        min={dateFrom || undefined}
+                        className="h-8 border border-blue-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                    />
+                    <button
+                        onClick={() => {
+                            const today = jakartaDate(new Date().toISOString());
+                            setDateFrom(today);
+                            setDateTo(today);
+                        }}
+                        className="h-8 px-3 rounded-lg text-xs font-semibold bg-white border border-blue-200 text-blue-700 hover:bg-blue-100 active:scale-95 transition-all duration-150 shrink-0"
+                    >
+                        Hari Ini
+                    </button>
+                    {(dateFrom !== "" || dateTo !== "") && (
+                        <button
+                            onClick={() => { setDateFrom(""); setDateTo(""); }}
+                            className="h-8 px-3 rounded-lg text-xs font-semibold text-red-500 hover:bg-red-50 active:scale-95 transition-all duration-150 shrink-0"
+                        >
+                            Reset (semua tanggal)
+                        </button>
+                    )}
+                    <span className="text-[10.5px] text-blue-700/70 shrink-0">
+                        {dateFrom === "" && dateTo === ""
+                            ? "Berlaku untuk semua tanggal"
+                            : dateFrom !== "" && dateFrom === dateTo
+                                ? `Cuma tanggal ${fmtTgl(dateFrom)}`
+                                : `Cuma ${dateFrom ? fmtTgl(dateFrom) : "…"} – ${dateTo ? fmtTgl(dateTo) : "…"}`}
+                    </span>
+                </div>
+            )}
+
             {selectedEntryIds.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 bg-slate-900 text-white rounded-xl px-4 py-2.5">
                     <span className="text-xs font-bold shrink-0">{selectedEntryIds.size} entry dipilih</span>
