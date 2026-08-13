@@ -25,9 +25,27 @@ export interface OvertimeTableRow {
   total_pay: number | null;
   actual_start: string | null;
   actual_end: string | null;
+  is_holiday?: boolean | null;
+  is_late?: boolean | null;
+  requested_start?: string | null;
   users?: { id: string; name: string; role: string } | null;
   approver?: { id: string; name: string } | null;
   auditor?: { id: string; name: string } | null;
+}
+
+function detectLateFromTimeStr(timeStr: string | null | undefined): boolean {
+  if (!timeStr) return false;
+  const LATE_THRESHOLD = 8 * 60;
+  let totalMin: number;
+  if (timeStr.includes("T")) {
+    const w = new Date(new Date(timeStr).getTime() + 7 * 60 * 60 * 1000);
+    totalMin = w.getUTCHours() * 60 + w.getUTCMinutes();
+  } else {
+    const [h, m] = timeStr.split(":").map(Number);
+    if (Number.isNaN(h)) return false;
+    totalMin = h * 60 + (m || 0);
+  }
+  return totalMin >= LATE_THRESHOLD;
 }
 
 const COLOR_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
@@ -216,7 +234,17 @@ export function OvertimeTable({
                       {canAccThis && <button disabled={isBusy} onClick={() => setRejectModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50">Tolak</button>}
                       {canUploadProof && <button onClick={() => setDetailModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100">Upload Bukti</button>}
                       {canAuditThis && (
-                        <button disabled={isBusy} onClick={() => { if (confirm(`Audit lemburan ${o.users?.name}? Nominal akan dihitung dan dikunci.`)) runAction(o.id, { action: "AUDIT", decision: "APPROVE" }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50">{isBusy ? "..." : "Audit"}</button>
+                        <button disabled={isBusy} onClick={() => {
+                          if (o.is_holiday) {
+                            const isLate = o.is_late === true || (o.is_late == null && detectLateFromTimeStr(o.requested_start ?? o.actual_start));
+                            const holidayPay = isLate ? 50000 : 100000;
+                            if (confirm(`Audit lemburan hari libur ${o.users?.name}?\n\nStatus: ${isLate ? "Terlambat" : "Tepat Waktu"} — nominal terkunci ${holidayPay === 50000 ? "Rp50.000" : "Rp100.000"} (aturan tetap).`)) {
+                              runAction(o.id, { action: "AUDIT", decision: "APPROVE", total_pay: holidayPay, rate_per_hour: null });
+                            }
+                            return;
+                          }
+                          if (confirm(`Audit lemburan ${o.users?.name}? Nominal akan dihitung dan dikunci.`)) runAction(o.id, { action: "AUDIT", decision: "APPROVE" });
+                        }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50">{isBusy ? "..." : "Audit"}</button>
                       )}
                       {onOpenDetail && <button onClick={() => onOpenDetail(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100">Detail</button>}
                       {!canFillDetail && !canAccThis && !canUploadProof && !canAuditThis && !onOpenDetail && <span className="text-[10px] text-gray-300">—</span>}
@@ -278,7 +306,8 @@ function OvertimeRejectForm({ row, onClose, onSaved }: { row: OvertimeTableRow; 
   );
 }
 
-function OvertimeQuickDetailForm({ row, onClose, onSaved }: { row: OvertimeTableRow; onClose: () => void; onSaved: () => void }) {  const [category, setCategory] = useState<OvertimeCategory | "">((row.category as OvertimeCategory) || "");
+function OvertimeQuickDetailForm({ row, onClose, onSaved }: { row: OvertimeTableRow; onClose: () => void; onSaved: () => void }) {
+  const [category, setCategory] = useState<OvertimeCategory | "">((row.category as OvertimeCategory) || "");
   const [desc, setDesc] = useState(row.work_description ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
