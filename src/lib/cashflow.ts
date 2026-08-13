@@ -74,6 +74,7 @@ export type AuditFilter = "ALL" | "AUDITED" | "NOT_AUDITED";
 export type SourceFilter = "ALL" | "MANUAL" | "AUTO";
 export type PaymentMethodFilter = "ALL" | "CASH" | "SALDO";
 export type StatusFilter = "ALL" | "ACTIVE" | "VOIDED";
+export type IncomeMethodFilter = "ALL" | "TUNAI" | "TRANSFER" | "TUNAI_TRANSFER"; // ⬅️ UPDATE: tambah opsi kombinasi Tunai+Transfer
 
 export interface CashflowFilter {
   dateFrom: string;
@@ -83,6 +84,7 @@ export interface CashflowFilter {
   source: SourceFilter;
   paymentMethod: PaymentMethodFilter;
   status: StatusFilter;
+  incomeMethod: IncomeMethodFilter; // ⬅️ BARU: khusus tab Uang Masuk
   search: string;
 }
 
@@ -95,6 +97,7 @@ export function defaultCashflowFilter(): CashflowFilter {
     source: "ALL",
     paymentMethod: "ALL", // ⬅️ BARU
     status: "ALL", // ⬅️ BARU: filter Batal
+    incomeMethod: "ALL", // ⬅️ BARU
     search: "",
   };
 }
@@ -109,6 +112,7 @@ export function isFilterActive(f: CashflowFilter): boolean {
     f.source !== d.source ||
     f.paymentMethod !== d.paymentMethod || // ⬅️ BARU
     f.status !== d.status || // ⬅️ BARU
+    f.incomeMethod !== d.incomeMethod || // ⬅️ BARU
     f.search !== d.search
   );
 }
@@ -121,6 +125,7 @@ export function activeFilterCount(f: CashflowFilter): number {
   if (f.source !== "ALL") c++;
   if (f.paymentMethod !== "ALL") c++; // ⬅️ BARU
   if (f.status !== "ALL") c++; // ⬅️ BARU
+  if (f.incomeMethod !== "ALL") c++; // ⬅️ BARU
   if (f.search.trim()) c++;
   return c;
 }
@@ -132,6 +137,7 @@ export function applyFilters<T extends {
   source_type?: string;
   payment_method?: string | null; // ⬅️ BARU
   is_voided?: boolean; // ⬅️ BARU
+  tx_payment_method?: string | null; // ⬅️ BARU: buat filter Tunai/Transfer
   nama?: string;
   keterangan?: string | null;
 }>(entries: T[], filter: CashflowFilter): T[] {
@@ -145,9 +151,15 @@ export function applyFilters<T extends {
     if (filter.audit === "NOT_AUDITED" && e.is_audited) return false;
     if (filter.source === "MANUAL" && e.source_type !== "MANUAL") return false;
     if (filter.source === "AUTO" && e.source_type === "MANUAL") return false;
-    if (filter.paymentMethod !== "ALL" && e.payment_method !== filter.paymentMethod) return false; // ⬅️ BARU
+   if (filter.paymentMethod !== "ALL" && e.payment_method !== filter.paymentMethod) return false; // ⬅️ BARU
     if (filter.status === "ACTIVE" && e.is_voided) return false; // ⬅️ BARU
     if (filter.status === "VOIDED" && !e.is_voided) return false; // ⬅️ BARU
+    if (filter.incomeMethod !== "ALL") { // ⬅️ UPDATE: exact-match label — "Tunai" murni gak lagi ikut kebawa yang kombo
+      const m = (e.tx_payment_method || "").trim();
+      if (filter.incomeMethod === "TUNAI" && m !== "Tunai") return false;
+      if (filter.incomeMethod === "TRANSFER" && m !== "Transfer") return false;
+      if (filter.incomeMethod === "TUNAI_TRANSFER" && m !== "Tunai+Transfer") return false;
+    }
    if (q) {
       const haystack = `${e.nama || ""} ${e.keterangan || ""}`.toLowerCase();
       if (!haystack.includes(q)) return false;
