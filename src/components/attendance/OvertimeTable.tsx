@@ -31,8 +31,8 @@ export interface OvertimeTableRow {
 }
 
 const COLOR_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
-  BLUE:  { bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",    label: "Belum Terhitung Lembur" },
-  AMBER: { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",   label: "Sudah di-ACC — Menunggu Audit" },
+  BLUE: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", label: "Belum Terhitung Lembur" },
+  AMBER: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", label: "Sudah di-ACC — Menunggu Audit" },
   GREEN: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", label: "Sudah Diaudit" },
 };
 
@@ -104,7 +104,7 @@ function RowActions({
 }
 
 export function OvertimeTable({
-  rows, loading, canApprove, canAudit, currentUserId, onRefresh,
+  rows, loading, canApprove, canAudit, currentUserId, onRefresh, onOpenDetail,
 }: {
   rows: OvertimeTableRow[];
   loading: boolean;
@@ -112,10 +112,12 @@ export function OvertimeTable({
   canAudit: boolean;
   currentUserId?: string;
   onRefresh: () => void;
+  onOpenDetail?: (row: OvertimeTableRow) => void;
 }) {
   const [detailModalRow, setDetailModalRow] = useState<OvertimeTableRow | null>(null);
   const [photoModalUrl, setPhotoModalUrl] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [rejectModalRow, setRejectModalRow] = useState<OvertimeTableRow | null>(null);
 
   if (loading) {
     return (
@@ -211,11 +213,13 @@ export function OvertimeTable({
                     <div className="flex items-center justify-center gap-1.5 flex-wrap">
                       {canFillDetail && <button onClick={() => setDetailModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100">Isi Detail</button>}
                       {canAccThis && <button disabled={isBusy} onClick={() => runAction(o.id, { action: "APPROVE" })} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50">{isBusy ? "..." : "ACC"}</button>}
+                      {canAccThis && <button disabled={isBusy} onClick={() => setRejectModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50">Tolak</button>}
                       {canUploadProof && <button onClick={() => setDetailModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100">Upload Bukti</button>}
                       {canAuditThis && (
                         <button disabled={isBusy} onClick={() => { if (confirm(`Audit lemburan ${o.users?.name}? Nominal akan dihitung dan dikunci.`)) runAction(o.id, { action: "AUDIT", decision: "APPROVE" }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50">{isBusy ? "..." : "Audit"}</button>
                       )}
-                      {!canFillDetail && !canAccThis && !canUploadProof && !canAuditThis && <span className="text-[10px] text-gray-300">—</span>}
+                      {onOpenDetail && <button onClick={() => onOpenDetail(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100">Detail</button>}
+                      {!canFillDetail && !canAccThis && !canUploadProof && !canAuditThis && !onOpenDetail && <span className="text-[10px] text-gray-300">—</span>}
                     </div>
                   </td>
                 </tr>
@@ -232,12 +236,49 @@ export function OvertimeTable({
       )}
       {detailModalRow && detailModalRow.status === "PENDING" && <OvertimeQuickDetailForm row={detailModalRow} onClose={() => setDetailModalRow(null)} onSaved={onRefresh} />}
       {detailModalRow && detailModalRow.status === "NEED_PROOF" && <OvertimeProofUploadForm row={detailModalRow} onClose={() => setDetailModalRow(null)} onSaved={onRefresh} />}
+      {rejectModalRow && <OvertimeRejectForm row={rejectModalRow} onClose={() => setRejectModalRow(null)} onSaved={onRefresh} />}
     </div>
   );
 }
 
-function OvertimeQuickDetailForm({ row, onClose, onSaved }: { row: OvertimeTableRow; onClose: () => void; onSaved: () => void }) {
-  const [category, setCategory] = useState<OvertimeCategory | "">((row.category as OvertimeCategory) || "");
+function OvertimeRejectForm({ row, onClose, onSaved }: { row: OvertimeTableRow; onClose: () => void; onSaved: () => void }) {
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const save = async () => {
+    if (!reason.trim()) { setError("Alasan penolakan wajib diisi."); return; }
+    setSaving(true); setError("");
+    try {
+      const res = await fetch("/api/attendance/overtime", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: row.id, action: "REJECT", rejection_note: reason.trim() }),
+      });
+      const d = await res.json();
+      if (!d.success) { setError(d.message || "Gagal menolak lembur."); return; }
+      onSaved(); onClose();
+    } catch (err: any) {
+      setError(err?.message || "Gagal menolak — periksa koneksi internet.");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[105] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+      <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3.5">
+        <p className="font-bold text-sm text-gray-800">Tolak Lembur — {row.users?.name}</p>
+        <p className="text-[11px] text-gray-400">Setelah ditolak, lemburan ini tidak dihitung dan langsung hilang dari daftar.</p>
+        {error && <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg">{error}</div>}
+        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Alasan penolakan..." className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs resize-none" />
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 h-9 bg-gray-100 rounded-xl text-xs font-semibold text-gray-600">Batal</button>
+          <button onClick={save} disabled={saving} className="flex-1 h-9 bg-red-600 rounded-xl text-xs font-bold text-white disabled:opacity-50">{saving ? "Menolak..." : "Tolak Lembur"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OvertimeQuickDetailForm({ row, onClose, onSaved }: { row: OvertimeTableRow; onClose: () => void; onSaved: () => void }) {  const [category, setCategory] = useState<OvertimeCategory | "">((row.category as OvertimeCategory) || "");
   const [desc, setDesc] = useState(row.work_description ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
