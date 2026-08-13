@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Layers } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -133,7 +133,11 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [searchNominal, setSearchNominal] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
-    const [pendingSearch, setPendingSearch] = useState("");
+    const [pendingSearch, setPendingSearch] = useState(""); // search khusus untuk daftar pending (325 data belum konfirmasi)
+    const deferredSearch = React.useDeferredValue(search);
+    const deferredSearchNominal = React.useDeferredValue(searchNominal);
+    const deferredPendingSearch = React.useDeferredValue(pendingSearch);
+    const [displayLimit, setDisplayLimit] = useState(50);
     const [accountCodeFilter, setAccountCodeFilter] = useState<Set<string>>(new Set());
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     const [showAccountFilter, setShowAccountFilter] = useState(false);
@@ -580,7 +584,11 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
 
         return result;
-    }, [entries, search, searchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, groupBySource, dateFrom, dateTo]);
+    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, groupBySource, dateFrom, dateTo]);
+
+    const visibleEntries = useMemo(() => {
+        return filtered.slice(0, displayLimit);
+    }, [filtered, displayLimit]);
 
     // Search untuk daftar PENDING (data yang belum dikonfirmasi ke jurnal umum) —
     // terpisah dari `filtered` di atas karena sumber datanya beda (PendingDraft, bukan JournalEntry).
@@ -1271,235 +1279,25 @@ export default function JurnalUmum({ period }: { period: string }) {
                                             </tr>
                                         </tbody>
                                     ) : (
-                                        filtered.map((entry, index) => {
-                                            const badge = SOURCE_BADGE[entry.source_type];
-                                            const companyBadge = entry.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
-                                            const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
-                                            // Modal belum diinput → tampilkan baris akun HPP (130) dengan nominal Rp0
-                                            // LANGSUNG di tabel (bukan badge terpisah), persis seperti baris akun lain.
-                                            // Baris ini tidak tersimpan di journal_lines (karena mergeLines() di
-                                            // accountingSource.ts memang skip baris nominal 0) — jadi cuma dirender
-                                            // di sini, tidak mempengaruhi total debit/kredit (nominalnya 0).
-                                            const modalMissing = entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing === true;
-                                            // Modal belum diinput → tampilkan PASANGAN akun HPP/Modal Keluar dengan
-                                            // nominal Rp0, persis posisi debit/kredit-nya seperti kalau modal > 0:
-                                            // 440 (Modal Keluar) di Debit, 130 (HPP) di Kredit — lihat buildTransactionDrafts()
-                                            // di accountingSource.ts. Kedua baris ini sintetis (tidak tersimpan di
-                                            // journal_lines), jadi tidak mempengaruhi Total Debit/Kredit di atas.
-                                            const displayLines: JournalLine[] = modalMissing
-                                                ? [
-                                                    ...entry.lines,
-                                                    {
-                                                        id: `${entry.id}-modal-keluar-missing`,
-                                                        account_code: AKUN.MODAL_KELUAR,
-                                                        account_name: accountName(AKUN.MODAL_KELUAR),
-                                                        side: "DEBIT",
-                                                        nominal: 0,
-                                                        keterangan: "Harga modal belum diinput",
-                                                        line_order: 999,
-                                                    },
-                                                    {
-                                                        id: `${entry.id}-hpp-missing`,
-                                                        account_code: AKUN.HPP,
-                                                        account_name: accountName(AKUN.HPP),
-                                                        side: "KREDIT",
-                                                        nominal: 0,
-                                                        keterangan: null,
-                                                        line_order: 1000,
-                                                    },
-                                                ]
-                                                : entry.lines;
-                                            const linesToRender = accountCodeFilter.size > 0
-                                                ? displayLines.filter((l) => accountCodeFilter.has(l.account_code))
-                                                : displayLines;
 
-                                            const validLinesForCheck = entry.lines.filter((l) => !l.id.endsWith("-missing"));
-                                            const isEntryChecked = validLinesForCheck.length > 0 && validLinesForCheck.every((l) => l.checked);
-
-                                            return (
-                                                <Draggable key={entry.id} draggableId={entry.id} index={index}>
-                                                    {(provided, snapshot) => (
-                                                        <tbody
-                                                            ref={provided.innerRef}
-                                                            {...provided.draggableProps}
-                                                            {...provided.dragHandleProps}
-                                                            className={`group ${snapshot.isDragging
-                                                                ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400"
-                                                                : isDraggingGroup && selectedEntryIds.has(entry.id)
-                                                                    ? "opacity-50 ring-2 ring-blue-200"
-                                                                    : ""
-                                                                }`}
-                                                            style={provided.draggableProps.style}
-                                                        >
-                                                            {linesToRender.map((line, i) => {
-                                                                const first = i === 0;
-                                                                const isKredit = line.side === "KREDIT";
-                                                                return (
-                                                                    <tr
-                                                                        key={line.id}
-                                                                        className={`${first ? "border-t-2 border-gray-200" : ""} hover:bg-blue-50/30 transition`}
-                                                                    >
-                                                                        {/* Tanggal — hanya di baris pertama */}
-                                                                        <td className="px-4 py-2 align-top">
-                                                                            {first && (
-                                                                                <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap flex items-center gap-2">
-                                                                                    <input
-                                                                                        type="checkbox"
-                                                                                        checked={selectedEntryIds.has(entry.id)}
-                                                                                        onChange={() => toggleEntrySelected(entry.id)}
-                                                                                        className="w-3.5 h-3.5 rounded border-gray-300 accent-[#1a1545] shrink-0"
-                                                                                        title="Pilih entry ini"
-                                                                                    />
-                                                                                    <div
-                                                                                        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
-                                                                                        title="Tahan & geser dari sini (bukan dari checkbox)"
-                                                                                    >
-                                                                                        <GripVertical className="w-3 h-3" />
-                                                                                    </div>
-                                                                                    {fmtTgl(entry.tanggal)}
-                                                                                </span>
-                                                                            )}
-                                                                        </td>
-
-                                                                        <td className="px-4 py-2 align-top">
-                                                                            {first && (
-                                                                                <>
-                                                                                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
-                                                                                            {badge.label}
-                                                                                        </span>
-                                                                                        {companyBadge && (
-                                                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
-                                                                                                {companyBadge.label}
-                                                                                            </span>
-                                                                                        )}
-                                                                                        {entry.is_edited && (
-                                                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
-                                                                                                diedit · {entry.updated_by_user?.name ?? "—"}
-                                                                                            </span>
-                                                                                        )}
-                                                                                        {entry.has_warning && (
-                                                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1 shrink-0">
-                                                                                                <AlertTriangle className="w-2.5 h-2.5 text-red-600" /> Penanda
-                                                                                            </span>
-                                                                                        )}
-                                                                                        {modalMissing && (
-                                                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1 shrink-0" title="Harga modal belum diinput di transaksi ini">
-                                                                                                <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Modal Rp0
-                                                                                            </span>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div className="text-sm font-bold text-gray-900 mt-1 mb-0.5 leading-snug">
-                                                                                        {entry.keterangan}
-                                                                                    </div>
-                                                                                </>
-                                                                            )}
-                                                                            {first && specParts.length > 0 && (
-                                                                                <div className="text-[10px] text-gray-400 mb-1.5">{specParts.join(" · ")}</div>
-                                                                            )}
-                                                                            <div className={`text-[11px] ${isKredit ? "pl-10 text-emerald-800" : "pl-1 text-blue-800"} font-medium`}>
-                                                                                {line.account_name}
-                                                                            </div>
-                                                                            {line.keterangan && (
-                                                                                <div className={`text-[10px] italic text-gray-400 mt-0.5 ${isKredit ? "pl-10" : "pl-1"}`}>
-                                                                                    {line.keterangan}
-                                                                                </div>
-                                                                            )}
-                                                                        </td>
-
-                                                                        {/* Ref = kode akun (post reference). Filternya sekarang lewat dropdown di header "Ref". */}
-                                                                        <td className="px-4 py-2 text-center align-bottom">
-                                                                            <span
-                                                                                className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${accountCodeFilter.has(line.account_code)
-                                                                                    ? "bg-blue-50 text-blue-700"
-                                                                                    : "text-gray-400"
-                                                                                    }`}
-                                                                            >
-                                                                                {line.account_code}
-                                                                            </span>
-                                                                            {first && entry.ref && (
-                                                                                <div className="text-[9px] text-gray-300 font-mono mt-0.5">{entry.ref}</div>
-                                                                            )}
-                                                                        </td>
-
-                                                                        {/* Debit */}
-                                                                        <td className="px-4 py-2 text-right align-bottom">
-                                                                            {!isKredit && (
-                                                                                <span className="text-[12px] font-bold text-gray-900 font-mono">
-                                                                                    {rp(line.nominal)}
-                                                                                </span>
-                                                                            )}
-                                                                        </td>
-
-                                                                        {/* Kredit */}
-                                                                        <td className="px-4 py-2 text-right align-bottom">
-                                                                            {isKredit && (
-                                                                                <span className="text-[12px] font-bold text-gray-900 font-mono">
-                                                                                    {rp(line.nominal)}
-                                                                                </span>
-                                                                            )}
-                                                                        </td>
-
-                                                                        {/* Aksi — hanya baris pertama */}
-                                                                        <td className="px-4 py-2 align-top">
-                                                                            {first && (
-                                                                                <div className="flex items-center justify-center gap-1">
-                                                                                    <button
-                                                                                        onClick={() => setEditEntry(entry)}
-                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
-                                                                                        title="Edit jurnal"
-                                                                                    >
-                                                                                        <Pencil className="w-4 h-4" />
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => setLogEntry(entry)}
-                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"
-                                                                                        title="Riwayat perubahan"
-                                                                                    >
-                                                                                        <Clock className="w-4 h-4" />
-                                                                                    </button>
-                                                                                    <WarningToggle
-                                                                                        entry={entry}
-                                                                                        onUpdated={() => load(false)}
-                                                                                        onToggleWarningState={(entryId, hasWarn) => {
-                                                                                            setEntries((prev) =>
-                                                                                                prev.map((e) => (e.id === entryId ? { ...e, has_warning: hasWarn } : e))
-                                                                                            );
-                                                                                        }}
-                                                                                        setToast={setToast}
-                                                                                    />
-                                                                                    <button
-                                                                                        onClick={() => handleDelete(entry)}
-                                                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
-                                                                                        title="Hapus"
-                                                                                    >
-                                                                                        <Trash2 className="w-4 h-4" />
-                                                                                    </button>
-                                                                                    <button
-                                                                                        onClick={() => toggleEntryChecked(entry, !isEntryChecked)}
-                                                                                        title={
-                                                                                            isEntryChecked
-                                                                                                ? "Sudah dicek (Klik untuk batalkan)"
-                                                                                                : "Tandai sudah dicek"
-                                                                                        }
-                                                                                        className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${isEntryChecked
-                                                                                            ? "bg-green-600 border-green-600 text-white shadow-2xs"
-                                                                                            : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"
-                                                                                            }`}
-                                                                                    >
-                                                                                        <Check className="w-3.5 h-3.5 mx-auto" />
-                                                                                    </button>
-                                                                                </div>
-                                                                            )}
-                                                                        </td>
-                                                                    </tr>
-                                                                );
-                                                            })}
-                                                        </tbody>
-                                                    )}
-                                                </Draggable>
-                                            );
-                                        })
+                                        visibleEntries.map((entry, index) => (
+                                            <JournalEntryRow
+                                                key={entry.id}
+                                                entry={entry}
+                                                index={index}
+                                                isSelected={selectedEntryIds.has(entry.id)}
+                                                isDraggingGroup={isDraggingGroup}
+                                                accountCodeFilter={accountCodeFilter}
+                                                onToggleSelect={toggleEntrySelected}
+                                                onEdit={setEditEntry}
+                                                onLog={setLogEntry}
+                                                onDelete={handleDelete}
+                                                onToggleChecked={toggleEntryChecked}
+                                                onUpdated={handleUpdated}
+                                                onToggleWarningState={handleToggleWarningState}
+                                                setToast={setToast}
+                                            />
+                                        ))
                                     )}
                                     {provided.placeholder}
                                 </table>
