@@ -146,6 +146,8 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [isDraggingGroup, setIsDraggingGroup] = useState(false);
     const [showBulkWarningInput, setShowBulkWarningInput] = useState(false);
     const [bulkWarningReason, setBulkWarningReason] = useState("");
+    const [showBulkMoveModal, setShowBulkMoveModal] = useState(false);
+    const [targetMoveDate, setTargetMoveDate] = useState("");
     const [bulkBusy, setBulkBusy] = useState(false);
     const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
     const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
@@ -234,7 +236,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             const json = await res.json();
             if (!json.success) { setToast(json.message ?? "Gagal konfirmasi"); return; }
             setToast(`${json.data?.inserted ?? 0} data masuk jurnal umum`);
-            await load();
+            await load(false);
         } catch {
             setToast("Koneksi bermasalah");
         } finally {
@@ -256,22 +258,33 @@ export default function JurnalUmum({ period }: { period: string }) {
                 next.delete(entry.id);
                 return next;
             });
-            await load();
+            await load(false);
         } finally {
             setBusy(false);
         }
     };
 
-    // Toggle pilih satu entry jurnal lewat checkbox di kolom Tanggal.
-    const toggleEntrySelected = (id: string) => {
+    // Reset display limit when period or filter changes
+    useEffect(() => {
+        setDisplayLimit(50);
+    }, [period, search, searchNominal, accountCodeFilter, showOnlyWarnings, sortOrder]);
+
+    const toggleEntrySelected = useCallback((id: string) => {
         setSelectedEntryIds((prev) => {
             const next = new Set(prev);
             next.has(id) ? next.delete(id) : next.add(id);
             return next;
         });
-    };
+    }, []);
 
-    const clearEntrySelection = () => setSelectedEntryIds(new Set());
+    const clearEntrySelection = useCallback(() => setSelectedEntryIds(new Set()), []);
+
+    const handleUpdated = useCallback(() => { load(false); }, [load]);
+    const handleToggleWarningState = useCallback((entryId: string, hasWarn: boolean) => {
+        setEntries((prev) =>
+            prev.map((e) => (e.id === entryId ? { ...e, has_warning: hasWarn } : e))
+        );
+    }, []);
 
     // Dipanggil saat drag mulai — kalau entry yang di-drag termasuk yang lagi dipilih
     // (dan ada >1 yang dipilih), tandai supaya baris lain yang ikut pindah bareng dikasih highlight.
@@ -326,29 +339,40 @@ export default function JurnalUmum({ period }: { period: string }) {
             ? new Set(entries.filter((e) => selectedEntryIds.has(e.id)).map((e) => e.id))
             : new Set([draggedEntry.id]);
 
-        if (isGroupDrag) {
-            const adaTanggalBeda = entries.some((e) => idsToMoveSet.has(e.id) && e.tanggal !== draggedEntry.tanggal);
-            if (adaTanggalBeda) {
-                setToast("Semua entry terpilih harus di tanggal yang sama untuk digeser bersamaan.");
-                return;
-            }
-        }
-
         const insertAt = computeGroupInsertIndex(entries, sourceIndex, destinationIndex, idsToMoveSet);
         const remaining = entries.filter((e) => !idsToMoveSet.has(e.id));
         const moving = entries.filter((e) => idsToMoveSet.has(e.id));
 
+        const neighborBefore = remaining[insertAt - 1];
         const neighborAfter = remaining[insertAt];
-        if (neighborAfter && neighborAfter.tanggal !== draggedEntry.tanggal) {
-            setToast("Hanya bisa mengubah urutan di tanggal yang sama.");
-            return;
+        const targetDate = neighborAfter?.tanggal || neighborBefore?.tanggal || draggedEntry.tanggal;
+
+        const dateChanged = moving.some((e) => e.tanggal !== targetDate);
+        if (dateChanged) {
+            try {
+                const res = await fetch("/api/akutansi/jurnal/move", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ids: Array.from(idsToMoveSet), targetDate }),
+                });
+                const json = await res.json();
+                if (!json.success) {
+                    setToast(json.message ?? "Gagal memindahkan jurnal.");
+                    load(false);
+                    return;
+                }
+            } catch {
+                setToast("Gagal memindahkan jurnal.");
+                load(false);
+                return;
+            }
         }
 
-        const newEntries = [...remaining.slice(0, insertAt), ...moving, ...remaining.slice(insertAt)];
+        const updatedMoving = moving.map((e) => ({ ...e, tanggal: targetDate }));
+        const newEntries = [...remaining.slice(0, insertAt), ...updatedMoving, ...remaining.slice(insertAt)];
         setEntries(newEntries);
 
-        const targetDate = draggedEntry.tanggal;
-        const sameDateEntries = newEntries.filter(e => e.tanggal === targetDate);
+        const sameDateEntries = newEntries.filter((e) => e.tanggal === targetDate);
 
         try {
             const res = await fetch("/api/akutansi/jurnal/reorder", {
@@ -356,20 +380,49 @@ export default function JurnalUmum({ period }: { period: string }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     date: targetDate,
-                    orderedIds: sameDateEntries.map(e => e.id),
-                    sortOrder
-                })
+                    orderedIds: sameDateEntries.map((e) => e.id),
+                    sortOrder,
+                }),
             });
             const json = await res.json();
             if (!json.success) {
                 setToast(json.message ?? "Gagal menyimpan urutan.");
-                load();
+                load(false);
             } else if (isGroupDrag) {
-                setToast(`${idsToMoveSet.size} entry dipindahkan bersama`);
+                setToast(`${idsToMoveSet.size} entry dipindahkan ke ${fmtTgl(targetDate)}`);
+            } else if (dateChanged) {
+                setToast(`1 entry dipindahkan ke ${fmtTgl(targetDate)}`);
             }
         } catch (e) {
             setToast("Gagal menyimpan urutan.");
-            load();
+            load(false);
+        }
+    };
+
+    // Pindahkan semua entry yang terpilih ke tanggal baru
+    const handleBulkMove = async () => {
+        if (selectedEntryIds.size === 0 || !targetMoveDate || bulkBusy) return;
+        setBulkBusy(true);
+        try {
+            const ids = Array.from(selectedEntryIds);
+            const res = await fetch("/api/akutansi/jurnal/move", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids, targetDate: targetMoveDate }),
+            });
+            const json = await res.json();
+            if (!json.success) {
+                setToast(json.message ?? "Gagal memindahkan jurnal");
+                return;
+            }
+            setToast(`${json.count ?? ids.length} jurnal dipindahkan ke ${fmtTgl(targetMoveDate)}`);
+            setShowBulkMoveModal(false);
+            setSelectedEntryIds(new Set());
+            await load(false);
+        } catch {
+            setToast("Koneksi bermasalah saat memindahkan jurnal");
+        } finally {
+            setBulkBusy(false);
         }
     };
 
@@ -390,7 +443,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             const gagal = results.filter((r: any) => !r.success).length;
             setToast(gagal > 0 ? `${ids.length - gagal} dihapus, ${gagal} gagal` : `${ids.length} jurnal dihapus`);
             setSelectedEntryIds(new Set());
-            await load();
+            await load(false);
         } finally {
             setBulkBusy(false);
         }
@@ -465,8 +518,8 @@ export default function JurnalUmum({ period }: { period: string }) {
     const warningCount = useMemo(() => entries.filter(hasWarning).length, [entries, hasWarning]);
 
     const filtered = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        const qNom = searchNominal.trim();
+        const q = deferredSearch.trim().toLowerCase();
+        const qNom = deferredSearchNominal.trim();
         let result = entries;
 
         if (showOnlyWarnings) {
@@ -537,7 +590,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             // Data pending belum masuk ke jurnal umum (belum memiliki penanda manual AKSI)
             pendingResult = [];
         }
-        const q = pendingSearch.trim().toLowerCase();
+        const q = deferredPendingSearch.trim().toLowerCase();
         if (!q) return pendingResult;
         return pendingResult.filter((d) => {
             const badge = SOURCE_BADGE[d.source_type];
@@ -550,7 +603,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                 specParts.some((s) => s.toLowerCase().includes(q))
             );
         });
-    }, [pending, pendingSearch, showOnlyWarnings]);
+    }, [pending, deferredPendingSearch, showOnlyWarnings]);
 
     // Buka/tutup dropdown filter akun. Posisinya dihitung dari posisi tombol "Ref" di layar
     // (pakai position: fixed) supaya dropdown tidak terpotong oleh area scroll tabel.
@@ -975,6 +1028,17 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 className="h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold active:scale-95 transition-all duration-150"
                             >
                                 Pilih Semua ({filtered.length})
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const firstSelected = entries.find((e) => selectedEntryIds.has(e.id));
+                                    setTargetMoveDate(firstSelected?.tanggal ?? `${period}-01`);
+                                    setShowBulkMoveModal(true);
+                                }}
+                                disabled={bulkBusy}
+                                className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 disabled:opacity-40"
+                            >
+                                <Calendar className="w-3.5 h-3.5" /> Pindah Tanggal
                             </button>
                             <button
                                 onClick={() => setShowBulkWarningInput(true)}
@@ -1450,7 +1514,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                 <EntryFormModal
                     period={period}
                     onClose={() => setShowManual(false)}
-                    onSaved={() => { setShowManual(false); setToast("Jurnal manual dibuat"); load(); }}
+                    onSaved={() => { setShowManual(false); setToast("Jurnal manual dibuat"); load(false); }}
                 />
             )}
             {editEntry && (
@@ -1458,10 +1522,20 @@ export default function JurnalUmum({ period }: { period: string }) {
                     period={period}
                     entry={editEntry}
                     onClose={() => setEditEntry(null)}
-                    onSaved={() => { setEditEntry(null); setToast("Jurnal diperbarui"); load(); }}
+                    onSaved={() => { setEditEntry(null); setToast("Jurnal diperbarui"); load(false); }}
                 />
             )}
             {logEntry && <AuditLogModal entry={logEntry} onClose={() => setLogEntry(null)} />}
+            {showBulkMoveModal && (
+                <BulkMoveModal
+                    count={selectedEntryIds.size}
+                    targetDate={targetMoveDate}
+                    setTargetDate={setTargetMoveDate}
+                    onClose={() => setShowBulkMoveModal(false)}
+                    onConfirm={handleBulkMove}
+                    busy={bulkBusy}
+                />
+            )}
 
             <style jsx global>{`
                 @keyframes toastIn {
@@ -2275,3 +2349,334 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
         </div>
     );
 }
+
+// ─── Bulk Move Modal ─────────────────────────────────────────────────────────
+function BulkMoveModal({
+    count,
+    targetDate,
+    setTargetDate,
+    onClose,
+    onConfirm,
+    busy,
+}: {
+    count: number;
+    targetDate: string;
+    setTargetDate: (d: string) => void;
+    onClose: () => void;
+    onConfirm: () => void;
+    busy: boolean;
+}) {
+    return (
+        <div className="fixed inset-0 z-[95] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <Calendar className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-900 leading-tight">Pindahkan Entry Jurnal</h3>
+                            <p className="text-xs text-slate-500">{count} entry jurnal dipilih</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        disabled={busy}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                <div className="space-y-3">
+                    <label className="block">
+                        <span className="text-xs font-bold text-slate-700 block mb-1">Tanggal Tujuan</span>
+                        <input
+                            type="date"
+                            value={targetDate}
+                            onChange={(e) => setTargetDate(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 text-sm text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
+                        />
+                    </label>
+                    <p className="text-[11.5px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed">
+                        Entry jurnal yang dipilih akan dipindahkan ke tanggal ini. Jika tanggal tujuan berada di periode (bulan) lain, entry akan otomatis disesuaikan ke periode tersebut.
+                    </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={busy}
+                        className="h-9 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={busy || !targetDate}
+                        className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-40 flex items-center gap-1.5"
+                    >
+                        {busy ? "Memindahkan..." : `Pindahkan (${count} Jurnal)`}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Journal Entry Row (Memoized for 60 FPS performance) ────────────────────
+interface JournalEntryRowProps {
+    entry: JournalEntry;
+    index: number;
+    isSelected: boolean;
+    isDraggingGroup: boolean;
+    accountCodeFilter: Set<string>;
+    onToggleSelect: (id: string) => void;
+    onEdit: (entry: JournalEntry) => void;
+    onLog: (entry: JournalEntry) => void;
+    onDelete: (entry: JournalEntry) => void;
+    onToggleChecked: (entry: JournalEntry, checked: boolean) => void;
+    onUpdated: (showLoader?: boolean) => void;
+    onToggleWarningState: (entryId: string, hasWarn: boolean) => void;
+    setToast: (msg: string) => void;
+}
+
+const JournalEntryRow = React.memo(function JournalEntryRow({
+    entry,
+    index,
+    isSelected,
+    isDraggingGroup,
+    accountCodeFilter,
+    onToggleSelect,
+    onEdit,
+    onLog,
+    onDelete,
+    onToggleChecked,
+    onUpdated,
+    onToggleWarningState,
+    setToast,
+}: JournalEntryRowProps) {
+    const badge = SOURCE_BADGE[entry.source_type];
+    const companyBadge = entry.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
+    const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
+    const modalMissing = entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing === true;
+
+    const displayLines: JournalLine[] = useMemo(() => {
+        if (!modalMissing) return entry.lines;
+        return [
+            ...entry.lines,
+            {
+                id: `${entry.id}-modal-keluar-missing`,
+                account_code: AKUN.MODAL_KELUAR,
+                account_name: accountName(AKUN.MODAL_KELUAR),
+                side: "DEBIT",
+                nominal: 0,
+                keterangan: "Harga modal belum diinput",
+                line_order: 999,
+            },
+            {
+                id: `${entry.id}-hpp-missing`,
+                account_code: AKUN.HPP,
+                account_name: accountName(AKUN.HPP),
+                side: "KREDIT",
+                nominal: 0,
+                keterangan: null,
+                line_order: 1000,
+            },
+        ];
+    }, [entry.lines, entry.id, modalMissing]);
+
+    const linesToRender = useMemo(() => {
+        if (accountCodeFilter.size === 0) return displayLines;
+        return displayLines.filter((l) => accountCodeFilter.has(l.account_code));
+    }, [displayLines, accountCodeFilter]);
+
+    const validLinesForCheck = useMemo(
+        () => entry.lines.filter((l) => !l.id.endsWith("-missing")),
+        [entry.lines]
+    );
+    const isEntryChecked = useMemo(
+        () => validLinesForCheck.length > 0 && validLinesForCheck.every((l) => l.checked),
+        [validLinesForCheck]
+    );
+
+    return (
+        <Draggable draggableId={entry.id} index={index}>
+            {(provided, snapshot) => (
+                <tbody
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    {...provided.dragHandleProps}
+                    className={`group ${
+                        snapshot.isDragging
+                            ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400"
+                            : isDraggingGroup && isSelected
+                            ? "opacity-50 ring-2 ring-blue-200"
+                            : ""
+                    }`}
+                    style={provided.draggableProps.style}
+                >
+                    {linesToRender.map((line, i) => {
+                        const first = i === 0;
+                        const isKredit = line.side === "KREDIT";
+                        return (
+                            <tr
+                                key={line.id}
+                                className={`${first ? "border-t-2 border-gray-200" : ""} hover:bg-blue-50/30 transition`}
+                            >
+                                <td className="px-4 py-2 align-top">
+                                    {first && (
+                                        <span className="text-[11px] font-semibold text-gray-700 whitespace-nowrap flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => onToggleSelect(entry.id)}
+                                                className="w-3.5 h-3.5 rounded border-gray-300 accent-[#1a1545] shrink-0"
+                                                title="Pilih entry ini"
+                                            />
+                                            <div
+                                                className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+                                                title="Tahan & geser dari sini (bukan dari checkbox)"
+                                            >
+                                                <GripVertical className="w-3 h-3" />
+                                            </div>
+                                            {fmtTgl(entry.tanggal)}
+                                        </span>
+                                    )}
+                                </td>
+
+                                <td className="px-4 py-2 align-top">
+                                    {first && (
+                                        <>
+                                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
+                                                    {badge.label}
+                                                </span>
+                                                {companyBadge && (
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
+                                                        {companyBadge.label}
+                                                    </span>
+                                                )}
+                                                {entry.is_edited && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
+                                                        diedit · {entry.updated_by_user?.name ?? "—"}
+                                                    </span>
+                                                )}
+                                                {entry.has_warning && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 inline-flex items-center gap-1 shrink-0">
+                                                        <AlertTriangle className="w-2.5 h-2.5 text-red-600" /> Penanda
+                                                    </span>
+                                                )}
+                                                {modalMissing && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1 shrink-0" title="Harga modal belum diinput di transaksi ini">
+                                                        <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Modal Rp0
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-sm font-bold text-gray-900 mt-1 mb-0.5 leading-snug">
+                                                {entry.keterangan}
+                                            </div>
+                                        </>
+                                    )}
+                                    {first && specParts.length > 0 && (
+                                        <div className="text-[10px] text-gray-400 mb-1.5">{specParts.join(" · ")}</div>
+                                    )}
+                                    <div className={`text-[11px] ${isKredit ? "pl-10 text-emerald-800" : "pl-1 text-blue-800"} font-medium`}>
+                                        {line.account_name}
+                                    </div>
+                                    {line.keterangan && (
+                                        <div className={`text-[10px] italic text-gray-400 mt-0.5 ${isKredit ? "pl-10" : "pl-1"}`}>
+                                            {line.keterangan}
+                                        </div>
+                                    )}
+                                </td>
+
+                                <td className="px-4 py-2 text-center align-bottom">
+                                    <span
+                                        className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${
+                                            accountCodeFilter.has(line.account_code)
+                                                ? "bg-blue-50 text-blue-700"
+                                                : "text-gray-400"
+                                        }`}
+                                    >
+                                        {line.account_code}
+                                    </span>
+                                    {first && entry.ref && (
+                                        <div className="text-[9px] text-gray-300 font-mono mt-0.5">{entry.ref}</div>
+                                    )}
+                                </td>
+
+                                <td className="px-4 py-2 text-right align-bottom">
+                                    {!isKredit && (
+                                        <span className="text-[12px] font-bold text-gray-900 font-mono">
+                                            {rp(line.nominal)}
+                                        </span>
+                                    )}
+                                </td>
+
+                                <td className="px-4 py-2 text-right align-bottom">
+                                    {isKredit && (
+                                        <span className="text-[12px] font-bold text-gray-900 font-mono">
+                                            {rp(line.nominal)}
+                                        </span>
+                                    )}
+                                </td>
+
+                                <td className="px-4 py-2 align-top">
+                                    {first && (
+                                        <div className="flex items-center justify-center gap-1">
+                                            <button
+                                                onClick={() => onEdit(entry)}
+                                                className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 active:scale-90 transition-all duration-150"
+                                                title="Edit jurnal"
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => onLog(entry)}
+                                                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"
+                                                title="Riwayat perubahan"
+                                            >
+                                                <Clock className="w-4 h-4" />
+                                            </button>
+                                            <WarningToggle
+                                                entry={entry}
+                                                onUpdated={() => onUpdated(false)}
+                                                onToggleWarningState={onToggleWarningState}
+                                                setToast={setToast}
+                                            />
+                                            <button
+                                                onClick={() => onDelete(entry)}
+                                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 active:scale-90 transition-all duration-150"
+                                                title="Hapus"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => onToggleChecked(entry, !isEntryChecked)}
+                                                title={
+                                                    isEntryChecked
+                                                        ? "Sudah dicek (Klik untuk batalkan)"
+                                                        : "Tandai sudah dicek"
+                                                }
+                                                className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${
+                                                    isEntryChecked
+                                                        ? "bg-green-600 border-green-600 text-white shadow-2xs"
+                                                        : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"
+                                                }`}
+                                            >
+                                                <Check className="w-3.5 h-3.5 mx-auto" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            )}
+        </Draggable>
+    );
+});

@@ -1419,12 +1419,6 @@ export default function CashflowPage() {
     const [tab, setTab] = useState<"IN" | "OUT">("IN");
     const [customFrom, setCustomFrom] = useState("");
     const [customTo, setCustomTo] = useState("");
-
-    useEffect(() => {
-        const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-        setCustomFrom(today);
-        setCustomTo(today);
-    }, []);
     const [showModal, setShowModal] = useState(false);
     const [showModalAwal, setShowModalAwal] = useState(false);
     const [showIncomeModal, setShowIncomeModal] = useState(false);
@@ -1537,7 +1531,6 @@ export default function CashflowPage() {
     );
 
     const currentFilter = tab === "IN" ? filterIn : filterOut;
-    const setCurrentFilter = tab === "IN" ? setFilterIn : setFilterOut;
     const allRows = tab === "IN" ? masuk : keluar;
     const rows = applyFilters(allRows, currentFilter);
     const filterCount = activeFilterCount(currentFilter);
@@ -1548,10 +1541,32 @@ export default function CashflowPage() {
 
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
+    const handleDateRangeChange = (from: string, to: string) => {
+        setCustomFrom(from);
+        setCustomTo(to);
+        setFilterIn((prev) => ({ ...prev, dateFrom: from, dateTo: to }));
+        setFilterOut((prev) => ({ ...prev, dateFrom: from, dateTo: to }));
+    };
+
+    const handleFilterChange = (newFilter: CashflowFilter) => {
+        if (tab === "IN") setFilterIn(newFilter);
+        else setFilterOut(newFilter);
+        setCustomFrom(newFilter.dateFrom);
+        setCustomTo(newFilter.dateTo);
+    };
+
+    const handleFilterReset = () => {
+        const d = defaultCashflowFilter();
+        if (tab === "IN") setFilterIn(d);
+        else setFilterOut(d);
+        setCustomFrom("");
+        setCustomTo("");
+    };
+
     const inPeriod = (tanggal: string) => {
         if (customFrom && tanggal < customFrom) return false;
         if (customTo && tanggal > customTo) return false;
-        return !!(customFrom || customTo);
+        return true;
     };
 
     const incomeValue = masuk.reduce((s, e) => e.source_type !== "MODAL_AWAL" && !e.is_voided && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s, 0);
@@ -1639,7 +1654,7 @@ export default function CashflowPage() {
                                 <InlineDateRange
                                     from={customFrom}
                                     to={customTo}
-                                    onChange={(f, t) => { setCustomFrom(f); setCustomTo(t); }}
+                                    onChange={handleDateRangeChange}
                                 />
                             </div>
                         </div>
@@ -1684,7 +1699,7 @@ export default function CashflowPage() {
                     )}
                 </div>
 
-                {showFilter && <FilterPanel filter={currentFilter} onChange={setCurrentFilter} onReset={() => setCurrentFilter(defaultCashflowFilter())} direction={tab} />}
+                {showFilter && <FilterPanel filter={currentFilter} onChange={handleFilterChange} onReset={handleFilterReset} direction={tab} />}
 
                 {!loading && voidedCount > 0 && (
                     <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[12px] text-gray-600">
@@ -1739,7 +1754,7 @@ export default function CashflowPage() {
                                                 {filterCount > 0 ? `Tidak ada data yang cocok (${allRows.length} entry tersembunyi).` : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`}
                                             </p>
                                             {filterCount > 0 && (
-                                                <button onClick={() => setCurrentFilter(defaultCashflowFilter())} className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                                                <button onClick={handleFilterReset} className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
                                                     <IconX /> Reset Filter
                                                 </button>
                                             )}
