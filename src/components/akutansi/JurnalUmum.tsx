@@ -445,7 +445,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         try {
             await Promise.all(
                 validLines.map((l) =>
-                    fetch("/api/akutansi/buku-besar/check", {
+                    fetch("/api/akutansi/jurnal/check", {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ line_id: l.id, checked: next }),

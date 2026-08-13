@@ -118,7 +118,7 @@ export const GET = withAuth(async (req) => {
     for (let i = 0; i < allLineIds.length; i += chunkSize) {
       const chunk = allLineIds.slice(i, i + chunkSize);
       const { data: checksData } = await supabase
-        .from("journal_line_checks")
+       .from("journal_umum_line_checks")
         .select("line_id, checked_at")
         .in("line_id", chunk);
 
