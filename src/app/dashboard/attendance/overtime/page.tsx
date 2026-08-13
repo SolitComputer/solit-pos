@@ -8,7 +8,7 @@ import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2, AlertTriang
 import { OvertimeTable, type OvertimeTableRow } from "@/components/attendance/OvertimeTable"; // ✅ NEW poin 15
 import { OvertimeFillDetailModal } from "@/components/attendance/OvertimeFillDetailModal"; // ✅ NEW
 import { OvertimeSOPBanner } from "@/components/attendance/OvertimeSOPBanner";
-import { useOvertimeNotify } from "@/hooks/useOvertimeNotify"; 
+import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { OvertimePendingPopup } from "@/components/attendance/OvertimePendingPopup";
 import { OvertimeRecapTable } from "@/components/attendance/OvertimeRecapTable"; // ✅ NEW — rekap bulanan
 
@@ -822,21 +822,30 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
   );
 }
 
-// ─── SET PAY MODAL ─────────────────────────────────────────────────────────
 function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
   const start = o.actual_start ?? o.scheduled_start, end = o.actual_end ?? o.scheduled_end;
   const hours = (!start || !end) ? 0 : Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 3600000);
+
+  // ✅ NEW — aturan KETAT lembur hari libur: Tepat waktu = Rp100.000,
+  // Terlambat = Rp50.000 (setengah). Nominal ini TIDAK bisa diedit manual
+  // sama sekali kalau overtime ini ditandai is_holiday.
+  const isHoliday = o.is_holiday === true;
+  const holidayLate = isHoliday && (o.is_late === true || (o.is_late == null && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start)));
+  const holidayAutoPay = isHoliday ? (holidayLate ? 50000 : 100000) : null;
+
   const isFlatPay = o.is_holiday === true || (!o.rate_per_hour && (o.total_pay ?? 0) > 0);
   const [payMode, setPayMode] = useState<"PER_JAM" | "TETAP">(isFlatPay ? "TETAP" : "PER_JAM");
   const [rate, setRate] = useState(o.rate_per_hour || 100000);
-  const [fixedPay, setFixedPay] = useState(o.total_pay ?? 0);
+  const [fixedPay, setFixedPay] = useState(holidayAutoPay ?? (o.total_pay ?? 0));
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
 
-  const totalPay = payMode === "PER_JAM" ? rate * hours : fixedPay;
+  const totalPay = isHoliday ? (holidayAutoPay as number) : (payMode === "PER_JAM" ? rate * hours : fixedPay);
 
   const save = async () => {
-    if (payMode === "PER_JAM" && rate < 0) { setError("Tarif harus >= 0"); return; }
-    if (payMode === "TETAP" && fixedPay < 0) { setError("Nominal harus >= 0"); return; }
+    if (!isHoliday) {
+      if (payMode === "PER_JAM" && rate < 0) { setError("Tarif harus >= 0"); return; }
+      if (payMode === "TETAP" && fixedPay < 0) { setError("Nominal harus >= 0"); return; }
+    }
     setSaving(true); setError("");
     try {
       const res = await fetch("/api/attendance/overtime", {
@@ -846,6 +855,8 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
           id: o.id,
           action: "AUDIT",
           decision: "APPROVE",
+          total_pay: isHoliday ? holidayAutoPay : totalPay,
+          rate_per_hour: isHoliday ? null : (payMode === "PER_JAM" ? rate : null),
         }),
       });
       const d = await res.json();
@@ -859,14 +870,27 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
       <ModalHead icon="" title="Atur Bayaran" sub={o.users?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5 max-h-[65vh] overflow-y-auto">
         {error && <ErrorBanner msg={error} />}
-        <div className="grid grid-cols-2 gap-2">
-          {(["PER_JAM", "TETAP"] as const).map(m => (
-            <button key={m} type="button" onClick={() => setPayMode(m)}
-              className={`py-3 rounded-xl text-xs font-bold border transition-all ${payMode === m ? "bg-violet-600 text-white border-violet-600 shadow-md shadow-violet-200" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
-              {m === "PER_JAM" ? "Per Jam" : "Tetap"}
-            </button>
-          ))}
-        </div>
+        {/* ✅ NEW — lembur hari libur: tidak ada pilihan mode, langsung kunci ke aturan */}
+        {isHoliday ? (
+          <div className={`rounded-xl p-3.5 border ${holidayLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
+            <p className={`text-xs font-bold ${holidayLate ? "text-amber-800" : "text-emerald-800"}`}>
+              Lembur Hari Libur — {holidayLate ? "Terlambat" : "Tepat Waktu"}
+            </p>
+            <p className="text-[10px] text-gray-500 mt-1">
+              Aturan tetap sistem: Tepat waktu = {formatRupiah(100000)} · Terlambat = {formatRupiah(50000)}.
+              Nominal ini terkunci dan tidak bisa diubah manual.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {(["PER_JAM", "TETAP"] as const).map(m => (
+              <button key={m} type="button" onClick={() => setPayMode(m)}
+                className={`py-3 rounded-xl text-xs font-bold border transition-all ${payMode === m ? "bg-violet-600 text-white border-violet-600 shadow-md shadow-violet-200" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                {m === "PER_JAM" ? "Per Jam" : "Tetap"}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="rounded-xl p-4 bg-gradient-to-br from-gray-900 to-gray-800 text-white">
           <div className="flex items-end justify-between mb-4">
             <div>
@@ -881,12 +905,14 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
           <div className="border-t border-white/10 pt-3.5">
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Total Bayaran</p>
             <p className="text-xl font-bold text-emerald-400">{formatRupiah(Math.round(totalPay))}</p>
-            {payMode === "PER_JAM"
-              ? <p className="text-[9px] text-gray-500 mt-0.5">{hours} jam × {formatRupiah(Math.round(rate))}</p>
-              : <p className="text-[9px] text-gray-500 mt-0.5">Nominal tetap · tidak dikali jam</p>}
+            {isHoliday
+              ? <p className="text-[9px] text-gray-500 mt-0.5">Nominal tetap (aturan hari libur) · tidak dikali jam</p>
+              : payMode === "PER_JAM"
+                ? <p className="text-[9px] text-gray-500 mt-0.5">{hours} jam × {formatRupiah(Math.round(rate))}</p>
+                : <p className="text-[9px] text-gray-500 mt-0.5">Nominal tetap · tidak dikali jam</p>}
           </div>
         </div>
-        {payMode === "PER_JAM" ? (
+        {!isHoliday && (payMode === "PER_JAM" ? (
           <div>
             <label className={lbl}>Tarif Per Jam (Rp)</label>
             <div className="relative">
@@ -903,7 +929,7 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
             </div>
             <p className="text-[9px] text-gray-400 mt-1">Bebas isi berapa saja, tidak mengikuti tarif per jam.</p>
           </div>
-        )}
+        ))}
       </div>
       <ModalFoot>
         <button onClick={onClose} className={secondaryBtn}>Batal</button>
@@ -1042,6 +1068,19 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
     [isHolidayOvertime, startTime]
   );
 
+  const holidayAutoPay = useMemo(
+    () => (isHolidayOvertime ? (holidayIsLate ? 50000 : 100000) : null),
+    [isHolidayOvertime, holidayIsLate]
+  );
+
+  useEffect(() => {
+    if (isHolidayOvertime && holidayAutoPay != null) {
+      setManualPay(String(holidayAutoPay));
+    } else if (!isHolidayOvertime) {
+      setManualPay("");
+    }
+  }, [isHolidayOvertime, holidayAutoPay]);
+
   const submit = async () => {
     if (!targetUserId || !requestDate || !startTime || !endTime || !reasonType || !workDescription.trim()) { setError("Semua field wajib diisi"); return; }
     //  FIX: cuma tolak kalau jam mulai & selesai SAMA PERSIS (durasi 0), bukan karena beda hari
@@ -1067,7 +1106,9 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           is_holiday: isHolidayOvertime,
           is_late: isHolidayOvertime ? holidayIsLate : false,
 
-          total_pay: manualPay.trim() ? Math.round(Number(manualPay)) : undefined,
+          total_pay: isHolidayOvertime && holidayAutoPay != null
+            ? holidayAutoPay
+            : (manualPay.trim() ? Math.round(Number(manualPay)) : undefined),
         }),
       });
       const d = await res.json();
@@ -1114,7 +1155,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           </span>
           <div className="flex-1">
             <p className={`text-[11px] font-semibold leading-tight ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}> Lembur hari libur</p>
-            <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran diatur lewat Set Bayaran</p>
+            <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran otomatis: Tepat 100rb / Telat 50rb</p>
           </div>
         </button>
         {/*  Mode normal: grid tanggal/jam selalu tampil seperti sebelumnya */}
@@ -1144,6 +1185,9 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
                 <p className="text-[10px] text-gray-400 mt-0.5">
                   {holidayIsLate ? "Mulai 08:00 ke atas dihitung terlambat di hari libur." : "Masuk sebelum 08:00 dihitung tepat waktu di hari libur."}
                 </p>
+                <p className={`text-[11px] font-bold mt-1.5 pt-1.5 border-t ${holidayIsLate ? "text-amber-700 border-amber-200" : "text-emerald-700 border-emerald-200"}`}>
+                  Bayaran lembur: {holidayIsLate ? formatRupiah(50000) : formatRupiah(100000)}
+                </p>
               </div>
             </div>
           </div>
@@ -1154,10 +1198,12 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
             <span className="text-xs text-violet-700">Durasi: <strong>{previewHours} jam</strong>{isHolidayOvertime ? " · hanya catatan, bayaran diatur manual" : ""}</span>
           </div>
         )}
-        {/*  FIX: input nominal langsung — nominal tetap tersimpan walau belum upload foto */}
         <div>
           <label className={lbl}>
-            Nominal Bayaran <span className="normal-case font-normal text-gray-400">(opsional)</span>
+            Nominal Bayaran{" "}
+            {isHolidayOvertime
+              ? <span className="normal-case font-normal text-purple-500">(otomatis — aturan lembur hari libur)</span>
+              : <span className="normal-case font-normal text-gray-400">(opsional)</span>}
           </label>
           <div className="relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-medium">Rp</span>
@@ -1166,13 +1212,15 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
               min={0}
               value={manualPay}
               onChange={e => setManualPay(e.target.value)}
-              placeholder={isHolidayOvertime ? "Isi nominal lembur libur di sini" : "Kosongkan = otomatis dari tarif/jam"}
-              className="w-full h-10 border border-gray-200 rounded-xl pl-9 pr-3.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+              readOnly={isHolidayOvertime}
+              disabled={isHolidayOvertime}
+              placeholder={isHolidayOvertime ? "" : "Kosongkan = otomatis dari tarif/jam"}
+              className={`w-full h-10 border rounded-xl pl-9 pr-3.5 text-xs font-mono transition-all ${isHolidayOvertime ? "border-purple-200 bg-purple-50 text-purple-700 font-bold cursor-not-allowed" : "border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400"}`}
             />
           </div>
           <p className="text-[9px] text-gray-400 mt-1">
             {isHolidayOvertime
-              ? "Lembur hari libur tidak punya tarif otomatis — isi nominal di sini, atau atur nanti via tombol Set Bayaran."
+              ? `Aturan tetap: Tepat waktu = ${formatRupiah(100000)} · Terlambat = ${formatRupiah(50000)}. Nominal ini terkunci mengikuti status jam masuk, tidak bisa diedit manual.`
               : "Kosong → dihitung dari tarif per jam × durasi. Diisi → pakai nominal ini (tetap), tidak dikali jam."}
           </p>
         </div>
@@ -1813,10 +1861,11 @@ export default function OvertimePage() {
     const q = searchQuery.trim().toLowerCase();
     return filtered
       .filter((o) => o.users)
-      .filter((o) => !isUserPKL(o.users!.role))
+      .filter((o) => (activeTab === "KARYAWAN" ? !isUserPKL(o.users!.role) : isUserPKL(o.users!.role)))
+      .filter((o) => filterStatus === "REJECTED" || o.status !== "REJECTED")
       .filter((o) => !q || o.users!.name.toLowerCase().includes(q))
       .sort((a, b) => new Date(b.request_date).getTime() - new Date(a.request_date).getTime()) as unknown as OvertimeTableRow[];
-  }, [filtered, searchQuery]);
+  }, [filtered, searchQuery, activeTab, filterStatus]);
 
   const groupedKaryawan = useMemo(
     () => groupedByUser.filter(g => !isUserPKL(g.user.role)),
@@ -1828,7 +1877,7 @@ export default function OvertimePage() {
     [groupedByUser]
   );
 
-const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : groupedPKL;
+  const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : groupedPKL;
 
   const recapUsers = useMemo(
     () => [...allUsers]
@@ -1890,11 +1939,11 @@ const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : grouped
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-             <button onClick={() => router.push("/dashboard/attendance/overtime/leaderboard")}
+              <button onClick={() => router.push("/dashboard/attendance/overtime/leaderboard")}
                 className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow">
                 <Trophy size={16} /><span className="hidden sm:inline">Leaderboard</span>
               </button>
-             <button onClick={() => { setShowRecap(v => !v); if (!recapUserId) setRecapUserId("ALL"); }}
+              <button onClick={() => { setShowRecap(v => !v); if (!recapUserId) setRecapUserId("ALL"); }}
                 className={`h-9 px-4 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap shadow-sm hover:shadow border ${showRecap ? "bg-gray-900 text-white border-gray-900" : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"}`}>
                 <CalendarDays size={16} /><span className="hidden sm:inline">Rekap Bulanan</span>
               </button>
@@ -1993,7 +2042,7 @@ const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : grouped
                 return (
                   <button
                     key={tab}
-                   onClick={() => { setActiveTab(tab); setSearchQuery(""); setFilterStatus("Semua"); setSelectedUserId(null); setRecapUserId("ALL"); }}
+                    onClick={() => { setActiveTab(tab); setSearchQuery(""); setFilterStatus("Semua"); setSelectedUserId(null); setRecapUserId("ALL"); }}
                     className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${active
                       ? "bg-[#0f0c29] text-white shadow-md"
                       : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"
@@ -2011,7 +2060,7 @@ const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : grouped
             </div>
           )}
 
-        {/* ── Poin 14: SOP wajib tampil di halaman lembur ── */}
+          {/* ── Poin 14: SOP wajib tampil di halaman lembur ── */}
           <OvertimeSOPBanner />
 
           {/* ✅ NEW — Rekap Bulanan per karyawan (dihitung ulang dari face_verifications) */}
@@ -2028,7 +2077,7 @@ const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : grouped
                   </select>
                 </div>
               )}
-           {recapUserId === "ALL" && (
+              {recapUserId === "ALL" && (
                 <div className="space-y-2">
                   {recapUsers.map(u => {
                     const isOpen = expandedRecapUsers.has(u.id);
@@ -2062,80 +2111,48 @@ const activeGroupedByUser = activeTab === "KARYAWAN" ? groupedKaryawan : grouped
             </div>
           )}
 
-          {/* ── Search + Status filter — khusus tab Karyawan; tab PKL punya filter sendiri di EmployeeListPanel ── */}
-          {activeTab === "KARYAWAN" && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-                <input
-                  type="text"
-                  placeholder="Cari nama karyawan..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full h-9 pl-9 pr-3.5 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all placeholder:text-gray-300"
-                />
-              </div>
-              {statuses.length > 0 && (
-                <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-                  {["Semua", ...statuses].map(s => {
-                    const c = s !== "Semua" ? STATUS_CONFIG[s] : null;
-                    const active = filterStatus === s;
-                    const Icon = c?.icon;
-                    return (
-                      <button key={s} onClick={() => setFilterStatus(s)}
-                        className={`flex-shrink-0 h-9 px-3 rounded-xl text-[10px] font-semibold transition-all border ${active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"}`}>
-                        {c && Icon ? <span className="inline-flex items-center gap-1"><Icon size={12} />{c.label}</span> : "Semua"}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+              <input
+                type="text"
+                placeholder="Cari nama karyawan..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full h-9 pl-9 pr-3.5 border border-gray-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all placeholder:text-gray-300"
+              />
             </div>
-          )}
+            {statuses.length > 0 && (
+              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+                {["Semua", ...statuses].map(s => {
+                  const c = s !== "Semua" ? STATUS_CONFIG[s] : null;
+                  const active = filterStatus === s;
+                  const Icon = c?.icon;
+                  return (
+                    <button key={s} onClick={() => setFilterStatus(s)}
+                      className={`flex-shrink-0 h-9 px-3 rounded-xl text-[10px] font-semibold transition-all border ${active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"}`}>
+                      {c && Icon ? <span className="inline-flex items-center gap-1"><Icon size={12} />{c.label}</span> : "Semua"}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-          {/* ── Karyawan: sistem otomatis IN/OUT — PKL: sistem manual + ACC atasan ── */}
-          {activeTab === "KARYAWAN" ? (
-            <OvertimeTable
-              rows={tableRows}
-              loading={loading}
-              canApprove={(targetRole) => canApproveTarget(currentUser?.roles ?? currentUser?.role, targetRole)}
-              canAudit={isAdminRole(currentUser?.roles ?? currentUser?.role)}
-              currentUserId={currentUser?.id}
-              onRefresh={refetch}
-            />
-          ) : (
-            selectedUserId && selectedUserData ? (
-              <EmployeeDetailView
-                userId={selectedUserId}
-                name={selectedUserData.user.name}
-                role={selectedUserData.user.role}
-                overtimes={selectedUserData.items}
-                userCanViewPay={userCanViewPay}
-                currentUser={currentUser}
-                onBack={() => setSelectedUserId(null)}
-                onDetailOpen={(o) => setDetailData(o)}
-              />
-            ) : (
-              <EmployeeListPanel
-                groupedByUser={groupedPKL}
-                loading={loading}
-                userCanViewPay={userCanViewPay}
-                currentUser={currentUser}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                filterStatus={filterStatus}
-                setFilterStatus={setFilterStatus}
-                statuses={statuses}
-                onSelectUser={(uid) => setSelectedUserId(uid)}
-              />
-            )
-          )}
+          <OvertimeTable
+            rows={tableRows}
+            loading={loading}
+            canApprove={(targetRole) => canApproveTarget(currentUser?.roles ?? currentUser?.role, targetRole)}
+            canAudit={isAdminRole(currentUser?.roles ?? currentUser?.role)}
+            currentUserId={currentUser?.id}
+            onRefresh={refetch}
+            onOpenDetail={(row) => setDetailData(row as unknown as OvertimeRequest)}
+          />
 
         </div>
       </div>
 
       {/* ── Modals ── */}
-      {/*  FIX: Semua onSaved/onDeleted pakai refetch() bukan fetchOvertimes() */}
       {showRequestModal && <RequestOvertimeModal onClose={() => setShowRequestModal(false)} onSaved={() => { refetch(); setShowRequestModal(false); }} currentUser={currentUser} />}
       {showManualModal && <ManualOvertimeModal onClose={() => setShowManualModal(false)} onSaved={() => { refetch(); setShowManualModal(false); }} allUsers={allUsers} currentUser={currentUser} />}
       {approveData && <ApproveModal overtime={approveData} onClose={() => setApproveData(null)} onSaved={() => { refetch(); setApproveData(null); }} />}

@@ -61,6 +61,18 @@ const PAY_VIEW_ROLES = [
   "KEPALA_PENGELOLA_BARANG",
 ];
 
+function isHolidayOvertimeLate(overtime: { is_late?: boolean | null; requested_start?: string | null }): boolean {
+  if (overtime.is_late === true) return true;
+  if (overtime.is_late === false) return false;
+  const requestedStart = overtime.requested_start;
+  if (!requestedStart) return false;
+  const [h, m] = String(requestedStart).split(":").map(Number);
+  if (Number.isNaN(h)) return false;
+  return h * 60 + (m || 0) >= 8 * 60;
+}
+
+const HOLIDAY_OVERTIME_PAY = { LATE: 50000, ON_TIME: 100000 } as const;
+
 // ─── HELPER: apakah approver (single role) bisa approve target ─────────────
 function canApprove(
   approverRole: string,
@@ -755,6 +767,25 @@ export async function PATCH(request: Request) {
               ? "Lembur ini belum di-ACC oleh kepala divisi — tidak bisa diaudit."
               : `Status lembur saat ini (${overtime.status}) tidak bisa diaudit.`,
         }, { status: 400 });
+      }
+
+      if (overtime.is_holiday === true) {
+        const late = isHolidayOvertimeLate(overtime);
+        const holidayPay = late ? HOLIDAY_OVERTIME_PAY.LATE : HOLIDAY_OVERTIME_PAY.ON_TIME;
+
+        const { data, error } = await supabase.from("overtime_requests").update({
+          audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
+          total_pay: holidayPay,
+          rate_per_hour: null,
+          per_minute_rate: null,
+          base_salary_snapshot: null,
+          effective_workdays_snapshot: null,
+          is_late: late,
+          updated_at: new Date().toISOString(),
+        }).eq("id", id).select().single();
+
+        if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+        return NextResponse.json({ success: true, data });
       }
 
       const [yearStr, monthStr] = overtime.request_date.split("-");
