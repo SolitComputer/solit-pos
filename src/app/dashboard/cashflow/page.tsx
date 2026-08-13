@@ -1754,7 +1754,7 @@ export default function CashflowPage() {
                                                 {filterCount > 0 ? `Tidak ada data yang cocok (${allRows.length} entry tersembunyi).` : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`}
                                             </p>
                                             {filterCount > 0 && (
-                                                <button onClick={() => setCurrentFilter(defaultCashflowFilter())} className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                                                <button onClick={handleFilterReset} className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
                                                     <IconX /> Reset Filter
                                                 </button>
                                             )}
