@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -14,6 +14,7 @@ import {
     MANUAL_TEMPLATES,
     accountName,
     isBalanced,
+    jakartaDate,
     sumSide,
 } from "@/lib/accounting";
 
@@ -87,7 +88,6 @@ interface CustomTemplate {
     created_by_user?: { id: string; name: string } | null;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const rp = (n: number) => `Rp${Math.round(Number(n || 0)).toLocaleString("id-ID")}`;
 const fmtTgl = (d: string) =>
     new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" });
@@ -101,10 +101,15 @@ const SOURCE_BADGE: Record<string, { label: string; color: string }> = {
     MANUAL: { label: "Manual", color: "bg-gray-100 text-gray-600 border-gray-200" },
 };
 
+const SOURCE_GROUP_RANK: Record<string, number> = {
+    MANUAL: 0,
+    SERVICE: 1,
+    TRANSACTION: 2,
+    CASHFLOW: 3,
+};
+
 const key = (d: { source_type: string; source_id: string }) => `${d.source_type}:${d.source_id}`;
 
-// Badge nama toko — replikasi persis logic getCompanyBadge() di transactions/page.tsx,
-// supaya label & warnanya konsisten dengan halaman Riwayat Transaksi.
 function getCompanyBadge(company?: string | null): { label: string; color: string } | null {
     if (!company) return null;
     const cn = company.toLowerCase();
@@ -126,12 +131,13 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [busy, setBusy] = useState(false);
     const [search, setSearch] = useState("");
     const [searchNominal, setSearchNominal] = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
     const [pendingSearch, setPendingSearch] = useState(""); // search khusus untuk daftar pending (325 data belum konfirmasi)
     const deferredSearch = React.useDeferredValue(search);
     const deferredSearchNominal = React.useDeferredValue(searchNominal);
     const deferredPendingSearch = React.useDeferredValue(pendingSearch);
     const [displayLimit, setDisplayLimit] = useState(50);
-    // Filter berdasarkan akun yang dipilih lewat dropdown "Ref" — bisa lebih dari satu (OR).
     const [accountCodeFilter, setAccountCodeFilter] = useState<Set<string>>(new Set());
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     const [showAccountFilter, setShowAccountFilter] = useState(false);
@@ -140,8 +146,6 @@ export default function JurnalUmum({ period }: { period: string }) {
     const accountFilterButtonRef = useRef<HTMLButtonElement>(null);
     const [filterDropdownPos, setFilterDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
-    // Selection KHUSUS baris jurnal utama (bukan panel pending) — dipakai untuk
-    // bulk actions: geser bareng, kasih penanda bareng, hapus bareng.
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
     const [isDraggingGroup, setIsDraggingGroup] = useState(false);
     const [showBulkWarningInput, setShowBulkWarningInput] = useState(false);
@@ -149,14 +153,13 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [showBulkMoveModal, setShowBulkMoveModal] = useState(false);
     const [targetMoveDate, setTargetMoveDate] = useState("");
     const [bulkBusy, setBulkBusy] = useState(false);
-    const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // default: terbaru dulu
-    const [showOnlyWarnings, setShowOnlyWarnings] = useState(false); // filter khusus entry warning (Modal Rp0 / diedit)
+    const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+    const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
+    const [groupBySource, setGroupBySource] = useState(false);
     const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
     const [showManual, setShowManual] = useState(false);
     const [logEntry, setLogEntry] = useState<JournalEntry | null>(null);
     const [toast, setToast] = useState<string | null>(null);
-    // Default TERTUTUP supaya tidak mengganggu tabel jurnal utama.
-    // Pilihan buka/tutup user diingat per browser lewat localStorage.
     const [showPending, setShowPending] = useState(() => {
         if (typeof window === "undefined") return false;
         return localStorage.getItem("jurnal-show-pending") === "true";
@@ -325,8 +328,8 @@ export default function JurnalUmum({ period }: { period: string }) {
         const destinationIndex = result.destination.index;
         if (sourceIndex === destinationIndex) return;
 
-        if (search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0) {
-            setToast("Harap kosongkan pencarian dan filter akun sebelum mengubah urutan.");
+        if (search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || groupBySource) {
+            setToast("Harap matikan mode Urutkan Sumber dan kosongkan pencarian/filter akun sebelum mengubah urutan.");
             return;
         }
 
@@ -540,8 +543,6 @@ export default function JurnalUmum({ period }: { period: string }) {
             });
         }
 
-        // Filter kode akun: OR — entry lolos kalau salah satu baris akunnya
-        // ada di dalam accountCodeFilter (jadi bisa pilih 110 saja, atau 110 + 440 sekaligus).
         if (accountCodeFilter.size > 0) {
             result = result.filter((e) => {
                 const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
@@ -552,8 +553,38 @@ export default function JurnalUmum({ period }: { period: string }) {
             });
         }
 
+        // Mode "Urutkan Sumber" (opt-in). PENTING: blok ini TIDAK PERNAH membuang
+        // entry — semua data tetap tampil. dateFrom/dateTo di sini cuma menentukan
+        // tanggal MANA yang urutannya disusun ulang per sumber (Manual, Service,
+        // Transaksi, Cashflow). Tanggal lain di luar rentang tetap tampil apa
+        // adanya, urutan aslinya tidak diutak-atik. Kosongkan dateFrom & dateTo
+        // untuk menerapkan penyusunan ulang ke SEMUA tanggal sekaligus.
+        if (groupBySource) {
+            const inDateScope = (tanggal: string) => {
+                if (!dateFrom && !dateTo) return true;
+                if (dateFrom && tanggal < dateFrom) return false;
+                if (dateTo && tanggal > dateTo) return false;
+                return true;
+            };
+
+            const next = [...result];
+            let i = 0;
+            while (i < next.length) {
+                let j = i + 1;
+                while (j < next.length && next[j].tanggal === next[i].tanggal) j++;
+                if (inDateScope(next[i].tanggal)) {
+                    const block = next.slice(i, j).sort(
+                        (a, b) => (SOURCE_GROUP_RANK[a.source_type] ?? 99) - (SOURCE_GROUP_RANK[b.source_type] ?? 99)
+                    );
+                    next.splice(i, j - i, ...block);
+                }
+                i = j;
+            }
+            result = next;
+        }
+
         return result;
-    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning]);
+    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, groupBySource, dateFrom, dateTo]);
 
     const visibleEntries = useMemo(() => {
         return filtered.slice(0, displayLimit);
@@ -894,8 +925,22 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 </span>
                             )}
                         </button>
+                        <button
+                            onClick={() => setGroupBySource((v) => {
+                                const next = !v;
+                                if (!next) { setDateFrom(""); setDateTo(""); } // matikan mode → reset pilihan tanggal
+                                return next;
+                            })}
+                            title={groupBySource ? "Matikan pengurutan per sumber (kembali ke urutan tanggal biasa)" : "Urutkan tiap tanggal: Manual, Service, Transaksi, Cashflow (dari atas ke bawah)"}
+                            className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${groupBySource
+                                ? "bg-blue-600 text-white shadow-2xs font-bold ring-2 ring-blue-300"
+                                : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                                }`}
+                        >
+                            <Layers className={`w-3.5 h-3.5 ${groupBySource ? "text-white" : "text-slate-400"}`} />
+                            <span>Urutkan Sumber</span>
+                        </button>
                     </div>
-
                     <button
                         onClick={() => setShowManual(true)}
                         className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
@@ -905,7 +950,58 @@ export default function JurnalUmum({ period }: { period: string }) {
                 </div>
             </div>
 
-            {/* ── Bulk actions — muncul kalau ada entry jurnal (bukan pending) yang dicentang ── */}
+            {/* ── Muncul HANYA saat "Urutkan Sumber" aktif. TIDAK menyembunyikan data
+                 apa pun — cuma menentukan tanggal mana yang disusun ulang per sumber.
+                 Kosongkan kedua kolom supaya berlaku ke SEMUA tanggal. ── */}
+            {groupBySource && (
+                <div className="flex flex-wrap items-center gap-2 bg-blue-50/60 border border-blue-200/80 rounded-xl px-3 py-2">
+                    <Layers className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider shrink-0">
+                        Urutkan tanggal
+                    </span>
+                    <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        max={dateTo || undefined}
+                        className="h-8 border border-blue-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                    />
+                    <span className="text-xs text-blue-400 shrink-0">s/d</span>
+                    <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        min={dateFrom || undefined}
+                        className="h-8 border border-blue-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                    />
+                    <button
+                        onClick={() => {
+                            const today = jakartaDate(new Date().toISOString());
+                            setDateFrom(today);
+                            setDateTo(today);
+                        }}
+                        className="h-8 px-3 rounded-lg text-xs font-semibold bg-white border border-blue-200 text-blue-700 hover:bg-blue-100 active:scale-95 transition-all duration-150 shrink-0"
+                    >
+                        Hari Ini
+                    </button>
+                    {(dateFrom !== "" || dateTo !== "") && (
+                        <button
+                            onClick={() => { setDateFrom(""); setDateTo(""); }}
+                            className="h-8 px-3 rounded-lg text-xs font-semibold text-red-500 hover:bg-red-50 active:scale-95 transition-all duration-150 shrink-0"
+                        >
+                            Reset (semua tanggal)
+                        </button>
+                    )}
+                    <span className="text-[10.5px] text-blue-700/70 shrink-0">
+                        {dateFrom === "" && dateTo === ""
+                            ? "Berlaku untuk semua tanggal"
+                            : dateFrom !== "" && dateFrom === dateTo
+                                ? `Cuma tanggal ${fmtTgl(dateFrom)}`
+                                : `Cuma ${dateFrom ? fmtTgl(dateFrom) : "…"} – ${dateTo ? fmtTgl(dateTo) : "…"}`}
+                    </span>
+                </div>
+            )}
+
             {selectedEntryIds.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 bg-slate-900 text-white rounded-xl px-4 py-2.5">
                     <span className="text-xs font-bold shrink-0">{selectedEntryIds.size} entry dipilih</span>
