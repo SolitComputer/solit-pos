@@ -15,8 +15,7 @@ function hasAccess(request: NextRequest): boolean {
   return roles.some((r) => (FIXED_ASSET_ROLES as string[]).includes(r));
 }
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   if (!hasAccess(request)) {
     return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
   }
@@ -53,8 +52,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   return NextResponse.json({ success: true, data });
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   if (!hasAccess(request)) {
     return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
   }

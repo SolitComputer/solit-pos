@@ -207,7 +207,7 @@ export default function FixedAssetsContent() {
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-7 flex-wrap">
+        <div className="flex items-start justify-between gap-4 mb-6 pb-5 border-b border-gray-100 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-[#1a1a2e] flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#1a1a2e]/20">
               <AssetIcon className="text-white" />
@@ -233,7 +233,7 @@ export default function FixedAssetsContent() {
 
         {/* Summary */}
         <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="rounded-2xl bg-white border border-gray-100 p-4 shadow-sm shadow-gray-100/80">
+          <div className="rounded-2xl bg-white border border-gray-100 p-4 shadow-sm shadow-gray-100/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-7 h-7 rounded-lg bg-[#1a1a2e]/5 flex items-center justify-center">
                 <StackIcon className="text-[#1a1a2e]/60" />
@@ -243,12 +243,12 @@ export default function FixedAssetsContent() {
             <p className="text-xl sm:text-2xl font-black text-[#1a1a2e]">{assets.length}</p>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#2d2d4a] p-4 shadow-lg shadow-[#1a1a2e]/20">
-            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-emerald-400/10 blur-xl" />
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#2d2d4a] p-4 shadow-lg shadow-[#1a1a2e]/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl">
+            <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-amber-400/20 blur-2xl" />
             <div className="relative">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">
-                  <WalletIcon className="text-emerald-300" />
+                  <WalletIcon className="text-amber-300" />
                 </div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Total Nilai Aset</p>
               </div>
@@ -293,6 +293,7 @@ export default function FixedAssetsContent() {
 
         {/* List */}
         <div className="rounded-2xl border border-gray-100 overflow-hidden bg-white">
+          <div className="h-1 bg-gradient-to-r from-amber-300 via-amber-400 to-amber-300" />
           {loading ? (
             <div className="divide-y divide-gray-50">
               {[1, 2, 3, 4].map((i) => (
@@ -343,7 +344,7 @@ export default function FixedAssetsContent() {
                     <div className="hidden md:block w-16 flex-shrink-0">
                       <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500"
+                          className="h-full rounded-full bg-gradient-to-r from-amber-300 to-amber-500"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -428,7 +429,7 @@ export default function FixedAssetsContent() {
                     required
                   />
                   {hasNominalPreview && (
-                    <p className="text-xs text-emerald-600 font-medium mt-1.5">
+                    <p className="text-xs text-amber-600 font-medium mt-1.5">
                       ≈ {formatIDR(nominalPreview)}
                     </p>
                   )}
