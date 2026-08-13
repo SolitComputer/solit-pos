@@ -16,6 +16,7 @@ import {
     type SourceFilter,
     type PaymentMethodFilter,
     type StatusFilter,
+    type IncomeMethodFilter, // ⬅️ BARU
     defaultCashflowFilter,
     isFilterActive,
     activeFilterCount,
@@ -777,6 +778,21 @@ function FilterPanel({ filter, onChange, onReset, direction }: {
                             <option value="ALL">Semua Status</option>
                             <option value="ACTIVE">Aktif</option>
                             <option value="VOIDED">Dibatalkan</option>
+                        </select>
+                    </div>
+                )}
+                {direction === "IN" && (
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Metode Pembayaran</label>
+                        <select
+                            value={filter.incomeMethod}
+                            onChange={(e) => onChange({ ...filter, incomeMethod: e.target.value as IncomeMethodFilter })}
+                            className={`${selectCls} w-full`}
+                        >
+                            <option value="ALL">Semua Metode</option>
+                            <option value="TUNAI">Tunai</option>
+                            <option value="TRANSFER">Transfer</option>
+                            <option value="TUNAI_TRANSFER">Tunai+Transfer</option>
                         </select>
                     </div>
                 )}
