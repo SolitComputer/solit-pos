@@ -912,11 +912,12 @@ export function LaptopsContent() {
             belum_lunas_label: belumLunasLabel,
         };
 
-        //  ── Mode EXPLODE: Cari SN cocok di kelompok ini ──
-        //  Jika pencarian SN cocok ke salah satu unit dalam kelompok ini,
-        //  tampilkan SELURUH unit dalam kelompok ini secara utuh (bukan cuma unit yang dicari doang).
+       //  ── Mode EXPLODE: Cari SN cocok di kelompok ini ──
+        //  Search 1 SN → tampilkan CUMA unit yang cocok pencarian (matchedUnits),
+        //  bukan seluruh kelompok/model — biar hasil search gak bikin bingung
+        //  kalau 1 model punya banyak unit siap jual.
         if (matchedUnits && matchedUnits.length > 0) {
-            return aktif.map(u => ({
+            return matchedUnits.map(u => ({
                 ...base,
                 unit_id: u.id,
                 harga_modal: u.purchase_price ?? 0,
