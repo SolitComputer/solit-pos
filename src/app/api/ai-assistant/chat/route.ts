@@ -83,6 +83,9 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
           role: "assistant",
           content: result.reply,
           provider: result.providerUsed,
+          prompt_tokens: result.usage?.prompt_tokens ?? null,
+          completion_tokens: result.usage?.completion_tokens ?? null,
+          total_tokens: result.usage?.total_tokens ?? null,
         });
         await supabaseAdmin.from("ai_ceo_conversations").update({ updated_at: new Date().toISOString() }).eq("id", convId);
 

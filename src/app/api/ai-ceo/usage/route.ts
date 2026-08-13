@@ -24,7 +24,7 @@ async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
   const [{ data, error }, { data: health }] = await Promise.all([
     supabaseAdmin
       .from("ai_ceo_messages")
-      .select("provider")
+      .select("provider, prompt_tokens, completion_tokens, total_tokens")
       .eq("role", "assistant")
       .gte("created_at", start)
       .lt("created_at", end)
@@ -35,9 +35,14 @@ async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 
   const counts: Record<string, number> = {};
+  const tokens: Record<string, { prompt: number; completion: number; total: number }> = {};
   for (const row of data ?? []) {
     const p = row.provider as string;
     counts[p] = (counts[p] ?? 0) + 1;
+    if (!tokens[p]) tokens[p] = { prompt: 0, completion: 0, total: 0 };
+    tokens[p].prompt += row.prompt_tokens ?? 0;
+    tokens[p].completion += row.completion_tokens ?? 0;
+    tokens[p].total += row.total_tokens ?? 0;
   }
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
@@ -47,7 +52,7 @@ async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
     blocked[h.provider as string] = h.blocked_until ? new Date(h.blocked_until).getTime() > now : false;
   }
 
-  return NextResponse.json({ success: true, counts, total, blocked });
+ return NextResponse.json({ success: true, counts, total, blocked, tokens });
 }
 
 export const GET = withAuth(getHandler, AI_CEO_ROLES);
