@@ -60,7 +60,7 @@ function buildTxPayload(t: any) {
 }
 
 function buildSvcPayload(s: any, techName: string) {
-    const refDate = (s.tanggal_selesai || s.tanggal_diambil || s.tanggal_masuk) as string;
+   const refDate = (s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
     return {
         direction: "IN",
         category: "SERVICE",
@@ -402,7 +402,7 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
             dikerjakan_by,
             dikerjakan_by_user:users!service_orders_dikerjakan_by_fkey(id, name)
         `)
-        .in("status", ["DONE", "SUDAH_DIAMBIL"])
+        .in("status", ["SUDAH_DIAMBIL"])
         .not("payment_amount", "is", null)
         .gt("payment_amount", 0);
 
@@ -412,7 +412,7 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
         const { data: servicesFallback, error: svcFbError } = await supabase
             .from("service_orders")
             .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, tanggal_masuk, status, dikerjakan_by")
-            .in("status", ["DONE", "SUDAH_DIAMBIL"])
+            .in("status", ["SUDAH_DIAMBIL"])
             .not("payment_amount", "is", null)
             .gt("payment_amount", 0);
 
