@@ -242,19 +242,26 @@ export async function createOvertimeDraft(
     MANUAL: "Input manual admin",
   };
 
+  const isLateForHoliday = args.direction === "HOLIDAY" && (() => {
+    const wib = new Date(new Date(args.actualStart).getTime() + 7 * 3600_000);
+    const totalMin = wib.getUTCHours() * 60 + wib.getUTCMinutes();
+    return totalMin >= 8 * 60;
+  })();
+
   const { data, error } = await supabaseAdmin
     .from("overtime_requests")
     .insert({
       user_id: args.userId,
       request_date: args.requestDate,
       direction: args.direction,
-      reason: AUTO_REASON_BY_DIRECTION[args.direction], // ✅ FIX — wajib diisi
-      requested_start: toWIBTimeString(args.actualStart), // ✅ FIX — wajib diisi, kolom NOT NULL
+      reason: AUTO_REASON_BY_DIRECTION[args.direction], 
+      requested_start: toWIBTimeString(args.actualStart), 
       status: "PENDING",
       duration_minutes: args.minutes,
       actual_start: args.actualStart,
       actual_end: args.actualEnd,
       is_holiday: args.isHoliday,
+      is_late: args.direction === "HOLIDAY" ? isLateForHoliday : null, // ✅ NEW
       source_face_verification_id: args.sourceFaceVerificationId,
     })
     .select("id").single();
