@@ -237,7 +237,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             const json = await res.json();
             if (!json.success) { setToast(json.message ?? "Gagal konfirmasi"); return; }
             setToast(`${json.data?.inserted ?? 0} data masuk jurnal umum`);
-            await load();
+            await load(false);
         } catch {
             setToast("Koneksi bermasalah");
         } finally {
@@ -259,7 +259,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                 next.delete(entry.id);
                 return next;
             });
-            await load();
+            await load(false);
         } finally {
             setBusy(false);
         }
@@ -359,12 +359,12 @@ export default function JurnalUmum({ period }: { period: string }) {
                 const json = await res.json();
                 if (!json.success) {
                     setToast(json.message ?? "Gagal memindahkan jurnal.");
-                    load();
+                    load(false);
                     return;
                 }
             } catch {
                 setToast("Gagal memindahkan jurnal.");
-                load();
+                load(false);
                 return;
             }
         }
@@ -388,7 +388,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             const json = await res.json();
             if (!json.success) {
                 setToast(json.message ?? "Gagal menyimpan urutan.");
-                load();
+                load(false);
             } else if (isGroupDrag) {
                 setToast(`${idsToMoveSet.size} entry dipindahkan ke ${fmtTgl(targetDate)}`);
             } else if (dateChanged) {
@@ -396,7 +396,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             }
         } catch (e) {
             setToast("Gagal menyimpan urutan.");
-            load();
+            load(false);
         }
     };
 
@@ -419,7 +419,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             setToast(`${json.count ?? ids.length} jurnal dipindahkan ke ${fmtTgl(targetMoveDate)}`);
             setShowBulkMoveModal(false);
             setSelectedEntryIds(new Set());
-            await load();
+            await load(false);
         } catch {
             setToast("Koneksi bermasalah saat memindahkan jurnal");
         } finally {
@@ -444,7 +444,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             const gagal = results.filter((r: any) => !r.success).length;
             setToast(gagal > 0 ? `${ids.length - gagal} dihapus, ${gagal} gagal` : `${ids.length} jurnal dihapus`);
             setSelectedEntryIds(new Set());
-            await load();
+            await load(false);
         } finally {
             setBulkBusy(false);
         }
@@ -1197,7 +1197,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                 onLog={setLogEntry}
                                                 onDelete={handleDelete}
                                                 onToggleChecked={toggleEntryChecked}
-                                                onUpdated={load}
+                                                onUpdated={handleUpdated}
                                                 onToggleWarningState={handleToggleWarningState}
                                                 setToast={setToast}
                                             />
@@ -1216,7 +1216,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                 <EntryFormModal
                     period={period}
                     onClose={() => setShowManual(false)}
-                    onSaved={() => { setShowManual(false); setToast("Jurnal manual dibuat"); load(); }}
+                    onSaved={() => { setShowManual(false); setToast("Jurnal manual dibuat"); load(false); }}
                 />
             )}
             {editEntry && (
@@ -1224,7 +1224,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                     period={period}
                     entry={editEntry}
                     onClose={() => setEditEntry(null)}
-                    onSaved={() => { setEditEntry(null); setToast("Jurnal diperbarui"); load(); }}
+                    onSaved={() => { setEditEntry(null); setToast("Jurnal diperbarui"); load(false); }}
                 />
             )}
             {logEntry && <AuditLogModal entry={logEntry} onClose={() => setLogEntry(null)} />}
