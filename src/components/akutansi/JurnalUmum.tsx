@@ -139,7 +139,7 @@ export default function JurnalUmum({ period }: { period: string }) {
     const accountFilterRef = useRef<HTMLDivElement>(null);
     const accountFilterButtonRef = useRef<HTMLButtonElement>(null);
     const [filterDropdownPos, setFilterDropdownPos] = useState<{ top: number; left: number } | null>(null);
-   const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [selected, setSelected] = useState<Set<string>>(new Set());
     // Selection KHUSUS baris jurnal utama (bukan panel pending) — dipakai untuk
     // bulk actions: geser bareng, kasih penanda bareng, hapus bareng.
     const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
@@ -162,7 +162,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         return localStorage.getItem("jurnal-show-pending") === "true";
     });
 
-   const load = useCallback(async (showLoader = true) => {
+    const load = useCallback(async (showLoader = true) => {
         if (showLoader) setLoading(true);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 25000); // stop nunggu setelah 25 detik
@@ -488,13 +488,13 @@ export default function JurnalUmum({ period }: { period: string }) {
             prev.map((e) =>
                 e.id === entry.id
                     ? {
-                          ...e,
-                          lines: e.lines.map((l) =>
-                              validLineIds.has(l.id)
-                                  ? { ...l, checked: next, checked_at: next ? new Date().toISOString() : null }
-                                  : l
-                          ),
-                      }
+                        ...e,
+                        lines: e.lines.map((l) =>
+                            validLineIds.has(l.id)
+                                ? { ...l, checked: next, checked_at: next ? new Date().toISOString() : null }
+                                : l
+                        ),
+                    }
                     : e
             )
         );
@@ -880,10 +880,10 @@ export default function JurnalUmum({ period }: { period: string }) {
                             onClick={() => setShowOnlyWarnings((v) => !v)}
                             title={showOnlyWarnings ? "Tampilkan semua data" : "Filter hanya data dengan penanda (Modal Rp0 / diedit)"}
                             className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyWarnings
-                                    ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300"
-                                    : warningCount > 0
-                                        ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                                        : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                                ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300"
+                                : warningCount > 0
+                                    ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                                    : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
                                 }`}
                         >
                             <AlertTriangle className={`w-3.5 h-3.5 ${showOnlyWarnings ? "text-white" : warningCount > 0 ? "text-red-600" : "text-slate-400"}`} />
@@ -896,7 +896,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                         </button>
                     </div>
 
-                 <button
+                    <button
                         onClick={() => setShowManual(true)}
                         className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
                     >
@@ -1030,8 +1030,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                         </span>
                         <span
                             className={`text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 shrink-0 ${totalDebit === totalKredit
-                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
-                                    : "bg-red-50 text-red-700 border border-red-200/80"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
+                                : "bg-red-50 text-red-700 border border-red-200/80"
                                 }`}
                         >
                             {totalDebit === totalKredit ? (
@@ -1183,6 +1183,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                             </tr>
                                         </tbody>
                                     ) : (
+
                                         visibleEntries.map((entry, index) => (
                                             <JournalEntryRow
                                                 key={entry.id}
@@ -1371,9 +1372,8 @@ function WarningToggle({
                     onClick={() => { computePos(); setShowPopover((v) => !v); }}
                     disabled={busy}
                     title="Klik untuk hapus atau tandai ulang penanda"
-                    className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${
-                        showPopover ? "bg-red-100 text-red-700 border-red-300" : "text-red-600 bg-red-50 border-red-200 hover:bg-red-100"
-                    }`}
+                    className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${showPopover ? "bg-red-100 text-red-700 border-red-300" : "text-red-600 bg-red-50 border-red-200 hover:bg-red-100"
+                        }`}
                 >
                     <AlertTriangle className="w-4 h-4 text-red-600" />
                 </button>

@@ -770,6 +770,11 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   }
 });
 
+// ── Audit Barang Keluar: hanya role yang sudah punya akses ITEM_OUTFLOW_ROLES.
+// Pakai .map() bikin objek grup BARU per-role (bukan .push() ke grup yang
+// di-share banyak role, misal ADMIN_INVENTARIS dipakai ADMIN+PROGRAMMER+
+// ASISTEN_CEO+ACCOUNTING) — supaya ACCOUNTING dkk yang TIDAK ada di
+// ITEM_OUTFLOW_ROLES gak ikut kebagian menu ini gara-gara referensi objek sama.
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   if (!(ITEM_OUTFLOW_ROLES as string[]).includes(role)) return;
   let hasInventaris = false;
