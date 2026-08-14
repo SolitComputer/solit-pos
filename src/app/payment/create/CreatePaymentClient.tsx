@@ -566,7 +566,7 @@ export default function CreatePaymentPage() {
             return;
         }
 
-        if (!paymentPhoto) { alert("Foto pembayaran wajib diupload"); return; }
+       if (paymentFlow === "DIRECT" && !paymentPhoto) { alert("Foto pembayaran wajib diupload"); return; }
         if (!latitude || !longitude) { alert("GPS wajib diambil"); return; }
 
         if (data.payment_method === "TF_CASH") {
@@ -618,28 +618,33 @@ export default function CreatePaymentPage() {
         alert(`Tidak bisa lanjut — ${firstMsg}\n\n(Cek Console untuk detail lengkap semua field yang error)\n\n${fieldErrors.join("\n")}`);
     };
 
-    const handleConfirmedSubmit = async () => {
-        if (!pendingSubmitData || !paymentPhoto) return;
+   const handleConfirmedSubmit = async () => {
+        if (!pendingSubmitData) return;
         setShowConfirmModal(false);
         setSubmitting(true);
         try {
-            // Upload foto
-            const fileName = `${Date.now()}-${paymentPhoto.name}`;
-            const { error: uploadError } = await supabase.storage
-                .from("payment-proof")
-                .upload(fileName, paymentPhoto);
-            if (uploadError) { alert("Upload foto gagal"); return; }
+            // Upload foto — opsional untuk Payment Pending, wajib sudah divalidasi
+            // di onSubmit untuk Payment Transaksi (DIRECT)
+            let photoUrl: string | null = null;
+            if (paymentPhoto) {
+                const fileName = `${Date.now()}-${paymentPhoto.name}`;
+                const { error: uploadError } = await supabase.storage
+                    .from("payment-proof")
+                    .upload(fileName, paymentPhoto);
+                if (uploadError) { alert("Upload foto gagal"); return; }
 
-            const { data: imageData } = supabase.storage
-                .from("payment-proof")
-                .getPublicUrl(fileName);
+                const { data: imageData } = supabase.storage
+                    .from("payment-proof")
+                    .getPublicUrl(fileName);
+                photoUrl = imageData.publicUrl;
+            }
 
             const res = await fetch("/api/transaction/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...pendingSubmitData,
-                    payment_photo: imageData.publicUrl,
+                    payment_photo: photoUrl,
                     latitude, longitude,
                     warranty_duration: warrantyDuration,
                     seller_type: sellerType,
@@ -1528,8 +1533,10 @@ export default function CreatePaymentPage() {
                             )}
 
                             {/* Foto */}
-                            <div>
-                                <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5"><Camera size={14} /> Foto Bukti Pembayaran *</label>
+                           <div>
+                                <label className="text-xs text-gray-500 mb-1.5 flex items-center gap-1.5">
+                                    <Camera size={14} /> Foto Bukti Pembayaran {paymentFlow === "DIRECT" ? "*" : <span className="text-gray-400 font-normal">(opsional)</span>}
+                                </label>
                                 <input type="file" accept="image/*" capture="environment"
                                     className="border border-gray-200 rounded-xl p-3 text-sm w-full bg-white file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 transition"
                                     onChange={handlePhotoChange}
