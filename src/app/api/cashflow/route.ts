@@ -554,8 +554,16 @@ export const GET = withAuth(async () => {
     const masuk = all.filter((e: any) => e.direction === "IN");
     const keluar = all.filter((e: any) => e.direction === "OUT");
 
+    // ✅ FIX: entry yang is_stale (sudah diaudit, tapi harga di transaksi sumbernya
+    // berubah belakangan — badge "Kini Rp2.850.000" di tabel) dihitung pakai
+    // source_nominal (harga TERKINI di tabel transactions), bukan nominal yang
+    // ter-lock saat audit. Supaya Saldo Cashflow selalu mencerminkan uang yang
+    // benar-benar diterima sekarang, bukan angka lama yang sudah usang.
+    const effectiveNominal = (e: any) =>
+        e.is_stale && e.source_nominal != null ? Number(e.source_nominal) : Number(e.nominal || 0);
+
     const totalMasuk = masuk.reduce(
-        (s: number, e: any) => (e.is_voided ? s : s + Number(e.nominal || 0)),
+        (s: number, e: any) => (e.is_voided ? s : s + effectiveNominal(e)),
         0
     );
     const totalKeluar = keluar.reduce((s: number, e: any) => s + Number(e.nominal || 0), 0);

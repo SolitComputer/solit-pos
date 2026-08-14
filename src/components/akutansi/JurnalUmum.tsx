@@ -239,8 +239,14 @@ export default function JurnalUmum({ period }: { period: string }) {
             });
             const json = await res.json();
             if (!json.success) { setToast(json.message ?? "Gagal konfirmasi"); return; }
-            setToast(`${json.data?.inserted ?? 0} data masuk jurnal umum`);
-            await load(false);
+            const insertedCount = json.data?.inserted ?? 0;
+            const skippedCount = json.data?.skipped ?? 0;
+            setToast(
+                skippedCount > 0
+                    ? `${insertedCount} data masuk jurnal umum (${skippedCount} sudah pernah dikonfirmasi sebelumnya)`
+                    : `${insertedCount} data masuk jurnal umum`
+            );
+            await load();
         } catch {
             setToast("Koneksi bermasalah");
         } finally {
@@ -2322,7 +2328,13 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                         return (
                             <tr
                                 key={line.id}
-                                className={`${first ? "border-t-2 border-gray-200" : ""} hover:bg-blue-50/30 transition`}
+                                onClick={(e) => {
+                                    // Jangan toggle select kalau yang diklik tombol aksi, checkbox, atau elemen interaktif lain
+                                    const target = e.target as HTMLElement;
+                                    if (target.closest("button, input, a, select, textarea")) return;
+                                    onToggleSelect(entry.id);
+                                }}
+                                className={`${first ? "border-t-2 border-gray-200" : ""} hover:bg-blue-50/30 cursor-pointer transition ${isSelected ? "bg-blue-50/50" : ""}`}
                             >
                                 <td className="px-4 py-2 align-top">
                                     {first && (
@@ -2331,7 +2343,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                 type="checkbox"
                                                 checked={isSelected}
                                                 onChange={() => onToggleSelect(entry.id)}
-                                                className="w-3.5 h-3.5 rounded border-gray-300 accent-[#1a1545] shrink-0"
+                                               className="w-5 h-5 rounded border-gray-300 accent-[#1a1545] shrink-0 cursor-pointer"
                                                 title="Pilih entry ini"
                                             />
                                             <div

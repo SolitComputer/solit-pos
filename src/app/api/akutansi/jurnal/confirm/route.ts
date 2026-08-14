@@ -51,7 +51,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       ? new Set(items.map((i) => `${i.source_type}:${i.source_id}`))
       : null;
 
-  const selected = drafts.filter((d) => {
+  let selected = drafts.filter((d) => {
     const key = draftKey(d);
     if (posted.has(key)) return false;              // sudah pernah diposting
     return wanted ? wanted.has(key) : true;         // null = semua
@@ -72,10 +72,54 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     created_by: user.id,
   }));
 
-  const { data: inserted, error: entryErr } = await supabase
+  let { data: inserted, error: entryErr } = await supabase
     .from("journal_entries")
     .insert(entryRows)
     .select("id, source_type, source_id");
+
+  let skippedCount = 0;
+
+  // (fix) "duplicate key value violates unique constraint journal_entries_source_uniq"
+  // bisa terjadi kalau salah satu item yang dipilih ternyata SUDAH pernah
+  // dikonfirmasi (daftar pending di layar sempat basi). Sebelumnya error ini
+  // bikin SELURUH batch gagal walau item lain di batch itu masih valid.
+  // Sekarang: kalau errornya spesifik unique violation (kode Postgres 23505 —
+  // berlaku untuk constraint apa pun bentuknya, jadi tidak perlu tau persis
+  // definisi constraint-nya), cek ulang ke DB item mana yang bentrok, buang
+  // dari daftar, lalu insert ulang HANYA sisanya.
+  if (entryErr?.code === "23505") {
+    const freshPosted = await getPostedKeys(supabase);
+    skippedCount = selected.filter((d) => freshPosted.has(draftKey(d))).length;
+    selected = selected.filter((d) => !freshPosted.has(draftKey(d)));
+
+    if (selected.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: { inserted: 0, skipped: skippedCount },
+        message: "Semua data terpilih ternyata sudah pernah dikonfirmasi sebelumnya",
+      });
+    }
+
+    const retryEntryRows = selected.map((d) => ({
+      period: periodFromDate(d.tanggal),
+      tanggal: d.tanggal,
+      keterangan: d.keterangan,
+      ref: d.ref,
+      source_type: d.source_type,
+      source_id: d.source_id,
+      source_category: d.source_category,
+      total: d.total,
+      created_by: user.id,
+    }));
+
+    const retry = await supabase
+      .from("journal_entries")
+      .insert(retryEntryRows)
+      .select("id, source_type, source_id");
+
+    inserted = retry.data;
+    entryErr = retry.error;
+  }
 
   if (entryErr || !inserted) {
     console.error("[akuntansi confirm] insert entries:", entryErr);
@@ -111,5 +155,8 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     }))
   );
 
-  return NextResponse.json({ success: true, data: { inserted: selected.length } }, { status: 201 });
+  return NextResponse.json(
+    { success: true, data: { inserted: selected.length, skipped: skippedCount } },
+    { status: 201 }
+  );
 }, AKUNTANSI_MANAGE_ROLES);
