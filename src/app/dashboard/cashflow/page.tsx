@@ -1534,7 +1534,7 @@ export default function CashflowPage() {
 
     const isDetailRow = (e: Entry) => e.direction === "OUT" || (e.direction === "IN" && e.source_type === "MANUAL");
 
-  const handleRowClick = (e: Entry) => {
+    const handleRowClick = (e: Entry) => {
         if (e.source_type === "MODAL_AWAL") return;
         if (isDetailRow(e)) { setDetailEntry(e); return; }
         if (e.source_type === "TRANSACTION" || e.source_type === "TRANSACTION_PAYMENT" || e.source_type === "TRANSACTION_DP") {
@@ -1593,8 +1593,9 @@ export default function CashflowPage() {
         return true;
     };
 
-    const incomeValue = masuk.reduce((s, e) => e.source_type !== "MODAL_AWAL" && !e.is_voided && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s, 0);
-    const expenseValue = keluar.reduce((s, e) => inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s, 0);
+    const effectiveNominal = (e: Entry) =>
+        e.is_stale && e.source_nominal != null ? Number(e.source_nominal) : Number(e.nominal || 0);
+    const incomeValue = masuk.reduce((s, e) => e.source_type !== "MODAL_AWAL" && !e.is_voided && inPeriod(e.tanggal) ? s + effectiveNominal(e) : s, 0); const expenseValue = keluar.reduce((s, e) => inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s, 0);
     const periodLabel = (customFrom || customTo) ? `${customFrom ? fmtTanggalShort(customFrom) : "..."} — ${customTo ? fmtTanggalShort(customTo) : "..."}` : "Semua Waktu";
 
     const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
@@ -1788,7 +1789,7 @@ export default function CashflowPage() {
                                     paginatedRows.map((e) => {
                                         const isClickable = clickable(e);
                                         return (
-                                           <tr key={e.id} onClick={() => isClickable && handleRowClick(e)}
+                                            <tr key={e.id} onClick={() => isClickable && handleRowClick(e)}
                                                 className={`transition-colors group ${e.is_voided && e.is_audited ? "bg-red-50/70 ring-1 ring-inset ring-red-200" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-gray-50/50"}`}>
                                                 <td className="pl-5 pr-3 py-3 whitespace-nowrap">
                                                     <span className="text-[11px] font-semibold text-gray-600">
@@ -1799,7 +1800,7 @@ export default function CashflowPage() {
                                                     <p className="text-[9px] text-gray-400 font-mono mt-0.5">{fmtTanggal(e.tanggal)}</p>
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap"><SourceBadge sourceType={e.source_type} /></td>
-                                               <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
+                                                <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
                                                     {e.direction === "OUT" && e.source_type === "MANUAL" ? (
                                                         e.payment_method === "SALDO"
                                                             ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={11} /> Saldo</span>
@@ -1847,7 +1848,7 @@ export default function CashflowPage() {
                                                 <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
                                                     <AuditCell entry={e} busy={auditingId === e.id} onAudit={() => toggleAudit(e)} canAudit={e.direction === "OUT" ? canAuditOut : true} />
                                                 </td>
-                                               <td className="px-3 py-3 whitespace-nowrap">
+                                                <td className="px-3 py-3 whitespace-nowrap">
                                                     {e.audited_by_user?.name ? (
                                                         <>
                                                             <span className="text-[11px] text-emerald-600 font-semibold"> {e.audited_by_user.name}</span>
@@ -1857,7 +1858,7 @@ export default function CashflowPage() {
                                                         <span className="text-gray-300 text-[11px]">—</span>
                                                     )}
                                                 </td>
-                                              <td className="px-3 pr-5 py-3 text-right whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
+                                                <td className="px-3 pr-5 py-3 text-right whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
                                                     <span className="text-[10px] text-gray-400 font-mono whitespace-nowrap">
                                                         {e.is_audited && e.audited_at ? fmtWaktuAudit(e.audited_at) : "—"}
                                                     </span>
