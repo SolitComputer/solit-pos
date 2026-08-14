@@ -51,7 +51,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       ? new Set(items.map((i) => `${i.source_type}:${i.source_id}`))
       : null;
 
-  const selected = drafts.filter((d) => {
+  let selected = drafts.filter((d) => {
     const key = draftKey(d);
     if (posted.has(key)) return false;              // sudah pernah diposting
     return wanted ? wanted.has(key) : true;         // null = semua
@@ -72,19 +72,41 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     created_by: user.id,
   }));
 
+  // (fix) Pakai upsert + ignoreDuplicates alih-alih insert biasa. Sebelumnya,
+  // kalau SATU SAJA item yang dipilih ternyata sudah pernah dikonfirmasi
+  // (mis. daftar pending di layar sempat basi, atau ada klik dobel / tab lain
+  // yang lebih dulu konfirmasi), insert gagal total dengan error
+  // "duplicate key value violates unique constraint journal_entries_source_uniq"
+  // dan SELURUH batch ikut gagal. Dengan ignoreDuplicates:true, Postgres
+  // otomatis MELEWATI baris yang bentrok (ON CONFLICT DO NOTHING) alih-alih
+  // error, dan cuma mengembalikan baris yang benar-benar baru diinsert.
   const { data: inserted, error: entryErr } = await supabase
     .from("journal_entries")
-    .insert(entryRows)
+    .upsert(entryRows, { onConflict: "source_type,source_id", ignoreDuplicates: true })
     .select("id, source_type, source_id");
 
-  if (entryErr || !inserted) {
+  if (entryErr) {
     console.error("[akuntansi confirm] insert entries:", entryErr);
-    return NextResponse.json({ success: false, message: entryErr?.message ?? "Gagal konfirmasi" }, { status: 500 });
+    return NextResponse.json({ success: false, message: entryErr.message }, { status: 500 });
   }
 
   const idMap = new Map<string, string>(
-    inserted.map((e: any) => [draftKey(e), e.id as string])
+    (inserted ?? []).map((e: any) => [draftKey(e), e.id as string])
   );
+
+  // Item yang bentrok (sudah pernah diposting) tidak ada di idMap — persempit
+  // `selected` supaya baris jurnal & audit log di bawah cuma dibuat untuk
+  // entry yang BENAR-BENAR baru diinsert kali ini.
+  const skippedCount = selected.length - idMap.size;
+  selected = selected.filter((d) => idMap.has(draftKey(d)));
+
+  if (selected.length === 0) {
+    return NextResponse.json({
+      success: true,
+      data: { inserted: 0, skipped: skippedCount },
+      message: "Semua data terpilih ternyata sudah pernah dikonfirmasi sebelumnya",
+    });
+  }
 
   const lineRows = selected.flatMap((d) => {
     const entryId = idMap.get(draftKey(d));
@@ -111,5 +133,8 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     }))
   );
 
-  return NextResponse.json({ success: true, data: { inserted: selected.length } }, { status: 201 });
+  return NextResponse.json(
+    { success: true, data: { inserted: selected.length, skipped: skippedCount } },
+    { status: 201 }
+  );
 }, AKUNTANSI_MANAGE_ROLES);

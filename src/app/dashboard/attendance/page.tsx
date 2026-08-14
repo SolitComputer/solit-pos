@@ -1,6 +1,6 @@
 "use client";
 
-import { getOvertimeColor, formatOvertimeMinutes, OVERTIME_CATEGORIES, OVERTIME_CATEGORY_LABELS, type OvertimeCategory } from "@/lib/overtimeEngine";
+import { getOvertimeColor, formatOvertimeMinutes, OVERTIME_CATEGORIES, OVERTIME_CATEGORY_LABELS, type OvertimeCategory, computeBeforeInOvertimeMinutes, computeAfterOutOvertimeMinutes, computeHolidayOvertimeMinutes } from "@/lib/overtimeEngine";
 import React from "react";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
@@ -1758,22 +1758,26 @@ function TodayAttendanceCard({ status, loading, onRefresh, onRequestEarlyCheckou
     );
 }
 
-// ─── Kartu Pilihan Lembur (Awal/Akhir/Awal-Akhir/Hari Libur/Tidak Mau) ─────────
-// ✅ NEW — muncul di bawah TodayAttendanceCard begitu karyawan (termasuk PKL)
-// sudah absen pulang DAN ada potensi lembur. "Tidak Mau Lembur" cuma menutup
-// kartu ini di sesi ini, tidak memanggil API apa pun.
-function OvertimeChoiceCard({ options, isDayOff }: {
+function OvertimeChoiceCard({ date, options, isDayOff, alreadyRequested, onDismiss, onSubmitted }: {
+    date: string;
     options: { beforeInMinutes: number; afterOutMinutes: number; holidayMinutes: number };
     isDayOff: boolean;
+    alreadyRequested?: Set<string>;
+    onDismiss?: () => void;
+    onSubmitted?: () => void;
 }) {
     const router = useRouter();
     const [dismissed, setDismissed] = useState(false);
     const [submitting, setSubmitting] = useState<string | null>(null);
     const [error, setError] = useState("");
+    const already = alreadyRequested ?? new Set<string>();
 
     if (dismissed) return null;
     const { beforeInMinutes, afterOutMinutes, holidayMinutes } = options;
     if (beforeInMinutes <= 0 && afterOutMinutes <= 0 && holidayMinutes <= 0) return null;
+
+    const isToday = date === getWIBToday();
+    const dateLabel = new Date(date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
     const submit = async (direction: "BEFORE_IN" | "AFTER_OUT" | "BOTH" | "HOLIDAY") => {
         setSubmitting(direction); setError("");
@@ -1781,10 +1785,11 @@ function OvertimeChoiceCard({ options, isDayOff }: {
             const res = await fetch("/api/attendance/overtime", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ is_self_declare: true, declare_direction: direction }),
+                body: JSON.stringify({ is_self_declare: true, declare_direction: direction, request_date: date }),
             });
             const d = await res.json();
             if (!d.success) { setError(d.message || "Gagal mengajukan lembur"); setSubmitting(null); return; }
+            onSubmitted?.();
             router.push(`/dashboard/attendance/overtime?fillDetail=${d.data.id}`);
         } catch {
             setError("Gagal mengajukan lembur");
@@ -1799,46 +1804,113 @@ function OvertimeChoiceCard({ options, isDayOff }: {
                     <Clock className="w-5 h-5 text-violet-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-800 text-sm leading-snug">Kamu Berpotensi Dapat Lembur</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">Pilih mau ajukan yang mana, atau tidak sama sekali.</p>
+                    <p className="font-bold text-gray-800 text-sm leading-snug">
+                        {isToday ? "Kamu Berpotensi Dapat Lembur" : "Lembur Belum Diajukan"}
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+                        {dateLabel} · Pilih mau ajukan yang mana, atau tidak sama sekali.
+                    </p>
                 </div>
             </div>
 
             {error && <div className="bg-red-50 border border-red-200 text-red-600 text-[11px] px-3.5 py-2.5 rounded-xl">{error}</div>}
 
             <div className="flex flex-col gap-2">
-                {isDayOff && holidayMinutes > 0 && (
+                {isDayOff && holidayMinutes > 0 && !already.has("HOLIDAY") && (
                     <button onClick={() => submit("HOLIDAY")} disabled={!!submitting}
                         className="w-full h-11 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                         {submitting === "HOLIDAY" && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                         Ajukan Lembur Hari Libur ({formatOvertimeMinutes(holidayMinutes)})
                     </button>
                 )}
-                {!isDayOff && beforeInMinutes > 0 && (
+                {!isDayOff && beforeInMinutes > 0 && !already.has("BEFORE_IN") && !already.has("BOTH") && (
                     <button onClick={() => submit("BEFORE_IN")} disabled={!!submitting}
                         className="w-full h-11 bg-white border border-violet-200 text-violet-700 rounded-xl text-xs font-bold hover:bg-violet-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                         {submitting === "BEFORE_IN" && <div className="w-4 h-4 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin" />}
                         Ajukan Lembur Awal ({formatOvertimeMinutes(beforeInMinutes)})
                     </button>
                 )}
-                {!isDayOff && afterOutMinutes > 0 && (
+                {!isDayOff && afterOutMinutes > 0 && !already.has("AFTER_OUT") && !already.has("BOTH") && (
                     <button onClick={() => submit("AFTER_OUT")} disabled={!!submitting}
                         className="w-full h-11 bg-white border border-violet-200 text-violet-700 rounded-xl text-xs font-bold hover:bg-violet-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                         {submitting === "AFTER_OUT" && <div className="w-4 h-4 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin" />}
                         Ajukan Lembur Akhir ({formatOvertimeMinutes(afterOutMinutes)})
                     </button>
                 )}
-                {!isDayOff && beforeInMinutes > 0 && afterOutMinutes > 0 && (
+                {!isDayOff && beforeInMinutes > 0 && afterOutMinutes > 0 && !already.has("BOTH") && !(already.has("BEFORE_IN") && already.has("AFTER_OUT")) && (
                     <button onClick={() => submit("BOTH")} disabled={!!submitting}
                         className="w-full h-11 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                         {submitting === "BOTH" && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                         Ajukan Awal & Akhir ({formatOvertimeMinutes(beforeInMinutes + afterOutMinutes)})
                     </button>
                 )}
-                <button onClick={() => setDismissed(true)} disabled={!!submitting}
+                <button onClick={() => { setDismissed(true); onDismiss?.(); }} disabled={!!submitting}
                     className="w-full h-10 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all disabled:opacity-50">
                     Tidak Mau Lembur
                 </button>
+            </div>
+        </div>
+    );
+}
+
+// ─── Kartu "Lembur Belum Diajukan" untuk tanggal-tanggal yang sudah lewat ──
+// ✅ NEW — sebelumnya tombol ajukan lembur awal/akhir & tidak mau lembur cuma
+// muncul untuk HARI INI (lewat TodayAttendanceCard). Begitu tanggalnya lewat,
+// tombolnya hilang total walau karyawan belum sempat memilih. Kartu ini
+// menampilkan daftar tanggal lalu yang masih berpotensi lembur & belum
+// diajukan/ditandai "Tidak Mau Lembur" — ada ikon warning per tanggal, diklik
+// baru muncul pilihan yang sama seperti kartu hari ini (lengkap tanggalnya).
+function PastOvertimeOpportunitiesCard({ items, onResolved }: {
+    items: { date: string; options: { beforeInMinutes: number; afterOutMinutes: number; holidayMinutes: number }; isDayOff: boolean; already: Set<string> }[];
+    onResolved: (date: string) => void;
+}) {
+    const [openDate, setOpenDate] = useState<string | null>(null);
+    if (items.length === 0) return null;
+
+    return (
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 bg-amber-50/70 border-b border-amber-100">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <ShieldAlert className="w-5 h-5 text-amber-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-amber-800">
+                        {items.length} Hari Lembur Belum Diajukan
+                    </p>
+                    <p className="text-[11px] text-amber-600 mt-0.5">Klik tanggalnya untuk ajukan lembur atau tandai tidak mau lembur</p>
+                </div>
+            </div>
+            <div className="divide-y divide-amber-50">
+                {items.map(item => {
+                    const isOpen = openDate === item.date;
+                    const label = new Date(item.date + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
+                    return (
+                        <div key={item.date}>
+                            <button
+                                onClick={() => setOpenDate(p => p === item.date ? null : item.date)}
+                                className="w-full flex items-center justify-between gap-3 px-4 sm:px-5 py-3 hover:bg-amber-50/40 transition-all text-left"
+                            >
+                                <div className="flex items-center gap-2.5">
+                                    <ShieldAlert className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                                    <span className="text-xs font-semibold text-gray-700">{label}</span>
+                                </div>
+                                <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`} />
+                            </button>
+                            {isOpen && (
+                                <div className="px-4 sm:px-5 pb-4">
+                                    <OvertimeChoiceCard
+                                        date={item.date}
+                                        options={item.options}
+                                        isDayOff={item.isDayOff}
+                                        alreadyRequested={item.already}
+                                        onDismiss={() => { onResolved(item.date); setOpenDate(null); }}
+                                        onSubmitted={() => { onResolved(item.date); setOpenDate(null); }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
@@ -3254,6 +3326,8 @@ export default function AttendanceDashboardPage() {
     const [contractDetailUser, setContractDetailUser] = useState<UserInfo | null>(null);
     const [shiftSchedules, setShiftSchedules] = useState<ShiftScheduleRow[]>([]);
     const [shiftConfigs, setShiftConfigs] = useState<any[]>([]);
+    const [myOvertimeDirections, setMyOvertimeDirections] = useState<Record<string, Set<string>>>({}); // ✅ NEW
+    const [dismissedPastOvertimeDates, setDismissedPastOvertimeDates] = useState<Set<string>>(new Set()); // ✅ NEW
 
     const fetchShiftSchedules = useCallback(async (y: number, m: number) => {
         try {
@@ -3316,10 +3390,29 @@ export default function AttendanceDashboardPage() {
         } catch { }
     }, []);
 
+    const fetchMyOvertimeDirections = useCallback(async (year: number, month: number, myUserId?: string) => {
+        if (!myUserId) { setMyOvertimeDirections({}); return; }
+        try {
+            const r = await fetch(`/api/attendance/overtime?year=${year}&month=${month + 1}`);
+            const d = await r.json();
+            if (!d.success) return;
+            const map: Record<string, Set<string>> = {};
+            (d.data || []).forEach((o: any) => {
+                if (o.user_id !== myUserId) return;
+                if (o.status === "REJECTED" || o.status === "CANCELLED") return; // boleh diajukan ulang
+                if (!o.direction || o.direction === "MANUAL") return;
+                if (!map[o.request_date]) map[o.request_date] = new Set();
+                map[o.request_date].add(o.direction);
+            });
+            setMyOvertimeDirections(map);
+        } catch { }
+    }, []);
+
     useEffect(() => {
         if (!selectedMonth) return;
         fetchAfterOutOvertime(selectedMonth.year, selectedMonth.month);
-    }, [selectedMonth, fetchAfterOutOvertime]);
+        fetchMyOvertimeDirections(selectedMonth.year, selectedMonth.month, currentUser?.id);
+    }, [selectedMonth, fetchAfterOutOvertime, fetchMyOvertimeDirections, currentUser?.id]);
     const fetchManualRecords = useCallback(async (y: number, m: number) => {
         const r = await fetch(`/api/attendance/manual?year=${y}&month=${m + 1}`);
         const d = await r.json();
@@ -3820,6 +3913,55 @@ export default function AttendanceDashboardPage() {
             close: closeMin,
         };
     }, [schedulesByUser, configsByUser, allUsers]);
+
+    // ✅ NEW — daftar tanggal LALU (sebelum hari ini) milik user yang sedang
+    // login yang masih berpotensi lembur (masuk lebih awal / pulang lebih
+    // larut / lembur hari libur) tapi belum diajukan / belum ditandai
+    // "Tidak Mau Lembur". Dipakai PastOvertimeOpportunitiesCard supaya tombol
+    // ajukan lembur tetap bisa diakses walau harinya sudah lewat.
+    const myPastOvertimeOpportunities = useMemo(() => {
+        if (!currentUser?.id || !selectedMonth) return [];
+        const dim = new Date(calYear, calMonth + 1, 0).getDate();
+        const userStartDate = getUserStartDate(currentUser.created_at, calYear, calMonth);
+        const results: { date: string; options: { beforeInMinutes: number; afterOutMinutes: number; holidayMinutes: number }; isDayOff: boolean; already: Set<string> }[] = [];
+
+        for (let d = 1; d <= dim; d++) {
+            const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
+            if (dk >= todayKey) continue; // hanya tanggal yang sudah lewat
+            if (dk < userStartDate) continue;
+            if (dismissedPastOvertimeDates.has(dk)) continue;
+
+            const myAtt = attendances.find(a => a.user_id === currentUser.id && toWIBDateKey(a.check_in_time || a.created_at) === dk);
+            const myManual = manualMap[`${currentUser.id}_${dk}`];
+            const checkInISO = myAtt
+                ? (myAtt.check_in_time || myAtt.created_at)
+                : (myManual && (myManual.status === "PRESENT" || myManual.status === "LATE") ? myManual.check_in_time : null);
+            if (!checkInISO) continue;
+
+            const checkoutISO = checkoutTimes[`${currentUser.id}_${dk}`] ?? null;
+            const isOff = isDayOffForUser(currentUser.name, dk);
+            const eff = effectiveShiftFor(currentUser.id, dk);
+            const schedule = {
+                lateFrom: { h: Math.floor(eff.late / 60), m: eff.late % 60 },
+                checkout: { h: Math.floor(eff.close / 60), m: eff.close % 60 },
+            };
+
+            let beforeInMinutes = 0, afterOutMinutes = 0, holidayMinutes = 0;
+            if (isOff) {
+                if (checkoutISO) holidayMinutes = computeHolidayOvertimeMinutes(checkInISO, checkoutISO);
+            } else {
+                beforeInMinutes = computeBeforeInOvertimeMinutes(checkInISO, schedule);
+                if (checkoutISO) afterOutMinutes = computeAfterOutOvertimeMinutes(checkoutISO, schedule);
+            }
+            if (beforeInMinutes <= 0 && afterOutMinutes <= 0 && holidayMinutes <= 0) continue;
+
+            const already = myOvertimeDirections[dk] ?? new Set<string>();
+            if (already.size > 0) continue;
+
+            results.push({ date: dk, options: { beforeInMinutes, afterOutMinutes, holidayMinutes }, isDayOff: isOff, already });
+        }
+        return results.sort((a, b) => b.date.localeCompare(a.date));
+    }, [currentUser, selectedMonth, calYear, calMonth, attendances, manualMap, checkoutTimes, isDayOffForUser, effectiveShiftFor, myOvertimeDirections, dismissedPastOvertimeDates, todayKey]);
 
     const userSummary = useMemo(() => {
         type UserStat = {
@@ -4490,7 +4632,7 @@ export default function AttendanceDashboardPage() {
             items,
             monthLabel: `${MONTH_NAMES[calMonth]} ${calYear}`,
         };
-   }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser, checkoutTimes]);
+    }, [calYear, calMonth, allUsers, manualRecords, thisMonthAtt, thisMonthKey, isDayOffForUser, checkoutTimes]);
 
     const lastRefreshRef = useRef<number>(Date.now());
 
@@ -4627,9 +4769,12 @@ export default function AttendanceDashboardPage() {
                 <OvertimeSOPBanner compact />
                 <TodayAttendanceCard status={todayStatus} loading={statusLoading} onRefresh={fetchTodayStatus} onRequestEarlyCheckout={() => setShowEarlyCheckoutModal(true)} />
                 {todayStatus?.overtimeOptions && (
-                    <OvertimeChoiceCard options={todayStatus.overtimeOptions} isDayOff={todayStatus.isDayOff} />
+                    <OvertimeChoiceCard date={todayKey} options={todayStatus.overtimeOptions} isDayOff={todayStatus.isDayOff} />
                 )}
-
+                <PastOvertimeOpportunitiesCard
+                    items={myPastOvertimeOpportunities}
+                    onResolved={(dk) => setDismissedPastOvertimeDates(prev => new Set(prev).add(dk))}
+                />
                 {/* ── Stat Cards ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {[

@@ -87,6 +87,35 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     const { data, error, count } = await query;
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
 
+    // ── Resolve laptop_id untuk item yang TIDAK punya laptop_id ──
+    // SN yang dipilih dari hasil pencarian stok (addUnit di CreateModal)
+    // sudah punya laptop_id sejak insert. Tapi SN yang diinput manual
+    // (addManual) atau lewat scan barcode (BarcodeScanModal) HANYA punya
+    // serial_number — laptop_id & laptop_name kosong. Supaya spek+merk
+    // tetap muncul buat SN jenis ini juga, cocokkan dulu serial_number-nya
+    // ke `laptop_units` di sini.
+    const allItemsFlat = (data ?? []).flatMap((o: any) => o.preparation_items ?? []);
+    const missingSns = [
+      ...new Set(
+        allItemsFlat
+          .filter((it: any) => !it.laptop_id && it.serial_number)
+          .map((it: any) => it.serial_number)
+      ),
+    ] as string[];
+
+    let snToLaptop = new Map<string, string>();
+    if (missingSns.length > 0) {
+      const { data: matchedUnits } = await supabase
+        .from("laptop_units")
+        .select("serial_number, laptop_id")
+        .in("serial_number", missingSns);
+      snToLaptop = new Map(
+        (matchedUnits ?? [])
+          .filter((u: any) => u.laptop_id)
+          .map((u: any) => [u.serial_number, u.laptop_id])
+      );
+    }
+
     // ── Enrich preparation_items dengan spek laptop (CPU/RAM/Storage/GPU) ──
     // laptop_id sudah tersimpan di preparation_items sejak dibuat, tapi
     // speknya sendiri TIDAK didenormalisasi ke situ — diambil live dari
@@ -94,11 +123,24 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     // belakangan di Data Barang, yang tampil di sini ikut ke-update.
     const laptopIds = [
       ...new Set(
-        (data ?? []).flatMap((o: any) =>
-          (o.preparation_items ?? []).map((it: any) => it.laptop_id).filter(Boolean)
-        )
+        allItemsFlat
+          .map((it: any) => it.laptop_id ?? snToLaptop.get(it.serial_number))
+          .filter(Boolean)
       ),
     ] as string[];
+
+    // Nama model buat SN manual/scan yang berhasil dicocokkan di atas.
+    // Kolom di tabel `laptops` namanya "laptop_name" (lihat api/units/search-sn/route.ts).
+    let laptopNameMap = new Map<string, string>();
+    if (laptopIds.length > 0) {
+      const { data: laptopNames, error: nameErr } = await supabase
+        .from("laptops")
+        .select("id, laptop_name")
+        .in("id", laptopIds);
+      if (!nameErr && laptopNames) {
+        laptopNameMap = new Map(laptopNames.map((l: any) => [l.id, l.laptop_name]));
+      }
+    }
 
     if (laptopIds.length > 0) {
       const { data: laptopSpecs } = await supabase
@@ -107,10 +149,14 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
         .in("id", laptopIds);
       const specMap = new Map((laptopSpecs ?? []).map((l: any) => [l.id, l]));
       (data ?? []).forEach((o: any) => {
-        o.preparation_items = (o.preparation_items ?? []).map((it: any) => ({
-          ...it,
-          laptop_spec: it.laptop_id ? specMap.get(it.laptop_id) ?? null : null,
-        }));
+        o.preparation_items = (o.preparation_items ?? []).map((it: any) => {
+          const resolvedLaptopId = it.laptop_id ?? snToLaptop.get(it.serial_number) ?? null;
+          return {
+            ...it,
+            laptop_name: it.laptop_name ?? (resolvedLaptopId ? laptopNameMap.get(resolvedLaptopId) ?? null : null),
+            laptop_spec: resolvedLaptopId ? specMap.get(resolvedLaptopId) ?? null : null,
+          };
+        });
       });
     }
 
