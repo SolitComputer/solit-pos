@@ -22,10 +22,10 @@ export function ThinkingIndicator({ label }: { label: string }) {
     );
 }
 
-export function MarkdownMessage({ content }: { content: string }) {
+export function MarkdownMessage({ content }: { content: string | null | undefined }) {
     const [copied, setCopied] = useState(false);
     const handleCopy = () => {
-        navigator.clipboard.writeText(content);
+        navigator.clipboard.writeText(content || "");
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -63,7 +63,7 @@ export function MarkdownMessage({ content }: { content: string }) {
                         tr: ({ children }) => <tr className="even:bg-gray-50/60 hover:bg-gray-100/70 transition-colors">{children}</tr>,
                     }}
                 >
-                    {content}
+                    {content || ""}
                 </ReactMarkdown>
             </div>
             <div className="flex items-center gap-2 pt-1 opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-100 transition-opacity duration-200">
