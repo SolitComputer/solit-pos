@@ -303,19 +303,22 @@ export async function POST(request: Request) {
       is_holiday = false,
     } = body;
 
-    // ── SELF-DECLARE — karyawan mengajukan sendiri lembur miliknya ─────────
-    // Dipanggil dari halaman Absensi saat karyawan pilih Awal/Akhir/Awal-Akhir/
-    // Libur. "Tidak Mau Lembur" = tidak pernah memanggil endpoint ini.
     if (is_self_declare === true) {
       const validDirections: OvertimeDirection[] = ["BEFORE_IN", "AFTER_OUT", "BOTH", "HOLIDAY"];
       if (!validDirections.includes(declare_direction)) {
         return NextResponse.json({ success: false, message: "Kategori lembur tidak valid." }, { status: 400 });
       }
 
-      // ✅ PKL disamakan dengan karyawan — tidak ada lagi pengecualian role di sini.
       const nowWIB = new Date(Date.now() + 7 * 3600_000);
-      const todayDate = nowWIB.toISOString().slice(0, 10);
-      const todayDow = nowWIB.getUTCDay();
+      const todayWIBDate = nowWIB.toISOString().slice(0, 10);
+
+      const targetDate: string = (request_date && String(request_date).trim()) || todayWIBDate;
+      if (targetDate > todayWIBDate) {
+        return NextResponse.json({ success: false, message: "Tidak bisa mengajukan lembur untuk tanggal yang belum terjadi." }, { status: 400 });
+      }
+
+      const todayDate = targetDate;
+      const todayDow = new Date(todayDate + "T12:00:00").getDay();
 
       // Cegah pengajuan dobel untuk tanggal + arah yang sama
       const { data: existingReq } = await supabase
@@ -380,7 +383,7 @@ export async function POST(request: Request) {
 
       let minutes = 0, actualStart = "", actualEnd = "";
 
-     if (declare_direction === "HOLIDAY") {
+      if (declare_direction === "HOLIDAY") {
         if (!isDayOffToday) return NextResponse.json({ success: false, message: "Hari ini bukan hari libur kamu." }, { status: 400 });
         if (!todayOut) return NextResponse.json({ success: false, message: "Belum ada absen pulang hari ini." }, { status: 400 });
         minutes = computeHolidayOvertimeMinutes(effectiveTodayIn.created_at, todayOut.created_at);
