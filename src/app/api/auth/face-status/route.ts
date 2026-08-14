@@ -74,6 +74,7 @@ export async function GET() {
         .eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "IN")
         .gte("created_at", `${todayDate}T00:00:00+07:00`)
         .lte("created_at", `${todayDate}T23:59:59+07:00`)
+        .order("created_at", { ascending: false }).limit(1)
         .maybeSingle(),
       supabase.from("users").select("face_embedding, shift, biometric_enabled").eq("id", user.id).single(),
     ]);
@@ -85,6 +86,7 @@ export async function GET() {
       .eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "OUT")
       .gte("created_at", `${todayDate}T00:00:00+07:00`)
       .lte("created_at", `${todayDate}T23:59:59+07:00`)
+      .order("created_at", { ascending: false }).limit(1)
       .maybeSingle();
 
     const userShift = ((userData as any)?.shift ?? (user as any).shift ?? "PAGI") as "PAGI" | "SORE";
@@ -96,7 +98,7 @@ export async function GET() {
 
     // Check jika ada leave (cuti) hari ini
     const { data: leaveToday } = await supabase
-      .from("leave_requests")
+      .from("user_leave_requests")
       .select("id")
       .eq("user_id", user.id)
       .eq("leave_date", todayDate)

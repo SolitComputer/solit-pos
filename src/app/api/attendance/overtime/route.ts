@@ -337,9 +337,11 @@ export async function POST(request: Request) {
       // percaya menit dari client, selalu hitung ulang dari data absen asli.
       const [{ data: todayIn }, { data: todayOut }, { data: weeklyOff }, { data: specificOff }, { data: dateWork }, { data: monthlyOff }] = await Promise.all([
         supabase.from("face_verifications").select("id, created_at").eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "IN")
-          .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`).maybeSingle(),
+          .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("face_verifications").select("id, created_at").eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "OUT")
-          .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`).maybeSingle(),
+          .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("user_day_off").select("id").eq("user_id", user.id).eq("day_of_week", todayDow).maybeSingle(),
         supabase.from("user_date_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
         supabase.from("user_date_work").select("id").eq("user_id", user.id).eq("work_date", todayDate).maybeSingle(),
@@ -350,7 +352,7 @@ export async function POST(request: Request) {
 
       if (!effectiveTodayIn) {
         const { data: manualToday, error: manualError } = await supabase
-          .from("manual_attendance")
+          .from("attendance_manual")
           .select("check_in_time")
           .eq("user_id", user.id)
           .eq("attendance_date", todayDate)
@@ -358,7 +360,7 @@ export async function POST(request: Request) {
           .maybeSingle();
 
         if (manualError) {
-          console.error("[POST /api/attendance/overtime] Query manual_attendance gagal:", manualError.message);
+          console.error("[POST /api/attendance/overtime] Query attendance_manual gagal:", manualError.message);
         }
 
         if (manualToday?.check_in_time) {
