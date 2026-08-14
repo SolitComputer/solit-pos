@@ -7,6 +7,7 @@ import { UserRole, PERMISSIONS, hasPermission, hasAnyRole } from "@/lib/permissi
 import DateRangeCalendarPicker from "@/components/ui/DateRangeCalendarPicker";
 import { createPortal } from "react-dom";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import { supabase } from "@/services/supabase";
 import {
   ImageIcon, Pencil, CheckCircle2, Receipt, Inbox,
   Store, Building2, User, Landmark, Banknote, QrCode, CreditCard,
@@ -295,11 +296,12 @@ function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
 }
 
 // ─── CONFIRM PAYMENT MODAL ────────────────────────────────────────────
-function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setConfirmError, confirming, payMode, setPayMode, cicilanAmount, setCicilanAmount, onConfirm, onClose }: {
+function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setConfirmError, confirming, payMode, setPayMode, cicilanAmount, setCicilanAmount, confirmPhoto, setConfirmPhoto, onConfirm, onClose }: {
   item: any; confirmSN: string; setConfirmSN: (v: string) => void; confirmError: string;
   setConfirmError: (v: string) => void; confirming: boolean;
   payMode: "LUNAS" | "CICILAN"; setPayMode: (v: "LUNAS" | "CICILAN") => void;
   cicilanAmount: string; setCicilanAmount: (v: string) => void;
+  confirmPhoto: File | null; setConfirmPhoto: (v: File | null) => void;
   onConfirm: () => void; onClose: () => void;
 }) {
   const fmt = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
@@ -318,7 +320,31 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
           <p className="font-semibold text-white text-sm">Pembayaran</p>
           <p className="text-xs text-white/60 mt-0.5 font-mono">{item.invoice_number}</p>
         </div>
-        <div className="p-5 space-y-4">
+       <div className="p-5 space-y-4">
+          {/* ── REVISI: Ringkasan transaksi selalu tampil — sebelumnya modal ini
+               kosong untuk status non-RESERVED (HELD/PACKING/PENDING) karena semua
+               konten di bawah cuma tampil kalau isReserved ── */}
+          <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-200 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-gray-400">Customer</span>
+              <span className="text-xs font-bold text-gray-800 text-right truncate max-w-[65%]">{item.customer_name}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-gray-400">Barang</span>
+              <span className="text-xs font-semibold text-gray-700 text-right truncate max-w-[65%]">
+                {item.laptop_name || (item.grouped_items?.length > 1 ? `${item.grouped_items.length} laptop` : "—")}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-gray-400">Status Saat Ini</span>
+              <span className="text-xs font-bold text-gray-800">{STATUS_LABEL[item.status] ?? item.status}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-gray-200">
+              <span className="text-xs text-gray-500 font-semibold">Total Tagihan</span>
+              <span className="text-sm font-bold text-emerald-700">{fmt(dealTotal)}</span>
+            </div>
+          </div>
+
           {isReserved && (
             <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-200 grid grid-cols-2 gap-3">
               <div>
@@ -370,6 +396,20 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
               />
             </div>
           )}
+
+         {/* ── REVISI: Foto bukti pembayaran wajib diisi setiap konfirmasi lewat
+               tombol centang di Riwayat Transaksi ── */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Foto Bukti Pembayaran <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="file" accept="image/*" capture="environment"
+              onChange={(e) => { setConfirmPhoto(e.target.files?.[0] ?? null); setConfirmError(""); }}
+              className="w-full border border-gray-200 rounded-xl p-2.5 text-xs bg-gray-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gray-900 file:text-white hover:file:bg-gray-800 transition"
+            />
+            {confirmPhoto && <p className="text-[11px] text-emerald-600 font-medium">✓ {confirmPhoto.name}</p>}
+          </div>
 
           {confirmError && <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-xs text-red-700 font-medium">{confirmError}</div>}
         </div>
@@ -580,19 +620,39 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
   const [showDetails, setShowDetails] = useState(false);
   const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
   const [cicilanAmount, setCicilanAmount] = useState("");
+  const [confirmPhoto, setConfirmPhoto] = useState<File | null>(null);
 
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING" || item.status === "PENDING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
-  const handleConfirmPayment = async () => {
-    const isCicilan = item.status === "RESERVED" && payMode === "CICILAN";
+ const handleConfirmPayment = async () => {
+    if (!confirmPhoto) { setConfirmError("Foto bukti pembayaran wajib diupload"); return; }
 
+    const isCicilan = item.status === "RESERVED" && payMode === "CICILAN";
     if (isCicilan) {
       const amt = Number(cicilanAmount);
       if (!amt || amt <= 0) { setConfirmError("Nominal cicilan wajib diisi"); return; }
-      setConfirming(true); setConfirmError("");
+    } else if (item.status === "RESERVED" && !confirmSN.trim()) {
+      setConfirmError("Serial number wajib diisi"); return;
+    }
+
+    setConfirming(true); setConfirmError("");
+
+    // Upload foto bukti pembayaran dulu, baru konfirmasi ke API
+    let photoUrl = "";
+    try {
+      const fileName = `${Date.now()}-${confirmPhoto.name}`;
+      const { error: uploadError } = await supabase.storage.from("payment-proof").upload(fileName, confirmPhoto);
+      if (uploadError) { setConfirmError("Upload foto gagal: " + uploadError.message); setConfirming(false); return; }
+      const { data: imageData } = supabase.storage.from("payment-proof").getPublicUrl(fileName);
+      photoUrl = imageData.publicUrl;
+    } catch {
+      setConfirmError("Upload foto gagal"); setConfirming(false); return;
+    }
+
+    if (isCicilan) {
       try {
-        const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, amount: amt, is_partial: true }) });
+        const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, amount: Number(cicilanAmount), is_partial: true, payment_photo: photoUrl }) });
         const result = await res.json();
         if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
         setShowConfirmModal(false); onRestored(item.invoice_number);
@@ -600,10 +660,8 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
       return;
     }
 
-    if (item.status === "RESERVED" && !confirmSN.trim()) { setConfirmError("Serial number wajib diisi"); return; }
-    setConfirming(true); setConfirmError("");
     try {
-      const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, serial_number: confirmSN.trim() || item.serial_number }) });
+      const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, serial_number: confirmSN.trim() || item.serial_number, payment_photo: photoUrl }) });
       const result = await res.json();
       if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
       setShowConfirmModal(false); onRestored(item.invoice_number);
@@ -868,7 +926,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
             </a>
           )}
           {isPending && canEditTransaction && (
-            <button onClick={() => { setConfirmSN(item.serial_number || ""); setPayMode("LUNAS"); setCicilanAmount(""); setShowConfirmModal(true); }} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition text-[10px] font-semibold">
+            <button onClick={() => { setConfirmSN(item.serial_number || ""); setPayMode("LUNAS"); setCicilanAmount(""); setConfirmPhoto(null); setShowConfirmModal(true); }} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition text-[10px] font-semibold">
               <CheckCircle2 className="w-3.5 h-3.5" />Bayar
             </button>
           )}
@@ -885,7 +943,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
       {showRestoreModal && <RestoreModal item={item} isPending={isPending} restoring={restoring} onConfirm={handleRestore} onClose={() => setShowRestoreModal(false)} />}
-      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
+     {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} confirmPhoto={confirmPhoto} setConfirmPhoto={setConfirmPhoto} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
     </div>
   );
 }
@@ -1039,19 +1097,39 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
   const [confirmError, setConfirmError] = useState("");
   const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
   const [cicilanAmount, setCicilanAmount] = useState("");
+  const [confirmPhoto, setConfirmPhoto] = useState<File | null>(null);
 
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING" || item.status === "PENDING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
   const handleConfirmPayment = async () => {
-    const isCicilan = item.status === "RESERVED" && payMode === "CICILAN";
+    if (!confirmPhoto) { setConfirmError("Foto bukti pembayaran wajib diupload"); return; }
 
+    const isCicilan = item.status === "RESERVED" && payMode === "CICILAN";
     if (isCicilan) {
       const amt = Number(cicilanAmount);
       if (!amt || amt <= 0) { setConfirmError("Nominal cicilan wajib diisi"); return; }
-      setConfirming(true); setConfirmError("");
+    } else if (item.status === "RESERVED" && !confirmSN.trim()) {
+      setConfirmError("Serial number wajib diisi"); return;
+    }
+
+    setConfirming(true); setConfirmError("");
+
+    // Upload foto bukti pembayaran dulu, baru konfirmasi ke API
+    let photoUrl = "";
+    try {
+      const fileName = `${Date.now()}-${confirmPhoto.name}`;
+      const { error: uploadError } = await supabase.storage.from("payment-proof").upload(fileName, confirmPhoto);
+      if (uploadError) { setConfirmError("Upload foto gagal: " + uploadError.message); setConfirming(false); return; }
+      const { data: imageData } = supabase.storage.from("payment-proof").getPublicUrl(fileName);
+      photoUrl = imageData.publicUrl;
+    } catch {
+      setConfirmError("Upload foto gagal"); setConfirming(false); return;
+    }
+
+    if (isCicilan) {
       try {
-        const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, amount: amt, is_partial: true }) });
+        const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, amount: Number(cicilanAmount), is_partial: true, payment_photo: photoUrl }) });
         const result = await res.json();
         if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
         setShowConfirmModal(false); onRestored(item.invoice_number);
@@ -1059,10 +1137,8 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
       return;
     }
 
-    if (item.status === "RESERVED" && !confirmSN.trim()) { setConfirmError("Serial number wajib diisi"); return; }
-    setConfirming(true); setConfirmError("");
     try {
-      const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, serial_number: confirmSN.trim() || item.serial_number }) });
+      const res = await fetch("/api/units/confirm-payment", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_number: item.invoice_number, serial_number: confirmSN.trim() || item.serial_number, payment_photo: photoUrl }) });
       const result = await res.json();
       if (!result.success) { setConfirmError(result.message || "Gagal"); return; }
       setShowConfirmModal(false); onRestored(item.invoice_number);
@@ -1339,7 +1415,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
               </a>
             )}
             {isPending && canEditTransaction && (
-              <button onClick={() => { setConfirmSN(item.serial_number || ""); setPayMode("LUNAS"); setCicilanAmount(""); setShowConfirmModal(true); }} className="p-1.5 text-gray-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition group-hover:text-gray-400" title="Bayar">
+              <button onClick={() => { setConfirmSN(item.serial_number || ""); setPayMode("LUNAS"); setCicilanAmount(""); setConfirmPhoto(null); setShowConfirmModal(true); }} className="p-1.5 text-gray-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition group-hover:text-gray-400" title="Bayar">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </button>
             )}
@@ -1357,7 +1433,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
       {showRestoreModal && <RestoreModal item={item} isPending={isPending} restoring={restoring} onConfirm={handleRestore} onClose={() => setShowRestoreModal(false)} />}
-      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
+      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} confirmPhoto={confirmPhoto} setConfirmPhoto={setConfirmPhoto} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
     </>
   );
 }

@@ -66,6 +66,14 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
     const paidSoFar = Number(transaction.dp_amount ?? 0);
     const remaining = Math.max(0, dealTotal - paidSoFar);
 
+    // ── REVISI: Foto bukti pembayaran wajib diisi setiap konfirmasi ──
+    if (!payment_photo || typeof payment_photo !== "string" || !payment_photo.trim()) {
+      return NextResponse.json(
+        { success: false, message: "Foto bukti pembayaran wajib diupload" },
+        { status: 400 }
+      );
+    }
+
     // ── Jalur CICILAN: bayar sebagian, transaksi TETAP di status semula ──
     if (is_partial) {
       const cicilan = Math.round(Number(amount));
@@ -89,6 +97,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         .from("transactions")
         .update({
           dp_amount: newPaidTotal,
+          payment_photo: payment_photo,
           last_edited_by: user.name,
           last_edited_at: now,
           notes: transaction.notes
