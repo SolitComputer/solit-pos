@@ -25,6 +25,7 @@ const PUBLIC_API_ROUTES = [
   "/api/service/stream",
   "/api/service/public",
   "/api/public/catalog",
+  "/api/webhooks/whatsapp",
 ];
 const CRON_ROUTES = [
   "/api/cc-reports/sync",
@@ -552,5 +553,7 @@ export const config = {
     "/dashboard/profile/:path*",
     "/api/profile/:path*",
     "/api/achievements/:path*",
+    "/api/leads-chat/:path*",
+    "/api/webhooks/:path*",
   ],
 };
