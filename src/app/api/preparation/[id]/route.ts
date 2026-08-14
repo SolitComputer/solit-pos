@@ -19,11 +19,49 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
       return NextResponse.json({ success: false, message: "Data penyiapan tidak ditemukan" }, { status: 404 });
     }
 
+    // ── Resolve laptop_id untuk item yang TIDAK punya laptop_id ──
+    // Sama seperti alasan di GET /api/preparation (list) — SN manual/scan
+    // barcode gak punya laptop_id, jadi cocokkan dulu ke laptop_units lewat
+    // serial_number supaya spek+merk tetap bisa tampil.
+    const missingSns = [
+      ...new Set(
+        (data.preparation_items ?? [])
+          .filter((it: any) => !it.laptop_id && it.serial_number)
+          .map((it: any) => it.serial_number)
+      ),
+    ] as string[];
+
+    let snToLaptop = new Map<string, string>();
+    if (missingSns.length > 0) {
+      const { data: matchedUnits } = await supabase
+        .from("laptop_units")
+        .select("serial_number, laptop_id")
+        .in("serial_number", missingSns);
+      snToLaptop = new Map(
+        (matchedUnits ?? [])
+          .filter((u: any) => u.laptop_id)
+          .map((u: any) => [u.serial_number, u.laptop_id])
+      );
+    }
+
     // ── Enrich preparation_items dengan spek laptop (CPU/RAM/Storage/GPU) ──
     // Sama seperti GET /api/preparation (list) — lihat komentar di sana.
     const specLaptopIds = [...new Set(
-      (data.preparation_items ?? []).map((it: any) => it.laptop_id).filter(Boolean)
+      (data.preparation_items ?? [])
+        .map((it: any) => it.laptop_id ?? snToLaptop.get(it.serial_number))
+        .filter(Boolean)
     )] as string[];
+
+    let laptopNameMap = new Map<string, string>();
+    if (specLaptopIds.length > 0) {
+      const { data: laptopNames, error: nameErr } = await supabase
+        .from("laptops")
+        .select("id, laptop_name")
+        .in("id", specLaptopIds);
+      if (!nameErr && laptopNames) {
+        laptopNameMap = new Map(laptopNames.map((l: any) => [l.id, l.laptop_name]));
+      }
+    }
 
     if (specLaptopIds.length > 0) {
       const { data: laptopSpecs } = await supabase
@@ -31,10 +69,14 @@ async function getHandler(_req: NextRequest, props: Props, _user: AuthUser) {
         .select("id, cpu, ram, storage, gpu")
         .in("id", specLaptopIds);
       const specMap = new Map((laptopSpecs ?? []).map((l: any) => [l.id, l]));
-      data.preparation_items = (data.preparation_items ?? []).map((it: any) => ({
-        ...it,
-        laptop_spec: it.laptop_id ? specMap.get(it.laptop_id) ?? null : null,
-      }));
+      data.preparation_items = (data.preparation_items ?? []).map((it: any) => {
+        const resolvedLaptopId = it.laptop_id ?? snToLaptop.get(it.serial_number) ?? null;
+        return {
+          ...it,
+          laptop_name: it.laptop_name ?? (resolvedLaptopId ? laptopNameMap.get(resolvedLaptopId) ?? null : null),
+          laptop_spec: resolvedLaptopId ? specMap.get(resolvedLaptopId) ?? null : null,
+        };
+      });
     }
 
     // ── Deteksi unit yang sudah SOLD lewat transaksi di pesanan LAIN ──────────
