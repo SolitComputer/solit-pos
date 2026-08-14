@@ -105,3 +105,26 @@ export async function sendMessage(params: {
   });
   return await res.json();
 }
+
+export interface FonnteDeviceInfo {
+  device: string;
+  name: string;
+  status: "connect" | "disconnect" | string;
+  token: string;
+  autoread?: string;
+  package?: string;
+}
+
+/** Ambil semua device yang SUDAH ada di akun Fonnte. Pakai ACCOUNT TOKEN. */
+export async function getAllDevices(): Promise<{
+  status: boolean; connected?: number; devices?: number; data?: FonnteDeviceInfo[]; reason?: string;
+}> {
+  const accountToken = process.env.FONNTE_ACCOUNT_TOKEN;
+  if (!accountToken) throw new Error("FONNTE_ACCOUNT_TOKEN belum diset di .env");
+
+  const res = await fetch(`${FONNTE_BASE_URL}/get-devices`, {
+    method: "POST",
+    headers: { Authorization: accountToken },
+  });
+  return await res.json();
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { MessageCircle, Plus, Trash2, Send, X } from "lucide-react";
+import { MessageCircle, Plus, Trash2, Send, X, RefreshCw } from "lucide-react";
 
 function FacebookIcon({ className }: { className?: string }) {
   return (
@@ -85,10 +85,60 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
   );
 }
 
+function ImportDeviceModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [label, setLabel] = useState("");
+  const [phone, setPhone] = useState("");
+  const [token, setToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    if (!label.trim() || !phone.trim() || !token.trim()) { setError("Semua field wajib diisi"); return; }
+    setSaving(true); setError("");
+    try {
+      const res = await fetch("/api/leads-chat/accounts/import", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label, phoneNumber: phone, deviceToken: token }),
+      });
+      const data = await res.json();
+      if (!data.success) { setError(data.message); return; }
+      onImported(); onClose();
+    } catch { setError("Terjadi kesalahan"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X className="w-4 h-4" /></button>
+        <h3 className="font-black text-lg text-[#1a1a2e] mb-1">Import Nomor yang Sudah Ada</h3>
+        <p className="text-[11px] text-gray-400 mb-4">Buat nomor yang udah connect di dashboard Fonnte kamu. Ambil token-nya dari tombol "Token" di baris device tersebut.</p>
+        <div className="space-y-3">
+          {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, mis. Solit03-WA"
+            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Nomor WA, mis. 085178277591"
+            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
+          <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Device Token dari Fonnte"
+            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm font-mono" />
+          <button onClick={submit} disabled={saving}
+            className="w-full h-11 rounded-xl bg-[#1a1a2e] text-white font-bold text-sm disabled:opacity-50">
+            {saving ? "Mengimpor..." : "Import"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AccountsPanel({ onClose }: { onClose: () => void }) {
   const [accounts, setAccounts] = useState<WhatsappAccount[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<WhatsappAccount | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+  const [showImport, setShowImport] = useState(false);
 
   const fetchAccounts = useCallback(async () => {
     const res = await fetch("/api/leads-chat/accounts");
@@ -96,6 +146,21 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
     if (data.success) setAccounts(data.accounts);
   }, []);
   useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
+
+  const handleSync = async () => {
+    setSyncing(true); setSyncMsg("");
+    try {
+      const res = await fetch("/api/leads-chat/accounts/sync", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setSyncMsg(`${data.imported.length} nomor baru ditarik, ${data.skipped.length} sudah ada sebelumnya`);
+        fetchAccounts();
+      } else {
+        setSyncMsg(data.message ?? "Gagal sync");
+      }
+    } catch { setSyncMsg("Terjadi kesalahan saat sync"); }
+    finally { setSyncing(false); }
+  };
 
   const handleDelete = async () => {
     if (!confirmDelete) return;
@@ -111,9 +176,20 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
           <h3 className="font-black text-lg text-[#1a1a2e]">Nomor WhatsApp Tersambung</h3>
           <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
         </div>
-        <button onClick={() => setShowAdd(true)}
-          className="w-full h-10 rounded-xl bg-[#1a1a2e] text-white text-xs font-bold flex items-center justify-center gap-1.5 mb-4">
-          <Plus className="w-3.5 h-3.5" /> Sambungkan Nomor Baru
+        <div className="flex gap-2 mb-1">
+          <button onClick={() => setShowAdd(true)}
+            className="flex-1 h-10 rounded-xl bg-[#1a1a2e] text-white text-xs font-bold flex items-center justify-center gap-1.5">
+            <Plus className="w-3.5 h-3.5" /> Nomor Baru
+          </button>
+          <button onClick={handleSync} disabled={syncing}
+            className="flex-1 h-10 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50">
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} /> {syncing ? "Sinkron..." : "Sync dari Fonnte"}
+          </button>
+        </div>
+        {syncMsg && <p className="text-[10.5px] text-gray-400 text-center mb-2 mt-1.5">{syncMsg}</p>}
+        <button onClick={() => setShowImport(true)}
+          className="w-full text-center text-[11px] font-semibold text-violet-600 hover:underline mb-4">
+          Sudah punya nomor connect di Fonnte? Import pakai Token →
         </button>
         <div className="space-y-2">
           {accounts.map((acc) => (
@@ -133,6 +209,7 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
           {accounts.length === 0 && <p className="text-xs text-gray-400 text-center py-6">Belum ada nomor tersambung</p>}
         </div>
         {showAdd && <AddAccountModal onClose={() => setShowAdd(false)} onAdded={fetchAccounts} />}
+        {showImport && <ImportDeviceModal onClose={() => setShowImport(false)} onImported={fetchAccounts} />}
         {confirmDelete && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmDelete(null)} />
@@ -228,23 +305,23 @@ export default function LeadsChatPage() {
               <div className="flex-1 overflow-y-auto">
                 {loading ? <p className="text-xs text-gray-400 text-center py-8">Memuat...</p>
                   : conversations.length === 0 ? <p className="text-xs text-gray-400 text-center py-8">Belum ada chat masuk</p>
-                  : conversations.map((c) => (
-                    <button key={c.id} onClick={() => openConversation(c)}
-                      className={`w-full text-left px-3.5 py-3 border-b border-gray-50 hover:bg-gray-50 flex items-start gap-2.5 ${selected?.id === c.id ? "bg-violet-50" : ""}`}>
-                      <div className="w-9 h-9 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center text-[10px] font-black flex-shrink-0">
-                        {(c.customer_name || c.customer_identifier).slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-bold text-gray-800 truncate">{c.customer_name || c.customer_identifier}</p>
-                          {c.unread_count > 0 && (
-                            <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center flex-shrink-0">{c.unread_count}</span>
-                          )}
+                    : conversations.map((c) => (
+                      <button key={c.id} onClick={() => openConversation(c)}
+                        className={`w-full text-left px-3.5 py-3 border-b border-gray-50 hover:bg-gray-50 flex items-start gap-2.5 ${selected?.id === c.id ? "bg-violet-50" : ""}`}>
+                        <div className="w-9 h-9 rounded-full bg-[#1a1a2e] text-white flex items-center justify-center text-[10px] font-black flex-shrink-0">
+                          {(c.customer_name || c.customer_identifier).slice(0, 2).toUpperCase()}
                         </div>
-                        <p className="text-[10.5px] text-gray-400 truncate">{c.last_message_preview || "-"}</p>
-                      </div>
-                    </button>
-                  ))}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold text-gray-800 truncate">{c.customer_name || c.customer_identifier}</p>
+                            {c.unread_count > 0 && (
+                              <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center flex-shrink-0">{c.unread_count}</span>
+                            )}
+                          </div>
+                          <p className="text-[10.5px] text-gray-400 truncate">{c.last_message_preview || "-"}</p>
+                        </div>
+                      </button>
+                    ))}
               </div>
             </div>
 
