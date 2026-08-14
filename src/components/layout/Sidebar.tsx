@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
+import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
@@ -1288,7 +1289,8 @@ export default function Sidebar() {
   }, []);
 
   const prep = usePrepNotify(userRoles, user?.id);
-  const overtimeNotify = useOvertimeNotify(userRoles, user?.id); // ✅ NEW — poin 9
+  const overtimeNotify = useOvertimeNotify(userRoles, user?.id);
+  const leadsChat = useLeadsChatNotify(userRoles, user?.id);
   const { sound_key: notifSoundKey, custom_sound_url: notifCustomUrl } = useNotificationSettings(user?.id ?? null);
 
   useEffect(() => {
@@ -1303,6 +1305,7 @@ export default function Sidebar() {
 
   usePrepAlarm(onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, true, 4000, notifSoundKey, notifCustomUrl);
   usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true, 4000, notifSoundKey, notifCustomUrl);
+  usePrepAlarm(leadsChat.unreadUnacked.map((id) => ({ id })), ALARM_KEYS.LEADS_CHAT, true, 4000, notifSoundKey, notifCustomUrl);
 
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
   const reminderUnread = useReminderBadge(user?.id);
@@ -1315,8 +1318,8 @@ export default function Sidebar() {
     "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count,
     "/dashboard/tanya-ceo": onTanyaCeoPage ? 0 : reminderUnread,
     "/dashboard/ai-ceo": aiCeoEscalationCount,
+    "/dashboard/leads-chat": leadsChat.unreadCount,
   };
-
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
   const displayGroups: MenuGroup[] = groups.map((g) => ({
     ...g,
