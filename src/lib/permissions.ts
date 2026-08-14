@@ -287,6 +287,13 @@ export const CC_REPORT_MANAGE_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_MARKETING",
 ];
 
+export const LEADS_CHAT_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING", "KONTEN",
+];
+export const LEADS_CHAT_MANAGE_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "KEPALA_MARKETING",
+];
+
 export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
@@ -505,11 +512,12 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/missions/history": [...ALL_ROLES],
   "/api/missions": [...ALL_ROLES],
 
-  // ── Content Creator ────────────────────────────────────────────────────────
   "/dashboard/cc-reports": [...CC_REPORT_ROLES],
   "/api/cc-reports": [...CC_REPORT_ROLES],
 
-  // ── To-Do List — ADMIN & PROGRAMMER only ──────────────────────────────────
+  "/dashboard/leads-chat": [...LEADS_CHAT_ROLES],
+  "/api/leads-chat": [...LEADS_CHAT_ROLES],
+
   "/dashboard/todos": [...TODO_ROLES],
   "/api/todos": [...TODO_ROLES],
 
