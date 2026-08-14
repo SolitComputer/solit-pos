@@ -349,6 +349,26 @@ function minToHHMM(min: number): string {
     return `${pad2(h)}:${pad2(m)}`;
 }
 
+const OVERTIME_RESOLVED_STORAGE_PREFIX = "solitpos:overtime-resolved:";
+
+function loadResolvedOvertimeDates(userId: string): Set<string> {
+    if (typeof window === "undefined") return new Set();
+    try {
+        const raw = window.localStorage.getItem(OVERTIME_RESOLVED_STORAGE_PREFIX + userId);
+        const arr = raw ? JSON.parse(raw) : [];
+        return new Set(Array.isArray(arr) ? arr : []);
+    } catch {
+        return new Set();
+    }
+}
+
+function saveResolvedOvertimeDates(userId: string, dates: Set<string>) {
+    if (typeof window === "undefined") return;
+    try {
+        window.localStorage.setItem(OVERTIME_RESOLVED_STORAGE_PREFIX + userId, JSON.stringify(Array.from(dates)));
+    } catch { }
+}
+
 function getUserStartDate(
     userCreatedAt: string | null | undefined,
     calYear: number,
@@ -3329,6 +3349,26 @@ export default function AttendanceDashboardPage() {
     const [myOvertimeDirections, setMyOvertimeDirections] = useState<Record<string, Set<string>>>({}); // ✅ NEW
     const [dismissedPastOvertimeDates, setDismissedPastOvertimeDates] = useState<Set<string>>(new Set()); // ✅ NEW
 
+    useEffect(() => {
+        if (!currentUser?.id) return;
+        const stored = loadResolvedOvertimeDates(currentUser.id);
+        if (stored.size === 0) return;
+        setDismissedPastOvertimeDates(prev => {
+            const merged = new Set(prev);
+            stored.forEach(d => merged.add(d));
+            return merged;
+        });
+    }, [currentUser?.id]);
+
+    const markOvertimeDateResolved = useCallback((dateKey: string) => {
+        setDismissedPastOvertimeDates(prev => {
+            const next = new Set(prev);
+            next.add(dateKey);
+            if (currentUser?.id) saveResolvedOvertimeDates(currentUser.id, next);
+            return next;
+        });
+    }, [currentUser?.id]);
+
     const fetchShiftSchedules = useCallback(async (y: number, m: number) => {
         try {
             const r = await fetch(`/api/attendance/shift-schedule?year=${y}&month=${m + 1}`);
@@ -4768,12 +4808,19 @@ export default function AttendanceDashboardPage() {
 
                 <OvertimeSOPBanner compact />
                 <TodayAttendanceCard status={todayStatus} loading={statusLoading} onRefresh={fetchTodayStatus} onRequestEarlyCheckout={() => setShowEarlyCheckoutModal(true)} />
-                {todayStatus?.overtimeOptions && (
-                    <OvertimeChoiceCard date={todayKey} options={todayStatus.overtimeOptions} isDayOff={todayStatus.isDayOff} />
+                {todayStatus?.overtimeOptions && !dismissedPastOvertimeDates.has(todayKey) && (
+                    <OvertimeChoiceCard
+                        date={todayKey}
+                        options={todayStatus.overtimeOptions}
+                        isDayOff={todayStatus.isDayOff}
+                        alreadyRequested={myOvertimeDirections[todayKey]}
+                        onDismiss={() => markOvertimeDateResolved(todayKey)}
+                        onSubmitted={() => markOvertimeDateResolved(todayKey)}
+                    />
                 )}
                 <PastOvertimeOpportunitiesCard
                     items={myPastOvertimeOpportunities}
-                    onResolved={(dk) => setDismissedPastOvertimeDates(prev => new Set(prev).add(dk))}
+                    onResolved={(dk) => markOvertimeDateResolved(dk)}
                 />
                 {/* ── Stat Cards ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
