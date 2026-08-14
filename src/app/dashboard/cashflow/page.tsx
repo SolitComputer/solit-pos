@@ -50,6 +50,12 @@ const fmtTanggal = (d?: string) =>
 const fmtTanggalShort = (d?: string) =>
     d ? new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "—";
 
+// ⬅️ BARU: format timestamp audit (tanggal + jam WIB), dipakai di tabel & detail modal
+const fmtWaktuAudit = (iso?: string | null) =>
+    iso
+        ? `${new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })} WIB`
+        : "—";
+
 const compareEntries = (a: Entry, b: Entry): number => {
     if (a.tanggal !== b.tanggal) return a.tanggal < b.tanggal ? 1 : -1;
     const ca = a.created_at ?? "";
@@ -401,6 +407,15 @@ function SourceBadge({ sourceType }: { sourceType: Entry["source_type"] }) {
 
 // ── Audit Cell ────────────────────────────────────────────────────────────────
 function AuditCell({ entry, onAudit, busy, canAudit = true }: { entry: Entry; onAudit: () => void; busy: boolean; canAudit?: boolean }) {
+    // ⬅️ BARU: entry yang SUDAH diaudit tapi transaksi sumbernya kini dibatalkan.
+    // Dipisah dari badge "Dibatalkan" biasa (di bawah) karena kasus ini lebih serius —
+    // nominalnya sempat dihitung sebagai terverifikasi, jadi harus mencolok utk ditinjau ulang.
+    if (entry.is_voided && entry.is_audited) return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 cursor-not-allowed whitespace-nowrap"
+            title={`Entry ini SUDAH diaudit${entry.audited_at ? ` (${fmtWaktuAudit(entry.audited_at)})` : ""}, tapi transaksi sumbernya kini dibatalkan. Perlu ditinjau ulang.`}>
+            <AlertTriangle size={12} /> Diaudit tapi Batal
+        </span>
+    );
     if (entry.is_voided) return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed whitespace-nowrap"
             title="Transaksi sumber sudah di-restore/dibatalkan — tidak bisa diaudit">
@@ -938,6 +953,15 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                     </DetailRow>
                     {entry.is_audited && entry.audited_by_user?.name && (
                         <DetailRow label="Diaudit oleh"><span className="text-emerald-600 font-semibold inline-flex items-center gap-1"><Check size={14} /> {entry.audited_by_user.name}</span></DetailRow>
+                    )}
+                    {entry.is_audited && entry.audited_at && (
+                        <DetailRow label="Waktu Audit">{fmtWaktuAudit(entry.audited_at)}</DetailRow>
+                    )}
+                    {entry.is_voided && entry.is_audited && (
+                        <div className="mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-[11px] text-red-700 flex items-start gap-1.5">
+                            <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                            <span>Entry ini sudah diaudit, tapi transaksi sumbernya kini <b>dibatalkan</b>. Perlu ditinjau ulang.</span>
+                        </div>
                     )}
                     <div className="pt-3">
                         <p className="text-xs font-semibold text-gray-400 mb-1.5">Keterangan</p>
@@ -1731,7 +1755,7 @@ export default function CashflowPage() {
                                         { label: "Keterangan", align: "left" },
                                         { label: "Audit", align: "left" },
                                         { label: "Diaudit oleh", align: "left" },
-                                        { label: "", align: "center" },
+                                        { label: "Waktu Audit", align: "center" },
                                     ].map((h, i) => (
                                         <th key={i} className={`px-3.5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap text-${h.align} first:pl-5 last:pr-5`}>{h.label}</th>
                                     ))}
@@ -1764,8 +1788,8 @@ export default function CashflowPage() {
                                     paginatedRows.map((e) => {
                                         const isClickable = clickable(e);
                                         return (
-                                            <tr key={e.id} onClick={() => isClickable && handleRowClick(e)}
-                                                className={`transition-colors group ${e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-gray-50/50"}`}>
+                                           <tr key={e.id} onClick={() => isClickable && handleRowClick(e)}
+                                                className={`transition-colors group ${e.is_voided && e.is_audited ? "bg-red-50/70 ring-1 ring-inset ring-red-200" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-gray-50/50"}`}>
                                                 <td className="pl-5 pr-3 py-3 whitespace-nowrap">
                                                     <span className="text-[11px] font-semibold text-gray-600">
                                                         {e.created_at
@@ -1823,25 +1847,20 @@ export default function CashflowPage() {
                                                 <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
                                                     <AuditCell entry={e} busy={auditingId === e.id} onAudit={() => toggleAudit(e)} canAudit={e.direction === "OUT" ? canAuditOut : true} />
                                                 </td>
-                                                <td className="px-3 py-3 whitespace-nowrap">
-                                                    {e.audited_by_user?.name
-                                                        ? <span className="text-[11px] text-emerald-600 font-semibold"> {e.audited_by_user.name}</span>
-                                                        : <span className="text-gray-300 text-[11px]">—</span>}
+                                               <td className="px-3 py-3 whitespace-nowrap">
+                                                    {e.audited_by_user?.name ? (
+                                                        <>
+                                                            <span className="text-[11px] text-emerald-600 font-semibold"> {e.audited_by_user.name}</span>
+                                                            {e.audited_at && <p className="text-[9px] text-gray-400 font-mono mt-0.5">{fmtWaktuAudit(e.audited_at)}</p>}
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-gray-300 text-[11px]">—</span>
+                                                    )}
                                                 </td>
-                                                <td className="px-3 pr-5 py-3 text-right whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        {e.source_type === "MANUAL" && e.direction === "OUT" && (
-                                                            <button onClick={() => setEditEntry(e)} className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Edit"><IconEdit /></button>
-                                                        )}
-                                                        {e.source_type === "MANUAL" && e.direction === "IN" && (
-                                                            <button onClick={() => deleteEntry(e)} className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition opacity-0 group-hover:opacity-100" title="Hapus"><IconTrash /></button>
-                                                        )}
-                                                        {isClickable && (
-                                                            <span className="p-1.5 text-gray-300 group-hover:text-blue-400 rounded-lg transition" title={isDetailRow(e) ? "Lihat detail" : "Buka sumber"}>
-                                                                {isDetailRow(e) ? <IconEye /> : <IconExternal />}
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                              <td className="px-3 pr-5 py-3 text-right whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
+                                                    <span className="text-[10px] text-gray-400 font-mono whitespace-nowrap">
+                                                        {e.is_audited && e.audited_at ? fmtWaktuAudit(e.audited_at) : "—"}
+                                                    </span>
                                                 </td>
                                             </tr>
                                         );
