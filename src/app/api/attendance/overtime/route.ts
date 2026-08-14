@@ -346,20 +346,20 @@ export async function POST(request: Request) {
         supabase.from("user_monthly_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
       ]);
 
-      // ✅ FIX: absen manual (via Absen Manual admin) tidak pernah tercatat di
-      // face_verifications, jadi query di atas selalu null untuk karyawan yang
-      // diabsenkan manual → endpoint ini selalu nolak walau karyawan sudah hadir.
-      // Fallback: cek tabel absen manual sebelum benar-benar menolak.
       let effectiveTodayIn: { id: string | null; created_at: string } | null = todayIn;
 
       if (!effectiveTodayIn) {
-        const { data: manualToday } = await supabase
-          .from("manual_attendance") // ⚠️ sesuaikan kalau nama tabel beda — lihat catatan di bawah
+        const { data: manualToday, error: manualError } = await supabase
+          .from("manual_attendance")
           .select("check_in_time")
           .eq("user_id", user.id)
           .eq("attendance_date", todayDate)
-          .in("status", ["PRESENT", "LATE"]) // biar SICK/PERMIT/ABSENT/LEAVE tidak dianggap "masuk"
+          .in("status", ["PRESENT", "LATE"])
           .maybeSingle();
+
+        if (manualError) {
+          console.error("[POST /api/attendance/overtime] Query manual_attendance gagal:", manualError.message);
+        }
 
         if (manualToday?.check_in_time) {
           effectiveTodayIn = { id: null, created_at: manualToday.check_in_time };
@@ -374,9 +374,15 @@ export async function POST(request: Request) {
       const baseSchedule = await resolveShiftConfigFromDB(user.id, supabase);
       const scheduleOverride = await resolveScheduleOverride(supabase, user.id, todayDate);
       const overrideShape = scheduleOverride ? toAuthScheduleShape(scheduleOverride) : null;
+
       const schedule = overrideShape
         ? { ...baseSchedule, ...overrideShape, checkout: overrideShape.checkout ?? baseSchedule.checkout }
         : baseSchedule;
+
+      if (!schedule?.lateFrom || !schedule?.checkout) {
+        console.error("[POST /api/attendance/overtime] Jadwal shift tidak lengkap:", { userId: user.id, baseSchedule, overrideShape });
+        return NextResponse.json({ success: false, message: "Jadwal shift kamu belum lengkap — hubungi admin untuk mengatur jadwal shift dulu." }, { status: 400 });
+      }
 
       const pad = (n: number) => String(n).padStart(2, "0");
       const buildTS = (time: { h: number; m: number }) => new Date(`${todayDate}T${pad(time.h)}:${pad(time.m)}:00+07:00`).toISOString();
@@ -595,7 +601,8 @@ export async function POST(request: Request) {
     }, { status: 410 });
 
   } catch (err: any) {
-    return NextResponse.json({ success: false, message: err?.message }, { status: 500 });
+    console.error("[POST /api/attendance/overtime Error]", err);
+    return NextResponse.json({ success: false, message: err?.message || "Terjadi kesalahan server." }, { status: 500 });
   }
 }
 
