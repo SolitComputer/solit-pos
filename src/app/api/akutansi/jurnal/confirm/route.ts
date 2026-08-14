@@ -72,41 +72,63 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     created_by: user.id,
   }));
 
-  // (fix) Pakai upsert + ignoreDuplicates alih-alih insert biasa. Sebelumnya,
-  // kalau SATU SAJA item yang dipilih ternyata sudah pernah dikonfirmasi
-  // (mis. daftar pending di layar sempat basi, atau ada klik dobel / tab lain
-  // yang lebih dulu konfirmasi), insert gagal total dengan error
-  // "duplicate key value violates unique constraint journal_entries_source_uniq"
-  // dan SELURUH batch ikut gagal. Dengan ignoreDuplicates:true, Postgres
-  // otomatis MELEWATI baris yang bentrok (ON CONFLICT DO NOTHING) alih-alih
-  // error, dan cuma mengembalikan baris yang benar-benar baru diinsert.
-  const { data: inserted, error: entryErr } = await supabase
+  let { data: inserted, error: entryErr } = await supabase
     .from("journal_entries")
-    .upsert(entryRows, { onConflict: "source_type,source_id", ignoreDuplicates: true })
+    .insert(entryRows)
     .select("id, source_type, source_id");
 
-  if (entryErr) {
+  let skippedCount = 0;
+
+  // (fix) "duplicate key value violates unique constraint journal_entries_source_uniq"
+  // bisa terjadi kalau salah satu item yang dipilih ternyata SUDAH pernah
+  // dikonfirmasi (daftar pending di layar sempat basi). Sebelumnya error ini
+  // bikin SELURUH batch gagal walau item lain di batch itu masih valid.
+  // Sekarang: kalau errornya spesifik unique violation (kode Postgres 23505 —
+  // berlaku untuk constraint apa pun bentuknya, jadi tidak perlu tau persis
+  // definisi constraint-nya), cek ulang ke DB item mana yang bentrok, buang
+  // dari daftar, lalu insert ulang HANYA sisanya.
+  if (entryErr?.code === "23505") {
+    const freshPosted = await getPostedKeys(supabase);
+    skippedCount = selected.filter((d) => freshPosted.has(draftKey(d))).length;
+    selected = selected.filter((d) => !freshPosted.has(draftKey(d)));
+
+    if (selected.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: { inserted: 0, skipped: skippedCount },
+        message: "Semua data terpilih ternyata sudah pernah dikonfirmasi sebelumnya",
+      });
+    }
+
+    const retryEntryRows = selected.map((d) => ({
+      period: periodFromDate(d.tanggal),
+      tanggal: d.tanggal,
+      keterangan: d.keterangan,
+      ref: d.ref,
+      source_type: d.source_type,
+      source_id: d.source_id,
+      source_category: d.source_category,
+      total: d.total,
+      created_by: user.id,
+    }));
+
+    const retry = await supabase
+      .from("journal_entries")
+      .insert(retryEntryRows)
+      .select("id, source_type, source_id");
+
+    inserted = retry.data;
+    entryErr = retry.error;
+  }
+
+  if (entryErr || !inserted) {
     console.error("[akuntansi confirm] insert entries:", entryErr);
-    return NextResponse.json({ success: false, message: entryErr.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: entryErr?.message ?? "Gagal konfirmasi" }, { status: 500 });
   }
 
   const idMap = new Map<string, string>(
-    (inserted ?? []).map((e: any) => [draftKey(e), e.id as string])
+    inserted.map((e: any) => [draftKey(e), e.id as string])
   );
-
-  // Item yang bentrok (sudah pernah diposting) tidak ada di idMap — persempit
-  // `selected` supaya baris jurnal & audit log di bawah cuma dibuat untuk
-  // entry yang BENAR-BENAR baru diinsert kali ini.
-  const skippedCount = selected.length - idMap.size;
-  selected = selected.filter((d) => idMap.has(draftKey(d)));
-
-  if (selected.length === 0) {
-    return NextResponse.json({
-      success: true,
-      data: { inserted: 0, skipped: skippedCount },
-      message: "Semua data terpilih ternyata sudah pernah dikonfirmasi sebelumnya",
-    });
-  }
 
   const lineRows = selected.flatMap((d) => {
     const entryId = idMap.get(draftKey(d));
