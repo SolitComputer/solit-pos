@@ -233,7 +233,13 @@ export default function JurnalUmum({ period }: { period: string }) {
             });
             const json = await res.json();
             if (!json.success) { setToast(json.message ?? "Gagal konfirmasi"); return; }
-            setToast(`${json.data?.inserted ?? 0} data masuk jurnal umum`);
+            const insertedCount = json.data?.inserted ?? 0;
+            const skippedCount = json.data?.skipped ?? 0;
+            setToast(
+                skippedCount > 0
+                    ? `${insertedCount} data masuk jurnal umum (${skippedCount} sudah pernah dikonfirmasi sebelumnya)`
+                    : `${insertedCount} data masuk jurnal umum`
+            );
             await load();
         } catch {
             setToast("Koneksi bermasalah");

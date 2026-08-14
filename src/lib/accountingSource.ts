@@ -934,14 +934,39 @@ export async function buildDraftsForPeriod(
   });
 }
 
-/** Semua source yang SUDAH masuk jurnal (lintas periode, anti double-post) */
+/** Semua source yang SUDAH masuk jurnal (lintas periode, anti double-post).
+ *  (fix) Supabase/PostgREST membatasi hasil SELECT ke 1000 baris per query
+ *  secara default. Kalau total journal_entries sudah lebih dari 1000 baris,
+ *  versi lama fungsi ini cuma dapat 1000 baris PERTAMA — entry lain yang
+ *  sudah diposting jadi tidak terdeteksi, sehingga tampil lagi sebagai
+ *  "pending" di UI dan gagal dengan error unique constraint saat dikonfirmasi
+ *  ulang. Di sini kita paginasi pakai .range() supaya SEMUA baris ke-scan,
+ *  berapa pun jumlahnya. */
 export async function getPostedKeys(supabase: SupabaseClient): Promise<Set<string>> {
-  const { data } = await supabase
-    .from("journal_entries")
-    .select("source_type, source_id")
-    .not("source_id", "is", null);
+  const keys = new Set<string>();
+  const PAGE_SIZE = 1000;
+  let from = 0;
 
-  return new Set((data ?? []).map((e: any) => draftKey(e)));
+  while (true) {
+    const { data, error } = await supabase
+      .from("journal_entries")
+      .select("source_type, source_id")
+      .not("source_id", "is", null)
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) {
+      console.error("[akuntansi] getPostedKeys:", error.message);
+      break;
+    }
+    if (!data || data.length === 0) break;
+
+    for (const e of data as any[]) keys.add(draftKey(e));
+
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return keys;
 }
 
 export function draftToLineRows(entryId: string, lines: DraftLine[]) {
