@@ -98,6 +98,7 @@ const nextConfig: NextConfig = {
         fs: false,
         path: false,
         crypto: false,
+        encoding: false,
       };
     }
     return config;

@@ -11,6 +11,7 @@ import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_AS
 import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
+import { useEscalationBadge } from "@/hooks/useEscalationBadge";
 
 const CACHE_KEY = "solit_sidebar_userit";
 const RAIL_KEY = "solit_sidebar_rail";
@@ -1298,7 +1299,7 @@ export default function Sidebar() {
 
   const onAntrian = pathname.startsWith("/dashboard/preparation/antrian");
   const onSiapKirim = pathname.startsWith("/dashboard/preparation/siap-kirim");
-  const onOvertimePage = pathname.startsWith("/dashboard/attendance/overtime"); // ✅ NEW
+  const onOvertimePage = pathname.startsWith("/dashboard/attendance/overtime");
 
   usePrepAlarm(onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, true, 4000, notifSoundKey, notifCustomUrl);
   usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true, 4000, notifSoundKey, notifCustomUrl);
@@ -1306,12 +1307,14 @@ export default function Sidebar() {
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
   const reminderUnread = useReminderBadge(user?.id);
   const onTanyaCeoPage = pathname.startsWith("/dashboard/tanya-ceo");
+  const aiCeoEscalationCount = useEscalationBadge(user?.id, userRoles.some(r => AI_CEO_ROLES.includes(r as any)));
   const badges: Record<string, number> = {
     "/dashboard/preparation/pengantaran": deliveryBadge,
     "/dashboard/preparation/antrian": prep.menungguUnacked.length,
     "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
-    "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count, // ✅ NEW — poin 9
+    "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count,
     "/dashboard/tanya-ceo": onTanyaCeoPage ? 0 : reminderUnread,
+    "/dashboard/ai-ceo": aiCeoEscalationCount,
   };
 
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
@@ -1347,9 +1350,33 @@ export default function Sidebar() {
           </button>
         </div>
       )}
-      {/* ✅ Poin 9 (redesign): lemburan menunggu ACC — mobile only sebagai icon bell + badge di kanan atas.
-          Desktop gak perlu ini karena sidebar-nya selalu terbuka & badge count-nya sudah nempel
-          di menu item "Lembur" lewat prop `badges` di bawah. */}
+      {/* ✅ Peringatan / Pengingat Tanya CEO — Banner di atas jika ada peringatan baru */}
+      {!onTanyaCeoPage && reminderUnread > 0 && (
+        <div
+          className="fixed left-1/2 -translate-x-1/2 z-[58] w-full max-w-sm px-2"
+          style={{
+            top: (!onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12)
+              + (!onSiapKirim && prep.siapKirimUnacked.length > 0 ? 52 : 0),
+          }}
+        >
+          <button
+            onClick={() => router.push("/dashboard/tanya-ceo")}
+            className="w-full bg-gradient-to-r from-amber-600 to-rose-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-rose-900/40 flex items-center justify-between gap-2 active:scale-[0.98] transition hover:brightness-105"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-bold truncate">
+                {reminderUnread} Pesan Peringatan Baru — Buka Tanya CEO
+              </span>
+            </div>
+            <span className="text-[10px] bg-white/25 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex-shrink-0">
+              Buka
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* ✅ Poin 9 (redesign): lemburan menunggu ACC — mobile only sebagai icon bell + badge di kanan atas. */}
       {!onOvertimePage && overtimeNotify.count > 0 && (
         <button
           onClick={() => router.push("/dashboard/attendance/overtime")}
@@ -1372,6 +1399,7 @@ export default function Sidebar() {
         <div className="fixed left-1/2 -translate-x-1/2 z-[57] w-full max-w-sm px-2" style={{
           top: (!onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12)
             + (!onSiapKirim && prep.siapKirimUnacked.length > 0 ? 52 : 0)
+            + (!onTanyaCeoPage && reminderUnread > 0 ? 52 : 0)
             + (!onOvertimePage && overtimeNotify.count > 0 ? 52 : 0),
         }}>
           <button onClick={() => router.push("/contract")} className="w-full bg-amber-500 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-amber-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
