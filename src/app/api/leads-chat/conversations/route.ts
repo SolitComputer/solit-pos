@@ -1,0 +1,24 @@
+import { NextRequest, NextResponse } from "next/server";
+import { withAuth, AuthUser } from "@/lib/auth";
+import { LEADS_CHAT_ROLES } from "@/lib/permissions";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
+
+async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
+  const { searchParams } = req.nextUrl;
+  const channelType = searchParams.get("channel");
+  const search = searchParams.get("search");
+
+  let query = supabaseAdmin
+    .from("chat_conversations")
+    .select("id, channel_type, customer_identifier, customer_name, last_message_preview, last_message_at, unread_count, assigned_to, status, whatsapp_account_id")
+    .order("last_message_at", { ascending: false, nullsFirst: false });
+
+  if (channelType) query = query.eq("channel_type", channelType);
+  if (search) query = query.ilike("customer_name", `%${search}%`);
+
+  const { data, error } = await query;
+  if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, conversations: data });
+}
+
+export const GET = withAuth(getHandler, LEADS_CHAT_ROLES);
