@@ -20,6 +20,8 @@ function readAck(storageKey: string): Set<string> {
  * Ring alarm every `intervalMs` for items yang belum di-acknowledge.
  * Ack disimpan di localStorage + broadcast event biar sinkron antar komponen.
  */
+import { isSoundMuted } from "@/lib/soundSettings";
+
 export function usePrepAlarm(
   items: { id: string }[],
   storageKey: string,
@@ -29,15 +31,21 @@ export function usePrepAlarm(
   customSoundUrl: string | null = null
 ) {
   const [ackedIds, setAckedIds] = useState<Set<string>>(() => readAck(storageKey));
+  const [muted, setMuted] = useState<boolean>(() => isSoundMuted());
 
-  // sinkron ack antar hook instance (sidebar ↔ page) & antar tab
+  // sinkron ack & mute status antar hook instance & antar tab
   useEffect(() => {
     const reread = () => setAckedIds(readAck(storageKey));
+    const onMuteChange = () => setMuted(isSoundMuted());
     window.addEventListener("prep-ack-changed", reread);
+    window.addEventListener("solit-sound-mute-changed", onMuteChange);
     window.addEventListener("storage", reread);
+    window.addEventListener("storage", onMuteChange);
     return () => {
       window.removeEventListener("prep-ack-changed", reread);
+      window.removeEventListener("solit-sound-mute-changed", onMuteChange);
       window.removeEventListener("storage", reread);
+      window.removeEventListener("storage", onMuteChange);
     };
   }, [storageKey]);
 
@@ -50,11 +58,11 @@ export function usePrepAlarm(
 
   useEffect(() => {
     if (alarmRef.current) { clearInterval(alarmRef.current); alarmRef.current = null; }
-    if (unacked.length === 0 || !soundEnabled) return;
+    if (unacked.length === 0 || !soundEnabled || muted) return;
     playSoundByKey(soundKey, customSoundUrl); // bunyi langsung
     alarmRef.current = setInterval(() => playSoundByKey(soundKey, customSoundUrl), intervalMs);
     return () => { if (alarmRef.current) clearInterval(alarmRef.current); };
-  }, [unacked.length, soundEnabled, intervalMs, soundKey, customSoundUrl]);
+  }, [unacked.length, soundEnabled, intervalMs, soundKey, customSoundUrl, muted]);
 
   useEffect(() => () => { if (alarmRef.current) clearInterval(alarmRef.current); }, []);
 

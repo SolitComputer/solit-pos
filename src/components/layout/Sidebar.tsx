@@ -13,6 +13,7 @@ import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
 import { useEscalationBadge } from "@/hooks/useEscalationBadge";
+import SoundToggleButton from "@/components/ui/SoundToggleButton";
 
 const CACHE_KEY = "solit_sidebar_userit";
 const RAIL_KEY = "solit_sidebar_rail";
@@ -943,22 +944,25 @@ function SidebarContent({
             </div>
             {!rail && <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>}
           </div>
-          {onToggleRail && (
-            <button onClick={onToggleRail} className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition ${rail ? "mx-auto mt-2" : ""}`} title={rail ? "Perbesar sidebar" : "Perkecil sidebar"} aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" style={{ transform: rail ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-                <polyline points="11 17 6 12 11 7" />
-                <polyline points="18 17 13 12 18 7" />
-              </svg>
-            </button>
-          )}
-          {onClose && (
-            <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition" aria-label="Tutup sidebar">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            <SoundToggleButton size="sm" />
+            {onToggleRail && (
+              <button onClick={onToggleRail} className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition ${rail ? "mx-auto mt-2" : ""}`} title={rail ? "Perbesar sidebar" : "Perkecil sidebar"} aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" style={{ transform: rail ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                  <polyline points="11 17 6 12 11 7" />
+                  <polyline points="18 17 13 12 18 7" />
+                </svg>
+              </button>
+            )}
+            {onClose && (
+              <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition" aria-label="Tutup sidebar">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {loading || !user ? (
