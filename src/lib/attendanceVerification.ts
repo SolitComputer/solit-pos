@@ -62,10 +62,12 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
     supabaseAdmin.from("face_verifications").select("id, created_at")
       .eq("user_id", userId).eq("status", "SUCCESS").eq("direction", "IN")
       .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`)
+      .order("created_at", { ascending: false }).limit(1)
       .maybeSingle(),
     supabaseAdmin.from("face_verifications").select("id, created_at")
       .eq("user_id", userId).eq("status", "SUCCESS").eq("direction", "OUT")
       .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`)
+      .order("created_at", { ascending: false }).limit(1)
       .maybeSingle(),
     supabaseAdmin.from("user_day_off").select("id").eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
     supabaseAdmin.from("user_date_off").select("id").eq("user_id", userId).eq("off_date", todayDate).maybeSingle(),

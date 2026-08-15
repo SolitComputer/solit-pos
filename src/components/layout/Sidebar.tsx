@@ -1318,7 +1318,9 @@ export default function Sidebar() {
     "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count,
     "/dashboard/tanya-ceo": onTanyaCeoPage ? 0 : reminderUnread,
     "/dashboard/ai-ceo": aiCeoEscalationCount,
+
     "/dashboard/leads-chat": leadsChat.unreadCount,
+
   };
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
   const displayGroups: MenuGroup[] = groups.map((g) => ({

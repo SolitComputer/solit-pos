@@ -58,6 +58,11 @@ export async function updateDeviceWebhook(params: {
       autoread: "true",
       personal: "true",
       group: "false",
+      // 🆕 ⚠️ Nama field ini BELUM terverifikasi 100% dari dokumentasi Fonnte —
+      // tujuannya biar webhook status pesan (buat centang biru) ikut aktif.
+      // Kalau setelah ini centang birunya tetap gak pernah muncul, kemungkinan
+      // field-nya harus diaktifkan manual di dashboard Fonnte → Device → Edit.
+      webhookstatus: "true",
     }),
   });
   return assertOk(await res.json());
@@ -127,4 +132,14 @@ export async function getAllDevices(): Promise<{
     headers: { Authorization: accountToken },
   });
   return await res.json();
+}
+
+
+export async function deleteMessage(params: { deviceToken: string; messageId: string }) {
+  const res = await fetch(`${FONNTE_BASE_URL}/delete-message`, {
+    method: "POST",
+    headers: { Authorization: params.deviceToken, "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ id: params.messageId }),
+  });
+  return (await res.json()) as { status: boolean; detail?: string; reason?: string };
 }

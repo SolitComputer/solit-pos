@@ -143,7 +143,7 @@ async function hasAttendedTodayInDB(userId: string): Promise<boolean> {
         .gte("created_at", dayStart).lte("created_at", dayEnd).maybeSingle(),
       supabase.from("attendance_manual").select("id")
         .eq("user_id", userId).eq("attendance_date", todayDate).maybeSingle(),
-      supabase.from("leave_requests").select("id")
+      supabase.from("user_leave_requests").select("id")
         .eq("user_id", userId).eq("leave_date", todayDate).eq("status", "APPROVED").maybeSingle(),
     ]);
 
