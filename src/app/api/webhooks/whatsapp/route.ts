@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { findOrCreateConversation, saveIncomingMessage } from "@/lib/leadsChat";
+import { findOrCreateConversation, saveIncomingMessage, refreshCustomerName, updateMessageDeliveryStatus } from "@/lib/leadsChat";
 
 // PUBLIC (lihat edit middleware.ts di bawah) karena yang manggil server Fonnte,
 // bukan browser user Solit POS — gak ada cookie token JWT. Keamanan dijaga pakai
@@ -16,6 +16,13 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json({ success: false, message: "Invalid body" }, { status: 400 });
+  }
+
+  if (!body?.sender && (body?.id || body?.stateid)) {
+    console.log("[webhook/whatsapp] status update:", body);
+    const raw = body.state || body.status;
+    if (body.id && raw) await updateMessageDeliveryStatus({ fonnteMessageId: String(body.id), raw: String(raw) });
+    return NextResponse.json({ success: true });
   }
 
   const { device, sender, message, name, url, filename } = body ?? {};
@@ -39,6 +46,7 @@ export async function POST(req: NextRequest) {
     customerNumberRaw: sender,
     customerName: name ?? null,
   });
+  await refreshCustomerName(conversation.id, name); 
 
   await saveIncomingMessage({
     conversationId: conversation.id,

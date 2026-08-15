@@ -39,6 +39,24 @@ export async function findOrCreateConversation(params: {
   return created;
 }
 
+/** Kalau customer ganti nama profil WA-nya, ikutin di percakapan yang udah ada. */
+export async function refreshCustomerName(conversationId: string, newName?: string | null) {
+  if (!newName) return;
+  await supabaseAdmin
+    .from("chat_conversations")
+    .update({ customer_name: newName })
+    .eq("id", conversationId)
+    .neq("customer_name", newName);
+}
+
+/** Simpan status pengiriman (dari webhook status Fonnte) ke pesan terkait. */
+export async function updateMessageDeliveryStatus(params: { fonnteMessageId: string; raw: string }) {
+  await supabaseAdmin
+    .from("chat_messages")
+    .update({ delivery_status: params.raw })
+    .eq("fonnte_message_id", params.fonnteMessageId);
+}
+
 /** Simpan pesan masuk (dari webhook Fonnte) + update ringkasan percakapan. */
 export async function saveIncomingMessage(params: {
   conversationId: string;
