@@ -3,6 +3,19 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { expandRolesWithParents } from "@/lib/permissions";
 
+// ✅ NEW — pergantian "hari absensi" jam 04:00 WIB (bukan 00:00 WIB), dipakai
+// konsisten di seluruh fungsi terkait absensi pada file ini
+// (resolveShiftConfigFromDB, getAttendanceExpiry, attendanceDayKeyWIB).
+function toAttendanceDateKey(iso: string): string {
+  return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 export type { UserRole } from "@/lib/permissions";
 export {
   ROLE_DEFAULT_REDIRECT,
@@ -234,10 +247,12 @@ export async function resolveShiftConfigFromDB(
   userId: string,
   supabaseAdmin: any
 ): Promise<DaySchedule> {
-  const nowUTC = new Date();
-  const nowWIB = new Date(nowUTC.getTime() + 7 * 60 * 60 * 1000);
-  const todayDow = nowWIB.getUTCDay();
-  const todayDate = nowWIB.toISOString().slice(0, 10);
+  // ✅ FIX: tanggal yang dipakai untuk cari jadwal shift (custom per-tanggal
+  // maupun mingguan) sekarang ikut cutoff jam 04:00 WIB — absen jam
+  // 00:00–03:59 WIB tetap dianggap bagian hari kerja SEBELUMNYA, jadi
+  // jadwal shift yang diambil juga jadwal hari sebelumnya.
+  const todayDate = toAttendanceDateKey(new Date().toISOString());
+  const todayDow = new Date(`${todayDate}T12:00:00Z`).getUTCDay();
 
   const [
     { data: userData },
@@ -379,9 +394,12 @@ export function calcAttendanceWeight(
 }
 
 export function getAttendanceExpiry(): Date {
-  const expiry = new Date();
-  expiry.setHours(23, 59, 59, 999);
-  return expiry;
+  // ✅ FIX: cookie "sudah absen hari ini" sekarang kedaluwarsa jam 04:00 WIB
+  // besok (pergantian hari absensi), bukan jam 23:59:59 malam ini. Dihitung
+  // eksplisit dari WIB, bukan `new Date().setHours()` yang ikut timezone
+  // server (bisa salah kalau server hosting jalan di UTC, bukan WIB).
+  const attendanceDate = toAttendanceDateKey(new Date().toISOString());
+  return new Date(`${addDaysToDateStr(attendanceDate, 1)}T04:00:00+07:00`);
 }
 
 // ── Attendance cookie signing (anti-forge) ─────────────────────────────────────
@@ -391,7 +409,13 @@ export function getAttendanceExpiry(): Date {
 // di-bind ke hari (WIB), sehingga tidak bisa dipalsukan atau di-replay besoknya.
 // Pakai Web Crypto agar kompatibel di edge runtime (middleware).
 function attendanceDayKeyWIB(): string {
-  return new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+  // ✅ FIX: dulu "hari" untuk tanda tangan HMAC cookie absensi berpatokan
+  // tengah malam (00:00 WIB) — akibatnya cookie yang di-set jam 02:00 WIB
+  // (misal absen pulang dini hari, masih bagian hari kerja kemarin) akan
+  // GAGAL diverifikasi begitu jam kalender lewat 00:00, padahal cookie-nya
+  // sendiri baru resmi expired jam 04:00 (lihat getAttendanceExpiry di atas).
+  // Sekarang disamakan ke cutoff jam 04:00 WIB biar konsisten.
+  return toAttendanceDateKey(new Date().toISOString());
 }
 
 async function attendanceHmac(userId: string): Promise<string> {

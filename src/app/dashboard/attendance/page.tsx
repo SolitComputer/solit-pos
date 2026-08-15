@@ -236,11 +236,15 @@ function toWIBTime(iso: string): string {
 }
 
 function toWIBDateKey(iso: string): string {
-    return new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    // ✅ FIX: pergantian hari absensi jam 04:00 WIB (bukan 00:00) — jam
+    // 00:00–03:59 WIB masih dihitung hari sebelumnya. Offset WIB (+7 jam)
+    // dikurangi 4 jam cutoff = +3 jam.
+    return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 function getWIBToday(): string {
-    return new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    // ✅ FIX: konsisten dengan toWIBDateKey — "hari ini" ikut cutoff jam 04:00 WIB.
+    return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 const SHIFT_LATE: Record<"PAGI" | "SORE", number> = { PAGI: 8 * 60, SORE: 16 * 60 };
