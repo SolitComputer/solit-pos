@@ -23,7 +23,7 @@ function assertOk<T extends { status: boolean; reason?: string }>(data: T): T {
 
 export async function addDevice(params: {
   name: string;
-  phoneNumber: string; 
+  phoneNumber: string;
 }): Promise<AddDeviceResponse> {
   const accountToken = process.env.FONNTE_ACCOUNT_TOKEN;
   if (!accountToken) throw new Error("FONNTE_ACCOUNT_TOKEN belum diset di .env");
@@ -34,9 +34,9 @@ export async function addDevice(params: {
     body: new URLSearchParams({
       name: params.name,
       device: params.phoneNumber,
-      autoread: "true", 
+      autoread: "true",
       personal: "true",
-      group: "false",  
+      group: "true",
     }),
   });
   return assertOk((await res.json()) as AddDeviceResponse);
@@ -57,11 +57,7 @@ export async function updateDeviceWebhook(params: {
       webhook: params.webhookUrl,
       autoread: "true",
       personal: "true",
-      group: "false",
-      // 🆕 ⚠️ Nama field ini BELUM terverifikasi 100% dari dokumentasi Fonnte —
-      // tujuannya biar webhook status pesan (buat centang biru) ikut aktif.
-      // Kalau setelah ini centang birunya tetap gak pernah muncul, kemungkinan
-      // field-nya harus diaktifkan manual di dashboard Fonnte → Device → Edit.
+      group: "true",
       webhookstatus: "true",
     }),
   });
