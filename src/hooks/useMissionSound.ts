@@ -9,6 +9,8 @@ const NOTES = [
     { freq: 1046.5, start: 0.47, dur: 0.25 },
 ];
 
+import { isSoundMuted } from "@/lib/soundSettings";
+
 export function useMissionSound() {
     const ctxRef = useRef<AudioContext | null>(null);
     const unlocked = useRef(false);
@@ -29,6 +31,7 @@ export function useMissionSound() {
     }, []);
 
     const _playTones = useCallback((ctx: AudioContext) => {
+        if (isSoundMuted()) return;
         const now = ctx.currentTime;
         const master = ctx.createGain();
         master.gain.setValueAtTime(0.45, now);

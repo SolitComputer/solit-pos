@@ -943,22 +943,24 @@ function SidebarContent({
             </div>
             {!rail && <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>}
           </div>
-          {onToggleRail && (
-            <button onClick={onToggleRail} className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition ${rail ? "mx-auto mt-2" : ""}`} title={rail ? "Perbesar sidebar" : "Perkecil sidebar"} aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" style={{ transform: rail ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-                <polyline points="11 17 6 12 11 7" />
-                <polyline points="18 17 13 12 18 7" />
-              </svg>
-            </button>
-          )}
-          {onClose && (
-            <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition" aria-label="Tutup sidebar">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {onToggleRail && (
+              <button onClick={onToggleRail} className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition ${rail ? "mx-auto mt-2" : ""}`} title={rail ? "Perbesar sidebar" : "Perkecil sidebar"} aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" style={{ transform: rail ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                  <polyline points="11 17 6 12 11 7" />
+                  <polyline points="18 17 13 12 18 7" />
+                </svg>
+              </button>
+            )}
+            {onClose && (
+              <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition" aria-label="Tutup sidebar">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {loading || !user ? (
@@ -1141,6 +1143,8 @@ export default function Sidebar() {
   useEffect(() => { widthRef.current = width; }, [width]);
 
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
+  const [reminderDismissed, setReminderDismissed] = useState(false);
+  const [contractDismissed, setContractDismissed] = useState(false);
 
   useEffect(() => {
     const cached = getCachedUser();
@@ -1318,7 +1322,9 @@ export default function Sidebar() {
     "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count,
     "/dashboard/tanya-ceo": onTanyaCeoPage ? 0 : reminderUnread,
     "/dashboard/ai-ceo": aiCeoEscalationCount,
-    "/dashboard/leads-chat": leadsChat.unreadCount, // 🆕
+
+    "/dashboard/leads-chat": leadsChat.unreadCount,
+
   };
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
   const displayGroups: MenuGroup[] = groups.map((g) => ({
@@ -1339,22 +1345,58 @@ export default function Sidebar() {
 
       {!onAntrian && prep.menungguUnacked.length > 0 && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
-          <button onClick={() => { prep.ackMenunggu(prep.menungguUnacked); router.push("/dashboard/preparation/antrian"); }} className="w-full bg-red-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">{prep.menungguUnacked.length} penyiapan baru — buka antrian</span>
-          </button>
+          <div className="w-full bg-red-600 text-white pl-4 pr-1.5 py-1.5 rounded-full shadow-2xl shadow-red-900/40 flex items-center justify-between gap-2 transition">
+            <button
+              onClick={() => { prep.ackMenunggu(prep.menungguUnacked); router.push("/dashboard/preparation/antrian"); }}
+              className="flex-1 flex items-center gap-2 min-w-0 text-left active:scale-[0.98] transition py-1"
+            >
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-black truncate">{prep.menungguUnacked.length} penyiapan baru — buka antrian</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                prep.ackMenunggu(prep.menungguUnacked);
+              }}
+              className="w-7 h-7 rounded-full bg-black/20 hover:bg-black/35 active:scale-90 flex items-center justify-center text-white flex-shrink-0 transition"
+              title="Tutup & matikan alarm"
+              aria-label="Tutup notifikasi"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
       {!onSiapKirim && prep.siapKirimUnacked.length > 0 && (
         <div className="fixed left-1/2 -translate-x-1/2 z-[59] w-full max-w-sm px-2" style={{ top: !onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12 }}>
-          <button onClick={() => { prep.ackSiapKirim(prep.siapKirimUnacked); router.push("/dashboard/preparation/siap-kirim"); }} className="w-full bg-orange-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-orange-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">{prep.siapKirimUnacked.length} barang siap — pilih pengiriman</span>
-          </button>
+          <div className="w-full bg-orange-600 text-white pl-4 pr-1.5 py-1.5 rounded-full shadow-2xl shadow-orange-900/40 flex items-center justify-between gap-2 transition">
+            <button
+              onClick={() => { prep.ackSiapKirim(prep.siapKirimUnacked); router.push("/dashboard/preparation/siap-kirim"); }}
+              className="flex-1 flex items-center gap-2 min-w-0 text-left active:scale-[0.98] transition py-1"
+            >
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-black truncate">{prep.siapKirimUnacked.length} barang siap — pilih pengiriman</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                prep.ackSiapKirim(prep.siapKirimUnacked);
+              }}
+              className="w-7 h-7 rounded-full bg-black/20 hover:bg-black/35 active:scale-90 flex items-center justify-center text-white flex-shrink-0 transition"
+              title="Tutup & matikan alarm"
+              aria-label="Tutup notifikasi"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
       {/* ✅ Peringatan / Pengingat Tanya CEO — Banner di atas jika ada peringatan baru */}
-      {!onTanyaCeoPage && reminderUnread > 0 && (
+      {!onTanyaCeoPage && reminderUnread > 0 && !reminderDismissed && (
         <div
           className="fixed left-1/2 -translate-x-1/2 z-[58] w-full max-w-sm px-2"
           style={{
@@ -1362,20 +1404,38 @@ export default function Sidebar() {
               + (!onSiapKirim && prep.siapKirimUnacked.length > 0 ? 52 : 0),
           }}
         >
-          <button
-            onClick={() => router.push("/dashboard/tanya-ceo")}
-            className="w-full bg-gradient-to-r from-amber-600 to-rose-600 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-rose-900/40 flex items-center justify-between gap-2 active:scale-[0.98] transition hover:brightness-105"
-          >
-            <div className="flex items-center gap-2 min-w-0">
+          <div className="w-full bg-gradient-to-r from-amber-600 to-rose-600 text-white pl-4 pr-1.5 py-1.5 rounded-full shadow-2xl shadow-rose-900/40 flex items-center justify-between gap-2 transition hover:brightness-105">
+            <button
+              onClick={() => router.push("/dashboard/tanya-ceo")}
+              className="flex-1 flex items-center gap-2 min-w-0 text-left active:scale-[0.98] transition py-1"
+            >
               <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping flex-shrink-0" />
               <span className="text-xs sm:text-sm font-bold truncate">
-                {reminderUnread} Pesan Peringatan Baru — Buka Tanya CEO
+                {reminderUnread} Pesan Peringatan — Tanya CEO
               </span>
+            </button>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={() => router.push("/dashboard/tanya-ceo")}
+                className="text-[10px] bg-white/25 hover:bg-white/35 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider transition"
+              >
+                Buka
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setReminderDismissed(true);
+                }}
+                className="w-7 h-7 rounded-full bg-black/20 hover:bg-black/35 active:scale-90 flex items-center justify-center text-white transition"
+                title="Tutup notifikasi"
+                aria-label="Tutup notifikasi"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <span className="text-[10px] bg-white/25 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex-shrink-0">
-              Buka
-            </span>
-          </button>
+          </div>
         </div>
       )}
 
@@ -1398,17 +1458,32 @@ export default function Sidebar() {
 
       {/* ✅ NEW — kontrak akan berakhir dalam N hari; akun masih bisa dipakai,
           cuma diberi peringatan supaya sempat diperpanjang sebelum terkunci. */}
-      {contractWarningDays !== null && (
+      {contractWarningDays !== null && !contractDismissed && (
         <div className="fixed left-1/2 -translate-x-1/2 z-[57] w-full max-w-sm px-2" style={{
           top: (!onAntrian && prep.menungguUnacked.length > 0 ? 64 : 12)
             + (!onSiapKirim && prep.siapKirimUnacked.length > 0 ? 52 : 0)
-            + (!onTanyaCeoPage && reminderUnread > 0 ? 52 : 0)
+            + (!onTanyaCeoPage && reminderUnread > 0 && !reminderDismissed ? 52 : 0)
             + (!onOvertimePage && overtimeNotify.count > 0 ? 52 : 0),
         }}>
-          <button onClick={() => router.push("/contract")} className="w-full bg-amber-500 text-white px-4 py-2.5 rounded-full shadow-2xl shadow-amber-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            <span className="text-sm font-black">Kontrak berakhir {contractWarningDays} hari lagi</span>
-          </button>
+          <div className="w-full bg-amber-500 text-white pl-4 pr-1.5 py-1.5 rounded-full shadow-2xl shadow-amber-900/40 flex items-center justify-between gap-2 transition">
+            <button onClick={() => router.push("/contract")} className="flex-1 flex items-center gap-2 min-w-0 text-left active:scale-[0.98] transition py-1">
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-black truncate">Kontrak berakhir {contractWarningDays} hari lagi</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setContractDismissed(true);
+              }}
+              className="w-7 h-7 rounded-full bg-black/20 hover:bg-black/35 active:scale-90 flex items-center justify-center text-white flex-shrink-0 transition"
+              title="Tutup notifikasi"
+              aria-label="Tutup notifikasi"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 

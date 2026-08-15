@@ -16,6 +16,7 @@ function readAck(key: string): Set<string> {
 function writeAck(key: string, ids: Set<string>) {
   try {
     localStorage.setItem(key, JSON.stringify([...ids]));
+    window.dispatchEvent(new CustomEvent(`prep-ack-changed:${key}`));
     window.dispatchEvent(new CustomEvent("prep-ack-changed"));
   } catch { }
 }

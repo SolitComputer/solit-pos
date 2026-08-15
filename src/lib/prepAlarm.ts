@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { playSoundByKey } from "@/lib/preparationSound";
+import { isSoundMuted } from "@/lib/soundSettings";
 
 export const ALARM_KEYS = {
   MENUNGGU: "prep_alarm_menunggu",
   SIAP_KIRIM: "prep_alarm_siapkirim",
-  APPROVAL: "prep_alarm_approval",   
-  LEADS_CHAT: "prep_alarm_leadschat", 
+  APPROVAL: "prep_alarm_approval",
+  LEADS_CHAT: "prep_alarm_leadschat",
 } as const;
 
 function readAck(storageKey: string): Set<string> {
@@ -17,8 +18,8 @@ function readAck(storageKey: string): Set<string> {
 }
 
 /**
- * Ring alarm every `intervalMs` for items yang belum di-acknowledge.
- * Ack disimpan di localStorage + broadcast event biar sinkron antar komponen.
+ * Notifikasi suara hanya berbunyi 1x saat ada item baru masuk.
+ * Tidak looping terus menerus tiap 4 detik dan tidak berbunyi saat banner di-close/disilang.
  */
 export function usePrepAlarm(
   items: { id: string }[],
@@ -29,15 +30,27 @@ export function usePrepAlarm(
   customSoundUrl: string | null = null
 ) {
   const [ackedIds, setAckedIds] = useState<Set<string>>(() => readAck(storageKey));
+  const [muted, setMuted] = useState<boolean>(() => isSoundMuted());
+  const prevCountRef = useRef<number>(0);
+  const initialLoadRef = useRef<boolean>(true);
 
-  // sinkron ack antar hook instance (sidebar ↔ page) & antar tab
+  // sinkron ack & mute status antar hook instance & antar tab untuk key spesifik
   useEffect(() => {
     const reread = () => setAckedIds(readAck(storageKey));
+    const onMuteChange = () => setMuted(isSoundMuted());
+    const eventName = `prep-ack-changed:${storageKey}`;
+
+    window.addEventListener(eventName, reread);
     window.addEventListener("prep-ack-changed", reread);
+    window.addEventListener("solit-sound-mute-changed", onMuteChange);
     window.addEventListener("storage", reread);
+    window.addEventListener("storage", onMuteChange);
     return () => {
+      window.removeEventListener(eventName, reread);
       window.removeEventListener("prep-ack-changed", reread);
+      window.removeEventListener("solit-sound-mute-changed", onMuteChange);
       window.removeEventListener("storage", reread);
+      window.removeEventListener("storage", onMuteChange);
     };
   }, [storageKey]);
 
@@ -46,17 +59,23 @@ export function usePrepAlarm(
     [items, ackedIds]
   );
 
-  const alarmRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   useEffect(() => {
-    if (alarmRef.current) { clearInterval(alarmRef.current); alarmRef.current = null; }
-    if (unacked.length === 0 || !soundEnabled) return;
-    playSoundByKey(soundKey, customSoundUrl); // bunyi langsung
-    alarmRef.current = setInterval(() => playSoundByKey(soundKey, customSoundUrl), intervalMs);
-    return () => { if (alarmRef.current) clearInterval(alarmRef.current); };
-  }, [unacked.length, soundEnabled, intervalMs, soundKey, customSoundUrl]);
+    if (unacked.length === 0 || !soundEnabled || muted) {
+      prevCountRef.current = unacked.length;
+      initialLoadRef.current = false;
+      return;
+    }
 
-  useEffect(() => () => { if (alarmRef.current) clearInterval(alarmRef.current); }, []);
+    // HANYA BUNYI 1x JIKA JUMLAH BERTAMBAH (ADA ORDER/PESAN BARU DATANG)
+    // TIDAK AKAN PERNAH LOOPING TIAP 4 DETIK & TIDAK BUNYI SAAT DI-CLOSE
+    const isNewItem = !initialLoadRef.current && unacked.length > prevCountRef.current;
+    prevCountRef.current = unacked.length;
+    initialLoadRef.current = false;
+
+    if (isNewItem) {
+      playSoundByKey(soundKey, customSoundUrl);
+    }
+  }, [unacked.length, soundEnabled, soundKey, customSoundUrl, muted]);
 
   const acknowledge = useCallback(
     (id: string) => {
@@ -65,7 +84,8 @@ export function usePrepAlarm(
         next.add(id);
         try {
           localStorage.setItem(storageKey, JSON.stringify([...next]));
-          window.dispatchEvent(new CustomEvent("prep-ack-changed")); // ← broadcast
+          window.dispatchEvent(new CustomEvent(`prep-ack-changed:${storageKey}`));
+          window.dispatchEvent(new CustomEvent("prep-ack-changed"));
         } catch { }
         return next;
       });
