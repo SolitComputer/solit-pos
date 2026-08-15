@@ -13,7 +13,7 @@ export interface PendingOvertimeItem {
   category: string;
 }
 
-const POLL_MS = 60_000; 
+const POLL_MS = 60_000;
 const SOUND_URL = "/sounds/overtime-alert.mp3";
 
 export function useOvertimeNotify(userRoles: string[], userId?: string) {
@@ -50,7 +50,7 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
     };
   }, [fetchPending]);
 
- useEffect(() => {
+  useEffect(() => {
     const isNew = pending.some((p) => !seenIdsRef.current.has(p.id));
     if (isNew && pending.length > 0) {
       if (!audioRef.current) {
