@@ -20,7 +20,7 @@ function playChime(ctx: AudioContext, startOffset: number) {
   for (const tn of tones) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = "triangle"; 
+    osc.type = "triangle";
     osc.frequency.value = tn.freq;
     gain.gain.setValueAtTime(0.0001, now + tn.t);
     gain.gain.exponentialRampToValueAtTime(0.7, now + tn.t + 0.02);
