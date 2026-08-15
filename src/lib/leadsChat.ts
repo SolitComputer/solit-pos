@@ -7,13 +7,15 @@ function normalizeWaNumber(raw: string): string {
   return digits;
 }
 
-/** Cari conversation yang sudah ada, atau bikin baru kalau customer baru pertama kali chat. */
 export async function findOrCreateConversation(params: {
   whatsappAccountId: string;
   customerNumberRaw: string;
   customerName?: string | null;
+  isGroup?: boolean;
 }) {
-  const customerIdentifier = normalizeWaNumber(params.customerNumberRaw);
+  const customerIdentifier = params.isGroup
+    ? params.customerNumberRaw
+    : normalizeWaNumber(params.customerNumberRaw);
 
   const { data: existing, error: findErr } = await supabaseAdmin
     .from("chat_conversations")
@@ -31,6 +33,7 @@ export async function findOrCreateConversation(params: {
       whatsapp_account_id: params.whatsappAccountId,
       customer_identifier: customerIdentifier,
       customer_name: params.customerName ?? null,
+      is_group: params.isGroup ?? false,
       status: "OPEN",
     })
     .select("*")
@@ -57,13 +60,14 @@ export async function updateMessageDeliveryStatus(params: { fonnteMessageId: str
     .eq("fonnte_message_id", params.fonnteMessageId);
 }
 
-/** Simpan pesan masuk (dari webhook Fonnte) + update ringkasan percakapan. */
 export async function saveIncomingMessage(params: {
   conversationId: string;
   body?: string | null;
   mediaUrl?: string | null;
   mediaType?: string | null;
   fonnteMessageId?: string | null;
+  fromMember?: string | null;
+  fromMemberName?: string | null;
 }) {
   const { error: msgErr } = await supabaseAdmin.from("chat_messages").insert({
     conversation_id: params.conversationId,
@@ -72,6 +76,8 @@ export async function saveIncomingMessage(params: {
     media_url: params.mediaUrl ?? null,
     media_type: params.mediaType ?? null,
     fonnte_message_id: params.fonnteMessageId ?? null,
+    from_member: params.fromMember ?? null,
+    from_member_name: params.fromMemberName ?? null,
   });
   if (msgErr) throw msgErr;
 
