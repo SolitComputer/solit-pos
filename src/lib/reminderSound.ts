@@ -22,8 +22,11 @@ export function unlockReminderAudio() {
   }
 }
 
+import { isSoundMuted } from "@/lib/soundSettings";
+
 /** Mainkan nada notifikasi satu kali (dua nada pendek naik, seperti "ting-ting"). */
 export function playReminderBeep() {
+  if (isSoundMuted()) return;
   const c = getCtx();
   if (!c) return;
   if (c.state === "suspended") {
