@@ -196,10 +196,31 @@ export async function PATCH(request: Request) {
           updated_at: new Date().toISOString(),
         }).eq("id", existingDraft.id);
       } else {
+        const AUTO_REASON_BY_DIRECTION: Record<string, string> = {
+          BEFORE_IN: "Diajukan karyawan — lembur awal (sebelum jam masuk)",
+          AFTER_OUT: "Diajukan karyawan — lembur akhir (sesudah jam pulang)",
+          BOTH: "Diajukan karyawan — gabungan lembur awal & akhir",
+          HOLIDAY: "Diajukan karyawan — lembur di hari libur",
+          MANUAL: "Input manual admin",
+        };
+        const toWIBTimeString = (iso: string) => {
+          const pad = (n: number) => String(n).padStart(2, "0");
+          const wib = new Date(new Date(iso).getTime() + 7 * 3600_000);
+          return `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())}:${pad(wib.getUTCSeconds())}`;
+        };
+
         await supabaseAdmin.from("overtime_requests").insert({
-          user_id, request_date: date, direction: correctDirection, status: "PENDING",
-          duration_minutes: correctMinutes, actual_start: correctActualStart, actual_end: correctActualEnd,
-          is_holiday: correctDirection === "HOLIDAY", source_face_verification_id: outRecordId,
+          user_id,
+          request_date: date,
+          direction: correctDirection,
+          reason: AUTO_REASON_BY_DIRECTION[correctDirection] ?? "Koreksi jam pulang admin",
+          requested_start: toWIBTimeString(correctActualStart),
+          status: "PENDING",
+          duration_minutes: correctMinutes,
+          actual_start: correctActualStart,
+          actual_end: correctActualEnd,
+          is_holiday: correctDirection === "HOLIDAY",
+          source_face_verification_id: outRecordId,
         });
       }
     } else if (existingDraft) {

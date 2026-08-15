@@ -1,6 +1,7 @@
 "use client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { supabase } from "@/services/supabase";
 import { ThinkingIndicator, MarkdownMessage, CHAT_DOT_KEYFRAMES } from "@/components/ai/ChatPrimitives";
 import { Sparkles, ArrowUp, ArrowLeft, CheckCircle2, AlertTriangle, Bell } from "lucide-react";
 
@@ -11,6 +12,11 @@ interface ReminderSummary {
     severity: "info" | "warning" | "critical";
     status: "terkirim" | "dibaca" | "dibalas" | "selesai" | "diabaikan";
     created_at: string;
+}
+interface ConversationSummary {
+    id: string;
+    title: string;
+    updated_at: string;
 }
 interface ChatMessage { id?: string; role: "user" | "assistant"; content: string; }
 
@@ -29,49 +35,117 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function TanyaCeoWorkspace() {
+    const [activeTab, setActiveTab] = useState<"chat" | "pengingat">("chat");
     const [reminders, setReminders] = useState<ReminderSummary[]>([]);
+    const [conversations, setConversations] = useState<ConversationSummary[]>([]);
     const [loadingList, setLoadingList] = useState(true);
-    const [activeId, setActiveId] = useState<string | null>(null);
+    const [activeId, setActiveId] = useState<string | null>(null); // Boleh null untuk "Chat Baru"
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const [thinkingLabel, setThinkingLabel] = useState("Memikirkan jawaban...");
     const [loadingThread, setLoadingThread] = useState(false);
-
     const bottomRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const autoSelectFirstRef = useRef(false);
+    const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
-    const loadReminders = useCallback(async () => {
-        try {
-            const res = await fetch("/api/ai-assistant/reminders");
-            const json = await res.json();
-            if (json.success) setReminders(json.data);
-        } catch { } finally {
-            setLoadingList(false);
-        }
-    }, []);
-
-    useEffect(() => { loadReminders(); }, [loadReminders]);
-    useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, sending]);
-
-    const openReminder = useCallback(async (id: string) => {
+    const openThread = useCallback(async (id: string | null, type: "reminder" | "conversation") => {
         setActiveId(id);
+        if (!id) {
+            setMessages([]);
+            setActiveConversationId(null);
+            return;
+        }
         setLoadingThread(true);
         try {
-            const res = await fetch(`/api/ai-assistant/reminders/${id}`);
+            const endpoint = type === "reminder" ? "reminders" : "conversations";
+            const res = await fetch(`/api/ai-assistant/${endpoint}/${id}`);
             const json = await res.json();
             if (json.success) {
                 setMessages(json.messages.map((m: any) => ({ id: m.id, role: m.role, content: m.content })));
-                setReminders((prev) => prev.map((r) => (r.id === id && r.status === "terkirim" ? { ...r, status: "dibaca" } : r)));
+                setActiveConversationId(json.conversation?.id ?? json.conversationId ?? (type === "conversation" ? id : null));
+                if (type === "reminder") {
+                    setReminders((prev) => prev.map((r) => (r.id === id && r.status === "terkirim" ? { ...r, status: "dibaca" } : r)));
+                }
             }
         } catch { } finally {
             setLoadingThread(false);
         }
     }, []);
 
+    useEffect(() => {
+        if (!activeConversationId) return;
+        
+        const channelId = `tanya_ceo_messages_${activeConversationId}_${Math.random().toString(36).substring(2, 9)}`;
+        const chan = supabase
+            .channel(channelId)
+            .on(
+                "postgres_changes",
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "ai_ceo_messages",
+                    filter: `conversation_id=eq.${activeConversationId}`,
+                },
+                (payload) => {
+                    const row = payload.new as any;
+                    // Supaya tidak double-insert (kalau ini dikirim user sendiri, biasanya sudah dioptimistic update)
+                    setMessages((prev) => {
+                        if (prev.some((m) => m.id === row.id)) return prev; // Already exists
+                        if (row.role === "assistant" && row.provider === "system") {
+                            // Pesan admin (via tool jawab_pertanyaan_member)
+                            return [...prev, { id: row.id, role: "assistant", content: row.content }];
+                        }
+                        // Ignore other messages as they are handled by streaming or already optimistic
+                        return prev;
+                    });
+                    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(chan);
+        };
+    }, [activeConversationId]);
+
+    const loadData = useCallback(async () => {
+        try {
+            setLoadingList(true);
+            const [remRes, convRes] = await Promise.all([
+                fetch("/api/ai-assistant/reminders"),
+                fetch("/api/ai-assistant/conversations")
+            ]);
+            
+            const remJson = await remRes.json();
+            const convJson = await convRes.json();
+            
+            const remList = remJson.success ? (remJson.data ?? []) : [];
+            const convList = convJson.success ? (convJson.data ?? []) : [];
+            
+            setReminders(remList);
+            setConversations(convList);
+            
+            // Auto select untuk reminder yang belum dibaca jika tab pengingat (bisa juga otomatis switch kalau ada reminder)
+            if (!autoSelectFirstRef.current && remList.some((r: any) => r.status === "terkirim") && typeof window !== "undefined" && window.innerWidth >= 640) {
+                autoSelectFirstRef.current = true;
+                setActiveTab("pengingat");
+                const firstUnread = remList.find((r: any) => r.status === "terkirim");
+                if (firstUnread) openThread(firstUnread.id, "reminder");
+            }
+        } catch { } finally {
+            setLoadingList(false);
+        }
+    }, [openThread]);
+
+    useEffect(() => { loadData(); }, [loadData]);
+    useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, sending]);
+
+
     const handleSend = async () => {
         const text = input.trim();
-        if (!text || sending || !activeId) return;
+        if (!text || sending || (activeTab === "pengingat" && !activeId)) return;
 
         setInput("");
         if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -80,10 +154,14 @@ export default function TanyaCeoWorkspace() {
         setThinkingLabel("Memikirkan jawaban...");
 
         try {
+            const bodyPayload = activeTab === "pengingat" 
+                ? { message: text, reminderId: activeId } 
+                : { message: text, conversationId: activeId };
+
             const res = await fetch("/api/ai-assistant/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: text, reminderId: activeId }),
+                body: JSON.stringify(bodyPayload),
             });
             if (!res.body) throw new Error("Streaming tidak didukung.");
 
@@ -107,8 +185,14 @@ export default function TanyaCeoWorkspace() {
                     if (evt.type === "tool") {
                         setThinkingLabel(evt.tool === "tandai_pengingat_selesai" ? "Menandai selesai..." : evt.tool === "eskalasi_ke_admin" ? "Mengirim ke admin..." : "Memproses...");
                     } else if (evt.type === "done") {
-                        setMessages((prev) => [...prev, { role: "assistant", content: evt.reply }]);
-                        loadReminders();
+                        if (evt.reply) {
+                            setMessages((prev) => [...prev, { role: "assistant", content: evt.reply }]);
+                        }
+                        if (activeTab === "chat" && !activeId && evt.conversationId) {
+                            setActiveId(evt.conversationId);
+                            setActiveConversationId(evt.conversationId);
+                        }
+                        loadData();
                         finished = true;
                     } else if (evt.type === "error") {
                         setMessages((prev) => [...prev, { role: "assistant", content: `Gagal: ${evt.message}` }]);
@@ -124,7 +208,7 @@ export default function TanyaCeoWorkspace() {
     };
 
     const markSelesaiManual = async () => {
-        if (!activeId) return;
+        if (!activeId || activeTab !== "pengingat") return;
         await fetch(`/api/ai-assistant/reminders/${activeId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -133,7 +217,11 @@ export default function TanyaCeoWorkspace() {
         setReminders((prev) => prev.map((r) => (r.id === activeId ? { ...r, status: "selesai" } : r)));
     };
 
-    const activeReminder = reminders.find((r) => r.id === activeId) ?? null;
+    const activeReminder = activeTab === "pengingat" ? (reminders.find((r) => r.id === activeId) ?? null) : null;
+    const activeConversation = activeTab === "chat" ? (conversations.find((c) => c.id === activeId) ?? null) : null;
+    const isNewChat = activeTab === "chat" && !activeId;
+    
+    const unreadRemindersCount = reminders.filter(r => r.status === "terkirim").length;
 
     return (
         <DashboardLayout>
@@ -141,30 +229,64 @@ export default function TanyaCeoWorkspace() {
 
             <div className="flex h-[calc(100vh-6rem)] sm:h-[calc(100vh-3.5rem)] -mx-4 -my-4 lg:mx-0 lg:my-0 w-[calc(100%+2rem)] lg:w-full bg-white text-gray-800 overflow-hidden font-sans rounded-none sm:rounded-2xl border-0 sm:border border-gray-200 shadow-xs">
 
-                <aside className={`w-full sm:w-72 flex-shrink-0 bg-gray-50 border-r border-gray-200 flex-col ${activeId ? "hidden sm:flex" : "flex"}`}>
+                <aside className={`w-full sm:w-72 flex-shrink-0 bg-gray-50 border-r border-gray-200 flex-col ${(!activeId && !isNewChat) || (activeTab === "chat" && isNewChat) ? "flex" : "hidden sm:flex"}`}>
                     <div className="p-4 border-b border-gray-200 flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-lg bg-[#1a1a2e] flex items-center justify-center text-white shadow-xs flex-shrink-0">
                             <Sparkles className="w-3.5 h-3.5" />
                         </div>
                         <h1 className="text-sm font-bold text-[#1a1a2e]">Tanya CEO</h1>
                     </div>
+                    
+                    <div className="px-4 py-3 flex gap-1 border-b border-gray-200 bg-white">
+                        <button
+                            onClick={() => { setActiveTab("chat"); openThread(null, "conversation"); }}
+                            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${activeTab === "chat" ? "bg-gray-100 text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+                        >
+                            Chat
+                        </button>
+                        <button
+                            onClick={() => { setActiveTab("pengingat"); openThread(null, "reminder"); }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${activeTab === "pengingat" ? "bg-gray-100 text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+                        >
+                            Pengingat
+                            {unreadRemindersCount > 0 && (
+                                <span className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[9px] font-bold">
+                                    {unreadRemindersCount}
+                                </span>
+                            )}
+                        </button>
+                    </div>
+
                     <div className="flex-1 overflow-y-auto p-2 space-y-1">
                         {loadingList && (
                             <div className="space-y-2 p-2">
                                 {[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-xl bg-gray-100 animate-pulse" />)}
                             </div>
                         )}
-                        {!loadingList && reminders.length === 0 && (
+                        {!loadingList && activeTab === "pengingat" && reminders.length === 0 && (
                             <p className="text-xs text-gray-400 italic px-3 py-6 text-center">Belum ada pengingat dari CEO/admin.</p>
                         )}
-                        {reminders.map((r) => {
+                        {!loadingList && activeTab === "chat" && conversations.length === 0 && (
+                            <p className="text-xs text-gray-400 italic px-3 py-6 text-center">Mulai chat baru dengan AI CEO.</p>
+                        )}
+                        
+                        {activeTab === "chat" && (
+                            <button
+                                onClick={() => openThread(null, "conversation")}
+                                className={`w-full text-left rounded-xl px-3 py-2.5 transition border text-xs font-bold text-blue-600 border-dashed border-blue-200 hover:bg-blue-50 mb-2 ${isNewChat ? "bg-blue-50 border-blue-300" : "bg-transparent"}`}
+                            >
+                                + Chat Baru
+                            </button>
+                        )}
+
+                        {!loadingList && activeTab === "pengingat" && reminders.map((r) => {
                             const style = SEVERITY_STYLE[r.severity] ?? SEVERITY_STYLE.info;
                             const Icon = r.status === "selesai" ? CheckCircle2 : style.icon;
                             const unread = r.status === "terkirim";
                             return (
                                 <button
                                     key={r.id}
-                                    onClick={() => openReminder(r.id)}
+                                    onClick={() => openThread(r.id, "reminder")}
                                     className={`w-full text-left rounded-xl p-3 transition border ${activeId === r.id ? "bg-white border-[#1a1a2e] shadow-xs" : "border-transparent hover:bg-gray-100"}`}
                                 >
                                     <div className="flex items-start gap-2">
@@ -178,16 +300,31 @@ export default function TanyaCeoWorkspace() {
                                 </button>
                             );
                         })}
+                        
+                        {!loadingList && activeTab === "chat" && conversations.map((c) => {
+                            return (
+                                <button
+                                    key={c.id}
+                                    onClick={() => openThread(c.id, "conversation")}
+                                    className={`w-full text-left rounded-xl p-3 transition border ${activeId === c.id ? "bg-white border-[#1a1a2e] shadow-xs" : "border-transparent hover:bg-gray-100"}`}
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-xs truncate font-medium text-gray-900">{c.title}</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">{new Date(c.updated_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 </aside>
 
-                <main className={`flex-1 flex-col min-w-0 bg-white h-full ${activeId ? "flex" : "hidden sm:flex"}`}>
-                    {!activeReminder ? (
+                <main className={`flex-1 flex-col min-w-0 bg-white h-full ${activeId || isNewChat ? "flex" : "hidden sm:flex"}`}>
+                    {!activeId && !isNewChat ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
                             <div className="w-10 h-10 rounded-2xl bg-[#1a1a2e] flex items-center justify-center text-white shadow-md mb-3">
                                 <Sparkles className="w-5 h-5" />
                             </div>
-                            <p className="text-sm text-gray-500">Pilih pengingat di samping untuk mulai ngobrol.</p>
+                            <p className="text-sm text-gray-500">Pilih pesan di samping untuk mulai ngobrol.</p>
                         </div>
                     ) : (
                         <>
@@ -197,11 +334,15 @@ export default function TanyaCeoWorkspace() {
                                         <ArrowLeft className="w-4 h-4" />
                                     </button>
                                     <div className="min-w-0">
-                                        <p className="text-xs sm:text-sm font-bold text-[#1a1a2e] truncate">{activeReminder.title}</p>
-                                        <p className="text-[10px] text-gray-400">{STATUS_LABEL[activeReminder.status] ?? activeReminder.status}</p>
+                                        <p className="text-xs sm:text-sm font-bold text-[#1a1a2e] truncate">
+                                            {activeTab === "pengingat" ? activeReminder?.title : (activeConversation?.title || "Chat Baru")}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400">
+                                            {activeTab === "pengingat" ? (STATUS_LABEL[activeReminder?.status ?? ""] ?? activeReminder?.status) : "AI Asisten Solit 03"}
+                                        </p>
                                     </div>
                                 </div>
-                                {activeReminder.status !== "selesai" && (
+                                {activeTab === "pengingat" && activeReminder && activeReminder.status !== "selesai" && (
                                     <button onClick={markSelesaiManual} className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition flex-shrink-0">
                                         Tandai Selesai
                                     </button>
@@ -209,9 +350,23 @@ export default function TanyaCeoWorkspace() {
                             </header>
 
                             <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4 max-w-3xl mx-auto w-full">
-                                <div className={`rounded-2xl border p-3 text-xs sm:text-sm ${SEVERITY_STYLE[activeReminder.severity]?.bg} ${SEVERITY_STYLE[activeReminder.severity]?.border} ${SEVERITY_STYLE[activeReminder.severity]?.text}`}>
-                                    {activeReminder.message}
-                                </div>
+                                {activeTab === "pengingat" && activeReminder && (
+                                    <div className={`rounded-2xl border p-3 text-xs sm:text-sm ${SEVERITY_STYLE[activeReminder.severity]?.bg} ${SEVERITY_STYLE[activeReminder.severity]?.border} ${SEVERITY_STYLE[activeReminder.severity]?.text}`}>
+                                        {activeReminder.message}
+                                    </div>
+                                )}
+                                
+                                {isNewChat && messages.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center pt-8 sm:pt-16 pb-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1a1a2e] to-[#3a3a5e] flex items-center justify-center text-white shadow-lg mb-4">
+                                            <Sparkles className="w-6 h-6" />
+                                        </div>
+                                        <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2">Tanya Apa Saja</h2>
+                                        <p className="text-xs sm:text-sm text-gray-500 text-center max-w-sm">
+                                            Silakan tanya soal stok, absensi, panduan kerja, atau apa saja seputar operasional Solit 03.
+                                        </p>
+                                    </div>
+                                )}
 
                                 {loadingThread && <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />}
 
@@ -251,7 +406,7 @@ export default function TanyaCeoWorkspace() {
                                         }}
                                         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                                         rows={1}
-                                        placeholder="Balas atau tanya soal pengingat ini..."
+                                        placeholder={activeTab === "pengingat" ? "Balas atau tanya soal pengingat ini..." : "Tanya apa saja..."}
                                         className="flex-1 resize-none bg-transparent border-0 text-xs sm:text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 max-h-28 sm:max-h-36 px-1 py-1"
                                     />
                                     <button
