@@ -33,6 +33,8 @@ function getDismissKey(): string {
 }
 
 export function BirthdayBanner() {
+    // Disabled birthday notification banner per user request
+    return null;
     const [birthdayUsers, setBirthdayUsers] = useState<BirthdayUser[]>([]);
     const [dismissed, setDismissed] = useState(true); // start hidden until loaded
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
