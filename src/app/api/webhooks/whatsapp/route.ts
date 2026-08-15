@@ -25,7 +25,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   }
 
-  const { device, sender, message, name, url, filename } = body ?? {};
+  // 🆕 Log MENTAH setiap pesan masuk (bukan cuma status update) — kalau nanti
+  // ada laporan "balasan gak kedetect" lagi, cek log ini dulu: kalau baris ini
+  // SAMA SEKALI gak muncul pas customer bales, artinya Fonnte gak manggil webhook
+  // kita sama sekali (masalah di sisi Fonnte/koneksi device, bukan kode kita).
+  console.log("[webhook/whatsapp] incoming payload:", body);
+
+  const { device, sender, message, name, url, filename, member } = body ?? {};
   if (!device || !sender) {
     return NextResponse.json({ success: false, message: "Payload tidak lengkap" }, { status: 400 });
   }
@@ -41,18 +47,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true }); // tetap 200 biar Fonnte gak retry terus
   }
 
+  // 🆕 Pesan grup: Fonnte kirim field "member" (nomor pengirim asli di dalam grup),
+  // sementara "sender" jadi ID grupnya sendiri. Pesan personal biasa gak punya "member".
+  const isGroup = Boolean(member);
+
   const conversation = await findOrCreateConversation({
     whatsappAccountId: account.id,
     customerNumberRaw: sender,
-    customerName: name ?? null,
+    customerName: isGroup ? null : (name ?? null), // nama grup gak dikasih Fonnte di sini, biarin default
+    isGroup,
   });
-  await refreshCustomerName(conversation.id, name); 
+  if (!isGroup) await refreshCustomerName(conversation.id, name);
 
   await saveIncomingMessage({
     conversationId: conversation.id,
     body: message ?? null,
     mediaUrl: url ?? null,
     mediaType: filename ? "file" : null,
+    fromMember: isGroup ? String(member).replace(/\D/g, "") : null,
+    fromMemberName: isGroup ? (name ?? null) : null,
   });
 
   return NextResponse.json({ success: true });

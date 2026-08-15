@@ -35,10 +35,12 @@ interface Conversation {
   id: string; channel_type: "WHATSAPP" | "FACEBOOK"; customer_identifier: string;
   customer_name: string | null; last_message_preview: string | null; unread_count: number;
   whatsapp_accounts: { label: string; phone_number: string } | null;
+  is_group: boolean;
 }
 interface Message {
   id: string; direction: "IN" | "OUT"; body: string | null; media_url: string | null;
   delivery_status: string | null; deleted_at: string | null; deleted_scope: "me" | "everyone" | null;
+  from_member_name: string | null; created_at: string;
 }
 
 function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
@@ -325,6 +327,9 @@ function MessageBubble({ m, isOpen, onToggleMenu, onCopy, onDelete, onCopyToInpu
   onCopy: () => void; onDelete: (scope: "me" | "everyone") => void; onCopyToInput: () => void;
 }) {
   const isOut = m.direction === "OUT";
+  // 🆕 Fonnte cuma bisa "tarik" pesan yang belum sempat terkirim (hitungan detik).
+  // Setelah 2 menit hampir pasti gagal, jadi opsinya disembunyikan biar gak menyesatkan.
+  const canRecall = isOut && (Date.now() - new Date(m.created_at).getTime() < 2 * 60 * 1000);
   if (m.deleted_at) {
     return (
       <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
@@ -347,12 +352,15 @@ function MessageBubble({ m, isOpen, onToggleMenu, onCopy, onDelete, onCopyToInpu
                 {m.body && <button onClick={onCopy} className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2"><Copy className="w-3 h-3" /> Salin</button>}
                 {m.body && <button onClick={onCopyToInput} className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2"><PencilLine className="w-3 h-3" /> Salin ke kotak balasan</button>}
                 <button onClick={() => onDelete("me")} className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700">Hapus untuk Saya</button>
-                <button onClick={() => onDelete("everyone")} className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-600">Hapus untuk Semua Orang</button>
+                {canRecall && <button onClick={() => onDelete("everyone")} className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-600">Hapus untuk Semua Orang</button>}
               </div>
             )}
           </div>
         )}
         <div className={`px-3 py-1.5 rounded-lg text-[13px] leading-relaxed shadow-sm ${isOut ? "bg-[#d9fdd3] rounded-tr-sm text-gray-800" : "bg-white rounded-tl-sm text-gray-800 border border-gray-100"}`}>
+          {m.from_member_name && (
+            <p className="text-[11px] font-bold text-emerald-700 mb-0.5">{m.from_member_name}</p>
+          )}
           {m.media_url && <img src={m.media_url} className="rounded-md max-w-full mb-1 max-h-64 object-cover" />}
           {m.body && <span className="whitespace-pre-wrap break-words">{m.body}</span>}
           <div className="flex items-center justify-end gap-1 mt-0.5">
@@ -528,11 +536,16 @@ export default function LeadsChatPage() {
                             )}
                           </div>
                           <p className="text-[10.5px] text-gray-400 truncate">{c.last_message_preview || "-"}</p>
-                          {c.whatsapp_accounts && (
-                            <span className="inline-block mt-0.5 text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                              via {c.whatsapp_accounts.label}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                            {c.is_group && (
+                              <span className="text-[9px] font-semibold text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded-full">Grup</span>
+                            )}
+                            {c.whatsapp_accounts && (
+                              <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                                via {c.whatsapp_accounts.label}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </button>
                     ))}
@@ -549,11 +562,16 @@ export default function LeadsChatPage() {
                       <p className="text-sm font-bold text-gray-800">{displayName(selected)}</p>
                       <p className="text-[10.5px] text-gray-400">{selected.customer_identifier}</p>
                     </div>
-                    {selected.whatsapp_accounts && (
-                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full flex items-center gap-1">
-                        <MessageCircle className="w-2.5 h-2.5" /> {selected.whatsapp_accounts.label} · {selected.whatsapp_accounts.phone_number}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {selected.is_group && (
+                        <span className="text-[10px] font-semibold text-violet-700 bg-violet-50 px-2 py-1 rounded-full">Grup</span>
+                      )}
+                      {selected.whatsapp_accounts && (
+                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full flex items-center gap-1">
+                          <MessageCircle className="w-2.5 h-2.5" /> {selected.whatsapp_accounts.label} · {selected.whatsapp_accounts.phone_number}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {messagesError && (
                     <p className="text-xs text-red-600 font-semibold px-4 py-2 bg-red-50 border-b border-red-100">{messagesError}</p>
