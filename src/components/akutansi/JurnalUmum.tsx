@@ -1119,8 +1119,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                 <div className="bg-slate-50 border border-slate-200/80 rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-x-4 sm:gap-x-6 gap-y-2">
                     <span className="text-xs font-semibold text-slate-500">
                         {isFiltered
-                            ? `Menampilkan ${filtered.length} dari ${entries.length} entry (${totalLinesFiltered} / ${totalLinesAll} baris)`
-                            : `Menampilkan semua ${entries.length} entry (${totalLinesAll} total baris)`}
+                            ? `Menampilkan ${visibleEntries.length} dari ${filtered.length} entry (${totalLinesFiltered} / ${totalLinesAll} baris)`
+                            : `Menampilkan ${visibleEntries.length} dari ${entries.length} entry (${totalLinesAll} total baris)`}
                     </span>
                     <div className="flex items-center gap-x-4 sm:gap-x-6 flex-wrap gap-y-1">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL</span>
@@ -1310,8 +1310,19 @@ export default function JurnalUmum({ period }: { period: string }) {
                             )}
                         </Droppable>
                     </DragDropContext>
-                </div>
+               </div>
             </div>
+
+            {!loading && visibleEntries.length < filtered.length && (
+                <div className="flex justify-center">
+                    <button
+                        onClick={() => setDisplayLimit((prev) => prev + 100)}
+                        className="h-9 px-5 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 hover:text-slate-900 active:scale-[0.97] transition-all duration-150 shadow-xs"
+                    >
+                        Tampilkan 100 Lagi ({filtered.length - visibleEntries.length} tersisa)
+                    </button>
+                </div>
+            )}
 
             {/* ── Modals ── */}
             {showManual && (
