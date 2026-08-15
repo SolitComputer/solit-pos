@@ -4,7 +4,8 @@ import { playSoundByKey } from "@/lib/preparationSound";
 export const ALARM_KEYS = {
   MENUNGGU: "prep_alarm_menunggu",
   SIAP_KIRIM: "prep_alarm_siapkirim",
-  APPROVAL: "prep_alarm_approval",   // ← tugas antar nunggu persetujuan pengantar
+  APPROVAL: "prep_alarm_approval",   
+  LEADS_CHAT: "prep_alarm_leadschat", 
 } as const;
 
 function readAck(storageKey: string): Set<string> {

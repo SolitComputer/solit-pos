@@ -25,6 +25,7 @@ const PUBLIC_API_ROUTES = [
   "/api/service/stream",
   "/api/service/public",
   "/api/public/catalog",
+  "/api/webhooks/whatsapp",
 ];
 const CRON_ROUTES = [
   "/api/cc-reports/sync",
@@ -142,7 +143,7 @@ async function hasAttendedTodayInDB(userId: string): Promise<boolean> {
         .gte("created_at", dayStart).lte("created_at", dayEnd).maybeSingle(),
       supabase.from("attendance_manual").select("id")
         .eq("user_id", userId).eq("attendance_date", todayDate).maybeSingle(),
-      supabase.from("leave_requests").select("id")
+      supabase.from("user_leave_requests").select("id")
         .eq("user_id", userId).eq("leave_date", todayDate).eq("status", "APPROVED").maybeSingle(),
     ]);
 
@@ -552,5 +553,7 @@ export const config = {
     "/dashboard/profile/:path*",
     "/api/profile/:path*",
     "/api/achievements/:path*",
+    "/api/leads-chat/:path*",
+    "/api/webhooks/:path*",
   ],
 };
