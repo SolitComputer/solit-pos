@@ -333,8 +333,8 @@ export default function JurnalUmum({ period }: { period: string }) {
         const destinationIndex = result.destination.index;
         if (sourceIndex === destinationIndex) return;
 
-        if (search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || groupBySource) {
-            setToast("Harap matikan mode Urutkan Sumber dan kosongkan pencarian/filter akun sebelum mengubah urutan.");
+        if (search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || showOnlyWarnings) {
+            setToast("Harap kosongkan pencarian dan filter sebelum mengubah urutan.");
             return;
         }
 
