@@ -32,7 +32,7 @@ export default function TanyaCeoAdminWorkspace() {
     const loadEscalations = useCallback(async () => {
         try {
             setLoadingList(true);
-            const res = await fetch("/api/ai-assistant/escalations");
+            const res = await fetch("/api/ai-assistant/escalations", { cache: "no-store" });
             const json = await res.json();
             if (json.success) {
                 setEscalations(json.data ?? []);
@@ -54,7 +54,7 @@ export default function TanyaCeoAdminWorkspace() {
         }
         setLoadingThread(true);
         try {
-            const res = await fetch(`/api/ai-assistant/conversations/${esc.conversation_id}`);
+            const res = await fetch(`/api/ai-assistant/conversations/${esc.conversation_id}`, { cache: "no-store" });
             const json = await res.json();
             if (json.success) {
                 setMessages(json.messages.map((m: any) => ({ id: m.id, role: m.role, content: m.content, provider: m.provider })));
