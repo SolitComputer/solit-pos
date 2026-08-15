@@ -27,6 +27,7 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
   const [accountId, setAccountId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [qrError, setQrError] = useState("");
 
   const submit = async () => {
     if (!label.trim() || !phone.trim()) { setError("Nama dan nomor WA wajib diisi"); return; }
@@ -39,6 +40,7 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
       setAccountId(data.account.id); setQr(data.qrImageBase64); setStep("qr");
+      if (!data.qrImageBase64) setQrError("Menunggu QR dari Fonnte...");
     } catch { setError("Terjadi kesalahan saat menyambungkan"); }
     finally { setSaving(false); }
   };
@@ -49,7 +51,12 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
       const res = await fetch(`/api/leads-chat/accounts/${accountId}/qr`);
       const data = await res.json();
       if (data.alreadyConnected) { clearInterval(interval); onAdded(); onClose(); }
-      else if (data.qrImageBase64) setQr(data.qrImageBase64);
+      else if (data.qrImageBase64) { setQr(data.qrImageBase64); setQrError(""); }
+      else if (res.status === 404) {
+        clearInterval(interval);
+        setQrError(data.message ?? "Akun ini sudah tidak ada di database — tutup modal ini dan coba lagi dari awal");
+      }
+      else if (!data.success) { setQrError(data.message ?? "Gagal ambil QR dari Fonnte"); }
     }, 4000);
     return () => clearInterval(interval);
   }, [step, accountId, onAdded, onClose]);
@@ -77,6 +84,7 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
             <p className="text-xs text-gray-500">Scan QR ini pakai WhatsApp di HP nomor tersebut (Perangkat Tertaut)</p>
             {qr ? <img src={`data:image/png;base64,${qr}`} alt="QR WhatsApp" className="mx-auto w-48 h-48 rounded-xl border" />
               : <div className="w-48 h-48 mx-auto rounded-xl bg-gray-100 animate-pulse" />}
+            {qrError && <p className="text-[11px] text-red-500 font-semibold">{qrError}</p>}
             <p className="text-[11px] text-gray-400">Menunggu koneksi... halaman ini otomatis tertutup setelah tersambung.</p>
           </div>
         )}
@@ -89,8 +97,12 @@ function ImportDeviceModal({ onClose, onImported }: { onClose: () => void; onImp
   const [label, setLabel] = useState("");
   const [phone, setPhone] = useState("");
   const [token, setToken] = useState("");
+  const [step, setStep] = useState<"form" | "qr">("form");
+  const [qr, setQr] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [qrError, setQrError] = useState("");
 
   const submit = async () => {
     if (!label.trim() || !phone.trim() || !token.trim()) { setError("Semua field wajib diisi"); return; }
@@ -102,31 +114,65 @@ function ImportDeviceModal({ onClose, onImported }: { onClose: () => void; onImp
       });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
-      onImported(); onClose();
+      if (data.alreadyConnected) { onImported(); onClose(); return; }
+      // 🆕 Device belum connect — lanjut ke step QR, sama kayak alur Nomor Baru
+      setAccountId(data.account.id); setQr(data.qrImageBase64); setStep("qr");
+      if (!data.qrImageBase64) setQrError("Menunggu QR dari Fonnte...");
     } catch { setError("Terjadi kesalahan"); }
     finally { setSaving(false); }
   };
+
+  useEffect(() => {
+    if (step !== "qr" || !accountId) return;
+    const interval = setInterval(async () => {
+      const res = await fetch(`/api/leads-chat/accounts/${accountId}/qr`);
+      const data = await res.json();
+      if (data.alreadyConnected) { clearInterval(interval); onImported(); onClose(); }
+      else if (data.qrImageBase64) { setQr(data.qrImageBase64); setQrError(""); }
+      else if (res.status === 404) {
+        clearInterval(interval);
+        setQrError(data.message ?? "Akun ini sudah tidak ada di database — tutup modal ini dan coba lagi dari awal");
+      }
+      else if (!data.success) { setQrError(data.message ?? "Gagal ambil QR dari Fonnte"); }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [step, accountId, onImported, onClose]);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X className="w-4 h-4" /></button>
-        <h3 className="font-black text-lg text-[#1a1a2e] mb-1">Import Nomor yang Sudah Ada</h3>
-        <p className="text-[11px] text-gray-400 mb-4">Buat nomor yang udah connect di dashboard Fonnte kamu. Ambil token-nya dari tombol "Token" di baris device tersebut.</p>
-        <div className="space-y-3">
-          {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, mis. Solit03-WA"
-            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Nomor WA, mis. 085178277591"
-            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
-          <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Device Token dari Fonnte"
-            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm font-mono" />
-          <button onClick={submit} disabled={saving}
-            className="w-full h-11 rounded-xl bg-[#1a1a2e] text-white font-bold text-sm disabled:opacity-50">
-            {saving ? "Mengimpor..." : "Import"}
-          </button>
-        </div>
+        {step === "form" ? (
+          <>
+            <h3 className="font-black text-lg text-[#1a1a2e] mb-1">Sambungkan Nomor Pakai Token</h3>
+            <p className="text-[11px] text-gray-400 mb-4">Buat nomor yang sudah punya device di Fonnte (connect atau belum). Ambil token-nya dari tombol "Token" di baris device tersebut.</p>
+            <div className="space-y-3">
+              {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
+              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, mis. Solit03-WA"
+                className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Nomor WA, mis. 085178277591"
+                className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
+              <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Device Token dari Fonnte"
+                className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm font-mono" />
+              <button onClick={submit} disabled={saving}
+                className="w-full h-11 rounded-xl bg-[#1a1a2e] text-white font-bold text-sm disabled:opacity-50">
+                {saving ? "Memeriksa..." : "Lanjut"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3 className="font-black text-lg text-[#1a1a2e] mb-4">Scan QR di WhatsApp</h3>
+            <div className="text-center space-y-3">
+              <p className="text-xs text-gray-500">Device ini belum connect — scan QR pakai WhatsApp di HP nomor tersebut (Perangkat Tertaut)</p>
+              {qr ? <img src={`data:image/png;base64,${qr}`} alt="QR WhatsApp" className="mx-auto w-48 h-48 rounded-xl border" />
+                : <div className="w-48 h-48 mx-auto rounded-xl bg-gray-100 animate-pulse" />}
+              {qrError && <p className="text-[11px] text-red-500 font-semibold">{qrError}</p>}
+              <p className="text-[11px] text-gray-400">Menunggu koneksi... halaman ini otomatis tertutup setelah tersambung.</p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -136,6 +182,7 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
   const [accounts, setAccounts] = useState<WhatsappAccount[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<WhatsappAccount | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
   const [showImport, setShowImport] = useState(false);
@@ -164,8 +211,18 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
 
   const handleDelete = async () => {
     if (!confirmDelete) return;
-    await fetch(`/api/leads-chat/accounts/${confirmDelete.id}`, { method: "DELETE" });
-    setConfirmDelete(null); fetchAccounts();
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/leads-chat/accounts/${confirmDelete.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok && res.status !== 404) {
+        setDeleteError(data?.message ?? `Gagal hapus (status ${res.status})`);
+        return;
+      }
+      setConfirmDelete(null); fetchAccounts();
+    } catch {
+      setDeleteError("Terjadi kesalahan jaringan saat hapus");
+    }
   };
 
   return (
@@ -202,7 +259,7 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${acc.status === "connected" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
                   {acc.status === "connected" ? "Tersambung" : "Menunggu"}
                 </span>
-                <button onClick={() => setConfirmDelete(acc)} className="text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                <button onClick={() => { setConfirmDelete(acc); setDeleteError(""); }} className="text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             </div>
           ))}
@@ -215,7 +272,8 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
             <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmDelete(null)} />
             <div className="relative bg-white rounded-2xl p-5 max-w-xs w-full">
               <p className="text-sm font-bold text-gray-800 mb-1">Hapus {confirmDelete.label}?</p>
-              <p className="text-xs text-gray-400 mb-4">Chat yang sudah masuk tetap tersimpan, nomor ini cuma berhenti nerima chat baru.</p>
+              <p className="text-xs text-gray-400 mb-2">Chat yang sudah masuk tetap tersimpan, nomor ini cuma berhenti nerima chat baru.</p>
+              {deleteError && <p className="text-xs text-red-600 font-semibold mb-2">{deleteError}</p>}
               <div className="flex gap-2">
                 <button onClick={() => setConfirmDelete(null)} className="flex-1 h-9 rounded-xl bg-gray-100 text-xs font-semibold">Batal</button>
                 <button onClick={handleDelete} className="flex-1 h-9 rounded-xl bg-red-600 text-white text-xs font-bold">Ya, Hapus</button>
@@ -237,6 +295,7 @@ export default function LeadsChatPage() {
   const [sending, setSending] = useState(false);
   const [showAccounts, setShowAccounts] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [messagesError, setMessagesError] = useState("");
 
   const fetchConversations = useCallback(async () => {
     const qs = activeChannel !== "ALL" ? `?channel=${activeChannel}` : "";
@@ -254,12 +313,18 @@ export default function LeadsChatPage() {
 
   const openConversation = async (conv: Conversation) => {
     setSelected(conv);
-    const res = await fetch(`/api/leads-chat/conversations/${conv.id}/messages`);
-    const data = await res.json();
-    if (data.success) setMessages(data.messages);
+    setMessages([]);
+    setMessagesError("");
+    try {
+      const res = await fetch(`/api/leads-chat/conversations/${conv.id}/messages`);
+      const data = await res.json();
+      if (data.success) setMessages(data.messages);
+      else setMessagesError(data.message ?? `Gagal memuat pesan (status ${res.status})`);
+    } catch {
+      setMessagesError("Terjadi kesalahan jaringan saat memuat pesan");
+    }
     fetchConversations();
   };
-
   const sendReply = async () => {
     if (!selected || !replyText.trim()) return;
     setSending(true);
@@ -334,6 +399,9 @@ export default function LeadsChatPage() {
                     <p className="text-sm font-bold text-gray-800">{selected.customer_name || selected.customer_identifier}</p>
                     <p className="text-[10.5px] text-gray-400">{selected.customer_identifier}</p>
                   </div>
+                  {messagesError && (
+                    <p className="text-xs text-red-600 font-semibold px-4 py-2 bg-red-50 border-b border-red-100">{messagesError}</p>
+                  )}
                   <div className="flex-1 overflow-y-auto p-4 space-y-2">
                     {messages.map((m) => (
                       <div key={m.id} className={`flex ${m.direction === "OUT" ? "justify-end" : "justify-start"}`}>
