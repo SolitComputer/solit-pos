@@ -12,12 +12,22 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
   const qr = await getDeviceQr({ deviceToken: account.fonnte_device_token, phoneNumber: account.phone_number });
 
+  console.log("[leads-chat/qr] response Fonnte:", qr);
+
   if (qr.reason === "device already connect") {
     await supabaseAdmin.from("whatsapp_accounts")
       .update({ status: "connected", connected_at: new Date().toISOString() }).eq("id", id);
     return NextResponse.json({ success: true, alreadyConnected: true });
   }
-  return NextResponse.json({ success: true, qrImageBase64: qr.url ?? null });
+
+  if (!qr.url) {
+    return NextResponse.json(
+      { success: false, message: qr.reason ?? "Fonnte belum bisa kasih QR untuk device ini" },
+      { status: 502 }
+    );
+  }
+
+  return NextResponse.json({ success: true, qrImageBase64: qr.url });
 }
 
 export const GET = withAuth(getHandler, LEADS_CHAT_MANAGE_ROLES);

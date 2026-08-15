@@ -27,6 +27,7 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
   const [accountId, setAccountId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [qrError, setQrError] = useState("");
 
   const submit = async () => {
     if (!label.trim() || !phone.trim()) { setError("Nama dan nomor WA wajib diisi"); return; }
@@ -39,6 +40,7 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
       setAccountId(data.account.id); setQr(data.qrImageBase64); setStep("qr");
+      if (!data.qrImageBase64) setQrError("Menunggu QR dari Fonnte...");
     } catch { setError("Terjadi kesalahan saat menyambungkan"); }
     finally { setSaving(false); }
   };
@@ -49,7 +51,8 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
       const res = await fetch(`/api/leads-chat/accounts/${accountId}/qr`);
       const data = await res.json();
       if (data.alreadyConnected) { clearInterval(interval); onAdded(); onClose(); }
-      else if (data.qrImageBase64) setQr(data.qrImageBase64);
+      else if (data.qrImageBase64) { setQr(data.qrImageBase64); setQrError(""); }
+      else if (!data.success) { setQrError(data.message ?? "Gagal ambil QR dari Fonnte"); }
     }, 4000);
     return () => clearInterval(interval);
   }, [step, accountId, onAdded, onClose]);
@@ -77,6 +80,7 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
             <p className="text-xs text-gray-500">Scan QR ini pakai WhatsApp di HP nomor tersebut (Perangkat Tertaut)</p>
             {qr ? <img src={`data:image/png;base64,${qr}`} alt="QR WhatsApp" className="mx-auto w-48 h-48 rounded-xl border" />
               : <div className="w-48 h-48 mx-auto rounded-xl bg-gray-100 animate-pulse" />}
+            {qrError && <p className="text-[11px] text-red-500 font-semibold">{qrError}</p>}
             <p className="text-[11px] text-gray-400">Menunggu koneksi... halaman ini otomatis tertutup setelah tersambung.</p>
           </div>
         )}
