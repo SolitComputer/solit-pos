@@ -93,8 +93,12 @@ function ImportDeviceModal({ onClose, onImported }: { onClose: () => void; onImp
   const [label, setLabel] = useState("");
   const [phone, setPhone] = useState("");
   const [token, setToken] = useState("");
+  const [step, setStep] = useState<"form" | "qr">("form");
+  const [qr, setQr] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [qrError, setQrError] = useState("");
 
   const submit = async () => {
     if (!label.trim() || !phone.trim() || !token.trim()) { setError("Semua field wajib diisi"); return; }
@@ -106,31 +110,61 @@ function ImportDeviceModal({ onClose, onImported }: { onClose: () => void; onImp
       });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
-      onImported(); onClose();
+      if (data.alreadyConnected) { onImported(); onClose(); return; }
+      // 🆕 Device belum connect — lanjut ke step QR, sama kayak alur Nomor Baru
+      setAccountId(data.account.id); setQr(data.qrImageBase64); setStep("qr");
+      if (!data.qrImageBase64) setQrError("Menunggu QR dari Fonnte...");
     } catch { setError("Terjadi kesalahan"); }
     finally { setSaving(false); }
   };
+
+  useEffect(() => {
+    if (step !== "qr" || !accountId) return;
+    const interval = setInterval(async () => {
+      const res = await fetch(`/api/leads-chat/accounts/${accountId}/qr`);
+      const data = await res.json();
+      if (data.alreadyConnected) { clearInterval(interval); onImported(); onClose(); }
+      else if (data.qrImageBase64) { setQr(data.qrImageBase64); setQrError(""); }
+      else if (!data.success) { setQrError(data.message ?? "Gagal ambil QR dari Fonnte"); }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [step, accountId, onImported, onClose]);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6">
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X className="w-4 h-4" /></button>
-        <h3 className="font-black text-lg text-[#1a1a2e] mb-1">Import Nomor yang Sudah Ada</h3>
-        <p className="text-[11px] text-gray-400 mb-4">Buat nomor yang udah connect di dashboard Fonnte kamu. Ambil token-nya dari tombol "Token" di baris device tersebut.</p>
-        <div className="space-y-3">
-          {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, mis. Solit03-WA"
-            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Nomor WA, mis. 085178277591"
-            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
-          <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Device Token dari Fonnte"
-            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm font-mono" />
-          <button onClick={submit} disabled={saving}
-            className="w-full h-11 rounded-xl bg-[#1a1a2e] text-white font-bold text-sm disabled:opacity-50">
-            {saving ? "Mengimpor..." : "Import"}
-          </button>
-        </div>
+        {step === "form" ? (
+          <>
+            <h3 className="font-black text-lg text-[#1a1a2e] mb-1">Sambungkan Nomor Pakai Token</h3>
+            <p className="text-[11px] text-gray-400 mb-4">Buat nomor yang sudah punya device di Fonnte (connect atau belum). Ambil token-nya dari tombol "Token" di baris device tersebut.</p>
+            <div className="space-y-3">
+              {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
+              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, mis. Solit03-WA"
+                className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Nomor WA, mis. 085178277591"
+                className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
+              <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Device Token dari Fonnte"
+                className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm font-mono" />
+              <button onClick={submit} disabled={saving}
+                className="w-full h-11 rounded-xl bg-[#1a1a2e] text-white font-bold text-sm disabled:opacity-50">
+                {saving ? "Memeriksa..." : "Lanjut"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3 className="font-black text-lg text-[#1a1a2e] mb-4">Scan QR di WhatsApp</h3>
+            <div className="text-center space-y-3">
+              <p className="text-xs text-gray-500">Device ini belum connect — scan QR pakai WhatsApp di HP nomor tersebut (Perangkat Tertaut)</p>
+              {qr ? <img src={`data:image/png;base64,${qr}`} alt="QR WhatsApp" className="mx-auto w-48 h-48 rounded-xl border" />
+                : <div className="w-48 h-48 mx-auto rounded-xl bg-gray-100 animate-pulse" />}
+              {qrError && <p className="text-[11px] text-red-500 font-semibold">{qrError}</p>}
+              <p className="text-[11px] text-gray-400">Menunggu koneksi... halaman ini otomatis tertutup setelah tersambung.</p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
