@@ -6,10 +6,10 @@ import { sendMessage } from "@/lib/fonnte";
 import { saveOutgoingMessage } from "@/lib/leadsChat";
 
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  const { id } = ctx.params;
+  const { id } = await ctx.params; // Next.js 15+: params sekarang Promise, wajib di-await
   const { data, error } = await supabaseAdmin
     .from("chat_messages")
-    .select("id, direction, body, media_url, media_type, sender_user_id, created_at")
+    .select("id, direction, body, media_url, media_type, sender_user_id, delivery_status, deleted_at, deleted_scope, created_at")
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
@@ -19,7 +19,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 }
 
 async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  const { id } = ctx.params;
+  const { id } = await ctx.params;
   const { message, mediaUrl } = await req.json();
   if (!message && !mediaUrl) return NextResponse.json({ success: false, message: "Pesan kosong" }, { status: 400 });
 
