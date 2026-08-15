@@ -36,6 +36,14 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       .single();
     if (error) throw error;
 
+    if (!account?.id) {
+      console.error("[leads-chat/accounts POST] insert sukses tapi tidak ada id di hasilnya:", account);
+      return NextResponse.json(
+        { success: false, message: "Akun tersimpan tapi server gagal membaca ID-nya kembali — cek log server" },
+        { status: 500 }
+      );
+    }
+
     const qr = await getDeviceQr({ deviceToken: device.token, phoneNumber: normalizedPhone });
     return NextResponse.json({ success: true, account, qrImageBase64: qr.url ?? null });
   } catch (err: any) {

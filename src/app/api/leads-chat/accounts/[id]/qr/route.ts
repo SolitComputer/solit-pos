@@ -18,7 +18,13 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: "Akun tidak ditemukan" }, { status: 404 });
   }
 
-  const qr = await getDeviceQr({ deviceToken: account.fonnte_device_token, phoneNumber: account.phone_number });
+  let qr;
+  try {
+    qr = await getDeviceQr({ deviceToken: account.fonnte_device_token, phoneNumber: account.phone_number });
+  } catch (err: any) {
+    console.error(`[leads-chat/qr] gagal panggil Fonnte untuk id=${id}:`, err);
+    return NextResponse.json({ success: false, message: err?.message ?? "Gagal menghubungi Fonnte" }, { status: 502 });
+  }
 
   console.log("[leads-chat/qr] response Fonnte:", qr);
 

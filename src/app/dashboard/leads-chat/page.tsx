@@ -39,6 +39,10 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
       });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
+      if (!data.account?.id) {
+        setError("Akun berhasil dibuat tapi server tidak mengembalikan ID-nya. Coba refresh & cek lagi di list nomor.");
+        return;
+      }
       setAccountId(data.account.id); setQr(data.qrImageBase64); setStep("qr");
       if (!data.qrImageBase64) setQrError("Menunggu QR dari Fonnte...");
     } catch { setError("Terjadi kesalahan saat menyambungkan"); }
@@ -46,17 +50,24 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
   };
 
   useEffect(() => {
-    if (step !== "qr" || !accountId) return;
+    if (step !== "qr" || !accountId || accountId === "undefined") {
+      if (step === "qr") setQrError("Gagal mendapatkan ID akun dari server — tutup modal ini dan coba lagi.");
+      return;
+    }
     const interval = setInterval(async () => {
-      const res = await fetch(`/api/leads-chat/accounts/${accountId}/qr`);
-      const data = await res.json();
-      if (data.alreadyConnected) { clearInterval(interval); onAdded(); onClose(); }
-      else if (data.qrImageBase64) { setQr(data.qrImageBase64); setQrError(""); }
-      else if (res.status === 404) {
-        clearInterval(interval);
-        setQrError(data.message ?? "Akun ini sudah tidak ada di database — tutup modal ini dan coba lagi dari awal");
+      try {
+        const res = await fetch(`/api/leads-chat/accounts/${accountId}/qr`);
+        const data = await res.json();
+        if (data.alreadyConnected) { clearInterval(interval); onAdded(); onClose(); }
+        else if (data.qrImageBase64) { setQr(data.qrImageBase64); setQrError(""); }
+        else if (res.status === 404) {
+          clearInterval(interval);
+          setQrError(data.message ?? "Akun ini sudah tidak ada di database — tutup modal ini dan coba lagi dari awal");
+        }
+        else if (!data.success) { setQrError(data.message ?? "Gagal ambil QR dari Fonnte"); }
+      } catch {
+        setQrError("Gagal menghubungi server — coba tutup modal dan ulangi.");
       }
-      else if (!data.success) { setQrError(data.message ?? "Gagal ambil QR dari Fonnte"); }
     }, 4000);
     return () => clearInterval(interval);
   }, [step, accountId, onAdded, onClose]);
@@ -115,7 +126,10 @@ function ImportDeviceModal({ onClose, onImported }: { onClose: () => void; onImp
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
       if (data.alreadyConnected) { onImported(); onClose(); return; }
-      // 🆕 Device belum connect — lanjut ke step QR, sama kayak alur Nomor Baru
+      if (!data.account?.id) {
+        setError("Akun berhasil dibuat tapi server tidak mengembalikan ID-nya. Coba refresh & cek lagi di list nomor.");
+        return;
+      }
       setAccountId(data.account.id); setQr(data.qrImageBase64); setStep("qr");
       if (!data.qrImageBase64) setQrError("Menunggu QR dari Fonnte...");
     } catch { setError("Terjadi kesalahan"); }
@@ -123,17 +137,24 @@ function ImportDeviceModal({ onClose, onImported }: { onClose: () => void; onImp
   };
 
   useEffect(() => {
-    if (step !== "qr" || !accountId) return;
+    if (step !== "qr" || !accountId || accountId === "undefined") {
+      if (step === "qr") setQrError("Gagal mendapatkan ID akun dari server — tutup modal ini dan coba lagi.");
+      return;
+    }
     const interval = setInterval(async () => {
-      const res = await fetch(`/api/leads-chat/accounts/${accountId}/qr`);
-      const data = await res.json();
-      if (data.alreadyConnected) { clearInterval(interval); onImported(); onClose(); }
-      else if (data.qrImageBase64) { setQr(data.qrImageBase64); setQrError(""); }
-      else if (res.status === 404) {
-        clearInterval(interval);
-        setQrError(data.message ?? "Akun ini sudah tidak ada di database — tutup modal ini dan coba lagi dari awal");
+      try {
+        const res = await fetch(`/api/leads-chat/accounts/${accountId}/qr`);
+        const data = await res.json();
+        if (data.alreadyConnected) { clearInterval(interval); onImported(); onClose(); }
+        else if (data.qrImageBase64) { setQr(data.qrImageBase64); setQrError(""); }
+        else if (res.status === 404) {
+          clearInterval(interval);
+          setQrError(data.message ?? "Akun ini sudah tidak ada di database — tutup modal ini dan coba lagi dari awal");
+        }
+        else if (!data.success) { setQrError(data.message ?? "Gagal ambil QR dari Fonnte"); }
+      } catch {
+        setQrError("Gagal menghubungi server — coba tutup modal dan ulangi.");
       }
-      else if (!data.success) { setQrError(data.message ?? "Gagal ambil QR dari Fonnte"); }
     }, 4000);
     return () => clearInterval(interval);
   }, [step, accountId, onImported, onClose]);
