@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers, Undo2, Sparkles } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -131,9 +131,6 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [busy, setBusy] = useState(false);
     const [search, setSearch] = useState("");
     const [searchNominal, setSearchNominal] = useState("");
-    const [dateFrom, setDateFrom] = useState("");
-    const [dateTo, setDateTo] = useState("");
-    const [lockedSourceRanges, setLockedSourceRanges] = useState<{ from: string; to: string }[]>([]);
     const [pendingSearch, setPendingSearch] = useState("");
     const deferredSearch = React.useDeferredValue(search);
     const deferredSearchNominal = React.useDeferredValue(searchNominal);
@@ -156,7 +153,8 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [bulkBusy, setBulkBusy] = useState(false);
     const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
     const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
-    const [groupBySource, setGroupBySource] = useState(false);
+    const [undoState, setUndoState] = useState<{ previousEntries: JournalEntry[]; batches: { date: string; orderedIds: string[] }[] } | null>(null);
+    const [reorderingBusy, setReorderingBusy] = useState(false);
     const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
     const [showManual, setShowManual] = useState(false);
     const [logEntry, setLogEntry] = useState<JournalEntry | null>(null);
@@ -410,6 +408,117 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
     };
 
+    // ── Rapikan Urutan Sumber per Tanggal (Manual → Service → Transaksi → Cashflow) ──
+    const handleSortBySource = async () => {
+        if (entries.length === 0 || reorderingBusy) return;
+        setReorderingBusy(true);
+
+        // Kelompokkan entries per tanggal
+        const dateGroups = new Map<string, JournalEntry[]>();
+        for (const e of entries) {
+            if (!dateGroups.has(e.tanggal)) {
+                dateGroups.set(e.tanggal, []);
+            }
+            dateGroups.get(e.tanggal)!.push(e);
+        }
+
+        const changedBatches: { date: string; orderedIds: string[] }[] = [];
+        const revertBatches: { date: string; orderedIds: string[] }[] = [];
+        const newEntries: JournalEntry[] = [];
+
+        for (const [date, list] of dateGroups.entries()) {
+            const originalIds = list.map((e) => e.id);
+            // Stable sort by SOURCE_GROUP_RANK: MANUAL (0) -> SERVICE (1) -> TRANSACTION (2) -> CASHFLOW (3)
+            const sortedList = [...list].sort((a, b) => {
+                const rankA = SOURCE_GROUP_RANK[a.source_type] ?? 99;
+                const rankB = SOURCE_GROUP_RANK[b.source_type] ?? 99;
+                return rankA - rankB;
+            });
+            const sortedIds = sortedList.map((e) => e.id);
+
+            const isChanged = originalIds.some((id, idx) => id !== sortedIds[idx]);
+            if (isChanged) {
+                changedBatches.push({ date, orderedIds: sortedIds });
+                revertBatches.push({ date, orderedIds: originalIds });
+            }
+            newEntries.push(...sortedList);
+        }
+
+        if (changedBatches.length === 0) {
+            setToast("Urutan sumber per tanggal sudah rapi.");
+            setReorderingBusy(false);
+            return;
+        }
+
+        // Simpan snapshot sebelumnya untuk fitur Undo
+        const previousEntriesSnapshot = [...entries];
+        setUndoState({
+            previousEntries: previousEntriesSnapshot,
+            batches: revertBatches,
+        });
+
+        // Optimistic update state
+        setEntries(newEntries);
+
+        try {
+            const res = await fetch("/api/akutansi/jurnal/reorder", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    batches: changedBatches,
+                    sortOrder,
+                }),
+            });
+            const json = await res.json();
+            if (!json.success) {
+                setToast(json.message ?? "Gagal menyimpan perapian urutan.");
+                setEntries(previousEntriesSnapshot);
+                setUndoState(null);
+            } else {
+                setToast(`Urutan sumber berhasil dirapikan (${changedBatches.length} tanggal diperbarui).`);
+            }
+        } catch {
+            setToast("Koneksi bermasalah saat merapikan urutan.");
+            setEntries(previousEntriesSnapshot);
+            setUndoState(null);
+        } finally {
+            setReorderingBusy(false);
+        }
+    };
+
+    const handleUndoReorder = async () => {
+        if (!undoState || reorderingBusy) return;
+        setReorderingBusy(true);
+        const { previousEntries, batches } = undoState;
+
+        // Optimistic revert state
+        setEntries(previousEntries);
+        setUndoState(null);
+
+        try {
+            const res = await fetch("/api/akutansi/jurnal/reorder", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    batches,
+                    sortOrder,
+                }),
+            });
+            const json = await res.json();
+            if (!json.success) {
+                setToast(json.message ?? "Gagal mengembalikan urutan.");
+                load(false);
+            } else {
+                setToast("Urutan berhasil dikembalikan ke semula.");
+            }
+        } catch {
+            setToast("Gagal mengembalikan urutan.");
+            load(false);
+        } finally {
+            setReorderingBusy(false);
+        }
+    };
+
     // Pindahkan semua entry yang terpilih ke tanggal baru
     const handleBulkMove = async () => {
         if (selectedEntryIds.size === 0 || !targetMoveDate || bulkBusy) return;
@@ -560,35 +669,8 @@ export default function JurnalUmum({ period }: { period: string }) {
             });
         }
 
-        if (groupBySource) {
-            const matchesRange = (from: string, to: string, tanggal: string) => {
-                if (!from && !to) return false;
-                if (from && tanggal < from) return false;
-                if (to && tanggal > to) return false;
-                return true;
-            };
-            const inDateScope = (tanggal: string) =>
-                matchesRange(dateFrom, dateTo, tanggal) ||
-                lockedSourceRanges.some((r) => matchesRange(r.from, r.to, tanggal));
-
-            const next = [...result];
-            let i = 0;
-            while (i < next.length) {
-                let j = i + 1;
-                while (j < next.length && next[j].tanggal === next[i].tanggal) j++;
-                if (inDateScope(next[i].tanggal)) {
-                    const block = next.slice(i, j).sort(
-                        (a, b) => (SOURCE_GROUP_RANK[a.source_type] ?? 99) - (SOURCE_GROUP_RANK[b.source_type] ?? 99)
-                    );
-                    next.splice(i, j - i, ...block);
-                }
-                i = j;
-            }
-            result = next;
-        }
-
         return result;
-    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, groupBySource, dateFrom, dateTo, lockedSourceRanges]);
+    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning]);
 
     const visibleEntries = useMemo(() => {
         return filtered.slice(0, displayLimit);
@@ -742,15 +824,26 @@ export default function JurnalUmum({ period }: { period: string }) {
 
     useEffect(() => {
         if (!toast) return;
-        const t = setTimeout(() => setToast(null), 3000);
+        const duration = undoState ? 6000 : 3000;
+        const t = setTimeout(() => setToast(null), duration);
         return () => clearTimeout(t);
-    }, [toast]);
+    }, [toast, undoState]);
 
     return (
         <div className="space-y-4">
             {toast && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg toast-in">
-                    {toast}
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] bg-gradient-to-br from-[#0f0c29] to-[#1a1545] text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg toast-in flex items-center gap-3">
+                    <span>{toast}</span>
+                    {undoState && (
+                        <button
+                            onClick={handleUndoReorder}
+                            disabled={reorderingBusy}
+                            className="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-900 font-bold hover:bg-amber-300 active:scale-95 transition text-[11px] flex items-center gap-1 shadow-xs shrink-0"
+                        >
+                            <Undo2 className="w-3 h-3" />
+                            Undo
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -930,24 +1023,25 @@ export default function JurnalUmum({ period }: { period: string }) {
                             )}
                         </button>
                         <button
-                            onClick={() => setGroupBySource((v) => {
-                                const next = !v;
-                                if (!next) {
-                                    setDateFrom("");
-                                    setDateTo("");
-                                    setLockedSourceRanges([]); // matikan mode → reset semua tanggal, termasuk yang sudah dikunci
-                                }
-                                return next;
-                            })}
-                            title={groupBySource ? "Matikan pengurutan per sumber (kembali ke urutan tanggal biasa)" : "Urutkan tiap tanggal: Manual, Service, Transaksi, Cashflow (dari atas ke bawah)"}
-                            className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${groupBySource
-                                ? "bg-blue-600 text-white shadow-2xs font-bold ring-2 ring-blue-300"
-                                : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
-                                }`}
+                            onClick={handleSortBySource}
+                            disabled={reorderingBusy || entries.length === 0}
+                            title="Rapikan urutan tiap tanggal: Manual → Service → Transaksi → Cashflow"
+                            className="h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 text-slate-700 hover:text-slate-900 bg-white border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs disabled:opacity-50"
                         >
-                            <Layers className={`w-3.5 h-3.5 ${groupBySource ? "text-white" : "text-slate-400"}`} />
-                            <span>Urutkan Sumber</span>
+                            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                            <span>{reorderingBusy ? "Merapikan..." : "Rapikan Sumber"}</span>
                         </button>
+                        {undoState && (
+                            <button
+                                onClick={handleUndoReorder}
+                                disabled={reorderingBusy}
+                                title="Kembalikan urutan sebelum dirapikan"
+                                className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 text-amber-900 bg-amber-100 border border-amber-300 hover:bg-amber-200 shadow-2xs animate-in fade-in zoom-in-95 duration-200"
+                            >
+                                <Undo2 className="w-3.5 h-3.5 text-amber-700" />
+                                <span>Undo Urutan</span>
+                            </button>
+                        )}
                     </div>
                     <button
                         onClick={() => setShowManual(true)}
@@ -957,73 +1051,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                     </button>
                 </div>
             </div>
-
-            {/* ── Muncul HANYA saat "Urutkan Sumber" aktif. TIDAK menyembunyikan data
-                 apa pun — cuma menentukan tanggal mana yang disusun ulang per sumber.
-                 Pilih tanggal lalu klik "Kunci Tanggal Ini" supaya tanggal itu tetap
-                 tersusun by source selamanya; tanggal lain yang belum dikunci gak ikut berubah. ── */}
-            {groupBySource && (
-                <div className="flex flex-wrap items-center gap-2 bg-blue-50/60 border border-blue-200/80 rounded-xl px-3 py-2">
-                    <Layers className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider shrink-0">
-                        Urutkan tanggal
-                    </span>
-                    <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        max={dateTo || undefined}
-                        className="h-8 border border-blue-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
-                    />
-                    <span className="text-xs text-blue-400 shrink-0">s/d</span>
-                    <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        min={dateFrom || undefined}
-                        className="h-8 border border-blue-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
-                    />
-                    <button
-                        onClick={() => {
-                            const today = jakartaDate(new Date().toISOString());
-                            setDateFrom(today);
-                            setDateTo(today);
-                        }}
-                        className="h-8 px-3 rounded-lg text-xs font-semibold bg-white border border-blue-200 text-blue-700 hover:bg-blue-100 active:scale-95 transition-all duration-150 shrink-0"
-                    >
-                        Hari Ini
-                    </button>
-                    {(dateFrom !== "" || dateTo !== "") && (
-                        <button
-                            onClick={() => {
-                                setLockedSourceRanges((prev) => [...prev, { from: dateFrom, to: dateTo }]);
-                                setDateFrom("");
-                                setDateTo("");
-                            }}
-                            className="h-8 px-3 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all duration-150 shrink-0"
-                        >
-                            Kunci Tanggal Ini
-                        </button>
-                    )}
-                    {lockedSourceRanges.length > 0 && (
-                        <button
-                            onClick={() => setLockedSourceRanges([])}
-                            className="h-8 px-3 rounded-lg text-xs font-semibold text-red-500 hover:bg-red-50 active:scale-95 transition-all duration-150 shrink-0"
-                        >
-                            Hapus Semua Kunci ({lockedSourceRanges.length})
-                        </button>
-                    )}
-                    <span className="text-[10.5px] text-blue-700/70 shrink-0">
-                        {dateFrom === "" && dateTo === ""
-                            ? lockedSourceRanges.length > 0
-                                ? `${lockedSourceRanges.length} rentang tanggal terkunci`
-                                : "Belum ada tanggal dipilih"
-                            : dateFrom !== "" && dateFrom === dateTo
-                                ? `Cuma tanggal ${fmtTgl(dateFrom)}`
-                                : `Cuma ${dateFrom ? fmtTgl(dateFrom) : "…"} – ${dateTo ? fmtTgl(dateTo) : "…"}`}
-                    </span>
-                </div>
-            )}
 
             {selectedEntryIds.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 bg-slate-900 text-white rounded-xl px-4 py-2.5">
