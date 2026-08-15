@@ -140,6 +140,7 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
   const [accounts, setAccounts] = useState<WhatsappAccount[]>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<WhatsappAccount | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
   const [showImport, setShowImport] = useState(false);
@@ -168,8 +169,18 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
 
   const handleDelete = async () => {
     if (!confirmDelete) return;
-    await fetch(`/api/leads-chat/accounts/${confirmDelete.id}`, { method: "DELETE" });
-    setConfirmDelete(null); fetchAccounts();
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/leads-chat/accounts/${confirmDelete.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok && res.status !== 404) {
+        setDeleteError(data?.message ?? `Gagal hapus (status ${res.status})`);
+        return;
+      }
+      setConfirmDelete(null); fetchAccounts();
+    } catch {
+      setDeleteError("Terjadi kesalahan jaringan saat hapus");
+    }
   };
 
   return (
@@ -206,7 +217,7 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${acc.status === "connected" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
                   {acc.status === "connected" ? "Tersambung" : "Menunggu"}
                 </span>
-                <button onClick={() => setConfirmDelete(acc)} className="text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                <button onClick={() => { setConfirmDelete(acc); setDeleteError(""); }} className="text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             </div>
           ))}
@@ -219,7 +230,8 @@ function AccountsPanel({ onClose }: { onClose: () => void }) {
             <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmDelete(null)} />
             <div className="relative bg-white rounded-2xl p-5 max-w-xs w-full">
               <p className="text-sm font-bold text-gray-800 mb-1">Hapus {confirmDelete.label}?</p>
-              <p className="text-xs text-gray-400 mb-4">Chat yang sudah masuk tetap tersimpan, nomor ini cuma berhenti nerima chat baru.</p>
+              <p className="text-xs text-gray-400 mb-2">Chat yang sudah masuk tetap tersimpan, nomor ini cuma berhenti nerima chat baru.</p>
+              {deleteError && <p className="text-xs text-red-600 font-semibold mb-2">{deleteError}</p>}
               <div className="flex gap-2">
                 <button onClick={() => setConfirmDelete(null)} className="flex-1 h-9 rounded-xl bg-gray-100 text-xs font-semibold">Batal</button>
                 <button onClick={handleDelete} className="flex-1 h-9 rounded-xl bg-red-600 text-white text-xs font-bold">Ya, Hapus</button>
