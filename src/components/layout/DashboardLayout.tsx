@@ -17,6 +17,7 @@ import { unlockReminderAudio } from "@/lib/reminderSound";
 import PatchNoteFab from "@/components/ui/PatchNoteFab";
 import BackButton from "@/components/ui/BackButton";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import SoundToggleButton from "@/components/ui/SoundToggleButton";
 
 
 function ScrollRestorer() {
@@ -93,12 +94,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="flex-1 flex flex-col min-w-0">
           {/* Mobile topbar */}
-          <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center px-4 flex-shrink-0 sticky top-0 z-30">
-            {isDashboardHome ? <div className="w-9 ml-12" /> : <BackButton className="ml-12" />}
-            <span className="text-sm font-bold text-[#1a1a2e] tracking-tight mx-auto">
+          <div className="lg:hidden h-12 bg-white border-b border-gray-100 flex items-center justify-between px-4 flex-shrink-0 sticky top-0 z-30">
+            <div className="flex items-center">
+              {isDashboardHome ? <div className="w-9 ml-12" /> : <BackButton className="ml-12" />}
+            </div>
+            <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">
               Solit POS
             </span>
-            <div className="w-9 ml-12" />
+            <div className="flex items-center justify-end w-9">
+              <SoundToggleButton size="sm" />
+            </div>
           </div>
 
           <main className="flex-1">

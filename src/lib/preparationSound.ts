@@ -124,8 +124,11 @@ function getCustomAudio(url: string): HTMLAudioElement {
   return audio;
 }
 
+import { isSoundMuted } from "@/lib/soundSettings";
+
 export function playSoundByKey(key: string, customUrl?: string | null) {
   try {
+    if (isSoundMuted()) return;
     if (key === "custom" && customUrl) {
       const audio = getCustomAudio(customUrl);
       audio.currentTime = 0;
