@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
-import { AI_CEO_ROLES } from "@/lib/permissions";
+import { AI_ASSISTANT_ROLES } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseAdmin = createClient(
@@ -8,24 +8,31 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
+async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
+  const userRoles: string[] =
+    Array.isArray((user as any).roles) && (user as any).roles.length > 0
+      ? (user as any).roles
+      : user.role
+      ? [user.role]
+      : [];
+
+  const roleFilters = userRoles.map((r) => `target_role.eq.${r}`).join(",");
+  const orCondition = `target_user_id.eq.${user.id}` + (roleFilters ? `,${roleFilters}` : "");
+
   const { data, error } = await supabaseAdmin
     .from("ai_ceo_reminders")
-    .select("id, title, message, severity, status, target_user_id, created_at, read_at, resolved_at, whatsapp_sent, whatsapp_error")
+    .select("id, title, message, severity, status, target_user_id, target_role, created_at, read_at, resolved_at, whatsapp_sent, whatsapp_error")
+    .or(orCondition)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(50);
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 
-  const userIds = Array.from(new Set((data ?? []).map((r) => r.target_user_id).filter(Boolean)));
-  const usersMap = new Map<string, string>();
-  if (userIds.length > 0) {
-    const { data: users } = await supabaseAdmin.from("users").select("id, name").in("id", userIds);
-    for (const u of users ?? []) usersMap.set(u.id, u.name);
-  }
+  const rows = data ?? [];
+  const unread = rows.filter((r) => r.status === "terkirim").length;
+  const latest = rows.find((r) => r.status === "terkirim") ?? null;
 
-  const rows = (data ?? []).map((r) => ({ ...r, target_name: usersMap.get(r.target_user_id) ?? "Unknown" }));
-  return NextResponse.json({ success: true, data: rows });
+  return NextResponse.json({ success: true, data: rows, unread, latest });
 }
 
-export const GET = withAuth(getHandler, AI_CEO_ROLES);
+export const GET = withAuth(getHandler, AI_ASSISTANT_ROLES);
