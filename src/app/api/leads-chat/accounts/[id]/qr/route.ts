@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { getDeviceQr } from "@/lib/fonnte";
 
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  const { id } = ctx.params;
+  const { id } = await ctx.params;
   const { data: account, error: selectError } = await supabaseAdmin
     .from("whatsapp_accounts").select("phone_number, fonnte_device_token").eq("id", id).maybeSingle();
 

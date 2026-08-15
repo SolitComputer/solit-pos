@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { deleteDevice } from "@/lib/fonnte";
 
 async function deleteHandler(req: NextRequest, ctx: any, user: AuthUser) {
-  const { id } = ctx.params;
+  const { id } = await ctx.params; 
   const { data: account, error: selectError } = await supabaseAdmin
     .from("whatsapp_accounts").select("fonnte_device_token").eq("id", id).maybeSingle();
 
