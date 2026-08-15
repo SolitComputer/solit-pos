@@ -97,12 +97,15 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
           ? `📎 ${attachment_name ?? "File"}`
           : trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent;
 
+      const isBirthdayWish = trimmedContent.startsWith("🎂");
+
       await sendPushToUser(receiver_id, {
-        title: senderName,          
+        title: senderName,
         body: pushBody,
         tag: `dm-${senderId}`,
         url: `/dashboard?dm=${senderId}`,
         requireInteraction: false,
+        silent: isBirthdayWish,
       });
     } catch (err) {
       console.error("[push DM]", err);

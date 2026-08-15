@@ -32,6 +32,7 @@ export interface PushPayload {
     tag?: string;
     url?: string;
     requireInteraction?: boolean;
+    silent?: boolean;
 }
 
 // ─── Helper internal ───────────────────────────────────────────────────────────
@@ -93,10 +94,11 @@ export async function sendPushToUser(
     const notification = JSON.stringify({
         title: payload.title,
         body: payload.body,
-        icon: payload.icon ?? "/assets/solit03.jpeg",   
+        icon: payload.icon ?? "/assets/solit03.jpeg",
         badge: payload.badge ?? "/assets/solit03.jpeg",
         tag: payload.tag ?? `notif-${Date.now()}`,
         requireInteraction: payload.requireInteraction ?? false,
+        silent: payload.silent ?? false,
         data: { url: payload.url ?? "/dashboard/users" },
     });
 
