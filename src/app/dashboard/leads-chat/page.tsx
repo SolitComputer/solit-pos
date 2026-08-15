@@ -52,6 +52,10 @@ function AddAccountModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
       const data = await res.json();
       if (data.alreadyConnected) { clearInterval(interval); onAdded(); onClose(); }
       else if (data.qrImageBase64) { setQr(data.qrImageBase64); setQrError(""); }
+      else if (res.status === 404) {
+        clearInterval(interval);
+        setQrError(data.message ?? "Akun ini sudah tidak ada di database — tutup modal ini dan coba lagi dari awal");
+      }
       else if (!data.success) { setQrError(data.message ?? "Gagal ambil QR dari Fonnte"); }
     }, 4000);
     return () => clearInterval(interval);
@@ -125,6 +129,10 @@ function ImportDeviceModal({ onClose, onImported }: { onClose: () => void; onImp
       const data = await res.json();
       if (data.alreadyConnected) { clearInterval(interval); onImported(); onClose(); }
       else if (data.qrImageBase64) { setQr(data.qrImageBase64); setQrError(""); }
+      else if (res.status === 404) {
+        clearInterval(interval);
+        setQrError(data.message ?? "Akun ini sudah tidak ada di database — tutup modal ini dan coba lagi dari awal");
+      }
       else if (!data.success) { setQrError(data.message ?? "Gagal ambil QR dari Fonnte"); }
     }, 4000);
     return () => clearInterval(interval);
@@ -287,6 +295,7 @@ export default function LeadsChatPage() {
   const [sending, setSending] = useState(false);
   const [showAccounts, setShowAccounts] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [messagesError, setMessagesError] = useState("");
 
   const fetchConversations = useCallback(async () => {
     const qs = activeChannel !== "ALL" ? `?channel=${activeChannel}` : "";
@@ -304,12 +313,18 @@ export default function LeadsChatPage() {
 
   const openConversation = async (conv: Conversation) => {
     setSelected(conv);
-    const res = await fetch(`/api/leads-chat/conversations/${conv.id}/messages`);
-    const data = await res.json();
-    if (data.success) setMessages(data.messages);
+    setMessages([]);
+    setMessagesError("");
+    try {
+      const res = await fetch(`/api/leads-chat/conversations/${conv.id}/messages`);
+      const data = await res.json();
+      if (data.success) setMessages(data.messages);
+      else setMessagesError(data.message ?? `Gagal memuat pesan (status ${res.status})`);
+    } catch {
+      setMessagesError("Terjadi kesalahan jaringan saat memuat pesan");
+    }
     fetchConversations();
   };
-
   const sendReply = async () => {
     if (!selected || !replyText.trim()) return;
     setSending(true);
@@ -384,6 +399,9 @@ export default function LeadsChatPage() {
                     <p className="text-sm font-bold text-gray-800">{selected.customer_name || selected.customer_identifier}</p>
                     <p className="text-[10.5px] text-gray-400">{selected.customer_identifier}</p>
                   </div>
+                  {messagesError && (
+                    <p className="text-xs text-red-600 font-semibold px-4 py-2 bg-red-50 border-b border-red-100">{messagesError}</p>
+                  )}
                   <div className="flex-1 overflow-y-auto p-4 space-y-2">
                     {messages.map((m) => (
                       <div key={m.id} className={`flex ${m.direction === "OUT" ? "justify-end" : "justify-start"}`}>
