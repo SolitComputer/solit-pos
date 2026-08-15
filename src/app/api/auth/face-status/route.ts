@@ -12,6 +12,24 @@ const supabase = createClient(
 
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"] as const;
 
+// ✅ NEW — pergantian "hari absensi" jam 04:00 WIB (bukan 00:00 WIB).
+function toAttendanceDateKey(iso: string): string {
+  return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+// Cookie "hari ini sudah beres" (absen/skip/libur) harus bertahan sampai
+// hari absensi berakhir (jam 04:00 WIB besok), bukan jam 00:00 WIB — kalau
+// tetap pakai jam 00:00, jam 00:00–03:59 jadi "linglung": secara data masih
+// hari kemarin, tapi cookie-nya udah expired duluan.
+function getAttendanceDayExpiry(attendanceDateKey: string): Date {
+  return new Date(`${addDaysToDateStr(attendanceDateKey, 1)}T04:00:00+07:00`);
+}
+
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -50,10 +68,16 @@ export async function GET() {
     )) ? user.id : undefined;
 
     const nowUTC = new Date();
-    const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
-    const nowWIB = new Date(wibMs);
-    const todayDow = nowWIB.getUTCDay();
-    const todayDate = nowWIB.toISOString().slice(0, 10);
+    // ✅ FIX: "hari ini" sekarang ikut cutoff jam 04:00 WIB — jam 00:00–03:59
+    // WIB masih dihitung tanggal kemarin (bukan lagi berdasarkan tengah malam).
+    const todayDate = toAttendanceDateKey(nowUTC.toISOString());
+    const todayDow = new Date(`${todayDate}T12:00:00Z`).getUTCDay();
+
+   // ✅ FIX: rentang absen "hari ini" sekarang jam 04:00 → 04:00 hari
+    // berikutnya (bukan 00:00–23:59), konsisten dengan pergantian hari
+    // absensi jam 4 pagi.
+    const attendanceDayStart = `${todayDate}T04:00:00+07:00`;
+    const attendanceDayEnd = `${addDaysToDateStr(todayDate, 1)}T03:59:59+07:00`;
 
     const [
       { data: weeklyOff },
@@ -72,8 +96,8 @@ export async function GET() {
         .eq("user_id", user.id).eq("attendance_date", todayDate).maybeSingle(),
       supabase.from("face_verifications").select("id, created_at")
         .eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "IN")
-        .gte("created_at", `${todayDate}T00:00:00+07:00`)
-        .lte("created_at", `${todayDate}T23:59:59+07:00`)
+        .gte("created_at", attendanceDayStart)
+        .lte("created_at", attendanceDayEnd)
         .order("created_at", { ascending: false }).limit(1)
         .maybeSingle(),
       supabase.from("users").select("face_embedding, shift, biometric_enabled").eq("id", user.id).single(),
@@ -84,8 +108,8 @@ export async function GET() {
       .from("face_verifications")
       .select("id, created_at")
       .eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "OUT")
-      .gte("created_at", `${todayDate}T00:00:00+07:00`)
-      .lte("created_at", `${todayDate}T23:59:59+07:00`)
+      .gte("created_at", attendanceDayStart)
+      .lte("created_at", attendanceDayEnd)
       .order("created_at", { ascending: false }).limit(1)
       .maybeSingle();
 
@@ -106,11 +130,6 @@ export async function GET() {
       .maybeSingle();
 
     if (leaveToday) {
-      const getMidnightWIB = () => new Date(Date.UTC(
-        nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(),
-        nowWIB.getUTCDate() + 1, 17, 0, 0
-      ));
-
       const response = NextResponse.json({
         success: true,
         alreadyAttended: true,
@@ -127,18 +146,13 @@ export async function GET() {
 
       response.cookies.set("day_off_today", await signAttendanceCookie(user.id), {
         httpOnly: true, secure: process.env.NODE_ENV === "production",
-        sameSite: "lax", path: "/", expires: getMidnightWIB(),
+        sameSite: "lax", path: "/", expires: getAttendanceDayExpiry(todayDate),
       });
 
       return response;
     }
 
-    if (manualToday && !manualIsAttendanceType) {
-      const getMidnightWIB = () => new Date(Date.UTC(
-        nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(),
-        nowWIB.getUTCDate() + 1, 17, 0, 0
-      ));
-
+   if (manualToday && !manualIsAttendanceType) {
       // ✅ FIX: Ambil nama admin yang mengabsenkan
       let createdByName: string | null = null;
       const createdById = (manualToday as any).created_by;
@@ -151,7 +165,7 @@ export async function GET() {
         createdByName = creatorData?.name ?? null;
       }
 
-      const expiry = getMidnightWIB();
+      const expiry = getAttendanceDayExpiry(todayDate);
       const response = NextResponse.json({
         success: true,
         alreadyAttended: true,
@@ -277,12 +291,7 @@ export async function GET() {
     const alreadyFromCookie = faceVerified === user.id || faceAttended === user.id;
     const alreadyAttended = alreadyFromCookie || alreadyAttendedDB;
 
-    const getMidnightWIB = () => new Date(Date.UTC(
-      nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(),
-      nowWIB.getUTCDate() + 1, 17, 0, 0
-    ));
-
-    const { count: biometricCredCount } = await supabase
+   const { count: biometricCredCount } = await supabase
       .from("user_webauthn_credentials")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id);
@@ -328,12 +337,12 @@ export async function GET() {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax", path: "/",
-        expires: getMidnightWIB(),
+        expires: getAttendanceDayExpiry(todayDate),
       });
     }
 
     if (alreadyAttendedDB && faceAttended !== user.id) {
-      const expiry = getMidnightWIB();
+      const expiry = getAttendanceDayExpiry(todayDate);
       response.cookies.set("face_attended", await signAttendanceCookie(user.id), {
         httpOnly: true, secure: process.env.NODE_ENV === "production",
         sameSite: "lax", path: "/", expires: expiry,
@@ -361,19 +370,17 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ success: false }, { status: 401 });
 
     const nowUTC = new Date();
-    const wibMs = nowUTC.getTime() + 7 * 60 * 60 * 1000;
-    const nowWIB = new Date(wibMs);
-    const midnight = new Date(Date.UTC(
-      nowWIB.getUTCFullYear(), nowWIB.getUTCMonth(),
-      nowWIB.getUTCDate() + 1, 17, 0, 0
-    ));
+    // ✅ FIX: expiry cookie "skip absen" ikut cutoff jam 04:00 WIB, konsisten
+    // dengan batas hari absensi di endpoint lain.
+    const todayDate = toAttendanceDateKey(nowUTC.toISOString());
+    const skipExpiry = getAttendanceDayExpiry(todayDate);
 
     const response = NextResponse.json({ success: true });
     response.cookies.set("attendance_skipped", await signAttendanceCookie(user.id), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax", path: "/",
-      expires: midnight,
+      expires: skipExpiry,
     });
     return response;
   } catch (err) {

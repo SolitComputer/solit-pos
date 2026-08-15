@@ -69,7 +69,12 @@ export function computeAfterOutOvertimeMinutes(
   checkOutISO: string,
   schedule: { checkout: { h: number; m: number } }
 ): number {
-  const actual = toWIBMinutesOfDay(checkOutISO);
+  let actual = toWIBMinutesOfDay(checkOutISO);
+  // ✅ FIX: pergantian hari absensi jam 04:00 WIB — kalau checkout terjadi
+  // jam 00:00–03:59 WIB, itu masih kelanjutan shift kemarin, jadi tambahkan
+  // 24 jam (mis. checkout jam 01:00 dihitung sebagai "25:00") supaya lembur
+  // akhir tetap terhitung benar, bukan malah dianggap 0.
+  if (actual < 4 * 60) actual += 24 * 60;
   const scheduledCheckout = schedule.checkout.h * 60 + schedule.checkout.m;
   const delta = actual - scheduledCheckout;
   return delta > 0 ? delta : 0;

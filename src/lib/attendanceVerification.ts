@@ -13,6 +13,18 @@ import {
   type OvertimeDirection,
 } from "@/lib/overtimeEngine";
 
+// ✅ NEW — pergantian "hari absensi" jam 04:00 WIB (bukan 00:00 WIB). Jam
+// 00:00–03:59 WIB masih dihitung sebagai kelanjutan hari sebelumnya.
+function toAttendanceDateKey(iso: string): string {
+  return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 interface ProcessAttendanceParams {
   supabaseAdmin: any;
   userId: string;
@@ -44,11 +56,16 @@ export type AttendanceOutcome =
   };
 
 export async function processAttendanceVerification(p: ProcessAttendanceParams): Promise<AttendanceOutcome> {
-  const { supabaseAdmin, userId } = p;
+ const { supabaseAdmin, userId } = p;
   const nowISO = p.overrideNowISO ?? new Date().toISOString();
-  const nowWIB = new Date(new Date(nowISO).getTime() + 7 * 3600_000);
-  const todayDow = nowWIB.getUTCDay();
-  const todayDate = nowWIB.toISOString().slice(0, 10);
+  // ✅ FIX: "hari ini" sekarang ikut cutoff jam 04:00 WIB, bukan tengah
+  // malam — jam 00:00–03:59 WIB masih dianggap kelanjutan hari kemarin
+  // (jadi absen pulang jam 2 pagi tetap dicocokkan ke absen masuk kemarin,
+  // dan absen jam 4 pagi ke atas otomatis dianggap "absen masuk" baru).
+  const todayDate = toAttendanceDateKey(nowISO);
+  const todayDow = new Date(`${todayDate}T12:00:00Z`).getUTCDay();
+  const attendanceDayStart = `${todayDate}T04:00:00+07:00`;
+  const attendanceDayEnd = `${addDaysToDateStr(todayDate, 1)}T03:59:59+07:00`;
 
   const [
     { data: todayIn },
@@ -61,12 +78,12 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
   ] = await Promise.all([
     supabaseAdmin.from("face_verifications").select("id, created_at")
       .eq("user_id", userId).eq("status", "SUCCESS").eq("direction", "IN")
-      .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`)
+      .gte("created_at", attendanceDayStart).lte("created_at", attendanceDayEnd)
       .order("created_at", { ascending: false }).limit(1)
       .maybeSingle(),
     supabaseAdmin.from("face_verifications").select("id, created_at")
       .eq("user_id", userId).eq("status", "SUCCESS").eq("direction", "OUT")
-      .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`)
+      .gte("created_at", attendanceDayStart).lte("created_at", attendanceDayEnd)
       .order("created_at", { ascending: false }).limit(1)
       .maybeSingle(),
     supabaseAdmin.from("user_day_off").select("id").eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
