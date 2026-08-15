@@ -3,6 +3,8 @@ import TanyaCeoAdminWorkspace from "./TanyaCeoAdminWorkspace";
 import { getCurrentUser } from "@/lib/auth";
 import { AI_CEO_ROLES } from "@/lib/permissions";
 
+export const dynamic = "force-dynamic";
+
 export default async function Page() {
     const user = await getCurrentUser();
     
