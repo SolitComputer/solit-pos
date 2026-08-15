@@ -18,7 +18,7 @@ function getCtx(): AudioContext | null {
 export function unlockReminderAudio() {
   const c = getCtx();
   if (c && c.state === "suspended") {
-    c.resume().catch(() => {});
+    c.resume().catch(() => { });
   }
 }
 
@@ -30,7 +30,7 @@ export function playReminderBeep() {
   const c = getCtx();
   if (!c) return;
   if (c.state === "suspended") {
-    c.resume().catch(() => {});
+    c.resume().catch(() => { });
   }
 
   const playTone = (freq: number, start: number, duration: number) => {
