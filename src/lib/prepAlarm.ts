@@ -18,8 +18,10 @@ function readAck(storageKey: string): Set<string> {
 }
 
 /**
- * Notifikasi suara hanya berbunyi 1x saat ada item baru masuk.
- * Tidak looping terus menerus tiap 4 detik dan tidak berbunyi saat banner di-close/disilang.
+ * Notifikasi suara hanya berbunyi 1x saat ada item BARU YANG BELUM PERNAH TERLIHAT masuk.
+ * - Tidak looping tiap 4 detik.
+ * - Tidak bunyi saat pertama kali buka halaman / data pertama kali datang dari API.
+ * - Tidak bunyi saat banner di-close/disilang (acknowledge).
  */
 export function usePrepAlarm(
   items: { id: string }[],
@@ -31,10 +33,15 @@ export function usePrepAlarm(
 ) {
   const [ackedIds, setAckedIds] = useState<Set<string>>(() => readAck(storageKey));
   const [muted, setMuted] = useState<boolean>(() => isSoundMuted());
-  const prevCountRef = useRef<number>(0);
-  const initialLoadRef = useRef<boolean>(true);
 
-  // sinkron ack & mute status antar hook instance & antar tab untuk key spesifik
+  // Set ID yang sudah pernah "terlihat" oleh hook ini (termasuk data pertama dari API).
+  // Ini yang mencegah bunyi saat halaman pertama dibuka dan data async datang.
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  // Flag: apakah kita sudah pernah menerima data non-kosong?
+  // Selama belum pernah, semua data dianggap "initial batch" dan tidak bunyi.
+  const hasReceivedDataRef = useRef<boolean>(false);
+
+  // sinkron ack & mute status antar hook instance & antar tab
   useEffect(() => {
     const reread = () => setAckedIds(readAck(storageKey));
     const onMuteChange = () => setMuted(isSoundMuted());
@@ -60,25 +67,42 @@ export function usePrepAlarm(
   );
 
   useEffect(() => {
-    if (unacked.length === 0 || !soundEnabled || muted) {
-      prevCountRef.current = unacked.length;
-      initialLoadRef.current = false;
+    if (!soundEnabled || muted) {
+      // Tetap catat semua ID yang ada supaya nanti tidak dianggap "baru"
+      unacked.forEach((o) => seenIdsRef.current.add(o.id));
+      hasReceivedDataRef.current = hasReceivedDataRef.current || unacked.length > 0;
       return;
     }
 
-    // HANYA BUNYI 1x JIKA JUMLAH BERTAMBAH (ADA ORDER/PESAN BARU DATANG)
-    // TIDAK AKAN PERNAH LOOPING TIAP 4 DETIK & TIDAK BUNYI SAAT DI-CLOSE
-    const isNewItem = !initialLoadRef.current && unacked.length > prevCountRef.current;
-    prevCountRef.current = unacked.length;
-    initialLoadRef.current = false;
+    if (unacked.length === 0) {
+      // Tidak ada item → tidak perlu bunyi, tapi tandai sudah pernah terima data
+      // (kasus: pertama kali render sebelum API fetch selesai, unacked = [])
+      return;
+    }
 
-    if (isNewItem) {
+    // Cari ID yang BENAR-BENAR BARU (belum pernah terlihat oleh hook ini)
+    const trulyNewIds = unacked.filter((o) => !seenIdsRef.current.has(o.id));
+
+    // Catat SEMUA id yang sekarang ada sebagai "sudah terlihat"
+    unacked.forEach((o) => seenIdsRef.current.add(o.id));
+
+    // Kalau belum pernah terima data sama sekali sebelumnya,
+    // ini adalah "initial batch" dari API → JANGAN bunyi.
+    if (!hasReceivedDataRef.current) {
+      hasReceivedDataRef.current = true;
+      return;
+    }
+
+    // Sudah pernah terima data sebelumnya DAN ada ID baru → bunyi 1x
+    if (trulyNewIds.length > 0) {
       playSoundByKey(soundKey, customSoundUrl);
     }
-  }, [unacked.length, soundEnabled, soundKey, customSoundUrl, muted]);
+  }, [unacked, soundEnabled, soundKey, customSoundUrl, muted]);
 
   const acknowledge = useCallback(
     (id: string) => {
+      // Tandai juga sebagai "sudah terlihat" supaya tidak bunyi lagi
+      seenIdsRef.current.add(id);
       setAckedIds((prev) => {
         const next = new Set(prev);
         next.add(id);
