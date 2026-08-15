@@ -9,6 +9,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+export const dynamic = "force-dynamic";
+
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const body = await req.json().catch(() => null);
   const message: string = body?.message?.trim();
@@ -67,6 +69,20 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   } else {
     // Mode member_chat (Tanya CEO Bebas)
     mode = "member_chat";
+    if (convId) {
+      // Pastikan percakapan yang diminta benar-benar milik user yang sedang login!
+      const { data: convCheck } = await supabaseAdmin
+        .from("ai_ceo_conversations")
+        .select("id, user_id")
+        .eq("id", convId)
+        .maybeSingle();
+
+      if (!convCheck || convCheck.user_id !== user.id) {
+        // Percakapan bukan milik user ini -> abaikan dan buat percakapan baru untuk user ini
+        convId = undefined;
+      }
+    }
+
     if (!convId) {
       const { data: newConv, error: convErr } = await supabaseAdmin
         .from("ai_ceo_conversations")

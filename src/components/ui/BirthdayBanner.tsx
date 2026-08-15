@@ -14,16 +14,20 @@ interface BirthdayUser {
 function isBirthdayToday(birthDate: string | null): boolean {
     if (!birthDate) return false;
     const today = new Date();
-    const bd = new Date(birthDate + "T00:00:00");
-    return bd.getDate() === today.getDate() && bd.getMonth() === today.getMonth();
+    const clean = birthDate.slice(0, 10);
+    const [y, m, d] = clean.split("-").map(Number);
+    if (!y || !m || !d) return false;
+    return d === today.getDate() && m === (today.getMonth() + 1);
 }
 
 function getAge(birthDate: string): number {
     const today = new Date();
-    const bd = new Date(birthDate + "T00:00:00");
-    let age = today.getFullYear() - bd.getFullYear();
-    const m = today.getMonth() - bd.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
+    const clean = birthDate.slice(0, 10);
+    const [y, m, d] = clean.split("-").map(Number);
+    if (!y || !m || !d) return 0;
+    let age = today.getFullYear() - y;
+    const currentMonth = today.getMonth() + 1;
+    if (currentMonth < m || (currentMonth === m && today.getDate() < d)) age--;
     return age;
 }
 
@@ -64,7 +68,7 @@ export function BirthdayBanner() {
     useEffect(() => {
         const fetchBirthdays = async () => {
             try {
-                const res = await fetch("/api/users");
+                const res = await fetch("/api/users", { cache: "no-store" });
                 const data = await res.json();
                 if (data.success) {
                     const bdays = (data.users ?? []).filter(

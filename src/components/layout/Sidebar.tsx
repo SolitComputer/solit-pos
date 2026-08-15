@@ -13,6 +13,7 @@ import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
 import { useEscalationBadge } from "@/hooks/useEscalationBadge";
+import { invalidateAuthCache } from "@/hooks/useAuthUser";
 
 const CACHE_KEY = "solit_sidebar_userit";
 const RAIL_KEY = "solit_sidebar_rail";
@@ -1201,6 +1202,7 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     sessionStorage.removeItem(CACHE_KEY);
+    invalidateAuthCache();
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
   };
