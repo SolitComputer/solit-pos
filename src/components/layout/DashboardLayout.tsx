@@ -8,7 +8,6 @@ import { usePathname } from "next/navigation";
 import DeliveryAlertListener from "../preparation/DeliveryAlertListener";
 import { HTCallProvider } from "@/contexts/HTCallContext";
 import ConfirmDialog from "../ui/ConfirmDialog";
-import { BirthdayBanner } from "@/components/ui/BirthdayBanner";
 import { MissionSoundNotifier } from "@/components/layout/MissionSoundNotifier";
 import { useMissionSound } from "@/hooks/useMissionSound";
 import { SellerReminderNotifier } from "@/components/layout/SellerReminderNotifier";
@@ -107,7 +106,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <BackButton />
               </div>
             )}
-            <BirthdayBanner />
             <div className="px-4 pb-4 pt-2 lg:px-5 lg:pb-5 lg:pt-2 w-full">
               {children}
             </div>
