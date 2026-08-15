@@ -422,13 +422,10 @@ export async function POST(request: Request) {
       const created = await createOvertimeDraft(supabase, {
         userId: user.id, requestDate: todayDate, direction: declare_direction, minutes,
         actualStart, actualEnd,
-        // ✅ FIX: optional chaining — sebelumnya `(todayOut ?? todayIn).id` bisa
-        // crash kalau keduanya null, dan sekarang tetap aman walau todayIn
-        // berasal dari fallback absen manual (id-nya null, bukan face_verifications).
         sourceFaceVerificationId: todayOut?.id ?? todayIn?.id ?? null,
         isHoliday: declare_direction === "HOLIDAY",
       });
-
+      
       if (!created) {
         return NextResponse.json({ success: false, message: "Gagal menyimpan pengajuan lembur." }, { status: 500 });
       }
