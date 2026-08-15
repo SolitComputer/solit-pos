@@ -9,7 +9,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const { id } = await ctx.params; // Next.js 15+: params sekarang Promise, wajib di-await
   const { data, error } = await supabaseAdmin
     .from("chat_messages")
-    .select("id, direction, body, media_url, media_type, sender_user_id, delivery_status, deleted_at, deleted_scope, created_at")
+   .select("id, direction, body, media_url, media_type, sender_user_id, delivery_status, deleted_at, deleted_scope, from_member_name, created_at")
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
