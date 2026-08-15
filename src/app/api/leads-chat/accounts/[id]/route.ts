@@ -9,9 +9,17 @@ import { deleteDevice } from "@/lib/fonnte";
 // device fisiknya mungkin masih aktif di Fonnte — cek manual dashboard mereka.
 async function deleteHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const { id } = ctx.params;
-  const { data: account } = await supabaseAdmin
+  const { data: account, error: selectError } = await supabaseAdmin
     .from("whatsapp_accounts").select("fonnte_device_token").eq("id", id).maybeSingle();
-  if (!account) return NextResponse.json({ success: false, message: "Akun tidak ditemukan" }, { status: 404 });
+
+  if (selectError) {
+    console.error("[leads-chat/accounts DELETE] gagal query akun:", selectError);
+    return NextResponse.json({ success: false, message: selectError.message }, { status: 500 });
+  }
+  if (!account) {
+    console.warn(`[leads-chat/accounts DELETE] akun id=${id} sudah tidak ada di database`);
+    return NextResponse.json({ success: false, message: "Akun tidak ditemukan" }, { status: 404 });
+  }
 
   try {
     await deleteDevice({ deviceToken: account.fonnte_device_token });
