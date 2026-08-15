@@ -11,6 +11,7 @@ import ConfirmDialog from "../ui/ConfirmDialog";
 import { MissionSoundNotifier } from "@/components/layout/MissionSoundNotifier";
 import { useMissionSound } from "@/hooks/useMissionSound";
 import { SellerReminderNotifier } from "@/components/layout/SellerReminderNotifier";
+import { ReminderPopupModal } from "@/components/layout/ReminderPopupModal";
 import { unlockReminderAudio } from "@/lib/reminderSound";
 import PatchNoteFab from "@/components/ui/PatchNoteFab";
 import BackButton from "@/components/ui/BackButton";
@@ -86,6 +87,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
 
         <SellerReminderNotifier userId={soundUserId} />
+        <ReminderPopupModal userId={soundUserId} />
         <PatchNoteFab />
 
         <div className="flex-1 flex flex-col min-w-0">

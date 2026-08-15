@@ -133,7 +133,8 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [searchNominal, setSearchNominal] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
-    const [pendingSearch, setPendingSearch] = useState(""); // search khusus untuk daftar pending (325 data belum konfirmasi)
+    const [lockedSourceRanges, setLockedSourceRanges] = useState<{ from: string; to: string }[]>([]);
+    const [pendingSearch, setPendingSearch] = useState("");
     const deferredSearch = React.useDeferredValue(search);
     const deferredSearchNominal = React.useDeferredValue(searchNominal);
     const deferredPendingSearch = React.useDeferredValue(pendingSearch);
@@ -559,19 +560,16 @@ export default function JurnalUmum({ period }: { period: string }) {
             });
         }
 
-        // Mode "Urutkan Sumber" (opt-in). PENTING: blok ini TIDAK PERNAH membuang
-        // entry — semua data tetap tampil. dateFrom/dateTo di sini cuma menentukan
-        // tanggal MANA yang urutannya disusun ulang per sumber (Manual, Service,
-        // Transaksi, Cashflow). Tanggal lain di luar rentang tetap tampil apa
-        // adanya, urutan aslinya tidak diutak-atik. Kosongkan dateFrom & dateTo
-        // untuk menerapkan penyusunan ulang ke SEMUA tanggal sekaligus.
         if (groupBySource) {
-            const inDateScope = (tanggal: string) => {
-                if (!dateFrom && !dateTo) return true;
-                if (dateFrom && tanggal < dateFrom) return false;
-                if (dateTo && tanggal > dateTo) return false;
+            const matchesRange = (from: string, to: string, tanggal: string) => {
+                if (!from && !to) return false;
+                if (from && tanggal < from) return false;
+                if (to && tanggal > to) return false;
                 return true;
             };
+            const inDateScope = (tanggal: string) =>
+                matchesRange(dateFrom, dateTo, tanggal) ||
+                lockedSourceRanges.some((r) => matchesRange(r.from, r.to, tanggal));
 
             const next = [...result];
             let i = 0;
@@ -590,7 +588,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
 
         return result;
-    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, groupBySource, dateFrom, dateTo]);
+    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, groupBySource, dateFrom, dateTo, lockedSourceRanges]);
 
     const visibleEntries = useMemo(() => {
         return filtered.slice(0, displayLimit);
@@ -934,7 +932,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                         <button
                             onClick={() => setGroupBySource((v) => {
                                 const next = !v;
-                                if (!next) { setDateFrom(""); setDateTo(""); } // matikan mode → reset pilihan tanggal
+                                if (!next) {
+                                    setDateFrom("");
+                                    setDateTo("");
+                                    setLockedSourceRanges([]); // matikan mode → reset semua tanggal, termasuk yang sudah dikunci
+                                }
                                 return next;
                             })}
                             title={groupBySource ? "Matikan pengurutan per sumber (kembali ke urutan tanggal biasa)" : "Urutkan tiap tanggal: Manual, Service, Transaksi, Cashflow (dari atas ke bawah)"}
@@ -958,7 +960,8 @@ export default function JurnalUmum({ period }: { period: string }) {
 
             {/* ── Muncul HANYA saat "Urutkan Sumber" aktif. TIDAK menyembunyikan data
                  apa pun — cuma menentukan tanggal mana yang disusun ulang per sumber.
-                 Kosongkan kedua kolom supaya berlaku ke SEMUA tanggal. ── */}
+                 Pilih tanggal lalu klik "Kunci Tanggal Ini" supaya tanggal itu tetap
+                 tersusun by source selamanya; tanggal lain yang belum dikunci gak ikut berubah. ── */}
             {groupBySource && (
                 <div className="flex flex-wrap items-center gap-2 bg-blue-50/60 border border-blue-200/80 rounded-xl px-3 py-2">
                     <Layers className="w-3.5 h-3.5 text-blue-600 shrink-0" />
@@ -992,15 +995,29 @@ export default function JurnalUmum({ period }: { period: string }) {
                     </button>
                     {(dateFrom !== "" || dateTo !== "") && (
                         <button
-                            onClick={() => { setDateFrom(""); setDateTo(""); }}
+                            onClick={() => {
+                                setLockedSourceRanges((prev) => [...prev, { from: dateFrom, to: dateTo }]);
+                                setDateFrom("");
+                                setDateTo("");
+                            }}
+                            className="h-8 px-3 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all duration-150 shrink-0"
+                        >
+                            Kunci Tanggal Ini
+                        </button>
+                    )}
+                    {lockedSourceRanges.length > 0 && (
+                        <button
+                            onClick={() => setLockedSourceRanges([])}
                             className="h-8 px-3 rounded-lg text-xs font-semibold text-red-500 hover:bg-red-50 active:scale-95 transition-all duration-150 shrink-0"
                         >
-                            Reset (semua tanggal)
+                            Hapus Semua Kunci ({lockedSourceRanges.length})
                         </button>
                     )}
                     <span className="text-[10.5px] text-blue-700/70 shrink-0">
                         {dateFrom === "" && dateTo === ""
-                            ? "Berlaku untuk semua tanggal"
+                            ? lockedSourceRanges.length > 0
+                                ? `${lockedSourceRanges.length} rentang tanggal terkunci`
+                                : "Belum ada tanggal dipilih"
                             : dateFrom !== "" && dateFrom === dateTo
                                 ? `Cuma tanggal ${fmtTgl(dateFrom)}`
                                 : `Cuma ${dateFrom ? fmtTgl(dateFrom) : "…"} – ${dateTo ? fmtTgl(dateTo) : "…"}`}
@@ -2324,13 +2341,12 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                     ref={provided.innerRef}
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
-                    className={`group ${
-                        snapshot.isDragging
-                            ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400"
-                            : isDraggingGroup && isSelected
+                    className={`group ${snapshot.isDragging
+                        ? "bg-white shadow-lg z-50 relative ring-2 ring-blue-400"
+                        : isDraggingGroup && isSelected
                             ? "opacity-50 ring-2 ring-blue-200"
                             : ""
-                    }`}
+                        }`}
                     style={provided.draggableProps.style}
                 >
                     {linesToRender.map((line, i) => {
@@ -2354,7 +2370,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                 type="checkbox"
                                                 checked={isSelected}
                                                 onChange={() => onToggleSelect(entry.id)}
-                                               className="w-5 h-5 rounded border-gray-300 accent-[#1a1545] shrink-0 cursor-pointer"
+                                                className="w-5 h-5 rounded border-gray-300 accent-[#1a1545] shrink-0 cursor-pointer"
                                                 title="Pilih entry ini"
                                             />
                                             <div
@@ -2416,11 +2432,10 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
 
                                 <td className="px-4 py-2 text-center align-bottom">
                                     <span
-                                        className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${
-                                            accountCodeFilter.has(line.account_code)
-                                                ? "bg-blue-50 text-blue-700"
-                                                : "text-gray-400"
-                                        }`}
+                                        className={`text-[10px] font-mono font-bold rounded px-1 py-0.5 ${accountCodeFilter.has(line.account_code)
+                                            ? "bg-blue-50 text-blue-700"
+                                            : "text-gray-400"
+                                            }`}
                                     >
                                         {line.account_code}
                                     </span>
@@ -2482,11 +2497,10 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                         ? "Sudah dicek (Klik untuk batalkan)"
                                                         : "Tandai sudah dicek"
                                                 }
-                                                className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${
-                                                    isEntryChecked
-                                                        ? "bg-green-600 border-green-600 text-white shadow-2xs"
-                                                        : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"
-                                                }`}
+                                                className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${isEntryChecked
+                                                    ? "bg-green-600 border-green-600 text-white shadow-2xs"
+                                                    : "bg-white border-gray-300 text-gray-300 hover:border-gray-400 hover:text-gray-400"
+                                                    }`}
                                             >
                                                 <Check className="w-3.5 h-3.5 mx-auto" />
                                             </button>

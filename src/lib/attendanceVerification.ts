@@ -32,16 +32,16 @@ interface ProcessAttendanceParams {
 export type AttendanceOutcome =
   | { ok: false; status: number; message: string; code: string }
   | {
-      ok: true;
-      direction: "IN" | "OUT";
-      message: string;
-      overtimeOptions: {
-        beforeInMinutes: number;
-        afterOutMinutes: number;
-        holidayMinutes: number;
-        sourceFaceVerificationId: string;
-      } | null;
-    };
+    ok: true;
+    direction: "IN" | "OUT";
+    message: string;
+    overtimeOptions: {
+      beforeInMinutes: number;
+      afterOutMinutes: number;
+      holidayMinutes: number;
+      sourceFaceVerificationId: string;
+    } | null;
+  };
 
 export async function processAttendanceVerification(p: ProcessAttendanceParams): Promise<AttendanceOutcome> {
   const { supabaseAdmin, userId } = p;
@@ -50,7 +50,7 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
   const todayDow = nowWIB.getUTCDay();
   const todayDate = nowWIB.toISOString().slice(0, 10);
 
- const [
+  const [
     { data: todayIn },
     { data: todayOut },
     { data: weeklyOff },
@@ -62,10 +62,12 @@ export async function processAttendanceVerification(p: ProcessAttendanceParams):
     supabaseAdmin.from("face_verifications").select("id, created_at")
       .eq("user_id", userId).eq("status", "SUCCESS").eq("direction", "IN")
       .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`)
+      .order("created_at", { ascending: false }).limit(1)
       .maybeSingle(),
     supabaseAdmin.from("face_verifications").select("id, created_at")
       .eq("user_id", userId).eq("status", "SUCCESS").eq("direction", "OUT")
       .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`)
+      .order("created_at", { ascending: false }).limit(1)
       .maybeSingle(),
     supabaseAdmin.from("user_day_off").select("id").eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
     supabaseAdmin.from("user_date_off").select("id").eq("user_id", userId).eq("off_date", todayDate).maybeSingle(),
@@ -254,14 +256,14 @@ export async function createOvertimeDraft(
       user_id: args.userId,
       request_date: args.requestDate,
       direction: args.direction,
-      reason: AUTO_REASON_BY_DIRECTION[args.direction], 
-      requested_start: toWIBTimeString(args.actualStart), 
+      reason: AUTO_REASON_BY_DIRECTION[args.direction],
+      requested_start: toWIBTimeString(args.actualStart),
       status: "PENDING",
       duration_minutes: args.minutes,
       actual_start: args.actualStart,
       actual_end: args.actualEnd,
       is_holiday: args.isHoliday,
-      is_late: args.direction === "HOLIDAY" ? isLateForHoliday : null, // ✅ NEW
+      is_late: args.direction === "HOLIDAY" ? isLateForHoliday : false, 
       source_face_verification_id: args.sourceFaceVerificationId,
     })
     .select("id").single();
