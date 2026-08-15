@@ -37,7 +37,7 @@ function getDeepSeekKey(): string {
     return key;
 }
 
-function buildAiCeoSystemPrompt(): string {
+function buildAiCeoSystemPrompt(pendingEscalations: string = ""): string {
     const nowWIB = new Date(Date.now() + WIB_OFFSET_MS);
     const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
     const todayLabel = `${dayNames[nowWIB.getUTCDay()]}, ${nowWIB.toISOString().slice(0, 10)} (WIB)`;
@@ -56,7 +56,23 @@ Peranmu:
 7. Kamu juga bisa menjawab pertanyaan soal lembur karyawan lewat tool "get_overtime_summary".
 8. Format jawaban WAJIB dua tahap: (a) mulai dengan penjelasan singkat berbentuk KALIMAT/PARAGRAF biasa yang langsung menjawab inti pertanyaan secara naratif — contoh: "Penjualan bulan ini terlihat naik dibanding bulan lalu, didorong oleh peningkatan transaksi laptop ready stock." — (b) BARU setelah paragraf itu (pisahkan dengan baris kosong), tampilkan ringkasan terstruktur (bullet point, list bernomor, atau tabel Markdown) kalau datanya berbentuk daftar/angka rinci. Jangan langsung mulai dengan bullet point atau tabel tanpa kalimat pembuka. Tetap pakai **bold** untuk angka/istilah penting, dan pecah paragraf pendek-pendek.
 
-Gaya jawaban: Bahasa Indonesia, singkat, langsung ke inti, pakai angka nyata dari data. Jangan pernah mengklaim sudah "melakukan" perubahan apapun ke sistem.`;
+Gaya jawaban: Bahasa Indonesia, singkat, langsung ke inti, pakai angka nyata dari data. Jangan pernah mengklaim sudah "melakukan" perubahan apapun ke sistem.
+${pendingEscalations}`;
+}
+
+function buildMemberChatSystemPrompt(userName: string = "Member", userRole: string = "Staff"): string {
+    const nowWIB = new Date(Date.now() + WIB_OFFSET_MS);
+    const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const todayLabel = `${dayNames[nowWIB.getUTCDay()]}, ${nowWIB.toISOString().slice(0, 10)} (WIB)`;
+
+    return `Kamu adalah "AI Asisten" Solit 03.
+Konteks waktu: HARI INI adalah ${todayLabel}. Kalau user pakai istilah relatif ("kemarin", "besok"), HITUNG SENDIRI tanggalnya.
+Lawan bicaramu adalah: ${userName} (Role: ${userRole}).
+
+Aturan ketat:
+1. Jawab pertanyaan berdasarkan DATA ASLI dari tools yang tersedia. Jangan mengarang jawaban jika tool tidak mengembalikan data yang cukup.
+2. Jika pertanyaan di luar scope akses tool-mu, atau kamu tidak yakin jawabannya, panggil tool "eskalasi_ke_admin" dengan catatan jelas berisi keluhan/pertanyaan user.
+3. Bahasa Indonesia, singkat, ramah, tidak menggurui. Pecah paragraf jadi pendek-pendek. Format: mulai dengan kalimat naratif, lalu list/tabel jika ada data rinci.`;
 }
 
 function buildAssistantSystemPrompt(reminder: { title: string; message: string; severity: string }): string {
@@ -188,6 +204,18 @@ export const AI_CEO_TOOLS = [
                     required: ["judul", "pesan"],
                 },
             },
+            {
+                name: "jawab_pertanyaan_member",
+                description: "Kirim jawaban admin ke pertanyaan member yang di-eskalasi. Butuh escalation_id (dari daftar eskalasi pending) dan isi jawaban.",
+                parameters: {
+                    type: "OBJECT",
+                    properties: {
+                        escalation_id: { type: "STRING", description: "ID eskalasi yang mau dijawab." },
+                        jawaban: { type: "STRING", description: "Isi jawaban admin untuk member." },
+                    },
+                    required: ["escalation_id", "jawaban"],
+                },
+            },
         ],
     },
 ];
@@ -219,12 +247,70 @@ const MEMBER_ASSISTANT_TOOLS = [
 
 const MEMBER_ASSISTANT_TOOL_NAMES = new Set(MEMBER_ASSISTANT_TOOLS[0].functionDeclarations.map((f) => f.name));
 
+const ROLE_TOOL_WHITELIST: Record<string, string[]> = {
+    // Sales family
+    CREW_SALES: ["get_ready_stock", "get_ready_units", "get_recent_transactions", "get_accessory_stock"],
+    SOTECH: ["get_ready_stock", "get_ready_units", "get_recent_transactions", "get_accessory_stock"],
+    ONPOINT: ["get_ready_stock", "get_ready_units", "get_recent_transactions", "get_accessory_stock"],
+    KEPALA_SALES: ["get_ready_stock", "get_ready_units", "get_recent_transactions", "get_accessory_stock"],
+    KEPALA_ZENITH: ["get_ready_stock", "get_ready_units", "get_recent_transactions", "get_accessory_stock"],
+    KEPALA_SOTECH: ["get_ready_stock", "get_ready_units", "get_recent_transactions", "get_accessory_stock"],
+    KEPALA_ONPOINT: ["get_ready_stock", "get_ready_units", "get_recent_transactions", "get_accessory_stock"],
+    // Teknisi family
+    TEKNISI: ["get_minus_stock", "get_ready_stock", "get_ready_units", "get_accessory_stock"],
+    KEPALA_TEKNISI: ["get_minus_stock", "get_ready_stock", "get_ready_units", "get_accessory_stock"],
+    // Pengelola family
+    PENGELOLA_BARANG: ["get_ready_stock", "get_ready_units", "get_minus_stock", "get_accessory_stock"],
+    KEPALA_PENGELOLA_BARANG: ["get_ready_stock", "get_ready_units", "get_minus_stock", "get_accessory_stock"],
+    // Penyedia family
+    PENYEDIA_BARANG: ["get_ready_stock", "get_ready_units", "get_minus_stock"],
+    KEPALA_PENYEDIA_BARANG: ["get_ready_stock", "get_ready_units", "get_minus_stock"],
+    // Marketing family
+    MARKETING: ["get_ready_stock", "get_ready_units", "get_dashboard_stats", "get_accessory_stock"],
+    KEPALA_MARKETING: ["get_ready_stock", "get_ready_units", "get_dashboard_stats", "get_accessory_stock"],
+    KONTEN: ["get_ready_stock", "get_ready_units", "get_dashboard_stats", "get_accessory_stock"],
+    // Finance
+    ACCOUNTING: ["get_dashboard_stats", "get_cashflow_summary", "get_recent_transactions", "get_ready_stock"],
+    PURCHASING: ["get_dashboard_stats", "get_cashflow_summary", "get_recent_transactions", "get_ready_stock"],
+    // Others
+    PENGANTARAN: ["get_ready_stock", "get_ready_units"],
+    CUSTOMER_SERVICE: ["get_ready_stock", "get_ready_units", "get_accessory_stock", "get_minus_stock"],
+    KEBERSIHAN: [],
+};
+
+function buildMemberChatTools(userRole: string) {
+    let allowedNames = ROLE_TOOL_WHITELIST[userRole];
+    // Fallback if PKL
+    if (!allowedNames && userRole.startsWith("PKL")) {
+        const parentRole = userRole === "PKL" ? "CREW_SALES" : userRole.replace("PKL_", "");
+        allowedNames = ROLE_TOOL_WHITELIST[parentRole] ?? [];
+    }
+    allowedNames = allowedNames ?? [];
+    
+    // Member always gets these tools
+    allowedNames.push("eskalasi_ke_admin", "get_attendance_summary", "get_overtime_summary");
+    
+    // Copy eskalasi_ke_admin from MEMBER_ASSISTANT_TOOLS
+    const eskalasiTool = MEMBER_ASSISTANT_TOOLS[0].functionDeclarations.find(f => f.name === "eskalasi_ke_admin")!;
+    
+    // Filter AI_CEO_TOOLS
+    const filteredCeoTools = AI_CEO_TOOLS[0].functionDeclarations.filter(f => allowedNames.includes(f.name));
+    
+    return [
+        {
+            functionDeclarations: [...filteredCeoTools, eskalasiTool],
+        },
+    ];
+}
+
 interface ToolContext {
     req: NextRequest;
     userId: string;
     conversationId: string | null;
-    mode?: "ceo" | "asisten";
+    mode?: "ceo" | "asisten" | "member_chat";
     reminder?: { id: string; title: string; message: string; severity: string } | null;
+    userName?: string;
+    userRole?: string;
 }
 
 function resolveInternalOriginCandidates(req: NextRequest): string[] {
@@ -511,6 +597,23 @@ export async function runToolCall(
 ): Promise<any> {
     if (ctx.mode === "asisten" && !MEMBER_ASSISTANT_TOOL_NAMES.has(name)) {
         return { error: `Tool "${name}" tidak tersedia di mode Asisten.` };
+    }
+    if (ctx.mode === "member_chat") {
+        let allowedNames = ROLE_TOOL_WHITELIST[ctx.userRole ?? ""] ?? [];
+        if (!allowedNames && ctx.userRole?.startsWith("PKL")) {
+            const parentRole = ctx.userRole === "PKL" ? "CREW_SALES" : ctx.userRole.replace("PKL_", "");
+            allowedNames = ROLE_TOOL_WHITELIST[parentRole] ?? [];
+        }
+        allowedNames = allowedNames ?? [];
+        const isCommonTool = ["eskalasi_ke_admin", "get_attendance_summary", "get_overtime_summary"].includes(name);
+        if (!allowedNames.includes(name) && !isCommonTool) {
+            return { error: `Tool "${name}" tidak tersedia untuk role Anda.` };
+        }
+        
+        // Force args for personal queries
+        if (name === "get_attendance_summary") {
+            args.nama = ctx.userName;
+        }
     }
 
     switch (name) {
@@ -869,21 +972,27 @@ export async function runToolCall(
             }
 
             const rows = otRows.map((r: any) => ({ ...r, users: otUsersMap.get(r.user_id) ?? null }));
+            
+            let finalRows = rows;
+            if (ctx.mode === "member_chat" && ctx.userName) {
+                finalRows = rows.filter((r: any) => r.users?.name?.toLowerCase().includes(ctx.userName!.toLowerCase()));
+                if (finalRows.length === 0) return { error: `Tidak ada data lembur untuk Anda pada bulan tersebut.` };
+            }
 
             const ringkasanStatus: Record<string, number> = {};
             let totalBayar = 0;
             let adaInfoBayar = false;
-            for (const r of rows) {
+            for (const r of finalRows) {
                 ringkasanStatus[r.status] = (ringkasanStatus[r.status] ?? 0) + 1;
                 if (r.total_pay != null) { adaInfoBayar = true; totalBayar += Number(r.total_pay); }
             }
 
             return {
                 periode: `${year}-${paddedMonth}`,
-                total_pengajuan: rows.length,
+                total_pengajuan: finalRows.length,
                 ringkasan_status: ringkasanStatus,
                 total_bayar_lembur: adaInfoBayar ? totalBayar : null,
-                daftar: rows.slice(0, 60).map((r: any) => ({
+                daftar: finalRows.slice(0, 60).map((r: any) => ({
                     nama: r.users?.name,
                     role: r.users?.role,
                     tanggal: r.request_date,
@@ -984,9 +1093,24 @@ export async function runToolCall(
         }
 
         case "eskalasi_ke_admin": {
-            if (!ctx.reminder) return { error: "Tidak ada pengingat aktif di percakapan ini." };
             const catatan = String(args?.catatan ?? "").trim();
             if (!catatan) return { error: "Catatan tidak boleh kosong." };
+
+            if (ctx.mode === "member_chat") {
+                const { error } = await supabaseAdmin.from("ai_ceo_suggestions").insert({
+                    conversation_id: ctx.conversationId,
+                    created_by: ctx.userId,
+                    category: "balasan_member",
+                    title: `Pertanyaan dari ${ctx.userName} (${ctx.userRole})`,
+                    description: catatan,
+                    severity: "warning",
+                    status: "pending"
+                });
+                if (error) return { error: error.message };
+                return { success: true, message: "Pertanyaan sudah diteruskan ke Admin. Silakan tunggu balasan di chat ini." };
+            }
+
+            if (!ctx.reminder) return { error: "Tidak ada pengingat aktif di percakapan ini." };
 
             const { error: updErr } = await supabaseAdmin.from("ai_ceo_reminders").update({ status: "dibalas" }).eq("id", ctx.reminder.id);
             if (updErr) return { error: updErr.message };
@@ -998,9 +1122,45 @@ export async function runToolCall(
                 title: `Balasan soal: ${ctx.reminder.title}`,
                 description: catatan,
                 severity: "warning",
+                status: "pending"
             });
             if (error) return { error: error.message };
             return { success: true, message: "Balasan sudah dikirim ke daftar review Admin/CEO." };
+        }
+        
+        case "jawab_pertanyaan_member": {
+            const escalationId = String(args?.escalation_id ?? "").trim();
+            const jawaban = String(args?.jawaban ?? "").trim();
+            
+            if (!escalationId || !jawaban) return { error: "escalation_id dan jawaban wajib diisi." };
+            
+            // Cari eskalasi
+            const { data: esc, error: escErr } = await supabaseAdmin
+                .from("ai_ceo_suggestions")
+                .select("id, conversation_id, status")
+                .eq("id", escalationId)
+                .maybeSingle();
+                
+            if (escErr || !esc) return { error: "Eskalasi tidak ditemukan." };
+            if (esc.status === "answered") return { error: "Eskalasi ini sudah dijawab sebelumnya." };
+            if (!esc.conversation_id) return { error: "Tidak ada percakapan yang terkait dengan eskalasi ini." };
+            
+            // Insert balasan ke percakapan member
+            const { error: msgErr } = await supabaseAdmin.from("ai_ceo_messages").insert({
+                conversation_id: esc.conversation_id,
+                role: "assistant",
+                content: `💬 **Balasan dari Admin:**\n\n${jawaban}`,
+                provider: "system"
+            });
+            if (msgErr) return { error: `Gagal mengirim pesan: ${msgErr.message}` };
+            
+            // Update status eskalasi
+            await supabaseAdmin.from("ai_ceo_suggestions").update({ status: "answered" }).eq("id", escalationId);
+            
+            // Update updated_at di conversation biar muncul ke atas
+            await supabaseAdmin.from("ai_ceo_conversations").update({ updated_at: new Date().toISOString() }).eq("id", esc.conversation_id);
+            
+            return { success: true, message: `Jawaban berhasil dikirim.` };
         }
 
         default:
@@ -1342,10 +1502,36 @@ export async function runAiCeoTurn(
                 preferredProvider === "deepseek" ? ["deepseek"] :
                     ["deepseek", "gemini", "groq"];
 
-    const isAssistant = toolCtx.mode === "asisten";
-    if (isAssistant && !toolCtx.reminder) throw new Error("Mode asisten butuh toolCtx.reminder.");
-    const tools = isAssistant ? MEMBER_ASSISTANT_TOOLS : AI_CEO_TOOLS;
-    const systemPrompt = isAssistant ? buildAssistantSystemPrompt(toolCtx.reminder!) : buildAiCeoSystemPrompt();
+    let tools: any;
+    let systemPrompt: string;
+
+    if (toolCtx.mode === "asisten") {
+        if (!toolCtx.reminder) throw new Error("Mode asisten butuh toolCtx.reminder.");
+        tools = MEMBER_ASSISTANT_TOOLS;
+        systemPrompt = buildAssistantSystemPrompt(toolCtx.reminder);
+    } else if (toolCtx.mode === "member_chat") {
+        tools = buildMemberChatTools(toolCtx.userRole ?? "");
+        systemPrompt = buildMemberChatSystemPrompt(toolCtx.userName, toolCtx.userRole);
+    } else {
+        tools = AI_CEO_TOOLS;
+        let pendingEscalations = "";
+        try {
+            const { data } = await supabaseAdmin.from("ai_ceo_suggestions")
+                .select("id, title, description")
+                .eq("category", "balasan_member")
+                .eq("status", "pending")
+                .order("created_at", { ascending: true });
+            
+            if (data && data.length > 0) {
+                pendingEscalations = "\n\nAda pertanyaan member yang belum dijawab:\n" + 
+                    data.map((d: any, i: number) => `${i + 1}. [${d.title}] "${d.description}" (escalation_id: ${d.id})`).join("\n") + 
+                    "\n\nKalau admin mau jawab, panggil tool \"jawab_pertanyaan_member\" dengan escalation_id yang sesuai.";
+            }
+        } catch (e) {
+            console.error("[ai-ceo] Gagal fetch escalations", e);
+        }
+        systemPrompt = buildAiCeoSystemPrompt(pendingEscalations);
+    }
 
     let usageTotal: AiUsage | null = null;
     const accumulateUsage: UsageEventCallback = (u) => {
