@@ -4,9 +4,6 @@ import { LEADS_CHAT_MANAGE_ROLES } from "@/lib/permissions";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { deleteDevice } from "@/lib/fonnte";
 
-// ⚠️ Lihat catatan OTP di lib/fonnte.ts deleteDevice(). Kalau delete di Fonnte
-// gagal, akun tetap dihapus dari Solit POS (biar gak nyangkut di UI) tapi
-// device fisiknya mungkin masih aktif di Fonnte — cek manual dashboard mereka.
 async function deleteHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const { id } = ctx.params;
   const { data: account, error: selectError } = await supabaseAdmin
