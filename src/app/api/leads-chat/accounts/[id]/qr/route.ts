@@ -6,9 +6,17 @@ import { getDeviceQr } from "@/lib/fonnte";
 
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   const { id } = ctx.params;
-  const { data: account } = await supabaseAdmin
+  const { data: account, error: selectError } = await supabaseAdmin
     .from("whatsapp_accounts").select("phone_number, fonnte_device_token").eq("id", id).maybeSingle();
-  if (!account) return NextResponse.json({ success: false, message: "Akun tidak ditemukan" }, { status: 404 });
+
+  if (selectError) {
+    console.error(`[leads-chat/qr] gagal query akun id=${id}:`, selectError);
+    return NextResponse.json({ success: false, message: selectError.message }, { status: 500 });
+  }
+  if (!account) {
+    console.warn(`[leads-chat/qr] akun id=${id} tidak ditemukan di database — cek Table Editor Supabase`);
+    return NextResponse.json({ success: false, message: "Akun tidak ditemukan" }, { status: 404 });
+  }
 
   const qr = await getDeviceQr({ deviceToken: account.fonnte_device_token, phoneNumber: account.phone_number });
 
