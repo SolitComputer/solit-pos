@@ -51,6 +51,47 @@ const FACE_API_WHITELIST = [
 
 const PKL_BLOCKED_ROUTES = ["/dashboard/users"];
 
+// ── Pembatasan khusus 1 akun: Raffi Fahrezi (PKL_PENGELOLA_BARANG) hanya
+// boleh buka halaman Data Laptop untuk cari unit + toggle SO/UnSO. Blok ini
+// SELALU mengurangi akses (AND tambahan setelah cek role normal di bawah),
+// tidak pernah menambah — jadi kalau role-nya nanti berubah dan ROUTE_PERMISSIONS
+// sudah tidak mengizinkan sebuah path, blok ini tetap konsisten (tidak override).
+const SO_ONLY_USER_IDS = ["203810b5-f9e0-4de4-9495-e1378451fa29"];
+
+// Domain yang dibatasi buat akun di atas — di luar prefix ini akses jalan normal
+// (absensi, chat, profil, dsb SAMA SEKALI tidak disentuh).
+const SO_ONLY_DOMAIN_PREFIXES = [
+  "/dashboard/data-barang",
+  "/dashboard/accessories",
+  "/dashboard/units",
+  "/dashboard/laptops",
+  "/api/laptops",
+  "/api/accessories",
+  "/api/item-outflows",
+  "/api/units",
+];
+
+function isSoOnlyRestrictedPath(pathname: string): boolean {
+  const inDomain = SO_ONLY_DOMAIN_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
+  if (!inDomain) return false;
+
+  // Halaman Data Laptop (list + tombol SO)
+  if (pathname === "/dashboard/laptops") return false;
+  // GET list laptop
+  if (pathname === "/api/laptops") return false;
+  // Halaman Units per-model (cari unit saat stok > 1)
+  if (/^\/dashboard\/laptops\/[^/]+\/units$/.test(pathname)) return false;
+  // GET units per-model + GET/PATCH SO (toggle & riwayat)
+  if (/^\/api\/laptops\/[^/]+\/units$/.test(pathname)) return false;
+  if (/^\/api\/laptops\/[^/]+\/so$/.test(pathname)) return false;
+  // GET detail 1 laptop by id (dipakai saat buka Detail/Unit popup)
+  if (/^\/api\/laptops\/[^/]+$/.test(pathname) && pathname !== "/api/laptops/create" && pathname !== "/api/laptops/minus") return false;
+
+  return true; // selain itu (data-barang, accessories, units summary, ready, minus, monitoring, dll) → blocked
+}
+
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"];
 const CONTRACT_EXEMPT_ROLES = ["PROGRAMMER"];
@@ -450,7 +491,7 @@ export async function middleware(request: NextRequest) {
     hasRouteAccess = true;
   }
 
-  if (!hasRouteAccess) {
+ if (!hasRouteAccess) {
     if (!isPageRoute) {
       return NextResponse.json(
         { success: false, message: "Forbidden: role Anda tidak punya akses ke endpoint ini" },
@@ -460,6 +501,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(
       new URL(ROLE_DEFAULT_REDIRECT[effectivePrimary] ?? "/dashboard", request.url)
     );
+  }
+
+  // ── Gate tambahan: akun SO-only (lihat SO_ONLY_USER_IDS di atas) ──────────
+  if (SO_ONLY_USER_IDS.includes(user.id) && isSoOnlyRestrictedPath(pathname)) {
+    if (!isPageRoute) {
+      return NextResponse.json(
+        { success: false, message: "Forbidden: akun ini hanya diizinkan mengakses fitur SO" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.redirect(new URL("/dashboard/laptops", request.url));
   }
 
   requestHeaders.set("x-user-id", user.id);
