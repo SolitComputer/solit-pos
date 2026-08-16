@@ -20,6 +20,19 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// ✅ NEW — pergantian "hari absensi" jam 04:00 WIB (lihat penjelasan sama
+// di api/attendance/route.ts).
+function toAttendanceDateKey(iso: string): string {
+  return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────
 const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 const DIVISION_HEAD_MAP: Record<string, string[]> = {
@@ -137,10 +150,11 @@ export async function GET(request: Request) {
         const actualEnd = expired.scheduled_end;
         const startMs = expired.actual_start ? new Date(expired.actual_start).getTime() : NaN;
         const endMs = new Date(actualEnd).getTime();
-        const durationMins = Number.isNaN(startMs) ? 0 : Math.round((endMs - startMs) / 60000);
-        const billedHours = Math.floor(durationMins / 60);
+       const durationMins = Number.isNaN(startMs) ? 0 : Math.round((endMs - startMs) / 60000);
         const ratePerHour = expired.rate_per_hour ?? 0;
-        const calculatedPay = billedHours * ratePerHour;
+        // ✅ FIX: lembur dihitung proporsional per menit, bukan dibulatkan
+        // ke bawah per jam penuh — sebelumnya 1j45m cuma dibayar 1 jam.
+        const calculatedPay = Math.round((durationMins / 60) * ratePerHour);
 
         await supabase
           .from("overtime_requests")
@@ -309,8 +323,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: "Kategori lembur tidak valid." }, { status: 400 });
       }
 
-      const nowWIB = new Date(Date.now() + 7 * 3600_000);
-      const todayWIBDate = nowWIB.toISOString().slice(0, 10);
+     // ✅ FIX: "hari ini" untuk pengajuan lembur ikut pergantian hari
+      // absensi jam 04:00 WIB (bukan jam 00:00).
+      const todayWIBDate = toAttendanceDateKey(new Date().toISOString());
 
       const targetDate: string = (request_date && String(request_date).trim()) || todayWIBDate;
       if (targetDate > todayWIBDate) {
@@ -335,12 +350,16 @@ export async function POST(request: Request) {
 
       // Ambil absen masuk & pulang HARI INI milik user sendiri — jangan pernah
       // percaya menit dari client, selalu hitung ulang dari data absen asli.
+      // ✅ FIX: rentang absen "hari ini" sekarang jam 04:00 → 04:00 hari
+      // berikutnya (bukan 00:00–23:59).
+      const todayRangeStart = `${todayDate}T04:00:00+07:00`;
+      const todayRangeEnd = `${addDaysToDateStr(todayDate, 1)}T03:59:59+07:00`;
       const [{ data: todayIn }, { data: todayOut }, { data: weeklyOff }, { data: specificOff }, { data: dateWork }, { data: monthlyOff }] = await Promise.all([
         supabase.from("face_verifications").select("id, created_at").eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "IN")
-          .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`)
+          .gte("created_at", todayRangeStart).lte("created_at", todayRangeEnd)
           .order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("face_verifications").select("id, created_at").eq("user_id", user.id).eq("status", "SUCCESS").eq("direction", "OUT")
-          .gte("created_at", `${todayDate}T00:00:00+07:00`).lte("created_at", `${todayDate}T23:59:59+07:00`)
+          .gte("created_at", todayRangeStart).lte("created_at", todayRangeEnd)
           .order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("user_day_off").select("id").eq("user_id", user.id).eq("day_of_week", todayDow).maybeSingle(),
         supabase.from("user_date_off").select("id").eq("user_id", user.id).eq("off_date", todayDate).maybeSingle(),
@@ -509,10 +528,9 @@ export async function POST(request: Request) {
         );
       }
 
-      const durationMins = Math.round(
+     const durationMins = Math.round(
         (new Date(actualEnd).getTime() - new Date(actualStart).getTime()) / 60000
       );
-      const billedHours = Math.floor(durationMins / 60);
 
       let finalRate: number;
       let totalPay: number;
@@ -543,10 +561,11 @@ export async function POST(request: Request) {
               .select("rate_per_hour")
               .eq("role", targetUserData.role)
               .maybeSingle();
-            finalRate = rateData?.rate_per_hour ?? 0;
+          finalRate = rateData?.rate_per_hour ?? 0;
           }
         }
-        totalPay = billedHours * finalRate;
+        // ✅ FIX: proporsional per menit, bukan dibulatkan ke bawah per jam.
+        totalPay = Math.round((durationMins / 60) * finalRate);
       }
 
       let manualIsLate = false;
@@ -898,18 +917,18 @@ export async function PATCH(request: Request) {
           updated_at: new Date().toISOString(),
         };
 
-        if (!overtime.actual_end && overtime.scheduled_end && overtime.actual_start) {
+      if (!overtime.actual_end && overtime.scheduled_end && overtime.actual_start) {
           const lockedEnd = overtime.scheduled_end;
           const startMs = new Date(overtime.actual_start).getTime();
           const endMs = new Date(lockedEnd).getTime();
           if (endMs > startMs) {
             const durationMins = Math.round((endMs - startMs) / 60000);
-            const billedHours = Math.floor(durationMins / 60);
             const ratePerHour = overtime.rate_per_hour ?? 0;
             updatePayload.actual_end = lockedEnd;
             updatePayload.completed_at = lockedEnd;
             updatePayload.duration_minutes = durationMins;
-            updatePayload.total_pay = billedHours * ratePerHour;
+            // ✅ FIX: proporsional per menit, bukan dibulatkan ke bawah per jam.
+            updatePayload.total_pay = Math.round((durationMins / 60) * ratePerHour);
           }
         }
 
@@ -953,10 +972,10 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: false, message: "Waktu selesai tidak valid" }, { status: 400 });
       }
 
-      const durationMins = Math.round((endMs - startMs) / 60000);
+     const durationMins = Math.round((endMs - startMs) / 60000);
       const ratePerHour = overtime.rate_per_hour ?? 0;
-      const billedHours = Math.floor(durationMins / 60);
-      const calculatedPay = billedHours * ratePerHour;
+      // ✅ FIX: proporsional per menit, bukan dibulatkan ke bawah per jam.
+      const calculatedPay = Math.round((durationMins / 60) * ratePerHour);
       const finalProof = proof_photo_url ?? null;
 
       const updates: any = {
@@ -1089,7 +1108,10 @@ export async function PATCH(request: Request) {
         const endMs = new Date(resolvedEnd).getTime();
         if (endMs > startMs) {
           durationMins = Math.round((endMs - startMs) / 60000);
-          computedPay = Math.floor(durationMins / 60) * resolvedRate;
+          // ✅ FIX: proporsional per menit, bukan dibulatkan ke bawah per
+          // jam penuh — konsisten dengan action lain (GET auto-complete,
+          // is_manual, COMPLETE) yang sudah dibenerin sebelumnya.
+          computedPay = Math.round((durationMins / 60) * resolvedRate);
         }
       }
 
