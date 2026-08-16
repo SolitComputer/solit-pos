@@ -823,8 +823,11 @@ function RequestOvertimeModal({ onClose, onSaved, currentUser }: { onClose: () =
 }
 
 function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequest; onClose: () => void; onSaved: () => void }) {
-  const start = o.actual_start ?? o.scheduled_start, end = o.actual_end ?? o.scheduled_end;
-  const hours = (!start || !end) ? 0 : Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 3600000);
+ const start = o.actual_start ?? o.scheduled_start, end = o.actual_end ?? o.scheduled_end;
+  // ✅ FIX: simpan durasi dalam menit (durationMinutes) buat hitung bayaran
+  // proporsional, "hours" tetap dipakai cuma buat tampilan "X jam".
+  const durationMinutes = (!start || !end) ? 0 : Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
+  const hours = Math.floor(durationMinutes / 60);
 
   // ✅ NEW — aturan KETAT lembur hari libur: Tepat waktu = Rp100.000,
   // Terlambat = Rp50.000 (setengah). Nominal ini TIDAK bisa diedit manual
@@ -839,7 +842,9 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
   const [fixedPay, setFixedPay] = useState(holidayAutoPay ?? (o.total_pay ?? 0));
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
 
-  const totalPay = isHoliday ? (holidayAutoPay as number) : (payMode === "PER_JAM" ? rate * hours : fixedPay);
+ // ✅ FIX: mode Per Jam sekarang proporsional per menit, bukan dibulatkan
+  // ke bawah per jam penuh (mis. 6j30m bukan cuma dibayar 6 jam).
+  const totalPay = isHoliday ? (holidayAutoPay as number) : (payMode === "PER_JAM" ? Math.round((durationMinutes / 60) * rate) : fixedPay);
 
   const save = async () => {
     if (!isHoliday) {

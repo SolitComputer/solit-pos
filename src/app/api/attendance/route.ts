@@ -8,6 +8,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// ✅ NEW — pergantian "hari absensi" sekarang jam 04:00 WIB, bukan jam 00:00.
+// Jam 00:00–03:59 WIB masih dihitung hari sebelumnya (absen pulang dini hari
+// tetap tercatat sebagai pulang hari kemarin), jam 04:00 WIB ke atas sudah
+// hari absensi baru.
+function toAttendanceDateKey(iso: string): string {
+  // offset WIB (+7 jam) dikurangi 4 jam cutoff = +3 jam
+  return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -68,8 +84,7 @@ export async function GET(request: Request) {
     // sertakan arah, jadi IN dan OUT hari yang sama dua-duanya selamat.
     const seen = new Set<string>();
     const deduplicated = allData.filter((item: any) => {
-      const wibDate = new Date(new Date(item.created_at).getTime() + 7 * 60 * 60 * 1000)
-        .toISOString().slice(0, 10);
+     const wibDate = toAttendanceDateKey(item.created_at);
       const direction = item.direction ?? "IN";
       const key = `${item.user_id}_${wibDate}_${direction}`;
       if (seen.has(key)) return false;
@@ -137,10 +152,12 @@ export async function DELETE(request: Request) {
     // padahal pasangannya sudah tidak relevan lagi — ini penyebab lembur
     // jadi gak pernah kedeteksi lagi setelah hapus+absen-ulang.
     const recordDirection = record.direction ?? "IN";
-    const wibDate = new Date(new Date(record.created_at).getTime() + 7 * 60 * 60 * 1000)
-      .toISOString().slice(0, 10);
-    const dayStart = `${wibDate}T00:00:00+07:00`;
-    const dayEnd = `${wibDate}T23:59:59+07:00`;
+    const wibDate = toAttendanceDateKey(record.created_at);
+    // ✅ FIX: rentang pencarian pasangan sekarang jam 04:00 → 04:00 hari
+    // berikutnya (bukan 00:00–23:59), konsisten dengan pergantian hari
+    // absensi jam 4 pagi.
+    const dayStart = `${wibDate}T04:00:00+07:00`;
+    const dayEnd = `${addDaysToDateStr(wibDate, 1)}T03:59:59+07:00`;
     const oppositeDirection = recordDirection === "OUT" ? "IN" : "OUT";
 
     const { data: pairRecord } = await supabase
