@@ -51,6 +51,7 @@ interface JournalEntry {
     lines: JournalLine[];
     created_by_user?: { id: string; name: string } | null;
     updated_by_user?: { id: string; name: string } | null;
+    created_at?: string;
     updated_at?: string;
     trx_meta?: {
         company_name: string | null;
@@ -153,16 +154,23 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [bulkBusy, setBulkBusy] = useState(false);
     const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
     const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
+    const [showSortSourceModal, setShowSortSourceModal] = useState(false);
     const [undoState, setUndoState] = useState<{ previousEntries: JournalEntry[]; batches: { date: string; orderedIds: string[] }[] } | null>(null);
     const [reorderingBusy, setReorderingBusy] = useState(false);
     const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
     const [showManual, setShowManual] = useState(false);
     const [logEntry, setLogEntry] = useState<JournalEntry | null>(null);
     const [toast, setToast] = useState<string | null>(null);
-    const [showPending, setShowPending] = useState(() => {
-        if (typeof window === "undefined") return false;
-        return localStorage.getItem("jurnal-show-pending") === "true";
-    });
+    const [showPending, setShowPending] = useState(false);
+    const hasHydratedPending = useRef(false);
+
+    useEffect(() => {
+        const saved = localStorage.getItem("jurnal-show-pending");
+        if (saved !== null) {
+            setShowPending(saved === "true");
+        }
+        hasHydratedPending.current = true;
+    }, []);
 
     const load = useCallback(async (showLoader = true) => {
         if (showLoader) setLoading(true);
@@ -198,9 +206,8 @@ export default function JurnalUmum({ period }: { period: string }) {
 
     useEffect(() => { load(); }, [load]);
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            localStorage.setItem("jurnal-show-pending", String(showPending));
-        }
+        if (!hasHydratedPending.current) return;
+        localStorage.setItem("jurnal-show-pending", String(showPending));
     }, [showPending]);
 
     // Daftar lengkap akun untuk dropdown filter "Ref" — dimuat sekali saat komponen mount,
@@ -409,9 +416,21 @@ export default function JurnalUmum({ period }: { period: string }) {
     };
 
     // ── Rapikan Urutan Sumber per Tanggal (Manual → Service → Transaksi → Cashflow) ──
-    const handleSortBySource = async () => {
+    const handleSortBySource = async (scope: "all" | "today" | "custom", fromDate: string, toDate: string) => {
         if (entries.length === 0 || reorderingBusy) return;
         setReorderingBusy(true);
+
+        const today = jakartaDate(new Date().toISOString());
+        const inScope = (tgl: string) => {
+            if (scope === "all") return true;
+            if (scope === "today") return tgl === today;
+            if (scope === "custom") {
+                if (fromDate && tgl < fromDate) return false;
+                if (toDate && tgl > toDate) return false;
+                return true;
+            }
+            return true;
+        };
 
         // Kelompokkan entries per tanggal
         const dateGroups = new Map<string, JournalEntry[]>();
@@ -427,26 +446,48 @@ export default function JurnalUmum({ period }: { period: string }) {
         const newEntries: JournalEntry[] = [];
 
         for (const [date, list] of dateGroups.entries()) {
-            const originalIds = list.map((e) => e.id);
-            // Stable sort by SOURCE_GROUP_RANK: MANUAL (0) -> SERVICE (1) -> TRANSACTION (2) -> CASHFLOW (3)
-            const sortedList = [...list].sort((a, b) => {
-                const rankA = SOURCE_GROUP_RANK[a.source_type] ?? 99;
-                const rankB = SOURCE_GROUP_RANK[b.source_type] ?? 99;
-                return rankA - rankB;
-            });
-            const sortedIds = sortedList.map((e) => e.id);
+            if (inScope(date)) {
+                const originalIds = list.map((e) => e.id);
+                // Stable sort by SOURCE_GROUP_RANK: MANUAL (0) -> SERVICE (1) -> TRANSACTION (2) -> CASHFLOW (3)
+                // Khusus sesama CASHFLOW: urutkan persis seperti di menu Cashflow (id / created_at)
+                const sortedList = [...list].sort((a, b) => {
+                    const rankA = SOURCE_GROUP_RANK[a.source_type] ?? 99;
+                    const rankB = SOURCE_GROUP_RANK[b.source_type] ?? 99;
+                    if (rankA !== rankB) {
+                        return rankA - rankB;
+                    }
 
-            const isChanged = originalIds.some((id, idx) => id !== sortedIds[idx]);
-            if (isChanged) {
-                changedBatches.push({ date, orderedIds: sortedIds });
-                revertBatches.push({ date, orderedIds: originalIds });
+                    // Jika sama-sama CASHFLOW: samakan dengan urutan di menu Cashflow (id DESC untuk terbaru / ASC untuk terlama)
+                    if (a.source_type === "CASHFLOW" && b.source_type === "CASHFLOW") {
+                        const idA = a.source_id?.trim();
+                        const idB = b.source_id?.trim();
+                        if (idA && idB && !Number.isNaN(Number(idA)) && !Number.isNaN(Number(idB))) {
+                            return sortOrder === "asc" ? Number(idA) - Number(idB) : Number(idB) - Number(idA);
+                        }
+                        const strA = idA || a.created_at || "";
+                        const strB = idB || b.created_at || "";
+                        return sortOrder === "asc" ? strA.localeCompare(strB) : strB.localeCompare(strA);
+                    }
+
+                    return 0;
+                });
+                const sortedIds = sortedList.map((e) => e.id);
+
+                const isChanged = originalIds.some((id, idx) => id !== sortedIds[idx]);
+                if (isChanged) {
+                    changedBatches.push({ date, orderedIds: sortedIds });
+                    revertBatches.push({ date, orderedIds: originalIds });
+                }
+                newEntries.push(...sortedList);
+            } else {
+                newEntries.push(...list);
             }
-            newEntries.push(...sortedList);
         }
 
         if (changedBatches.length === 0) {
-            setToast("Urutan sumber per tanggal sudah rapi.");
+            setToast("Urutan sumber pada tanggal yang dipilih sudah rapi.");
             setReorderingBusy(false);
+            setShowSortSourceModal(false);
             return;
         }
 
@@ -459,6 +500,7 @@ export default function JurnalUmum({ period }: { period: string }) {
 
         // Optimistic update state
         setEntries(newEntries);
+        setShowSortSourceModal(false);
 
         try {
             const res = await fetch("/api/akutansi/jurnal/reorder", {
@@ -1023,7 +1065,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                             )}
                         </button>
                         <button
-                            onClick={handleSortBySource}
+                            onClick={() => setShowSortSourceModal(true)}
                             disabled={reorderingBusy || entries.length === 0}
                             title="Rapikan urutan tiap tanggal: Manual → Service → Transaksi → Cashflow"
                             className="h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 text-slate-700 hover:text-slate-900 bg-white border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs disabled:opacity-50"
@@ -1393,6 +1435,14 @@ export default function JurnalUmum({ period }: { period: string }) {
                     onClose={() => setShowBulkMoveModal(false)}
                     onConfirm={handleBulkMove}
                     busy={bulkBusy}
+                />
+            )}
+            {showSortSourceModal && (
+                <SortBySourceModal
+                    period={period}
+                    onClose={() => setShowSortSourceModal(false)}
+                    onConfirm={handleSortBySource}
+                    busy={reorderingBusy}
                 />
             )}
 
@@ -2280,6 +2330,143 @@ function BulkMoveModal({
                         {busy ? "Memindahkan..." : `Pindahkan (${count} Jurnal)`}
                     </button>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Sort By Source Modal ───────────────────────────────────────────────────
+interface SortBySourceModalProps {
+    period: string;
+    onClose: () => void;
+    onConfirm: (scope: "all" | "today" | "custom", fromDate: string, toDate: string) => Promise<void>;
+    busy: boolean;
+}
+
+function SortBySourceModal({ period, onClose, onConfirm, busy }: SortBySourceModalProps) {
+    const today = jakartaDate(new Date().toISOString());
+    const [scope, setScope] = useState<"all" | "today" | "custom">("all");
+    const [fromDate, setFromDate] = useState(today);
+    const [toDate, setToDate] = useState(today);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onConfirm(scope, fromDate, toDate);
+    };
+
+    return (
+        <div className="fixed inset-0 z-[95] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <Sparkles className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-900 leading-tight">Rapikan Urutan Sumber</h3>
+                            <p className="text-xs text-slate-500">Manual → Service → Transaksi → Cashflow</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        disabled={busy}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-3.5">
+                    <div className="space-y-2">
+                        <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${scope === "all" ? "bg-blue-50/60 border-blue-300 ring-1 ring-blue-300" : "bg-slate-50 border-slate-200 hover:bg-slate-100/70"}`}>
+                            <input
+                                type="radio"
+                                name="sort_scope"
+                                checked={scope === "all"}
+                                onChange={() => setScope("all")}
+                                className="mt-0.5 accent-blue-600"
+                            />
+                            <div>
+                                <p className="text-xs font-bold text-slate-800">Semua Tanggal di Periode Ini</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">Rapikan seluruh tanggal pada periode yang sedang dibuka ({period})</p>
+                            </div>
+                        </label>
+
+                        <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${scope === "today" ? "bg-blue-50/60 border-blue-300 ring-1 ring-blue-300" : "bg-slate-50 border-slate-200 hover:bg-slate-100/70"}`}>
+                            <input
+                                type="radio"
+                                name="sort_scope"
+                                checked={scope === "today"}
+                                onChange={() => setScope("today")}
+                                className="mt-0.5 accent-blue-600"
+                            />
+                            <div>
+                                <p className="text-xs font-bold text-slate-800">Hari Ini Saja ({fmtTgl(today)})</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">Hanya susun ulang entry pada tanggal hari ini</p>
+                            </div>
+                        </label>
+
+                        <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${scope === "custom" ? "bg-blue-50/60 border-blue-300 ring-1 ring-blue-300" : "bg-slate-50 border-slate-200 hover:bg-slate-100/70"}`}>
+                            <input
+                                type="radio"
+                                name="sort_scope"
+                                checked={scope === "custom"}
+                                onChange={() => setScope("custom")}
+                                className="mt-0.5 accent-blue-600"
+                            />
+                            <div className="flex-1">
+                                <p className="text-xs font-bold text-slate-800">Pilih Rentang Tanggal</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">Tentukan rentang tanggal yang ingin dirapikan</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    {scope === "custom" && (
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 animate-in fade-in duration-150">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <span className="text-[11px] font-bold text-slate-700 block mb-1">Dari Tanggal</span>
+                                    <input
+                                        type="date"
+                                        value={fromDate}
+                                        onChange={(e) => setFromDate(e.target.value)}
+                                        max={toDate || undefined}
+                                        className="w-full h-9 border border-slate-200 bg-white rounded-lg px-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
+                                    />
+                                </div>
+                                <div>
+                                    <span className="text-[11px] font-bold text-slate-700 block mb-1">Sampai Tanggal</span>
+                                    <input
+                                        type="date"
+                                        value={toDate}
+                                        onChange={(e) => setToDate(e.target.value)}
+                                        min={fromDate || undefined}
+                                        className="w-full h-9 border border-slate-200 bg-white rounded-lg px-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={busy}
+                            className="h-9 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={busy || (scope === "custom" && (!fromDate || !toDate))}
+                            className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs active:scale-95 transition-all duration-150 disabled:opacity-40"
+                        >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            {busy ? "Merapikan..." : "Rapikan Sekarang"}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );
