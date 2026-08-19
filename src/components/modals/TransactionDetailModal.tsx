@@ -19,6 +19,7 @@ interface LaptopEntry {
     created_at: string;
     sales_name?: string;
     source_platform?: string;
+    items?: { name: string; type: "laptop" | "accessory"; quantity: number; is_bonus: boolean }[];
   }[];
 }
 
@@ -48,12 +49,12 @@ const fmtShort = (n: number): string => {
 };
 
 const PLATFORM_COLOR: Record<string, { bg: string; color: string; border: string }> = {
-  shopee:    { bg: "#FFF7ED", color: "#C2410C", border: "#FED7AA" },
+  shopee: { bg: "#FFF7ED", color: "#C2410C", border: "#FED7AA" },
   tokopedia: { bg: "#ECFDF5", color: "#065F46", border: "#A7F3D0" },
-  facebook:  { bg: "#EEF2FF", color: "#3730A3", border: "#C7D2FE" },
-  olx:       { bg: "#F5F3FF", color: "#5B21B6", border: "#DDD6FE" },
+  facebook: { bg: "#EEF2FF", color: "#3730A3", border: "#C7D2FE" },
+  olx: { bg: "#F5F3FF", color: "#5B21B6", border: "#DDD6FE" },
   carousell: { bg: "#FEF2F2", color: "#991B1B", border: "#FECACA" },
-  cod:       { bg: "#FFFBEB", color: "#92400E", border: "#FDE68A" },
+  cod: { bg: "#FFFBEB", color: "#92400E", border: "#FDE68A" },
 };
 
 type TabKey = "daily" | "monthly" | "yearly";
@@ -90,10 +91,10 @@ function LaptopRow({
     rank === 1
       ? { bg: "#FFFBEB", color: "#B45309", border: "#FDE68A", bar: "linear-gradient(90deg,#F59E0B,#FCD34D)" }
       : rank === 2
-      ? { bg: "#F8FAFC", color: "#475569", border: "#E2E8F0", bar: "linear-gradient(90deg,#94A3B8,#CBD5E1)" }
-      : rank === 3
-      ? { bg: "#FFF7ED", color: "#C2410C", border: "#FED7AA", bar: "linear-gradient(90deg,#F97316,#FDBA74)" }
-      : { bg: "#EEF2FF", color: "#4338CA", border: "#C7D2FE", bar: "linear-gradient(90deg,#6366F1,#818CF8)" };
+        ? { bg: "#F8FAFC", color: "#475569", border: "#E2E8F0", bar: "linear-gradient(90deg,#94A3B8,#CBD5E1)" }
+        : rank === 3
+          ? { bg: "#FFF7ED", color: "#C2410C", border: "#FED7AA", bar: "linear-gradient(90deg,#F97316,#FDBA74)" }
+          : { bg: "#EEF2FF", color: "#4338CA", border: "#C7D2FE", bar: "linear-gradient(90deg,#6366F1,#818CF8)" };
 
   return (
     <div
@@ -245,6 +246,18 @@ function LaptopRow({
                         </span>
                       )}
                     </div>
+                    {tx.items && tx.items.length > 0 && (
+                      <p className="text-[10px] mt-1 leading-relaxed" style={{ color: "#64748B" }}>
+                        {tx.items.map((it, idx) => (
+                          <span key={idx}>
+                            {idx > 0 && <span style={{ color: "#CBD5E1" }}> · </span>}
+                            {it.name}
+                            {it.quantity > 1 ? ` x${it.quantity}` : ""}
+                            {it.is_bonus && <span style={{ color: "#F59E0B" }}> (bonus)</span>}
+                          </span>
+                        ))}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right flex-shrink-0">
                     {canSeeFinancials && (
@@ -432,15 +445,15 @@ export function TransactionDetailModal({
   if (!isOpen) return null;
 
   const tabs: { key: TabKey; label: string }[] = [
-    { key: "daily",   label: "Harian"  },
+    { key: "daily", label: "Harian" },
     { key: "monthly", label: "Bulanan" },
-    { key: "yearly",  label: "Tahunan" },
+    { key: "yearly", label: "Tahunan" },
   ];
 
   const activeData =
-    activeTab === "daily"   ? data?.daily   :
-    activeTab === "monthly" ? data?.monthly :
-    data?.yearly;
+    activeTab === "daily" ? data?.daily :
+      activeTab === "monthly" ? data?.monthly :
+        data?.yearly;
 
   return (
     <>
