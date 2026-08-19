@@ -65,9 +65,12 @@ export function usePrepAlarm(
   );
 
   useEffect(() => {
-    // Pada load pertama saat komponen mount:
-    // Catat item awal yang sudah ada (jika ada) ke seenIdsRef dan akhiri initial batch
+    // Pada load pertama data ASLI dari API (bukan render awal yang masih kosong
+    // sebelum fetch selesai): catat item yang sudah ada ke seenIdsRef dan akhiri
+    // initial batch. Kalau ditutup lebih awal saat items masih [], order LAMA
+    // yang baru saja termuat akan dianggap "baru" dan alarm salah bunyi.
     if (isInitialBatchRef.current) {
+      if (items.length === 0) return;
       unacked.forEach((o) => seenIdsRef.current.add(o.id));
       isInitialBatchRef.current = false;
       return;
@@ -93,7 +96,7 @@ export function usePrepAlarm(
     if (trulyNewIds.length > 0) {
       playSoundByKey(soundKey, customSoundUrl);
     }
-  }, [unacked, soundEnabled, soundKey, customSoundUrl, muted]);
+  }, [items, unacked, soundEnabled, soundKey, customSoundUrl, muted]);
 
   const acknowledge = useCallback(
     (id: string) => {
