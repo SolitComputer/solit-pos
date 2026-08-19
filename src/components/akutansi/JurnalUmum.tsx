@@ -1500,11 +1500,17 @@ function WarningToggle({
     const [reason, setReason] = useState("");
     const [busy, setBusy] = useState(false);
 
-    const computePos = () => {
+       const computePos = () => {
         const btn = btnRef.current;
         if (!btn) return;
         const rect = btn.getBoundingClientRect();
-        setPopPos({ top: rect.bottom + 6, left: Math.max(8, rect.right - 256) });
+        const POPOVER_HEIGHT = 420; // estimasi tinggi maksimal popover (header + form + riwayat)
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const top =
+            spaceBelow < POPOVER_HEIGHT
+                ? Math.max(8, rect.top - POPOVER_HEIGHT - 6) // ruang bawah kurang -> buka ke atas tombol
+                : rect.bottom + 6;
+        setPopPos({ top, left: Math.max(8, rect.right - 256) });
     };
 
     useEffect(() => {
@@ -1590,7 +1596,7 @@ function WarningToggle({
                 </button>
                 {showPopover && popPos && (
                     <div
-                        className="fixed z-[95] w-72 bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
+                                              className="fixed z-[95] w-72 max-h-[80vh] overflow-y-auto bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
                         style={{ top: popPos.top, left: popPos.left }}
                     >
                         <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-gray-100">
