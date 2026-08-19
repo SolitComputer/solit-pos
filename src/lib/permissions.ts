@@ -958,6 +958,28 @@ export const SO_ROLES: UserRole[] = [
   "PKL_PENGELOLA_BARANG",
 ];
 
+// ── SO Terbatas (per-akun) ────────────────────────────────────────────────
+// Akun spesifik (BUKAN role) yang boleh SO tapi HANYA untuk laptop yang masih
+// ada stok Siap Jual (siap_jual > 0). Beda dari SO_ROLES di atas yang bebas
+// SO model apa saja tanpa syarat stok. Tinggal tambah/hapus user id di array
+// ini kalau mau kasih/cabut akses akun lain.
+export const SO_LIMITED_USER_IDS: string[] = [
+  "203810b5-f9e0-4de4-9495-e1378451fa29",
+];
+
+/** Cek apakah user boleh SO baris laptop ini:
+ *  - Role di SO_ROLES        → bebas, boleh SO model apa saja.
+ *  - User id di SO_LIMITED_USER_IDS → HANYA boleh kalau siap_jual > 0. */
+export function canSoLaptop(
+  userRoles: UserRole[],
+  userId: string | null | undefined,
+  siapJual: number
+): boolean {
+  if (hasAnyRole(userRoles, SO_ROLES)) return true;
+  if (userId && SO_LIMITED_USER_IDS.includes(userId)) return siapJual > 0;
+  return false;
+}
+
 // ── Data Barang: Role yang boleh melihat tab Data Laptop & Aksesoris ──────────
 // Kepala Sales, Kepala Zenith, Kepala Onpoint, Kepala Sotech, Crew Sales, dan Sales tidak diperbolehkan.
 export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
