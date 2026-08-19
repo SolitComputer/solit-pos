@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 
 const ADMIN_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
@@ -236,6 +236,7 @@ export function AdminChatMonitor() {
     const [msgLoading, setMsgLoading] = useState(false);
     const [search, setSearch] = useState("");
     const isMobile = useIsMobile();
+    const listScrollTopRef = useRef(0);
 
     useEffect(() => {
         getCurrentUserClient().then(u => {
@@ -396,6 +397,7 @@ export function AdminChatMonitor() {
                     conversations={filtered}
                     loading={loading}
                     onSelect={fetchMessages}
+                    scrollTopRef={listScrollTopRef}
                 />
             )}
         </div>
@@ -404,13 +406,21 @@ export function AdminChatMonitor() {
 
 // ─── ConversationList ─────────────────────────────────────────────────────────
 function ConversationList({
-    conversations, loading, onSelect,
+    conversations, loading, onSelect, scrollTopRef,
 }: {
     conversations: Conversation[];
     loading: boolean;
     onSelect: (c: Conversation) => void;
+    scrollTopRef: React.MutableRefObject<number>;
 }) {
     const isMobile = useIsMobile();
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (containerRef.current) {
+            containerRef.current.scrollTop = scrollTopRef.current;
+        }
+    }, [scrollTopRef]);
 
     if (loading) {
         return (
@@ -451,7 +461,11 @@ function ConversationList({
     }
 
     return (
-        <div style={{ overflowY: "auto", maxHeight: isMobile ? "60vh" : 460, background: THEME.bg }}>
+        <div
+            ref={containerRef}
+            onScroll={e => { scrollTopRef.current = e.currentTarget.scrollTop; }}
+            style={{ overflowY: "auto", maxHeight: isMobile ? "60vh" : 460, background: THEME.bg }}
+        >
             {conversations.map((conv, idx) => {
                 const pA = getAvatarPalette(conv.userA.name);
                 const pB = getAvatarPalette(conv.userB.name);
@@ -553,6 +567,13 @@ function MessageView({
 }) {
     const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
     const isMobile = useIsMobile();
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!loading) {
+            messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+        }
+    }, [messages, loading]);
 
     const grouped = messages.reduce<{ date: string; label: string; msgs: Message[] }[]>((acc, msg) => {
         const d = new Date(msg.created_at);
@@ -830,6 +851,7 @@ function MessageView({
                             </div>
                         ))
                     )}
+                    <div ref={messagesEndRef} />
                 </div>
             </div>
         </>
