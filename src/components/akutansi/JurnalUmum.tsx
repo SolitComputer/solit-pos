@@ -449,7 +449,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             if (inScope(date)) {
                 const originalIds = list.map((e) => e.id);
                 // Stable sort by SOURCE_GROUP_RANK: MANUAL (0) -> SERVICE (1) -> TRANSACTION (2) -> CASHFLOW (3)
-                // Khusus sesama CASHFLOW: urutkan persis seperti di menu Cashflow (id / created_at)
+                // Khusus sesama CASHFLOW: urutkan persis seperti di menu Cashflow (created_at → source_id)
                 const sortedList = [...list].sort((a, b) => {
                     const rankA = SOURCE_GROUP_RANK[a.source_type] ?? 99;
                     const rankB = SOURCE_GROUP_RANK[b.source_type] ?? 99;
@@ -457,16 +457,20 @@ export default function JurnalUmum({ period }: { period: string }) {
                         return rankA - rankB;
                     }
 
-                    // Jika sama-sama CASHFLOW: samakan dengan urutan di menu Cashflow (id DESC untuk terbaru / ASC untuk terlama)
+                    // Jika sama-sama CASHFLOW: samakan dengan urutan di menu Cashflow
+                    // (tanggal DESC → created_at DESC → id DESC).
+                    // source_id di sini berisi UUID cashflow_entries.id — bukan angka,
+                    // jadi kita sort pakai created_at (journal_entries) dulu, lalu
+                    // source_id sebagai tiebreaker stabil.
                     if (a.source_type === "CASHFLOW" && b.source_type === "CASHFLOW") {
-                        const idA = a.source_id?.trim();
-                        const idB = b.source_id?.trim();
-                        if (idA && idB && !Number.isNaN(Number(idA)) && !Number.isNaN(Number(idB))) {
-                            return sortOrder === "asc" ? Number(idA) - Number(idB) : Number(idB) - Number(idA);
+                        const caA = a.created_at || "";
+                        const caB = b.created_at || "";
+                        if (caA !== caB) {
+                            return sortOrder === "asc" ? caA.localeCompare(caB) : caB.localeCompare(caA);
                         }
-                        const strA = idA || a.created_at || "";
-                        const strB = idB || b.created_at || "";
-                        return sortOrder === "asc" ? strA.localeCompare(strB) : strB.localeCompare(strA);
+                        const idA = a.source_id || "";
+                        const idB = b.source_id || "";
+                        return sortOrder === "asc" ? idA.localeCompare(idB) : idB.localeCompare(idA);
                     }
 
                     return 0;
