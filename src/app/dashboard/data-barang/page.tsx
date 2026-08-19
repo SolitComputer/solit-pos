@@ -153,10 +153,10 @@ export default function DataBarangPage() {
   return (
     <DashboardLayout>
       {/* ── PAGE HEADER — scrolls away normally ───────────────── */}
-      <div ref={topRef} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden mb-0">
+      <div ref={topRef} className="bg-white border border-gray-200/80 rounded-2xl shadow-sm overflow-hidden mb-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 gap-3 sm:gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 sm:w-9 sm:h-9 bg-gray-900 rounded-[10px] flex items-center justify-center flex-shrink-0 shadow-md">
+            <div className="w-10 h-10 sm:w-9 sm:h-9 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[10px] flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-900/25">
               <svg
                 className="w-[18px] h-[18px] sm:w-[17px] sm:h-[17px]"
                 viewBox="0 0 24 24"
@@ -180,7 +180,7 @@ export default function DataBarangPage() {
               </p>
             </div>
           </div>
-          <span className="inline-flex self-start sm:self-auto text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-3 py-1 font-medium tabular-nums">
+          <span className="inline-flex self-start sm:self-auto text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-full px-3 py-1 font-semibold tabular-nums">
             {visibleTabs.length} kategori
           </span>
         </div>
@@ -193,7 +193,7 @@ export default function DataBarangPage() {
         Negative margin + padding trick supaya sticky full-width
       */}
       <div className="-mx-4 lg:-mx-5 px-4 lg:px-5">
-        <div className="bg-white/95 backdrop-blur-md border border-gray-200 border-t-0 rounded-b-2xl shadow-sm overflow-hidden">
+        <div className="bg-white/95 backdrop-blur-md border border-gray-200/80 border-t-0 rounded-b-2xl shadow-sm overflow-hidden">
           <div className="flex overflow-x-auto scrollbar-hide px-4 sm:px-6">
             {visibleTabs.map((tab) => {
               const isActive = tab.key === activeTab;
@@ -204,13 +204,13 @@ export default function DataBarangPage() {
                   className={[
                     "flex-shrink-0 flex items-center gap-2 h-11 px-1 mr-6",
                     "text-[13px] border-b-2 -mb-px transition-all duration-150 select-none",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 rounded-sm",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 rounded-sm",
                     isActive
-                      ? "border-gray-900 text-gray-900 font-medium"
+                      ? "border-indigo-600 text-indigo-600 font-semibold"
                       : "border-transparent text-gray-500 font-normal hover:text-gray-800 hover:border-gray-300",
                   ].join(" ")}
                 >
-                  {getTabIcon(tab.icon, `w-4 h-4 ${isActive ? "opacity-80" : "opacity-40"}`)}
+                  {getTabIcon(tab.icon, `w-4 h-4 ${isActive ? "opacity-100" : "opacity-40"}`)}
                   {tab.label}
                 </button>
               );
@@ -225,7 +225,7 @@ export default function DataBarangPage() {
           <div className="p-8 text-center text-sm text-gray-400">Memuat data...</div>
         ) : visibleTabs.length === 0 ? (
           <div className="p-12 text-center bg-white rounded-2xl border border-gray-200 shadow-sm">
-            <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-3 ring-1 ring-rose-100">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
