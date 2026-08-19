@@ -458,7 +458,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                     }
 
                     // Jika sama-sama CASHFLOW: samakan dengan urutan di menu Cashflow
-                    // (tanggal DESC → created_at DESC → id DESC).
+                    // (tanggal DESC → created_at DESC → id DESC — LIHAT compareEntries()
+                    // di src/app/dashboard/cashflow/page.tsx, urutannya FIXED desc, tidak
+                    // ikut toggle "sortOrder" punya Jurnal Umum). Sengaja TIDAK dibikin
+                    // ikut sortOrder di sini, supaya hasilnya tetap sama persis dengan
+                    // menu Cashflow walau Jurnal Umum lagi ditampilkan terlama-dulu (asc).
                     // source_id di sini berisi UUID cashflow_entries.id — bukan angka,
                     // jadi kita sort pakai created_at (journal_entries) dulu, lalu
                     // source_id sebagai tiebreaker stabil.
@@ -466,11 +470,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                         const caA = a.created_at || "";
                         const caB = b.created_at || "";
                         if (caA !== caB) {
-                            return sortOrder === "asc" ? caA.localeCompare(caB) : caB.localeCompare(caA);
+                            return caB.localeCompare(caA);
                         }
                         const idA = a.source_id || "";
                         const idB = b.source_id || "";
-                        return sortOrder === "asc" ? idA.localeCompare(idB) : idB.localeCompare(idA);
+                        return idB.localeCompare(idA);
                     }
 
                     return 0;
