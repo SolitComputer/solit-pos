@@ -1294,9 +1294,9 @@ export default function Sidebar() {
     window.addEventListener("mouseup", onUp);
   }, []);
 
-  const prep = usePrepNotify(userRoles, user?.id);
-  const overtimeNotify = useOvertimeNotify(userRoles, user?.id);
-  const leadsChat = useLeadsChatNotify(userRoles, user?.id);
+  const prep = usePrepNotify(effectiveRoles, user?.id);
+  const overtimeNotify = useOvertimeNotify(effectiveRoles, user?.id);
+  const leadsChat = useLeadsChatNotify(effectiveRoles, user?.id);
   const { sound_key: notifSoundKey, custom_sound_url: notifCustomUrl } = useNotificationSettings(user?.id ?? null);
 
   useEffect(() => {

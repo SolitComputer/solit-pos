@@ -35,11 +35,9 @@ export function usePrepAlarm(
   const [muted, setMuted] = useState<boolean>(() => isSoundMuted());
 
   // Set ID yang sudah pernah "terlihat" oleh hook ini (termasuk data pertama dari API).
-  // Ini yang mencegah bunyi saat halaman pertama dibuka dan data async datang.
   const seenIdsRef = useRef<Set<string>>(new Set());
-  // Flag: apakah kita sudah pernah menerima data non-kosong?
-  // Selama belum pernah, semua data dianggap "initial batch" dan tidak bunyi.
-  const hasReceivedDataRef = useRef<boolean>(false);
+  // Flag apakah inisialisasi awal sudah lewat
+  const isInitialBatchRef = useRef<boolean>(true);
 
   // sinkron ack & mute status antar hook instance & antar tab
   useEffect(() => {
@@ -67,16 +65,24 @@ export function usePrepAlarm(
   );
 
   useEffect(() => {
+    // Pada load pertama data ASLI dari API (bukan render awal yang masih kosong
+    // sebelum fetch selesai): catat item yang sudah ada ke seenIdsRef dan akhiri
+    // initial batch. Kalau ditutup lebih awal saat items masih [], order LAMA
+    // yang baru saja termuat akan dianggap "baru" dan alarm salah bunyi.
+    if (isInitialBatchRef.current) {
+      if (items.length === 0) return;
+      unacked.forEach((o) => seenIdsRef.current.add(o.id));
+      isInitialBatchRef.current = false;
+      return;
+    }
+
     if (!soundEnabled || muted) {
       // Tetap catat semua ID yang ada supaya nanti tidak dianggap "baru"
       unacked.forEach((o) => seenIdsRef.current.add(o.id));
-      hasReceivedDataRef.current = hasReceivedDataRef.current || unacked.length > 0;
       return;
     }
 
     if (unacked.length === 0) {
-      // Tidak ada item → tidak perlu bunyi, tapi tandai sudah pernah terima data
-      // (kasus: pertama kali render sebelum API fetch selesai, unacked = [])
       return;
     }
 
@@ -86,18 +92,11 @@ export function usePrepAlarm(
     // Catat SEMUA id yang sekarang ada sebagai "sudah terlihat"
     unacked.forEach((o) => seenIdsRef.current.add(o.id));
 
-    // Kalau belum pernah terima data sama sekali sebelumnya,
-    // ini adalah "initial batch" dari API → JANGAN bunyi.
-    if (!hasReceivedDataRef.current) {
-      hasReceivedDataRef.current = true;
-      return;
-    }
-
-    // Sudah pernah terima data sebelumnya DAN ada ID baru → bunyi 1x
+    // Sudah pernah inisialisasi DAN ada ID baru → bunyi 1x
     if (trulyNewIds.length > 0) {
       playSoundByKey(soundKey, customSoundUrl);
     }
-  }, [unacked, soundEnabled, soundKey, customSoundUrl, muted]);
+  }, [items, unacked, soundEnabled, soundKey, customSoundUrl, muted]);
 
   const acknowledge = useCallback(
     (id: string) => {
