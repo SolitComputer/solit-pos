@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import ExcelJS from "exceljs";
 import Link from "next/link";
 import BarcodeModal from "@/components/ui/BarcodeModal";
-import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, LAPTOP_DELETE_ROLES } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop, LAPTOP_DELETE_ROLES } from "@/lib/permissions";
 import { Laptop } from "lucide-react";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
@@ -380,6 +380,8 @@ export function LaptopsContent() {
 
     //  Multi-role: simpan SEMUA roles user (bukan cuma 1 primary role)
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    //  Dipakai khusus untuk cek SO_LIMITED_USER_IDS (akun dengan SO terbatas)
+    const [userId, setUserId] = useState<string | null>(null);
 
     //  Semua permission check sekarang pakai hasAnyRole(userRoles, ...)
     // Additive: aksi muncul kalau role sudah diizinkan lewat array hardcode
@@ -407,8 +409,10 @@ export function LaptopsContent() {
     const canSeePrivateBarang = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
     const canViewTotalStok = canSeePrivateBarang;
     //  SO (Stock Opname) pakai whitelist sendiri, lebih sempit dari
-    //  canSeePrivateBarang — khusus tim Pengelola Barang saja.
-    const canManageSo = hasAnyRole(userRoles, SO_ROLES);
+    //  canSeePrivateBarang — khusus tim Pengelola Barang saja. Ditambah akun
+    //  spesifik di SO_LIMITED_USER_IDS supaya kolom SO tetap tampil buat
+    //  mereka — syarat "cuma Siap Jual" dicek PER BARIS via canSoLaptop().
+    const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
 
     //  Pop-up Detail unit — dipakai saat stok = 1 (tanpa perlu masuk halaman Units)
     const [unitDetail, setUnitDetail] = useState<{ unit: UnitDetailData; laptop: Laptop } | null>(null);
@@ -420,7 +424,7 @@ export function LaptopsContent() {
     const [alertModal, setAlertModal] = useState<string | null>(null);
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
     const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ laptop: Laptop; unitCount: number } | null>(null);
-   //  Audit: id laptop yang lagi diproses (biar tombolnya loading & tidak dobel klik)
+    //  Audit: id laptop yang lagi diproses (biar tombolnya loading & tidak dobel klik)
     const [auditingId, setAuditingId] = useState<string | null>(null);
     //  Pricelist Pedagang: id UNIT yang lagi diproses (beda level dari Audit —
     //  Audit per-model, Pedagang per-unit/SN)
@@ -479,7 +483,7 @@ export function LaptopsContent() {
                     ? { ...l, so_at: json.data.so_at, so_by: json.data.so_by }
                     : l
             ));
-           setSoPromptLaptop(null);
+            setSoPromptLaptop(null);
         } catch (e) {
             showAlert(e instanceof Error ? e.message : "Gagal memperbarui SO");
         } finally {
@@ -524,8 +528,9 @@ export function LaptopsContent() {
                             ? [r.user.role]
                             : [];
                 setUserRoles(roles as UserRole[]);
+                setUserId(r.user?.id ?? null);
             })
-            .catch(() => setUserRoles([]));
+            .catch(() => { setUserRoles([]); setUserId(null); });
     }, []);
 
     useEffect(() => {
@@ -656,7 +661,7 @@ export function LaptopsContent() {
             case "PRICE_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
             case "MODAL_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0) - (b.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0)); break;
             case "MODAL_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0) - (a.laptop_units?.find(u => u.status !== "SOLD")?.purchase_price ?? 0)); break;
-           case "SPAREPART_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0) - (b.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0)); break;
+            case "SPAREPART_ASC": list.sort((a, b) => (a.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0) - (b.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0)); break;
             case "SPAREPART_DESC": list.sort((a, b) => (b.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0) - (a.laptop_units?.find(u => u.status !== "SOLD")?.sparepart_cost ?? 0)); break;
             case "TOTAL_MODAL_ASC": list.sort((a, b) => {
                 const ua = a.laptop_units?.find(u => u.status !== "SOLD"); const ub = b.laptop_units?.find(u => u.status !== "SOLD");
@@ -871,7 +876,7 @@ export function LaptopsContent() {
         const max = modals.length ? Math.max(...modals) : 0;
         const jt = (n: number) => (n / 1_000_000).toFixed(1).replace(".", ",");
 
-       const spareparts = aktif.map(u => u.sparepart_cost).filter((n): n is number => n != null && n > 0);
+        const spareparts = aktif.map(u => u.sparepart_cost).filter((n): n is number => n != null && n > 0);
         const spMin = spareparts.length ? Math.min(...spareparts) : 0;
         const spMax = spareparts.length ? Math.max(...spareparts) : 0;
 
@@ -912,7 +917,7 @@ export function LaptopsContent() {
             belum_lunas_label: belumLunasLabel,
         };
 
-       //  ── Mode EXPLODE: Cari SN cocok di kelompok ini ──
+        //  ── Mode EXPLODE: Cari SN cocok di kelompok ini ──
         //  Search 1 SN → tampilkan CUMA unit yang cocok pencarian (matchedUnits),
         //  bukan seluruh kelompok/model — biar hasil search gak bikin bingung
         //  kalau 1 model punya banyak unit siap jual.
@@ -1136,7 +1141,7 @@ export function LaptopsContent() {
                                 <option value="PRICE_DESC">Harga Jual: Tinggi → Rendah</option>
                                 {canSeePrivateBarang && <option value="MODAL_ASC">Modal Laptop: Rendah → Tinggi</option>}
                                 {canSeePrivateBarang && <option value="MODAL_DESC">Modal Laptop: Tinggi → Rendah</option>}
-                              {canSeePrivateBarang && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
+                                {canSeePrivateBarang && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
                                 {canSeePrivateBarang && <option value="SPAREPART_DESC">Modal Sparepart: Tinggi → Rendah</option>}
                                 {canSeePrivateBarang && <option value="TOTAL_MODAL_ASC">Total Modal: Rendah → Tinggi</option>}
                                 {canSeePrivateBarang && <option value="TOTAL_MODAL_DESC">Total Modal: Tinggi → Rendah</option>}
@@ -1219,7 +1224,7 @@ export function LaptopsContent() {
                                 showTotalJual
                                 sortBy={sortBy}
                                 onSort={handleSort}
-                               onRowClick={(row) => {
+                                onRowClick={(row) => {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (l) handleRowClick(l, row.unit_id);
                                 }}
@@ -1251,6 +1256,9 @@ export function LaptopsContent() {
                                 renderSo={canManageSo ? (row) => {
                                     const l = filteredLaptops.find(x => x.id === row.id);
                                     if (!l) return null;
+                                    //  Akun di SO_LIMITED_USER_IDS cuma boleh SO laptop yang masih
+                                    //  ada stok Siap Jual — kalau tidak, sel SO disembunyikan.
+                                    if (!canSoLaptop(userRoles, userId, l.siap_jual ?? 0)) return null;
                                     return (
                                         <div className="flex items-center justify-center gap-1">
                                             <SoButton
@@ -1875,7 +1883,7 @@ function PedagangButton({ active, loading, onClick }: {
                 </>
             )}
         </button>
-)
+    )
 }
 
 //  Riwayat semua audit sebuah model laptop — dibaca dari tabel laptop_audit_logs
