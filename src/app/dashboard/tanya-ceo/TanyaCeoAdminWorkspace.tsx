@@ -3,7 +3,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/services/supabase";
 import { MarkdownMessage } from "@/components/ai/ChatPrimitives";
-import { AlertTriangle, Send, Inbox, User, Clock, CheckCircle2, Sparkles } from "lucide-react";
+import { AlertTriangle, Send, Inbox, User, Clock, CheckCircle2, Sparkles, ArrowLeft } from "lucide-react";
 
 interface Escalation {
     id: string;
@@ -18,6 +18,15 @@ interface Escalation {
 }
 
 interface ChatMessage { id?: string; role: "user" | "assistant"; content: string; provider?: string; }
+
+// Keyframe tambahan khusus halaman ini: fade-in untuk bubble pesan baru.
+// Warna tidak diubah — ini murni animasi, tidak nambah palet baru.
+const EXTRA_KEYFRAMES = `
+@keyframes messageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+`;
 
 export default function TanyaCeoAdminWorkspace() {
     const [escalations, setEscalations] = useState<Escalation[]>([]);
@@ -68,7 +77,7 @@ export default function TanyaCeoAdminWorkspace() {
 
     useEffect(() => {
         if (!activeEscalation?.conversation_id) return;
-        
+
         const channelId = `admin_tanya_ceo_${activeEscalation.conversation_id}_${Math.random().toString(36).substring(2, 9)}`;
         const chan = supabase
             .channel(channelId)
@@ -113,7 +122,7 @@ export default function TanyaCeoAdminWorkspace() {
                 body: JSON.stringify({ jawaban: text }),
             });
             const json = await res.json();
-            
+
             if (json.success) {
                 // Update local status
                 setEscalations(prev => prev.map(e => e.id === activeEscalation.id ? { ...e, status: "reviewed" } : e));
@@ -133,26 +142,34 @@ export default function TanyaCeoAdminWorkspace() {
 
     return (
         <DashboardLayout>
+            <style dangerouslySetInnerHTML={{ __html: EXTRA_KEYFRAMES }} />
+
             <div className="flex h-[calc(100vh-6rem)] sm:h-[calc(100vh-3.5rem)] -mx-4 -my-4 lg:mx-0 lg:my-0 w-[calc(100%+2rem)] lg:w-full bg-white text-gray-800 overflow-hidden font-sans rounded-none sm:rounded-2xl border-0 sm:border border-gray-200 shadow-xs">
-                
+
                 {/* SIDEBAR INBOX */}
                 <aside className={`w-full sm:w-80 flex-shrink-0 bg-gray-50 border-r border-gray-200 flex-col ${!activeEscalation ? "flex" : "hidden sm:flex"}`}>
                     <div className="p-4 border-b border-gray-200 flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center text-white shadow-xs">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center text-white shadow-sm">
                                 <Inbox className="w-4 h-4" />
                             </div>
-                            <h1 className="text-[15px] font-bold text-gray-900">Inbox Eskalasi</h1>
+                            <h1 className="text-[15px] font-bold text-gray-900 tracking-tight">Inbox Eskalasi</h1>
                         </div>
                     </div>
-                    
+
                     <div className="flex-1 overflow-y-auto">
                         {loadingList ? (
-                            <div className="p-6 text-center text-sm text-gray-500">Memuat antrean...</div>
+                            <div className="p-4 space-y-2">
+                                {[0, 1, 2].map((i) => (
+                                    <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" style={{ animationDelay: `${i * 120}ms` }} />
+                                ))}
+                            </div>
                         ) : escalations.length === 0 ? (
-                            <div className="p-6 text-center">
-                                <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3 opacity-20" />
-                                <p className="text-sm font-medium text-gray-600">Inbox Bersih</p>
+                            <div className="p-8 text-center">
+                                <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+                                    <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                                </div>
+                                <p className="text-sm font-semibold text-gray-700">Inbox Bersih</p>
                                 <p className="text-xs text-gray-400 mt-1">Tidak ada pertanyaan member saat ini.</p>
                             </div>
                         ) : (
@@ -164,7 +181,7 @@ export default function TanyaCeoAdminWorkspace() {
                                         <li key={esc.id}>
                                             <button
                                                 onClick={() => openEscalation(esc)}
-                                                className={`w-full text-left p-4 hover:bg-gray-100 transition-colors ${isActive ? "bg-indigo-50/50 hover:bg-indigo-50/50" : ""} ${!isAnswered && !isActive ? "bg-white" : ""}`}
+                                                className={`w-full text-left p-4 border-l-2 transition-all duration-200 ${isActive ? "bg-indigo-50/60 border-indigo-500" : "bg-white border-transparent hover:bg-gray-100"}`}
                                             >
                                                 <div className="flex items-center justify-between mb-1.5">
                                                     <span className="text-xs font-bold text-gray-900 line-clamp-1">{esc.users?.name ?? "Unknown Member"}</span>
@@ -197,15 +214,18 @@ export default function TanyaCeoAdminWorkspace() {
                     {activeEscalation ? (
                         <>
                             {/* HEADER */}
-                            <header className="h-16 border-b border-gray-200 px-4 flex items-center gap-3 shrink-0 bg-white/80 backdrop-blur-md sticky top-0 z-10">
-                                <button onClick={() => setActiveEscalation(null)} className="sm:hidden p-2 -ml-2 rounded-lg text-gray-500 hover:bg-gray-100">
-                                    <AlertTriangle className="w-5 h-5 rotate-90" /> {/* Simulating back arrow */}
+                            <header className="h-16 border-b border-gray-200 px-4 flex items-center gap-3 shrink-0 bg-white/90 backdrop-blur-md sticky top-0 z-10">
+                                <button onClick={() => setActiveEscalation(null)} className="sm:hidden p-2 -ml-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors">
+                                    <ArrowLeft className="w-5 h-5" />
                                 </button>
-                                <div>
-                                    <h2 className="text-sm font-bold text-gray-900">{activeEscalation.users?.name ?? "Member"}</h2>
-                                    <p className="text-xs text-gray-500">{activeEscalation.users?.role}</p>
+                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-xs flex-shrink-0">
+                                    <User className="w-4 h-4" />
                                 </div>
-                                <div className="ml-auto">
+                                <div className="min-w-0">
+                                    <h2 className="text-sm font-bold text-gray-900 truncate">{activeEscalation.users?.name ?? "Member"}</h2>
+                                    <p className="text-xs text-gray-500 truncate">{activeEscalation.users?.role}</p>
+                                </div>
+                                <div className="ml-auto flex-shrink-0">
                                     <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${activeEscalation.status === "reviewed" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
                                         {activeEscalation.status === "reviewed" ? "Dijawab" : "Menunggu Balasan Admin"}
                                     </span>
@@ -220,11 +240,11 @@ export default function TanyaCeoAdminWorkspace() {
                                     messages.map((msg, i) => {
                                         const isAi = msg.role === "assistant";
                                         const isAdmin = isAi && msg.provider === "system";
-                                        
+
                                         if (!isAi) {
                                             // USER MESSAGE
                                             return (
-                                                <div key={msg.id ?? i} className="flex justify-end max-w-[85%] ml-auto">
+                                                <div key={msg.id ?? i} className="flex justify-end max-w-[85%] ml-auto" style={{ animation: "messageIn 0.25s ease-out" }}>
                                                     <div className="bg-[#1a1a2e] text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-xs">
                                                         <div className="text-[13px] sm:text-sm whitespace-pre-wrap leading-relaxed">
                                                             {msg.content}
@@ -236,7 +256,7 @@ export default function TanyaCeoAdminWorkspace() {
 
                                         // AI OR ADMIN MESSAGE
                                         return (
-                                            <div key={msg.id ?? i} className="flex max-w-[90%] gap-3">
+                                            <div key={msg.id ?? i} className="flex max-w-[90%] gap-3" style={{ animation: "messageIn 0.25s ease-out" }}>
                                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${isAdmin ? "bg-red-600 text-white" : "bg-gradient-to-br from-indigo-500 to-purple-600 text-white"}`}>
                                                     {isAdmin ? <User className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
                                                 </div>
@@ -256,11 +276,11 @@ export default function TanyaCeoAdminWorkspace() {
                             <div className="p-4 bg-white border-t border-gray-200">
                                 {activeEscalation.status === "reviewed" && (
                                     <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700 flex items-center gap-2">
-                                        <CheckCircle2 className="w-4 h-4" />
+                                        <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
                                         Eskalasi ini sudah dijawab. Anda tetap bisa mengirim pesan tambahan jika perlu.
                                     </div>
                                 )}
-                                <div className="relative max-w-4xl mx-auto flex items-end gap-2 bg-gray-50 border border-gray-300 rounded-2xl p-1.5 focus-within:bg-white focus-within:border-indigo-500 transition-all shadow-xs">
+                                <div className="relative max-w-4xl mx-auto flex items-end gap-2 bg-gray-50 border border-gray-300 rounded-2xl p-1.5 focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all duration-200 shadow-xs">
                                     <textarea
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
@@ -277,7 +297,7 @@ export default function TanyaCeoAdminWorkspace() {
                                     <button
                                         onClick={handleSend}
                                         disabled={!input.trim() || sending}
-                                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl bg-[#1a1a2e] text-white disabled:opacity-50 disabled:bg-gray-300 transition-colors"
+                                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl bg-[#1a1a2e] text-white disabled:opacity-50 disabled:bg-gray-300 active:scale-90 transition-all duration-150"
                                     >
                                         <Send className="w-4 h-4 -ml-0.5" />
                                     </button>
@@ -289,8 +309,8 @@ export default function TanyaCeoAdminWorkspace() {
                             <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4 border border-gray-100 shadow-xs">
                                 <Inbox className="w-8 h-8 text-gray-300" />
                             </div>
-                            <h2 className="text-base font-bold text-gray-800">Inbox Eskalasi</h2>
-                            <p className="text-sm text-gray-500 mt-2 max-w-xs">Pilih percakapan dari daftar di sebelah kiri untuk melihat riwayat pesan dan membalas member.</p>
+                            <h2 className="text-base font-bold text-gray-800 tracking-tight">Inbox Eskalasi</h2>
+                            <p className="text-sm text-gray-500 mt-2 max-w-xs leading-relaxed">Pilih percakapan dari daftar di sebelah kiri untuk melihat riwayat pesan dan membalas member.</p>
                         </div>
                     )}
                 </main>
