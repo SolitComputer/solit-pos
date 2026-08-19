@@ -50,9 +50,11 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
     };
   }, [fetchPending]);
 
+  const isFirstLoadRef = useRef(true);
+
   useEffect(() => {
     const isNew = pending.some((p) => !seenIdsRef.current.has(p.id));
-    if (isNew && pending.length > 0) {
+    if (isNew && pending.length > 0 && !isFirstLoadRef.current) {
       if (!audioRef.current) {
         audioRef.current = new Audio(SOUND_URL);
       }
@@ -61,6 +63,7 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
         // sekali — ini normal, badge visual tetap muncul walau suara gagal.
       });
     }
+    isFirstLoadRef.current = false;
     pending.forEach((p) => seenIdsRef.current.add(p.id));
   }, [pending]);
 
