@@ -2,10 +2,35 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
-import { SO_ROLES } from "@/lib/permissions";
+import { SO_ROLES, SO_LIMITED_USER_IDS, expandRolesWithParents } from "@/lib/permissions";
 
 interface Props {
   params: Promise<{ id: string }>;
+}
+
+// Sama seperti canSoLaptop() di lib/permissions — role di SO_ROLES bebas SO
+// model apa saja; akun di SO_LIMITED_USER_IDS HANYA boleh kalau siap_jual > 0.
+// Dicek ulang di sini (bukan cuma di frontend) supaya tidak bisa dibypass
+// dengan langsung memanggil endpoint ini. Role di-expand ke parent (PKL dst)
+// sama seperti yang sebelumnya dilakukan withAuth(allowedRoles).
+// "Siap Jual" dihitung dari laptop_units (bukan kolom di tabel laptops) —
+// harus konsisten dengan hitungan siapJualReady di LaptopsContent.tsx
+// (status SIAP_JUAL + harga lengkap).
+async function countSiapJual(laptopId: string): Promise<number> {
+  const { count } = await supabase
+    .from("laptop_units")
+    .select("id", { count: "exact", head: true })
+    .eq("laptop_id", laptopId)
+    .eq("status", "SIAP_JUAL")
+    .eq("is_price_complete", true);
+  return count ?? 0;
+}
+
+async function canSoLaptop(user: AuthUser, laptopId: string): Promise<boolean> {
+  const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
+  if (effectiveRoles.some((r) => (SO_ROLES as string[]).includes(r))) return true;
+  if (SO_LIMITED_USER_IDS.includes(user.id)) return (await countSiapJual(laptopId)) > 0;
+  return false;
 }
 
 //  Harus sama logikanya dengan isSoActive di LaptopsContent — reset otomatis
@@ -35,6 +60,13 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       return NextResponse.json(
         { success: false, message: readErr?.message || "Laptop tidak ditemukan" },
         { status: 404 }
+      );
+    }
+
+    if (!(await canSoLaptop(user, id))) {
+      return NextResponse.json(
+        { success: false, message: "Forbidden: laptop ini tidak punya stok Siap Jual" },
+        { status: 403 }
       );
     }
 
@@ -106,6 +138,10 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
       return NextResponse.json({ success: false, message: readErr.message }, { status: 400 });
     }
 
+    if (!(await canSoLaptop(user, id))) {
+      return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
+    }
+
     // Riwayat lengkap (SO & UNSO), terbaru dulu — tidak terpengaruh TTL.
     const { data: history, error: historyErr } = await supabase
       .from("laptop_so_logs")
@@ -130,5 +166,8 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const GET = withAuth(getHandler, SO_ROLES);
-export const PATCH = withAuth(patchHandler, SO_ROLES);
+// Role check tidak lagi dilempar ke withAuth (allowedRoles) supaya akun di
+// SO_LIMITED_USER_IDS (role di luar SO_ROLES) tetap bisa masuk handler —
+// otorisasi sebenarnya dicek manual via canSoLaptop() di atas.
+export const GET = withAuth(getHandler);
+export const PATCH = withAuth(patchHandler);

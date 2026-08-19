@@ -58,7 +58,12 @@ export function usePrepNotify(userRoles: string[], userId?: string | null) {
     } catch { /* ignore */ }
   }, [canHearMenunggu, canHearSiapKirim, userId]);
 
-  useEffect(() => { if (rolesKey) fetchData(); }, [rolesKey, fetchData]);
+  useEffect(() => {
+    if (!rolesKey) return;
+    fetchData();
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
+  }, [rolesKey, fetchData]);
 
   useEffect(() => {
     // admin / role yang tak berhak dengar → tidak usah subscribe sama sekali
@@ -70,11 +75,14 @@ export function usePrepNotify(userRoles: string[], userId?: string | null) {
     return () => { supabase.removeChannel(ch); };
   }, [rolesKey, silent, canHearMenunggu, canHearSiapKirim, fetchData]);
 
-  // sinkron ack (same-tab event + cross-tab storage + balik fokus)
+  // sinkron ack (same-tab event + cross-tab storage + balik fokus) & re-fetch saat tab aktif
   useEffect(() => {
     const reread = () => {
       setMenungguAck(readAck(ALARM_KEYS.MENUNGGU));
       setSiapKirimAck(readAck(ALARM_KEYS.SIAP_KIRIM));
+      if (document.visibilityState === "visible") {
+        fetchData();
+      }
     };
     window.addEventListener("prep-ack-changed", reread);
     window.addEventListener("storage", reread);
@@ -84,7 +92,7 @@ export function usePrepNotify(userRoles: string[], userId?: string | null) {
       window.removeEventListener("storage", reread);
       document.removeEventListener("visibilitychange", reread);
     };
-  }, []);
+  }, [fetchData]);
 
   const menungguUnacked = useMemo(
     () => menungguIds.filter((id) => !menungguAck.has(id)),
