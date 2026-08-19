@@ -1,7 +1,8 @@
 "use client";
 // src/app/dashboard/service/history/page.tsx
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import ServiceStatusBadge from "@/components/service/ServiceStatusBadge";
 import type { ServiceOrder, ServiceStatus } from "@/types/service";
 import { STATUS_LABEL } from "@/types/service";
@@ -296,8 +297,8 @@ function HistoryDetailModal({
         {/* ── HERO HEADER ─────────────────────────────────────────────────── */}
         <div
           className={`relative shrink-0 overflow-hidden px-5 pb-6 pt-4 sm:pt-5 ${isBad
-              ? "bg-gradient-to-br from-rose-50 via-rose-50/60 to-white"
-              : "bg-gradient-to-br from-[#1a1a2e]/[0.03] via-blue-50/40 to-white"
+            ? "bg-gradient-to-br from-rose-50 via-rose-50/60 to-white"
+            : "bg-gradient-to-br from-[#1a1a2e]/[0.03] via-blue-50/40 to-white"
             }`}
         >
           {/* Dekoratif circle blur di pojok */}
@@ -668,7 +669,7 @@ function EditPaymentModal({
             <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-gray-400">
               Metode Pembayaran
             </label>
-          <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {(["CASH", "TRANSFER", "QRIS"] as const).map(m => (
                 <button
                   key={m}
@@ -755,13 +756,16 @@ function TeamRow({ label, name, color }: { label: string; name?: string; color: 
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
-export default function HistoryPage() {
+function HistoryPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
- const [filterStatus, setFilterStatus] = useState<ServiceStatus | "ALL">("ALL");
+  const [filterStatus, setFilterStatus] = useState<ServiceStatus | "ALL">("ALL");
   const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
   const [editOrder, setEditOrder] = useState<ServiceOrder | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null); // ⬅️ BARU: id dari Cashflow (?id=) — sorot barisnya di tabel, bukan buka modal
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -776,6 +780,24 @@ export default function HistoryPage() {
   }, []);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  // ⬅️ BARU: dibuka dari Cashflow (?id=<service_order_id>) — bukan fetch+modal lagi,
+  // cukup pastikan baris itu tidak ketutup search/filter, lalu tandai untuk disorot.
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (!id) return;
+    setSearch("");
+    setFilterStatus("ALL");
+    setHighlightId(id);
+    router.replace("/dashboard/service/history"); // bersihkan URL — sorotan tetap jalan dari state
+  }, [searchParams, router]);
+
+  // ⬅️ BARU: begitu baris yang mau disorot sudah ke-render di tabel/list, scroll ke situ.
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    const el = document.getElementById(`svc-row-${highlightId}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId, loading, orders]);
 
   const filtered = orders.filter(o => {
     const q = search.toLowerCase();
@@ -820,6 +842,16 @@ export default function HistoryPage() {
               </div>
             </div>
 
+            {highlightId && (
+              <button
+                type="button"
+                onClick={() => setHighlightId(null)}
+                className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-[11px] font-semibold text-blue-600 hover:bg-blue-100 transition sm:inline-flex"
+              >
+                Menyorot 1 entry · Hapus
+              </button>
+            )}
+
             <button
               type="button"
               onClick={fetchOrders}
@@ -842,7 +874,7 @@ export default function HistoryPage() {
               </span>
               <input
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={e => { setSearch(e.target.value); setHighlightId(null); }}
                 placeholder="Cari nama, no HP, laptop..."
                 className="h-9 w-full rounded-xl border border-gray-100 bg-gray-50 pl-9 pr-8 text-[13px] outline-none transition placeholder:text-gray-300 focus:border-[#1a1a2e]/30 focus:bg-white focus:ring-2 focus:ring-[#1a1a2e]/10"
               />
@@ -864,7 +896,7 @@ export default function HistoryPage() {
                 <button
                   key={s}
                   type="button"
-                  onClick={() => setFilterStatus(s)}
+                  onClick={() => { setFilterStatus(s); setHighlightId(null); }}
                   className={`
                     inline-flex h-9 shrink-0 snap-start items-center justify-center whitespace-nowrap rounded-xl px-3.5
                     text-[11px] font-black tracking-tight outline-none transition
@@ -976,7 +1008,7 @@ export default function HistoryPage() {
           ) : (
             <>
               {/* ══ Desktop / Laptop: Table ══════════════════════════════════ */}
-            <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm lg:block">
+              <div className="hidden overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm lg:block">
                 {/* Hint bar — sengaja di luar area scroll biar tetap nempel di atas */}
                 <div className="flex items-center gap-2 border-b border-gray-50 bg-gray-50/60 px-5 py-2">
                   <span className="shrink-0 text-gray-300">
@@ -1020,8 +1052,9 @@ export default function HistoryPage() {
                         return (
                           <tr
                             key={o.id}
-                            onClick={() => setSelectedOrder(o)}
-                            className={`group cursor-pointer transition-colors duration-100 ${rowBg}`}
+                            id={`svc-row-${o.id}`}
+                            onClick={() => { setSelectedOrder(o); setHighlightId(null); }}
+                            className={`group cursor-pointer transition-colors duration-300 ${o.id === highlightId ? "bg-blue-50 ring-2 ring-inset ring-blue-400" : rowBg}`}
                           >
                             {/* No */}
                             <td className="w-px whitespace-nowrap py-3.5 pl-5 pr-4 align-top">
@@ -1155,8 +1188,9 @@ export default function HistoryPage() {
                   return (
                     <div
                       key={o.id}
-                      onClick={() => setSelectedOrder(o)}
-                      className={`cursor-pointer overflow-hidden rounded-2xl border shadow-sm transition-all active:scale-[0.99] ${cardTone}`}
+                      id={`svc-row-${o.id}`}
+                      onClick={() => { setSelectedOrder(o); setHighlightId(null); }}
+                      className={`cursor-pointer overflow-hidden rounded-2xl border shadow-sm transition-all active:scale-[0.99] ${o.id === highlightId ? "ring-2 ring-blue-400 bg-blue-50" : cardTone}`}
                     >
                       {/* Head */}
                       <div className="flex items-start justify-between gap-3 px-4 pt-4">
@@ -1260,7 +1294,12 @@ export default function HistoryPage() {
       {/* ── Detail Modal ── */}
       <HistoryDetailModal
         order={selectedOrder}
-        onClose={() => setSelectedOrder(null)}
+        onClose={() => {
+          setSelectedOrder(null);
+          // ⬅️ BARU: bersihkan ?id= dari URL — kalau gak, refresh/tombol back
+          // akan buka lagi detail order yang sama.
+          if (searchParams.get("id")) router.replace("/dashboard/service/history");
+        }}
         onEdit={() => { if (selectedOrder) setEditOrder(selectedOrder); }}
       />
       {editOrder && (
@@ -1271,5 +1310,14 @@ export default function HistoryPage() {
         />
       )}
     </DashboardLayout>
+  );
+}
+
+// ⬅️ BARU: useSearchParams() di App Router wajib dibungkus <Suspense>
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={null}>
+      <HistoryPageContent />
+    </Suspense>
   );
 }
