@@ -1452,6 +1452,8 @@ export default function CashflowPage() {
     const [filterIn, setFilterIn] = useState<CashflowFilter>(defaultCashflowFilter());
     const [filterOut, setFilterOut] = useState<CashflowFilter>(defaultCashflowFilter());
     const [auditingId, setAuditingId] = useState<string | null>(null);
+    const [staleOnly, setStaleOnly] = useState(false); // ⬅️ BARU: toggle "tampilkan cuma entry stale"
+    const tableRef = useRef<HTMLDivElement>(null); // ⬅️ BARU: buat scroll-to-table pas banner diklik
     const [currentPage, setCurrentPage] = useState(1);
     const [exporting, setExporting] = useState(false);
     const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -1542,7 +1544,13 @@ export default function CashflowPage() {
             if (invoice) router.push(`/dashboard/transactions?invoice=${encodeURIComponent(invoice)}`);
             return;
         }
-        if (e.source_type === "SERVICE") router.push("/dashboard/service/history");
+        if (e.source_type === "SERVICE") {
+            // ⬅️ FIX: kirim id service order lewat query param, supaya halaman History
+            // langsung buka detail modal 1 baris itu saja — bukan daftar penuh.
+            if (e.source_id) router.push(`/dashboard/service/history?id=${encodeURIComponent(e.source_id)}`);
+            else router.push("/dashboard/service/history");
+            return;
+        }
     };
 
     if (allowed === false) return (
@@ -1556,8 +1564,10 @@ export default function CashflowPage() {
 
     const currentFilter = tab === "IN" ? filterIn : filterOut;
     const allRows = tab === "IN" ? masuk : keluar;
-    const rows = applyFilters(allRows, currentFilter);
+    const baseRows = applyFilters(allRows, currentFilter);
+    const rows = staleOnly ? baseRows.filter((e) => e.is_stale) : baseRows; // ⬅️ BARU
     const filterCount = activeFilterCount(currentFilter);
+    const belumAuditActive = filterIn.audit === "NOT_AUDITED" && filterOut.audit === "NOT_AUDITED"; // ⬅️ BARU
     const voidedCount = allRows.filter((e) => e.is_voided).length;
     const totalPages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
     const safePage = Math.min(currentPage, totalPages);
@@ -1585,6 +1595,36 @@ export default function CashflowPage() {
         else setFilterOut(d);
         setCustomFrom("");
         setCustomTo("");
+        setStaleOnly(false); // ⬅️ BARU
+    };
+
+    // ⬅️ BARU: klik banner "X entry belum diaudit" — TOGGLE. Kalau filter Audit di kedua
+    // tab sudah NOT_AUDITED (bekas klik banner ini), klik lagi mengembalikannya ke
+    // "Semua Status" seperti semula. Filter Audit di kedua tab (Masuk & Keluar) diubah
+    // bareng karena belum_audit dihitung lintas direction.
+    const toggleBelumAuditEntries = () => {
+        if (belumAuditActive) {
+            setFilterIn((prev) => ({ ...prev, audit: "ALL" }));
+            setFilterOut((prev) => ({ ...prev, audit: "ALL" }));
+            return;
+        }
+        setFilterIn((prev) => ({ ...prev, audit: "NOT_AUDITED" }));
+        setFilterOut((prev) => ({ ...prev, audit: "NOT_AUDITED" }));
+        setStaleOnly(false);
+        setShowFilter(true);
+        requestAnimationFrame(() => tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    };
+
+    // ⬅️ BARU: klik banner "X entry sudah diaudit tapi harga transaksinya berubah" —
+    // stale cuma pernah muncul di tab Masuk (source_type TRANSACTION), jadi paksa tab IN.
+    // Reset audit filter ke ALL karena stale itu pasti is_audited=true — kalau kebetulan
+    // audit filter lagi NOT_AUDITED (bekas klik banner lain), hasilnya bakal kosong.
+    const showStaleEntries = () => {
+        setTab("IN");
+        setFilterIn((prev) => ({ ...prev, audit: "ALL" }));
+        setStaleOnly(true);
+        setShowFilter(false);
+        requestAnimationFrame(() => tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     };
 
     const inPeriod = (tanggal: string) => {
@@ -1663,16 +1703,26 @@ export default function CashflowPage() {
                                     <p className="text-[11px] text-violet-500 mt-1 font-medium inline-flex items-center gap-1"><Wallet size={12} /> Termasuk modal awal <span className="font-bold">{fmtRupiah(summary.modal_awal_entry.nominal)}</span></p>
                                 )}
                                 {!loading && summary.belum_audit > 0 && (
-                                    <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200">
+                                    <button
+                                        type="button"
+                                        onClick={toggleBelumAuditEntries}
+                                        className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg border active:scale-95 transition cursor-pointer ${belumAuditActive ? "bg-amber-100 border-amber-400" : "bg-amber-50 border-amber-200 hover:bg-amber-100 hover:border-amber-300"}`}
+                                        title={belumAuditActive ? "Klik untuk kembali ke tampilan semula" : "Klik untuk lihat entry yang belum diaudit"}
+                                    >
                                         <IconAlertTriangle />
-                                        <p className="text-[11px] text-amber-700 font-semibold">{summary.belum_audit} entry belum diaudit</p>
-                                    </div>
+                                        <p className="text-[11px] text-amber-700 font-semibold">{summary.belum_audit} entry belum diaudit{belumAuditActive ? " · aktif" : ""}</p>
+                                    </button>
                                 )}
                                 {!loading && (summary.stale ?? 0) > 0 && (
-                                    <div className="inline-flex items-center gap-1.5 mt-2 ml-2 px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200">
+                                    <button
+                                        type="button"
+                                        onClick={showStaleEntries}
+                                        className="inline-flex items-center gap-1.5 mt-2 ml-2 px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 hover:border-orange-300 active:scale-95 transition cursor-pointer"
+                                        title="Klik untuk lihat entry yang sudah diaudit tapi harga transaksinya berubah"
+                                    >
                                         <IconAlertTriangle />
                                         <p className="text-[11px] text-orange-700 font-semibold">{summary.stale} entry sudah diaudit tapi harga transaksinya berubah</p>
-                                    </div>
+                                    </button>
                                 )}
                             </div>
                             <div className="flex flex-col items-end gap-2 shrink-0">
@@ -1697,7 +1747,7 @@ export default function CashflowPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                         <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 gap-0.5">
                             {(["IN", "OUT"] as const).map((t) => (
-                                <button key={t} onClick={() => setTab(t)} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm" : "bg-red-600 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}>
+                                <button key={t} onClick={() => { setTab(t); setStaleOnly(false); }} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm" : "bg-red-600 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}>
                                     {t === "IN" ? `↑ Masuk ${!loading ? `(${masuk.length})` : ""}` : `↓ Keluar ${!loading ? `(${keluar.length})` : ""}`}
                                 </button>
                             ))}
@@ -1733,6 +1783,28 @@ export default function CashflowPage() {
                     </div>
                 )}
 
+                               {!loading && belumAuditActive && (
+                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[12px] text-amber-700">
+                        <IconAlertTriangle />
+                        <span>Menampilkan hanya entry yang <b>belum diaudit</b> di kedua tab (Masuk & Keluar).</span>
+                        <button
+                            onClick={() => { setFilterIn((prev) => ({ ...prev, audit: "ALL" })); setFilterOut((prev) => ({ ...prev, audit: "ALL" })); }}
+                            className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 transition"
+                        >
+                            <IconX /> Hapus Filter
+                        </button>
+                    </div>
+                )}
+
+                {!loading && staleOnly && (
+                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-orange-50 border border-orange-200 text-[12px] text-orange-700">
+                        <IconAlertTriangle />
+                        <span>Menampilkan hanya entry yang <b>sudah diaudit tapi harga transaksinya berubah</b>.</span>
+                        <button onClick={() => setStaleOnly(false)} className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-orange-700 bg-orange-100 hover:bg-orange-200 transition">
+                            <IconX /> Hapus Filter
+                        </button>
+                    </div>
+                )}
                 {tab === "IN" && (
                     <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-50/80 border border-blue-100 text-[12px] text-blue-700">
                         <IconInfo />
@@ -1741,7 +1813,7 @@ export default function CashflowPage() {
                 )}
 
                 {/* Table */}
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div ref={tableRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm" style={{ minWidth: 860 }}>
                             <thead>
