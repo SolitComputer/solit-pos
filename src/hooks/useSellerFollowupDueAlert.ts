@@ -64,6 +64,8 @@ export function useSellerFollowupDueAlert(userId: string | null | undefined) {
     };
   }, []);
 
+  const isInitialLoadRef = useRef(true);
+
   const fetchDue = useCallback(async () => {
     if (!userId) return;
     try {
@@ -85,9 +87,11 @@ export function useSellerFollowupDueAlert(userId: string | null | undefined) {
       setDueItems(items);
       setDueCount(count);
 
-      if (newlyDue.length > 0) {
+      // Jangan bunyikan notifikasi / toast saat initial load
+      if (newlyDue.length > 0 && !isInitialLoadRef.current) {
         setNewAlert({ count: newlyDue.length, sample: newlyDue[0].customer_name });
       }
+      isInitialLoadRef.current = false;
     } catch {
       // silent — polling / realtime berikutnya akan mencoba lagi
     }
