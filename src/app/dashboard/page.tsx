@@ -88,8 +88,8 @@ const getDealPrice = (item: Transaction): number =>
 const getInitials = (name: string) =>
   name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
-// Shared card styling token aligned with Laporan Keuangan
-const CARD = "bg-white rounded-2xl border border-gray-100 p-5 hover:border-gray-200 transition-all duration-200";
+// Shared card styling token aligned with Laporan Keuangan — soft gray gradient surface
+const CARD = "bg-gradient-to-b from-white to-gray-50 rounded-2xl border border-gray-200 p-5 shadow-sm shadow-gray-100/60 hover:shadow-xl hover:shadow-gray-200/70 hover:border-gray-300 hover:-translate-y-0.5 transition-all duration-300";
 
 // ─── Shimmer ──────────────────────────────────────────────────────────────────
 const Shimmer = ({ className = "", style = {} }: { className?: string; style?: React.CSSProperties }) => (
@@ -119,18 +119,20 @@ function StatCard({
   change?: number | null;
 }) {
   return (
-    <div className="report-stat-card bg-white rounded-2xl border border-gray-100 p-5 relative overflow-hidden group hover:border-gray-200 transition-all duration-200 w-full h-full flex flex-col justify-between text-left">
+    <div className="report-stat-card bg-gradient-to-br from-white via-white to-gray-50 rounded-2xl border border-gray-200 p-5 relative overflow-hidden group hover:border-gray-300 hover:-translate-y-1 transition-all duration-300 w-full h-full flex flex-col justify-between text-left shadow-sm shadow-gray-100/60 hover:shadow-xl hover:shadow-gray-300/40">
       {/* Subtle corner accent */}
-      <div className="absolute top-0 right-0 w-16 h-16 rounded-bl-[40px] bg-gray-50 group-hover:bg-gray-100 transition-colors duration-200" />
+      <div className="absolute top-0 right-0 w-24 h-24 rounded-bl-[56px] bg-gradient-to-br from-gray-100 to-gray-50 group-hover:from-gray-200 group-hover:to-gray-100 transition-colors duration-300" />
+      {/* Bottom hairline sheen on hover */}
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
       <div className="relative z-10">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center text-base group-hover:bg-gray-100 transition-colors duration-200 border border-gray-100 text-gray-500">
+          <div className="w-9 h-9 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center text-base group-hover:from-gray-700 group-hover:to-gray-900 transition-all duration-300 border border-gray-200 text-gray-600 group-hover:text-white shadow-sm group-hover:shadow-md group-hover:scale-110 group-hover:-rotate-3">
             {icon}
           </div>
           <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">{label}</span>
         </div>
-        <p className="text-xl font-bold text-gray-800 tracking-tight leading-none">{value}</p>
+        <p className="text-2xl font-extrabold text-gray-900 tracking-tight leading-none tabular-nums">{value}</p>
         {sub && <p className="text-[11px] text-gray-400 mt-1.5">{sub}</p>}
         {change !== undefined && change !== null && (
           <div className="mt-2.5">
@@ -140,7 +142,7 @@ function StatCard({
       </div>
 
       {rank !== undefined && (
-        <div className="absolute bottom-4 right-4 text-[10px] font-bold text-gray-300">
+        <div className="absolute bottom-4 right-4 text-[9px] font-bold text-gray-400 bg-white/80 backdrop-blur-sm px-1.5 py-0.5 rounded-md border border-gray-200 shadow-sm">
           #{rank}
         </div>
       )}
@@ -154,14 +156,14 @@ function SectionHeader({ icon, title, badge }: { icon?: React.ReactNode; title: 
     <div className="flex items-center justify-between mb-4 flex-shrink-0">
       <div className="flex items-center gap-2.5">
         {icon && (
-          <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center text-sm border border-gray-100 text-gray-600">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-sm border border-gray-200 text-gray-700 shadow-sm">
             {icon}
           </div>
         )}
         <h2 className="font-bold text-gray-800 text-sm">{title}</h2>
       </div>
       {badge && (
-        <span className="text-[10px] text-gray-400 font-medium bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
+        <span className="text-[10px] text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded-lg border border-gray-200">
           {badge}
         </span>
       )}
@@ -181,14 +183,14 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
   const pct = Math.round((total / Math.max(maxTotal, 1)) * 100);
 
   return (
-    <div className="group/item py-1">
+    <div className="group/item py-1.5 px-2 -mx-2 rounded-xl hover:bg-gray-100/60 transition-colors duration-200">
       <div className="flex items-center gap-2.5 mb-1.5">
         {/* Rank badge */}
         <div className="w-6 flex-shrink-0 flex items-center justify-center">
           {rank <= 3 ? (
-            <span className="text-base leading-none">{medals[rank - 1]}</span>
+            <span className="text-base leading-none drop-shadow-sm group-hover/item:scale-110 transition-transform duration-200 inline-block">{medals[rank - 1]}</span>
           ) : (
-            <span className="text-[10px] font-bold text-gray-400 w-5 h-5 rounded-full bg-gray-50 flex items-center justify-center border border-gray-100">
+            <span className="text-[10px] font-bold text-gray-500 w-5 h-5 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center border border-gray-200">
               {rank}
             </span>
           )}
@@ -203,14 +205,14 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
 
         {/* Count */}
         <div className="text-right flex-shrink-0 flex items-center gap-2">
-          <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-md border border-gray-100 font-medium tabular-nums">
+          <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md border border-gray-200 font-medium tabular-nums">
             {total}x
           </span>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="ml-8.5 h-1 bg-gray-100 rounded-full overflow-hidden">
+      <div className="ml-8.5 h-1 bg-gray-200 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{
@@ -246,10 +248,11 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
   const dateStr = txDate.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
   return (
-    <div className="px-4 sm:px-5 py-3 hover:bg-gray-50/70 transition-all duration-200 group">
+    <div className="px-4 sm:px-5 py-3 hover:bg-gray-50/80 hover:translate-x-0.5 transition-all duration-200 group relative">
+      <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gray-800 scale-y-0 group-hover:scale-y-100 transition-transform duration-200 origin-center rounded-r-full" />
       <div className="flex items-start gap-3">
         {/* Avatar */}
-        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gray-100 text-gray-700 font-bold border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 group-hover:border-gray-300 transition-colors">
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 font-bold border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 ring-2 ring-white group-hover:border-gray-300 group-hover:shadow-md transition-all shadow-sm">
           {getInitials(item.customer_name)}
         </div>
 
@@ -257,7 +260,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-semibold text-gray-800 text-xs sm:text-sm">{item.customer_name}</span>
-            <span className={`inline-flex items-center gap-1 text-[9px] sm:text-[10px] px-2 py-0.5 rounded-lg border font-medium ${STATUS_STYLES[item.status] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
+            <span className={`inline-flex items-center gap-1 text-[9px] sm:text-[10px] px-2 py-0.5 rounded-lg border font-medium ${STATUS_STYLES[item.status] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
               {(() => {
                 const StatusIco = STATUS_ICON[item.status] || ClipboardList;
                 return <StatusIco className="w-2.5 h-2.5 sm:w-3 sm:h-3" />;
@@ -265,7 +268,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
               <span className="hidden sm:inline">{item.status}</span>
             </span>
             {item.source_platform && (
-              <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-lg bg-gray-50 text-gray-400 border border-gray-100 font-medium hidden sm:inline-flex">
+              <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 font-medium hidden sm:inline-flex">
                 {item.source_platform}
               </span>
             )}
@@ -305,7 +308,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
       {/* Actions */}
       <div className="ml-11 sm:ml-12 mt-1.5 flex items-center gap-2 flex-wrap">
         {item.source_platform && (
-          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-gray-50 text-gray-500 border border-gray-100 font-medium sm:hidden">
+          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 border border-gray-200 font-medium sm:hidden">
             {item.source_platform}
           </span>
         )}
@@ -313,7 +316,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
         {item.payment_photo && (
           <button
             onClick={() => onPhotoClick(item.payment_photo!)}
-            className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-gray-800 transition-all duration-200 bg-gray-50 hover:bg-gray-100 px-2 py-0.5 rounded-md border border-gray-100"
+            className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-gray-800 transition-all duration-200 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded-md border border-gray-200"
           >
             <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -329,7 +332,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
             href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-gray-800 transition-all duration-200 bg-gray-50 hover:bg-gray-100 px-2 py-0.5 rounded-md border border-gray-100"
+            className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-gray-800 transition-all duration-200 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded-md border border-gray-200"
           >
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M17.657 16.657L13.414 20.9a8 8 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -382,7 +385,7 @@ function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoad
     <button
       onClick={onRefresh}
       disabled={isLoading}
-      className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all bg-white disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+      className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 hover:border-gray-300 hover:shadow-md active:scale-[0.97] transition-all bg-gradient-to-b from-white to-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
     >
       <svg
         className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`}
@@ -676,7 +679,7 @@ export default function Page() {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-gray-800 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                <div className="w-9 h-9 bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                     <rect x="3" y="3" width="7" height="7" />
                     <rect x="14" y="3" width="7" height="7" />
@@ -685,13 +688,19 @@ export default function Page() {
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900 leading-none">Dashboard</h1>
-                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1.5">
+                  <h1 className="text-xl font-extrabold bg-gradient-to-r from-gray-900 to-gray-500 bg-clip-text text-transparent leading-none tracking-tight">Dashboard</h1>
+                  <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
                     <span>{now}</span>
                     {lastUpdated && (
                       <>
                         <span>•</span>
-                        <span>Terakhir diperbarui {lastUpdated.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-gray-500" />
+                          </span>
+                          Terakhir diperbarui {lastUpdated.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
                       </>
                     )}
                   </p>
@@ -704,7 +713,7 @@ export default function Page() {
             <RefreshButton onRefresh={() => fetchAll(true)} isLoading={isRefreshing} />
             <a
               href="/payment/create"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 active:scale-[0.98] transition-all shadow-sm whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-gray-800 to-gray-900 text-white text-xs font-semibold hover:from-gray-900 hover:to-black active:scale-[0.97] transition-all shadow-md shadow-gray-900/10 hover:shadow-lg hover:shadow-gray-900/25 whitespace-nowrap"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -719,9 +728,9 @@ export default function Page() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 fade-up" style={{ animationDelay: "0.05s" }}>
           {isLoading ? (
             Array(4).fill(0).map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
+              <div key={i} className="bg-gradient-to-b from-white to-gray-50 rounded-2xl border border-gray-200 p-5 animate-pulse shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-8 h-8 bg-gray-100 rounded-xl" />
+                  <div className="w-9 h-9 bg-gray-200 rounded-xl" />
                   <div className="h-3 bg-gray-100 rounded w-16" />
                 </div>
                 <div className="h-7 bg-gray-100 rounded w-24 mb-1" />
@@ -818,7 +827,7 @@ export default function Page() {
         <div className="flex items-center gap-2 pt-2 fade-up" style={{ animationDelay: "0.08s" }}>
           <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
           <span className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wider">Analitik Penjualan</span>
-          <div className="flex-1 h-px bg-gray-100" />
+          <div className="flex-1 h-px bg-gradient-to-r from-gray-200 via-gray-100 to-transparent" />
         </div>
 
         {/* ── Analytics Grid ── */}
@@ -833,20 +842,20 @@ export default function Page() {
                 </div>
 
                 {/* Legend */}
-                <div className="flex gap-4 mb-3 flex-wrap -mt-2">
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
-                    <span className="w-4 h-0.5 bg-gray-700 inline-block rounded-full" />
+                <div className="flex gap-1.5 mb-3 flex-wrap -mt-2">
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-600 font-semibold bg-gray-100 px-2 py-1 rounded-full border border-gray-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-700 inline-block" />
                     <span>Omzet</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
-                    <span className="w-4 h-[1px] inline-block rounded-full" style={{ borderTop: "1.5px dashed #9CA3AF", background: "none" }} />
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-600 font-semibold bg-gray-100 px-2 py-1 rounded-full border border-gray-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
                     <span>Profit</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
-                    <span className="w-4 h-[1px] inline-block rounded-full" style={{ borderTop: "1.5px dashed #6B7280", background: "none" }} />
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-600 font-semibold bg-gray-100 px-2 py-1 rounded-full border border-gray-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-500 inline-block" />
                     <span>Laptop Terjual</span>
                   </div>
-                  <span className="ml-auto text-[10px] text-gray-400 font-medium hidden sm:inline">
+                  <span className="ml-auto text-[10px] text-gray-400 font-medium hidden sm:inline self-center">
                     axis kanan = unit
                   </span>
                 </div>
@@ -854,12 +863,14 @@ export default function Page() {
                 {isLoading ? (
                   <Shimmer className="w-full h-36" />
                 ) : weeklyRevenue.length > 0 ? (
-                  <div style={{ height: 170 }} className="sm:h-[180px]">
-                    <Line data={trendChartData} options={trendOptions} />
+                  <div className="rounded-xl bg-gray-50/70 border border-gray-100 p-3">
+                    <div style={{ height: 164 }} className="sm:h-[174px]">
+                      <Line data={trendChartData} options={trendOptions} />
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gray-50 flex items-center justify-center mb-2 border border-gray-100">
+                  <div className="text-center py-8 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-2 border border-gray-200">
                       <BarChart3 className="w-7 h-7 text-gray-300" />
                     </div>
                     <p className="text-gray-400 text-xs">Belum ada data</p>
@@ -874,12 +885,14 @@ export default function Page() {
                 {isLoading ? (
                   <Shimmer className="w-full h-36" />
                 ) : weeklyTrxCount.length > 0 ? (
-                  <div style={{ height: 160 }} className="sm:h-[180px]">
-                    <Bar data={trxBarData} options={barOptions} />
+                  <div className="rounded-xl bg-gray-50/70 border border-gray-100 p-3">
+                    <div style={{ height: 154 }} className="sm:h-[174px]">
+                      <Bar data={trxBarData} options={barOptions} />
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gray-50 flex items-center justify-center mb-2 border border-gray-100">
+                  <div className="text-center py-8 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-2 border border-gray-200">
                       <BarChart3 className="w-7 h-7 text-gray-300" />
                     </div>
                     <p className="text-gray-400 text-xs">Belum ada data</p>
@@ -923,7 +936,7 @@ export default function Page() {
                         total={s.total}
                         maxTotal={stats.topSales[0]?.total || 1}
                         extra={canSeeFinancials && s.profit > 0 ? (
-                          <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-md border border-gray-100 font-medium flex-shrink-0 tabular-nums">
+                          <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md border border-gray-200 font-medium flex-shrink-0 tabular-nums">
                             +{fmtShort(s.profit)}
                           </span>
                         ) : undefined}
@@ -931,8 +944,8 @@ export default function Page() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-6">
-                    <div className="w-12 h-12 mx-auto rounded-2xl bg-gray-50 flex items-center justify-center mb-2 border border-gray-100">
+                  <div className="text-center py-6 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
+                    <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-2 border border-gray-200">
                       <Trophy className="w-6 h-6 text-gray-300" />
                     </div>
                     <p className="text-gray-400 text-xs">Belum ada data</p>
@@ -978,8 +991,8 @@ export default function Page() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-6">
-                  <div className="w-12 h-12 mx-auto rounded-2xl bg-gray-50 flex items-center justify-center mb-2 border border-gray-100">
+                <div className="text-center py-6 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-2 border border-gray-200">
                     <Laptop className="w-6 h-6 text-gray-300" />
                   </div>
                   <p className="text-gray-400 text-xs">Belum ada data</p>
@@ -996,12 +1009,14 @@ export default function Page() {
             {isLoading ? (
               <Shimmer className="w-full h-36" />
             ) : weeklyTrxCount.length > 0 ? (
-              <div style={{ height: 160 }} className="sm:h-[180px]">
-                <Bar data={trxBarData} options={barOptions} />
+              <div className="rounded-xl bg-gray-50/70 border border-gray-100 p-3">
+                <div style={{ height: 154 }} className="sm:h-[174px]">
+                  <Bar data={trxBarData} options={barOptions} />
+                </div>
               </div>
             ) : (
-              <div className="text-center py-8">
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-gray-50 flex items-center justify-center mb-2 border border-gray-100">
+              <div className="text-center py-8 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-2 border border-gray-200">
                   <BarChart3 className="w-7 h-7 text-gray-300" />
                 </div>
                 <p className="text-gray-400 text-xs">Belum ada data</p>
@@ -1011,10 +1026,12 @@ export default function Page() {
         )}
 
         {/* ── Recent Transactions ── */}
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-gray-200 transition-all duration-200 fade-up" style={{ animationDelay: "0.16s" }}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white">
-            <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+        <div className="bg-gradient-to-b from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden hover:border-gray-300 transition-all duration-300 fade-up shadow-sm hover:shadow-md" style={{ animationDelay: "0.16s" }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white/60 backdrop-blur-sm">
+            <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center border border-gray-200 text-gray-700 shadow-sm">
+                <ClipboardList className="w-4 h-4" />
+              </span>
               Transaksi Terbaru
             </h2>
             <a href="/dashboard/transactions" className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-all duration-200 flex items-center gap-1 group">
@@ -1041,8 +1058,8 @@ export default function Page() {
                 </div>
               ))
             ) : transactions.length === 0 ? (
-              <div className="py-16 text-center">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-gray-50 flex items-center justify-center mb-3 border border-gray-100">
+              <div className="py-16 text-center mx-4 my-2 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-3 border border-gray-200 shadow-sm">
                   <Inbox className="w-8 h-8 text-gray-300" />
                 </div>
                 <p className="text-gray-700 font-semibold text-sm">Belum ada transaksi hari ini</p>
