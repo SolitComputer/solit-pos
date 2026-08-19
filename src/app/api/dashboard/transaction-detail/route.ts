@@ -71,6 +71,7 @@ interface LaptopEntry {
     created_at: string;
     source_platform?: string;
     sales_name?: string;
+    items: { name: string; type: "laptop" | "accessory"; quantity: number; is_bonus: boolean }[]; // rincian item asli dari transaction_items
   }[];
 }
 
@@ -96,7 +97,7 @@ function countUnitsSold(item: TransactionRow): number {
 }
 
 // ── Helper: aggregate laptop entries dari rows ────────────────────────────────
-function aggregateLaptops(rows: TransactionRow[], unitMap: Map<string, number>): LaptopEntry[] {
+function aggregateLaptops(rows: TransactionRow[], unitMap: Map<string, number>, itemsMap: Map<string, ItemInfo[]>): LaptopEntry[] {
   const map: Record<string, LaptopEntry> = {};
 
   for (const row of rows) {
@@ -135,6 +136,7 @@ function aggregateLaptops(rows: TransactionRow[], unitMap: Map<string, number>):
       created_at: row.created_at,
       source_platform: row.source_platform,
       sales_name: row.sales_name,
+      items: itemsMap.get(row.invoice_number) ?? [], // ✅ rincian nama asli unit tambahan & aksesori
     });
   }
 
@@ -162,6 +164,37 @@ async function buildUnitMap(rows: TransactionRow[]): Promise<Map<string, number>
     }
   }
   return unitMap;
+}
+
+// ── Batch fetch transaction_items (nama asli unit tambahan & aksesori) ───────
+interface ItemInfo {
+  name: string;
+  type: "laptop" | "accessory";
+  quantity: number;
+  is_bonus: boolean;
+}
+
+async function buildItemsMap(rows: TransactionRow[]): Promise<Map<string, ItemInfo[]>> {
+  const itemsMap = new Map<string, ItemInfo[]>();
+  const invoiceNumbers = [...new Set(rows.map(r => r.invoice_number).filter(Boolean))];
+  if (invoiceNumbers.length === 0) return itemsMap;
+
+  const { data: items } = await supabase
+    .from("transaction_items")
+    .select("invoice_number, item_type, item_name, laptop_name, quantity, is_bonus")
+    .in("invoice_number", invoiceNumbers);
+
+  for (const it of items ?? []) {
+    const list = itemsMap.get(it.invoice_number) ?? [];
+    list.push({
+      name: it.item_name || it.laptop_name || "—",
+      type: it.item_type === "accessory" ? "accessory" : "laptop",
+      quantity: Number(it.quantity) || 1,
+      is_bonus: Boolean(it.is_bonus),
+    });
+    itemsMap.set(it.invoice_number, list);
+  }
+  return itemsMap;
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -225,6 +258,7 @@ async function handler(req: NextRequest, _ctx: any, _user: AuthUser) {
         : `${dayName}, ${dd} ${MONTH_NAMES[m - 1]}`;
 
       const unitMap = await buildUnitMap(rowList);
+      const itemsMap = await buildItemsMap(rowList);
 
       const revenue = rowList.reduce((s, r) => s + Number(r.deal_price || r.amount || 0), 0);
       const profit = rowList.reduce((s, r) => {
@@ -244,7 +278,7 @@ async function handler(req: NextRequest, _ctx: any, _user: AuthUser) {
         count: rowList.length,
         revenue,
         profit,
-        laptops: aggregateLaptops(rowList, unitMap),
+        laptops: aggregateLaptops(rowList, unitMap, itemsMap),
       });
     }
 
@@ -265,6 +299,7 @@ async function handler(req: NextRequest, _ctx: any, _user: AuthUser) {
 
       const rowList = (rows ?? []) as TransactionRow[];
       const unitMap = await buildUnitMap(rowList);
+      const itemsMap = await buildItemsMap(rowList);
 
       const label = i === 0
         ? `Bulan Ini (${MONTH_NAMES[month - 1]} ${year})`
@@ -281,13 +316,13 @@ async function handler(req: NextRequest, _ctx: any, _user: AuthUser) {
         return s + (pp > 0 ? rev - pp : 0);
       }, 0);
 
-      monthly.push({
+           monthly.push({
         label,
         date: `${year}-${String(month).padStart(2, "0")}`,
         count: rowList.length,
         revenue,
         profit,
-        laptops: aggregateLaptops(rowList, unitMap),
+        laptops: aggregateLaptops(rowList, unitMap, itemsMap),
       });
     }
 
@@ -305,6 +340,7 @@ async function handler(req: NextRequest, _ctx: any, _user: AuthUser) {
 
       const rowList = (rows ?? []) as TransactionRow[];
       const unitMap = await buildUnitMap(rowList);
+      const itemsMap = await buildItemsMap(rowList);
 
       const revenue = rowList.reduce((s, r) => s + Number(r.deal_price || r.amount || 0), 0);
       const profit = rowList.reduce((s, r) => {
@@ -324,7 +360,7 @@ async function handler(req: NextRequest, _ctx: any, _user: AuthUser) {
         count: rowList.length,
         revenue,
         profit,
-        laptops: aggregateLaptops(rowList, unitMap),
+        laptops: aggregateLaptops(rowList, unitMap, itemsMap),
       });
     }
 
