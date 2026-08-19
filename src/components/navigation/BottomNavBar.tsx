@@ -138,4 +138,4 @@ export default function BottomNavBar() {
       </div>
     </nav>
   );
-}
+}
