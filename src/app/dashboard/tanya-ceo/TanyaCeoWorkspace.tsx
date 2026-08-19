@@ -60,7 +60,7 @@ export default function TanyaCeoWorkspace() {
         setLoadingThread(true);
         try {
             const endpoint = type === "reminder" ? "reminders" : "conversations";
-            const res = await fetch(`/api/ai-assistant/${endpoint}/${id}`);
+            const res = await fetch(`/api/ai-assistant/${endpoint}/${id}`, { cache: "no-store" });
             const json = await res.json();
             if (json.success) {
                 setMessages(json.messages.map((m: any) => ({ id: m.id, role: m.role, content: m.content })));
@@ -114,8 +114,8 @@ export default function TanyaCeoWorkspace() {
         try {
             setLoadingList(true);
             const [remRes, convRes] = await Promise.all([
-                fetch("/api/ai-assistant/reminders"),
-                fetch("/api/ai-assistant/conversations")
+                fetch("/api/ai-assistant/reminders", { cache: "no-store" }),
+                fetch("/api/ai-assistant/conversations", { cache: "no-store" })
             ]);
             
             const remJson = await remRes.json();

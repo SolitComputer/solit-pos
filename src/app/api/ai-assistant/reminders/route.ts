@@ -3,6 +3,8 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { AI_ASSISTANT_ROLES } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 
+export const dynamic = "force-dynamic";
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -26,13 +28,21 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  if (error) {
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: 500, headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
+  }
 
   const rows = data ?? [];
   const unread = rows.filter((r) => r.status === "terkirim").length;
   const latest = rows.find((r) => r.status === "terkirim") ?? null;
 
-  return NextResponse.json({ success: true, data: rows, unread, latest });
+  return NextResponse.json(
+    { success: true, data: rows, unread, latest },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+  );
 }
 
-export const GET = withAuth(getHandler, AI_ASSISTANT_ROLES);
+export const GET = withAuth(getHandler, AI_ASSISTANT_ROLES);
