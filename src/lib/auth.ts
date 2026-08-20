@@ -2,6 +2,11 @@ import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { expandRolesWithParents } from "@/lib/permissions";
+import { withTimeout } from "@/lib/withTimeout";
+
+// Sama kayak di middleware.ts / dynamicPermissions.ts — cegah Promise.all
+// nyangkut tanpa batas kalau salah satu dari 4 query shift di bawah hang.
+const SHIFT_CONFIG_TIMEOUT_MS = 5000;
 
 // ✅ NEW — pergantian "hari absensi" jam 04:00 WIB (bukan 00:00 WIB), dipakai
 // konsisten di seluruh fungsi terkait absensi pada file ini
@@ -254,23 +259,39 @@ export async function resolveShiftConfigFromDB(
   const todayDate = toAttendanceDateKey(new Date().toISOString());
   const todayDow = new Date(`${todayDate}T12:00:00Z`).getUTCDay();
 
+      const TIMED_OUT_SCHEDULE: [
+    { data: null },
+    { data: null },
+    { data: null },
+    { data: null }
+  ] = [
+    { data: null },
+    { data: null },
+    { data: null },
+    { data: null },
+  ];
+
   const [
     { data: userData },
     { data: dateSchedule },
     { data: weeklySchedule },
     { data: shiftConfig },
-  ] = await Promise.all([
-    supabaseAdmin.from("users").select("shift").eq("id", userId).single(),
-    supabaseAdmin.from("user_date_schedule")
-      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute,checkout_hour,checkout_minute")
-      .eq("user_id", userId).eq("schedule_date", todayDate).maybeSingle(),
-    supabaseAdmin.from("user_schedule")
-      .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute,checkout_hour,checkout_minute")
-      .eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
-    supabaseAdmin.from("user_shift_config")
-      .select("open_hour,open_minute,late_hour,late_minute,close_hour,close_minute,checkout_hour,checkout_minute,shift")
-      .eq("user_id", userId).maybeSingle(),
-  ]);
+  ] = await withTimeout(
+    Promise.all([
+      supabaseAdmin.from("users").select("shift").eq("id", userId).single(),
+      supabaseAdmin.from("user_date_schedule")
+        .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute,checkout_hour,checkout_minute")
+        .eq("user_id", userId).eq("schedule_date", todayDate).maybeSingle(),
+      supabaseAdmin.from("user_schedule")
+        .select("start_hour,start_minute,late_hour,late_minute,end_hour,end_minute,checkout_hour,checkout_minute")
+        .eq("user_id", userId).eq("day_of_week", todayDow).maybeSingle(),
+      supabaseAdmin.from("user_shift_config")
+        .select("open_hour,open_minute,late_hour,late_minute,close_hour,close_minute,checkout_hour,checkout_minute,shift")
+        .eq("user_id", userId).maybeSingle(),
+    ]),
+    SHIFT_CONFIG_TIMEOUT_MS,
+    TIMED_OUT_SCHEDULE
+  );
 
   const shift: ShiftType = (userData?.shift as ShiftType) ?? "PAGI";
   const defaultCheckout = SHIFT_CONFIG[shift].checkout;

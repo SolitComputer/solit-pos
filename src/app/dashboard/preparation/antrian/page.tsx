@@ -85,6 +85,7 @@ export default function PreparationAntrianPage() {
       .channel("prep-antrian-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "preparation_orders" }, (payload) => {
         const row: any = payload.new;
+        console.log("[prep-antrian] INSERT masuk:", row.order_number, "| userRole:", JSON.stringify(userRole), "| canHearIncoming:", canHearIncoming);
         if (canHearIncoming) {   // ← admin / non-penyedia yang buka halaman ini tidak ikut bunyi
           showToast("Penyiapan baru masuk!", `${row.customer_name ?? "Customer"} · ${row.order_number ?? ""}`);
         }
@@ -96,7 +97,9 @@ export default function PreparationAntrianPage() {
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "preparation_orders" }, () => fetchOrders())
       .on("postgres_changes", { event: "DELETE", schema: "public", table: "preparation_orders" }, () => fetchOrders())
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[prep-antrian] channel status:", status);
+      });
     return () => { supabase.removeChannel(channel); };
   }, [userRole, showToast, fetchOrders, canHearIncoming]);
 

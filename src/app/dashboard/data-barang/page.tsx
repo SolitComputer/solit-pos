@@ -230,7 +230,7 @@ export default function DataBarangPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h3 className="text-sm font-semibold text-gray-900">Akses Dibatasii</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Akses Dibatasi</h3>
             <p className="text-xs text-gray-500 mt-1">Anda tidak memiliki akses untuk melihat data di halaman ini.</p>
           </div>
         ) : (
