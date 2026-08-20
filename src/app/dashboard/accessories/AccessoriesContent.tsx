@@ -113,7 +113,7 @@ function PriceInput({ value, onChange, placeholder }: { value: string; onChange:
     return (
         <div className="relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium pointer-events-none">Rp</span>
-            <input inputMode="numeric" className="w-full h-11 border border-gray-200 rounded-xl pl-9 pr-3.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150 tabular-nums" placeholder={placeholder ?? "0"} value={value}
+            <input inputMode="numeric" className="w-full h-11 border border-gray-200 rounded-xl pl-9 pr-3.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all duration-150 tabular-nums" placeholder={placeholder ?? "0"} value={value}
                 onChange={e => { const raw = e.target.value.replace(/\D/g, ""); onChange(raw ? new Intl.NumberFormat("id-ID").format(parseInt(raw, 10)) : ""); }} />
         </div>
     );
@@ -140,7 +140,7 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: { open: boo
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-lg shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl overflow-hidden animate-popIn max-h-[92dvh] sm:max-h-[88vh]">
-                <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
+                <div className="h-0.5 w-full bg-gradient-to-r from-indigo-300 via-indigo-600 to-indigo-900 flex-shrink-0" />
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
                     <div><h2 className="font-bold text-gray-900 text-[15px] tracking-tight">{initial ? "Edit Aksesori" : "Tambah Aksesori"}</h2><p className="text-[11px] text-gray-400 mt-0.5">Stok dikelola sebagai jumlah (tanpa serial number)</p></div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all duration-150"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
@@ -162,7 +162,7 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: { open: boo
                 </div>
                 <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
                     <button onClick={onClose} disabled={loading} className="px-4 h-11 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 transition disabled:opacity-50">Batal</button>
-                    <button onClick={handleSubmit} disabled={loading} className="px-5 h-11 rounded-xl text-sm font-bold bg-gray-800 text-white hover:bg-gray-900 active:scale-[0.98] disabled:opacity-50 transition-all shadow-lg shadow-gray-800/20 flex items-center gap-2">{loading && <Spinner />}{initial ? "Simpan Perubahan" : "Tambah Aksesori"}</button>
+                    <button onClick={handleSubmit} disabled={loading} className="px-5 h-11 rounded-xl text-sm font-bold bg-gradient-to-r from-indigo-600 to-indigo-700 text-white hover:from-indigo-700 hover:to-indigo-800 active:scale-[0.98] disabled:opacity-50 transition-all shadow-lg shadow-indigo-600/25 flex items-center gap-2">{loading && <Spinner />}{initial ? "Simpan Perubahan" : "Tambah Aksesori"}</button>
                 </div>
             </div>
         </div>
@@ -181,7 +181,7 @@ function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete, canEdit, c
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-2xl shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl overflow-hidden animate-popIn max-h-[92dvh] sm:max-h-[88vh]">
-                <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
+                <div className="h-0.5 w-full bg-gradient-to-r from-indigo-300 via-indigo-600 to-indigo-900 flex-shrink-0" />
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0"><h2 className="font-bold text-gray-900 text-[15px] tracking-tight">Detail Aksesori</h2><button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all duration-150"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button></div>
                 <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
                     <div className="flex flex-col sm:flex-row gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-100">
@@ -195,7 +195,7 @@ function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete, canEdit, c
                     <div><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Informasi</p><div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">{[{ label: "Kategori", value: accessory.category }, { label: "Merk", value: accessory.brand }, { label: "Spesifikasi", value: accessory.spec }].map(({ label, value }) => (<div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p><p className="text-sm font-semibold text-gray-800 break-all leading-tight">{value || <span className="text-gray-300 font-normal">—</span>}</p></div>))}</div></div>
                     {accessory.notes && (<div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5"><p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">Keterangan</p><p className="text-sm text-amber-900">{accessory.notes}</p></div>)}
                 </div>
-                <div className="flex items-center justify-between gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0 flex-wrap"><p className="text-xs text-gray-400">{new Date(accessory.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}</p><div className="flex gap-2">{canEdit && <button onClick={onEdit} className="h-9 px-4 text-sm font-semibold text-white bg-gray-800 rounded-xl hover:bg-gray-900 active:scale-[0.97] transition-all duration-150">Edit</button>}{canDelete && <button onClick={onDelete} className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">Hapus</button>}</div></div>
+                <div className="flex items-center justify-between gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0 flex-wrap"><p className="text-xs text-gray-400">{new Date(accessory.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}</p><div className="flex gap-2">{canEdit && <button onClick={onEdit} className="h-9 px-4 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 active:scale-[0.97] transition-all duration-150">Edit</button>}{canDelete && <button onClick={onDelete} className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">Hapus</button>}</div></div>
             </div>
         </div>
     );
@@ -211,9 +211,9 @@ function DeleteConfirm({ open, title, name, onClose, onConfirm, loading }: { ope
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
-                <div className="h-1 w-full bg-gradient-to-r from-gray-400 via-gray-600 to-gray-800" />
-                <div className="bg-gray-800 px-6 py-5"><div className="flex items-center gap-3.5"><div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center ring-1 ring-white/20 flex-shrink-0"><svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></div><div><p className="font-bold text-white text-sm tracking-tight">{title}</p><p className="text-xs text-white/60 mt-0.5">Tindakan ini tidak dapat dibatalkan</p></div></div></div>
-                <div className="p-6"><p className="text-sm text-gray-600 text-center mb-6 leading-relaxed">Yakin hapus <span className="font-bold text-gray-800 break-all">{name}</span>?</p><div className="flex gap-3"><button onClick={onClose} disabled={loading} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 active:scale-[0.98] transition-all disabled:opacity-50">Batal</button><button onClick={onConfirm} disabled={loading} className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-gray-800/20 flex items-center justify-center gap-2">{loading && <Spinner />}Hapus</button></div></div>
+                <div className="h-1 w-full bg-gradient-to-r from-rose-400 via-rose-600 to-rose-800" />
+                <div className="bg-gradient-to-r from-rose-600 to-rose-700 px-6 py-5"><div className="flex items-center gap-3.5"><div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center ring-1 ring-white/20 flex-shrink-0"><svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></div><div><p className="font-bold text-white text-sm tracking-tight">{title}</p><p className="text-xs text-white/60 mt-0.5">Tindakan ini tidak dapat dibatalkan</p></div></div></div>
+                <div className="p-6"><p className="text-sm text-gray-600 text-center mb-6 leading-relaxed">Yakin hapus <span className="font-bold text-gray-800 break-all">{name}</span>?</p><div className="flex gap-3"><button onClick={onClose} disabled={loading} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 active:scale-[0.98] transition-all disabled:opacity-50">Batal</button><button onClick={onConfirm} disabled={loading} className="flex-1 h-11 bg-rose-600 text-white rounded-xl text-sm font-semibold hover:bg-rose-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2">{loading && <Spinner />}Hapus</button></div></div>
             </div>
         </div>
     );
@@ -250,7 +250,7 @@ function AuditHistoryModal({ accessory, onClose }: { accessory: Accessory | null
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl overflow-hidden animate-popIn max-h-[85dvh]">
-                <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
+                <div className="h-0.5 w-full bg-gradient-to-r from-indigo-300 via-indigo-600 to-indigo-900 flex-shrink-0" />
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
                     <div><h2 className="font-bold text-gray-900 text-[15px] tracking-tight">Riwayat Audit</h2><p className="text-[11px] text-gray-400 mt-0.5 truncate max-w-[260px]">{accessory.name}</p></div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
@@ -422,7 +422,7 @@ function AccessoriesContent() {
                 .table-scroll::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
                 .data-row { transition: background-color 0.15s ease; }
                 .data-row:hover { background-color: #f8fafc; }
-                .data-row:hover td:first-child { border-left: 3px solid #374151; }
+                .data-row:hover td:first-child { border-left: 3px solid #4f46e5; }
                 .filter-select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 10px center; background-repeat: no-repeat; background-size: 16px; padding-right: 32px !important; }
             `}</style>
 
@@ -438,7 +438,7 @@ function AccessoriesContent() {
                         </button>
                         {canCreateAcc && (
                             <button onClick={() => { setEditAcc(null); setAccModalOpen(true); }}
-                                className="inline-flex items-center gap-2 h-9 px-4 bg-gray-800 rounded-xl text-sm font-semibold text-white hover:bg-gray-900 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-gray-800/25">
+                                className="inline-flex items-center gap-2 h-9 px-4 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-xl text-sm font-semibold text-white hover:from-indigo-700 hover:to-indigo-800 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-indigo-600/25">
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
                                 Tambah Aksesori
                             </button>
@@ -458,7 +458,7 @@ function AccessoriesContent() {
                     {/* FILTER */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <div className="relative group lg:col-span-2"><div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg></div><input className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all font-medium placeholder:text-gray-400 placeholder:font-normal" placeholder="Cari nama, merk, spesifikasi..." value={search} onChange={e => handleSearch(e.target.value)} /></div>
+                            <div className="relative group lg:col-span-2"><div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg></div><input className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all font-medium placeholder:text-gray-400 placeholder:font-normal" placeholder="Cari nama, merk, spesifikasi..." value={search} onChange={e => handleSearch(e.target.value)} /></div>
                             <FilterSelect value={filterCategory} onChange={e => { setFilterCategory(e.target.value); fetchItems(1, search, e.target.value); }}><option value="">Semua Kategori</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</FilterSelect>
                             <button onClick={() => { setSearch(""); setFilterCategory(""); fetchItems(1, "", ""); }} disabled={!hasFilter} className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Reset</button>
                         </div>
@@ -508,7 +508,7 @@ function AccessoriesContent() {
                                 </table>
                             </div>
                             <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/60 flex flex-wrap items-center justify-between gap-3">
-                                {totalPages > 1 && (<div className="flex items-center gap-1.5"><button disabled={page <= 1} onClick={() => fetchItems(page - 1)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg></button>{Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (<button key={p} onClick={() => fetchItems(p)} className={`w-7 h-7 rounded-lg text-xs font-bold transition ${p === page ? "bg-gray-800 text-white" : "text-gray-500 hover:bg-gray-100"}`}>{p}</button>))}<button disabled={page >= totalPages} onClick={() => fetchItems(page + 1)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg></button></div>)}
+                                {totalPages > 1 && (<div className="flex items-center gap-1.5"><button disabled={page <= 1} onClick={() => fetchItems(page - 1)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg></button>{Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (<button key={p} onClick={() => fetchItems(p)} className={`w-7 h-7 rounded-lg text-xs font-bold transition ${p === page ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-100"}`}>{p}</button>))}<button disabled={page >= totalPages} onClick={() => fetchItems(page + 1)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-30 transition"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg></button></div>)}
                             </div>
                         </div>
                     )}
@@ -530,8 +530,8 @@ export default function AccessoriesPage() {
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED
 // ═══════════════════════════════════════════════════════════════════════════
-const inputCls = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150";
-const textareaCls = "w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all duration-150 resize-none";
+const inputCls = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all duration-150";
+const textareaCls = "w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all duration-150 resize-none";
 const labelCls = "block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5";
 
 function Spinner() { return (<svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>); }
@@ -541,7 +541,7 @@ function StatCard({ label, value, accent, icon, badge }: { label: string; value:
 }
 
 function FilterSelect({ value, onChange, children }: { value: string; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void; children: React.ReactNode }) {
-    return (<select value={value} onChange={onChange} className="filter-select h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition-all cursor-pointer hover:bg-gray-100">{children}</select>);
+    return (<select value={value} onChange={onChange} className="filter-select h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all cursor-pointer hover:bg-gray-100">{children}</select>);
 }
 
 function Th({ children, right, center }: { children: React.ReactNode; right?: boolean; center?: boolean }) {

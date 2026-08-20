@@ -449,7 +449,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             if (inScope(date)) {
                 const originalIds = list.map((e) => e.id);
                 // Stable sort by SOURCE_GROUP_RANK: MANUAL (0) -> SERVICE (1) -> TRANSACTION (2) -> CASHFLOW (3)
-                // Khusus sesama CASHFLOW: urutkan persis seperti di menu Cashflow (id / created_at)
+                // Khusus sesama CASHFLOW: urutkan persis seperti di menu Cashflow (created_at → source_id)
                 const sortedList = [...list].sort((a, b) => {
                     const rankA = SOURCE_GROUP_RANK[a.source_type] ?? 99;
                     const rankB = SOURCE_GROUP_RANK[b.source_type] ?? 99;
@@ -457,16 +457,24 @@ export default function JurnalUmum({ period }: { period: string }) {
                         return rankA - rankB;
                     }
 
-                    // Jika sama-sama CASHFLOW: samakan dengan urutan di menu Cashflow (id DESC untuk terbaru / ASC untuk terlama)
+                    // Jika sama-sama CASHFLOW: samakan dengan urutan di menu Cashflow
+                    // (tanggal DESC → created_at DESC → id DESC — LIHAT compareEntries()
+                    // di src/app/dashboard/cashflow/page.tsx, urutannya FIXED desc, tidak
+                    // ikut toggle "sortOrder" punya Jurnal Umum). Sengaja TIDAK dibikin
+                    // ikut sortOrder di sini, supaya hasilnya tetap sama persis dengan
+                    // menu Cashflow walau Jurnal Umum lagi ditampilkan terlama-dulu (asc).
+                    // source_id di sini berisi UUID cashflow_entries.id — bukan angka,
+                    // jadi kita sort pakai created_at (journal_entries) dulu, lalu
+                    // source_id sebagai tiebreaker stabil.
                     if (a.source_type === "CASHFLOW" && b.source_type === "CASHFLOW") {
-                        const idA = a.source_id?.trim();
-                        const idB = b.source_id?.trim();
-                        if (idA && idB && !Number.isNaN(Number(idA)) && !Number.isNaN(Number(idB))) {
-                            return sortOrder === "asc" ? Number(idA) - Number(idB) : Number(idB) - Number(idA);
+                        const caA = a.created_at || "";
+                        const caB = b.created_at || "";
+                        if (caA !== caB) {
+                            return caB.localeCompare(caA);
                         }
-                        const strA = idA || a.created_at || "";
-                        const strB = idB || b.created_at || "";
-                        return sortOrder === "asc" ? strA.localeCompare(strB) : strB.localeCompare(strA);
+                        const idA = a.source_id || "";
+                        const idB = b.source_id || "";
+                        return idB.localeCompare(idA);
                     }
 
                     return 0;
@@ -1496,11 +1504,17 @@ function WarningToggle({
     const [reason, setReason] = useState("");
     const [busy, setBusy] = useState(false);
 
-    const computePos = () => {
+       const computePos = () => {
         const btn = btnRef.current;
         if (!btn) return;
         const rect = btn.getBoundingClientRect();
-        setPopPos({ top: rect.bottom + 6, left: Math.max(8, rect.right - 256) });
+        const POPOVER_HEIGHT = 420; // estimasi tinggi maksimal popover (header + form + riwayat)
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const top =
+            spaceBelow < POPOVER_HEIGHT
+                ? Math.max(8, rect.top - POPOVER_HEIGHT - 6) // ruang bawah kurang -> buka ke atas tombol
+                : rect.bottom + 6;
+        setPopPos({ top, left: Math.max(8, rect.right - 256) });
     };
 
     useEffect(() => {
@@ -1586,7 +1600,7 @@ function WarningToggle({
                 </button>
                 {showPopover && popPos && (
                     <div
-                        className="fixed z-[95] w-72 bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
+                                              className="fixed z-[95] w-72 max-h-[80vh] overflow-y-auto bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
                         style={{ top: popPos.top, left: popPos.left }}
                     >
                         <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-gray-100">
