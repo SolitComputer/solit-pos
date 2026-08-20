@@ -684,6 +684,7 @@ export default function PreparationPage() {
   useEffect(() => {
     getAuthUser().then(u => ({ success: true, user: u }))
       .then((r) => {
+        console.log("[prep-debug] auth user:", JSON.stringify(r.user));
         setUserRole(r.user?.role ?? null);
         setUserId(r.user?.id ?? null);
       })
@@ -803,6 +804,7 @@ export default function PreparationPage() {
         { event: "INSERT", schema: "public", table: "preparation_orders" },
         (payload) => {
           const row: any = payload.new;
+          console.log("[prep-debug] INSERT masuk, row:", row, "userRole:", JSON.stringify(userRole), "isPrepProvider:", isPrepProvider(userRole), "isPrepSilent:", isPrepSilent(userRole));
           if (isPrepProvider(userRole) && !isPrepSilent(userRole)) {
             showToast(
               "Penyiapan baru masuk!",
@@ -855,7 +857,9 @@ export default function PreparationPage() {
           fetchStatsRef.current();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[prep-debug] channel status:", status);
+      });
     return () => {
       supabase.removeChannel(channel);
     };
