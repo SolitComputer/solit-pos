@@ -1009,242 +1009,245 @@ export default function JurnalUmum({ period }: { period: string }) {
                 </div>
             )}
 
-            {/* ── Toolbar ── */}
-            <div className="flex flex-col sm:flex-row gap-2">
-                <div className="flex-1 flex flex-col sm:flex-row gap-2">
-                    <div className="relative flex-1">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        <input
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Cari keterangan, akun, ref..."
-                            className="w-full h-10 border border-slate-200 bg-white rounded-xl pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition"
-                        />
+            {/* ── Sticky Toolbar, Filter & Summary Bar ── */}
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md -mx-4 sm:-mx-6 px-4 sm:px-6 pt-2 pb-3 space-y-2 border-b border-slate-100 shadow-xs transition-all">
+                {/* ── Toolbar ── */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                        <div className="relative flex-1">
+                            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Cari keterangan, akun, ref..."
+                                className="w-full h-10 border border-slate-200 bg-white rounded-xl pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition"
+                            />
+                        </div>
+                        <div className="relative flex-1">
+                            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                                value={searchNominal}
+                                onChange={(e) => setSearchNominal(e.target.value)}
+                                placeholder="Cari nominal..."
+                                className="w-full h-10 border border-slate-200 bg-white rounded-xl pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition"
+                            />
+                        </div>
                     </div>
-                    <div className="relative flex-1">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        <input
-                            value={searchNominal}
-                            onChange={(e) => setSearchNominal(e.target.value)}
-                            placeholder="Cari nominal..."
-                            className="w-full h-10 border border-slate-200 bg-white rounded-xl pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition"
-                        />
+
+                    <div className="flex gap-2">
+                        <div className="flex items-center gap-1 border border-slate-200/80 bg-slate-100/80 rounded-xl p-1 shrink-0">
+                            <button
+                                onClick={() => setSortOrder("desc")}
+                                title="Terbaru ke terlama"
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${sortOrder === "desc"
+                                    ? "bg-slate-900 text-white shadow-2xs font-bold"
+                                    : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                                    }`}
+                            >
+                                <ArrowUpDown className="w-3 h-3" /> Terbaru
+                            </button>
+                            <button
+                                onClick={() => setSortOrder("asc")}
+                                title="Terlama ke terbaru"
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold active:scale-95 transition-all duration-150 ${sortOrder === "asc"
+                                    ? "bg-slate-900 text-white shadow-2xs font-bold"
+                                    : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                                    }`}
+                            >
+                                Terlama
+                            </button>
+                            <button
+                                onClick={() => setShowOnlyWarnings((v) => !v)}
+                                title={showOnlyWarnings ? "Tampilkan semua data" : "Filter hanya data dengan penanda (Modal Rp0 / diedit)"}
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyWarnings
+                                    ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300"
+                                    : warningCount > 0
+                                        ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                                        : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                                    }`}
+                            >
+                                <AlertTriangle className={`w-3.5 h-3.5 ${showOnlyWarnings ? "text-white" : warningCount > 0 ? "text-red-600" : "text-slate-400"}`} />
+                                <span>Penanda</span>
+                                {warningCount > 0 && (
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${showOnlyWarnings ? "bg-white/20 text-white" : "bg-red-600 text-white"}`}>
+                                        {warningCount}
+                                    </span>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setShowSortSourceModal(true)}
+                                disabled={reorderingBusy || entries.length === 0}
+                                title="Rapikan urutan tiap tanggal: Manual → Service → Transaksi → Cashflow"
+                                className="h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 text-slate-700 hover:text-slate-900 bg-white border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs disabled:opacity-50"
+                            >
+                                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                                <span>{reorderingBusy ? "Merapikan..." : "Rapikan Sumber"}</span>
+                            </button>
+                            {undoState && (
+                                <button
+                                    onClick={handleUndoReorder}
+                                    disabled={reorderingBusy}
+                                    title="Kembalikan urutan sebelum dirapikan"
+                                    className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 text-amber-900 bg-amber-100 border border-amber-300 hover:bg-amber-200 shadow-2xs animate-in fade-in zoom-in-95 duration-200"
+                                >
+                                    <Undo2 className="w-3.5 h-3.5 text-amber-700" />
+                                    <span>Undo Urutan</span>
+                                </button>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setShowManual(true)}
+                            className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
+                        >
+                            + Jurnal Manual
+                        </button>
                     </div>
                 </div>
 
-                <div className="flex gap-2">
-                    <div className="flex items-center gap-1 border border-slate-200/80 bg-slate-100/80 rounded-xl p-1 shrink-0">
-                        <button
-                            onClick={() => setSortOrder("desc")}
-                            title="Terbaru ke terlama"
-                            className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${sortOrder === "desc"
-                                ? "bg-slate-900 text-white shadow-2xs font-bold"
-                                : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
-                                }`}
-                        >
-                            <ArrowUpDown className="w-3 h-3" /> Terbaru
-                        </button>
-                        <button
-                            onClick={() => setSortOrder("asc")}
-                            title="Terlama ke terbaru"
-                            className={`h-8 px-3 rounded-lg text-xs font-semibold active:scale-95 transition-all duration-150 ${sortOrder === "asc"
-                                ? "bg-slate-900 text-white shadow-2xs font-bold"
-                                : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
-                                }`}
-                        >
-                            Terlama
-                        </button>
-                        <button
-                            onClick={() => setShowOnlyWarnings((v) => !v)}
-                            title={showOnlyWarnings ? "Tampilkan semua data" : "Filter hanya data dengan penanda (Modal Rp0 / diedit)"}
-                            className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyWarnings
-                                ? "bg-red-600 text-white shadow-2xs font-bold ring-2 ring-red-300"
-                                : warningCount > 0
-                                    ? "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                                    : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
-                                }`}
-                        >
-                            <AlertTriangle className={`w-3.5 h-3.5 ${showOnlyWarnings ? "text-white" : warningCount > 0 ? "text-red-600" : "text-slate-400"}`} />
-                            <span>Penanda</span>
-                            {warningCount > 0 && (
-                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${showOnlyWarnings ? "bg-white/20 text-white" : "bg-red-600 text-white"}`}>
-                                    {warningCount}
-                                </span>
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setShowSortSourceModal(true)}
-                            disabled={reorderingBusy || entries.length === 0}
-                            title="Rapikan urutan tiap tanggal: Manual → Service → Transaksi → Cashflow"
-                            className="h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 text-slate-700 hover:text-slate-900 bg-white border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs disabled:opacity-50"
-                        >
-                            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                            <span>{reorderingBusy ? "Merapikan..." : "Rapikan Sumber"}</span>
-                        </button>
-                        {undoState && (
-                            <button
-                                onClick={handleUndoReorder}
-                                disabled={reorderingBusy}
-                                title="Kembalikan urutan sebelum dirapikan"
-                                className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 text-amber-900 bg-amber-100 border border-amber-300 hover:bg-amber-200 shadow-2xs animate-in fade-in zoom-in-95 duration-200"
-                            >
-                                <Undo2 className="w-3.5 h-3.5 text-amber-700" />
-                                <span>Undo Urutan</span>
-                            </button>
+                {selectedEntryIds.size > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 bg-slate-900 text-white rounded-xl px-4 py-2.5">
+                        <span className="text-xs font-bold shrink-0">{selectedEntryIds.size} entry dipilih</span>
+
+                        {showBulkWarningInput ? (
+                            <div className="flex items-center gap-1.5 flex-1 min-w-[220px]">
+                                <input
+                                    autoFocus
+                                    value={bulkWarningReason}
+                                    onChange={(e) => setBulkWarningReason(e.target.value)}
+                                    placeholder="Alasan penanda untuk semua yang dipilih..."
+                                    className="h-8 flex-1 min-w-[140px] rounded-lg px-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+                                />
+                                <button
+                                    onClick={handleBulkWarning}
+                                    disabled={bulkBusy || !bulkWarningReason.trim()}
+                                    className="h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-bold disabled:opacity-40 shrink-0"
+                                >
+                                    Terapkan
+                                </button>
+                                <button
+                                    onClick={() => { setShowBulkWarningInput(false); setBulkWarningReason(""); }}
+                                    className="h-8 px-2 text-xs font-semibold text-slate-300 hover:text-white shrink-0"
+                                >
+                                    Batal
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={() => setSelectedEntryIds(new Set(filtered.map((e) => e.id)))}
+                                    className="h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold active:scale-95 transition-all duration-150"
+                                >
+                                    Pilih Semua ({filtered.length})
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const firstSelected = entries.find((e) => selectedEntryIds.has(e.id));
+                                        setTargetMoveDate(firstSelected?.tanggal ?? `${period}-01`);
+                                        setShowBulkMoveModal(true);
+                                    }}
+                                    disabled={bulkBusy}
+                                    className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 disabled:opacity-40"
+                                >
+                                    <Calendar className="w-3.5 h-3.5" /> Pindah Tanggal
+                                </button>
+                                <button
+                                    onClick={() => setShowBulkWarningInput(true)}
+                                    disabled={bulkBusy}
+                                    className="h-8 px-3 rounded-lg bg-amber-500/90 hover:bg-amber-500 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 disabled:opacity-40"
+                                >
+                                    <AlertTriangle className="w-3.5 h-3.5" /> Beri Penanda
+                                </button>
+                                <button
+                                    onClick={handleBulkDelete}
+                                    disabled={bulkBusy}
+                                    className="h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 disabled:opacity-40"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" /> Hapus Terpilih
+                                </button>
+                                <button
+                                    onClick={clearEntrySelection}
+                                    className="h-8 px-3 rounded-lg text-xs font-semibold text-slate-300 hover:text-white ml-auto"
+                                >
+                                    Batal Pilih
+                                </button>
+                            </>
                         )}
                     </div>
-                    <button
-                        onClick={() => setShowManual(true)}
-                        className="flex-1 sm:flex-none h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs hover:shadow active:scale-[0.97] transition-all whitespace-nowrap"
-                    >
-                        + Jurnal Manual
-                    </button>
-                </div>
-            </div>
+                )}
 
-            {selectedEntryIds.size > 0 && (
-                <div className="flex flex-wrap items-center gap-2 bg-slate-900 text-white rounded-xl px-4 py-2.5">
-                    <span className="text-xs font-bold shrink-0">{selectedEntryIds.size} entry dipilih</span>
-
-                    {showBulkWarningInput ? (
-                        <div className="flex items-center gap-1.5 flex-1 min-w-[220px]">
-                            <input
-                                autoFocus
-                                value={bulkWarningReason}
-                                onChange={(e) => setBulkWarningReason(e.target.value)}
-                                placeholder="Alasan penanda untuk semua yang dipilih..."
-                                className="h-8 flex-1 min-w-[140px] rounded-lg px-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400/50"
-                            />
+                {/* ── Filter akun / warning aktif — muncul kalau ada filter yang diaktifkan ── */}
+                {(accountCodeFilter.size > 0 || showOnlyWarnings) && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Filter aktif:</span>
+                            {showOnlyWarnings && (
+                                <button
+                                    onClick={() => setShowOnlyWarnings(false)}
+                                    className="inline-flex items-center gap-1 text-[11px] font-bold bg-red-600 text-white px-2.5 py-0.5 rounded-full hover:bg-red-700 active:scale-95 transition-all duration-150 shadow-sm"
+                                >
+                                    <AlertTriangle className="w-3 h-3 text-white" /> Penanda Only ({warningCount}) <X className="w-3 h-3" />
+                                </button>
+                            )}
+                            {Array.from(accountCodeFilter).map((code) => (
+                                <button
+                                    key={code}
+                                    onClick={() => toggleAccountCodeFilter(code)}
+                                    className="inline-flex items-center gap-1 text-[11px] font-mono font-bold bg-blue-600 text-white px-2.5 py-0.5 rounded-full hover:bg-blue-700 active:scale-95 transition-all duration-150 shadow-sm"
+                                >
+                                    {code} <X className="w-3 h-3" />
+                                </button>
+                            ))}
                             <button
-                                onClick={handleBulkWarning}
-                                disabled={bulkBusy || !bulkWarningReason.trim()}
-                                className="h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-bold disabled:opacity-40 shrink-0"
+                                onClick={() => { setAccountCodeFilter(new Set()); setShowOnlyWarnings(false); }}
+                                className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 underline ml-1"
                             >
-                                Terapkan
-                            </button>
-                            <button
-                                onClick={() => { setShowBulkWarningInput(false); setBulkWarningReason(""); }}
-                                className="h-8 px-2 text-xs font-semibold text-slate-300 hover:text-white shrink-0"
-                            >
-                                Batal
+                                Hapus semua
                             </button>
                         </div>
-                    ) : (
-                        <>
-                            <button
-                                onClick={() => setSelectedEntryIds(new Set(filtered.map((e) => e.id)))}
-                                className="h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold active:scale-95 transition-all duration-150"
-                            >
-                                Pilih Semua ({filtered.length})
-                            </button>
-                            <button
-                                onClick={() => {
-                                    const firstSelected = entries.find((e) => selectedEntryIds.has(e.id));
-                                    setTargetMoveDate(firstSelected?.tanggal ?? `${period}-01`);
-                                    setShowBulkMoveModal(true);
-                                }}
-                                disabled={bulkBusy}
-                                className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 disabled:opacity-40"
-                            >
-                                <Calendar className="w-3.5 h-3.5" /> Pindah Tanggal
-                            </button>
-                            <button
-                                onClick={() => setShowBulkWarningInput(true)}
-                                disabled={bulkBusy}
-                                className="h-8 px-3 rounded-lg bg-amber-500/90 hover:bg-amber-500 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 disabled:opacity-40"
-                            >
-                                <AlertTriangle className="w-3.5 h-3.5" /> Beri Penanda
-                            </button>
-                            <button
-                                onClick={handleBulkDelete}
-                                disabled={bulkBusy}
-                                className="h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all duration-150 disabled:opacity-40"
-                            >
-                                <Trash2 className="w-3.5 h-3.5" /> Hapus Terpilih
-                            </button>
-                            <button
-                                onClick={clearEntrySelection}
-                                className="h-8 px-3 rounded-lg text-xs font-semibold text-slate-300 hover:text-white ml-auto"
-                            >
-                                Batal Pilih
-                            </button>
-                        </>
-                    )}
-                </div>
-            )}
-
-            {/* ── Filter akun / warning aktif — muncul kalau ada filter yang diaktifkan ── */}
-            {(accountCodeFilter.size > 0 || showOnlyWarnings) && (
-                <div className="flex flex-wrap items-center justify-between gap-2 -mt-1 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Filter aktif:</span>
-                        {showOnlyWarnings && (
-                            <button
-                                onClick={() => setShowOnlyWarnings(false)}
-                                className="inline-flex items-center gap-1 text-[11px] font-bold bg-red-600 text-white px-2.5 py-0.5 rounded-full hover:bg-red-700 active:scale-95 transition-all duration-150 shadow-sm"
-                            >
-                                <AlertTriangle className="w-3 h-3 text-white" /> Penanda Only ({warningCount}) <X className="w-3 h-3" />
-                            </button>
-                        )}
-                        {Array.from(accountCodeFilter).map((code) => (
-                            <button
-                                key={code}
-                                onClick={() => toggleAccountCodeFilter(code)}
-                                className="inline-flex items-center gap-1 text-[11px] font-mono font-bold bg-blue-600 text-white px-2.5 py-0.5 rounded-full hover:bg-blue-700 active:scale-95 transition-all duration-150 shadow-sm"
-                            >
-                                {code} <X className="w-3 h-3" />
-                            </button>
-                        ))}
-                        <button
-                            onClick={() => { setAccountCodeFilter(new Set()); setShowOnlyWarnings(false); }}
-                            className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 underline ml-1"
-                        >
-                            Hapus semua
-                        </button>
-                    </div>
-                    <span className="text-[11px] font-semibold text-blue-900 bg-white border border-blue-200 rounded-lg px-2.5 py-1 shadow-2xs">
-                        Tampil <b>{filtered.length}</b> dari <b>{entries.length}</b> entry ({totalLinesFiltered} baris)
-                    </span>
-                </div>
-            )}
-
-            {/* ── Total — di ATAS, di luar tabel (bar ringkasan) ── */}
-            {!loading && filtered.length > 0 && (
-                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-x-4 sm:gap-x-6 gap-y-2">
-                    <span className="text-xs font-semibold text-slate-500">
-                        {isFiltered
-                            ? `Menampilkan ${visibleEntries.length} dari ${filtered.length} entry (${totalLinesFiltered} / ${totalLinesAll} baris)`
-                            : `Menampilkan ${visibleEntries.length} dari ${entries.length} entry (${totalLinesAll} total baris)`}
-                    </span>
-                    <div className="flex items-center gap-x-4 sm:gap-x-6 flex-wrap gap-y-1">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL</span>
-                        <span className="text-xs sm:text-sm font-bold text-slate-900 font-mono">
-                            Debit&nbsp; <span className="font-extrabold text-slate-900">{rp(totalDebit)}</span>
-                        </span>
-                        <span className="text-xs sm:text-sm font-bold text-slate-900 font-mono">
-                            Kredit&nbsp; <span className="font-extrabold text-slate-900">{rp(totalKredit)}</span>
-                        </span>
-                        <span
-                            className={`text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 shrink-0 ${totalDebit === totalKredit
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
-                                : "bg-red-50 text-red-700 border border-red-200/80"
-                                }`}
-                        >
-                            {totalDebit === totalKredit ? (
-                                <>
-                                    Balance <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                </>
-                            ) : (
-                                "Tidak Balance"
-                            )}
+                        <span className="text-[11px] font-semibold text-blue-900 bg-white border border-blue-200 rounded-lg px-2.5 py-1 shadow-2xs">
+                            Tampil <b>{filtered.length}</b> dari <b>{entries.length}</b> entry ({totalLinesFiltered} baris)
                         </span>
                     </div>
-                </div>
-            )}
+                )}
+
+                {/* ── Total — bar ringkasan ── */}
+                {!loading && filtered.length > 0 && (
+                    <div className="bg-slate-50/90 border border-slate-200/80 rounded-2xl px-5 py-3 flex flex-wrap items-center justify-between gap-x-4 sm:gap-x-6 gap-y-2">
+                        <span className="text-xs font-semibold text-slate-500">
+                            {isFiltered
+                                ? `Menampilkan ${visibleEntries.length} dari ${filtered.length} entry (${totalLinesFiltered} / ${totalLinesAll} baris)`
+                                : `Menampilkan ${visibleEntries.length} dari ${entries.length} entry (${totalLinesAll} total baris)`}
+                        </span>
+                        <div className="flex items-center gap-x-4 sm:gap-x-6 flex-wrap gap-y-1">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL</span>
+                            <span className="text-xs sm:text-sm font-bold text-slate-900 font-mono">
+                                Debit&nbsp; <span className="font-extrabold text-slate-900">{rp(totalDebit)}</span>
+                            </span>
+                            <span className="text-xs sm:text-sm font-bold text-slate-900 font-mono">
+                                Kredit&nbsp; <span className="font-extrabold text-slate-900">{rp(totalKredit)}</span>
+                            </span>
+                            <span
+                                className={`text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 shrink-0 ${totalDebit === totalKredit
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
+                                    : "bg-red-50 text-red-700 border border-red-200/80"
+                                    }`}
+                            >
+                                {totalDebit === totalKredit ? (
+                                    <>
+                                        Balance <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    </>
+                                ) : (
+                                    "Tidak Balance"
+                                )}
+                            </span>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* ── Tabel Jurnal Umum ── */}
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-                <div className="overflow-auto max-h-[calc(100vh-220px)]">
+                <div className="overflow-x-auto">
                     <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
                         <Droppable droppableId="journal-entries">
                             {(provided) => (
@@ -1254,8 +1257,8 @@ export default function JurnalUmum({ period }: { period: string }) {
                                     ref={provided.innerRef}
                                     {...provided.droppableProps}
                                 >
-                                    <thead className="sticky top-0 z-30 ring-1 ring-slate-100 shadow-2xs">
-                                        <tr className="border-b border-slate-200/80 bg-slate-50/90 backdrop-blur-xs">
+                                    <thead>
+                                        <tr className="border-b border-slate-200/80 bg-slate-50/90">
                                             <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[95px] sm:w-[110px]">Tanggal</th>
                                             <th className="px-2 sm:px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
                                             <th className="px-2 sm:px-4 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[70px] sm:w-[80px]">

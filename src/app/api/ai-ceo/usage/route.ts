@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { AI_CEO_ROLES } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
+import { getProviderUsageStatus } from "@/lib/aiCeo";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,7 +22,7 @@ function todayRangeWIB() {
 async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
   const { start, end } = todayRangeWIB();
 
-  const [{ data, error }, { data: health }] = await Promise.all([
+  const [{ data, error }, { data: health }, limits] = await Promise.all([
     supabaseAdmin
       .from("ai_ceo_messages")
       .select("provider, prompt_tokens, completion_tokens, total_tokens")
@@ -30,6 +31,10 @@ async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
       .lt("created_at", end)
       .not("provider", "is", null),
     supabaseAdmin.from("ai_ceo_provider_health").select("provider, blocked_until"),
+    getProviderUsageStatus().catch((e) => {
+      console.error("[ai-ceo/usage] gagal ambil status limit provider:", e?.message ?? e);
+      return null;
+    }),
   ]);
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
@@ -51,8 +56,13 @@ async function getHandler(_req: NextRequest, _ctx: any, _user: AuthUser) {
   for (const h of health ?? []) {
     blocked[h.provider as string] = h.blocked_until ? new Date(h.blocked_until).getTime() > now : false;
   }
+  if (limits) {
+    blocked.deepseek = limits.deepseek.blocked;
+    blocked.groq = limits.groq.blocked;
+    blocked.gemini = limits.gemini.blocked;
+  }
 
- return NextResponse.json({ success: true, counts, total, blocked, tokens });
+  return NextResponse.json({ success: true, counts, total, blocked, tokens, limits });
 }
 
 export const GET = withAuth(getHandler, AI_CEO_ROLES);
