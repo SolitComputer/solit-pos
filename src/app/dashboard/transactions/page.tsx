@@ -41,7 +41,7 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-[#0f0c29]/70 backdrop-blur-md flex items-center justify-center p-4" onClick={onClose}>
       <div className="relative max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="absolute -top-10 right-0 text-white/70 hover:text-white transition flex items-center gap-1.5 text-sm font-medium">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -64,15 +64,16 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center ring-1 ring-black/5">
-        <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+      <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center ring-1 ring-black/5 overflow-hidden">
+        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#b8935a] to-transparent" />
+        <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4 mt-1">
           <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
         <p className="text-gray-700 text-sm font-medium mb-5 leading-relaxed">{message}</p>
-        <button onClick={onClose} className="w-full h-10 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition">OK</button>
+        <button onClick={onClose} className="w-full h-10 bg-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:bg-[#1a1545] transition">OK</button>
       </div>
     </div>
   );
@@ -82,7 +83,7 @@ function ExportProgressModal({ progress, label }: { progress: number; label: str
   const pct = Math.min(100, Math.max(0, Math.round(progress)));
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 ring-1 ring-black/5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0">
@@ -92,7 +93,7 @@ function ExportProgressModal({ progress, label }: { progress: number; label: str
             </svg>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900">Export Excel</p>
+            <p className="text-sm font-bold text-[#0f0c29]">Export Excel</p>
             <p className="text-xs text-gray-400 truncate">{label || "Memproses..."}</p>
           </div>
         </div>
@@ -250,9 +251,9 @@ function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[92dvh] flex flex-col ring-1 ring-black/5">
-        <div className={`px-5 py-4 flex-shrink-0 ${isPending ? "bg-red-600" : "bg-gray-900"}`}>
+        <div className={`px-5 py-4 flex-shrink-0 ${isPending ? "bg-red-600" : "bg-[#0f0c29]"}`}>
           <p className="font-semibold text-white text-sm">
             {isPending ? `Batalkan Pesanan (${currentLabel})` : "Restore Transaksi"}
           </p>
@@ -314,7 +315,7 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden ring-1 ring-black/5">
         <div className="bg-emerald-700 px-5 py-4">
           <p className="font-semibold text-white text-sm">Pembayaran</p>
@@ -327,7 +328,7 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
           <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-200 space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-gray-400">Customer</span>
-              <span className="text-xs font-bold text-gray-800 text-right truncate max-w-[65%]">{item.customer_name}</span>
+              <span className="text-xs font-bold text-[#1a1545] text-right truncate max-w-[65%]">{item.customer_name}</span>
             </div>
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-gray-400">Barang</span>
@@ -337,7 +338,7 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
             </div>
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-gray-400">Status Saat Ini</span>
-              <span className="text-xs font-bold text-gray-800">{STATUS_LABEL[item.status] ?? item.status}</span>
+              <span className="text-xs font-bold text-[#1a1545]">{STATUS_LABEL[item.status] ?? item.status}</span>
             </div>
             <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-gray-200">
               <span className="text-xs text-gray-500 font-semibold">Total Tagihan</span>
@@ -361,7 +362,7 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
           {isReserved && (
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setPayMode("CICILAN")}
-                className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "CICILAN" ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "CICILAN" ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
                 Cicilan
               </button>
               <button type="button" onClick={() => setPayMode("LUNAS")}
@@ -406,7 +407,7 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
             <input
               type="file" accept="image/*" capture="environment"
               onChange={(e) => { setConfirmPhoto(e.target.files?.[0] ?? null); setConfirmError(""); }}
-              className="w-full border border-gray-200 rounded-xl p-2.5 text-xs bg-gray-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-gray-900 file:text-white hover:file:bg-gray-800 transition"
+              className="w-full border border-gray-200 rounded-xl p-2.5 text-xs bg-gray-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-[#0f0c29] file:text-white hover:file:bg-[#1a1545] transition"
             />
             {confirmPhoto && <p className="text-[11px] text-emerald-600 font-medium">✓ {confirmPhoto.name}</p>}
           </div>
@@ -415,7 +416,7 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
         </div>
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-3 bg-gray-50">
           <button onClick={() => { onClose(); setConfirmError(""); }} className="flex-1 h-11 sm:h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-          <button onClick={onConfirm} disabled={confirming} className={`flex-1 h-11 sm:h-10 text-white rounded-xl text-sm font-semibold transition disabled:opacity-60 ${showCicilanForm ? "bg-gray-900 hover:bg-gray-800" : "bg-emerald-600 hover:bg-emerald-700"}`}>
+          <button onClick={onConfirm} disabled={confirming} className={`flex-1 h-11 sm:h-10 text-white rounded-xl text-sm font-semibold transition disabled:opacity-60 ${showCicilanForm ? "bg-[#0f0c29] hover:bg-[#1a1545]" : "bg-emerald-600 hover:bg-emerald-700"}`}>
             {confirming ? "Memproses..." : showCicilanForm ? "Simpan Cicilan" : "Konfirmasi Lunas"}
           </button>
         </div>
@@ -444,7 +445,7 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
     blue: { bg: "bg-blue-50", border: "border-blue-100", text: "text-blue-800", label: "text-blue-500" },
     emerald: { bg: "bg-emerald-50", border: "border-emerald-100", text: "text-emerald-800", label: "text-emerald-500" },
     purple: { bg: "bg-purple-50", border: "border-purple-100", text: "text-purple-800", label: "text-purple-500" },
-    gray: { bg: "bg-gray-50", border: "border-gray-100", text: "text-gray-800", label: "text-gray-500" },
+    gray: { bg: "bg-gray-50", border: "border-gray-100", text: "text-[#1a1545]", label: "text-gray-500" },
   };
 
   const m1meta = getMethodMeta(item.payment_method ?? "");
@@ -485,7 +486,7 @@ function PaymentBreakdown({ item, size = "sm" }: { item: any; size?: "sm" | "md"
 
 // ─── SKELETON ────────────────────────────────────────────────────────
 function SkeletonPulse({ className }: { className: string }) {
-  return <div className={`animate-pulse bg-gray-100 rounded ${className}`} />;
+  return <div className={`skeleton-shimmer rounded ${className}`} />;
 }
 
 function MobileCardSkeleton() {
@@ -701,7 +702,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
               </span>
             )}
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-bold text-gray-900 leading-snug break-words">{item.customer_name}</h3>
+              <h3 className="text-sm font-bold text-[#0f0c29] leading-snug break-words">{item.customer_name}</h3>
               <p className="text-[11px] text-gray-400 font-mono mt-0.5">{item.invoice_number}</p>
             </div>
           </div>
@@ -751,7 +752,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
                   <div key={idx} className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
                     <div className="flex items-start gap-1.5 mb-1.5">
                       <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5">{g.unit_count}x</span>
-                      <p className="text-xs font-bold text-gray-900 leading-snug min-w-0">{g.laptop_name}</p>
+                      <p className="text-xs font-bold text-[#0f0c29] leading-snug min-w-0">{g.laptop_name}</p>
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.cpu}</span>}
@@ -788,7 +789,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
           }
           return (
             <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
-              <p className="text-xs font-bold text-gray-900 leading-snug mb-1.5">{item.laptop_name || "—"}</p>
+              <p className="text-xs font-bold text-[#0f0c29] leading-snug mb-1.5">{item.laptop_name || "—"}</p>
               {(item.cpu || item.ram || item.storage) && (
                 <div className="flex flex-wrap gap-1 mb-1.5">
                   {item.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold"> {item.cpu}</span>}
@@ -822,7 +823,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
                   const isBonus = Boolean(a.is_bonus || deal === 0);
 
                   return (
-                    <div key={idx} className="flex items-center justify-between text-xs text-gray-800">
+                    <div key={idx} className="flex items-center justify-between text-xs text-[#1a1545]">
                       <span className="truncate pr-2">• {name} <strong className="text-emerald-700">({qty}x)</strong></span>
                       <span className="font-mono font-bold text-[11px] flex-shrink-0">
                         {isBonus ? <span className="text-amber-700 font-bold">BONUS</span> : `Rp${deal.toLocaleString("id-ID")}`}
@@ -885,7 +886,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
           <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-2 border border-gray-100">
             <div className="flex justify-between gap-2">
               <span className="text-gray-400">Invoice</span>
-              <span className="font-mono font-bold text-gray-800 break-all text-right">{item.invoice_number}</span>
+              <span className="font-mono font-bold text-[#1a1545] break-all text-right">{item.invoice_number}</span>
             </div>
             {(() => {
               const sns: string[] = Array.isArray(item.serial_numbers) && item.serial_numbers.length > 0
@@ -900,7 +901,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
             })()}
             <div className="flex justify-between gap-2">
               <span className="text-gray-400">Waktu</span>
-              <span className="font-mono font-bold text-gray-800">{formatDateTime(item.created_at)}</span>
+              <span className="font-mono font-bold text-[#1a1545]">{formatDateTime(item.created_at)}</span>
             </div>
           </div>
         )}
@@ -909,7 +910,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
           <button onClick={() => setShowDetails(!showDetails)} className="h-9 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 transition">
             {showDetails ? "Sembunyikan" : "Detail"}
           </button>
-          <button onClick={() => onRowClick?.(item)} className="h-9 rounded-xl bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800 transition">
+          <button onClick={() => onRowClick?.(item)} className="h-9 rounded-xl bg-[#0f0c29] text-white text-xs font-semibold hover:bg-[#1a1545] transition">
             Lihat Laptop
           </button>
         </div>
@@ -997,7 +998,7 @@ function SortIcon({ state }: { state: "none" | "asc" | "desc" }) {
   }
   return (
     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
-      className="text-gray-900 flex-shrink-0">
+      className="text-[#0f0c29] flex-shrink-0">
       {state === "asc" ? <polyline points="8 14 12 10 16 14" /> : <polyline points="8 10 12 14 16 10" />}
     </svg>
   );
@@ -1022,7 +1023,7 @@ function SortableTh({ label, sortKey, sortBy, sortDir, onSort, className = "", a
               : `${label} — klik lagi untuk reset ke urutan awal`
             : `Urutkan berdasarkan ${label}`
         }
-        className={`group/sort w-full inline-flex items-center gap-1 ${justify} text-[10px] font-bold uppercase tracking-widest transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/20 ${active ? "text-gray-900" : "text-gray-400 hover:text-gray-700"}`}
+        className={`group/sort w-full inline-flex items-center gap-1 ${justify} text-[10px] font-bold uppercase tracking-widest transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0f0c29]/20 ${active ? "text-[#0f0c29]" : "text-gray-400 hover:text-gray-700"}`}
       >
         <span className="whitespace-nowrap">{label}</span>
         <SortIcon state={active ? sortDir : "none"} />
@@ -1186,7 +1187,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
             <div key={idx} className="flex items-start gap-1.5">
               <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5">{g.unit_count}x</span>
               <div className="min-w-0">
-                <div className="text-xs font-bold text-gray-900 leading-snug">{g.laptop_name}</div>
+                <div className="text-xs font-bold text-[#0f0c29] leading-snug">{g.laptop_name}</div>
                 <div className="flex gap-0.5 flex-wrap mt-0.5">
                   {g.ram && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold">{g.ram}</span>}
                   {g.storage && <span className="text-[7px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold border border-blue-100">{g.storage}</span>}
@@ -1214,7 +1215,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
 
     return (
       <div>
-        <div className="text-xs font-bold text-gray-900 leading-snug mb-1">{item.laptop_name || "—"}</div>
+        <div className="text-xs font-bold text-[#0f0c29] leading-snug mb-1">{item.laptop_name || "—"}</div>
         {(item.ram || item.storage) && (
           <div className="flex items-center gap-1 flex-wrap">
             {item.ram && <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold whitespace-nowrap">{item.ram}</span>}
@@ -1253,7 +1254,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
         </td>
         <td className="px-4 py-3.5"><StatusBadge item={item} /></td>
         <td className="px-4 py-3.5">
-          <div className="text-xs font-bold text-gray-800 font-mono leading-tight mb-1">{item.invoice_number}</div>
+          <div className="text-xs font-bold text-[#1a1545] font-mono leading-tight mb-1">{item.invoice_number}</div>
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-gray-400">{datePart}</span>
             <span className="text-gray-200">·</span>
@@ -1261,7 +1262,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
           </div>
         </td>
         <td className="px-4 py-3.5">
-          <div className="text-xs font-bold text-gray-900 leading-snug mb-1">{item.customer_name}</div>
+          <div className="text-xs font-bold text-[#0f0c29] leading-snug mb-1">{item.customer_name}</div>
           {item.customer_type && item.customer_type !== "UMUM" && (
             <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 whitespace-nowrap">
               {(() => { const ct = getCustomerTypeBadge(item.customer_type); const CtIcon = ct.icon; return <><CtIcon className="w-2.5 h-2.5" /> {ct.text}</>; })()}
@@ -1274,7 +1275,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
         <td className="px-4 py-3.5">
           {item.sales_name ? (
             <div>
-              <div className="text-[11px] font-bold text-gray-800 leading-snug mb-0.5">{item.sales_name}</div>
+              <div className="text-[11px] font-bold text-[#1a1545] leading-snug mb-0.5">{item.sales_name}</div>
               {item.employee_role && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[8px] bg-blue-100 text-blue-700 font-bold whitespace-nowrap">{item.employee_role}</span>}
             </div>
           ) : <span className="text-[10px] text-gray-300">—</span>}
@@ -1308,7 +1309,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
             if (!isMulti) {
               return (
                 <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-sm font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">
+                  <span className="text-sm font-bold text-[#0f0c29] font-mono tabular-nums whitespace-nowrap">
                     Rp{priceDisplay.value.toLocaleString("id-ID")}
                   </span>
                   {priceDisplay.isDP && (
@@ -1331,7 +1332,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
                       <p className="text-[9px] font-semibold text-gray-500 leading-tight truncate text-left mb-0.5" title={g.laptop_name}>
                         {g.laptop_name || "—"}
                       </p>
-                      <p className="text-xs font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">
+                      <p className="text-xs font-bold text-[#0f0c29] font-mono tabular-nums whitespace-nowrap">
                         Rp{perUnit.toLocaleString("id-ID")}
                         <span className="text-[8px] text-gray-400 font-sans font-semibold ml-0.5">/unit</span>
                       </p>
@@ -1345,7 +1346,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
                 })}
                 <div className="flex items-center justify-between gap-1 border-t-2 border-gray-200 pt-1.5 mt-0.5">
                   <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
-                  <span className="text-sm font-bold text-gray-900 font-mono tabular-nums whitespace-nowrap">
+                  <span className="text-sm font-bold text-[#0f0c29] font-mono tabular-nums whitespace-nowrap">
                     Rp{priceDisplay.totalDeal.toLocaleString("id-ID")}
                   </span>
                 </div>
@@ -1498,7 +1499,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
 
   const modalContent = (
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
+      <div className="absolute inset-0 bg-[#0f0c29]/60 backdrop-blur-md" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden ring-1 ring-black/5">
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 flex-shrink-0">
@@ -1510,7 +1511,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
               </span>
               {isMulti && <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-700">{grouped.length} Barang</span>}
             </div>
-            <h2 className="font-bold text-gray-900 text-base leading-snug">{activeItem.customer_name}</h2>
+            <h2 className="font-bold text-[#0f0c29] text-base leading-snug">{activeItem.customer_name}</h2>
             <p className="text-xs text-gray-400 font-mono mt-0.5">{activeItem.invoice_number}</p>
             <p className="text-xs text-gray-400 mt-0.5"> {formatDateShort(activeItem.created_at)}</p>
           </div>
@@ -1542,7 +1543,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
                 <button
                   type="button"
                   onClick={() => setShowHistory((v) => !v)}
-                  className="ml-auto text-[10px] font-semibold px-2 py-1 rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition"
+                  className="ml-auto text-[10px] font-semibold px-2 py-1 rounded-lg bg-[#0f0c29] text-white hover:bg-[#1a1545] transition"
                 >
                   {showHistory ? "Sembunyikan Riwayat" : "Lihat Riwayat"}
                 </button>
@@ -1578,7 +1579,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">Customer</p>
-              <p className="text-sm font-bold text-gray-800">{activeItem.customer_name}</p>
+              <p className="text-sm font-bold text-[#1a1545]">{activeItem.customer_name}</p>
               {activeItem.customer_phone && <p className="text-xs text-gray-500 mt-0.5"> {activeItem.customer_phone}</p>}
               {activeItem.customer_type && activeItem.customer_type !== "UMUM" && (
                 <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
@@ -1590,7 +1591,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">Sales</p>
               {activeItem.sales_name ? (
                 <>
-                  <p className="text-sm font-bold text-gray-800">{activeItem.sales_name}</p>
+                  <p className="text-sm font-bold text-[#1a1545]">{activeItem.sales_name}</p>
                   {activeItem.employee_role && <span className="inline-flex items-center mt-2 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">{activeItem.employee_role}</span>}
                 </>
               ) : <p className="text-sm text-gray-300">—</p>}
@@ -1605,7 +1606,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
                 <div key={idx} className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
                   <div className="px-3.5 py-3 bg-gray-50/50 border-b border-gray-100 flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-800 leading-snug">{g.laptop_name}</p>
+                      <p className="text-sm font-bold text-[#1a1545] leading-snug">{g.laptop_name}</p>
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-gray-200 text-gray-700 font-semibold">{g.cpu}</span>}
                         {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-gray-200 text-gray-700 font-semibold">{g.ram}</span>}
@@ -1651,7 +1652,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
                 </div>
               )) : (
                 <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
-                  <p className="text-sm font-bold text-gray-800">{activeItem.laptop_name || "—"}</p>
+                  <p className="text-sm font-bold text-[#1a1545]">{activeItem.laptop_name || "—"}</p>
                   {activeItem.serial_number && <span className="font-mono text-[10px] font-bold bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md mt-1.5 inline-block">{activeItem.serial_number}</span>}
                 </div>
               )}
@@ -1689,7 +1690,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
                               {qty}x
                             </span>
                             <div className="min-w-0">
-                              <p className="text-xs font-bold text-gray-800 truncate">{name}</p>
+                              <p className="text-xs font-bold text-[#1a1545] truncate">{name}</p>
                               {isBonus ? (
                                 <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 inline-block mt-0.5">
                                   BONUS
@@ -1705,7 +1706,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
                             {isBonus ? (
                               <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">Bonus (Rp0)</span>
                             ) : (
-                              <span className="text-xs font-bold text-gray-900 font-mono tabular-nums">Rp{deal.toLocaleString("id-ID")}</span>
+                              <span className="text-xs font-bold text-[#0f0c29] font-mono tabular-nums">Rp{deal.toLocaleString("id-ID")}</span>
                             )}
                             {canSeeFinancials && canSeeModal && modalPrice > 0 && (
                               <p className="text-[9px] text-gray-400 font-mono mt-0.5">Modal: Rp{(modalPrice * qty).toLocaleString("id-ID")}</p>
@@ -1753,13 +1754,13 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-500">Total Harga Deal</span>
-                    <span className="text-sm font-bold text-gray-900 font-mono tabular-nums">Rp{totalDeal.toLocaleString("id-ID")}</span>
+                    <span className="text-sm font-bold text-[#0f0c29] font-mono tabular-nums">Rp{totalDeal.toLocaleString("id-ID")}</span>
                   </div>
                 </>
               ) : (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Total Harga Deal</span>
-                  <span className="text-sm font-bold text-gray-900 font-mono tabular-nums">Rp{totalDeal.toLocaleString("id-ID")}</span>
+                  <span className="text-sm font-bold text-[#0f0c29] font-mono tabular-nums">Rp{totalDeal.toLocaleString("id-ID")}</span>
                 </div>
               )}
               {/* ── REVISI: Baris Total Margin hanya muncul jika canSeeModal ── */}
@@ -1804,7 +1805,7 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
         {/* Footer */}
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-2.5 flex-shrink-0">
           <a href={`/receipt/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"> Receipt</a>
-          <a href={`/payment/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition"> Edit</a>
+          <a href={`/payment/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0f0c29] text-white rounded-xl hover:bg-[#1a1545] transition"> Edit</a>
         </div>
       </div>
     </div>
@@ -2156,6 +2157,14 @@ export default function Page() {
 
   return (
     <DashboardLayout>
+      <style>{`
+        @keyframes skeleton-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+        .skeleton-shimmer {
+          background: linear-gradient(90deg, #f3f4f6 25%, #ede9fe 37%, #f3f4f6 63%);
+          background-size: 400% 100%;
+          animation: skeleton-shimmer 1.4s ease-in-out infinite;
+        }
+      `}</style>
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
       {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} canViewActivityLog={canViewActivityLog} />}
       {isExporting && <ExportProgressModal progress={exportProgress} label={exportLabel} />}
@@ -2163,19 +2172,22 @@ export default function Page() {
       <div className={`${isMobile ? "px-4 py-4" : "max-w-[1920px] mx-auto px-6 py-4"} space-y-3`}>
 
         {/* ── Header ── */}
+        <div>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-1 h-6 bg-gray-900 rounded-full flex-shrink-0" />
+            <div className="w-10 h-10 bg-[#0f0c29] rounded-xl flex items-center justify-center shadow-lg shadow-[#0f0c29]/25 flex-shrink-0">
+              <Receipt className="w-4.5 h-4.5 text-white" />
+            </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-gray-900 leading-none">Riwayat Transaksi</h1>
-              <p className="text-xs text-gray-400 mt-0.5">Kelola dan pantau semua transaksi</p>
+              <h1 className="text-lg sm:text-xl font-black text-[#0f0c29] leading-none tracking-tight">Riwayat Transaksi</h1>
+              <p className="text-xs text-gray-400 mt-1">Kelola dan pantau semua transaksi</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
             {!isLoading && (
               <div className="flex items-center gap-1.5 bg-gray-100 px-3 h-9 rounded-xl">
-                <span className="text-xs font-bold text-gray-900 tabular-nums">{totalCount}</span>
+                <span className="text-xs font-bold text-[#0f0c29] tabular-nums">{totalCount}</span>
                 <span className="text-xs text-gray-400">transaksi</span>
               </div>
             )}
@@ -2191,6 +2203,8 @@ export default function Page() {
               </button>
             )}
           </div>
+        </div>
+        <div className="mt-3 h-px bg-gradient-to-r from-[#b8935a]/50 via-gray-200 to-transparent" />
         </div>
 
         {/* ── Deep-link banner ── */}
@@ -2217,7 +2231,7 @@ export default function Page() {
                 type="text"
                 placeholder="Cari nota, customer, laptop, CPU, SN..."
                 disabled={bulkSNList.length > 0}
-                className="w-full border border-gray-200 rounded-xl h-9 pl-9 pr-8 text-sm text-gray-800 placeholder-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full border border-gray-200 rounded-xl h-9 pl-9 pr-8 text-sm text-[#1a1545] placeholder-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#0f0c29]/10 focus:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -2231,7 +2245,7 @@ export default function Page() {
             <button
               onClick={() => handleSort("date")}
               title="Urutkan berdasarkan waktu transaksi"
-              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${sortBy === "date" ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${sortBy === "date" ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 {sortOrder === "newest"
@@ -2243,7 +2257,7 @@ export default function Page() {
 
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${hasActiveFilter ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${hasActiveFilter ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -2257,7 +2271,7 @@ export default function Page() {
             <button
               onClick={() => setShowBulkSN(!showBulkSN)}
               title="Cari banyak Serial Number sekaligus"
-              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${showBulkSN || bulkSNInput ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              className={`flex items-center gap-1.5 px-3 h-9 rounded-xl border text-xs font-semibold transition whitespace-nowrap ${showBulkSN || bulkSNInput ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="14" y2="18" />
@@ -2277,7 +2291,7 @@ export default function Page() {
                 value={bulkSNInput}
                 onChange={(e) => setBulkSNInput(e.target.value)}
                 rows={4}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition resize-y"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-mono text-[#1a1545] bg-white focus:outline-none focus:ring-2 focus:ring-[#0f0c29]/10 focus:border-gray-400 transition resize-y"
               />
               {bulkSNList.length > 0 && (
                 <div className="flex items-center justify-between mt-1.5">
@@ -2300,7 +2314,7 @@ export default function Page() {
                 <div className="flex flex-wrap gap-1.5">
                   {["ALL", "PAID", "RESERVED", "HELD", "PACKING", "PENDING", "CANCELLED"].map((s) => (
                     <button key={s} onClick={() => setStatus(s)}
-                      className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${status === s ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                      className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${status === s ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                       {s === "ALL" ? "Semua" : STATUS_LABEL[s] ?? s}
                     </button>
                   ))}
@@ -2324,7 +2338,7 @@ export default function Page() {
                       const badge = p !== "ALL" ? getSourcePlatformBadge(p as string) : null;
                       return (
                         <button key={p as string} onClick={() => setSourcePlatform(p as string)}
-                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${sourcePlatform === p ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${sourcePlatform === p ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                           {p === "ALL" ? "Semua" : badge?.text ?? (p as string)}
                         </button>
                       );
@@ -2341,7 +2355,7 @@ export default function Page() {
                       const style = m !== "ALL" ? getPaymentStyle(m as string) : null;
                       return (
                         <button key={m as string} onClick={() => setPaymentMethod(m as string)}
-                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${paymentMethod === m ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                          className={`h-8 px-3 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${paymentMethod === m ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                           {m === "ALL" ? "Semua" : style?.text ?? (m as string)}
                         </button>
                       );
@@ -2362,7 +2376,7 @@ export default function Page() {
                     { value: "zenit.id", label: "Zenit.id" },
                   ].map((c) => (
                     <button key={c.value} onClick={() => setCompanyName(c.value)}
-                      className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${companyName === c.value ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                      className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${companyName === c.value ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                       {c.label}
                     </button>
                   ))}
@@ -2379,7 +2393,7 @@ export default function Page() {
                     { value: "mixed", label: "Campuran" },
                   ].map((c) => (
                     <button key={c.value} onClick={() => setItemKind(c.value)}
-                      className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${itemKind === c.value ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                      className={`h-8 px-3 rounded-lg text-xs font-semibold border transition ${itemKind === c.value ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
                       {c.label}
                     </button>
                   ))}
@@ -2443,7 +2457,7 @@ export default function Page() {
 
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-400">Hal.</span>
-              <span className="text-sm font-bold text-gray-900 bg-gray-100 px-2.5 py-1 rounded-lg tabular-nums">{currentPage}</span>
+              <span className="text-sm font-bold text-[#0f0c29] bg-gray-100 px-2.5 py-1 rounded-lg tabular-nums">{currentPage}</span>
               <span className="text-xs text-gray-400">dari <b className="text-gray-600">{totalPages}</b></span>
             </div>
 
