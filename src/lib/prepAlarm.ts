@@ -18,10 +18,12 @@ function readAck(storageKey: string): Set<string> {
 }
 
 /**
- * Notifikasi suara hanya berbunyi 1x saat ada item BARU YANG BELUM PERNAH TERLIHAT masuk.
- * - Tidak looping tiap 4 detik.
+ * Notifikasi suara berbunyi BERULANG setiap `intervalMs` (default 4 detik) selama
+ * masih ada item yang belum di-acknowledge, dimulai begitu ada item BARU YANG
+ * BELUM PERNAH TERLIHAT masuk.
  * - Tidak bunyi saat pertama kali buka halaman / data pertama kali datang dari API.
- * - Tidak bunyi saat banner di-close/disilang (acknowledge).
+ * - Berhenti otomatis begitu SEMUA item di-acknowledge (mis. tombol "Terima" diklik,
+ *   atau order-nya dibuka).
  */
 export function usePrepAlarm(
   items: { id: string }[],
@@ -38,6 +40,8 @@ export function usePrepAlarm(
   const seenIdsRef = useRef<Set<string>>(new Set());
   // Flag apakah inisialisasi awal sudah lewat
   const isInitialBatchRef = useRef<boolean>(true);
+  // Flag mode "bunyi berulang": nyala saat ada item baru, mati begitu semua sudah di-ack
+  const alarmLoopActiveRef = useRef<boolean>(false);
 
   // sinkron ack & mute status antar hook instance & antar tab
   useEffect(() => {
@@ -83,6 +87,7 @@ export function usePrepAlarm(
     }
 
     if (unacked.length === 0) {
+      alarmLoopActiveRef.current = false;
       return;
     }
 
@@ -92,11 +97,25 @@ export function usePrepAlarm(
     // Catat SEMUA id yang sekarang ada sebagai "sudah terlihat"
     unacked.forEach((o) => seenIdsRef.current.add(o.id));
 
-    // Sudah pernah inisialisasi DAN ada ID baru → bunyi 1x
+    // Sudah pernah inisialisasi DAN ada ID baru → nyalain mode berulang + bunyi pertama kali
     if (trulyNewIds.length > 0) {
+      alarmLoopActiveRef.current = true;
       playSoundByKey(soundKey, customSoundUrl);
     }
   }, [items, unacked, soundEnabled, soundKey, customSoundUrl, muted]);
+
+  // Ulangi bunyi tiap `intervalMs` selama alarmLoopActiveRef aktif & masih ada
+  // item yang belum di-acknowledge. Otomatis berhenti (clearInterval lewat cleanup
+  // React) begitu unacked.length jadi 0, soundEnabled dimatikan, atau di-mute.
+  useEffect(() => {
+    if (!alarmLoopActiveRef.current || unacked.length === 0 || !soundEnabled || muted) {
+      return;
+    }
+    const id = setInterval(() => {
+      playSoundByKey(soundKey, customSoundUrl);
+    }, intervalMs);
+    return () => clearInterval(id);
+  }, [unacked.length, soundEnabled, muted, soundKey, customSoundUrl, intervalMs]);
 
   const acknowledge = useCallback(
     (id: string) => {
