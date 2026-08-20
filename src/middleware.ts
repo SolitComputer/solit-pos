@@ -17,6 +17,7 @@ import { createClient } from "@supabase/supabase-js";
 import { checkDynamicPageAccess, expandDynamicParents } from "@/lib/dynamicPermissions";
 import { CONTRACT_GATE_ENABLED } from "@/lib/featureFlags";
 import { withTimeout } from "@/lib/withTimeout";
+import { fetchWithTimeout } from "@/lib/supabaseFetchWithTimeout";
 
 // Batas waktu tiap call Supabase di middleware. Middleware jalan di HAMPIR
 // SETIAP request, jadi kalau Supabase lambat/hang, ini yang mencegah request
@@ -116,7 +117,7 @@ async function hasApprovedContract(userId: string): Promise<boolean> {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
+      { auth: { persistSession: false }, global: { fetch: fetchWithTimeout } }
     );
     const { data, error } = await withTimeout<{
       data: { contract_status?: string | null; contract_valid_until?: string | null } | null;
@@ -189,7 +190,7 @@ async function hasAttendedTodayInDB(userId: string): Promise<boolean> {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
+      { auth: { persistSession: false }, global: { fetch: fetchWithTimeout } }
     );
     const todayDate = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
     const dayStart = `${todayDate}T00:00:00+07:00`;
@@ -440,7 +441,7 @@ export async function middleware(request: NextRequest) {
         const supabase = createClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.SUPABASE_SERVICE_ROLE_KEY!,
-          { auth: { persistSession: false } }
+          { auth: { persistSession: false }, global: { fetch: fetchWithTimeout } }
         );
         const { data: userRecord } = await withTimeout<{
           data: { force_logout_at?: string | null } | null;

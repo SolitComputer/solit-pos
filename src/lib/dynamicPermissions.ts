@@ -10,6 +10,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { withTimeout } from "@/lib/withTimeout";
+import { fetchWithTimeout } from "@/lib/supabaseFetchWithTimeout";
 
 // Sama kayak SUPABASE_TIMEOUT_MS di middleware.ts — batas waktu per query
 // biar checkDynamicPageAccess() (dipanggil middleware di HAMPIR SETIAP
@@ -51,7 +52,7 @@ function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
+    { auth: { persistSession: false }, global: { fetch: fetchWithTimeout } }
   );
 }
 
