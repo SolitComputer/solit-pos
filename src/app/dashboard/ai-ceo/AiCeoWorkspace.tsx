@@ -2,6 +2,7 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { ThinkingIndicator, MarkdownMessage, CHAT_DOT_KEYFRAMES } from "@/components/ai/ChatPrimitives";
+import type { ProviderUsageStatus } from "@/lib/aiCeo";
 import {
     Sparkles,
     Plus,
@@ -81,7 +82,7 @@ const TOOL_THINKING_LABEL: Record<string, string> = {
 };
 const DEFAULT_THINKING_LABEL = "Memikirkan jawaban...";
 
-function UsageBar({ counts, blocked, tokens }: { counts: Record<string, number>; blocked: Record<string, boolean>; tokens: Record<string, { prompt: number; completion: number; total: number }> }) {
+function UsageBar({ counts, blocked, tokens, limits }: { counts: Record<string, number>; blocked: Record<string, boolean>; tokens: Record<string, { prompt: number; completion: number; total: number }>; limits?: ProviderUsageStatus | null }) {
     const deepseek = counts.deepseek ?? 0;
     const gemini = counts.gemini ?? 0;
     const groq = counts.groq ?? 0;
@@ -129,6 +130,23 @@ function UsageBar({ counts, blocked, tokens }: { counts: Record<string, number>;
                     {blocked?.groq && <span className="text-amber-600 font-bold">· Cooldown</span>}
                 </span>
             </div>
+
+            {limits && (
+                <div className="hidden md:flex items-center gap-2.5 text-[10px] font-medium pl-2 border-l border-gray-200">
+                    <span className={`flex items-center gap-1 ${limits.deepseek.blocked ? "text-rose-600 font-bold" : "text-gray-500"}`}>
+                        Saldo DeepSeek: <strong>${limits.deepseek.toppedUpBalance.toFixed(2)}</strong>
+                        {limits.deepseek.blocked && <span>· Habis</span>}
+                    </span>
+                    <span className={`flex items-center gap-1 ${limits.groq.blocked ? "text-rose-600 font-bold" : "text-gray-500"}`}>
+                        Kuota Groq: <strong>{limits.groq.remainingRequests ?? "-"}</strong> req
+                        {limits.groq.blocked && <span>· Habis</span>}
+                    </span>
+                    <span className={`flex items-center gap-1 ${limits.gemini.blocked ? "text-rose-600 font-bold" : "text-gray-500"}`}>
+                        Budget Gemini: <strong>{limits.gemini.percentUsed}%</strong>
+                        {limits.gemini.blocked && <span>· Habis</span>}
+                    </span>
+                </div>
+            )}
         </div>
     );
 }
@@ -149,6 +167,7 @@ export default function AiCeoWorkspace() {
     const [usage, setUsage] = useState<Record<string, number>>({});
     const [tokens, setTokens] = useState<Record<string, { prompt: number; completion: number; total: number }>>({});
     const [providerBlocked, setProviderBlocked] = useState<Record<string, boolean>>({});
+    const [limits, setLimits] = useState<ProviderUsageStatus | null>(null);
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState("");
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -212,10 +231,11 @@ export default function AiCeoWorkspace() {
         try {
             const res = await fetch("/api/ai-ceo/usage");
             const json = await res.json();
-           if (json.success) {
+            if (json.success) {
                 setUsage(json.counts ?? {});
                 setTokens(json.tokens ?? {});
                 setProviderBlocked(json.blocked ?? {});
+                setLimits(json.limits ?? null);
             }
         } catch { }
     }, []);
@@ -518,7 +538,7 @@ export default function AiCeoWorkspace() {
 
                         {/* Directly Visible Pemakaian Token / Message Usage Bar */}
                         <div className="flex items-center gap-2">
-                           <UsageBar counts={usage} blocked={providerBlocked} tokens={tokens} />
+                            <UsageBar counts={usage} blocked={providerBlocked} tokens={tokens} limits={limits} />
                         </div>
                     </header>
 

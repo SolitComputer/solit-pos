@@ -614,6 +614,24 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       const finalOldUnitIds = await resolveUnitIds(oldIds, oldSNs);
       finalNewUnitIds = await resolveNewUnitIds(newIds, newSNs);
 
+      if (newSNs.length > 0 && finalNewUnitIds.length < newSNs.length) {
+        const { data: matchedRows } = await supabase
+          .from("laptop_units")
+          .select("serial_number")
+          .in("serial_number", newSNs);
+        const matchedSNs = new Set((matchedRows ?? []).map((r) => r.serial_number));
+        const notFound = newSNs.filter((sn) => !matchedSNs.has(sn));
+        if (notFound.length > 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Serial number tidak ditemukan di database: ${notFound.join(", ")}. Periksa kembali penulisan SN — transaksi tidak disimpan.`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       const oldSet = new Set(finalOldUnitIds);
       const newSet = new Set(finalNewUnitIds);
       finalToRelease = finalOldUnitIds.filter((id) => !newSet.has(id));
@@ -898,7 +916,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       allowedFields.inventory_price = newInventoryPrice;
     }
 
-  allowedFields.edit_reason = editReason;
+    allowedFields.edit_reason = editReason;
 
     allowedFields.last_edited_by = user.name;
     allowedFields.last_edited_at = new Date().toISOString();
@@ -936,7 +954,7 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       }
     }
 
-   // ── Activity log ─────────────────────────────────────────────────
+    // ── Activity log ─────────────────────────────────────────────────
     await logActivity({
       userId: user.id,
       userName: user.name,

@@ -13,7 +13,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const body = await req.json().catch(() => null);
   const message: string = body?.message?.trim();
   let conversationId: string | null = body?.conversationId ?? null;
-const requestedProvider = (body?.provider ?? "auto") as "auto" | "gemini" | "groq" | "deepseek";
+  const requestedProvider = (body?.provider ?? "auto") as "auto" | "gemini" | "groq" | "deepseek";
 
   if (!message) {
     return NextResponse.json({ success: false, message: "Pesan tidak boleh kosong." }, { status: 400 });
@@ -84,14 +84,16 @@ const requestedProvider = (body?.provider ?? "auto") as "auto" | "gemini" | "gro
         const category = classifyAiCeoError(err);
         const friendlyMessage =
           category === "missing_key"
-           ? "Provider AI belum dikonfigurasi di server (API key kosong). Cek Variabel Environment di panel hosting kamu (DEEPSEEK_API_KEY / GEMINI_API_KEY / GROQ_API_KEY)."
-            : category === "quota"
-              ? "Kuota/limit AI untuk provider ini sudah habis. Coba pilih provider lain di dropdown kanan atas, atau tunggu beberapa menit sebelum coba lagi."
-              : category === "network"
-                ? "Server gagal terhubung ke provider AI (masalah jaringan keluar). Cek Log runtime untuk detail teknis, atau coba lagi sebentar lagi."
-                : category === "tool_glitch"
-                  ? "AI sempat 'salah ngomong' saat mencoba mengambil data (bug model AI, bukan bug sistem). Coba tanya ulang dengan kalimat yang sedikit berbeda."
-                  : "AI CEO sedang bermasalah menghubungi provider AI. Cek Log runtime untuk detail teknis. Coba lagi sebentar lagi.";
+            ? "Provider AI belum dikonfigurasi di server (API key kosong). Cek Variabel Environment di panel hosting kamu (DEEPSEEK_API_KEY / GEMINI_API_KEY / GROQ_API_KEY)."
+            : category === "provider_limited"
+              ? "Saldo/kuota provider AI yang kamu pilih lagi habis. Coba pilih provider lain di dropdown kanan atas, atau balik ke 'Otomatis'."
+              : category === "quota"
+                ? "Kuota/limit AI untuk provider ini sudah habis. Coba pilih provider lain di dropdown kanan atas, atau tunggu beberapa menit sebelum coba lagi."
+                : category === "network"
+                  ? "Server gagal terhubung ke provider AI (masalah jaringan keluar). Cek Log runtime untuk detail teknis, atau coba lagi sebentar lagi."
+                  : category === "tool_glitch"
+                    ? "AI sempat 'salah ngomong' saat mencoba mengambil data (bug model AI, bukan bug sistem). Coba tanya ulang dengan kalimat yang sedikit berbeda."
+                    : "AI CEO sedang bermasalah menghubungi provider AI. Cek Log runtime untuk detail teknis. Coba lagi sebentar lagi.";
         send({ type: "error", message: friendlyMessage });
       } finally {
         controller.close();

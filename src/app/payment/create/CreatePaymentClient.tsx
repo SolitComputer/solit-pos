@@ -840,7 +840,7 @@ export default function CreatePaymentPage() {
                             }}
                             className="text-xs text-gray-400 hover:text-gray-600 inline-flex items-center gap-1 -mt-1 mb-1"
                         >
-                            <ChevronLeft size={14} /> Ganti Jenis Payment
+                            <ChevronLeft size={14} /> Ganti Jenis Paymentt
                         </button>
                     )}
 
