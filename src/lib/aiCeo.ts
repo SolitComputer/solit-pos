@@ -19,6 +19,10 @@ const DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions";
 
 const PROVIDER_COOLDOWN_MS = 10 * 60 * 1000;
 
+const DEEPSEEK_BALANCE_ENDPOINT = "https://api.deepseek.com/user/balance";
+const BALANCE_CACHE_MS = 2 * 60 * 1000;
+const GEMINI_MONTHLY_BUDGET_USD = Number(process.env.GEMINI_MONTHLY_BUDGET_USD || 5);
+const GEMINI_PRICE_PER_MILLION_TOKENS_USD = Number(process.env.GEMINI_PRICE_PER_MILLION_TOKENS_USD || 0.3);
 function getGeminiKey(): string {
     const key = process.env.GEMINI_API_KEY;
     if (!key) throw new Error("GEMINI_API_KEY belum diset di environment variables.");
@@ -35,6 +39,65 @@ function getDeepSeekKey(): string {
     const key = process.env.DEEPSEEK_API_KEY;
     if (!key) throw new Error("DEEPSEEK_API_KEY belum diset di environment variables.");
     return key;
+}
+
+async function getDeepSeekBalance(forceRefresh: boolean = false): Promise<{
+    isAvailable: boolean;
+    currency: string;
+    totalBalance: number;
+    toppedUpBalance: number;
+    grantedBalance: number;
+    checkedAt: string;
+    stale?: boolean;
+    error?: string;
+}> {
+    const { data: cached } = await supabaseAdmin
+        .from("ai_ceo_provider_health")
+        .select("meta, updated_at")
+        .eq("provider", "deepseek")
+        .maybeSingle();
+
+    const cachedMeta = cached?.meta as any;
+    const cacheAgeMs = cached?.updated_at ? Date.now() - new Date(cached.updated_at).getTime() : Infinity;
+    if (!forceRefresh && cachedMeta?.checkedAt && cacheAgeMs < BALANCE_CACHE_MS) {
+        return cachedMeta;
+    }
+
+    try {
+        const res = await fetch(DEEPSEEK_BALANCE_ENDPOINT, {
+            headers: { Authorization: `Bearer ${getDeepSeekKey()}` },
+            cache: "no-store",
+            signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) throw new Error(`DeepSeek balance API error (${res.status})`);
+        const json = await res.json();
+        const info = (json.balance_infos ?? [])[0] ?? {};
+        const result = {
+            isAvailable: Boolean(json.is_available),
+            currency: info.currency ?? "USD",
+            totalBalance: Number(info.total_balance ?? 0),
+            toppedUpBalance: Number(info.topped_up_balance ?? 0),
+            grantedBalance: Number(info.granted_balance ?? 0),
+            checkedAt: new Date().toISOString(),
+        };
+        await supabaseAdmin.from("ai_ceo_provider_health").upsert({
+            provider: "deepseek",
+            meta: result,
+            updated_at: new Date().toISOString(),
+        });
+        return result;
+    } catch (err: any) {
+        console.error("[ai-ceo] getDeepSeekBalance gagal:", err?.message ?? err);
+        // Fail-open: kalau API saldo lagi down/network error, JANGAN blokir provider
+        // gara-gara ini — pakai cache lama kalau ada, atau anggap available.
+        if (cachedMeta) return { ...cachedMeta, stale: true };
+        return {
+            isAvailable: true,
+            currency: "USD", totalBalance: 0, toppedUpBalance: 0, grantedBalance: 0,
+            checkedAt: new Date().toISOString(),
+            error: err?.message ?? "Gagal mengambil saldo DeepSeek",
+        };
+    }
 }
 
 function buildAiCeoSystemPrompt(pendingEscalations: string = ""): string {
@@ -286,16 +349,16 @@ function buildMemberChatTools(userRole: string) {
         allowedNames = ROLE_TOOL_WHITELIST[parentRole] ?? [];
     }
     allowedNames = allowedNames ?? [];
-    
+
     // Member always gets these tools
     allowedNames.push("eskalasi_ke_admin", "get_attendance_summary", "get_overtime_summary");
-    
+
     // Copy eskalasi_ke_admin from MEMBER_ASSISTANT_TOOLS
     const eskalasiTool = MEMBER_ASSISTANT_TOOLS[0].functionDeclarations.find(f => f.name === "eskalasi_ke_admin")!;
-    
+
     // Filter AI_CEO_TOOLS
     const filteredCeoTools = AI_CEO_TOOLS[0].functionDeclarations.filter(f => allowedNames.includes(f.name));
-    
+
     return [
         {
             functionDeclarations: [...filteredCeoTools, eskalasiTool],
@@ -609,7 +672,7 @@ export async function runToolCall(
         if (!allowedNames.includes(name) && !isCommonTool) {
             return { error: `Tool "${name}" tidak tersedia untuk role Anda.` };
         }
-        
+
         // Force args for personal queries
         if (name === "get_attendance_summary") {
             args.nama = ctx.userName;
@@ -972,7 +1035,7 @@ export async function runToolCall(
             }
 
             const rows = otRows.map((r: any) => ({ ...r, users: otUsersMap.get(r.user_id) ?? null }));
-            
+
             let finalRows = rows;
             if (ctx.mode === "member_chat" && ctx.userName) {
                 finalRows = rows.filter((r: any) => r.users?.name?.toLowerCase().includes(ctx.userName!.toLowerCase()));
@@ -1127,24 +1190,24 @@ export async function runToolCall(
             if (error) return { error: error.message };
             return { success: true, message: "Balasan sudah dikirim ke daftar review Admin/CEO." };
         }
-        
+
         case "jawab_pertanyaan_member": {
             const escalationId = String(args?.escalation_id ?? "").trim();
             const jawaban = String(args?.jawaban ?? "").trim();
-            
+
             if (!escalationId || !jawaban) return { error: "escalation_id dan jawaban wajib diisi." };
-            
+
             // Cari eskalasi
             const { data: esc, error: escErr } = await supabaseAdmin
                 .from("ai_ceo_suggestions")
                 .select("id, conversation_id, status")
                 .eq("id", escalationId)
                 .maybeSingle();
-                
+
             if (escErr || !esc) return { error: "Eskalasi tidak ditemukan." };
             if (esc.status === "answered") return { error: "Eskalasi ini sudah dijawab sebelumnya." };
             if (!esc.conversation_id) return { error: "Tidak ada percakapan yang terkait dengan eskalasi ini." };
-            
+
             // Insert balasan ke percakapan member
             const { error: msgErr } = await supabaseAdmin.from("ai_ceo_messages").insert({
                 conversation_id: esc.conversation_id,
@@ -1153,13 +1216,13 @@ export async function runToolCall(
                 provider: "system"
             });
             if (msgErr) return { error: `Gagal mengirim pesan: ${msgErr.message}` };
-            
+
             // Update status eskalasi
             await supabaseAdmin.from("ai_ceo_suggestions").update({ status: "answered" }).eq("id", escalationId);
-            
+
             // Update updated_at di conversation biar muncul ke atas
             await supabaseAdmin.from("ai_ceo_conversations").update({ updated_at: new Date().toISOString() }).eq("id", esc.conversation_id);
-            
+
             return { success: true, message: `Jawaban berhasil dikirim.` };
         }
 
@@ -1186,17 +1249,43 @@ type UsageEventCallback = (usage: AiUsage) => void;
 async function isProviderBlocked(provider: AiProvider): Promise<boolean> {
     const { data, error } = await supabaseAdmin
         .from("ai_ceo_provider_health")
-        .select("blocked_until")
+        .select("blocked_until, meta")
         .eq("provider", provider)
         .maybeSingle();
     if (error) {
         console.error("[ai-ceo] isProviderBlocked gagal query (tabel ai_ceo_provider_health belum dibuat?):", error.message);
         return false;
     }
-    if (!data?.blocked_until) return false;
-    return new Date(data.blocked_until).getTime() > Date.now();
-}
 
+    if (data?.blocked_until && new Date(data.blocked_until).getTime() > Date.now()) return true;
+
+    if (provider === "deepseek") {
+        const balance = await getDeepSeekBalance();
+        if (balance.isAvailable === false || balance.totalBalance <= 0) return true;
+    }
+
+    if (provider === "groq") {
+        const meta = data?.meta as any;
+        if (meta?.remainingRequests != null && meta.remainingRequests <= 0) {
+            const resetPassed = meta.resetRequestsAt && new Date(meta.resetRequestsAt).getTime() < Date.now();
+            if (!resetPassed) return true;
+        }
+        if (meta?.remainingTokens != null && meta.remainingTokens <= 0) {
+            const resetPassed = meta.resetTokensAt && new Date(meta.resetTokensAt).getTime() < Date.now();
+            if (!resetPassed) return true;
+        }
+    }
+
+    if (provider === "gemini") {
+        const meta = data?.meta as any;
+        const monthKey = new Date().toISOString().slice(0, 7);
+        if (meta?.monthKey === monthKey && meta?.spentUsd != null && meta?.spentUsd >= (meta?.budgetUsd ?? GEMINI_MONTHLY_BUDGET_USD)) {
+            return true;
+        }
+    }
+
+    return false;
+}
 async function markProviderBlocked(provider: AiProvider): Promise<void> {
     const { error } = await supabaseAdmin.from("ai_ceo_provider_health").upsert({
         provider,
@@ -1212,6 +1301,17 @@ function isRateLimitError(err: any): boolean {
     const status = err?.status;
     const msg = String(err?.message ?? "");
     return status === 429 || /rate.?limit|quota|RESOURCE_EXHAUSTED/i.test(msg);
+}
+
+function parseGroqResetDuration(value: string | null): number | null {
+    if (!value) return null;
+    const match = value.match(/^(?:(\d+)m)?(\d+(?:\.\d+)?)(m?s)$/);
+    if (!match) return null;
+    const minutes = match[1] ? Number(match[1]) : 0;
+    const secondsOrMs = Number(match[2]);
+    const unit = match[3];
+    const totalMs = unit === "ms" ? secondsOrMs : (minutes * 60 + secondsOrMs) * 1000;
+    return Number.isFinite(totalMs) ? totalMs : null;
 }
 
 // ═══════════════════════════════════ GEMINI ═══════════════════════════════
@@ -1256,7 +1356,35 @@ async function callGemini(contents: GeminiContent[], tools: any = AI_CEO_TOOLS, 
         err.status = res.status;
         throw err;
     }
-    return res.json();
+    const json = await res.json();
+
+    // Gemini gak punya endpoint saldo — dihitung terhadap budget manual (env var).
+    const totalTokens = json?.usageMetadata?.totalTokenCount;
+    if (typeof totalTokens === "number") {
+        persistGeminiUsage(totalTokens).catch((e) => console.error("[ai-ceo] gagal simpan usage Gemini:", e?.message ?? e));
+    }
+
+    return json;
+}
+
+async function persistGeminiUsage(tokensThisCall: number): Promise<void> {
+    const monthKey = new Date().toISOString().slice(0, 7); // "2026-08"
+    const { data: cached } = await supabaseAdmin
+        .from("ai_ceo_provider_health")
+        .select("meta")
+        .eq("provider", "gemini")
+        .maybeSingle();
+
+    const prevMeta = cached?.meta as any;
+    const tokensSoFar = prevMeta?.monthKey === monthKey ? Number(prevMeta.tokensUsed ?? 0) : 0;
+    const tokensUsed = tokensSoFar + tokensThisCall;
+    const spentUsd = (tokensUsed / 1_000_000) * GEMINI_PRICE_PER_MILLION_TOKENS_USD;
+
+    await supabaseAdmin.from("ai_ceo_provider_health").upsert({
+        provider: "gemini",
+        meta: { monthKey, tokensUsed, spentUsd, budgetUsd: GEMINI_MONTHLY_BUDGET_USD, checkedAt: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+    });
 }
 
 async function runGeminiTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback, tools: any = AI_CEO_TOOLS, systemPrompt: string = buildAiCeoSystemPrompt()): Promise<string> {
@@ -1346,6 +1474,9 @@ async function callGroq(messages: OpenAiMessage[], toolsEnabled: boolean = true,
         throw netErr;
     }
 
+    // Fire-and-forget — jangan nambah latency ke jawaban user cuma buat nyimpen kuota.
+    persistGroqRateLimit(res.headers).catch((e) => console.error("[ai-ceo] gagal simpan rate limit Groq:", e?.message ?? e));
+
     if (!res.ok) {
         const errText = await res.text().catch(() => "");
         const err: any = new Error(`Groq API error (${res.status}): ${errText.slice(0, 300)}`);
@@ -1353,6 +1484,34 @@ async function callGroq(messages: OpenAiMessage[], toolsEnabled: boolean = true,
         throw err;
     }
     return res.json();
+}
+
+async function persistGroqRateLimit(headers: Headers): Promise<void> {
+    const remainingRequests = headers.get("x-ratelimit-remaining-requests");
+    const limitRequests = headers.get("x-ratelimit-limit-requests");
+    const remainingTokens = headers.get("x-ratelimit-remaining-tokens");
+    const limitTokens = headers.get("x-ratelimit-limit-tokens");
+    if (remainingRequests == null && remainingTokens == null) return;
+
+    const now = Date.now();
+    const resetRequestsMs = parseGroqResetDuration(headers.get("x-ratelimit-reset-requests"));
+    const resetTokensMs = parseGroqResetDuration(headers.get("x-ratelimit-reset-tokens"));
+
+    const meta = {
+        remainingRequests: remainingRequests != null ? Number(remainingRequests) : null,
+        limitRequests: limitRequests != null ? Number(limitRequests) : null,
+        remainingTokens: remainingTokens != null ? Number(remainingTokens) : null,
+        limitTokens: limitTokens != null ? Number(limitTokens) : null,
+        resetRequestsAt: resetRequestsMs != null ? new Date(now + resetRequestsMs).toISOString() : null,
+        resetTokensAt: resetTokensMs != null ? new Date(now + resetTokensMs).toISOString() : null,
+        checkedAt: new Date(now).toISOString(),
+    };
+
+    await supabaseAdmin.from("ai_ceo_provider_health").upsert({
+        provider: "groq",
+        meta,
+        updated_at: new Date(now).toISOString(),
+    });
 }
 
 function isMalformedToolCallError(err: any): boolean {
@@ -1444,7 +1603,7 @@ async function callDeepSeek(messages: OpenAiMessage[], toolsEnabled: boolean = t
 }
 
 async function runDeepSeekTurn(history: ChatTurn[], toolCtx: ToolContext, onToolCall?: ToolEventCallback, tools: any = AI_CEO_TOOLS, systemPrompt: string = buildAiCeoSystemPrompt(), onUsage?: UsageEventCallback): Promise<string> {
-        const messages: OpenAiMessage[] = [
+    const messages: OpenAiMessage[] = [
         { role: "system", content: systemPrompt },
         ...toOpenAiHistory(history),
     ];
@@ -1456,7 +1615,7 @@ async function runDeepSeekTurn(history: ChatTurn[], toolCtx: ToolContext, onTool
         try {
             data = await callDeepSeek(messages, true, tools);
         } catch (err: any) {
-           if (isMalformedToolCallError(err) && hasToolData) {
+            if (isMalformedToolCallError(err) && hasToolData) {
                 console.error("[ai-ceo] DeepSeek tool call rusak, retry tanpa tools:", err?.message ?? err);
                 const recovery = await callDeepSeek(messages, false);
                 if (recovery?.usage) onUsage?.(recovery.usage);
@@ -1521,10 +1680,10 @@ export async function runAiCeoTurn(
                 .eq("category", "balasan_member")
                 .eq("status", "pending")
                 .order("created_at", { ascending: true });
-            
+
             if (data && data.length > 0) {
-                pendingEscalations = "\n\nAda pertanyaan member yang belum dijawab:\n" + 
-                    data.map((d: any, i: number) => `${i + 1}. [${d.title}] "${d.description}" (escalation_id: ${d.id})`).join("\n") + 
+                pendingEscalations = "\n\nAda pertanyaan member yang belum dijawab:\n" +
+                    data.map((d: any, i: number) => `${i + 1}. [${d.title}] "${d.description}" (escalation_id: ${d.id})`).join("\n") +
                     "\n\nKalau admin mau jawab, panggil tool \"jawab_pertanyaan_member\" dengan escalation_id yang sesuai.";
             }
         } catch (e) {
@@ -1546,16 +1705,19 @@ export async function runAiCeoTurn(
         const provider = order[i];
         const isLast = i === order.length - 1;
 
-        if (preferredProvider === "auto" && !isLast) {
-            const blocked = await isProviderBlocked(provider);
-            if (blocked) continue;
+        const blocked = await isProviderBlocked(provider);
+        if (blocked) {
+            if (!isLast) continue; // masih ada provider lain buat dicoba di mode Otomatis
+            const limitErr: any = new Error(`Provider ${provider} sedang limit/saldo habis, gak bisa dipakai sementara.`);
+            limitErr.isProviderLimited = true;
+            throw limitErr;
         }
 
         try {
             const reply =
                 provider === "gemini"
                     ? await runGeminiTurn(history, toolCtx, onToolCall, tools, systemPrompt)
-                   : provider === "deepseek"
+                    : provider === "deepseek"
                         ? await runDeepSeekTurn(history, toolCtx, onToolCall, tools, systemPrompt, accumulateUsage)
                         : await runGroqTurn(history, toolCtx, onToolCall, tools, systemPrompt);
             return { reply, providerUsed: provider, usage: usageTotal };
@@ -1570,11 +1732,66 @@ export async function runAiCeoTurn(
     throw lastError ?? new Error("Semua provider AI gagal dipanggil.");
 }
 
-export function classifyAiCeoError(err: any): "missing_key" | "quota" | "network" | "tool_glitch" | "unknown" {
+export function classifyAiCeoError(err: any): "missing_key" | "quota" | "network" | "tool_glitch" | "provider_limited" | "unknown" {
     const msg = String(err?.message ?? "");
+    if (err?.isProviderLimited) return "provider_limited";
     if (/belum diset di environment variables/i.test(msg)) return "missing_key";
     if (err?.isNetworkError) return "network";
     if (err?.status === 429 || /rate.?limit|quota|RESOURCE_EXHAUSTED/i.test(msg)) return "quota";
     if (isMalformedToolCallError(err)) return "tool_glitch";
     return "unknown";
+}
+
+export interface ProviderUsageStatus {
+    deepseek: { kind: "balance"; currency: string; totalBalance: number; toppedUpBalance: number; grantedBalance: number; isAvailable: boolean; blocked: boolean; checkedAt: string; stale?: boolean };
+    groq: { kind: "quota"; remainingRequests: number | null; limitRequests: number | null; remainingTokens: number | null; limitTokens: number | null; blocked: boolean; checkedAt: string | null };
+    gemini: { kind: "budget"; spentUsd: number; budgetUsd: number; percentUsed: number; blocked: boolean; checkedAt: string | null };
+}
+
+export async function getProviderUsageStatus(): Promise<ProviderUsageStatus> {
+    const { data: rows } = await supabaseAdmin.from("ai_ceo_provider_health").select("provider, meta");
+    const groqMeta = (rows ?? []).find((r) => r.provider === "groq")?.meta as any;
+    const geminiMeta = (rows ?? []).find((r) => r.provider === "gemini")?.meta as any;
+
+    const [deepseekBalance, deepseekBlocked, groqBlocked, geminiBlocked] = await Promise.all([
+        getDeepSeekBalance(),
+        isProviderBlocked("deepseek"),
+        isProviderBlocked("groq"),
+        isProviderBlocked("gemini"),
+    ]);
+
+    const monthKey = new Date().toISOString().slice(0, 7);
+    const geminiSpent = geminiMeta?.monthKey === monthKey ? Number(geminiMeta.spentUsd ?? 0) : 0;
+    const geminiBudget = geminiMeta?.budgetUsd ?? GEMINI_MONTHLY_BUDGET_USD;
+
+    return {
+        deepseek: {
+            kind: "balance",
+            currency: deepseekBalance.currency,
+            totalBalance: deepseekBalance.totalBalance,
+            toppedUpBalance: deepseekBalance.toppedUpBalance,
+            grantedBalance: deepseekBalance.grantedBalance,
+            isAvailable: deepseekBalance.isAvailable,
+            blocked: deepseekBlocked,
+            checkedAt: deepseekBalance.checkedAt,
+            stale: deepseekBalance.stale,
+        },
+        groq: {
+            kind: "quota",
+            remainingRequests: groqMeta?.remainingRequests ?? null,
+            limitRequests: groqMeta?.limitRequests ?? null,
+            remainingTokens: groqMeta?.remainingTokens ?? null,
+            limitTokens: groqMeta?.limitTokens ?? null,
+            blocked: groqBlocked,
+            checkedAt: groqMeta?.checkedAt ?? null,
+        },
+        gemini: {
+            kind: "budget",
+            spentUsd: geminiSpent,
+            budgetUsd: geminiBudget,
+            percentUsed: geminiBudget > 0 ? Math.min(100, Math.round((geminiSpent / geminiBudget) * 100)) : 0,
+            blocked: geminiBlocked,
+            checkedAt: geminiMeta?.checkedAt ?? null,
+        },
+    };
 }
