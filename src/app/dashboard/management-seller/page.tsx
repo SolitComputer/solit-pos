@@ -80,7 +80,7 @@ const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean)
 
 /** Ring fokus konsisten untuk aksesibilitas keyboard (tanpa mengubah warna brand). */
 const FOCUS_RING =
-  "focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/25 focus-visible:ring-offset-1 focus-visible:ring-offset-white";
+  "focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/30 focus-visible:ring-offset-1 focus-visible:ring-offset-white";
 
 const fmtDate = (d?: string | null) =>
   d
@@ -268,7 +268,7 @@ function Avatar({ name, type }: { name: string; type: "USER" | "PEDAGANG" }) {
   return (
     <div
       className={cx(
-        "w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0",
+        "w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 shadow-sm",
         isPedagang ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
       )}
     >
@@ -410,7 +410,7 @@ function PicAccessDropdown({
         </span>
         <span>Akses PIC</span>
         {!error && (
-          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-900 text-white text-[10px] font-black tabular-nums">
+          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-br from-[#1a1545] to-[#0f0c29] text-white text-[10px] font-black tabular-nums">
             {activeCount}
           </span>
         )}
@@ -419,7 +419,7 @@ function PicAccessDropdown({
 
       {open && (
         <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[min(19rem,calc(100vw-2rem))] bg-white rounded-2xl border border-gray-200 shadow-2xl z-40 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+          <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-violet-50/60 to-transparent">
             <p className="text-xs font-black text-gray-900">Izin Follow-up</p>
             <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">
               Centang siapa yang boleh melakukan follow-up. Hanya Admin yang bisa mengubah.
@@ -554,7 +554,7 @@ function WaChatButton({ f, fullWidth = false }: { f: Followup; fullWidth?: boole
       href={waLink(f)}
       title="Buka WhatsApp"
       className={cx(
-        "h-11 sm:h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98] transition-all duration-150 flex-shrink-0",
+        "h-11 sm:h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-600/25 active:scale-[0.98] transition-all duration-150 flex-shrink-0",
         FOCUS_RING,
         fullWidth ? "flex-1 min-w-0 text-xs font-bold px-3" : "w-11 sm:w-10"
       )}
@@ -588,10 +588,12 @@ function TandaiFuButton({
         "flex-1 min-w-0 h-11 sm:h-10 inline-flex items-center justify-center gap-2 rounded-xl text-white text-xs font-bold px-3 transition-all duration-150",
         FOCUS_RING,
         processing
-          ? "bg-blue-400 opacity-70 cursor-not-allowed"
+          ? isUnowned
+            ? "bg-emerald-400 opacity-70 cursor-not-allowed"
+            : "bg-violet-400 opacity-70 cursor-not-allowed"
           : isUnowned
-            ? "bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]"
-            : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+            ? "bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-600/25 active:scale-[0.98]"
+            : "bg-violet-600 hover:bg-violet-700 hover:shadow-lg hover:shadow-violet-600/25 active:scale-[0.98]"
       )}
     >
       <span className="flex-shrink-0 inline-flex">
@@ -648,12 +650,12 @@ function BuktiFuUploader({
       </p>
 
       {preview ? (
-        <div className="relative rounded-xl overflow-hidden border border-blue-200 bg-blue-50">
+        <div className="relative rounded-xl overflow-hidden border border-violet-200 bg-violet-50">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={preview}
             alt="Bukti FU"
-            className="w-full h-32 sm:h-44 object-contain bg-blue-50"
+            className="w-full h-32 sm:h-44 object-contain bg-violet-50"
           />
           <button
             onClick={() => {
@@ -669,8 +671,8 @@ function BuktiFuUploader({
           >
             <TrashIcon />
           </button>
-          <div className="px-3 py-2 bg-white/80 backdrop-blur-sm border-t border-blue-100">
-            <p className="text-[10px] font-bold text-blue-600 truncate inline-flex items-center gap-1">
+          <div className="px-3 py-2 bg-white/80 backdrop-blur-sm border-t border-violet-100">
+            <p className="text-[10px] font-bold text-violet-600 truncate inline-flex items-center gap-1">
               <ImageIcon size={11} className="flex-shrink-0" /> {value?.name}
             </p>
             <p className="text-[9px] text-gray-400 mt-0.5 tabular-nums">
@@ -685,14 +687,14 @@ function BuktiFuUploader({
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
           className={cx(
-            "w-full border-2 border-dashed border-gray-200 rounded-xl px-4 py-5 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 active:bg-blue-50 transition-all duration-200 group",
+            "w-full border-2 border-dashed border-gray-200 rounded-xl px-4 py-5 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 active:bg-violet-50 transition-all duration-200 group",
             FOCUS_RING
           )}
         >
-          <span className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mx-auto mb-2.5 transition-colors text-gray-500">
+          <span className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-violet-100 flex items-center justify-center mx-auto mb-2.5 transition-colors text-gray-500">
             <UploadIcon />
           </span>
-          <span className="block text-xs font-bold text-gray-700 group-hover:text-blue-700 transition-colors">
+          <span className="block text-xs font-bold text-gray-700 group-hover:text-violet-700 transition-colors">
             Upload Screenshot Bukti FU
           </span>
           <span className="block text-[10px] text-gray-400 mt-1 leading-relaxed">
@@ -819,7 +821,7 @@ function ConfirmFollowupModal({
         <div className="flex h-1 bg-gray-100 flex-shrink-0">
           <div
             className={cx(
-              "h-full bg-blue-600 transition-all duration-300",
+              "h-full bg-violet-600 transition-all duration-300",
               step === 1 ? "w-1/2" : "w-full"
             )}
           />
@@ -837,14 +839,14 @@ function ConfirmFollowupModal({
 
         {/* ── Body scrollable ── */}
         <div className="px-4 sm:px-5 pt-3 sm:pt-5 pb-4 overflow-y-auto overscroll-contain flex-1">
-          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-3 sm:mb-4">
+          <p className="text-[10px] font-bold text-violet-500 uppercase tracking-widest mb-3 sm:mb-4">
             Langkah {step} dari 2
           </p>
 
           {step === 1 ? (
             <>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-base flex-shrink-0">
+                <div className="w-11 h-11 rounded-xl bg-violet-600 shadow-sm shadow-violet-600/30 flex items-center justify-center text-white font-black text-base flex-shrink-0">
                   {followup.customer_name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -860,12 +862,12 @@ function ConfirmFollowupModal({
                 </div>
               </div>
 
-              <div className="rounded-xl bg-blue-50 border border-blue-100 px-3.5 py-3 mb-4">
-                <p className="text-xs font-semibold text-blue-700 leading-relaxed">
+              <div className="rounded-xl bg-violet-50 border border-violet-100 px-3.5 py-3 mb-4">
+                <p className="text-xs font-semibold text-violet-700 leading-relaxed">
                   Apakah kamu sudah melakukan follow-up ke{" "}
                   <span className="font-black">{firstName}</span>?
                 </p>
-                <p className="text-[11px] text-blue-500 mt-1.5 leading-relaxed">
+                <p className="text-[11px] text-violet-500 mt-1.5 leading-relaxed">
                   Upload screenshot percakapan WA sebagai bukti bahwa FU sudah benar-benar
                   dilakukan.
                 </p>
@@ -919,7 +921,7 @@ function ConfirmFollowupModal({
                   )}
                 </SummaryRow>
                 <SummaryRow label="Jadwal baru">
-                  <span className="text-blue-600">+{intervalDays} hari dari sekarang</span>
+                  <span className="text-violet-600">+{intervalDays} hari dari sekarang</span>
                 </SummaryRow>
                 <SummaryRow label="Total FU">
                   {followup.followup_count + 1}× (setelah ini)
@@ -968,8 +970,8 @@ function ConfirmFollowupModal({
                   "flex-1 h-12 sm:h-11 rounded-xl text-white text-sm font-bold transition-all inline-flex items-center justify-center gap-1.5",
                   FOCUS_RING,
                   canProceedStep1
-                    ? "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
-                    : "bg-blue-200 cursor-not-allowed"
+                    ? "bg-violet-600 hover:bg-violet-700 hover:shadow-lg hover:shadow-violet-600/25 active:scale-[0.98]"
+                    : "bg-violet-200 cursor-not-allowed"
                 )}
               >
                 Lanjut
@@ -997,7 +999,7 @@ function ConfirmFollowupModal({
                 className={cx(
                   "flex-1 min-w-0 h-12 sm:h-11 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2 px-3",
                   FOCUS_RING,
-                  processing ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                  processing ? "bg-violet-400 cursor-not-allowed" : "bg-violet-600 hover:bg-violet-700 hover:shadow-lg hover:shadow-violet-600/25"
                 )}
               >
                 <span className="flex-shrink-0 inline-flex">
@@ -1100,7 +1102,7 @@ function DeleteConfirmModal({
               className={cx(
                 "flex-1 h-11 rounded-xl text-white text-sm font-bold transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2",
                 FOCUS_RING,
-                processing ? "bg-red-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+                processing ? "bg-red-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700 hover:shadow-lg hover:shadow-red-600/25"
               )}
             >
               {processing ? <Spinner /> : <TrashIcon />}
@@ -1122,7 +1124,7 @@ function PicBlock({ f }: { f: Followup }) {
   if (f.pic_user_id || hasHistory) {
     return (
       <div className="flex items-center gap-2.5 rounded-xl bg-violet-50 border border-violet-200 px-3 py-2.5">
-        <div className="w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-black flex-shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-violet-600 shadow-sm text-white flex items-center justify-center text-xs font-black flex-shrink-0">
           {(picName ?? "?").charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
@@ -1222,7 +1224,7 @@ function EditablePhoneCell({
             title="Edit nomor HP"
             aria-label="Edit nomor HP"
             className={cx(
-              "flex-shrink-0 w-4 h-4 inline-flex items-center justify-center text-gray-300 hover:text-blue-600 transition-colors disabled:opacity-40",
+              "flex-shrink-0 w-4 h-4 inline-flex items-center justify-center text-gray-300 hover:text-violet-600 transition-colors disabled:opacity-40",
               FOCUS_RING
             )}
           >
@@ -1246,7 +1248,7 @@ function EditablePhoneCell({
           if (e.key === "Escape") handleCancel();
         }}
         disabled={saving}
-        className="w-32 h-6 px-1.5 text-[11px] font-medium tabular-nums border border-blue-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-50"
+        className="w-32 h-6 px-1.5 text-[11px] font-medium tabular-nums border border-violet-300 rounded-md focus:outline-none focus:ring-1 focus:ring-violet-400 disabled:opacity-50"
       />
       <button
         type="button"
@@ -1308,7 +1310,7 @@ function FollowupCard({
         isDue ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200 shadow-sm"
       )}
     >
-      {isDue && <div className="absolute top-0 left-0 right-0 h-[3px] bg-red-400" />}
+      {isDue && <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-red-400 to-rose-500" />}
 
       {/* ── Card Header ── */}
       <div
@@ -1395,7 +1397,7 @@ function FollowupCard({
               href={f.last_followup_proof_url}
               title="Lihat bukti follow-up"
               className={cx(
-                "inline-flex items-center gap-1 h-6 text-[10px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-2 hover:bg-blue-100 transition",
+                "inline-flex items-center gap-1 h-6 text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-100 rounded-lg px-2 hover:bg-violet-100 transition",
                 FOCUS_RING
               )}
             >
@@ -1481,7 +1483,7 @@ function FollowupCard({
                 onClick={() => onReactivate(f.id)}
                 disabled={processing}
                 className={cx(
-                  "flex-1 min-w-0 h-11 sm:h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 text-white text-xs font-bold px-3 hover:bg-gray-900 active:scale-[0.98] transition-all duration-150 disabled:opacity-50",
+                  "flex-1 min-w-0 h-11 sm:h-10 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1a1545] to-[#0f0c29] text-white text-xs font-bold px-3 hover:brightness-110 hover:shadow-lg hover:shadow-[#1a1545]/25 active:scale-[0.98] transition-all duration-150 disabled:opacity-50",
                   FOCUS_RING
                 )}
               >
@@ -1557,7 +1559,7 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
           key={c.label}
           className={cx(
             "rounded-2xl border px-3 py-2.5 sm:px-4 sm:py-3.5 flex flex-col justify-center gap-1.5 sm:flex-row sm:items-center sm:gap-3 transition-colors",
-            c.danger ? "bg-red-50 border-red-200" : "bg-white border-gray-200"
+            c.danger ? "bg-red-50 border-red-200" : "bg-gradient-to-br from-white to-violet-50/50 border-violet-100"
           )}
         >
           {/* HP: emoji + angka satu baris. Laptop: kembali ke layout ikon-kiri. */}
@@ -1565,7 +1567,7 @@ function SummaryBar({ items, scope }: { items: Followup[]; scope: Scope }) {
             <div
               className={cx(
                 "w-7 h-7 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-base flex-shrink-0",
-                c.danger ? "bg-red-100 text-red-500" : "bg-gray-100 text-gray-500"
+                c.danger ? "bg-red-100 text-red-500" : "bg-violet-50 text-violet-600"
               )}
             >
               <c.icon size={16} />
@@ -1941,7 +1943,7 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
         <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 mb-1">
-              <span className="w-[3px] h-6 sm:h-7 bg-gray-900 rounded-full flex-shrink-0" />
+              <span className="w-[3px] h-6 sm:h-7 bg-gradient-to-b from-[#1a1545] to-[#0f0c29] rounded-full flex-shrink-0" />
               <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight truncate">
                 Management Seller
               </h1>
@@ -2022,7 +2024,7 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
                     "relative flex items-center gap-2 sm:gap-3 px-2.5 py-2.5 sm:px-4 sm:py-3.5 rounded-2xl border transition-all duration-200 text-left overflow-hidden active:scale-[0.99]",
                     FOCUS_RING,
                     isActive
-                      ? "bg-gray-900 border-gray-900 shadow-md"
+                      ? "bg-gradient-to-br from-[#1a1545] to-[#0f0c29] border-transparent shadow-lg shadow-[#1a1545]/25"
                       : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                   )}
                 >
@@ -2067,7 +2069,7 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as "ALL" | "SUDAH" | "BELUM")}
               className={cx(
-                "w-full sm:w-36 border border-gray-200 rounded-xl h-12 sm:h-11 px-3 text-base sm:text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 transition cursor-pointer"
+                "w-full sm:w-36 border border-gray-200 rounded-xl h-12 sm:h-11 px-3 text-base sm:text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 transition cursor-pointer"
               )}
             >
               <option value="ALL">Semua Status</option>
@@ -2086,7 +2088,7 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label="Cari customer"
-                className="w-full border border-gray-200 rounded-xl h-12 sm:h-11 pl-10 pr-11 text-base sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 transition placeholder:text-gray-400"
+                className="w-full border border-gray-200 rounded-xl h-12 sm:h-11 pl-10 pr-11 text-base sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 transition placeholder:text-gray-400"
               />
               {search && (
                 <button
@@ -2120,7 +2122,7 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
                   ? "bg-red-600 border-red-600 text-white shadow-sm"
                   : opt.key === "SUDAH"
                     ? "bg-emerald-600 border-emerald-600 text-white shadow-sm"
-                    : "bg-gray-900 border-gray-900 text-white shadow-sm";
+                    : "bg-gradient-to-br from-[#1a1545] to-[#0f0c29] border-transparent text-white shadow-sm";
               return (
                 <button
                   key={opt.key}
@@ -2158,14 +2160,16 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-200 py-14 sm:py-20 px-6 text-center">
-            <div className="mb-4 opacity-25 flex justify-center text-gray-700">
-              {scope === "ARCHIVED" ? (
-                <Archive size={48} />
-              ) : search.trim() ? (
-                <Search size={48} />
-              ) : (
-                <CheckCircle2 size={48} />
-              )}
+            <div className="mb-4 flex justify-center">
+              <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center text-gray-300">
+                {scope === "ARCHIVED" ? (
+                  <Archive size={40} />
+                ) : search.trim() ? (
+                  <Search size={40} />
+                ) : (
+                  <CheckCircle2 size={40} />
+                )}
+              </div>
             </div>
             <p className="text-sm font-bold text-gray-700">
               {search.trim()
@@ -2205,7 +2209,7 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
         ) : (
           <div className="space-y-3 sm:space-y-4">
             {scope === "ACTIVE" && fuFilter === "ALL" && dueCount > 0 && (
-              <div className="flex items-center gap-2.5 px-3.5 sm:px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
+              <div className="flex items-center gap-2.5 px-3.5 sm:px-4 py-2.5 rounded-xl bg-red-50 border border-red-200 border-l-4 border-l-red-500">
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
                 <p className="text-[11px] sm:text-xs text-red-600 font-semibold tabular-nums">
                   {dueCount} customer perlu segera di-follow-up
