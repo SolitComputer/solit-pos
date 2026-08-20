@@ -95,6 +95,14 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       }
     }
 
+    // ✅ SECURITY FIX: dulu margin (`other`) & `inventory_price` ikut terkirim ke
+    // SEMUA role (VIEW_DASHBOARD). Frontend menyembunyikan kolomnya untuk
+    // non-finance, tapi datanya tetap ada di payload. Sekarang field profit
+    // hanya dikirim ke role finance; selain itu di-nol-kan / dibuang.
+    const showFin = (user.roles ?? [user.role]).some(
+      (r) => (PERMISSIONS.VIEW_FINANCIALS as string[]).includes(r)
+    );
+
     // ── Recalculate margin live ───────────────────────────────────
     const enriched = transactions.map((trx: any) => {
       const dealPrice = Number(trx.deal_price ?? trx.amount ?? 0);
@@ -109,7 +117,9 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       }
 
       const margin = totalPurchasePrice > 0 ? dealPrice - totalPurchasePrice : 0;
-      return { ...trx, other: margin };
+      const row = { ...trx, other: showFin ? margin : 0 };
+      if (!showFin) delete row.inventory_price;
+      return row;
     });
 
     return NextResponse.json({ success: true, data: enriched });

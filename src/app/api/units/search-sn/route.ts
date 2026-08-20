@@ -1,13 +1,21 @@
 // src/app/api/units/search-sn/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { withAuth } from "@/lib/auth";
+import { PREPARATION_CREATE_ROLES } from "@/lib/permissions";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export async function GET(req: NextRequest) {
+// ✅ SECURITY FIX: dulu endpoint ini tanpa cek role sama sekali (tidak ada di
+// ROUTE_PERMISSIONS → middleware meloloskan SEMUA role login), padahal
+// responsnya menyertakan harga modal (purchase_price/buy_price). Dibatasi ke
+// role yang memang melakukan pencarian SN (sales + penyiapan + full access),
+// jadi role tak terkait (kebersihan, pengantaran, PKL non-sales) tidak lagi
+// bisa mengintip harga modal.
+export const GET = withAuth(async (req: NextRequest) => {
     const q = req.nextUrl.searchParams.get("q") || "";
 
     if (q.length < 2) {
@@ -118,4 +126,4 @@ export async function GET(req: NextRequest) {
     const merged = [...laptopFormatted, ...accessoryFormatted].slice(0, 10);
 
     return NextResponse.json({ data: merged });
-}
+}, PREPARATION_CREATE_ROLES);

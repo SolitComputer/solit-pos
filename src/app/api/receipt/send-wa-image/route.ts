@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from "@/lib/auth";
 
-export async function POST(req: NextRequest) {
+// ✅ SECURITY FIX: dulu route ini tidak lewat middleware (tidak ada di
+// config.matcher) DAN tidak punya cek auth sendiri, jadi siapa pun (tanpa login)
+// bisa memicu pengiriman WhatsApp pakai kredit Fonnte milik toko — jalur spam.
+// Dibungkus withAuth: hanya user login yang bisa mengirim struk. Pemanggilnya
+// memang halaman /dashboard (staff), jadi tidak ada fitur yang rusak.
+export const POST = withAuth(async (req: NextRequest) => {
     try {
         const { phone, imageUrl, invoice } = await req.json();
 
@@ -50,4 +56,4 @@ export async function POST(req: NextRequest) {
         console.error("[send-wa-image] Error:", err);
         return NextResponse.json({ success: false, message: String(err) });
     }
-}
+});

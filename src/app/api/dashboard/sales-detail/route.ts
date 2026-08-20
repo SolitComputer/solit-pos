@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
-import { PERMISSIONS, withAuth } from "@/lib/auth";
+import { PERMISSIONS, withAuth, AuthUser } from "@/lib/auth";
 
 function getTodayWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
@@ -18,7 +18,7 @@ function calcProfit(item: any): number {
   return inventoryPrice > 0 ? dealPrice - inventoryPrice : Number(item.other || 0);
 }
 
-async function handler(req: NextRequest) {
+async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
     const WIB = 7 * 60 * 60 * 1000;
     const today = getTodayWIB();
@@ -171,20 +171,34 @@ async function handler(req: NextRequest) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 10);
 
+    // ✅ SECURITY FIX: profit hanya untuk role finance. Untuk role lain, buang
+    // `profit` dari today/monthly, tiap salesPerformance, & nested dailyBreakdown.
+    const showFin = (user.roles ?? [user.role]).some(
+      (r) => (PERMISSIONS.VIEW_FINANCIALS as string[]).includes(r)
+    );
+    const safeSalesPerformance = showFin
+      ? salesPerformance
+      : salesPerformance.map(({ profit, dailyBreakdown, ...rest }: any) => ({
+          ...rest,
+          dailyBreakdown: (dailyBreakdown ?? []).map(
+            ({ profit: _p, ...d }: any) => d
+          ),
+        }));
+
     return NextResponse.json({
       success: true,
       data: {
         today: {
           count:   todayTrx?.length || 0,
           revenue: todayTrx?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0,
-          profit:  todayTrx?.reduce((acc, item) => acc + calcProfit(item), 0)   || 0,
+          ...(showFin ? { profit: todayTrx?.reduce((acc, item) => acc + calcProfit(item), 0) || 0 } : {}),
         },
         monthly: {
           count:   monthTrx?.length || 0,
           revenue: monthTrx?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0,
-          profit:  monthTrx?.reduce((acc, item) => acc + calcProfit(item), 0)   || 0,
+          ...(showFin ? { profit: monthTrx?.reduce((acc, item) => acc + calcProfit(item), 0) || 0 } : {}),
         },
-        salesPerformance,
+        salesPerformance: safeSalesPerformance,
       },
     });
   } catch (error) {

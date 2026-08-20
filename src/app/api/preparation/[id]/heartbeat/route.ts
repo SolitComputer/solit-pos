@@ -17,7 +17,11 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     const now = new Date().toISOString();
-    const { error } = await supabase
+    // ✅ SECURITY FIX (spoof status): dulu update tanpa cek pemilik, jadi pengantar
+    // lain bisa memalsukan status GPS order orang lain. Filter update langsung ke
+    // delivery_user_id = user.id (atomik, tanpa SELECT tambahan karena heartbeat
+    // dipanggil sangat sering). Kalau 0 baris terpengaruh → bukan pengantarnya.
+    const { data: updated, error } = await supabase
       .from("preparation_orders")
       .update({
         tracking_status: status,
@@ -25,8 +29,16 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         tracking_last_ping: now,
         tracking_updated_by: user.id,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("delivery_user_id", user.id)
+      .select("id");
     if (error) throw error;
+    if (!updated || updated.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "Pengiriman ini bukan ditugaskan ke kamu" },
+        { status: 403 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

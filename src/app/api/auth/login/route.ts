@@ -108,6 +108,21 @@ export async function POST(request: Request) {
             );
         }
 
+        // ── Key kanonik untuk rate-limit & log ────────────────────────────────────
+        // ✅ SECURITY FIX: dulu lockout & log pakai `rawIdentifier` (teks mentah yang
+        // diketik user). Karena lookup user menormalkan nomor HP ke berbagai format
+        // (628xxx / 08xxx / 8xxx), penyerang bisa menulis nomor yang SAMA dengan
+        // format berbeda tiap percobaan → tiap percobaan jadi "user_email" berbeda,
+        // sehingga penghitung 5x-gagal tidak pernah terpenuhi. Sekarang semua format
+        // nomor dipetakan ke satu key (628xxx), email di-lowercase, dan key ini
+        // dipakai KONSISTEN untuk query hitung maupun saat menyimpan login_logs.
+        const looksLikePhone =
+            /^[\d\+\s\-\(\)]+$/.test(rawIdentifier) &&
+            rawIdentifier.replace(/\D/g, "").length >= 8;
+        const lockKey = looksLikePhone
+            ? normalizePhone(rawIdentifier)
+            : rawIdentifier.toLowerCase();
+
         // ── Rate-limit brute-force ────────────────────────────────────────────────
         // Blokir kalau ada >= LOCK_THRESHOLD login GAGAL untuk identifier ini dalam
         // LOCK_WINDOW_MIN menit terakhir. Mencegah tebak password tanpa batas.
@@ -121,7 +136,7 @@ export async function POST(request: Request) {
                 .from("login_logs")
                 .select("id", { count: "exact", head: true })
                 .eq("status", "FAILED")
-                .eq("user_email", rawIdentifier)
+                .eq("user_email", lockKey)
                 .gte("created_at", windowStart);
             if ((count ?? 0) >= LOCK_THRESHOLD) {
                 return NextResponse.json(
@@ -137,11 +152,8 @@ export async function POST(request: Request) {
         }
 
         // ── Cari user: coba phone_number dulu, fallback ke email ─────────────────
+        // (looksLikePhone sudah dihitung di atas untuk keperluan lockKey)
         let user: any = null;
-
-        const looksLikePhone =
-            /^[\d\+\s\-\(\)]+$/.test(rawIdentifier) &&
-            rawIdentifier.replace(/\D/g, "").length >= 8;
 
         if (looksLikePhone) {
             const normalized = normalizePhone(rawIdentifier); // 628xxx
@@ -184,7 +196,7 @@ export async function POST(request: Request) {
                 user_id: null,
                 user_name: rawIdentifier,
                 user_role: "UNKNOWN",
-                identifier: rawIdentifier,
+                identifier: lockKey,
                 device,
                 ip_address: ip,
                 status: "FAILED",
@@ -226,7 +238,7 @@ export async function POST(request: Request) {
                 user_id: user.id,
                 user_name: user.name,
                 user_role: user.role,
-                identifier: rawIdentifier,
+                identifier: lockKey,
                 device,
                 ip_address: ip,
                 status: "FAILED",

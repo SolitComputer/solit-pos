@@ -1,7 +1,7 @@
 // src/app/api/dashboard/stats/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
-import { PERMISSIONS, withAuth } from "@/lib/auth";
+import { PERMISSIONS, withAuth, AuthUser } from "@/lib/auth";
 import { fetchAllRows } from "@/lib/supabaseFetch";
 
 function getTodayWIB(): string {
@@ -64,7 +64,7 @@ function wibDateToUTCRange(dateWIB: string): { start: string; end: string } {
   return { start: startWIB.toISOString(), end: endWIB.toISOString() };
 }
 
-async function handler(req: NextRequest) {
+async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
     const today = getTodayWIB();
     const yesterday = getYesterdayWIB();
@@ -234,20 +234,33 @@ async function handler(req: NextRequest) {
         (acc, item) => acc + countUnitsSold(item), 0
       ) || 0;
 
+    // ✅ SECURITY FIX: field profit hanya untuk role finance. Untuk role lain,
+    // nol-kan angka profit & buang `profit` dari tiap item weeklyTrend/topSales
+    // (frontend memang menyembunyikan kartunya untuk non-finance).
+    const showFin = (user.roles ?? [user.role]).some(
+      (r) => (PERMISSIONS.VIEW_FINANCIALS as string[]).includes(r)
+    );
+    const safeWeeklyTrend = showFin
+      ? weeklyTrend
+      : weeklyTrend.map(({ profit, ...rest }: any) => rest);
+    const safeTopSales = showFin
+      ? topSales
+      : topSales.map(({ profit, ...rest }: any) => rest);
+
     return NextResponse.json({
       success: true,
       data: {
         todayRevenue,
-        todayProfit: todayGrossProfit,
+        todayProfit: showFin ? todayGrossProfit : 0,
         todayTransactions: todayTransactions?.length || 0,
         todayLaptopSold,
         laptopReady: laptops?.length || 0,
         stockTotal,
         revenueChange,
-        profitChange,
+        profitChange: showFin ? profitChange : 0,
         trxChange,
-        weeklyTrend,
-        topSales,
+        weeklyTrend: safeWeeklyTrend,
+        topSales: safeTopSales,
         topSources,
         topLaptop,
       },

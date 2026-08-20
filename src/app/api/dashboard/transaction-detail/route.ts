@@ -198,7 +198,7 @@ async function buildItemsMap(rows: TransactionRow[]): Promise<Map<string, ItemIn
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
-async function handler(req: NextRequest, _ctx: any, _user: AuthUser) {
+async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
     const nowWIB = new Date(Date.now() + WIB_OFFSET);
     const todayStr = toWIBDateStr(new Date());
@@ -364,17 +364,28 @@ async function handler(req: NextRequest, _ctx: any, _user: AuthUser) {
       });
     }
 
+    // ✅ SECURITY FIX: profit hanya untuk role finance. Untuk role lain, buang
+    // `profit` dari today + tiap entry daily/monthly/yearly + nested laptops[].
+    const showFin = (user.roles ?? [user.role]).some(
+      (r) => (PERMISSIONS.VIEW_FINANCIALS as string[]).includes(r)
+    );
+    const stripPeriods = (arr: any[]) =>
+      arr.map(({ profit, laptops, ...rest }: any) => ({
+        ...rest,
+        laptops: (laptops ?? []).map(({ profit: _p, ...l }: any) => l),
+      }));
+
     return NextResponse.json({
       success: true,
       data: {
         today: {
           revenue: todayRevenue,
-          profit: todayProfit,
+          ...(showFin ? { profit: todayProfit } : {}),
           count: todayData.length,
         },
-        daily,
-        monthly,
-        yearly,
+        daily:   showFin ? daily   : stripPeriods(daily),
+        monthly: showFin ? monthly : stripPeriods(monthly),
+        yearly:  showFin ? yearly  : stripPeriods(yearly),
       },
     });
   } catch (err) {
