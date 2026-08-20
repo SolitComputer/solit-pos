@@ -22,7 +22,7 @@ async function fetchUser(): Promise<AuthUser | null> {
   if (_cached) return _cached;
   if (_promise) return _promise;
 
-  _promise = fetch("/api/auth/me")
+  _promise = fetch("/api/auth/me", { cache: "no-store" })
     .then(r => (r.ok ? r.json() : null))
     .then(json => {
       const u = json?.user ?? null;
