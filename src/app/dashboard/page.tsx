@@ -89,7 +89,7 @@ const getInitials = (name: string) =>
   name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
 // Shared card styling token aligned with Laporan Keuangan — soft gray gradient surface
-const CARD = "bg-gradient-to-b from-white to-gray-50 rounded-2xl border border-gray-200 p-5 shadow-sm shadow-gray-100/60 hover:shadow-xl hover:shadow-gray-200/70 hover:border-gray-300 hover:-translate-y-0.5 transition-all duration-300";
+const CARD = "bg-gradient-to-b from-white to-gray-50 rounded-2xl border border-gray-200 p-5 shadow-sm shadow-gray-100/60 hover:shadow-2xl hover:shadow-gray-300/50 hover:border-gray-300/80 hover:-translate-y-1 transition-all duration-500 ease-out will-change-transform";
 
 // ─── Shimmer ──────────────────────────────────────────────────────────────────
 const Shimmer = ({ className = "", style = {} }: { className?: string; style?: React.CSSProperties }) => (
@@ -101,7 +101,7 @@ function TrendBadge({ change }: { change: number | null }) {
   if (change === null) return null;
   const up = change >= 0;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-lg tabular-nums border ${up ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"}`}>
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-lg tabular-nums border ${up ? "bg-gray-900 text-white border-gray-900" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
       {up ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />} {Math.abs(change)}%
     </span>
   );
@@ -119,20 +119,22 @@ function StatCard({
   change?: number | null;
 }) {
   return (
-    <div className="report-stat-card bg-gradient-to-br from-white via-white to-gray-50 rounded-2xl border border-gray-200 p-5 relative overflow-hidden group hover:border-gray-300 hover:-translate-y-1 transition-all duration-300 w-full h-full flex flex-col justify-between text-left shadow-sm shadow-gray-100/60 hover:shadow-xl hover:shadow-gray-300/40">
+    <div className="report-stat-card bg-gradient-to-br from-white via-white to-gray-50 rounded-2xl border border-gray-200 p-5 relative overflow-hidden group hover:border-gray-300 hover:-translate-y-1 transition-all duration-500 ease-out w-full h-full flex flex-col justify-between text-left shadow-sm shadow-gray-100/60 hover:shadow-2xl hover:shadow-gray-300/40 will-change-transform">
       {/* Subtle corner accent */}
       <div className="absolute top-0 right-0 w-24 h-24 rounded-bl-[56px] bg-gradient-to-br from-gray-100 to-gray-50 group-hover:from-gray-200 group-hover:to-gray-100 transition-colors duration-300" />
+      {/* Diagonal shine sweep on hover */}
+      <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out bg-gradient-to-r from-transparent via-white/50 to-transparent pointer-events-none" />
       {/* Bottom hairline sheen on hover */}
       <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
       <div className="relative z-10">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-9 h-9 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center text-base group-hover:from-gray-700 group-hover:to-gray-900 transition-all duration-300 border border-gray-200 text-gray-600 group-hover:text-white shadow-sm group-hover:shadow-md group-hover:scale-110 group-hover:-rotate-3">
+          <div className="w-9 h-9 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center text-base group-hover:from-gray-700 group-hover:to-gray-900 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] border border-gray-200 text-gray-600 group-hover:text-white shadow-sm group-hover:shadow-md group-hover:scale-110 group-hover:-rotate-6">
             {icon}
           </div>
           <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">{label}</span>
         </div>
-        <p className="text-2xl font-extrabold text-gray-900 tracking-tight leading-none tabular-nums">{value}</p>
+        <p className="text-2xl font-extrabold text-gray-900 tracking-tight leading-none tabular-nums transition-transform duration-300 group-hover:scale-[1.03] origin-left">{value}</p>
         {sub && <p className="text-[11px] text-gray-400 mt-1.5">{sub}</p>}
         {change !== undefined && change !== null && (
           <div className="mt-2.5">
@@ -176,19 +178,19 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
   rank: number; name: string; total: number; maxTotal: number; extra?: React.ReactNode;
 }) {
   const medals = [
-    <Medal key="gold" className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500 drop-shadow-sm" />,
+    <Medal key="gold" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-900 drop-shadow-sm" />,
     <Medal key="silver" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 drop-shadow-sm" />,
-    <Medal key="bronze" className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 drop-shadow-sm" />
+    <Medal key="bronze" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300 drop-shadow-sm" />
   ];
   const pct = Math.round((total / Math.max(maxTotal, 1)) * 100);
 
   return (
-    <div className="group/item py-1.5 px-2 -mx-2 rounded-xl hover:bg-gray-100/60 transition-colors duration-200">
+    <div className="group/item py-1.5 px-2 -mx-2 rounded-xl hover:bg-gray-100/70 hover:shadow-sm transition-all duration-300 ease-out">
       <div className="flex items-center gap-2.5 mb-1.5">
         {/* Rank badge */}
         <div className="w-6 flex-shrink-0 flex items-center justify-center">
           {rank <= 3 ? (
-            <span className="text-base leading-none drop-shadow-sm group-hover/item:scale-110 transition-transform duration-200 inline-block">{medals[rank - 1]}</span>
+            <span className={`text-base leading-none drop-shadow-sm group-hover/item:scale-125 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] inline-block ${rank === 1 ? "rounded-full ring-2 ring-gray-200/80 group-hover/item:ring-gray-300" : ""}`}>{medals[rank - 1]}</span>
           ) : (
             <span className="text-[10px] font-bold text-gray-500 w-5 h-5 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center border border-gray-200">
               {rank}
@@ -214,7 +216,7 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
       {/* Progress bar */}
       <div className="ml-8.5 h-1 bg-gray-200 rounded-full overflow-hidden">
         <div
-          className="h-full rounded-full transition-all duration-700"
+          className="h-full rounded-full transition-all duration-700 ease-out"
           style={{
             width: `${pct}%`,
             background: rank === 1 ? "#374151" : rank === 2 ? "#6B7280" : "#9CA3AF",
@@ -227,9 +229,9 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
 
 // ─── Transaction Row ──────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
-  PAID: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  PENDING: "bg-amber-50 text-amber-700 border-amber-100",
-  CANCELLED: "bg-rose-50 text-rose-600 border-rose-100",
+  PAID: "bg-gray-900 text-white border-gray-900",
+  PENDING: "bg-gray-100 text-gray-700 border-gray-300",
+  CANCELLED: "bg-white text-gray-400 border-gray-200",
 };
 
 const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -248,11 +250,11 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
   const dateStr = txDate.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
   return (
-    <div className="px-4 sm:px-5 py-3 hover:bg-gray-50/80 hover:translate-x-0.5 transition-all duration-200 group relative">
-      <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gray-800 scale-y-0 group-hover:scale-y-100 transition-transform duration-200 origin-center rounded-r-full" />
+       <div className="px-4 sm:px-5 py-3 hover:bg-gray-50/80 hover:translate-x-0.5 transition-all duration-300 ease-out group relative">
+      <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-gray-700 to-gray-900 scale-y-0 group-hover:scale-y-100 transition-transform duration-300 ease-out origin-center rounded-r-full" />
       <div className="flex items-start gap-3">
         {/* Avatar */}
-        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 font-bold border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 ring-2 ring-white group-hover:border-gray-300 group-hover:shadow-md transition-all shadow-sm">
+             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 font-bold border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 ring-2 ring-white group-hover:border-gray-300 group-hover:shadow-md group-hover:scale-105 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-sm">
           {getInitials(item.customer_name)}
         </div>
 
@@ -298,7 +300,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
           </p>
           <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5">{dateStr} · {timeStr}</p>
           {canSeeFinancials && profit > 0 && (
-            <p className="text-[9px] sm:text-[10px] font-semibold text-emerald-600 mt-0.5 tabular-nums">
+            <p className="text-[9px] sm:text-[10px] font-semibold text-gray-900 mt-0.5 tabular-nums">
               +{profit.toLocaleString("id-ID")}
             </p>
           )}
@@ -385,10 +387,10 @@ function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoad
     <button
       onClick={onRefresh}
       disabled={isLoading}
-      className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 hover:border-gray-300 hover:shadow-md active:scale-[0.97] transition-all bg-gradient-to-b from-white to-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+           className="group flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 hover:border-gray-300 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] active:translate-y-0 transition-all duration-200 ease-out bg-gradient-to-b from-white to-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 shadow-sm"
     >
       <svg
-        className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`}
+        className={`w-3.5 h-3.5 transition-transform ${isLoading ? "animate-spin" : "group-hover:rotate-90 duration-300"}`}
         fill="none" stroke="currentColor" viewBox="0 0 24 24"
       >
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -627,11 +629,14 @@ export default function Page() {
         canSeeFinancials={canSeeFinancials}
       />
       <style>{`
-        .report-stat-card {
-          transition: box-shadow 0.15s ease, border-color 0.15s ease;
-        }
         .report-stat-card:hover {
-          box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+          box-shadow: 0 20px 40px -12px rgba(17,24,39,0.16), 0 4px 12px rgba(17,24,39,0.06);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .report-stat-card, .fade-up, .animate-shimmer, .animate-spin, .animate-fadeIn, .animate-scaleIn, .animate-slideIn {
+            animation: none !important;
+            transition: none !important;
+          }
         }
         @keyframes fade-up {
           from { opacity: 0; transform: translateY(12px); }
@@ -712,14 +717,16 @@ export default function Page() {
           <div className="flex items-center gap-2">
             <RefreshButton onRefresh={() => fetchAll(true)} isLoading={isRefreshing} />
             <a
+                       
               href="/payment/create"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-gray-800 to-gray-900 text-white text-xs font-semibold hover:from-gray-900 hover:to-black active:scale-[0.97] transition-all shadow-md shadow-gray-900/10 hover:shadow-lg hover:shadow-gray-900/25 whitespace-nowrap"
+              className="group relative inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-gray-800 to-gray-900 text-white text-xs font-semibold hover:from-gray-900 hover:to-black active:scale-[0.97] transition-all duration-300 ease-out shadow-md shadow-gray-900/10 hover:shadow-lg hover:shadow-gray-900/30 hover:-translate-y-0.5 whitespace-nowrap overflow-hidden"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="relative transition-transform duration-300 group-hover:rotate-90">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span className="hidden sm:inline">Buat Transaksi</span>
-              <span className="sm:hidden">Buat</span>
+              <span className="relative hidden sm:inline">Buat Transaksi</span>
+              <span className="relative sm:hidden">Buat</span>
             </a>
           </div>
         </div>
@@ -1026,7 +1033,7 @@ export default function Page() {
         )}
 
         {/* ── Recent Transactions ── */}
-        <div className="bg-gradient-to-b from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden hover:border-gray-300 transition-all duration-300 fade-up shadow-sm hover:shadow-md" style={{ animationDelay: "0.16s" }}>
+              <div className="bg-gradient-to-b from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden hover:border-gray-300/80 transition-all duration-500 ease-out fade-up shadow-sm hover:shadow-xl hover:shadow-gray-200/60" style={{ animationDelay: "0.16s" }}>
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white/60 backdrop-blur-sm">
             <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2.5">
               <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center border border-gray-200 text-gray-700 shadow-sm">
