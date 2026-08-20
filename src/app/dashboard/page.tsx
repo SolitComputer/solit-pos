@@ -92,14 +92,14 @@ const getDealPrice = (item: Transaction): number =>
 const getInitials = (name: string) =>
   name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
-// Avatar palette diversified (violet/blue/emerald/amber/rose) — purely decorative,
+// Avatar palette grayscale — purely decorative,
 // same charCodeAt() distribution logic as before.
 const AVATAR_COLORS = [
-  "from-violet-500 to-purple-600",
-  "from-blue-500 to-indigo-600",
-  "from-emerald-500 to-teal-600",
-  "from-amber-500 to-orange-600",
-  "from-rose-500 to-pink-600",
+  "from-gray-700 to-gray-900",
+  "from-gray-500 to-gray-700",
+  "from-gray-600 to-black",
+  "from-gray-400 to-gray-600",
+  "from-gray-800 to-black",
 ];
 const getAvatarColor = (name: string) =>
   AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
@@ -122,8 +122,8 @@ function TrendBadge({ change }: { change: number | null }) {
   if (change === null) return null;
   const up = change >= 0;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full tabular-nums shadow-sm ${up ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-600"}`}>
-      {up ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />} {Math.abs(change)}%
+    <span className={`inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full tabular-nums shadow-sm ${up ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"}`}>
+            {up ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />} {Math.abs(change)}%
     </span>
   );
 }
@@ -133,8 +133,8 @@ function SectionHeader({ icon, title, badge }: { icon?: React.ReactNode; title: 
   return (
     <div className="flex items-center justify-between mb-2 sm:mb-3 flex-shrink-0">
       <h2 className="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-2">
-        {icon ?? <span className="w-1 h-3 sm:h-4 bg-gradient-to-b from-violet-600 to-indigo-600 rounded-full" />}
-        {title}
+        {icon ?? <span className="w-1 h-3 sm:h-4 bg-gradient-to-b from-gray-700 to-gray-900 rounded-full" />}
+                {title}
       </h2>
       {badge && (
         <span className="text-[9px] sm:text-[10px] text-gray-500 bg-gray-100 px-1.5 sm:px-2 py-0.5 rounded-full font-semibold">
@@ -178,15 +178,15 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
-// Accent tokens — violet = pendapatan, emerald = profit, blue = inventaris, amber = transaksi.
-// Konsisten dipakai di stat card, chart, dan section header supaya tiap kategori data
-// punya "warna sendiri" yang gampang dikenali sekilas.
+// Accent tokens — semua netral grayscale sekarang. Key names (violet/emerald/blue/amber)
+// dipertahankan apa adanya supaya prop `accent="violet"` dkk di bawah tidak perlu diubah;
+// yang beda cuma value-nya, masing-masing dapat "gelap" berbeda biar tetap gampang dibedakan sekilas.
 const ACCENT = {
-  gray: { bg: "from-slate-50 to-slate-100", text: "text-slate-700", bar: "bg-slate-600", border: "border-slate-200" },
-  violet: { bg: "from-violet-50 to-purple-100", text: "text-violet-700", bar: "bg-violet-600", border: "border-violet-200" },
-  emerald: { bg: "from-emerald-50 to-green-100", text: "text-emerald-700", bar: "bg-emerald-600", border: "border-emerald-200" },
-  amber: { bg: "from-amber-50 to-yellow-100", text: "text-amber-700", bar: "bg-amber-600", border: "border-amber-200" },
-  blue: { bg: "from-blue-50 to-indigo-100", text: "text-blue-700", bar: "bg-blue-600", border: "border-blue-200" },
+  gray: { bg: "from-gray-50 to-gray-100", text: "text-gray-600", bar: "bg-gray-500", border: "border-gray-200" },
+  violet: { bg: "from-gray-100 to-gray-200", text: "text-gray-900", bar: "bg-gray-900", border: "border-gray-300" },
+  emerald: { bg: "from-gray-50 to-gray-100", text: "text-gray-700", bar: "bg-gray-700", border: "border-gray-200" },
+  amber: { bg: "from-gray-50 to-gray-100", text: "text-gray-600", bar: "bg-gray-500", border: "border-gray-200" },
+  blue: { bg: "from-gray-100 to-gray-200", text: "text-gray-800", bar: "bg-gray-800", border: "border-gray-300" },
 } as const;
 
 function StatCard({ label, value, sub, icon, accent = "gray", change }: {
@@ -224,15 +224,15 @@ function StatCard({ label, value, sub, icon, accent = "gray", change }: {
 
 // ─── Top List Row ─────────────────────────────────────────────────────────────
 const RANK_BAR: Record<number, string> = {
-  1: "from-amber-400 to-amber-500",
-  2: "from-gray-400 to-gray-500",
-  3: "from-amber-600 to-amber-700",
+  1: "from-gray-900 to-black",
+  2: "from-gray-500 to-gray-600",
+  3: "from-gray-300 to-gray-400",
 };
 
 function TopListItem({ rank, name, total, maxTotal, extra }: {
   rank: number; name: string; total: number; maxTotal: number; extra?: React.ReactNode;
 }) {
-  const medalColor = ["text-amber-400", "text-gray-400", "text-amber-600"][rank - 1];
+  const medalColor = ["text-gray-900", "text-gray-500", "text-gray-400"][rank - 1];
   const barGradient = RANK_BAR[rank] ?? "from-gray-500 to-gray-600";
   const pct = Math.round((total / Math.max(maxTotal, 1)) * 100);
   return (
@@ -261,9 +261,9 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
 
 // ─── Transaction Row ──────────────────────────────────────────────────────────
 const STATUS_STYLES: Record<string, string> = {
-  PAID: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  PENDING: "bg-amber-100 text-amber-700 border-amber-200",
-  CANCELLED: "bg-rose-100 text-rose-600 border-rose-200",
+  PAID: "bg-gray-900 text-white border-gray-900",
+  PENDING: "bg-gray-100 text-gray-700 border-gray-300",
+  CANCELLED: "bg-white text-gray-400 border-gray-200",
 };
 
 const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -331,7 +331,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
           </p>
           <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5">{dateStr} · {timeStr}</p>
           {canSeeFinancials && profit > 0 && (
-            <p className="text-[9px] sm:text-[10px] font-semibold text-emerald-600 mt-0.5 tabular-nums">
+            <p className="text-[9px] sm:text-[10px] font-semibold text-gray-900 mt-0.5 tabular-nums">
               +{profit.toLocaleString("id-ID")}
             </p>
           )}
@@ -349,7 +349,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
         {item.payment_photo && (
           <button
             onClick={() => onPhotoClick(item.payment_photo!)}
-            className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-violet-700 transition-all duration-200 group/btn"
+            className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-gray-900 transition-all duration-200 group/btn"
           >
             <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 group-hover/btn:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -365,7 +365,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
             href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-violet-700 transition-all duration-200"
+            className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-gray-900 transition-all duration-200"
           >
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M17.657 16.657L13.414 20.9a8 8 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -381,7 +381,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
 
 // ─── Live Dot ─────────────────────────────────────────────────────────────────
 const LiveDot = () => (
-  <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-pulse ring-2 ring-emerald-200 flex-shrink-0" />
+  <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-900 animate-pulse ring-2 ring-gray-300 flex-shrink-0" />
 );
 
 // ─── Refresh Button ───────────────────────────────────────────────────────────
@@ -390,7 +390,7 @@ function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoad
     <button
       onClick={onRefresh}
       disabled={isLoading}
-      className="relative flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-gray-500 hover:text-violet-700 border border-gray-200 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl transition-all duration-200 hover:bg-violet-50/60 hover:border-violet-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+      className="relative flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-gray-500 hover:text-gray-900 border border-gray-200 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl transition-all duration-200 hover:bg-gray-100/60 hover:border-gray-300 group disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <svg
         className={`w-3 h-3 sm:w-3.5 sm:h-3.5 transition-all duration-500 ${isLoading ? "animate-spin" : "group-hover:rotate-180"}`}
@@ -400,7 +400,7 @@ function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoad
       </svg>
       <span className="hidden sm:inline">{isLoading ? "Memuat..." : "Refresh"}</span>
       <span className="sm:hidden">{isLoading ? "..." : "↻"}</span>
-      {isLoading && <span className="absolute inset-0 rounded-xl bg-violet-50/50 animate-pulse" />}
+      {isLoading && <span className="absolute inset-0 rounded-xl bg-gray-100/50 animate-pulse" />}
     </button>
   );
 }
@@ -485,11 +485,11 @@ export default function Page() {
       {
         label: "Omzet",
         data: weeklyRevenue,
-        borderColor: "#7C3AED",
+        borderColor: "#111827",
         backgroundColor: (ctx: any) => {
           const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
-          gradient.addColorStop(0, "rgba(124,58,237,0.14)");
-          gradient.addColorStop(1, "rgba(124,58,237,0)");
+          gradient.addColorStop(0, "rgba(17,24,39,0.14)");
+          gradient.addColorStop(1, "rgba(17,24,39,0)");
           return gradient;
         },
         borderWidth: 2.5,
@@ -497,7 +497,7 @@ export default function Page() {
         tension: 0.4,
         pointRadius: 3,
         pointHoverRadius: 6,
-        pointBackgroundColor: "#7C3AED",
+        pointBackgroundColor: "#111827",
         pointBorderColor: "#fff",
         pointBorderWidth: 2,
         yAxisID: "yRevenue",
@@ -505,11 +505,11 @@ export default function Page() {
       {
         label: "Profit",
         data: weeklyProfit,
-        borderColor: "#10B981",
+        borderColor: "#6B7280",
         backgroundColor: (ctx: any) => {
           const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
-          gradient.addColorStop(0, "rgba(16,185,129,0.08)");
-          gradient.addColorStop(1, "rgba(16,185,129,0)");
+          gradient.addColorStop(0, "rgba(107,114,128,0.08)");
+          gradient.addColorStop(1, "rgba(107,114,128,0)");
           return gradient;
         },
         borderWidth: 2,
@@ -517,7 +517,7 @@ export default function Page() {
         tension: 0.4,
         pointRadius: 2.5,
         pointHoverRadius: 5,
-        pointBackgroundColor: "#10B981",
+        pointBackgroundColor: "#6B7280",
         pointBorderColor: "#fff",
         pointBorderWidth: 1.5,
         borderDash: [6, 4],
@@ -526,14 +526,14 @@ export default function Page() {
       {
         label: "Laptop Terjual",
         data: weeklyLaptopSold,
-        borderColor: "#6366F1",
-        backgroundColor: "rgba(99,102,241,0)",
+        borderColor: "#9CA3AF",
+        backgroundColor: "rgba(156,163,175,0)",
         borderWidth: 2,
         fill: false,
         tension: 0.4,
         pointRadius: 4,
         pointHoverRadius: 7,
-        pointBackgroundColor: "#6366F1",
+        pointBackgroundColor: "#9CA3AF",
         pointBorderColor: "#fff",
         pointBorderWidth: 2,
         borderDash: [3, 3],
@@ -548,11 +548,11 @@ export default function Page() {
       label: "Transaksi",
       data: weeklyTrxCount,
       backgroundColor: weeklyTrxCount.map((_, i) =>
-        i === weeklyTrxCount.length - 1 ? "#D97706" : "rgba(217,119,6,0.2)"
+        i === weeklyTrxCount.length - 1 ? "#111827" : "rgba(17,24,39,0.15)"
       ),
       borderRadius: 8,
       borderSkipped: false as const,
-      hoverBackgroundColor: "rgba(217,119,6,0.35)",
+      hoverBackgroundColor: "rgba(17,24,39,0.3)",
     }],
   };
 
@@ -605,7 +605,7 @@ export default function Page() {
         min: 0,
         ticks: {
           font: { size: 9 },
-          color: "#6366F1",
+          color: "#9CA3AF",
           stepSize: 1,
           callback: (v: any) => `${v}`,
         },
@@ -676,8 +676,8 @@ export default function Page() {
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
 
       <div className="space-y-4 sm:space-y-5 max-w-7xl mx-auto px-3 sm:px-4 relative">
-        {/* subtle ambient glow behind the header — now tinted with the brand violet accent */}
-        <div className="pointer-events-none absolute -top-6 left-0 right-0 h-56 -z-10 bg-[radial-gradient(ellipse_60%_100%_at_50%_0%,rgba(124,58,237,0.06),transparent)]" />
+        {/* subtle ambient glow behind the header — neutral black/gray now */}
+        <div className="pointer-events-none absolute -top-6 left-0 right-0 h-56 -z-10 bg-[radial-gradient(ellipse_60%_100%_at_50%_0%,rgba(17,24,39,0.04),transparent)]" />
 
         {/* ── Header ── */}
         <div className="flex flex-wrap items-end justify-between gap-3 fade-up">
@@ -690,7 +690,7 @@ export default function Page() {
             ) : (
               <>
                 <div className="flex items-center gap-2">
-                  <div className="w-1 h-5 sm:h-7 bg-gradient-to-b from-violet-600 to-indigo-700 rounded-full" />
+                  <div className="w-1 h-5 sm:h-7 bg-gradient-to-b from-gray-700 to-gray-900 rounded-full" />
                   <p className="text-[10px] sm:text-xs text-gray-400 font-medium">{now}</p>
                 </div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-black bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mt-0.5 tracking-tight">
@@ -710,7 +710,7 @@ export default function Page() {
             <RefreshButton onRefresh={() => fetchAll(true)} isLoading={isRefreshing} />
             <a
               href="/payment/create"
-              className="inline-flex items-center gap-1 sm:gap-1.5 bg-gradient-to-r from-violet-600 to-indigo-700 text-white text-[11px] sm:text-sm font-semibold px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl hover:from-violet-700 hover:to-indigo-800 transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg hover:shadow-violet-900/25 whitespace-nowrap"
+              className="inline-flex items-center gap-1 sm:gap-1.5 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-[11px] sm:text-sm font-semibold px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl hover:from-gray-900 hover:to-black transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg hover:shadow-gray-900/25 whitespace-nowrap"
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -842,18 +842,18 @@ export default function Page() {
                 {/* Legend */}
                 <div className="flex gap-3 sm:gap-4 mb-2 sm:mb-3 flex-wrap -mt-2">
                   {[
-                    { color: "bg-violet-600", label: "Omzet", solid: true },
-                    { color: "bg-emerald-500", label: "Profit", solid: false },
-                    { color: "bg-indigo-500", label: "Laptop Terjual", solid: false },
+                    { color: "bg-gray-900", label: "Omzet", solid: true },
+                    { color: "bg-gray-500", label: "Profit", solid: false },
+                    { color: "bg-gray-400", label: "Laptop Terjual", solid: false },
                   ].map(({ color, label, solid }) => (
                     <div key={label} className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-500">
                       <span className={`w-4 sm:w-5 h-0.5 inline-block rounded-full ${color}`}
                         style={!solid ? { borderTop: "2px dashed", background: "none" } : {}}
                       />
-                      <span className={label === "Laptop Terjual" ? "text-indigo-500" : ""}>{label}</span>
+                      <span className={label === "Laptop Terjual" ? "text-gray-500" : ""}>{label}</span>
                     </div>
                   ))}
-                  <span className="ml-auto text-[9px] text-indigo-400 hidden sm:inline">
+                  <span className="ml-auto text-[9px] text-gray-400 hidden sm:inline">
                     axis kanan = unit
                   </span>
                 </div>
@@ -905,7 +905,7 @@ export default function Page() {
           >
             <div className={`h-full flex flex-col ${CARD} p-3 sm:p-5`}>
               <SectionHeader
-                icon={<Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />}
+                icon={<Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />}
                 title="Top Sales"
                 badge="hari ini"
               />
@@ -926,7 +926,7 @@ export default function Page() {
                       <TopListItem key={s.name} rank={i + 1} name={s.name} total={s.total}
                         maxTotal={stats.topSales[0]?.total || 1}
                         extra={canSeeFinancials && s.profit > 0 ? (
-                          <span className="text-[9px] sm:text-[10px] text-emerald-600 font-semibold flex-shrink-0 tabular-nums">
+                          <span className="text-[9px] sm:text-[10px] text-gray-900 font-semibold flex-shrink-0 tabular-nums">
                             +{fmtShort(s.profit)}
                           </span>
                         ) : undefined}
@@ -954,7 +954,7 @@ export default function Page() {
           >
             <div className={`h-full flex flex-col ${CARD} p-3 sm:p-5`}>
               <SectionHeader
-                icon={<Laptop className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />}
+                icon={<Laptop className="w-4 h-4 sm:w-5 sm:h-5 text-gray-800" />}
                 title="Laptop Terlaris"
                 badge="hari ini"
               />
@@ -1013,7 +1013,7 @@ export default function Page() {
               <LiveDot />
               Transaksi Terbaru
             </h2>
-            <a href="/dashboard/transactions" className="text-[10px] sm:text-xs font-semibold text-gray-500 hover:text-violet-700 transition-all duration-200 flex items-center gap-1 group">
+            <a href="/dashboard/transactions" className="text-[10px] sm:text-xs font-semibold text-gray-500 hover:text-gray-900 transition-all duration-200 flex items-center gap-1 group">
               Lihat Semua
               <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <polyline points="9 18 15 12 9 6" />
