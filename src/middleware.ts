@@ -16,6 +16,12 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import { checkDynamicPageAccess, expandDynamicParents } from "@/lib/dynamicPermissions";
 import { CONTRACT_GATE_ENABLED } from "@/lib/featureFlags";
+import { withTimeout } from "@/lib/withTimeout";
+
+// Batas waktu tiap call Supabase di middleware. Middleware jalan di HAMPIR
+// SETIAP request, jadi kalau Supabase lambat/hang, ini yang mencegah request
+// nge-gantung sampai proxy di depan (nginx/LiteSpeed) motong paksa (408).
+const SUPABASE_TIMEOUT_MS = 5000;
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
 const PUBLIC_PREFIXES = ["/receipt/", "/scan/"];
@@ -112,11 +118,22 @@ async function hasApprovedContract(userId: string): Promise<boolean> {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { persistSession: false } }
     );
-    const { data } = await supabase
-      .from("users")
-      .select("contract_status, contract_valid_until")
-      .eq("id", userId)
-      .maybeSingle();
+    const { data, error } = await withTimeout<{
+      data: { contract_status?: string | null; contract_valid_until?: string | null } | null;
+      error: { message: string } | null;
+    }>(
+      supabase
+        .from("users")
+        .select("contract_status, contract_valid_until")
+        .eq("id", userId)
+        .maybeSingle(),
+      SUPABASE_TIMEOUT_MS,
+      { data: null, error: { message: "timeout" } }
+    );
+    // Query nge-hang (bukan error dilempar, cuma gak pernah resolve) ->
+    // fail-closed, sama kayak behavior `catch` di bawah, daripada nunggu
+    // tanpa batas sampai proxy motong koneksinya.
+    if (error) return false;
 
     const status = data?.contract_status ?? "NONE";
     if (status === "NONE") return true;
@@ -178,16 +195,26 @@ async function hasAttendedTodayInDB(userId: string): Promise<boolean> {
     const dayStart = `${todayDate}T00:00:00+07:00`;
     const dayEnd = `${todayDate}T23:59:59+07:00`;
 
-    const [{ data: faceIn }, { data: manual }, { data: leave }] = await Promise.all([
-      supabase.from("face_verifications").select("id")
-        .eq("user_id", userId).eq("status", "SUCCESS").eq("direction", "IN")
-        .gte("created_at", dayStart).lte("created_at", dayEnd).maybeSingle(),
-      supabase.from("attendance_manual").select("id")
-        .eq("user_id", userId).eq("attendance_date", todayDate).maybeSingle(),
-      supabase.from("user_leave_requests").select("id")
-        .eq("user_id", userId).eq("leave_date", todayDate).eq("status", "APPROVED").maybeSingle(),
-    ]);
+    const TIMED_OUT = Symbol("timed_out");
+    type MaybeRow = { data: { id: string } | null; error: unknown };
+    const result = await withTimeout<[MaybeRow, MaybeRow, MaybeRow] | typeof TIMED_OUT>(
+      Promise.all([
+        supabase.from("face_verifications").select("id")
+          .eq("user_id", userId).eq("status", "SUCCESS").eq("direction", "IN")
+          .gte("created_at", dayStart).lte("created_at", dayEnd).maybeSingle(),
+        supabase.from("attendance_manual").select("id")
+          .eq("user_id", userId).eq("attendance_date", todayDate).maybeSingle(),
+        supabase.from("user_leave_requests").select("id")
+          .eq("user_id", userId).eq("leave_date", todayDate).eq("status", "APPROVED").maybeSingle(),
+      ]),
+      SUPABASE_TIMEOUT_MS,
+      TIMED_OUT
+    );
+    // Nge-hang -> fail-closed (sama kayak catch di bawah): tetap minta
+    // verifikasi ulang daripada request-nya gantung nunggu proxy motong.
+    if (result === TIMED_OUT) return false;
 
+    const [{ data: faceIn }, { data: manual }, { data: leave }] = result;
     return Boolean(faceIn || manual || leave);
   } catch {
     // fail-closed: kalau DB gak bisa diakses, tetap minta verifikasi seperti biasa
@@ -262,13 +289,14 @@ export async function middleware(request: NextRequest) {
     if (token && pathname === "/login") {
       const user = await verifyToken(token);
       if (user) {
-        if (!isContractExempt(user.role as string)) {
-          const contractOk = await hasApprovedContract(user.id);
-          if (!contractOk) {
-            return NextResponse.redirect(new URL("/contract", request.url));
-          }
-        }
-
+        // Cek kontrak SENGAJA tidak dilakukan di sini — semua nilai
+        // ROLE_DEFAULT_REDIRECT ada di bawah "/dashboard", jadi query
+        // Supabase yang sama pasti kepanggil lagi begitu redirect di bawah
+        // ini "kena" blok PROTECTED_PREFIXES. Dulu di sini ada cek
+        // hasApprovedContract() terpisah yang query PERSIS sama ke tabel
+        // users, jadi tiap kali user (yang sudah login) buka "/" -> "/login"
+        // -> "/dashboard" bakal ada 2x round-trip Supabase berurutan buat
+        // data yang sama — nambah latensi & resiko timeout tanpa guna.
         const exempt = isAttendanceExempt(user.role as string);
         const hasAttended = await hasAttendanceBypass(request, user.id);
         if (!exempt && isWithinSystemHours() && !hasAttended) {
@@ -414,11 +442,18 @@ export async function middleware(request: NextRequest) {
           process.env.SUPABASE_SERVICE_ROLE_KEY!,
           { auth: { persistSession: false } }
         );
-        const { data: userRecord } = await supabase
-          .from("users")
-          .select("force_logout_at")
-          .eq("id", user.id)
-          .maybeSingle();
+        const { data: userRecord } = await withTimeout<{
+          data: { force_logout_at?: string | null } | null;
+          error: unknown;
+        }>(
+          supabase
+            .from("users")
+            .select("force_logout_at")
+            .eq("id", user.id)
+            .maybeSingle(),
+          SUPABASE_TIMEOUT_MS,
+          { data: null, error: null }
+        );
 
         if (userRecord?.force_logout_at) {
           const forceLogoutAtSec =
