@@ -1010,7 +1010,7 @@ export default function JurnalUmum({ period }: { period: string }) {
             )}
 
             {/* ── Sticky Toolbar, Filter & Summary Bar ── */}
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md -mx-4 sm:-mx-6 px-4 sm:px-6 pt-2 pb-3 space-y-2 border-b border-slate-100 shadow-xs transition-all">
+            <div className="sticky top-12 lg:top-0 z-20 bg-white/95 backdrop-blur-md -mx-4 sm:-mx-6 px-4 sm:px-6 pt-2 pb-3 space-y-2 border-b border-slate-100 shadow-xs transition-all">
                 {/* ── Toolbar ── */}
                 <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex-1 flex flex-col sm:flex-row gap-2">
