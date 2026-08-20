@@ -9,6 +9,12 @@
 // Dipakai di: middleware.ts, Sidebar.tsx, api/me/permissions, withAuth() (opsional).
 
 import { createClient } from "@supabase/supabase-js";
+import { withTimeout } from "@/lib/withTimeout";
+
+// Sama kayak SUPABASE_TIMEOUT_MS di middleware.ts — batas waktu per query
+// biar checkDynamicPageAccess() (dipanggil middleware di HAMPIR SETIAP
+// request) gak nge-gantung kalau Supabase lambat/hang.
+const SUPABASE_TIMEOUT_MS = 5000;
 
 export type PageAction = "view" | "create" | "edit" | "delete";
 
@@ -73,11 +79,18 @@ export function invalidateDynamicPermissionCache() {
 export async function getAppPages(): Promise<AppPage[]> {
   if (isFresh(pagesCache)) return pagesCache!.data;
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("app_pages")
-    .select("key,label,route,group_label,sort_order")
-    .order("group_label")
-    .order("sort_order");
+  const { data, error } = await withTimeout<{
+    data: AppPage[] | null;
+    error: { message: string } | null;
+  }>(
+    supabase
+      .from("app_pages")
+      .select("key,label,route,group_label,sort_order")
+      .order("group_label")
+      .order("sort_order"),
+    SUPABASE_TIMEOUT_MS,
+    { data: null, error: { message: "timeout" } }
+  );
   if (error) {
     console.error("[dynamicPermissions] getAppPages error:", error.message);
     return pagesCache?.data ?? [];
@@ -89,10 +102,17 @@ export async function getAppPages(): Promise<AppPage[]> {
 export async function getDynamicRoles(): Promise<DynamicRole[]> {
   if (isFresh(rolesCache)) return rolesCache!.data;
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("dynamic_roles")
-    .select("key,label,icon,badge_bg,badge_text,badge_border,is_pkl,parent_role")
-    .order("label");
+  const { data, error } = await withTimeout<{
+    data: DynamicRole[] | null;
+    error: { message: string } | null;
+  }>(
+    supabase
+      .from("dynamic_roles")
+      .select("key,label,icon,badge_bg,badge_text,badge_border,is_pkl,parent_role")
+      .order("label"),
+    SUPABASE_TIMEOUT_MS,
+    { data: null, error: { message: "timeout" } }
+  );
   if (error) {
     console.error("[dynamicPermissions] getDynamicRoles error:", error.message);
     return rolesCache?.data ?? [];
@@ -104,9 +124,16 @@ export async function getDynamicRoles(): Promise<DynamicRole[]> {
 async function getAllPermissionRows(): Promise<RolePermissionRow[]> {
   if (isFresh(permsCache)) return permsCache!.data;
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("role_page_permissions")
-    .select("role_key,page_key,can_view,can_create,can_edit,can_delete");
+  const { data, error } = await withTimeout<{
+    data: RolePermissionRow[] | null;
+    error: { message: string } | null;
+  }>(
+    supabase
+      .from("role_page_permissions")
+      .select("role_key,page_key,can_view,can_create,can_edit,can_delete"),
+    SUPABASE_TIMEOUT_MS,
+    { data: null, error: { message: "timeout" } }
+  );
   if (error) {
     console.error("[dynamicPermissions] getAllPermissionRows error:", error.message);
     return permsCache?.data ?? [];
