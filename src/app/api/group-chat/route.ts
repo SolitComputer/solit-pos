@@ -150,20 +150,48 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     Promise.resolve().then(async () => {
         try {
-            const { sendPushBroadcast } = await import("@/lib/push-notify");
+            const { sendPushBroadcast, sendPushToUserIds } = await import("@/lib/push-notify");
             const pushBody = attachment_type === "image"
                 ? "📷 Mengirim foto"
                 : attachment_type === "file"
                     ? `📎 ${attachment_name ?? "File"}`
                     : trimmedContent.length > 80 ? trimmedContent.slice(0, 80) + "..." : trimmedContent;
 
-            await sendPushBroadcast(senderId, {
-                title: "All Team Solit",
-                body: `${senderName}: ${pushBody}`,
-                tag: "group-chat",
-                url: "/dashboard/users",
-                requireInteraction: false,
-            });
+            if (groupId === DEFAULT_GROUP_ID) {
+                // Grup default "All Team" memang untuk semua orang → broadcast benar.
+                await sendPushBroadcast(senderId, {
+                    title: "All Team Solit",
+                    body: `${senderName}: ${pushBody}`,
+                    tag: "group-chat",
+                    url: "/dashboard/users",
+                    requireInteraction: false,
+                });
+            } else {
+                // ✅ SECURITY FIX (kebocoran chat privat): dulu SEMUA grup pakai
+                // sendPushBroadcast, jadi isi pesan grup privat ikut ter-push ke
+                // notifikasi SEMUA karyawan meski bukan anggota. Sekarang notif
+                // hanya dikirim ke anggota grup, dengan judul & deep-link grupnya.
+                const [{ data: members }, { data: grp }] = await Promise.all([
+                    supabaseAdmin
+                        .from("chat_group_members")
+                        .select("user_id")
+                        .eq("group_id", groupId),
+                    supabaseAdmin
+                        .from("chat_groups")
+                        .select("name")
+                        .eq("id", groupId)
+                        .maybeSingle(),
+                ]);
+                const memberIds = (members ?? []).map((m) => m.user_id as string);
+                const groupName = grp?.name ?? "Grup";
+                await sendPushToUserIds(memberIds, senderId, {
+                    title: groupName,
+                    body: `${senderName}: ${pushBody}`,
+                    tag: `group-chat-${groupId}`,
+                    url: `/dashboard/users?group=${groupId}`,
+                    requireInteraction: false,
+                });
+            }
         } catch (err: unknown) {
             console.error("[push group]", err);
         }

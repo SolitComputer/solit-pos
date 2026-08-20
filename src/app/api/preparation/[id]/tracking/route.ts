@@ -39,9 +39,19 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const { data: order } = await supabase
       .from("preparation_orders")
-      .select("id, status, delivery_method, return_started_at, returned_at")
+      .select("id, status, delivery_method, return_started_at, returned_at, delivery_user_id")
       .eq("id", id).single();
     if (!order) return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+
+    // ✅ SECURITY FIX (spoof GPS): dulu tidak ada cek pemilik, jadi pengantar lain
+    // bisa menyuntik titik lokasi palsu ke order orang lain. Hanya pengantar yang
+    // ditugaskan yang boleh kirim lokasi.
+    if (order.delivery_user_id && order.delivery_user_id !== user.id) {
+      return NextResponse.json(
+        { success: false, message: "Pengiriman ini ditangani pengantar lain" },
+        { status: 403 }
+      );
+    }
 
     const inDelivery = order.status === "DIKIRIM";
     const inReturn = order.status === "SELESAI" && !!order.return_started_at && !order.returned_at;

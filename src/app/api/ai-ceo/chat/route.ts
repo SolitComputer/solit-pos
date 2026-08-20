@@ -29,6 +29,19 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       return NextResponse.json({ success: false, message: "Gagal membuat percakapan baru." }, { status: 500 });
     }
     conversationId = conv.id;
+  } else {
+    // ✅ SECURITY FIX (IDOR): conversationId dari body dulu dipakai langsung
+    // tanpa cek pemilik, jadi sesama user AI-CEO bisa membaca histori & menyisip
+    // pesan ke percakapan orang lain. Pastikan percakapan ini milik user.
+    const { data: owned } = await supabaseAdmin
+      .from("ai_ceo_conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!owned) {
+      return NextResponse.json({ success: false, message: "Percakapan tidak ditemukan." }, { status: 404 });
+    }
   }
   const convId = conversationId;
 

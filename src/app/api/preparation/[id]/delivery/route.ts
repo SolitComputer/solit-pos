@@ -21,6 +21,18 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { data: order } = await supabase.from("preparation_orders").select("*").eq("id", id).single();
     if (!order) return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
 
+    // ✅ SECURITY FIX (hijack pengiriman): dulu START menimpa delivery_user_id
+    // jadi si pemanggil tanpa cek pemilik, jadi pengantar lain (sama-sama role
+    // PENGANTARAN) bisa merebut order yang sedang diantar orang lain. Kalau
+    // order SUDAH punya pengantar, hanya dia yang boleh lanjut. Kalau masih null
+    // (antar langsung tanpa flow accept), pemanggil boleh jadi pengantarnya.
+    if (order.delivery_user_id && order.delivery_user_id !== user.id) {
+      return NextResponse.json(
+        { success: false, message: "Pengiriman ini sedang ditangani pengantar lain" },
+        { status: 403 }
+      );
+    }
+
     const now = new Date().toISOString();
 
     if (action === "START") {

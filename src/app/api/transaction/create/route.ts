@@ -100,6 +100,9 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             return NextResponse.json({ success: false, message: "Minimal 1 unit atau aksesori harus dipilih" }, { status: 400 });
 
         const laptopUnitIds = laptopUnits.map(u => u.unit_id);
+        // Simpan status ASLI tiap unit (dipakai untuk revert klaim kalau nanti
+        // insert transaksi gagal / ada unit yang direbut transaksi lain).
+        const originalStatusById = new Map<string, string>();
 
         // 3. Validasi harga modal laptop
         const invalidLaptopUnits = laptopUnits.filter(u => !u.cost_price || u.cost_price <= 0);
@@ -116,6 +119,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             const { data: checks, error: e } = await supabase
                 .from("laptop_units").select("id, serial_number, status").in("id", laptopUnitIds);
             if (e) throw e;
+            for (const u of checks ?? []) originalStatusById.set(u.id, u.status);
 
             // Unit berstatus DALAM_PENYIAPAN (masuk alur Penyiapan Barang) tapi
             // preparation order-nya sudah SELESAI & belum pernah dibuatkan
@@ -237,6 +241,56 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         }
         const displaySN = laptopUnits.map(u => u.serial_number).join(", ") || "-";
 
+        // ─────────────────────────────────────────────────────────────────────
+        // 4c. ✅ FIX RACE "jual dobel": KLAIM unit secara ATOMIK sebelum insert.
+        // Dulu status unit baru di-set setelah transaksi dibuat, dengan
+        // `.update(...).in("id", ids)` tanpa syarat — jadi dua kasir yang proses
+        // unit sama nyaris bersamaan sama-sama lolos cek "SIAP_JUAL" lalu
+        // dua-duanya menandai unit terjual (1 unit fisik terjual 2x).
+        //
+        // Sekarang kita update dengan filter status pra-jual. Postgres mengunci
+        // baris saat UPDATE, jadi request kedua meng-evaluasi ulang WHERE-nya
+        // SETELAH request pertama commit → statusnya sudah bukan pra-jual →
+        // 0 baris ter-update untuk unit itu → jumlah klaim < jumlah diminta →
+        // kita deteksi konflik, revert, dan tolak. Tidak butuh migrasi DB.
+        const revertClaim = async (ids: string[]) => {
+            await Promise.all(ids.map((uid) =>
+                supabase.from("laptop_units").update({
+                    status: originalStatusById.get(uid) ?? "SIAP_JUAL",
+                    reserved_by: null,
+                    reserved_invoice: null,
+                }).eq("id", uid)
+            ));
+        };
+
+        let claimedIds: string[] = [];
+        if (laptopUnitIds.length > 0) {
+            const { data: claimed, error: claimErr } = await supabase
+                .from("laptop_units")
+                .update({
+                    status: laptopUnitStatus,
+                    reserved_by: laptopUnitStatus === "RESERVED" ? body.customer_name : null,
+                    reserved_invoice: laptopUnitStatus === "RESERVED" ? invoice_number : null,
+                })
+                .in("id", laptopUnitIds)
+                // Hanya klaim unit yang MASIH di status pra-jual (semua id di sini
+                // sudah lolos validasi ketersediaan di atas, jadi pra-statusnya
+                // pasti salah satu dari dua ini).
+                .in("status", ["SIAP_JUAL", "DALAM_PENYIAPAN"])
+                .select("id");
+            if (claimErr) throw claimErr;
+            claimedIds = (claimed ?? []).map((c: any) => c.id);
+            if (claimedIds.length !== laptopUnitIds.length) {
+                // Ada unit yang barusan direbut transaksi lain → revert yang
+                // sempat ke-klaim, lalu tolak. Kasir bisa ulangi dari awal.
+                if (claimedIds.length > 0) await revertClaim(claimedIds);
+                return NextResponse.json({
+                    success: false,
+                    message: "Sebagian unit baru saja terjual/dipakai di transaksi lain. Silakan ulangi transaksi.",
+                }, { status: 409 });
+            }
+        }
+
         // 5. Insert transaction
         const { data: transaction, error: txError } = await supabase
             .from("transactions").insert({
@@ -286,7 +340,12 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                         : "accessory",
             })
             .select().single();
-        if (txError) throw txError;
+        if (txError) {
+            // Insert gagal setelah unit sudah diklaim → kembalikan status unit
+            // supaya tidak nyangkut "terjual" padahal transaksi tidak jadi.
+            if (claimedIds.length > 0) await revertClaim(claimedIds);
+            throw txError;
+        }
 
         // 6. transaction_items (laptop + aksesori)
         const laptopItems = laptopUnits.map(u => ({
@@ -334,14 +393,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
             if (dpPayErr) console.error("[transaction/create] gagal catat DP:", dpPayErr.message);
         }
 
-        // 7. Update status laptop_units
-        if (laptopUnitIds.length > 0) {
-            await supabase.from("laptop_units").update({
-                status: laptopUnitStatus,
-                reserved_by: laptopUnitStatus === "RESERVED" ? body.customer_name : null,
-                reserved_invoice: laptopUnitStatus === "RESERVED" ? invoice_number : null,
-            }).in("id", laptopUnitIds);
-        }
+        // 7. Status laptop_units SUDAH di-set secara atomik di langkah 4c (klaim unit).
 
         // 7b. Kurangi stok aksesori (atomik). Bonus & PACKING tetap dikurangi (barang keluar/dialokasikan).
         for (const [accId, qty] of accQtyById) {

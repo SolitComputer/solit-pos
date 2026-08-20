@@ -141,6 +141,43 @@ export async function sendPushBroadcast(
     await sendAndCleanup(subs, notification);
 }
 
+/**
+ * Kirim push notification ke sekumpulan user tertentu (kecuali sender).
+ * Dipakai untuk chat grup NON-default: hanya anggota grup yang menerima notif,
+ * bukan semua orang seperti sendPushBroadcast.
+ */
+export async function sendPushToUserIds(
+    userIds: string[],
+    excludeUserId: string,
+    payload: PushPayload
+): Promise<void> {
+    if (!vapidReady) return;
+
+    const targetIds = userIds.filter((id) => id && id !== excludeUserId);
+    if (targetIds.length === 0) return;
+
+    const { data: subs, error } = await supabaseAdmin
+        .from("push_subscriptions")
+        .select("user_id, endpoint, p256dh, auth")
+        .in("user_id", targetIds);
+
+    if (error) { console.error("[push] DB error:", error.message); return; }
+    if (!subs || subs.length === 0) return;
+
+    const notification = JSON.stringify({
+        title: payload.title,
+        body: payload.body,
+        icon: payload.icon ?? "/favicon.ico",
+        badge: "/favicon.ico",
+        tag: `${payload.tag ?? "notif"}-${Date.now()}`,
+        requireInteraction: payload.requireInteraction ?? false,
+        data: { url: payload.url ?? "/dashboard/users" },
+    });
+
+    console.log(`[push] Sending to ${subs.length} device(s) of ${targetIds.length} member(s)`);
+    await sendAndCleanup(subs, notification);
+}
+
 // ✅ Sama untuk sendPushToUser — tag unik per DM
 export async function sendPushToUsers(
     userId: string,

@@ -611,10 +611,20 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
                 { status: 400 }
             );
 
-        const { count } = await supabase
+        const { count, error: countErr } = await supabase
             .from("cashflow_entries")
             .select("id", { count: "exact", head: true })
             .eq("source_type", "MODAL_AWAL");
+
+        // ✅ FIX: dulu error query TIDAK dicek — kalau gagal, `count` undefined →
+        // `(count ?? 0) > 0` = false → tetap lanjut insert (fail-open), padahal
+        // Modal Awal mungkin sudah ada. Sekarang fail-closed: kalau tidak bisa
+        // memverifikasi, tolak daripada berisiko dobel.
+        if (countErr)
+            return NextResponse.json(
+                { success: false, message: "Gagal memverifikasi status modal awal. Coba lagi." },
+                { status: 503 }
+            );
 
         if ((count ?? 0) > 0)
             return NextResponse.json(

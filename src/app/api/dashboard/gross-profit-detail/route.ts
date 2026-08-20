@@ -213,4 +213,7 @@ async function handler(req: NextRequest) {
   }
 }
 
-export const GET = withAuth(handler, PERMISSIONS.VIEW_DASHBOARD);
+// ✅ SECURITY FIX: dulu VIEW_DASHBOARD (semua role) — data ini murni finansial
+// (gross_profit/margin) & di frontend hanya dibuka role finance. Dikunci ke
+// VIEW_FINANCIALS (ADMIN/ACCOUNTING/PROGRAMMER).
+export const GET = withAuth(handler, PERMISSIONS.VIEW_FINANCIALS);
