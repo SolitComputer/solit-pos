@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasPermission, PERMISSIONS } from "@/lib/permissions";
-import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban } from "lucide-react";
+import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban, Wallet } from "lucide-react";
 import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface PendingTransaction {
@@ -75,15 +75,16 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
     }, [onClose]);
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 anim-fade">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center anim-pop">
-                <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center anim-pop overflow-hidden">
+                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#b8935a] to-transparent" />
+                <div className="w-12 h-12 rounded-2xl bg-violet-50 flex items-center justify-center mx-auto mb-4 mt-1">
+                    <svg className="w-6 h-6 text-[#0f0c29]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
                 <p className="text-gray-700 text-sm font-medium mb-5">{message}</p>
-                <button onClick={onClose} className="w-full h-10 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition">OK</button>
+                <button onClick={onClose} className="w-full h-10 bg-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:bg-[#1a1545] transition-colors shadow-sm">OK</button>
             </div>
         </div>
     );
@@ -121,25 +122,26 @@ function DetailModal({ tx, onClose }: { tx: PendingTransaction; onClose: () => v
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center anim-fade">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden anim-slide-up">
-                <div className="bg-gray-800 px-5 py-4 shrink-0">
+                <div className="bg-[#0f0c29] px-5 py-4 shrink-0 relative">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="font-bold text-white text-sm">Detail Transaksi</h2>
-                            <p className="text-xs text-gray-400 mt-0.5 font-mono">{tx.invoice_number}</p>
+                            <h2 className="font-bold text-white text-sm tracking-tight">Detail Transaksi</h2>
+                            <p className="text-xs text-white/40 mt-0.5 font-mono">{tx.invoice_number}</p>
                         </div>
-                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition">
+                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
+                    <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-[#b8935a]/70 via-[#b8935a]/20 to-transparent" />
                 </div>
                 <div className="overflow-y-auto flex-1 px-5 py-3">
                     <div className="divide-y divide-gray-100">
                         {rows.map(row => (
-                            <div key={row.label} className="flex flex-col sm:flex-row sm:items-center justify-between py-2.5 gap-1">
+                            <div key={row.label} className="flex flex-col sm:flex-row sm:items-center justify-between py-2.5 gap-1 px-1.5 -mx-1.5 rounded-lg hover:bg-gray-50 transition-colors">
                                 <span className="text-[11px] text-gray-400 font-semibold uppercase tracking-wide sm:w-28 shrink-0">{row.label}</span>
                                 <span className="text-xs text-gray-800 sm:text-right font-medium break-all">{row.value}</span>
                             </div>
@@ -245,27 +247,28 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center anim-fade">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden anim-slide-up">
-                <div className="bg-gray-800 px-5 py-4 shrink-0">
+                <div className="bg-[#0f0c29] px-5 py-4 shrink-0 relative">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center">
+                            <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center ring-1 ring-white/10">
                                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                             </div>
                             <div>
-                                <h2 className="font-bold text-white text-sm">Pembayaran</h2>
-                                <p className="text-xs text-gray-400 font-mono mt-0.5">{tx.invoice_number}</p>
+                                <h2 className="font-bold text-white text-sm tracking-tight">Pembayaran</h2>
+                                <p className="text-xs text-white/40 font-mono mt-0.5">{tx.invoice_number}</p>
                             </div>
                         </div>
-                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition">
+                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
                     </div>
+                    <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-[#b8935a]/70 via-[#b8935a]/20 to-transparent" />
                 </div>
 
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
@@ -299,11 +302,11 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
 
                     <div className="grid grid-cols-2 gap-2">
                         <button type="button" onClick={() => setPayMode("CICILAN")}
-                            className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "CICILAN" ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                            className={`h-10 rounded-xl text-sm font-semibold border transition-colors ${payMode === "CICILAN" ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"}`}>
                             Cicilan
                         </button>
                         <button type="button" onClick={() => setPayMode("LUNAS")}
-                            className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "LUNAS" ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                            className={`h-10 rounded-xl text-sm font-semibold border transition-colors ${payMode === "LUNAS" ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"}`}>
                             Lunas Sekarang
                         </button>
                     </div>
@@ -315,7 +318,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                                 type="number" value={cicilanAmount}
                                 onChange={(e) => { setCicilanAmount(e.target.value); setError(""); }}
                                 placeholder={`Kurang dari ${fmt(remaining)}`}
-                                className="w-full h-11 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:bg-white transition"
+                                className="w-full h-11 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0f0c29]/15 focus:border-[#0f0c29]/40 focus:bg-white transition"
                                 autoFocus
                             />
                             <p className="text-[11px] text-gray-400">Sisa setelah cicilan ini: {fmt(Math.max(0, remaining - (Number(cicilanAmount) || 0)))}</p>
@@ -332,7 +335,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                                 type="text" value={confirmSN}
                                 onChange={(e) => { setConfirmSN(e.target.value); setError(""); }}
                                 placeholder="Masukkan SN..."
-                                className="w-full h-11 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:bg-white transition"
+                                className="w-full h-11 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0f0c29]/15 focus:border-[#0f0c29]/40 focus:bg-white transition"
                             />
                         </div>
                     )}
@@ -383,7 +386,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                 <div className="px-5 py-3 border-t border-gray-100 flex gap-2.5 shrink-0">
                     <button onClick={onClose} disabled={loading} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
                    <button onClick={handleConfirm} disabled={loading || uploadingPhoto || !paymentPhoto}
-                        className="flex-1 h-10 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-md">
+                        className="flex-1 h-10 bg-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:bg-[#1a1545] transition-colors disabled:opacity-40 disabled:hover:bg-[#0f0c29] flex items-center justify-center gap-2 shadow-sm">
                         {loading
                             ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
                             : showCicilanForm
@@ -409,13 +412,18 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center anim-fade">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden anim-slide-up">
                 <div className="bg-red-600 px-5 py-4 shrink-0">
                     <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="font-bold text-white text-sm">Batalkan Pesanan (Tidak Jadi)</h2>
-                            <p className="text-xs text-white/70 mt-0.5 font-mono">{tx.invoice_number}</p>
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center ring-1 ring-white/10 shrink-0">
+                                <Ban size={16} className="text-white" />
+                            </div>
+                            <div>
+                                <h2 className="font-bold text-white text-sm tracking-tight">Batalkan Pesanan (Tidak Jadi)</h2>
+                                <p className="text-xs text-white/60 mt-0.5 font-mono">{tx.invoice_number}</p>
+                            </div>
                         </div>
                         <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -455,27 +463,27 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
 function StatusBadge({ status }: { status: "RESERVED" | "HELD" | "PENDING" | "PACKING" }) {
     if (status === "RESERVED") {
         return (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 whitespace-nowrap">
                 <CreditCard size={12} /> DP
             </span>
         );
     }
     if (status === "PENDING") {
         return (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 whitespace-nowrap">
                 <Clock size={12} /> Pending
             </span>
         );
     }
     if (status === "PACKING") {
         return (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-200 whitespace-nowrap">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-100 whitespace-nowrap">
                 <Package size={12} /> Packing
             </span>
         );
     }
     return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200 whitespace-nowrap">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-100 whitespace-nowrap">
             <Package size={12} /> Ambil
         </span>
     );
@@ -496,27 +504,27 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
     const age = daysSince(tx.created_at);
 
     return (
-        <tr className={`group border-b border-gray-50 last:border-0 hover:bg-gray-50/80 transition-colors duration-100 ${isOld ? "bg-amber-50/30 hover:bg-amber-50/60" : ""}`}>
+        <tr className={`group border-b border-gray-100 last:border-0 hover:bg-gray-50/70 transition-colors duration-100 border-l-2 ${isOld ? "border-l-amber-400" : "border-l-transparent"}`}>
             {/* No */}
-            <td className="pl-4 pr-2 py-2.5 text-center">
+            <td className="pl-4 pr-2 py-3 text-center">
                 <span className="text-[11px] font-semibold text-gray-300 tabular-nums">{String(idx + 1).padStart(2, "0")}</span>
             </td>
 
             {/* Invoice + status */}
-            <td className="px-3 py-2.5 min-w-[140px]">
+            <td className="px-3 py-3 min-w-[140px]">
                 <div className="flex items-center gap-1.5 flex-wrap">
                     <StatusBadge status={tx.status as "RESERVED" | "HELD" | "PENDING" | "PACKING"} />
                     {isOld && (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-50 text-red-500 border border-red-200">
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-200">
                             <AlertTriangle size={12} /> {age}
                         </span>
                     )}
                 </div>
-                <code className="text-[11px] font-mono text-gray-500 mt-0.5 block leading-tight">{tx.invoice_number}</code>
+                <code className="text-[11px] font-mono text-gray-500 mt-1 block leading-tight">{tx.invoice_number}</code>
             </td>
 
             {/* Customer */}
-            <td className="px-3 py-2.5 min-w-[130px]">
+            <td className="px-3 py-3 min-w-[130px]">
                 <p className="text-xs font-semibold text-gray-800 truncate max-w-[150px]">{tx.customer_name}</p>
                 {tx.customer_phone && (
                     <p className="text-[11px] text-gray-400 mt-0.5 truncate">{tx.customer_phone}</p>
@@ -524,7 +532,7 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
             </td>
 
             {/* Laptop */}
-            <td className="px-3 py-2.5 min-w-[160px]">
+            <td className="px-3 py-3 min-w-[160px]">
                 <p className="text-xs font-medium text-gray-700 truncate max-w-[200px]" title={tx.laptop_name}>{tx.laptop_name}</p>
                 {tx.serial_number
                     ? <code className="text-[10px] font-mono text-gray-400 mt-0.5 block">SN: {tx.serial_number}</code>
@@ -533,23 +541,23 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
             </td>
 
             {/* Harga */}
-            <td className="px-3 py-2.5 text-right whitespace-nowrap">
+            <td className="px-3 py-3 text-right whitespace-nowrap">
                 <span className="text-xs font-bold text-gray-800 tabular-nums">{fmt(tx.deal_price || tx.amount)}</span>
                 <p className="text-[10px] text-gray-400 mt-0.5">{tx.payment_method}</p>
             </td>
 
             {/* Sales + tanggal */}
-            <td className="px-3 py-2.5 hidden lg:table-cell min-w-[110px]">
+            <td className="px-3 py-3 hidden lg:table-cell min-w-[110px]">
                 <p className="text-[11px] text-gray-600 font-medium truncate">{tx.sales_name}</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">{fmtDateShort(tx.created_at)}</p>
             </td>
 
             {/* Actions */}
-            <td className="pl-2 pr-4 py-2.5">
+            <td className="pl-2 pr-4 py-3">
                 <div className="flex items-center justify-end gap-1">
                     <button onClick={() => onDetail(tx)}
                         title="Detail"
-                        className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all">
+                        className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-[#0f0c29] hover:bg-gray-100 transition-all">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
@@ -566,7 +574,7 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
                     {canConfirm && (
                         <button onClick={() => onConfirm(tx)}
                             title="Konfirmasi Lunas"
-                            className="h-7 px-2.5 flex items-center gap-1 rounded-lg text-[11px] font-bold text-white bg-gray-700 hover:bg-gray-800 transition-all shadow-sm">
+                            className="h-7 px-2.5 flex items-center gap-1 rounded-lg text-[11px] font-bold text-white bg-[#0f0c29] hover:bg-[#1a1545] transition-all shadow-sm">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                             </svg>
@@ -597,27 +605,27 @@ function HistoryRow({ tx, onDetail, onWhatsApp, idx }: {
     const originalStatus = getOriginalStatus(tx) ?? "HELD";
 
     return (
-        <tr className="group border-b border-gray-50 last:border-0 hover:bg-emerald-50/40 transition-colors duration-100">
+        <tr className="group border-b border-gray-100 last:border-0 hover:bg-emerald-50/30 transition-colors duration-100">
             {/* No */}
-            <td className="pl-4 pr-2 py-2.5 text-center">
+            <td className="pl-4 pr-2 py-3 text-center">
                 <span className="text-[11px] font-semibold text-gray-300 tabular-nums">{String(idx + 1).padStart(2, "0")}</span>
             </td>
 
             {/* Invoice + asal status */}
-            <td className="px-3 py-2.5 min-w-[150px]">
+            <td className="px-3 py-3 min-w-[150px]">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${originalStatus === "RESERVED" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-orange-50 text-orange-700 border-orange-200"}`}>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${originalStatus === "RESERVED" ? "bg-blue-50 text-blue-700 border-blue-100" : "bg-orange-50 text-orange-700 border-orange-100"}`}>
                         {originalStatus === "RESERVED" ? <><CreditCard size={12} /> DP</> : <><Package size={12} /> Ambil</>}
                     </span>
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
                         <CheckCircle2 size={12} /> Lunas
                     </span>
                 </div>
-                <code className="text-[11px] font-mono text-gray-500 mt-0.5 block leading-tight">{tx.invoice_number}</code>
+                <code className="text-[11px] font-mono text-gray-500 mt-1 block leading-tight">{tx.invoice_number}</code>
             </td>
 
             {/* Customer */}
-            <td className="px-3 py-2.5 min-w-[130px]">
+            <td className="px-3 py-3 min-w-[130px]">
                 <p className="text-xs font-semibold text-gray-800 truncate max-w-[150px]">{tx.customer_name}</p>
                 {tx.customer_phone && (
                     <p className="text-[11px] text-gray-400 mt-0.5">{tx.customer_phone}</p>
@@ -625,19 +633,19 @@ function HistoryRow({ tx, onDetail, onWhatsApp, idx }: {
             </td>
 
             {/* Laptop */}
-            <td className="px-3 py-2.5 min-w-[160px]">
+            <td className="px-3 py-3 min-w-[160px]">
                 <p className="text-xs font-medium text-gray-700 truncate max-w-[200px]" title={tx.laptop_name}>{tx.laptop_name}</p>
                 {tx.serial_number && <code className="text-[10px] font-mono text-gray-400 mt-0.5 block">SN: {tx.serial_number}</code>}
             </td>
 
             {/* Harga */}
-            <td className="px-3 py-2.5 text-right whitespace-nowrap">
+            <td className="px-3 py-3 text-right whitespace-nowrap">
                 <span className="text-xs font-bold text-gray-800 tabular-nums">{fmt(tx.deal_price || tx.amount)}</span>
                 <p className="text-[10px] text-gray-400 mt-0.5">{tx.payment_method}</p>
             </td>
 
             {/* Lunas at */}
-            <td className="px-3 py-2.5 hidden lg:table-cell min-w-[120px]">
+            <td className="px-3 py-3 hidden lg:table-cell min-w-[120px]">
                 {tx.paid_at ? (
                     <>
                         <p className="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-semibold"><CheckCircle2 size={11} /> {fmtDateShort(tx.paid_at)}</p>
@@ -649,10 +657,10 @@ function HistoryRow({ tx, onDetail, onWhatsApp, idx }: {
             </td>
 
             {/* Actions */}
-            <td className="pl-2 pr-4 py-2.5">
+            <td className="pl-2 pr-4 py-3">
                 <div className="flex items-center justify-end gap-1">
                     <button onClick={() => onDetail(tx)} title="Detail"
-                        className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all">
+                        className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-[#0f0c29] hover:bg-gray-100 transition-all">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
@@ -683,33 +691,33 @@ function SkeletonRows({ count = 8 }: { count?: number }) {
     return (
         <>
             {Array.from({ length: count }).map((_, i) => (
-                <tr key={i} className="border-b border-gray-50 last:border-0 animate-pulse">
-                    <td className="pl-4 pr-2 py-3"><div className="h-3 w-5 bg-gray-100 rounded mx-auto" /></td>
+                <tr key={i} className="border-b border-gray-100 last:border-0">
+                    <td className="pl-4 pr-2 py-3"><div className="h-3 w-5 skeleton-shimmer rounded mx-auto" /></td>
                     <td className="px-3 py-3">
-                        <div className="h-4 w-20 bg-gray-100 rounded mb-1.5" />
-                        <div className="h-3 w-28 bg-gray-100 rounded" />
+                        <div className="h-4 w-20 skeleton-shimmer rounded mb-1.5" />
+                        <div className="h-3 w-28 skeleton-shimmer rounded" />
                     </td>
                     <td className="px-3 py-3">
-                        <div className="h-3.5 w-24 bg-gray-100 rounded mb-1.5" />
-                        <div className="h-3 w-20 bg-gray-100 rounded" />
+                        <div className="h-3.5 w-24 skeleton-shimmer rounded mb-1.5" />
+                        <div className="h-3 w-20 skeleton-shimmer rounded" />
                     </td>
                     <td className="px-3 py-3">
-                        <div className="h-3.5 w-36 bg-gray-100 rounded mb-1.5" />
-                        <div className="h-3 w-24 bg-gray-100 rounded" />
+                        <div className="h-3.5 w-36 skeleton-shimmer rounded mb-1.5" />
+                        <div className="h-3 w-24 skeleton-shimmer rounded" />
                     </td>
                     <td className="px-3 py-3 text-right">
-                        <div className="h-3.5 w-20 bg-gray-100 rounded ml-auto mb-1.5" />
-                        <div className="h-3 w-12 bg-gray-100 rounded ml-auto" />
+                        <div className="h-3.5 w-20 skeleton-shimmer rounded ml-auto mb-1.5" />
+                        <div className="h-3 w-12 skeleton-shimmer rounded ml-auto" />
                     </td>
                     <td className="px-3 py-3 hidden lg:table-cell">
-                        <div className="h-3 w-20 bg-gray-100 rounded mb-1.5" />
-                        <div className="h-3 w-16 bg-gray-100 rounded" />
+                        <div className="h-3 w-20 skeleton-shimmer rounded mb-1.5" />
+                        <div className="h-3 w-16 skeleton-shimmer rounded" />
                     </td>
                     <td className="pl-2 pr-4 py-3">
                         <div className="flex gap-1 justify-end">
-                            <div className="h-7 w-7 bg-gray-100 rounded-lg" />
-                            <div className="h-7 w-7 bg-gray-100 rounded-lg" />
-                            <div className="h-7 w-14 bg-gray-100 rounded-lg" />
+                            <div className="h-7 w-7 skeleton-shimmer rounded-lg" />
+                            <div className="h-7 w-7 skeleton-shimmer rounded-lg" />
+                            <div className="h-7 w-14 skeleton-shimmer rounded-lg" />
                         </div>
                     </td>
                 </tr>
@@ -722,26 +730,26 @@ function SkeletonRows({ count = 8 }: { count?: number }) {
 function TableHead({ isHistory }: { isHistory?: boolean }) {
     return (
         <thead>
-            <tr className="border-b border-gray-100 bg-gray-50/80">
-                <th className="pl-4 pr-2 py-2.5 text-center w-8">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">#</span>
+            <tr className="border-b border-gray-200/70 bg-gray-50/60">
+                <th className="pl-4 pr-2 py-3 text-center w-8">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">No</span>
                 </th>
-                <th className="px-3 py-2.5 text-left">
+                <th className="px-3 py-3 text-left">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status / Invoice</span>
                 </th>
-                <th className="px-3 py-2.5 text-left">
+                <th className="px-3 py-3 text-left">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Customer</span>
                 </th>
-                <th className="px-3 py-2.5 text-left">
+                <th className="px-3 py-3 text-left">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Laptop</span>
                 </th>
-                <th className="px-3 py-2.5 text-right">
+                <th className="px-3 py-3 text-right">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Harga</span>
                 </th>
-                <th className="px-3 py-2.5 text-left hidden lg:table-cell">
+                <th className="px-3 py-3 text-left hidden lg:table-cell">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{isHistory ? "Tgl Lunas" : "Sales / Tgl"}</span>
                 </th>
-                <th className="pl-2 pr-4 py-2.5 text-right">
+                <th className="pl-2 pr-4 py-3 text-right">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Aksi</span>
                 </th>
             </tr>
@@ -922,88 +930,111 @@ export default function PendingOrdersPage() {
                 .tbl-scroll::-webkit-scrollbar { height: 5px; }
                 .tbl-scroll::-webkit-scrollbar-track { background: #f9fafb; }
                 .tbl-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 99px; }
+
+                @keyframes skeleton-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+                .skeleton-shimmer {
+                    background: linear-gradient(90deg, #f3f4f6 25%, #ede9fe 37%, #f3f4f6 63%);
+                    background-size: 400% 100%;
+                    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+                }
+
+                .stat-card { transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+                .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -10px rgba(15,12,41,0.16); border-color: rgba(15,12,41,0.12); }
+
+                .tab-underline { position: absolute; left: 14px; right: 14px; bottom: -1px; height: 2px; border-radius: 2px; background: #0f0c29; }
             `}</style>
 
-            <main className="min-h-screen bg-[#F7F7F8] p-3 sm:p-5 lg:p-7">
-                <div className="max-w-full mx-auto space-y-4">
+            <main className="relative min-h-screen bg-[#F7F7F8] p-3 sm:p-5 lg:p-7 overflow-hidden">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#1a1545]/[0.05] to-transparent" />
+
+                <div className="relative max-w-[1600px] mx-auto space-y-5">
 
                     {/* ── HEADER ─────────────────────────────────────────── */}
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-gray-800 rounded-xl flex items-center justify-center shadow-md shadow-gray-800/20 shrink-0">
-                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    <div>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-11 h-11 bg-[#0f0c29] rounded-2xl flex items-center justify-center shadow-lg shadow-[#0f0c29]/25 shrink-0">
+                                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl sm:text-2xl font-black text-[#0f0c29] tracking-tight leading-none">DP & Ambil Dulu</h1>
+                                    <p className="text-[11px] text-gray-400 mt-1">Transaksi belum lunas · Perlu tindakan</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => { fetchData(); if (activeTab === "history") fetchHistory(); }}
+                                disabled={isLoading}
+                                className="inline-flex items-center gap-1.5 h-8 px-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:border-gray-300 hover:text-[#0f0c29] transition shadow-sm disabled:opacity-60"
+                            >
+                                <svg className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
-                            </div>
-                            <div>
-                                <h1 className="text-lg font-black text-gray-900 tracking-tight leading-none">DP & Ambil Dulu</h1>
-                                <p className="text-[11px] text-gray-400 mt-0.5">Transaksi belum lunas · Perlu tindakan</p>
-                            </div>
+                                Refresh
+                            </button>
                         </div>
-                        <button
-                            onClick={() => { fetchData(); if (activeTab === "history") fetchHistory(); }}
-                            disabled={isLoading}
-                            className="inline-flex items-center gap-1.5 h-8 px-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 transition shadow-sm"
-                        >
-                            <svg className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Refresh
-                        </button>
+                        <div className="mt-4 h-px bg-gradient-to-r from-[#b8935a]/50 via-gray-200 to-transparent" />
                     </div>
 
                     {/* ── STATS STRIP ─────────────────────────────────────── */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                         {[
-                            { label: "Total Pending", value: String(counts.all), sub: "transaksi aktif", color: "border-l-gray-700" },
-                            { label: "DP", value: String(counts.reserved), sub: <span className="inline-flex items-center gap-1"><CreditCard size={11} /> Reserved</span>, color: "border-l-blue-400" },
-                            { label: "Ambil Dulu", value: String(counts.held), sub: <span className="inline-flex items-center gap-1"><Package size={11} /> Held</span>, color: "border-l-orange-400" },
-                            { label: "Packing", value: String(counts.packing), sub: <span className="inline-flex items-center gap-1"><Package size={11} /> Marketplace</span>, color: "border-l-violet-400" },
-                            { label: "Total Nilai", value: fmt(totalValue), sub: "dari filter aktif", color: "border-l-emerald-500" },
+                            { label: "Total Pending", value: String(counts.all), sub: "Transaksi aktif", Icon: Clock, chipBg: "bg-gray-100", chipText: "text-[#0f0c29]" },
+                            { label: "DP", value: String(counts.reserved), sub: "Reserved", Icon: CreditCard, chipBg: "bg-blue-50", chipText: "text-blue-600" },
+                            { label: "Ambil Dulu", value: String(counts.held), sub: "Held", Icon: Package, chipBg: "bg-orange-50", chipText: "text-orange-600" },
+                            { label: "Packing", value: String(counts.packing), sub: "Marketplace", Icon: Package, chipBg: "bg-violet-50", chipText: "text-violet-600" },
+                            { label: "Total Nilai", value: fmt(totalValue), sub: "Dari filter aktif", Icon: Wallet, chipBg: "bg-emerald-50", chipText: "text-emerald-600" },
                         ].map(s => (
-                            <div key={s.label} className={`bg-white rounded-2xl border border-gray-100 border-l-4 ${s.color} shadow-sm px-4 py-3`}>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{s.label}</p>
-                                <p className="text-xl font-black text-gray-800 mt-0.5 tabular-nums leading-tight">{s.value}</p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">{s.sub}</p>
+                            <div key={s.label} className="stat-card bg-white rounded-2xl border border-gray-200/70 shadow-sm px-4 py-4">
+                                <div className="flex items-center gap-2 mb-2.5">
+                                    <div className={`w-7 h-7 rounded-lg ${s.chipBg} flex items-center justify-center shrink-0`}>
+                                        <s.Icon size={13} className={s.chipText} />
+                                    </div>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider truncate">{s.label}</p>
+                                </div>
+                                <p className="text-2xl font-black text-[#0f0c29] tabular-nums leading-none">{s.value}</p>
+                                <p className="text-[10px] text-gray-400 mt-1.5">{s.sub}</p>
                             </div>
                         ))}
                     </div>
 
                     {/* ── TAB + TOOLBAR ───────────────────────────────────── */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm overflow-hidden">
 
                         {/* Tab row */}
-                        <div className="flex border-b border-gray-100">
+                        <div className="flex border-b border-gray-200/70 px-2">
                             {([
                                 { key: "pending", label: <><Clock size={14} /> Belum Lunas</>, count: counts.all },
                                 { key: "history", label: <><CheckCircle2 size={14} /> Sudah Lunas</>, count: historyTransactions.length },
                             ] as const).map(tab => (
                                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                                    className={`flex-1 py-3 px-4 text-xs font-bold transition-all flex items-center justify-center gap-2 ${activeTab === tab.key ? "bg-gray-800 text-white" : "text-gray-500 hover:bg-gray-50"}`}>
+                                    className={`relative py-3.5 px-4 text-xs font-bold transition-colors flex items-center justify-center gap-2 ${activeTab === tab.key ? "text-[#0f0c29]" : "text-gray-400 hover:text-gray-600"}`}>
                                     {tab.label}
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${activeTab === tab.key ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"}`}>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${activeTab === tab.key ? "bg-[#0f0c29] text-white" : "bg-gray-100 text-gray-500"}`}>
                                         {tab.count}
                                     </span>
+                                    {activeTab === tab.key && <span className="tab-underline" />}
                                 </button>
                             ))}
                         </div>
 
                         {/* Toolbar: search + filter pills */}
-                        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-50">
+                        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-gray-100">
                             {/* Search */}
                             <div className="relative flex-1 min-w-[180px]">
-                                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                                 <input type="text"
                                     placeholder="Cari customer, invoice, laptop, no HP..."
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
-                                    className="w-full h-8 border border-gray-200 rounded-xl pl-8 pr-7 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition font-medium placeholder:text-gray-400 placeholder:font-normal"
+                                    className="w-full h-9 border border-gray-200 rounded-full pl-9 pr-8 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0f0c29]/10 focus:border-[#0f0c29]/30 focus:bg-white transition font-medium placeholder:text-gray-400 placeholder:font-normal"
                                 />
                                 {searchQuery && (
                                     <button onClick={() => setSearchQuery("")}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 transition">
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 transition">
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                     </button>
                                 )}
@@ -1020,15 +1051,19 @@ export default function PendingOrdersPage() {
                                         { value: "PACKING", label: <><Package size={12} /> Packing</>, count: counts.packing },
                                     ] as const).map(opt => (
                                         <button key={opt.value} onClick={() => setFilterStatus(opt.value)}
-                                            className={`h-7 px-2.5 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${filterStatus === opt.value ? "bg-gray-800 text-white shadow-sm" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                                            className={`h-7 px-2.5 rounded-full text-[11px] font-bold transition-all flex items-center gap-1 border ${filterStatus === opt.value ? "bg-[#0f0c29] text-white border-[#0f0c29]" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"}`}>
                                             {opt.label}
-                                            <span className={`text-[10px] font-bold px-1 rounded-full ${filterStatus === opt.value ? "bg-white/20" : "bg-gray-200/80 text-gray-500"}`}>{opt.count}</span>
+                                            <span className={`text-[10px] font-bold px-1 rounded-full ${filterStatus === opt.value ? "bg-white/20" : "bg-gray-100 text-gray-500"}`}>{opt.count}</span>
                                         </button>
                                     ))}
-                                    <input type="number" placeholder="Sisa min (Rp)" value={minSisa} onChange={e => setMinSisa(e.target.value)}
-                                        className="h-7 w-28 border border-gray-200 rounded-lg px-2 text-[11px] bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20" />
-                                    <input type="number" placeholder="Sisa max (Rp)" value={maxSisa} onChange={e => setMaxSisa(e.target.value)}
-                                        className="h-7 w-28 border border-gray-200 rounded-lg px-2 text-[11px] bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20" />
+                                    <div className="flex items-center gap-1 h-7 pl-2.5 pr-1.5 border border-gray-200 rounded-full bg-white">
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0">Sisa</span>
+                                        <input type="number" placeholder="min" value={minSisa} onChange={e => setMinSisa(e.target.value)}
+                                            className="h-5 w-14 text-[11px] bg-transparent focus:outline-none" />
+                                        <span className="text-gray-300 text-xs">–</span>
+                                        <input type="number" placeholder="max" value={maxSisa} onChange={e => setMaxSisa(e.target.value)}
+                                            className="h-5 w-14 text-[11px] bg-transparent focus:outline-none" />
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1044,7 +1079,11 @@ export default function PendingOrdersPage() {
                                         ) : filtered.length === 0 ? (
                                             <tr>
                                                 <td colSpan={7} className="py-16 text-center">
-                                                    <div className="mb-3 flex justify-center">{transactions.length === 0 ? <PartyPopper size={40} className="text-gray-300" /> : <Search size={40} className="text-gray-300" />}</div>
+                                                    <div className="mb-3 flex justify-center">
+                                                        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center">
+                                                            {transactions.length === 0 ? <PartyPopper size={28} className="text-gray-400" /> : <Search size={28} className="text-gray-400" />}
+                                                        </div>
+                                                    </div>
                                                     <p className="text-sm font-semibold text-gray-600">
                                                         {transactions.length === 0 ? "Tidak ada transaksi pending" : "Tidak ada hasil"}
                                                     </p>
@@ -1077,7 +1116,11 @@ export default function PendingOrdersPage() {
                                         ) : historyTransactions.length === 0 ? (
                                             <tr>
                                                 <td colSpan={7} className="py-16 text-center">
-                                                    <div className="mb-3 flex justify-center"><Inbox size={40} className="text-gray-300" /></div>
+                                                    <div className="mb-3 flex justify-center">
+                                                        <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                                                            <Inbox size={28} className="text-emerald-500" />
+                                                        </div>
+                                                    </div>
                                                     <p className="text-sm font-semibold text-gray-600">Belum ada riwayat pelunasan</p>
                                                     <p className="text-xs text-gray-400 mt-1">Transaksi DP & Ambil Dulu yang lunas akan muncul di sini</p>
                                                     <button onClick={fetchHistory}
@@ -1100,7 +1143,7 @@ export default function PendingOrdersPage() {
 
                         {/* Table footer */}
                         {!isLoading && !isLoadingHistory && (
-                            <div className="px-4 py-2.5 border-t border-gray-50 bg-gray-50/50 flex items-center justify-between gap-3">
+                            <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between gap-3">
                                 <p className="text-[11px] text-gray-400">
                                     {activeTab === "pending" ? (
                                         <><span className="font-bold text-gray-600">{filtered.length}</span> dari <span className="font-bold text-gray-600">{transactions.length}</span> transaksi</>
@@ -1110,7 +1153,7 @@ export default function PendingOrdersPage() {
                                 </p>
                                 {activeTab === "pending" && filtered.length > 0 && (
                                     <p className="text-[11px] text-gray-400">
-                                        Total: <span className="font-bold text-gray-700">{fmt(totalValue)}</span>
+                                        Total: <span className="font-bold text-emerald-700">{fmt(totalValue)}</span>
                                     </p>
                                 )}
                             </div>
