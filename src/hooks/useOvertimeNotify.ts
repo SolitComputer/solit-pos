@@ -20,6 +20,11 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
   const [pending, setPending] = useState<PendingOvertimeItem[]>([]);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Ditutup DI DALAM fetchPending setelah data asli dari API diterima —
+  // bukan di effect terpisah yang jalan duluan saat `pending` masih [],
+  // supaya overtime LAMA yang belum di-approve tidak dianggap "baru" dan
+  // bikin alarm salah bunyi saat halaman pertama kali dibuka.
+  const isFirstLoadRef = useRef(true);
 
   const fetchPending = useCallback(async () => {
     if (!userId || userRoles.length === 0) return;
@@ -28,7 +33,22 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
     try {
       const res = await fetch("/api/attendance/overtime/pending-acc");
       const d = await res.json();
-      if (d.success) setPending(d.data || []);
+      if (d.success) {
+        const items: PendingOvertimeItem[] = d.data || [];
+        const isNew = items.some((p) => !seenIdsRef.current.has(p.id));
+        if (isNew && items.length > 0 && !isFirstLoadRef.current) {
+          if (!audioRef.current) {
+            audioRef.current = new Audio(SOUND_URL);
+          }
+          audioRef.current.play().catch(() => {
+            // Browser mungkin blokir autoplay sebelum ada interaksi user sama
+            // sekali — ini normal, badge visual tetap muncul walau suara gagal.
+          });
+        }
+        isFirstLoadRef.current = false;
+        items.forEach((p) => seenIdsRef.current.add(p.id));
+        setPending(items);
+      }
     } catch {
       // notifikasi bukan fitur kritis — jangan ganggu UX kalau fetch gagal
     }
@@ -49,20 +69,6 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [fetchPending]);
-
-  useEffect(() => {
-    const isNew = pending.some((p) => !seenIdsRef.current.has(p.id));
-    if (isNew && pending.length > 0) {
-      if (!audioRef.current) {
-        audioRef.current = new Audio(SOUND_URL);
-      }
-      audioRef.current.play().catch(() => {
-        // Browser mungkin blokir autoplay sebelum ada interaksi user sama
-        // sekali — ini normal, badge visual tetap muncul walau suara gagal.
-      });
-    }
-    pending.forEach((p) => seenIdsRef.current.add(p.id));
-  }, [pending]);
 
   return {
     pending,
