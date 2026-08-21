@@ -8,7 +8,7 @@ import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES } from "@/lib/permissions";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
@@ -46,6 +46,12 @@ function isItemActive(href: string, pathname: string): boolean {
   }
   if (href === "/dashboard/laptops/monitoring") {
     return pathname === "/dashboard/laptops/monitoring";
+  }
+  if (href === "/dashboard/fixed-assets") {
+    return pathname === "/dashboard/fixed-assets";
+  }
+  if (href === "/dashboard/fixed-assets/aset-matot") {
+    return pathname === "/dashboard/fixed-assets/aset-matot";
   }
 
   if (href === "/dashboard/preparation") {
@@ -200,6 +206,7 @@ const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dash
 const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang?tab=laptops", icon: Icons.barang };
 const ITEM_AUDIT_OUTFLOW: MenuItem = { name: "Audit Barang Keluar", href: "/dashboard/audit-barang-keluar", icon: Icons.auditOutflow };
 const ITEM_FIXED_ASSETS: MenuItem = { name: "Data Aset Tetap", href: "/dashboard/fixed-assets", icon: Icons.fixedAsset };
+const ITEM_ASET_MATOT: MenuItem = { name: "Aset Matot", href: "/dashboard/fixed-assets/aset-matot", icon: Icons.fixedAsset };
 const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Barang Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
 const ITEM_LAPTOP_MINUS: MenuItem = { name: "Barang Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LAPTOP_MONITORING: MenuItem = { name: "Monitoring Stok", href: "/dashboard/laptops/monitoring", icon: Icons.laptopMonitoring };
@@ -810,6 +817,20 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   });
   if (!hasInventaris) {
     ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Inventaris", items: [ITEM_FIXED_ASSETS] }];
+  }
+});
+
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (!(DEAD_ASSET_ROLES as string[]).includes(role)) return;
+  let hasInventaris = false;
+  ROLE_MENUS[role] = ROLE_MENUS[role].map((g) => {
+    if (g.label !== "Inventaris") return g;
+    hasInventaris = true;
+    if (g.items.some((it) => it.href === ITEM_ASET_MATOT.href)) return g;
+    return { label: g.label, items: [...g.items, ITEM_ASET_MATOT] };
+  });
+  if (!hasInventaris) {
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Inventaris", items: [ITEM_ASET_MATOT] }];
   }
 });
 

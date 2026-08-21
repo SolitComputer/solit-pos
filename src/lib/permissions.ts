@@ -146,6 +146,15 @@ export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOU
 // Hapus "PROGRAMMER" di bawah kalau mau strict cuma Admin + Accounting.
 export const FIXED_ASSET_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 
+// ─── Aset Matot (Dead Assets) — sub-bagian dari Aset Tetap ────────────────────
+export const MINUS_REVIEW_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+];
+export const DEAD_ASSET_ROLES: UserRole[] = [
+  ...FIXED_ASSET_ROLES, "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+];
+export const OFFICIAL_PRICE_EDIT_ROLES: UserRole[] = ["ADMIN"];
+
 export function humanizeRoleKey(role: string): string {
   return role
     .split("_")
@@ -537,6 +546,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/akutansi": [...AKUNTANSI_ROLES],
   "/dashboard/fixed-assets": [...FIXED_ASSET_ROLES],
   "/api/fixed-assets": [...FIXED_ASSET_ROLES],
+  "/dashboard/fixed-assets/aset-matot": [...DEAD_ASSET_ROLES],
+  "/api/dead-assets": [...DEAD_ASSET_ROLES],
+  "/api/laptops/minus/decision": [...MINUS_REVIEW_ROLES],
   "/api/notification-settings": [...NOTIFICATION_SETTINGS_ROLES],
   "/dashboard/ai-ceo": [...AI_CEO_ROLES],
   "/api/ai-ceo": [...AI_CEO_ROLES],
@@ -993,6 +1005,20 @@ export function canSoLaptop(
 ): boolean {
   if (hasAnyRole(userRoles, SO_ROLES)) return true;
   if (userId && SO_LIMITED_USER_IDS.includes(userId)) return siapJual > 0;
+  return false;
+}
+
+/** Versi canSoLaptop untuk endpoint SO per-UNIT (bukan per-model).
+ *  - Role di SO_ROLES                → bebas, boleh SO unit apa saja.
+ *  - User id di SO_LIMITED_USER_IDS  → HANYA boleh kalau unit ini statusnya
+ *    SIAP_JUAL (padanan level-unit dari syarat "siap_jual > 0" di atas). */
+export function canSoUnit(
+  userRoles: string[],
+  userId: string | null | undefined,
+  unitStatus: string | null | undefined
+): boolean {
+  if (hasAnyRole(userRoles, SO_ROLES)) return true;
+  if (userId && SO_LIMITED_USER_IDS.includes(userId)) return unitStatus === "SIAP_JUAL";
   return false;
 }
 
