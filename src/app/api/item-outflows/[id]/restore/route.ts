@@ -53,32 +53,46 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
         }
 
         // ── Baru kembalikan stok sesuai jenis barang ────────────────────────
+        // ✅ FIX (race condition): dulu read-modify-write polos — dua restore
+        // bersamaan pada barang yang sama bisa saling menimpa hasil tambah
+        // stok. Sekarang pakai compare-and-swap (retry kalau nilai berubah
+        // di antara baca & tulis).
         if (outflow.item_ref_id) {
             if (outflow.item_kind === "ACCESSORY") {
-                const { data: acc } = await supabaseAdmin
-                    .from("accessories")
-                    .select("stock")
-                    .eq("id", outflow.item_ref_id)
-                    .maybeSingle();
+                for (let attempt = 0; attempt < 5; attempt++) {
+                    const { data: acc } = await supabaseAdmin
+                        .from("accessories")
+                        .select("stock")
+                        .eq("id", outflow.item_ref_id)
+                        .maybeSingle();
+                    if (!acc) break;
 
-                if (acc) {
-                    await supabaseAdmin
+                    const { data: casRows } = await supabaseAdmin
                         .from("accessories")
                         .update({ stock: (Number(acc.stock) || 0) + 1 })
-                        .eq("id", outflow.item_ref_id);
+                        .eq("id", outflow.item_ref_id)
+                        .eq("stock", acc.stock)
+                        .select("id");
+
+                    if (casRows && casRows.length > 0) break;
                 }
             } else if (outflow.item_kind === "LAPTOP") {
-                const { data: lp } = await supabaseAdmin
-                    .from("laptops")
-                    .select("qty")
-                    .eq("id", outflow.item_ref_id)
-                    .maybeSingle();
+                for (let attempt = 0; attempt < 5; attempt++) {
+                    const { data: lp } = await supabaseAdmin
+                        .from("laptops")
+                        .select("qty")
+                        .eq("id", outflow.item_ref_id)
+                        .maybeSingle();
+                    if (!lp) break;
 
-                if (lp) {
-                    await supabaseAdmin
+                    const { data: casRows } = await supabaseAdmin
                         .from("laptops")
                         .update({ qty: (Number(lp.qty) || 0) + 1 })
-                        .eq("id", outflow.item_ref_id);
+                        .eq("id", outflow.item_ref_id)
+                        .eq("qty", lp.qty)
+                        .select("id");
+
+                    if (casRows && casRows.length > 0) break;
                 }
             }
         }

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { PERMISSIONS, withAuth } from "@/lib/auth";
+import { fetchAllRows } from "@/lib/supabaseFetch";
 
 function getTodayWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
@@ -61,17 +62,24 @@ async function handler(req: NextRequest) {
     const monthRange = { start: wibDateToUTCRange(monthStartWIB).start, end: wibDateToUTCRange(today).end };
     const dailyRange = { start: wibDateToUTCRange(dayStartWIB).start, end: wibDateToUTCRange(today).end };
 
-    const [
-      { data: todayTrx },
-      { data: monthTrx },
-      { data: dailyTrx },
-    ] = await Promise.all([
-      supabase.from("transactions").select("*").eq("status", "PAID")
-        .gte("paid_at", todayRange.start).lt("paid_at", todayRange.end),
-      supabase.from("transactions").select("*").eq("status", "PAID")
-        .gte("paid_at", monthRange.start).lt("paid_at", monthRange.end),
-      supabase.from("transactions").select("*").eq("status", "PAID")
-        .gte("paid_at", dailyRange.start).lt("paid_at", dailyRange.end),
+    // ✅ FIX: dulu pakai .select("*") tanpa pagination — Supabase membatasi
+    // hasil ke 1000 baris secara default, jadi bulan dengan transaksi >1000
+    // baris tampil profit lebih kecil dari sebenarnya TANPA pesan error.
+    // Sekarang pakai fetchAllRows yang sudah ada di lib, tapi belum dipakai
+    // di sini.
+    const [todayTrx, monthTrx, dailyTrx] = await Promise.all([
+      fetchAllRows((from, to) =>
+        supabase.from("transactions").select("*").eq("status", "PAID")
+          .gte("paid_at", todayRange.start).lt("paid_at", todayRange.end).range(from, to)
+      ),
+      fetchAllRows((from, to) =>
+        supabase.from("transactions").select("*").eq("status", "PAID")
+          .gte("paid_at", monthRange.start).lt("paid_at", monthRange.end).range(from, to)
+      ),
+      fetchAllRows((from, to) =>
+        supabase.from("transactions").select("*").eq("status", "PAID")
+          .gte("paid_at", dailyRange.start).lt("paid_at", dailyRange.end).range(from, to)
+      ),
     ]);
 
     // ── BATCH FETCH purchase_price dari laptop_units (sama seperti stats/route.ts) ──

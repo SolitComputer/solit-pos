@@ -30,8 +30,16 @@ function countStops(points: TP[]): number {
 async function getHandler(req: NextRequest, _ctx: unknown, _user: AuthUser) {
   try {
     const url = new URL(req.url);
-    const from = url.searchParams.get("from");
-    const to = url.searchParams.get("to");
+    // ✅ SECURITY FIX: dulu "from"/"to" dari query string ditaruh mentah di
+    // string filter .or() — karakter koma/kurung bisa dipakai menyisipkan
+    // kondisi filter tambahan (filter injection). Divalidasi dulu formatnya
+    // harus tanggal ISO (YYYY-MM-DD, boleh diikuti waktu), selain itu diabaikan.
+    const isValidDateParam = (v: string | null): v is string =>
+      !!v && /^\d{4}-\d{2}-\d{2}([T ][\d:.Z+-]*)?$/.test(v);
+    const fromRaw = url.searchParams.get("from");
+    const toRaw = url.searchParams.get("to");
+    const from = isValidDateParam(fromRaw) ? fromRaw : null;
+    const to = isValidDateParam(toRaw) ? toRaw : null;
 
    let query = admin
       .from("preparation_orders")

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isFullAccess } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       .select("id, user_id, day_of_week, start_hour, start_minute, late_hour, late_minute, end_hour, end_minute, notes")
       .order("user_id").order("day_of_week");
 
-    if (user.role !== "ADMIN") {
+    if (!isFullAccess(user.role)) {
       q = q.eq("user_id", user.id);
     } else if (targetUserId) {
       q = q.eq("user_id", targetUserId);
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
+    if (!user || !isFullAccess(user.role)) {
       return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
     }
 
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
+    if (!user || !isFullAccess(user.role)) {
       return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
     }
 

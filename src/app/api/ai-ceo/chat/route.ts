@@ -3,6 +3,7 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { AI_CEO_ROLES } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 import { runAiCeoTurn, classifyAiCeoError } from "@/lib/aiCeo";
+import { isRateLimited } from "@/lib/rateLimit";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,6 +11,17 @@ const supabaseAdmin = createClient(
 );
 
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
+  // ✅ SECURITY FIX (DDoS/cost-amplification): dulu tidak ada rate limit —
+  // tiap request ke sini memicu panggilan LLM sungguhan (biaya API + CPU).
+  // Flood ke endpoint ini jauh lebih mahal per-request dibanding endpoint
+  // biasa, jadi dibatasi ketat per user di luar limit global middleware.
+  if (isRateLimited(`ai-ceo-chat:${user.id}`, 15, 60_000)) {
+    return NextResponse.json(
+      { success: false, message: "Terlalu banyak pesan dalam waktu singkat, tunggu sebentar." },
+      { status: 429 }
+    );
+  }
+
   const body = await req.json().catch(() => null);
   const message: string = body?.message?.trim();
   let conversationId: string | null = body?.conversationId ?? null;

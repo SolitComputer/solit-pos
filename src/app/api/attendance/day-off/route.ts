@@ -65,7 +65,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
+    if (!user || !isFullAccess(user.role)) {
       return NextResponse.json({ success: false, message: "Hanya admin yang bisa mengatur hari libur" }, { status: 403 });
     }
 
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
+    if (!user || !isFullAccess(user.role)) {
       return NextResponse.json({ success: false, message: "Hanya admin" }, { status: 403 });
     }
 

@@ -12,6 +12,7 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import { resolveScheduleOverride, toAuthScheduleShape } from "@/lib/shiftSchedule";
 import { processAttendanceVerification } from "@/lib/attendanceVerification";
+import { logActivity } from "@/lib/activityLogger";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -149,6 +150,20 @@ export async function PUT(request: Request) {
       sameSite: "lax" as const,
       path: "/",
       expires: expiry,
+    });
+
+    // ✅ SECURITY FIX: dulu skip absen wajah tidak tercatat sama sekali —
+    // jadi tidak ada jejak siapa yang skip dan kapan. Sekarang dicatat ke
+    // activity_logs supaya bisa diaudit.
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "Unknown";
+    await logActivity({
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "CREATE",
+      entity: "attendance",
+      entityLabel: "Skip verifikasi wajah",
+      reason: `Absen dilanjutkan tanpa verifikasi wajah. IP: ${ip}`,
     });
 
     return response;

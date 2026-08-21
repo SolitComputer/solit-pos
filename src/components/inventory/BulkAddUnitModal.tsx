@@ -34,6 +34,18 @@ export default function BulkAddUnitModal({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [receivedAt, setReceivedAt] = useState("");
 
+    // ✅ FIX: kalau SN Awal > SN Akhir (salah ketik kebalik), generateRange
+    // diam-diam cuma menghasilkan 2 SN (persis "from" dan "to" apa adanya)
+    // tanpa peringatan apa pun — user bisa tidak sadar rangenya salah.
+    function isInvertedRange(from: string, to: string): boolean {
+        const fromTrimmed = from.trim();
+        const toTrimmed = to.trim();
+        if (!fromTrimmed || !toTrimmed) return false;
+        const fromNum = parseInt(fromTrimmed, 10);
+        const toNum = parseInt(toTrimmed, 10);
+        return !isNaN(fromNum) && !isNaN(toNum) && fromNum > toNum;
+    }
+
     function generateRange(from: string, to: string): string[] {
         const fromTrimmed = from.trim();
         const toTrimmed = to.trim();
@@ -122,6 +134,7 @@ export default function BulkAddUnitModal({
             received_at: receivedAt ? new Date(receivedAt).toISOString() : undefined,
         };
         if (tab === "range") {
+            if (isInvertedRange(snFrom, snTo)) return [];
             const sns = generateRange(snFrom, snTo);
             return sns.map(sn => ({ serial_number: sn, ...defaults }));
         }
@@ -246,7 +259,14 @@ export default function BulkAddUnitModal({
                                         className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition" />
                                 </div>
                             </div>
-                            {snFrom && snTo && (
+                            {snFrom && snTo && isInvertedRange(snFrom, snTo) && (
+                                <div className="bg-red-50 rounded-xl p-3 border border-red-200">
+                                    <p className="text-xs text-red-600 font-medium">
+                                        SN Awal lebih besar dari SN Akhir — cek lagi urutannya, mungkin kebalik.
+                                    </p>
+                                </div>
+                            )}
+                            {snFrom && snTo && !isInvertedRange(snFrom, snTo) && (
                                 <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                                     <p className="text-xs text-gray-500 mb-1">Total: <span className="font-bold text-gray-800">{generateRange(snFrom, snTo).length} unit</span></p>
                                     <p className="text-xs text-gray-400 font-mono">

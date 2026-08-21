@@ -2,13 +2,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
-import { ACCESSORY_VIEW_ROLES, ACCESSORY_CREATE_ROLES, expandRolesWithParents } from "@/lib/permissions";
+import { ACCESSORY_VIEW_ROLES, ACCESSORY_CREATE_ROLES, expandRolesWithParents, BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
+// ── Sanitasi term sebelum ditaruh mentah di string filter PostgREST (.or()) ──
+// Karakter koma/kurung punya arti khusus di syntax filter Supabase — kalau
+// tidak dibuang, user bisa menyisipkan kondisi filter tambahan lewat kotak
+// pencarian (filter injection).
+function sanitizeFilterTerm(raw: string): string {
+    return raw.replace(/[,()]/g, "").trim();
+}
+
 // ─── GET /api/accessories ─────────────────────────────────────────────────────
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthUser) => {
     const { searchParams } = new URL(req.url);
-    const search = searchParams.get("search")?.trim() ?? "";
+    const search = sanitizeFilterTerm(searchParams.get("search")?.trim() ?? "");
     const category = searchParams.get("category") ?? "";
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
     const limit = Math.min(10000, parseInt(searchParams.get("limit") ?? "20", 10));
@@ -30,12 +38,20 @@ export const GET = withAuth(async (req: NextRequest) => {
     }
 
     // stock_tersedia/stock_total tetap dikirim untuk kompatibilitas UI lama
-    const enriched = (data ?? []).map(acc => ({
-        ...acc,
-        stock: Number(acc.stock) || 0,
-        stock_tersedia: Number(acc.stock) || 0,
-        stock_total: Number(acc.stock) || 0,
-    }));
+    // ✅ SECURITY FIX: ACCESSORY_VIEW_ROLES mencakup role sales (CREW_SALES,
+    // CUSTOMER_SERVICE) yang tidak boleh lihat buy_price — dulu select("*")
+    // dikirim mentah tanpa masking sama sekali.
+    const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
+    const enriched = (data ?? []).map(acc => {
+        const base: Record<string, any> = {
+            ...acc,
+            stock: Number(acc.stock) || 0,
+            stock_tersedia: Number(acc.stock) || 0,
+            stock_total: Number(acc.stock) || 0,
+        };
+        if (!canSeePrivate) delete base.buy_price;
+        return base;
+    });
 
     return NextResponse.json({ success: true, data: enriched, total: count ?? 0, page, limit });
 }, ACCESSORY_VIEW_ROLES);

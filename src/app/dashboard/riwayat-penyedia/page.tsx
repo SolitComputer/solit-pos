@@ -195,6 +195,17 @@ export default function RiwayatPenyediaPage() {
     return providers.filter((p) => p.name.toLowerCase().includes(t));
   }, [providers, search]);
 
+  // ✅ FIX: ranking asli harus dihitung dari `providers` (list lengkap yang
+  // sudah terurut), bukan dari index di `filtered` — kalau lagi search,
+  // `filtered` cuma berisi sebagian baris jadi index-nya bukan peringkat
+  // sebenarnya (mis. hasil search cuma nampilin peringkat #5 & #8, tapi
+  // ditampilkan sebagai medali emas & perak).
+  const rankById = useMemo(() => {
+    const map = new Map<string, number>();
+    providers.forEach((p, i) => map.set(p.id, i));
+    return map;
+  }, [providers]);
+
   const totals = useMemo(() => {
     const totalPekerjaan = providers.reduce((s, p) => s + p.total_pekerjaan, 0);
     const totalJamTerbang = providers.reduce((s, p) => s + p.jam_terbang, 0);
@@ -433,15 +444,17 @@ export default function RiwayatPenyediaPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((p, i) => (
+                    {filtered.map((p) => {
+                      const rank = rankById.get(p.id) ?? 0;
+                      return (
                       <tr
                         key={p.id}
                         onClick={() => setSelected(p)}
                         className={`cursor-pointer border-t border-gray-100 hover:bg-gray-50 transition ${
-                          i === 0 ? "bg-amber-50/60" : ""
+                          rank === 0 ? "bg-amber-50/60" : ""
                         }`}
                       >
-                        <td className="px-3 py-3 text-center font-black text-sm">{medal(i)}</td>
+                        <td className="px-3 py-3 text-center font-black text-sm">{medal(rank)}</td>
                         <td className="px-3 py-3">
                           <span className="font-bold text-gray-800">{p.name}</span>
                         </td>
@@ -455,7 +468,8 @@ export default function RiwayatPenyediaPage() {
                           {fmtHours(p.rata_rata)}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

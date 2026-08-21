@@ -47,8 +47,10 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     return NextResponse.json({ success: false, message: "Key wajib diisi" }, { status: 400 });
   if (!file)
     return NextResponse.json({ success: false, message: "File wajib diupload" }, { status: 400 });
-  if (!file.type.startsWith("image/"))
-    return NextResponse.json({ success: false, message: "File harus berupa gambar" }, { status: 400 });
+  // ✅ FIX: "image/*" mencakup image/svg+xml — SVG bisa berisi <script> yang
+  // jalan kalau dibuka langsung dari bucket publik. Dipersempit ke raster.
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
+    return NextResponse.json({ success: false, message: "File harus berupa gambar JPG/PNG/WEBP" }, { status: 400 });
   if (file.size > 5 * 1024 * 1024)
     return NextResponse.json({ success: false, message: "Ukuran gambar maksimal 5MB" }, { status: 400 });
 
