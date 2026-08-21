@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
-import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasAnyRole, BARANG_FULL_ACCESS_ROLES, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, OFFICIAL_PRICE_EDIT_ROLES } from "@/lib/permissions";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
 import { Trash2, Package, CheckCircle2, Wrench, Wallet } from "lucide-react";
@@ -376,7 +376,7 @@ export default function UnitsPage() {
             const res = await fetch(`/api/units/${unit.id}/audit`, { method: "PATCH" });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal update audit");
-           const wasActive = isUnitAuditActive(unit);
+            const wasActive = isUnitAuditActive(unit);
             // Audit per-unit: hanya update unit yang diklik di state lokal
             setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, ...json.data } : u));
             setToast(wasActive ? "Audit unit dibatalkan" : "Unit ditandai sudah diaudit");
@@ -462,7 +462,7 @@ export default function UnitsPage() {
             case "TOTAL_JUAL_DESC": list.sort((a, b) => (b.selling_price || 0) - (a.selling_price || 0)); break;
             case "MODAL_ASC": list.sort((a, b) => (a.purchase_price || 0) - (b.purchase_price || 0)); break;
             case "MODAL_DESC": list.sort((a, b) => (b.purchase_price || 0) - (a.purchase_price || 0)); break;
-           case "SPAREPART_ASC": list.sort((a, b) => (a.sparepart_cost || 0) - (b.sparepart_cost || 0)); break;
+            case "SPAREPART_ASC": list.sort((a, b) => (a.sparepart_cost || 0) - (b.sparepart_cost || 0)); break;
             case "SPAREPART_DESC": list.sort((a, b) => (b.sparepart_cost || 0) - (a.sparepart_cost || 0)); break;
             case "TOTAL_MODAL_ASC": list.sort((a, b) => ((a.purchase_price || 0) + (a.sparepart_cost || 0)) - ((b.purchase_price || 0) + (b.sparepart_cost || 0))); break;
             case "TOTAL_MODAL_DESC": list.sort((a, b) => ((b.purchase_price || 0) + (b.sparepart_cost || 0)) - ((a.purchase_price || 0) + (a.sparepart_cost || 0))); break;
@@ -532,7 +532,7 @@ export default function UnitsPage() {
 
     //  Total Keseluruhan untuk bar ringkasan di atas tabel — dihitung dari
     //  filteredUnits (ikut filter aktif), pola sama dgn LaptopsContent.tsx
-   const totalModalLaptop = filteredUnits.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
+    const totalModalLaptop = filteredUnits.reduce((s, u) => s + (u.purchase_price ?? 0), 0);
     const totalModalSparepart = filteredUnits.reduce((s, u) => s + (u.sparepart_cost ?? 0), 0);
     const totalModal = totalModalLaptop + totalModalSparepart;
     const totalGrossProfit = filteredUnits.reduce((s, u) => s + ((u.selling_price || 0) - (u.sparepart_cost || 0) - (u.purchase_price || 0)), 0);
@@ -917,7 +917,7 @@ export default function UnitsPage() {
                                 <option value="PRICE_DESC">Harga Jual: Tinggi → Rendah</option>
                                 {canSeePriceInfo && <option value="MODAL_ASC">Harga Modal: Rendah → Tinggi</option>}
                                 {canSeePriceInfo && <option value="MODAL_DESC">Harga Modal: Tinggi → Rendah</option>}
-                               {canSeePriceInfo && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
+                                {canSeePriceInfo && <option value="SPAREPART_ASC">Modal Sparepart: Rendah → Tinggi</option>}
                                 {canSeePriceInfo && <option value="SPAREPART_DESC">Modal Sparepart: Tinggi → Rendah</option>}
                                 {canSeePriceInfo && <option value="TOTAL_MODAL_ASC">Total Modal: Rendah → Tinggi</option>}
                                 {canSeePriceInfo && <option value="TOTAL_MODAL_DESC">Total Modal: Tinggi → Rendah</option>}
@@ -1093,7 +1093,7 @@ export default function UnitsPage() {
                                             </button>
                                         </div>
                                     );
-                               } : undefined}
+                                } : undefined}
                                 renderPedagang={canFullAccessBarang ? (row) => {
                                     const u = filteredUnits.find(x => x.id === row.id);
                                     if (!u) return null;
@@ -1217,6 +1217,7 @@ export default function UnitsPage() {
                     saving={priceSaving}
                     onCancel={() => setShowPriceModal(false)}
                     onSave={handleBulkPrice}
+                    canEditOfficialPrice={hasAnyRole(userRoles, OFFICIAL_PRICE_EDIT_ROLES)}
                 />
             )}
         </DashboardLayout>
@@ -1318,11 +1319,12 @@ function SourceBulkModal({ value, onChange, saving, onCancel, onSave }: {
 }
 
 //  Modal set "Harga Store", "Harga Sparepart" & "Harga Official" untuk SEMUA unit satu model sekaligus.
-function PriceBulkModal({ value, onChange, saving, onCancel, onSave }: {
+function PriceBulkModal({ value, onChange, saving, onCancel, onSave, canEditOfficialPrice }: {
     value: { selling_price: string; sparepart_cost: string; official_price: string };
     onChange: (v: { selling_price: string; sparepart_cost: string; official_price: string }) => void;
     saving: boolean;
     onCancel: () => void; onSave: () => void;
+    canEditOfficialPrice: boolean;
 }) {
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
@@ -1376,14 +1378,18 @@ function PriceBulkModal({ value, onChange, saving, onCancel, onSave }: {
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Official (Rp)</label>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                            Harga Official (Rp)
+                            {!canEditOfficialPrice && <span className="text-gray-400 font-normal ml-1">(khusus Admin)</span>}
+                        </label>
                         <input
                             type="number"
                             min={0}
+                            disabled={!canEditOfficialPrice}
                             value={value.official_price}
                             onChange={e => onChange({ ...value, official_price: e.target.value })}
-                            placeholder="Kosongkan kalau tidak diubah"
-                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                            placeholder={canEditOfficialPrice ? "Kosongkan kalau tidak diubah" : "Hanya Admin yang bisa mengubah"}
+                            className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                     </div>
                 </div>
