@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { computeStatus, isCCBrand, type CCReport } from "@/lib/ccReports";
+import { getCurrentUser } from "@/lib/auth";
+import { hasAnyRole, CC_REPORT_MANAGE_ROLES } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +72,20 @@ export async function PATCH(
       { success: false, error: "Tidak ada field yang diupdate" },
       { status: 400 }
     );
+  }
+
+  // ✅ SECURITY FIX: tombol "Batalkan Konten" cuma disembunyikan di UI untuk
+  // role yang bukan CC_REPORT_MANAGE_ROLES — server tidak pernah mengecek ini,
+  // jadi role lain tetap bisa kirim PATCH { is_cancelled: true } langsung dan
+  // mengunci konten secara permanen. Sekarang dicek di sini juga.
+  if ("is_cancelled" in patch) {
+    const user = await getCurrentUser();
+    if (!user || !hasAnyRole(user.roles ?? [user.role], CC_REPORT_MANAGE_ROLES)) {
+      return NextResponse.json(
+        { success: false, error: "Kamu tidak punya akses untuk membatalkan konten ini" },
+        { status: 403 }
+      );
+    }
   }
 
   // 🚫 Konten yang sudah di-Cancel (is_cancelled) terkunci total di level API —

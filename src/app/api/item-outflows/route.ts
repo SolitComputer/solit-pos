@@ -328,18 +328,27 @@ async function postHandler(req: NextRequest, _ctx: unknown, user: AuthUser) {
                     { p_laptop_id: item_ref_id, p_qty: 1 }
                 );
                 if (lpErr) {
-                    // RPC tidak ada → fallback ke UPDATE manual
-                    const { data: currentLp } = await supabaseAdmin
-                        .from("laptops")
-                        .select("qty")
-                        .eq("id", item_ref_id)
-                        .single();
+                    // ✅ FIX (race condition): dulu read-modify-write polos (baca qty,
+                    // lalu tulis qty-1) — dua pengambilan bersamaan bisa baca qty yang
+                    // sama sebelum salah satu sempat menulis, jadi qty kurang terpotong.
+                    // Sekarang pakai compare-and-swap: tulis cuma berhasil kalau qty
+                    // masih persis seperti saat dibaca, kalau gagal coba baca ulang.
+                    for (let attempt = 0; attempt < 5; attempt++) {
+                        const { data: currentLp } = await supabaseAdmin
+                            .from("laptops")
+                            .select("qty")
+                            .eq("id", item_ref_id)
+                            .single();
+                        if (!currentLp) break;
 
-                    if (currentLp) {
-                        await supabaseAdmin
+                        const { data: casRows } = await supabaseAdmin
                             .from("laptops")
                             .update({ qty: Math.max(0, Number(currentLp.qty) - 1) })
-                            .eq("id", item_ref_id);
+                            .eq("id", item_ref_id)
+                            .eq("qty", currentLp.qty)
+                            .select("id");
+
+                        if (casRows && casRows.length > 0) break;
                     }
                 }
             }

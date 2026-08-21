@@ -31,7 +31,12 @@ export const GET = withAuth(
     if (entityId) query = query.eq("entity_id", entityId);
     if (action) query = query.eq("action", action);
     if (search) {
-      const term = `%${search}%`;
+      // ✅ SECURITY FIX: dulu search ditaruh mentah di dalam filter ber-quote
+      // (`ilike."${term}"`) — karakter kutip ganda (`"`) di input bisa
+      // menutup quote lebih awal lalu menyisipkan kondisi filter tambahan
+      // (filter injection). Karakter kutip/backslash/koma/kurung dibuang.
+      const safeSearch = search.replace(/["\\,()]/g, " ");
+      const term = `%${safeSearch}%`;
       query = query.or(
         `user_name.ilike."${term}",entity_label.ilike."${term}",before_data::text.ilike."${term}",after_data::text.ilike."${term}"`
       );

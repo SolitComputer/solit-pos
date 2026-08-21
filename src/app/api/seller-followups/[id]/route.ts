@@ -51,7 +51,9 @@ async function parseBody(
 }
 
 async function uploadProof(file: File, followupId: string): Promise<string> {
-  if (!file.type.startsWith("image/")) throw new Error("Bukti FU harus berupa gambar");
+  // ✅ FIX: "image/*" mencakup image/svg+xml — SVG bisa berisi <script> yang
+  // jalan kalau dibuka langsung dari bucket publik. Dipersempit ke raster.
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Bukti FU harus berupa gambar JPG/PNG/WEBP");
   if (file.size > MAX_PROOF_BYTES) throw new Error("Ukuran bukti FU maksimal 5 MB");
 
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();

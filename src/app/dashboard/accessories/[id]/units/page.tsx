@@ -814,10 +814,26 @@ export default function AccessoryUnitsPage() {
                 setConfirmModal(null);
                 setBulkDeleting(true);
                 try {
-                    await Promise.all(Array.from(selectedIds).map(id =>
-                        fetch(`/api/accessory-units/${id}`, { method: "DELETE" })
-                    ));
-                    toast.success(`${selectedIds.size} unit dihapus`);
+                    // ✅ FIX: dulu hasil fetch tidak dicek sama sekali (fetch tidak
+                    // reject untuk response 4xx/5xx) — jadi kalau sebagian unit
+                    // gagal dihapus, UI tetap bilang "berhasil semua".
+                    const results = await Promise.all(
+                        Array.from(selectedIds).map(async (id) => {
+                            try {
+                                const res = await fetch(`/api/accessory-units/${id}`, { method: "DELETE" });
+                                const json = await res.json().catch(() => null);
+                                return res.ok && json?.success !== false;
+                            } catch {
+                                return false;
+                            }
+                        })
+                    );
+                    const failedCount = results.filter((ok) => !ok).length;
+                    if (failedCount > 0) {
+                        toast.error(`${failedCount} dari ${results.length} unit gagal dihapus. Sisanya berhasil.`);
+                    } else {
+                        toast.success(`${results.length} unit dihapus`);
+                    }
                     setSelectedIds(new Set());
                     fetchData();
                 } catch { toast.error("Gagal menghapus beberapa unit"); }

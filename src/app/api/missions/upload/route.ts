@@ -31,8 +31,10 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   const file = form.get("file") as File | null;
 
   if (!file) return NextResponse.json({ success: false, message: "File tidak ditemukan" }, { status: 400 });
-  if (!file.type.startsWith("image/"))
-    return NextResponse.json({ success: false, message: "File harus berupa gambar" }, { status: 400 });
+  // ✅ FIX: "image/*" mencakup image/svg+xml — SVG bisa berisi <script> yang
+  // jalan kalau dibuka langsung dari bucket publik. Dipersempit ke raster.
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
+    return NextResponse.json({ success: false, message: "File harus berupa gambar JPG/PNG/WEBP" }, { status: 400 });
   if (file.size > MAX_SIZE)
     return NextResponse.json({ success: false, message: "Ukuran maksimal 5MB" }, { status: 400 });
 

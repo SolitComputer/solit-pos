@@ -75,6 +75,13 @@ async function getMessagesHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     const [userA, userB] = between.split(",");
     if (!userA || !userB) return NextResponse.json({ success: false, message: "Format: between=idA,idB" }, { status: 400 });
+    // ✅ SECURITY FIX: dulu userA/userB dari query string ditaruh mentah di
+    // string filter .or() — karakter koma/kurung bisa menyisipkan kondisi
+    // filter tambahan (filter injection). ID user harus UUID, divalidasi dulu.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(userA) || !UUID_RE.test(userB)) {
+      return NextResponse.json({ success: false, message: "Format: between=idA,idB (harus UUID)" }, { status: 400 });
+    }
 
     const { data, error } = await supabaseAdmin
         .from("messages")

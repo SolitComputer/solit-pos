@@ -546,6 +546,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/ai-assistant": [...AI_ASSISTANT_ROLES],
   "/api/admin/pages": [...ROLE_ACCESS_MANAGER_ROLES],
   "/api/admin/role-permissions": [...ROLE_ACCESS_MANAGER_ROLES],
+  // ✅ FIX: dulu tidak terdaftar di sini — middleware jadi default-allow
+  // "siapa saja yang login" untuk rute admin roles ini (proteksi cuma
+  // mengandalkan isRoleManager() internal). Disamakan dengan dua rute
+  // saudaranya di atas untuk defense-in-depth.
+  "/api/admin/roles": [...ROLE_ACCESS_MANAGER_ROLES],
 
   "/dashboard/profile": [...ALL_ROLES],
   "/dashboard/social": [...ALL_ROLES],

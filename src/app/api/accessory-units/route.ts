@@ -1,8 +1,8 @@
 // src/app/api/accessory-units/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { withAuth } from "@/lib/auth";
-import { UserRole } from "@/lib/permissions";
+import { withAuth, AuthUser } from "@/lib/auth";
+import { UserRole, BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
 
 const VIEW_ROLES: UserRole[] = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -19,7 +19,7 @@ const CREATE_ROLES: UserRole[] = [
 ];
 
 // ─── GET /api/accessory-units?accessory_id=xxx ────────────────────────────────
-export const GET = withAuth(async (req: NextRequest) => {
+export const GET = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthUser) => {
     const { searchParams } = new URL(req.url);
     const accessoryId = searchParams.get("accessory_id");
     const status = searchParams.get("status"); // optional filter
@@ -40,7 +40,17 @@ export const GET = withAuth(async (req: NextRequest) => {
 
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
 
-    return NextResponse.json({ success: true, data: data ?? [] });
+    // ✅ SECURITY FIX: VIEW_ROLES mencakup CREW_SALES/KEPALA_SALES yang tidak
+    // boleh lihat buy_price per unit — dulu select("*") mentah tanpa masking.
+    const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
+    const safeData = canSeePrivate
+        ? (data ?? [])
+        : (data ?? []).map((u: Record<string, any>) => {
+            const { buy_price, ...rest } = u;
+            return rest;
+        });
+
+    return NextResponse.json({ success: true, data: safeData });
 }, VIEW_ROLES);
 
 // ─── POST /api/accessory-units ────────────────────────────────────────────────
