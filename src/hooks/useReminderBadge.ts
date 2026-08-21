@@ -17,10 +17,13 @@ export function useCeoReminderNotify(userId?: string | null) {
   const [latestItem, setLatestItem] = useState<CeoReminderItem | null>(null);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initialLoadRef = useRef(true);
+  const inFlightRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!userId) return;
+    if (inFlightRef.current) return;
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    inFlightRef.current = true;
     try {
       const res = await fetch("/api/ai-assistant/reminders", { cache: "no-store" });
       const json = await res.json();
@@ -41,13 +44,15 @@ export function useCeoReminderNotify(userId?: string | null) {
       }
     } catch {
       // silent
+    } finally {
+      inFlightRef.current = false;
     }
   }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
     load();
-    const interval = setInterval(load, 30_000);
+    const interval = setInterval(load, 60_000); // 60s fallback, primary updates come from Realtime
 
     const onVisible = () => {
       if (document.visibilityState === "visible") load();
@@ -95,4 +100,3 @@ export function useReminderBadge(userId?: string | null): number {
   const { unreadCount } = useCeoReminderNotify(userId);
   return unreadCount;
 }
-

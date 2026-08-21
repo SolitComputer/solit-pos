@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { AI_ASSISTANT_ROLES } from "@/lib/permissions";
-import { createClient } from "@supabase/supabase-js";
-
-export const dynamic = "force-dynamic";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 
 async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
   const userRoles: string[] =

@@ -4,7 +4,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 
-const HEARTBEAT_INTERVAL_MS = 30_000; // 30 detik — balance antara responsif & beban server
+const HEARTBEAT_INTERVAL_MS = 45_000; // 45 detik — balance antara responsif & beban server (threshold server 90s)
 const INITIAL_DELAY_MS = 500;
 const THROTTLE_MS = 10_000; // minimal 10 detik antar heartbeat (cegah spam saat alt-tab berulang)
 
@@ -13,15 +13,18 @@ export function usePresence() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isVisibleRef = useRef(true);
   const lastSentRef = useRef(0); // timestamp terakhir heartbeat berhasil dikirim
+  const inFlightRef = useRef(false);
 
   const sendHeartbeat = useCallback(async (page: string) => {
     if (!isVisibleRef.current) return; // Jangan kirim jika tab hidden
+    if (inFlightRef.current) return;
 
     // Throttle: skip jika belum cukup jeda sejak heartbeat terakhir
     const now = Date.now();
     if (now - lastSentRef.current < THROTTLE_MS) return;
     lastSentRef.current = now;
 
+    inFlightRef.current = true;
     try {
       await fetch("/api/presence", {
         method: "POST",
@@ -30,6 +33,8 @@ export function usePresence() {
       });
     } catch {
       // Silently fail
+    } finally {
+      inFlightRef.current = false;
     }
   }, []);
 

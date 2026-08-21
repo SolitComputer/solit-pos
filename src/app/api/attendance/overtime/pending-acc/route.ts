@@ -1,12 +1,7 @@
 // src/app/api/attendance/overtime/pending-acc/route.ts
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 
 const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
@@ -48,7 +43,7 @@ export async function GET() {
         return NextResponse.json({ success: true, data: [] });
       }
 
-      const { data: subUsers, error: subUsersError } = await supabase
+      const { data: subUsers, error: subUsersError } = await supabaseAdmin
         .from("users")
         .select("id")
         .in("role", Array.from(subRoles));
@@ -67,7 +62,7 @@ export async function GET() {
       }
     }
 
-let query = supabase
+    let query = supabaseAdmin
       .from("overtime_requests")
       .select("id, user_id, duration_minutes, direction, request_date, category, work_description")
       .eq("status", "PENDING")
@@ -87,7 +82,7 @@ let query = supabase
 
     const userIds = [...new Set((data ?? []).map((o: any) => o.user_id))];
     const { data: usersData } = userIds.length > 0
-      ? await supabase.from("users").select("id, name, role").in("id", userIds)
+      ? await supabaseAdmin.from("users").select("id, name, role").in("id", userIds)
       : { data: [] };
     const usersMap: Record<string, any> = {};
     (usersData ?? []).forEach((u: any) => { usersMap[u.id] = u; });

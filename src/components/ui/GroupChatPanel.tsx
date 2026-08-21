@@ -1499,8 +1499,13 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
         }).catch(() => { });
     }, []);
 
-    // ── Ambil presence dari /api/presence (sumber sama dgn OnlineUsersPanel) + refresh tiap 30 dtk ──
+    const presenceInFlightRef = useRef(false);
+
+    // ── Ambil presence dari /api/presence (sumber sama dgn OnlineUsersPanel) + refresh tiap 45 dtk ──
     const fetchPresence = useCallback(async () => {
+        if (presenceInFlightRef.current) return;
+        if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+        presenceInFlightRef.current = true;
         try {
             const res = await fetch("/api/presence");
             const data = await res.json();
@@ -1519,12 +1524,14 @@ export function GroupChatPanel({ currentUser, onClose }: GroupChatPanelProps) {
             }
         } catch (err) {
             console.error("[GroupChatPanel] presence error:", err);
+        } finally {
+            presenceInFlightRef.current = false;
         }
     }, []);
 
     useEffect(() => {
         fetchPresence();
-        const ticker = setInterval(fetchPresence, 30_000); // refresh status online tiap 30 detik
+        const ticker = setInterval(fetchPresence, 45_000); // refresh status online tiap 45 detik
         return () => clearInterval(ticker);
     }, [fetchPresence]);
 
