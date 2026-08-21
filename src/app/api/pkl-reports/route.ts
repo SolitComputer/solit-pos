@@ -3,14 +3,21 @@ import { getCurrentUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 
 const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+// ✅ SECURITY FIX: KEPALA_ZENITH terdaftar di ROUTE_PERMISSIONS untuk akses
+// rute ini (lihat src/lib/permissions.ts), tapi dulu tidak ada di tiga map
+// di bawah — akibatnya isKepala("KEPALA_ZENITH") selalu false, cabang
+// filter divisi di GET tidak pernah jalan, dan KEPALA_ZENITH melihat SEMUA
+// laporan PKL lintas divisi. Disamakan dengan DIVISION_MAP.KEPALA_ZENITH di
+// lib/permissions.ts (mengelola subordinat yang sama seperti KEPALA_SALES).
 const KEPALA_ROLES = [
-    "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
 ];
 
 const KEPALA_DIVISION_MAP: Record<string, string> = {
     KEPALA_MARKETING: "MARKETING",
     KEPALA_SALES: "SALES",
+    KEPALA_ZENITH: "SALES",
     KEPALA_PENYEDIA_BARANG: "PENYEDIA_BARANG",
     KEPALA_TEKNISI: "TEKNISI",
     KEPALA_ONPOINT: "ONPOINT",
@@ -20,6 +27,7 @@ const KEPALA_DIVISION_MAP: Record<string, string> = {
 const KEPALA_PKL_ROLE_MAP: Record<string, string> = {
     KEPALA_MARKETING: "PKL_MARKETING",
     KEPALA_SALES: "PKL_SALES",
+    KEPALA_ZENITH: "PKL_SALES",
     KEPALA_PENYEDIA_BARANG: "PKL_PENYEDIA_BARANG",
     KEPALA_TEKNISI: "PKL_TEKNISI",
     KEPALA_ONPOINT: "PKL_ONPOINT",

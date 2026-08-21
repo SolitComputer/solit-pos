@@ -697,6 +697,22 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.price_per_unit !== undefined) allowedFields.price_per_unit = Number(body.price_per_unit);
 
     // ── Handle update purchase_price per unit ────────────────────────
+    // ✅ SECURITY FIX: dulu role mana pun yang punya EDIT_TRANSACTION (termasuk
+    // CREW_SALES, PKL_SALES, ONPOINT — bukan cuma finance) bisa menulis ulang
+    // laptop_units.purchase_price (COGS) lewat body PUT ini, merusak basis
+    // biaya yang dipakai bareng di semua laporan margin/profit. Sekarang
+    // dibatasi ke role finance (VIEW_FINANCIALS), sama seperti endpoint lain
+    // yang mengekspos data harga modal.
+    const canEditCost = (user.roles ?? [user.role]).some(
+      (r) => (PERMISSIONS.VIEW_FINANCIALS as string[]).includes(r)
+    );
+    if (Array.isArray(body.purchase_prices_per_unit) && body.purchase_prices_per_unit.length > 0 && !canEditCost) {
+      return NextResponse.json(
+        { success: false, message: "Kamu tidak punya akses untuk mengubah harga modal unit" },
+        { status: 403 }
+      );
+    }
+
     type PurchasePriceUpdate = { unit_id: string; purchase_price: number };
     const purchasePricesPerUnit: PurchasePriceUpdate[] = Array.isArray(body.purchase_prices_per_unit)
       ? body.purchase_prices_per_unit

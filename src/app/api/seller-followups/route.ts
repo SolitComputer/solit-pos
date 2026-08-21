@@ -15,7 +15,9 @@ async function getHandler(req: NextRequest, _ctx: { params: any }, user: AuthUse
     const url = new URL(req.url);
     const type = url.searchParams.get("type") ?? "ALL";
     const scope = url.searchParams.get("scope") ?? "ACTIVE";
-    const search = (url.searchParams.get("search") ?? "").trim();
+    // ✅ SECURITY FIX: dulu search ditaruh mentah di string filter .or() —
+    // karakter koma/kurung bisa menyisipkan kondisi filter tambahan.
+    const search = (url.searchParams.get("search") ?? "").trim().replace(/[,()]/g, " ");
 
     const roles = expandRolesWithParents(user.roles ?? [user.role]);
     const isSupervisor = hasAnyRole(roles, PERMS.VIEW_ALL_SELLER_FOLLOWUP);

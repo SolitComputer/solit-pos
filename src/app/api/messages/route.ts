@@ -16,6 +16,13 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   if (!receiverId) {
     return NextResponse.json({ success: false, message: "Parameter 'with' wajib" }, { status: 400 });
   }
+  // ✅ SECURITY FIX: dulu receiverId dari query string ditaruh mentah di
+  // string filter .or() — karakter koma/kurung bisa menyisipkan kondisi
+  // filter tambahan (filter injection). ID user harus UUID, divalidasi dulu.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(receiverId)) {
+    return NextResponse.json({ success: false, message: "Parameter 'with' tidak valid" }, { status: 400 });
+  }
 
   const { data, error } = await supabaseAdmin
     .from("messages")

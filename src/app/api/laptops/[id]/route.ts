@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
-import { LAPTOP_DELETE_ROLES, expandRolesWithParents } from "@/lib/permissions";
+import { LAPTOP_DELETE_ROLES, LAPTOP_VIEW_ROLES, BARANG_PRIVATE_VIEW_ROLES, expandRolesWithParents, hasAnyRole } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
 interface Props {
@@ -33,7 +33,18 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
       );
     }
 
-    return NextResponse.json({ success: true, data });
+    // ✅ SECURITY FIX: dulu select("*") dikembalikan mentah tanpa masking —
+    // beda dari GET /api/laptops (list) yang sudah benar menyaring
+    // purchase_price/sparepart_cost dari role non-privat. Disamakan di sini.
+    const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
+    const safeData = canSeePrivate
+      ? data
+      : (() => {
+          const { purchase_price, sparepart_cost, ...rest } = data as Record<string, any>;
+          return rest;
+        })();
+
+    return NextResponse.json({ success: true, data: safeData });
   } catch {
     return NextResponse.json({ success: false }, { status: 500 });
   }
@@ -219,6 +230,6 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const GET = withAuth(getHandler);
+export const GET = withAuth(getHandler, LAPTOP_VIEW_ROLES);
 export const PUT = withAuth(putHandler);
 export const DELETE = withAuth(deleteHandler);
