@@ -7,7 +7,7 @@
 // paling lama nunggu SUPABASE_FETCH_TIMEOUT_MS sebelum gagal dengan jelas,
 // daripada gantung sampai reverse proxy (nginx/LiteSpeed) motong paksa jadi
 // 408.
-const SUPABASE_FETCH_TIMEOUT_MS = 15_000;
+const SUPABASE_FETCH_TIMEOUT_MS = 8_000;
 
 export function fetchWithTimeout(
   input: RequestInfo | URL,
