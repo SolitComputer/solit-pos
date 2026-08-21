@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
-import { ACCESSORY_VIEW_ROLES, ACCESSORY_EDIT_ROLES, expandRolesWithParents } from "@/lib/permissions";
+import { ACCESSORY_VIEW_ROLES, ACCESSORY_EDIT_ROLES, expandRolesWithParents, BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
 async function hasEditAccess(user: AuthUser, action: "edit" | "delete"): Promise<boolean> {
@@ -13,12 +13,25 @@ async function hasEditAccess(user: AuthUser, action: "edit" | "delete"): Promise
 }
 
 // ─── GET /api/accessories/[id] ────────────────────────────────────────────────
-export const GET = withAuth(async (_req, { params }) => {
+export const GET = withAuth(async (_req, { params }, user: AuthUser) => {
     const { id } = await params;
     const { data, error } = await supabaseAdmin
         .from("accessories").select("*, units:accessory_units(*)").eq("id", id).maybeSingle();
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     if (!data) return NextResponse.json({ success: false, error: "Tidak ditemukan" }, { status: 404 });
+
+    // ✅ SECURITY FIX: dulu buy_price (di level accessory & tiap unit) dikirim
+    // mentah ke role sales — disamakan dengan pola masking di /api/accessories.
+    const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
+    if (!canSeePrivate) {
+        const { buy_price, ...accRest } = data as Record<string, any>;
+        accRest.units = ((data as any).units ?? []).map((u: Record<string, any>) => {
+            const { buy_price: _up, ...uRest } = u;
+            return uRest;
+        });
+        return NextResponse.json({ success: true, data: accRest });
+    }
+
     return NextResponse.json({ success: true, data });
 }, ACCESSORY_VIEW_ROLES);
 

@@ -2,6 +2,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { fetchAllRows } from "@/lib/supabaseFetch";
+
+const TRX_DETAIL_SELECT =
+  "id, invoice_number, customer_name, laptop_name, deal_price, amount, inventory_price, other, paid_at, created_at, source_platform, sales_name, status, unit_id, unit_ids";
 
 // ── WIB helpers ───────────────────────────────────────────────────────────────
 const WIB_OFFSET = 7 * 60 * 60 * 1000;
@@ -207,15 +211,19 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     // ── 1. TODAY ──────────────────────────────────────────────────────────────
     const todayRange = wibDayRange(todayStr);
-    const { data: todayRows, error: todayErr } = await supabase
-      .from("transactions")
-      .select("id, invoice_number, customer_name, laptop_name, deal_price, amount, inventory_price, other, paid_at, created_at, source_platform, sales_name, status, unit_id, unit_ids")
-      .eq("status", "PAID")
-      .gte("paid_at", todayRange.start)
-      .lt("paid_at", todayRange.end)
-      .order("paid_at", { ascending: false });
-
-    if (todayErr) throw todayErr;
+    // ✅ FIX: dulu tanpa pagination — Supabase membatasi hasil ke 1000 baris
+    // default, jadi kalau transaksi hari itu >1000 baris totalnya tampil
+    // lebih kecil dari sebenarnya tanpa pesan error. Sekarang fetchAllRows.
+    const todayRows = await fetchAllRows((from, to) =>
+      supabase
+        .from("transactions")
+        .select(TRX_DETAIL_SELECT)
+        .eq("status", "PAID")
+        .gte("paid_at", todayRange.start)
+        .lt("paid_at", todayRange.end)
+        .order("paid_at", { ascending: false })
+        .range(from, to)
+    );
     const todayData = (todayRows ?? []) as TransactionRow[];
 
     const todayUnitMap = await buildUnitMap(todayData);
@@ -240,12 +248,15 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
       const dateStr = toWIBDateStr(new Date(d.getTime() - WIB_OFFSET));
       const range = wibDayRange(dateStr);
 
-      const { data: rows } = await supabase
-        .from("transactions")
-        .select("id, invoice_number, customer_name, laptop_name, deal_price, amount, inventory_price, other, paid_at, created_at, source_platform, sales_name, status, unit_id, unit_ids")
-        .eq("status", "PAID")
-        .gte("paid_at", range.start)
-        .lt("paid_at", range.end);
+      const rows = await fetchAllRows((from, to) =>
+        supabase
+          .from("transactions")
+          .select(TRX_DETAIL_SELECT)
+          .eq("status", "PAID")
+          .gte("paid_at", range.start)
+          .lt("paid_at", range.end)
+          .range(from, to)
+      );
 
       const rowList = (rows ?? []) as TransactionRow[];
       if (rowList.length === 0 && i > 0) continue;
@@ -290,12 +301,15 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
       if (month <= 0) { month += 12; year -= 1; }
 
       const range = wibMonthRange(year, month);
-      const { data: rows } = await supabase
-        .from("transactions")
-        .select("id, invoice_number, customer_name, laptop_name, deal_price, amount, inventory_price, other, paid_at, created_at, source_platform, sales_name, status, unit_id, unit_ids")
-        .eq("status", "PAID")
-        .gte("paid_at", range.start)
-        .lt("paid_at", range.end);
+      const rows = await fetchAllRows((from, to) =>
+        supabase
+          .from("transactions")
+          .select(TRX_DETAIL_SELECT)
+          .eq("status", "PAID")
+          .gte("paid_at", range.start)
+          .lt("paid_at", range.end)
+          .range(from, to)
+      );
 
       const rowList = (rows ?? []) as TransactionRow[];
       const unitMap = await buildUnitMap(rowList);
@@ -331,12 +345,15 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
     for (let i = 0; i < 3; i++) {
       const year = currentYear - i;
       const range = wibYearRange(year);
-      const { data: rows } = await supabase
-        .from("transactions")
-        .select("id, invoice_number, customer_name, laptop_name, deal_price, amount, inventory_price, other, paid_at, created_at, source_platform, sales_name, status, unit_id, unit_ids")
-        .eq("status", "PAID")
-        .gte("paid_at", range.start)
-        .lt("paid_at", range.end);
+      const rows = await fetchAllRows((from, to) =>
+        supabase
+          .from("transactions")
+          .select(TRX_DETAIL_SELECT)
+          .eq("status", "PAID")
+          .gte("paid_at", range.start)
+          .lt("paid_at", range.end)
+          .range(from, to)
+      );
 
       const rowList = (rows ?? []) as TransactionRow[];
       const unitMap = await buildUnitMap(rowList);

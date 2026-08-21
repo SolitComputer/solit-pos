@@ -17,11 +17,20 @@ async function postHandler(_req: NextRequest, props: Props, user: AuthUser) {
     }
 
     const now = new Date().toISOString();
-    const { data: updated, error } = await supabase
+    // ✅ SECURITY FIX (TOCTOU): status dicek di atas lalu ditulis terpisah —
+    // sekarang filter status disertakan di WHERE supaya dua penerimaan
+    // bersamaan tidak saling menimpa.
+    const { data: updatedRows, error } = await supabase
       .from("preparation_orders")
       .update({ status: "DIPROSES", received_by: user.id, received_by_name: user.name, received_at: now, updated_at: now })
-      .eq("id", id).select().single();
+      .eq("id", id)
+      .eq("status", "MENUNGGU")
+      .select();
     if (error) throw error;
+    if (!updatedRows || updatedRows.length === 0) {
+      return NextResponse.json({ success: false, message: "Sudah diterima/diproses lebih dulu" }, { status: 409 });
+    }
+    const updated = updatedRows[0];
 
     await logActivity({
       userId: user.id, userName: user.name, userRole: user.role,

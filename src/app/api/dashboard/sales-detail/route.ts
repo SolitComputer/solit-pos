@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { PERMISSIONS, withAuth, AuthUser } from "@/lib/auth";
+import { fetchAllRows } from "@/lib/supabaseFetch";
 
 function getTodayWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
@@ -12,10 +13,45 @@ function getDealPrice(item: any): number {
   return Number(item.deal_price || item.amount || 0);
 }
 
-function calcProfit(item: any): number {
+// ✅ FIX: dulu profit di sini dihitung dari kolom `inventory_price` yang
+// tersimpan di baris transaksi (bisa basi kalau harga modal unit diedit
+// belakangan). Endpoint dashboard lain (gross-profit-detail, stats,
+// transaction-detail) semuanya pakai purchase_price LIVE dari laptop_units —
+// disamakan di sini supaya angka profit konsisten antar dashboard.
+async function buildUnitMap(
+  transactions: any[]
+): Promise<Map<string, number>> {
+  const allUnitIds = new Set<string>();
+  for (const trx of transactions) {
+    if (Array.isArray(trx.unit_ids) && trx.unit_ids.length > 0) {
+      for (const uid of trx.unit_ids) if (uid) allUnitIds.add(uid);
+    } else if (trx.unit_id) {
+      allUnitIds.add(trx.unit_id);
+    }
+  }
+  if (allUnitIds.size === 0) return new Map();
+
+  const { data: units } = await supabase
+    .from("laptop_units")
+    .select("id, purchase_price")
+    .in("id", Array.from(allUnitIds));
+
+  const map = new Map<string, number>();
+  for (const u of units ?? []) map.set(u.id, Number(u.purchase_price ?? 0));
+  return map;
+}
+
+function calcProfit(item: any, unitMap: Map<string, number>): number {
   const dealPrice = getDealPrice(item);
-  const inventoryPrice = Number(item.inventory_price || 0);
-  return inventoryPrice > 0 ? dealPrice - inventoryPrice : Number(item.other || 0);
+  let totalPurchasePrice = 0;
+
+  if (Array.isArray(item.unit_ids) && item.unit_ids.length > 0) {
+    for (const uid of item.unit_ids) totalPurchasePrice += unitMap.get(uid) ?? 0;
+  } else if (item.unit_id) {
+    totalPurchasePrice = unitMap.get(item.unit_id) ?? 0;
+  }
+
+  return totalPurchasePrice > 0 ? dealPrice - totalPurchasePrice : 0;
 }
 
 async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
@@ -31,29 +67,39 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
     dayStart.setUTCDate(dayStart.getUTCDate() - 29);
     const dayStartStr = dayStart.toISOString().split("T")[0];
 
-    const [
-      { data: todayTrx },
-      { data: monthTrx },
-      { data: dailyTrx },
-    ] = await Promise.all([
-      supabase
-        .from("transactions")
-        .select("*")
-        .eq("status", "PAID")
-        .eq("pickup_date", today),
-      supabase
-        .from("transactions")
-        .select("*")
-        .eq("status", "PAID")
-        .gte("pickup_date", monthStart)
-        .lte("pickup_date", today),
-      supabase
-        .from("transactions")
-        .select("*")
-        .eq("status", "PAID")
-        .gte("pickup_date", dayStartStr)
-        .lte("pickup_date", today),
+    // ✅ FIX: dulu .select("*") tanpa pagination — Supabase membatasi hasil ke
+    // 1000 baris default, jadi bulan dengan transaksi >1000 baris tampil
+    // total/profit lebih kecil dari sebenarnya tanpa pesan error.
+    const [todayTrx, monthTrx, dailyTrx] = await Promise.all([
+      fetchAllRows((from, to) =>
+        supabase
+          .from("transactions")
+          .select("*")
+          .eq("status", "PAID")
+          .eq("pickup_date", today)
+          .range(from, to)
+      ),
+      fetchAllRows((from, to) =>
+        supabase
+          .from("transactions")
+          .select("*")
+          .eq("status", "PAID")
+          .gte("pickup_date", monthStart)
+          .lte("pickup_date", today)
+          .range(from, to)
+      ),
+      fetchAllRows((from, to) =>
+        supabase
+          .from("transactions")
+          .select("*")
+          .eq("status", "PAID")
+          .gte("pickup_date", dayStartStr)
+          .lte("pickup_date", today)
+          .range(from, to)
+      ),
     ]);
+
+    const unitMap = await buildUnitMap([...(todayTrx ?? []), ...(monthTrx ?? []), ...(dailyTrx ?? [])]);
 
     // ── Step 1: Kumpulkan semua sales_id unik dari dailyTrx ─────────
     const allSalesIds = new Set<string>();
@@ -120,7 +166,7 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
 
       salesMap[groupKey].total   += 1;
       salesMap[groupKey].revenue += getDealPrice(item);
-      salesMap[groupKey].profit  += calcProfit(item);
+      salesMap[groupKey].profit  += calcProfit(item, unitMap);
     });
 
     // ── Step 4: Daily breakdown dengan groupKey yang sama ───────────
@@ -141,7 +187,7 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
 
       dailyDetailMap[groupKey][date].total   += 1;
       dailyDetailMap[groupKey][date].revenue += getDealPrice(item);
-      dailyDetailMap[groupKey][date].profit  += calcProfit(item);
+      dailyDetailMap[groupKey][date].profit  += calcProfit(item, unitMap);
     });
 
     // ── Step 5: Format output ────────────────────────────────────────
@@ -191,12 +237,12 @@ async function handler(req: NextRequest, _ctx: any, user: AuthUser) {
         today: {
           count:   todayTrx?.length || 0,
           revenue: todayTrx?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0,
-          ...(showFin ? { profit: todayTrx?.reduce((acc, item) => acc + calcProfit(item), 0) || 0 } : {}),
+          ...(showFin ? { profit: todayTrx?.reduce((acc, item) => acc + calcProfit(item, unitMap), 0) || 0 } : {}),
         },
         monthly: {
           count:   monthTrx?.length || 0,
           revenue: monthTrx?.reduce((acc, item) => acc + getDealPrice(item), 0) || 0,
-          ...(showFin ? { profit: monthTrx?.reduce((acc, item) => acc + calcProfit(item), 0) || 0 } : {}),
+          ...(showFin ? { profit: monthTrx?.reduce((acc, item) => acc + calcProfit(item, unitMap), 0) || 0 } : {}),
         },
         salesPerformance: safeSalesPerformance,
       },
