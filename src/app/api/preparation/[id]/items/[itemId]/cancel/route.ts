@@ -61,18 +61,10 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     if (error) throw error;
 
-    // ── Kembalikan stok "Siap Jual" untuk unit ini saja ──
-    // Order tetap jalan (unit lain masih RESERVED), cuma unit yang dibatalkan
-    // ini yang dikembalikan ke SIAP_JUAL. Guard status RESERVED mencegah unit
-    // yang sudah SOLD (race dengan pembayaran) ikut ter-restore.
-    if (target.unit_id) {
-      const { error: restoreError } = await supabase
-        .from("laptop_units")
-        .update({ status: "SIAP_JUAL" })
-        .eq("id", target.unit_id)
-        .eq("status", "DALAM_PENYIAPAN");
-      if (restoreError) throw restoreError;
-    }
+    // ── TIDAK ADA lagi restore ke laptop_units di sini ──
+    // Sama seperti di api/preparation/[id]/cancel/route.ts: Penyiapan tidak
+    // pernah mengubah laptop_units.status sama sekali, jadi tidak ada status
+    // unit yang perlu dikembalikan saat 1 SN di dalam order ini dibatalkan.
 
     await logActivity({
       userId: user.id, userName: user.name, userRole: user.role,
