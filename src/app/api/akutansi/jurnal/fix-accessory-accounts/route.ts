@@ -50,8 +50,36 @@ export const POST = withAuth(async (_req, _ctx, user: any) => {
     return NextResponse.json({ success: true, data: { scanned: 0, fixed: 0 } });
   }
 
+  // ✅ FIX (idempotency): kasus "mixed" menyisakan baris 410 dengan nominal
+  // yang sudah dikurangi (bukan dihapus) — kalau endpoint ini dipanggil lagi,
+  // baris itu masih lolos filter kandidat di atas dan nominalnya dikurangi
+  // LAGI. Sekarang entry yang sudah pernah diperbaiki (tercatat di
+  // journal_audit_logs) dibuang dari daftar kandidat.
+  const candidateIds = candidates.map((e: any) => e.id);
+  const alreadyFixedIds = new Set<string>();
+  for (const batch of chunkArray(candidateIds, 150)) {
+    const { data: logRows } = await supabase
+      .from("journal_audit_logs")
+      .select("entry_id, before_data")
+      .in("entry_id", batch)
+      .eq("action", "EDIT");
+    for (const row of (logRows ?? []) as any[]) {
+      if (row.before_data?.keterangan_action === "fix-accessory-account") {
+        alreadyFixedIds.add(row.entry_id);
+      }
+    }
+  }
+  const unfixedCandidates = candidates.filter((e: any) => !alreadyFixedIds.has(e.id));
+
+  if (unfixedCandidates.length === 0) {
+    return NextResponse.json({
+      success: true,
+      data: { scanned: candidates.length, fixed_accessory_only: 0, fixed_mixed_split: 0, skipped_already_correct_laptop: 0, skipped_already_fixed: candidates.length },
+    });
+  }
+
   // 2) Ambil item_kind & deal_price transaksi terkait
-  const invoiceNumbers = candidates.map((e: any) => e.source_id as string);
+  const invoiceNumbers = unfixedCandidates.map((e: any) => e.source_id as string);
   const trxByInvoice = new Map<string, { item_kind: string | null; deal_price: number }>();
 
   for (const batch of chunkArray(invoiceNumbers, 150)) {
@@ -95,7 +123,7 @@ export const POST = withAuth(async (_req, _ctx, user: any) => {
   let fixedMixed = 0;
   let skippedLaptop = 0;
 
-  for (const entry of candidates as any[]) {
+  for (const entry of unfixedCandidates as any[]) {
     const trx = trxByInvoice.get(entry.source_id as string);
     if (!trx) continue;
     if (trx.item_kind === "laptop") { skippedLaptop++; continue; } // memang seharusnya 410, biarkan

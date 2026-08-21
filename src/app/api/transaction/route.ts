@@ -10,6 +10,15 @@ function splitSerials(raw: any): string[] {
   return [];
 }
 
+// ── Sanitasi term sebelum ditaruh mentah di string filter PostgREST (.or()) ──
+// Karakter koma/kurung punya arti khusus di syntax filter Supabase — kalau
+// tidak dibuang, user bisa menyisipkan kondisi filter tambahan lewat kotak
+// pencarian (filter injection). Dibuang saja karena tidak berguna untuk
+// pencarian teks biasa.
+function sanitizeFilterTerm(raw: string): string {
+  return raw.replace(/[,()]/g, "").trim();
+}
+
 // ── Whitelist kolom yang boleh dipakai buat ORDER BY ──────────────────
 // Key = nilai `sortBy` yang dikirim client, value = nama kolom asli di tabel `transactions`.
 // Pakai whitelist supaya tidak ada celah injection lewat query string.
@@ -64,7 +73,7 @@ async function handler(req: NextRequest) {
     const search = url.searchParams.get("search") ?? "";
     const snList = (url.searchParams.get("snList") ?? "")
       .split(/[\s,;]+/)
-      .map((s) => s.trim())
+      .map((s) => sanitizeFilterTerm(s.trim()))
       .filter(Boolean);
     const status = url.searchParams.get("status") ?? "ALL";
     const invoiceExact = url.searchParams.get("invoiceExact") ?? "";
@@ -114,7 +123,7 @@ async function handler(req: NextRequest) {
 
         query = query.or(snOrParts.join(","));
       } else if (search.trim()) {
-        const term = search.trim();
+        const term = sanitizeFilterTerm(search.trim());
 
         const [{ data: snMatches }, { data: cpuLaptops }] = await Promise.all([
           supabase.from("transaction_items").select("invoice_number").ilike("serial_number", `%${term}%`),

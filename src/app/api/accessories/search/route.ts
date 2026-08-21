@@ -11,8 +11,16 @@ const VIEW_ROLES: UserRole[] = [
     "ACCOUNTING", "CUSTOMER_SERVICE",
 ];
 
+// ── Sanitasi term sebelum ditaruh mentah di string filter PostgREST (.or()) ──
+// Karakter koma/kurung punya arti khusus di syntax filter Supabase — kalau
+// tidak dibuang, user bisa menyisipkan kondisi filter tambahan lewat kotak
+// pencarian (filter injection).
+function sanitizeFilterTerm(raw: string): string {
+    return raw.replace(/[,()]/g, "").trim();
+}
+
 export const GET = withAuth(async (req: NextRequest) => {
-    const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
+    const q = sanitizeFilterTerm(new URL(req.url).searchParams.get("q")?.trim() ?? "");
 
     let query = supabaseAdmin
         .from("accessories")

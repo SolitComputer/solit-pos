@@ -25,7 +25,12 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     const now = new Date().toISOString();
 
     if (action === "ACCEPT") {
-      const { data: updated, error } = await supabase
+      // ✅ SECURITY FIX (TOCTOU): status dicek di atas lalu ditulis terpisah
+      // tanpa filter status di UPDATE — dua request bersamaan (mis. accept +
+      // decline nyaris bareng) bisa saling menimpa. Sekarang filter status
+      // ikut disertakan di WHERE, jadi update cuma sukses kalau status masih
+      // sama seperti yang dicek.
+      const { data: updatedRows, error } = await supabase
         .from("preparation_orders")
         .update({
           status: "DIKIRIM",
@@ -34,8 +39,15 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
           delivery_decline_reason: null,
           updated_at: now,
         })
-        .eq("id", id).select().single();
+        .eq("id", id)
+        .eq("status", "MENUNGGU_PENGANTAR")
+        .eq("delivery_user_id", user.id)
+        .select();
       if (error) throw error;
+      if (!updatedRows || updatedRows.length === 0) {
+        return NextResponse.json({ success: false, message: "Tugas ini sudah diproses lebih dulu" }, { status: 409 });
+      }
+      const updated = updatedRows[0];
 
       await logActivity({
         userId: user.id, userName: user.name, userRole: user.role,
@@ -48,7 +60,7 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     if (action === "DECLINE") {
       // balik ke SIAP_KIRIM biar sales bisa tugaskan ke pengantar lain
-      const { data: updated, error } = await supabase
+      const { data: updatedRows, error } = await supabase
         .from("preparation_orders")
         .update({
           status: "SIAP_KIRIM",
@@ -60,8 +72,15 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
           delivery_decline_reason: reason ?? null,
           updated_at: now,
         })
-        .eq("id", id).select().single();
+        .eq("id", id)
+        .eq("status", "MENUNGGU_PENGANTAR")
+        .eq("delivery_user_id", user.id)
+        .select();
       if (error) throw error;
+      if (!updatedRows || updatedRows.length === 0) {
+        return NextResponse.json({ success: false, message: "Tugas ini sudah diproses lebih dulu" }, { status: 409 });
+      }
+      const updated = updatedRows[0];
 
       await logActivity({
         userId: user.id, userName: user.name, userRole: user.role,
