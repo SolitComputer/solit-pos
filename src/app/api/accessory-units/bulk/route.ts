@@ -130,9 +130,17 @@ export const POST = withAuth(async (req: NextRequest) => {
 
     if (error) {
         console.error("[POST /api/accessory-units/bulk]", error);
+        // ✅ FIX: cek duplikat di atas cuma SELECT-lalu-INSERT (masih race
+        // kalau ada import/insert lain jalan bersamaan) — jadi kalaupun lolos
+        // sampai sini, unique constraint DB (kalau sudah dipasang) akan
+        // menolak dengan error 23505. Ditangani di sini biar pesan errornya
+        // jelas, bukan error mentah dari DB.
+        const message = error.code === "23505"
+            ? "Ada serial number yang baru saja terdaftar oleh proses lain — silakan cek ulang & coba lagi."
+            : error.message;
         return NextResponse.json(
-            { success: false, message: error.message },
-            { status: 500 }
+            { success: false, message },
+            { status: error.code === "23505" ? 409 : 500 }
         );
     }
 

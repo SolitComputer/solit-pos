@@ -29,6 +29,9 @@ export default function EditableLaptopPriceCell({
     }, [value, editing]);
 
     const handleSave = async () => {
+        // ✅ FIX: guard "sedang menyimpan" biar Enter berulang cepat tidak
+        // mengirim beberapa PUT sekaligus.
+        if (saving) return;
         const parsed = Math.round(Number(inputVal.replace(/\./g, "").replace(/,/g, "")));
         if (!Number.isFinite(parsed) || parsed < 0) {
             setError("Nominal tidak valid");

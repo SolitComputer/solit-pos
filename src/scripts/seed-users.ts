@@ -4,10 +4,27 @@ import * as dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  supabaseUrl,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+// ✅ SECURITY FIX: script ini men-DELETE user role OPERATOR/SALES lalu
+// insert/update akun contoh dengan password polos — kalau .env.local tidak
+// sengaja mengarah ke Supabase produksi, data user asli langsung terhapus
+// tanpa peringatan apa pun. Sekarang wajib konfirmasi eksplisit dulu.
+const projectRef = supabaseUrl.match(/^https?:\/\/([^.]+)\./)?.[1] ?? supabaseUrl;
+const confirmRef = process.env.CONFIRM_TARGET_PROJECT_REF;
+console.log(`\n🎯 Target Supabase project: ${projectRef} (${supabaseUrl})`);
+if (confirmRef !== projectRef) {
+  console.error(
+    `\n❌ DIBATALKAN. Script ini MENGHAPUS user role OPERATOR/SALES lalu menulis akun contoh.\n` +
+    `   Untuk melanjutkan, jalankan ulang dengan:\n` +
+    `   CONFIRM_TARGET_PROJECT_REF=${projectRef} npx tsx src/scripts/seed-users.ts\n`
+  );
+  process.exit(1);
+}
 
 const users = [
   { name: "Rei",    email: "Admin@gmail.com", password: "Rei@Solit25", role: "ADMIN" },

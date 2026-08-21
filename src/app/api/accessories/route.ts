@@ -5,10 +5,18 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { ACCESSORY_VIEW_ROLES, ACCESSORY_CREATE_ROLES, expandRolesWithParents } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
+// ── Sanitasi term sebelum ditaruh mentah di string filter PostgREST (.or()) ──
+// Karakter koma/kurung punya arti khusus di syntax filter Supabase — kalau
+// tidak dibuang, user bisa menyisipkan kondisi filter tambahan lewat kotak
+// pencarian (filter injection).
+function sanitizeFilterTerm(raw: string): string {
+    return raw.replace(/[,()]/g, "").trim();
+}
+
 // ─── GET /api/accessories ─────────────────────────────────────────────────────
 export const GET = withAuth(async (req: NextRequest) => {
     const { searchParams } = new URL(req.url);
-    const search = searchParams.get("search")?.trim() ?? "";
+    const search = sanitizeFilterTerm(searchParams.get("search")?.trim() ?? "");
     const category = searchParams.get("category") ?? "";
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
     const limit = Math.min(10000, parseInt(searchParams.get("limit") ?? "20", 10));

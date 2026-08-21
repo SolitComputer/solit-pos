@@ -242,10 +242,10 @@ export async function PATCH(req: NextRequest) {
     const { id, title, description, status } = body;
     if (!id) return NextResponse.json({ success: false, message: "id wajib" }, { status: 400 });
 
-    // Ambil laporan untuk cek kepemilikan
+    // Ambil laporan untuk cek kepemilikan (sertakan role pemilik buat cek divisi Kepala)
     const { data: existing } = await supabaseAdmin
         .from("pkl_work_reports")
-        .select("user_id, status")
+        .select("user_id, status, users!pkl_work_reports_user_id_fkey(role)")
         .eq("id", id)
         .maybeSingle();
 
@@ -259,7 +259,16 @@ export async function PATCH(req: NextRequest) {
         if (existing.status === "REVIEWED") {
             return NextResponse.json({ success: false, message: "Laporan yang sudah direview tidak bisa diedit" }, { status: 400 });
         }
-    } else if (!isFullAccess(user.role) && !isKepala(user.role)) {
+    } else if (isKepala(user.role)) {
+        // ✅ SECURITY FIX: dulu Kepala divisi bisa edit laporan PKL divisi lain
+        // karena tidak ada cek kepemilikan divisi di sini (beda dengan action
+        // "review" di POST yang sudah benar mengeceknya). Sekarang disamakan.
+        const pklRole = KEPALA_PKL_ROLE_MAP[user.role];
+        const reportOwnerRole = (existing as any)?.users?.role;
+        if (!pklRole || reportOwnerRole !== pklRole) {
+            return NextResponse.json({ success: false, message: "Laporan ini bukan dari PKL divisi kamu" }, { status: 403 });
+        }
+    } else if (!isFullAccess(user.role)) {
         return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
     }
 

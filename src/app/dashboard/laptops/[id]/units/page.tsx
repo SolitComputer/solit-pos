@@ -503,13 +503,35 @@ export default function UnitsPage() {
                 setConfirmModal(null);
                 setBulkDeleting(true);
                 try {
-                    await Promise.all(Array.from(selectedIds).map(id => fetch(`/api/units/${id}`, { method: "DELETE" })));
+                    // ✅ FIX: dulu hasil fetch tidak dicek sama sekali (fetch tidak
+                    // reject untuk response 4xx/5xx) — jadi kalau sebagian unit
+                    // gagal dihapus (mis. masih dipakai transaksi), UI tetap
+                    // bilang "berhasil" tanpa memberi tahu mana yang gagal.
+                    const results = await Promise.all(
+                        Array.from(selectedIds).map(async (id) => {
+                            try {
+                                const res = await fetch(`/api/units/${id}`, { method: "DELETE" });
+                                const json = await res.json().catch(() => null);
+                                return res.ok && json?.success !== false;
+                            } catch {
+                                return false;
+                            }
+                        })
+                    );
+                    const failedCount = results.filter((ok) => !ok).length;
+
                     const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
                     const freshData = await freshRes.json();
                     const freshUnits: LaptopUnit[] = freshData.data || [];
                     setUnits(freshUnits);
                     await syncLaptopStats(freshUnits);
                     setSelectedIds(new Set());
+
+                    if (failedCount > 0) {
+                        setAlertModal(`${failedCount} dari ${results.length} unit gagal dihapus (mungkin masih dipakai). Sisanya berhasil dihapus.`);
+                    } else {
+                        setToast(`${results.length} unit berhasil dihapus`);
+                    }
                 } catch {
                     setAlertModal("Gagal menghapus beberapa unit");
                 } finally {

@@ -69,27 +69,23 @@ async function postHandler(req: NextRequest, _: any, user: AuthUser) {
       return NextResponse.json({ success: false, error: `Stok tidak cukup (Sisa: ${acc.stock})` }, { status: 400 });
     }
 
-    // 2. Validasi unit jika disertakan
+    // 2. Validasi + claim unit jika disertakan
+    // ✅ FIX (race condition): dulu cek status lalu update terpisah — dua
+    // request bersamaan bisa sama-sama lolos cek "TERSEDIA" sebelum salah
+    // satu sempat menandai KELUAR. Sekarang filter status disertakan
+    // langsung di UPDATE (atomic claim), jadi cuma satu yang bisa menang.
     if (unit_id) {
-      const { data: unit, error: unitErr } = await supabaseAdmin
-        .from("accessory_units")
-        .select("status")
-        .eq("id", unit_id)
-        .single();
-
-      if (unitErr || !unit) {
-        return NextResponse.json({ success: false, error: "Unit tidak ditemukan" }, { status: 404 });
-      }
-      if (unit.status !== "TERSEDIA") {
-        return NextResponse.json({ success: false, error: `Unit tidak tersedia (Status: ${unit.status})` }, { status: 400 });
-      }
-
-      // Update status unit
-      const { error: updateErr } = await supabaseAdmin
+      const { data: claimedUnit, error: updateErr } = await supabaseAdmin
         .from("accessory_units")
         .update({ status: "KELUAR" })
-        .eq("id", unit_id);
+        .eq("id", unit_id)
+        .eq("status", "TERSEDIA")
+        .select("id")
+        .maybeSingle();
       if (updateErr) throw updateErr;
+      if (!claimedUnit) {
+        return NextResponse.json({ success: false, error: "Unit tidak ditemukan atau sudah tidak tersedia" }, { status: 400 });
+      }
     }
 
     // 3. Kurangi stok bulk dari tabel accessories

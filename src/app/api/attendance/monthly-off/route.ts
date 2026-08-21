@@ -153,6 +153,46 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: "Akses ditolak" }, { status: 403 });
       }
 
+      // ✅ SECURITY FIX: dulu jalur swap tidak ikut dihitung ke batas
+      // MAX_OFF_PER_MONTH (cuma jalur normal yang dicek) — karyawan bisa
+      // kumpulkan lebih dari 6 hari libur berbayar/bulan lewat tukar
+      // berulang. Sekarang replacement_date (hari libur pengganti) ikut
+      // dihitung bareng hari libur normal di bulan yang sama.
+      const replYear = replacementObj.getFullYear();
+      const replMonth = replacementObj.getMonth() + 1;
+      const replYearMonthPrefix = replacement_date.slice(0, 7);
+
+      const { data: monthlyOffsForMonth, error: moCountError } = await supabase
+        .from("user_monthly_off")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("year", replYear)
+        .eq("month", replMonth);
+      if (moCountError) {
+        return NextResponse.json({ success: false, message: moCountError.message }, { status: 500 });
+      }
+
+      const { data: dateOffsForMonth, error: doCountError } = await supabase
+        .from("user_date_off")
+        .select("id")
+        .eq("user_id", user_id)
+        .gte("off_date", `${replYearMonthPrefix}-01`)
+        .lte("off_date", `${replYearMonthPrefix}-31`);
+      if (doCountError) {
+        return NextResponse.json({ success: false, message: doCountError.message }, { status: 500 });
+      }
+
+      const totalOffThisMonth = (monthlyOffsForMonth ?? []).length + (dateOffsForMonth ?? []).length;
+      if (totalOffThisMonth >= MAX_OFF_PER_MONTH) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `${targetUser.name} sudah memiliki ${MAX_OFF_PER_MONTH} hari libur di bulan ${replMonth}/${replYear}.`,
+          },
+          { status: 400 }
+        );
+      }
+
       // Cek weekly_date belum di-swap
       const { data: existingWork } = await supabase
         .from("user_date_work")

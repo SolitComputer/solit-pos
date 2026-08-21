@@ -243,7 +243,7 @@ export default function EditTransactionPage() {
   // begitu metode TF+CASH dipilih, auto isi payment_method_2 = "CASH".
   // Kalau metode diganti ke selain TF+CASH, bersihkan sisa data split-nya.
   useEffect(() => {
-    if (formData.payment_method === "TF+CASH") {
+    if (formData.payment_method === "TF_CASH") {
       if (!formData.payment_method_2) {
         setFormData((prev) => ({ ...prev, payment_method_2: "CASH" }));
       }
@@ -642,7 +642,7 @@ export default function EditTransactionPage() {
   // total gabungan nominal Transfer + Tunai, buat validasi visual
   const splitTotal =
     Number(formData.amount_method_1 ?? 0) + Number(formData.amount_method_2 ?? 0);
-  const splitMatches = formData.payment_method !== "TF+CASH" || splitTotal === dealPrice;
+  const splitMatches = formData.payment_method !== "TF_CASH" || splitTotal === dealPrice;
 
   // ← BARU (opsional, aman dihapus): tombol bantu isi otomatis sisa nominal split.
   // Cuma mengubah formData lewat handler yang sudah ada, tidak nambah API/behaviour baru.
@@ -1315,10 +1315,17 @@ export default function EditTransactionPage() {
                   onChange={handleChange}
                   className={selectCls}
                 >
-                  {["CASH", "TRANSFER", "TF+CASH", "DP", "CICILAN", "LAINNYA"].map(
+                  {[
+                    { value: "CASH", label: "CASH" },
+                    { value: "TRANSFER", label: "TRANSFER" },
+                    { value: "TF_CASH", label: "TF+CASH" },
+                    { value: "DP", label: "DP" },
+                    { value: "CICILAN", label: "CICILAN" },
+                    { value: "LAINNYA", label: "LAINNYA" },
+                  ].map(
                     (m) => (
-                      <option key={m} value={m}>
-                        {m}
+                      <option key={m.value} value={m.value}>
+                        {m.label}
                       </option>
                     )
                   )}
@@ -1327,7 +1334,7 @@ export default function EditTransactionPage() {
             </div>
 
             {/* Split TF + Tunai — cuma muncul kalau Metode Pembayaran = TF+CASH */}
-            {formData.payment_method === "TF+CASH" && (
+            {formData.payment_method === "TF_CASH" && (
               <div className="split-card">
                 <div className="flex items-center justify-between mb-3 gap-2">
                   <p className="text-[11px] font-bold text-violet-500 uppercase tracking-wider">
@@ -1656,7 +1663,7 @@ export default function EditTransactionPage() {
               </div>
 
               {/* Ringkasan split TF + Tunai, kalau relevan */}
-              {formData.payment_method === "TF+CASH" && (
+              {formData.payment_method === "TF_CASH" && (
                 <div
                   className="rounded-2xl px-4 py-3 flex items-center justify-between gap-2"
                   style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}

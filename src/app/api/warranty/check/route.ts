@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
+import { isRateLimited } from "@/lib/rateLimit";
 
 const ALLOWED_ORIGINS = [
     "https://solit03.com",
@@ -34,6 +35,18 @@ export async function GET(req: NextRequest) {
     const corsHeaders = getCorsHeaders(origin);
 
     try {
+        // ✅ SECURITY FIX: endpoint publik ini (tanpa login, tanpa batas) bisa
+        // dipakai untuk mengumpulkan nama pelanggan lewat percobaan serial
+        // number berulang. Dibatasi 20 request/menit per IP — cukup untuk
+        // pemakaian wajar (cek 1 SN), tapi menghambat scraping/enumerasi.
+        const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+        if (isRateLimited(`warranty-check:${ip}`, 20, 60_000)) {
+            return NextResponse.json(
+                { success: false, message: "Terlalu banyak percobaan, coba lagi sebentar lagi" },
+                { status: 429, headers: corsHeaders }
+            );
+        }
+
         const { searchParams } = new URL(req.url);
         const sn = searchParams.get("sn")?.trim();
 
