@@ -57,6 +57,22 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // ✅ SECURITY FIX: dulu tidak ada security header sama sekali (tidak
+        // ada X-Frame-Options, X-Content-Type-Options, dll). Diterapkan ke
+        // SEMUA response (termasuk API) sebagai lapisan tambahan di luar
+        // Cloudflare. Sengaja TIDAK menyertakan Content-Security-Policy —
+        // app ini banyak load resource pihak ketiga (Supabase storage, peta,
+        // face-api.js model, dll), CSP yang salah bisa mematikan fitur tanpa
+        // ketahuan sampai dites manual di browser produksi.
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=15552000" },
+        ],
+      },
+      {
         // Semua halaman HTML
         source: "/((?!_next/static|_next/image|favicon.ico|assets).*)",
         headers: [
