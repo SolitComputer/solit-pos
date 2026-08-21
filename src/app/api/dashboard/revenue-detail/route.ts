@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, PERMISSIONS } from "@/lib/auth";
+import { fetchAllRows } from "@/lib/supabaseFetch";
 
 function getWIBOffset() { return 7 * 60 * 60 * 1000; }
 
@@ -55,15 +56,19 @@ async function handler(req: NextRequest) {
         const day30Range = wibDateToUTCRange(day30StartStr);
 
         // ── Fetch semua transaksi bulan ini ──────────────────────────────────
-        const { data: monthlyTx, error } = await supabase
-            .from("transactions")
-            .select("paid_at, deal_price, amount, unit_id, unit_ids, sales_name")
-            .eq("status", "PAID")
-            .gte("paid_at", monthStart.toISOString())
-            .lt("paid_at", monthEnd.toISOString())
-            .order("paid_at", { ascending: false });
-
-        if (error) throw error;
+        // ✅ FIX: dulu tanpa pagination — Supabase membatasi hasil ke 1000 baris
+        // default, jadi bulan dengan transaksi >1000 baris tampil revenue lebih
+        // kecil dari sebenarnya tanpa pesan error. Sekarang pakai fetchAllRows.
+        const monthlyTx = await fetchAllRows((from, to) =>
+            supabase
+                .from("transactions")
+                .select("paid_at, deal_price, amount, unit_id, unit_ids, sales_name")
+                .eq("status", "PAID")
+                .gte("paid_at", monthStart.toISOString())
+                .lt("paid_at", monthEnd.toISOString())
+                .order("paid_at", { ascending: false })
+                .range(from, to)
+        );
 
         const txList = monthlyTx || [];
 

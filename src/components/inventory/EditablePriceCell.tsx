@@ -23,6 +23,10 @@ export default function EditablePriceCell({
     }, [value, editing]);
 
     const handleSave = async () => {
+        // ✅ FIX: dulu tidak ada guard "sedang menyimpan" — Enter berkali-kali
+        // cepat (termasuk key-repeat) bisa memanggil handleSave sebelum state
+        // `saving` sempat re-render, jadi beberapa PATCH terkirim sekaligus.
+        if (saving) return;
         const parsed = Math.round(Number(inputVal.replace(/\./g, "").replace(/,/g, "")));
         if (!Number.isFinite(parsed) || parsed < 0) {
             setError("Nominal tidak valid");

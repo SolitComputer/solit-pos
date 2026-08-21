@@ -17,6 +17,7 @@ interface Warranty {
   warranty_duration: number;
   status: string;
   computed_status: string;
+  manual_status_override?: boolean;
   days_left: number;
   notes: string;
   technician_notes: string;
@@ -634,7 +635,7 @@ function WarrantyCard({
       <div className="px-4 pt-4 pb-0 flex items-start gap-3">
         {/* Avatar */}
         <div className={`w-10 h-10 rounded-full ${s.avatar} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm mt-0.5`}>
-          {w.customer_name.charAt(0).toUpperCase()}
+          {(w.customer_name || "?").charAt(0).toUpperCase()}
         </div>
 
         {/* Info */}
