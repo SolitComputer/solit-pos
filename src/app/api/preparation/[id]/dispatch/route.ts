@@ -93,14 +93,21 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
       payload.delivered_at = now;
     }
 
-    const { data, error } = await supabase
+    // ✅ SECURITY FIX (TOCTOU): status dicek di atas lalu ditulis terpisah —
+    // sekarang filter status disertakan di WHERE supaya dua dispatch
+    // bersamaan tidak saling menimpa.
+    const { data: dataRows, error } = await supabase
       .from("preparation_orders")
       .update(payload)
       .eq("id", id)
-      .select()
-      .single();
+      .eq("status", "SIAP_KIRIM")
+      .select();
 
     if (error) throw error;
+    if (!dataRows || dataRows.length === 0) {
+      return NextResponse.json({ success: false, message: "Status pesanan sudah berubah, silakan refresh" }, { status: 409 });
+    }
+    const data = dataRows[0];
 
     await logActivity({
       userId: user.id,

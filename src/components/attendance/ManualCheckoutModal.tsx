@@ -12,9 +12,13 @@ export function ManualCheckoutModal({ users, onClose, onSaved }: {
   onClose: () => void;
   onSaved: () => void;
 }) {
+  // ✅ FIX: dulu pakai new Date().toISOString() (UTC) — dibuka jam 01:00 WIB
+  // (masih 18:00 UTC hari sebelumnya) tanggal default jadi kemarin. Sekarang
+  // dihitung dari WIB (UTC+7), konsisten dengan konvensi lain di modul absensi.
+  const nowWIB = new Date(Date.now() + 7 * 60 * 60 * 1000);
   const [userId, setUserId] = useState(users[0]?.id ?? "");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
+  const [date, setDate] = useState(nowWIB.toISOString().slice(0, 10));
+  const [time, setTime] = useState(nowWIB.toISOString().slice(11, 16));
   const [category, setCategory] = useState<OvertimeCategory | "">("");
   const [desc, setDesc] = useState("");
   const [saving, setSaving] = useState(false);

@@ -181,8 +181,33 @@ async function patchHandler(req: NextRequest, props: Props, _user: AuthUser) {
     }
 
     const { data: order } = await supabase
-      .from("preparation_orders").select("id").eq("id", id).single();
+      .from("preparation_orders").select("id, customer_name").eq("id", id).single();
     if (!order) return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+
+    // ✅ SECURITY FIX: dulu invoice diterima apa adanya tanpa verifikasi
+    // benar-benar ada, dan role yang diizinkan (PREPARATION_VIEW_ROLES) jauh
+    // lebih luas dari yang seharusnya bisa mengelola link ini. Sekarang
+    // dicek invoice-nya benar ada & customer-nya cocok sebelum di-link, dan
+    // role dipersempit ke PREPARATION_CREATE_ROLES (lihat export di bawah).
+    const { data: trx } = await supabase
+      .from("transactions")
+      .select("invoice_number, customer_name")
+      .eq("invoice_number", transaction_invoice)
+      .maybeSingle();
+
+    if (!trx) {
+      return NextResponse.json({ success: false, message: "Invoice tidak ditemukan" }, { status: 404 });
+    }
+    if (
+      order.customer_name &&
+      trx.customer_name &&
+      order.customer_name.trim().toLowerCase() !== trx.customer_name.trim().toLowerCase()
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Invoice ini milik pelanggan lain — tidak bisa di-link ke pesanan ini" },
+        { status: 400 }
+      );
+    }
 
     const now = new Date().toISOString();
     const { data, error } = await supabase
@@ -225,5 +250,5 @@ async function deleteHandler(_req: NextRequest, props: Props, user: AuthUser) {
 }
 
 export const GET = withAuth(getHandler, PREPARATION_VIEW_ROLES);
-export const PATCH = withAuth(patchHandler, PREPARATION_VIEW_ROLES);
+export const PATCH = withAuth(patchHandler, PREPARATION_CREATE_ROLES);
 export const DELETE = withAuth(deleteHandler, PREPARATION_CREATE_ROLES);

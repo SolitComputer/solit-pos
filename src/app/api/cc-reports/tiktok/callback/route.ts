@@ -37,8 +37,6 @@ export async function GET(req: NextRequest) {
     const state = sp.get("state");
     const err = sp.get("error_description") ?? sp.get("error");
 
-    console.log("[tiktok/callback] params:", Object.fromEntries(sp.entries()));
-
     if (err) return back(req, err, false);
 
     if (!code) {

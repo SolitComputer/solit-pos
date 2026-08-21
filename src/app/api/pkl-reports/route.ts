@@ -3,14 +3,21 @@ import { getCurrentUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 
 const FULL_ACCESS = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
+// ✅ SECURITY FIX: KEPALA_ZENITH terdaftar di ROUTE_PERMISSIONS untuk akses
+// rute ini (lihat src/lib/permissions.ts), tapi dulu tidak ada di tiga map
+// di bawah — akibatnya isKepala("KEPALA_ZENITH") selalu false, cabang
+// filter divisi di GET tidak pernah jalan, dan KEPALA_ZENITH melihat SEMUA
+// laporan PKL lintas divisi. Disamakan dengan DIVISION_MAP.KEPALA_ZENITH di
+// lib/permissions.ts (mengelola subordinat yang sama seperti KEPALA_SALES).
 const KEPALA_ROLES = [
-    "KEPALA_SALES", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
     "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
 ];
 
 const KEPALA_DIVISION_MAP: Record<string, string> = {
     KEPALA_MARKETING: "MARKETING",
     KEPALA_SALES: "SALES",
+    KEPALA_ZENITH: "SALES",
     KEPALA_PENYEDIA_BARANG: "PENYEDIA_BARANG",
     KEPALA_TEKNISI: "TEKNISI",
     KEPALA_ONPOINT: "ONPOINT",
@@ -20,6 +27,7 @@ const KEPALA_DIVISION_MAP: Record<string, string> = {
 const KEPALA_PKL_ROLE_MAP: Record<string, string> = {
     KEPALA_MARKETING: "PKL_MARKETING",
     KEPALA_SALES: "PKL_SALES",
+    KEPALA_ZENITH: "PKL_SALES",
     KEPALA_PENYEDIA_BARANG: "PKL_PENYEDIA_BARANG",
     KEPALA_TEKNISI: "PKL_TEKNISI",
     KEPALA_ONPOINT: "PKL_ONPOINT",
@@ -242,10 +250,10 @@ export async function PATCH(req: NextRequest) {
     const { id, title, description, status } = body;
     if (!id) return NextResponse.json({ success: false, message: "id wajib" }, { status: 400 });
 
-    // Ambil laporan untuk cek kepemilikan
+    // Ambil laporan untuk cek kepemilikan (sertakan role pemilik buat cek divisi Kepala)
     const { data: existing } = await supabaseAdmin
         .from("pkl_work_reports")
-        .select("user_id, status")
+        .select("user_id, status, users!pkl_work_reports_user_id_fkey(role)")
         .eq("id", id)
         .maybeSingle();
 
@@ -259,7 +267,16 @@ export async function PATCH(req: NextRequest) {
         if (existing.status === "REVIEWED") {
             return NextResponse.json({ success: false, message: "Laporan yang sudah direview tidak bisa diedit" }, { status: 400 });
         }
-    } else if (!isFullAccess(user.role) && !isKepala(user.role)) {
+    } else if (isKepala(user.role)) {
+        // ✅ SECURITY FIX: dulu Kepala divisi bisa edit laporan PKL divisi lain
+        // karena tidak ada cek kepemilikan divisi di sini (beda dengan action
+        // "review" di POST yang sudah benar mengeceknya). Sekarang disamakan.
+        const pklRole = KEPALA_PKL_ROLE_MAP[user.role];
+        const reportOwnerRole = (existing as any)?.users?.role;
+        if (!pklRole || reportOwnerRole !== pklRole) {
+            return NextResponse.json({ success: false, message: "Laporan ini bukan dari PKL divisi kamu" }, { status: 403 });
+        }
+    } else if (!isFullAccess(user.role)) {
         return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
     }
 

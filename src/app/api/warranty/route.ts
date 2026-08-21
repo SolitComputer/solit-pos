@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { computeWarrantyStatus } from "@/lib/warranty";
 
 async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
@@ -37,22 +38,19 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     }
 
     // Auto-update status berdasarkan tanggal hari ini
+    // ✅ FIX: dulu status yang sudah diedit manual (mis. dipaksa ACTIVE) selalu
+    // ditimpa balik oleh hitungan tanggal di sini setiap kali data di-refresh
+    // — perubahan manual jadi hilang kecuali statusnya VOID. Sekarang kalau
+    // baris punya manual_status_override=true, status tersimpan (hasil edit
+    // admin) yang dipakai apa adanya, bukan dihitung ulang dari tanggal.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const soonThreshold = new Date();
     soonThreshold.setDate(soonThreshold.getDate() + 7);
 
     const enriched = (data || []).map((w) => {
-      const end = new Date(w.warranty_end);
-      end.setHours(0, 0, 0, 0);
-      const daysLeft = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-      let computedStatus = w.status;
-      if (w.status !== "VOID") {
-        if (daysLeft < 0) computedStatus = "EXPIRED";
-        else if (daysLeft <= 7) computedStatus = "EXPIRING_SOON";
-        else computedStatus = "ACTIVE";
-      }
+      const { computedStatus: autoStatus, daysLeft } = computeWarrantyStatus(w.warranty_end, w.status);
+      const computedStatus = w.manual_status_override ? w.status : autoStatus;
 
       return { ...w, computed_status: computedStatus, days_left: daysLeft };
     });

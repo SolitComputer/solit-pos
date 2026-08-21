@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
+import { isRateLimited } from "@/lib/rateLimit";
 
 const ALLOWED_ORIGINS = [
     "https://solit03.com",
@@ -7,6 +8,19 @@ const ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:3000",
 ];
+
+// ✅ SECURITY FIX: rate limit in-memory (lihat src/lib/rateLimit.ts) cuma
+// efektif per proses server — di deployment multi-instance/serverless,
+// proteksinya jauh lebih lemah dari yang dikira karena tiap instance punya
+// counter sendiri. Sebagai pertahanan berlapis, nama pelanggan yang
+// dikembalikan disamarkan (nama depan penuh, sisanya cuma inisial) — cukup
+// buat pemilik garansi mengenali miliknya sendiri, tapi tidak berguna
+// dikumpulkan lewat percobaan SN berulang.
+function maskCustomerName(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length <= 1) return parts[0] ?? name;
+    return [parts[0], ...parts.slice(1).map((p) => `${p.charAt(0).toUpperCase()}.`)].join(" ");
+}
 
 function getCorsHeaders(origin: string): Record<string, string> {
     const isAllowed = ALLOWED_ORIGINS.includes(origin);
@@ -34,6 +48,18 @@ export async function GET(req: NextRequest) {
     const corsHeaders = getCorsHeaders(origin);
 
     try {
+        // ✅ SECURITY FIX: endpoint publik ini (tanpa login, tanpa batas) bisa
+        // dipakai untuk mengumpulkan nama pelanggan lewat percobaan serial
+        // number berulang. Dibatasi 20 request/menit per IP — cukup untuk
+        // pemakaian wajar (cek 1 SN), tapi menghambat scraping/enumerasi.
+        const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+        if (isRateLimited(`warranty-check:${ip}`, 20, 60_000)) {
+            return NextResponse.json(
+                { success: false, message: "Terlalu banyak percobaan, coba lagi sebentar lagi" },
+                { status: 429, headers: corsHeaders }
+            );
+        }
+
         const { searchParams } = new URL(req.url);
         const sn = searchParams.get("sn")?.trim();
 
@@ -87,7 +113,7 @@ export async function GET(req: NextRequest) {
                 success: true,
                 data: {
                     serial_number: data.serial_number,
-                    customer_name: data.customer_name,
+                    customer_name: maskCustomerName(data.customer_name ?? ""),
                     laptop_name: data.laptop_name,
                     warranty_start: data.warranty_start,
                     warranty_end: data.warranty_end,

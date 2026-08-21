@@ -69,13 +69,8 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     if (file.size > MAX_SIZE) return NextResponse.json({ success: false, message: "Ukuran file maksimal 10MB" }, { status: 400 });
     if (file.size === 0) return NextResponse.json({ success: false, message: "File tidak boleh kosong" }, { status: 400 });
 
-    // Log untuk debug — hapus setelah confirmed fix
-    console.log("[upload] file.type:", file.type, "| file.name:", file.name, "| size:", file.size);
-
     const attachmentType = detectAttachmentType(file.type, file.name);
     const contentType = resolveContentType(file.type, file.name);
-
-    console.log("[upload] resolved contentType:", contentType, "| attachmentType:", attachmentType);
 
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const folder = attachmentType === "voice" ? "voice" : "dm";
@@ -99,8 +94,6 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     const { data: urlData } = supabaseAdmin.storage
         .from(BUCKET)
         .getPublicUrl(data.path);
-
-    console.log("[upload] success, publicUrl:", urlData.publicUrl);
 
     return NextResponse.json({
         success: true,

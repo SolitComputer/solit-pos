@@ -4,7 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/services/supabase";
 
 // Hanya role pengantaran yang bisa ditugaskan mengantar → yang butuh badge
-const ELIGIBLE_ROLES = new Set<string>(["PENGANTARAN"]);
+// ✅ FIX: PKL_PENGANTARAN juga bisa jadi driver, dulu tidak masuk daftar ini
+// jadi driver PKL tidak dapat badge notifikasi tugas baru.
+const ELIGIBLE_ROLES = new Set<string>(["PENGANTARAN", "PKL_PENGANTARAN"]);
 
 /**
  * Jumlah tugas pengantaran aktif (status DIKIRIM, metode PENGANTARAN)

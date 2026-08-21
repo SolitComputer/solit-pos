@@ -32,6 +32,9 @@ export default function EditableLaptopCombinedPriceCell({
     }, [total, editing]);
 
     const handleSave = async () => {
+        // ✅ FIX: guard "sedang menyimpan" biar Enter berulang cepat tidak
+        // mengirim beberapa PUT sekaligus.
+        if (saving) return;
         const parsedTotal = Math.round(Number(inputVal.replace(/\./g, "").replace(/,/g, "")));
 
         if (!Number.isFinite(parsedTotal) || parsedTotal < 0) {

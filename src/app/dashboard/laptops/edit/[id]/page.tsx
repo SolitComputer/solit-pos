@@ -11,22 +11,31 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ✅ FIX: dulu useEffect ini cuma jalan sekali saat mount ([] deps) — kalau
+  // pindah dari halaman edit laptop A ke laptop B tanpa full reload (mis.
+  // lewat Link/router.push), komponen ini tidak remount jadi form masih
+  // berisi data laptop A. Submit di halaman B akhirnya menimpa laptop B
+  // dengan data form laptop A yang tersisa. Sekarang effect ikut jalan ulang
+  // tiap `id` berubah, dan ada guard `cancelled` supaya respons fetch yang
+  // sudah basi (dari id sebelumnya) tidak menimpa state setelah pindah lagi.
   useEffect(() => {
-    fetchLaptop();
-  }, []);
-
-  const fetchLaptop = async () => {
-    try {
-      const response = await fetch(`/api/laptops/${id}`);
-      const result = await response.json();
-      setForm(result.data);
-    } catch (error) {
-      console.error(error);
-      alert("Gagal memuat data laptop");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    let cancelled = false;
+    setIsLoading(true);
+    setForm(null);
+    (async () => {
+      try {
+        const response = await fetch(`/api/laptops/${id}`);
+        const result = await response.json();
+        if (!cancelled) setForm(result.data);
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) alert("Gagal memuat data laptop");
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
