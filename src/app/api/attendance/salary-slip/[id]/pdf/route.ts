@@ -1,11 +1,26 @@
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
+
+const ADMIN_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ SECURITY FIX: dulu endpoint ini TIDAK ADA pengecekan login/kepemilikan
+    // sama sekali — siapa pun yang login (bahkan tebak-tebak UUID) bisa buka
+    // slip gaji siapa saja. Disamakan dengan guard yang sudah benar di
+    // halaman kembarnya /receipt/salary-slip/[slipId]/page.tsx.
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return new NextResponse(
+        JSON.stringify({ message: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     const { id } = await params;
 
     // Step 1: Ambil slip dulu
@@ -19,6 +34,20 @@ export async function GET(
       return new NextResponse(
         JSON.stringify({ message: "Slip tidak ditemukan", error: slipError?.message }),
         { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const isAdmin = ADMIN_ROLES.includes(currentUser.role);
+    if (!isAdmin && slip.user_id !== currentUser.id) {
+      return new NextResponse(
+        JSON.stringify({ message: "Forbidden" }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (!isAdmin && !slip.sent_at) {
+      return new NextResponse(
+        JSON.stringify({ message: "Slip belum dikirim" }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
       );
     }
 

@@ -3,6 +3,7 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { AI_ASSISTANT_ROLES } from "@/lib/permissions";
 import { createClient } from "@supabase/supabase-js";
 import { runAiCeoTurn, classifyAiCeoError } from "@/lib/aiCeo";
+import { isRateLimited } from "@/lib/rateLimit";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,6 +13,17 @@ const supabaseAdmin = createClient(
 export const dynamic = "force-dynamic";
 
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
+  // ✅ SECURITY FIX (DDoS/cost-amplification): endpoint ini dibuka untuk
+  // SEMUA role (AI_ASSISTANT_ROLES = ALL_ROLES) dan tiap request memicu
+  // panggilan LLM sungguhan (biaya API + CPU) — target termurah buat flood
+  // yang mahal. Dibatasi ketat per user di luar limit global middleware.
+  if (isRateLimited(`ai-assistant-chat:${user.id}`, 15, 60_000)) {
+    return NextResponse.json(
+      { success: false, message: "Terlalu banyak pesan dalam waktu singkat, tunggu sebentar." },
+      { status: 429 }
+    );
+  }
+
   const body = await req.json().catch(() => null);
   const message: string = body?.message?.trim();
   const reminderId: string | undefined = body?.reminderId;

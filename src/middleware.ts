@@ -18,6 +18,7 @@ import { checkDynamicPageAccess, expandDynamicParents } from "@/lib/dynamicPermi
 import { CONTRACT_GATE_ENABLED } from "@/lib/featureFlags";
 import { withTimeout } from "@/lib/withTimeout";
 import { fetchWithTimeout } from "@/lib/supabaseFetchWithTimeout";
+import { isRateLimited } from "@/lib/rateLimit";
 
 // Batas waktu tiap call Supabase di middleware. Middleware jalan di HAMPIR
 // SETIAP request, jadi kalau Supabase lambat/hang, ini yang mencegah request
@@ -278,6 +279,30 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const url = request.nextUrl.clone();
 
+  // ── Rate limit dasar (anti-flood) ───────────────────────────────────────────
+  // ✅ SECURITY FIX: dulu tidak ada rate limit sama sekali di level middleware —
+  // semua request (termasuk /api/auth/login yang mahal karena bcrypt) diproses
+  // penuh sebelum ada pengecekan apa pun. Ini BUKAN pengganti proteksi DDoS
+  // infra (Cloudflare/WAF di depan reverse proxy) — serangan volumetrik/
+  // terdistribusi dari banyak IP tetap harus ditahan di situ. Tapi karena app
+  // ini jalan sebagai satu proses Node di belakang reverse proxy (bukan edge
+  // multi-instance), rate limit in-memory di sini efektif menahan flood dari
+  // satu/segelintir sumber (script abuse, scanner) sebelum sempat menyentuh
+  // DB atau hitung bcrypt — mengurangi biaya server per request jahat.
+  const rlIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (isRateLimited(`mw-global:${rlIp}`, 400, 10_000)) {
+    return NextResponse.json(
+      { success: false, message: "Terlalu banyak request, coba lagi sebentar lagi" },
+      { status: 429 }
+    );
+  }
+  if (pathname === "/api/auth/login" && isRateLimited(`mw-login:${rlIp}`, 15, 10_000)) {
+    return NextResponse.json(
+      { success: false, message: "Terlalu banyak percobaan login, coba lagi sebentar lagi" },
+      { status: 429 }
+    );
+  }
+
   // ── Strip client-supplied identity headers (anti-spoof) ────────────────────
   // Tanpa ini, siapa pun bisa kirim header `x-user-roles: ADMIN` dan route yang
   // baca header itu akan percaya. Kita bikin salinan header request yang bersih;
@@ -433,10 +458,15 @@ export async function middleware(request: NextRequest) {
     return clearSessionAndRedirect(loginUrl);
   }
 
-  // ── Force logout check (tetap page-route only, biar hemat query DB) ───────
+  // ── Force logout check — sekarang berlaku untuk SEMUA route (page & API) ──
+  // ✅ SECURITY FIX: dulu blok ini cuma jalan `if (isPageRoute)` — admin yang
+  // klik "Force Logout" mengira sesi langsung terputus, padahal request
+  // API langsung (fetch/XHR dari tab yang sudah terbuka, bukan reload
+  // halaman) tetap lolos sampai token kedaluwarsa alami. Throttle "max 1x
+  // per 5 menit" tetap dipertahankan supaya biaya query DB tidak naik.
   let shouldRefreshFlCookie = false;
 
-  if (isPageRoute) {
+  {
     //  throttle cek force_logout: max 1x per 5 menit per sesi
     const nowSec = Math.floor(Date.now() / 1000);
     const lastFlCheck = Number(request.cookies.get("fl_check")?.value ?? 0);
@@ -468,6 +498,22 @@ export async function middleware(request: NextRequest) {
             new Date(userRecord.force_logout_at).getTime() / 1000;
           const BUFFER_SECONDS = 5;
           if (issuedAt < forceLogoutAtSec - BUFFER_SECONDS) {
+            if (!isPageRoute) {
+              const res = NextResponse.json(
+                { success: false, message: "Sesi dihentikan paksa (force logout), silakan login ulang", reason: "force_logout" },
+                { status: 401 }
+              );
+              for (const name of SESSION_COOKIES) {
+                res.cookies.set(name, "", {
+                  httpOnly: true,
+                  secure: process.env.NODE_ENV === "production",
+                  sameSite: "lax",
+                  path: "/",
+                  maxAge: 0,
+                });
+              }
+              return res;
+            }
             const loginUrl = new URL("/login", request.url);
             loginUrl.searchParams.set("reason", "force_logout");
             return clearSessionAndRedirect(loginUrl);

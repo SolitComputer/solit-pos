@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
+import { computeWarrantyStatus } from "@/lib/warranty";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -50,6 +51,18 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     if (body.customer_phone    !== undefined) allowed.customer_phone    = body.customer_phone;
     allowed.last_edited_by = user.name;
     allowed.last_edited_at = new Date().toISOString();
+
+    // ✅ FIX: kalau admin sengaja memilih status yang beda dari hasil hitung
+    // otomatis (mis. paksa ACTIVE walau tanggalnya sudah lewat), tandai
+    // manual_status_override supaya GET list tidak menimpanya balik di
+    // refresh berikutnya. Kalau status yang dipilih ternyata SAMA dengan
+    // hasil hitung otomatis (warranty_end dipakai kalau ikut diedit), berarti
+    // bukan override — biarkan auto-hitung jalan lagi seperti biasa.
+    if (body.status !== undefined && before) {
+      const warrantyEndForCheck = allowed.warranty_end ?? before.warranty_end;
+      const { computedStatus: autoStatus } = computeWarrantyStatus(warrantyEndForCheck, body.status);
+      allowed.manual_status_override = body.status !== autoStatus;
+    }
 
     const { data, error } = await supabase
       .from("warranties")

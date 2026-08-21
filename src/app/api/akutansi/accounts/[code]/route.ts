@@ -91,10 +91,25 @@ export const DELETE = withAuth(async (_req, ctx) => {
 
   const supabase = getAdmin();
 
-  const [{ data: usedInLines }, { data: usedInOpening }] = await Promise.all([
+  const [
+    { data: usedInLines, error: usedInLinesErr },
+    { data: usedInOpening, error: usedInOpeningErr },
+  ] = await Promise.all([
     supabase.from("journal_lines").select("id").eq("account_code", code).limit(1),
     supabase.from("journal_opening_balances").select("account_code").eq("account_code", code).maybeSingle(),
   ]);
+
+  // ✅ FIX: dulu error dari cek "masih dipakai?" tidak dicek — kalau query
+  // gagal, hasilnya (undefined) dianggap sama dengan "tidak dipakai" (fail-
+  // open), akun bisa terhapus padahal mutasinya masih ada. Sekarang gagal
+  // cek = tolak hapus (fail-closed), bukan lolos diam-diam.
+  if (usedInLinesErr || usedInOpeningErr) {
+    console.error("[accounts DELETE] gagal cek pemakaian akun:", usedInLinesErr?.message, usedInOpeningErr?.message);
+    return NextResponse.json(
+      { success: false, message: "Gagal memverifikasi apakah akun masih dipakai — dibatalkan demi keamanan" },
+      { status: 500 }
+    );
+  }
 
   if ((usedInLines && usedInLines.length > 0) || usedInOpening) {
     return NextResponse.json(

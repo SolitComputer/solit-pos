@@ -15,6 +15,24 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
+// ✅ SECURITY FIX: script ini bikin akun auth SUNGGUHAN pakai service role key
+// dari .env.local — kalau .env.local tidak sengaja mengarah ke Supabase
+// produksi, akun-akun ini langsung dibuat di database asli tanpa peringatan.
+// Sekarang wajib konfirmasi eksplisit: jalankan dengan
+// `CONFIRM_TARGET_PROJECT_REF=<project-ref-dari-url>` supaya operator harus
+// baca dulu project mana yang akan disentuh sebelum script jalan.
+const projectRef = supabaseUrl.match(/^https?:\/\/([^.]+)\./)?.[1] ?? supabaseUrl;
+const confirmRef = process.env.CONFIRM_TARGET_PROJECT_REF;
+console.log(`\n🎯 Target Supabase project: ${projectRef} (${supabaseUrl})`);
+if (confirmRef !== projectRef) {
+  console.error(
+    `\n❌ DIBATALKAN. Ini script yang bikin akun auth SUNGGUHAN.\n` +
+    `   Untuk melanjutkan, jalankan ulang dengan:\n` +
+    `   CONFIRM_TARGET_PROJECT_REF=${projectRef} npx tsx src/scripts/bulk-create-auth-users.ts\n`
+  );
+  process.exit(1);
+}
+
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });

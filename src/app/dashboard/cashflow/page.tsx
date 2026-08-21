@@ -1635,7 +1635,11 @@ export default function CashflowPage() {
 
     const effectiveNominal = (e: Entry) =>
         e.is_stale && e.source_nominal != null ? Number(e.source_nominal) : Number(e.nominal || 0);
-    const incomeValue = masuk.reduce((s, e) => e.source_type !== "MODAL_AWAL" && !e.is_voided && inPeriod(e.tanggal) ? s + effectiveNominal(e) : s, 0); const expenseValue = keluar.reduce((s, e) => inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s, 0);
+    const incomeValue = masuk.reduce((s, e) => e.source_type !== "MODAL_AWAL" && !e.is_voided && inPeriod(e.tanggal) ? s + effectiveNominal(e) : s, 0);
+    // ✅ FIX: dulu total "Keluar" tidak cek is_voided (beda dari incomeValue di
+    // atas yang sudah benar) — entri yang sudah di-void ikut kehitung, jadi
+    // totalnya lebih besar dari yang seharusnya.
+    const expenseValue = keluar.reduce((s, e) => !e.is_voided && inPeriod(e.tanggal) ? s + Number(e.nominal || 0) : s, 0);
     const periodLabel = (customFrom || customTo) ? `${customFrom ? fmtTanggalShort(customFrom) : "..."} — ${customTo ? fmtTanggalShort(customTo) : "..."}` : "Semua Waktu";
 
     const startDateFormatted = new Date(CASHFLOW_START_DATE + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth";
 import { AKUNTANSI_MANAGE_ROLES } from "@/lib/permissions";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { isValidPeriod, periodFromDate } from "@/lib/accounting";
+import { isValidPeriod, periodFromDate, isBalanced } from "@/lib/accounting";
 import {
   buildDraftsForPeriod,
   draftKey,
@@ -59,6 +59,28 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
 
   if (selected.length === 0)
     return NextResponse.json({ success: true, data: { inserted: 0 }, message: "Tidak ada data pending" });
+
+  // ✅ FIX: beda dari jalur buat/edit manual (yang selalu cek isBalanced
+  // sebelum simpan), jalur confirm ini langsung posting draft ke buku besar
+  // tanpa validasi debit=kredit. Draft yang tidak balance (mis. bug di
+  // logic pembangun draft transaksi tertentu) dibuang dari batch di sini
+  // supaya tidak ikut ter-posting; sisanya yang balance tetap diproses.
+  const unbalanced = selected.filter((d) => !isBalanced(d.lines));
+  if (unbalanced.length > 0) {
+    console.error(
+      "[akuntansi confirm] draft tidak balance, dilewati:",
+      unbalanced.map((d) => draftKey(d))
+    );
+  }
+  selected = selected.filter((d) => isBalanced(d.lines));
+
+  if (selected.length === 0) {
+    return NextResponse.json({
+      success: true,
+      data: { inserted: 0, skipped_unbalanced: unbalanced.length },
+      message: "Semua data terpilih tidak balance (debit ≠ kredit) — tidak ada yang diposting",
+    });
+  }
 
   const entryRows = selected.map((d) => ({
     period: periodFromDate(d.tanggal),
@@ -156,7 +178,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
   );
 
   return NextResponse.json(
-    { success: true, data: { inserted: selected.length, skipped: skippedCount } },
+    { success: true, data: { inserted: selected.length, skipped: skippedCount, skipped_unbalanced: unbalanced.length } },
     { status: 201 }
   );
 }, AKUNTANSI_MANAGE_ROLES);

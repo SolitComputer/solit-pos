@@ -28,12 +28,19 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     const now = new Date().toISOString();
+    // ✅ FIX: kalau belum ada driver yang accept (delivery_user_id kosong),
+    // pemanggil force-complete dicatat sebagai "driver" tanpa penanda apa pun
+    // — riwayat pengiriman jadi terlihat seolah driver itu benar-benar
+    // mengantar. Nama diberi label "(Force Complete)" supaya kelihatan jelas
+    // ini override admin/kepala, bukan pengantaran asli oleh driver
+    // tersebut. delivery_accepted_at tetap TIDAK diisi (beda dari alur
+    // accept normal), jadi laporan yang mengecek accepted_at tetap akurat.
     const patch: Record<string, any> = {
       status: "SELESAI",
       delivered_at: order.delivered_at ?? now,
       updated_at: now,
       ...(order.delivery_method === "PENGANTARAN" && !order.delivery_user_id
-        ? { delivery_user_id: user.id, delivery_user_name: user.name }
+        ? { delivery_user_id: user.id, delivery_user_name: `${user.name} (Force Complete)` }
         : {}),
     };
 

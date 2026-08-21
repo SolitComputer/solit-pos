@@ -585,7 +585,11 @@ export function LaptopsContent() {
             });
             setLaptops(normalized);
         } catch {
-            setLaptops([]);
+            // ✅ FIX: dulu gagal fetch (network error dll) menghapus SEMUA data
+            // laptop yang sudah tampil (setLaptops([])) — terlihat seolah data
+            // hilang total. Sekarang data lama dipertahankan, cuma kasih tahu
+            // via alert kalau refresh-nya gagal.
+            showAlert("Gagal memuat data laptop. Data yang tampil mungkin belum ter-update.");
         } finally {
             setIsLoading(false);
         }

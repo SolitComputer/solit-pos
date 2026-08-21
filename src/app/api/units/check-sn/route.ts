@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
+import { BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
 
 async function handler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
@@ -14,8 +15,13 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       );
     }
 
+    // ✅ SECURITY FIX: komentar di bawah ini dulu mengklaim "purchase_price
+    // TIDAK bocor ke client" — padahal kolomnya di-select dan ikut dikirim
+    // mentah ke SEMUA role login (withAuth tanpa daftar role). Sekarang
+    // benar-benar disaring server-side untuk role non-privat.
+    const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
+
     // ── 1) Laptop dulu — .eq case-sensitive (perilaku lama, dipertahankan) ──
-    // Kolom di-select eksplisit biar buy_price (modal) TIDAK bocor ke client.
     const { data: laptopUnit, error: laptopErr } = await supabaseAdmin
       .from("laptop_units")
       .select(`
@@ -30,9 +36,11 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
     if (laptopErr) console.error("[check-sn] laptop_units:", laptopErr);
 
     if (laptopUnit) {
+      const safeUnit: Record<string, any> = { ...laptopUnit };
+      if (!canSeePrivate) delete safeUnit.purchase_price;
       return NextResponse.json({
         success: true,
-        data: { ...laptopUnit, type: "LAPTOP" },
+        data: { ...safeUnit, type: "LAPTOP" },
       });
     }
 
