@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
-import { expandRolesWithParents } from "@/lib/permissions";
+import { expandRolesWithParents, BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 import { logActivity } from "@/lib/activityLogger";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
@@ -26,7 +26,19 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, data });
+    // ✅ SECURITY FIX: VIEW_UNITS mencakup role sales (CREW_SALES,
+    // KEPALA_SALES, dst) yang seharusnya TIDAK lihat harga modal — dulu
+    // select("*") dikirim mentah, sama seperti field sensitif yang sudah
+    // benar disaring di GET /api/laptops (list).
+    const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
+    const safeData = canSeePrivate
+      ? data
+      : (data ?? []).map((u: Record<string, any>) => {
+          const { purchase_price, sparepart_cost, ...rest } = u;
+          return rest;
+        });
+
+    return NextResponse.json({ success: true, data: safeData });
   } catch (err) {
     console.error(err);
     return NextResponse.json(

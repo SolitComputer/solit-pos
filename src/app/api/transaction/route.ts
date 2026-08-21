@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
-import { withAuth } from "@/lib/auth";
+import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 
 function splitSerials(raw: any): string[] {
   if (Array.isArray(raw)) return raw.filter(Boolean).map((s: string) => String(s).trim()).filter(Boolean);
@@ -55,8 +55,16 @@ function applyCompanyFilter(query: any, companyName: string) {
   return query.eq("company_name", companyName);
 }
 
-async function handler(req: NextRequest) {
+async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
   try {
+    // ✅ SECURITY FIX: dulu endpoint ini withAuth(handler) TANPA daftar role
+    // (siapa saja yang login lolos) DAN responsnya menyertakan harga modal +
+    // margin mentah untuk setiap transaksi — beda dari semua endpoint
+    // /api/dashboard/* yang sudah benar masking profit ke role finance saja.
+    const showFin = (user.roles ?? [user.role]).some(
+      (r) => (PERMISSIONS.VIEW_FINANCIALS as string[]).includes(r)
+    );
+
     const url = new URL(req.url);
 
     // ── Mode "meta": cuma buat isi dropdown filter (payment method / platform), dipanggil sekali saat mount ──
@@ -494,7 +502,13 @@ async function handler(req: NextRequest) {
       const totalMargin = hasModal ? dealPrice - finalInventoryPrice : 0;
       const modalMissing = finalInventoryPrice === 0; // modal 0 = belum di-set, apapun sumbernya
 
-      return {
+      // ✅ SECURITY FIX: margin/harga modal cuma buat role finance — sama
+      // seperti masking di /api/dashboard/transactions.
+      const safeGroupedItems = grouped_items_with_margin.map((g) =>
+        showFin ? g : { ...g, margin: 0, purchase_price_total: 0 }
+      );
+
+      const row: Record<string, any> = {
         ...trx,
         cpu: trx.cpu || laptopSpecs?.cpu || undefined,
         ram: trx.ram || laptopSpecs?.ram || undefined,
@@ -505,11 +519,11 @@ async function handler(req: NextRequest) {
         serial_numbers: allSerialNumbers.length > 0
           ? allSerialNumbers
           : trx.serial_numbers ?? (trx.serial_number ? [trx.serial_number] : []),
-        other: totalMargin,
+        other: showFin ? totalMargin : 0,
         has_modal: hasModal,
         modal_missing: modalMissing,
-        purchase_price_current: finalInventoryPrice,
-        grouped_items: grouped_items_with_margin,
+        purchase_price_current: showFin ? finalInventoryPrice : 0,
+        grouped_items: safeGroupedItems,
         accessory_items: (() => {
           // Try transaction_items first
           const fromTxItems = items
@@ -544,6 +558,9 @@ async function handler(req: NextRequest) {
           return "laptop";
         })(),
       };
+
+      if (!showFin) delete row.inventory_price;
+      return row;
     });
 
     return NextResponse.json({ success: true, data: enriched, total: count ?? enriched.length, page, limit });
@@ -553,4 +570,4 @@ async function handler(req: NextRequest) {
   }
 }
 
-export const GET = withAuth(handler);
+export const GET = withAuth(handler, PERMISSIONS.VIEW_TRANSACTIONS);

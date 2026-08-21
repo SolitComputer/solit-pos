@@ -16,7 +16,11 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
     return NextResponse.json({ success: false, message: "Ukuran gambar maksimal 5MB" }, { status: 400 });
   }
 
-  const ext = file.name.split(".").pop() || "jpg";
+  // ✅ FIX: ekstensi dulu diambil mentah dari file.name — kalau nama file
+  // tidak punya titik, seluruh nama (yang bisa mengandung karakter aneh)
+  // jadi "ekstensi". Disamakan dengan sanitasi di messages/group-chat upload.
+  const rawExt = (file.name.split(".").pop() || "jpg").replace(/[^a-zA-Z0-9]/g, "").slice(0, 10);
+  const ext = rawExt || "jpg";
   const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 

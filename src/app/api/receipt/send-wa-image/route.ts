@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@/lib/auth";
+import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
+import { isRateLimited } from "@/lib/rateLimit";
 
 // ✅ SECURITY FIX: dulu route ini tidak lewat middleware (tidak ada di
 // config.matcher) DAN tidak punya cek auth sendiri, jadi siapa pun (tanpa login)
 // bisa memicu pengiriman WhatsApp pakai kredit Fonnte milik toko — jalur spam.
 // Dibungkus withAuth: hanya user login yang bisa mengirim struk. Pemanggilnya
 // memang halaman /dashboard (staff), jadi tidak ada fitur yang rusak.
-export const POST = withAuth(async (req: NextRequest) => {
+// ✅ FIX lanjutan: withAuth tadinya tanpa daftar role (siapa pun yang login,
+// termasuk role tak terkait transaksi, bisa kirim WA pakai kredit toko tanpa
+// batas). Dibatasi ke role yang memang menangani transaksi/pembayaran, dan
+// ditambah rate limit per user.
+export const POST = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthUser) => {
     try {
+        if (isRateLimited(`send-wa-image:${user.id}`, 30, 60_000)) {
+            return NextResponse.json({ success: false, message: "Terlalu banyak percobaan, coba lagi sebentar lagi" }, { status: 429 });
+        }
+
         const { phone, imageUrl, invoice } = await req.json();
 
         if (!phone || !imageUrl) {
@@ -56,4 +65,4 @@ export const POST = withAuth(async (req: NextRequest) => {
         console.error("[send-wa-image] Error:", err);
         return NextResponse.json({ success: false, message: String(err) });
     }
-});
+}, PERMISSIONS.VIEW_TRANSACTIONS);

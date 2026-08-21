@@ -217,6 +217,16 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         const gross_profit = deal_price - inventory_price;
         const profitStatus = gross_profit > 0 ? "✓ PROFIT" : gross_profit < 0 ? "⚠️ LOSS" : "➖ BREAK EVEN";
 
+        // ✅ FIX: dulu tidak ada penanda apa pun kalau deal_price jauh di
+        // bawah harga jual resmi (selling_price) unit — potensi "sweetheart
+        // deal" tanpa jejak anomali, meski masih di atas modal (jadi tidak
+        // kena label LOSS di atas). Tidak diblokir (diskon besar bisa
+        // legitimate — approval tetap di luar sistem), tapi ditandai di
+        // activity log biar kelihatan saat direview.
+        const listedTotal = laptopUnits.reduce((s, u) => s + (u.selling_price ?? 0), 0);
+        const discountPct = listedTotal > 0 ? Math.round((1 - deal_price / listedTotal) * 100) : 0;
+        const discountFlag = discountPct >= 15 ? ` ⚠️ DISKON ${discountPct}% dari harga jual` : "";
+
         const isEcommerce = isEcommerceEarly;
         const txStatus = isEcommerce ? "PACKING" : isDP ? "RESERVED" : isAmbilDulu ? "HELD" : "PAID";
         // Status unit MENGIKUTI status transaksi selama masih pending (bukan cuma "RESERVED" generik).
@@ -474,7 +484,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
         await logActivity({
             userId: user.id, userName: user.name, userRole: user.role,
             action: "CREATE", entity: "transaction", entityId: transaction.id,
-            entityLabel: `${invoice_number} — ${body.customer_name} (${laptopUnits.length} unit, ${totalAccQty} aksesori) [${txStatus}]${isEcommerce ? ` via ${body.ecommerce_platform}` : ""} | ${profitStatus} Rp${Math.abs(gross_profit).toLocaleString("id-ID")}`,
+            entityLabel: `${invoice_number} — ${body.customer_name} (${laptopUnits.length} unit, ${totalAccQty} aksesori) [${txStatus}]${isEcommerce ? ` via ${body.ecommerce_platform}` : ""} | ${profitStatus} Rp${Math.abs(gross_profit).toLocaleString("id-ID")}${discountFlag}`,
             afterData: transaction,
         });
 

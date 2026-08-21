@@ -18,10 +18,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validasi tipe file
-    if (!file.type.startsWith("image/")) {
+    // ✅ FIX: dulu terima semua "image/*" termasuk image/svg+xml — SVG bisa
+    // menyisipkan <script> yang jalan kalau dibuka langsung dari bucket
+    // publik. Dipersempit ke format raster umum saja.
+    const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"];
+    if (!ALLOWED_MIME.includes(file.type)) {
       return NextResponse.json(
-        { success: false, message: "Hanya file gambar yang diterima" },
+        { success: false, message: "Hanya file gambar JPG/PNG/WEBP yang diterima" },
         { status: 400 }
       );
     }

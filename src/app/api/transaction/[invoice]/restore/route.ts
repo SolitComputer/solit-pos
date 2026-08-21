@@ -1,6 +1,10 @@
 // src/app/api/transaction/[invoice]/restore/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/services/supabase";
+// ✅ FIX: dulu pakai client anon-key (@/services/supabase), inkonsisten
+// dengan rute-rute saudaranya yang pakai supabaseAdmin — cuma bergantung ke
+// RLS anon-key yang bisa berubah, bukan bug yang langsung tereksploitasi
+// (akses sudah digerbang withAuth di bawah) tapi disamakan untuk konsistensi.
+import { supabaseAdmin as supabase } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { cancelOutflowByInvoice } from "@/lib/accessoryOutflow";
