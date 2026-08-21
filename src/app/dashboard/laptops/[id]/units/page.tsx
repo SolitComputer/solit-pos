@@ -399,7 +399,23 @@ export default function UnitsPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ notes: note }),
             });
-            const json = await res.json();
+
+            // ✅ FIX: dulu langsung res.json() — kalau server/proxy balikin
+            // HTML (mis. 403 dari withAuth, bukan dari handler kita),
+            // res.json() throw "Unexpected token '<'" yang membingungkan.
+            // Sekarang baca sebagai text dulu, baru coba parse.
+            const raw = await res.text();
+            let json: { success?: boolean; message?: string; data?: Partial<LaptopUnit> } = {};
+            try {
+                json = raw ? JSON.parse(raw) : {};
+            } catch {
+                throw new Error(
+                    res.status === 403
+                        ? "Akun ini tidak punya izin untuk SO unit ini (403 Forbidden)."
+                        : `Gagal update SO — server balas status ${res.status} (bukan JSON).`
+                );
+            }
+
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal update SO");
             const wasActive = isUnitSOActive(unit);
             setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, ...json.data } : u));

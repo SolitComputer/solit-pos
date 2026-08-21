@@ -41,13 +41,13 @@ export const GET = withAuth(async (req: NextRequest) => {
                 )
             `)
           .ilike("serial_number", `%${q}%`)
-            // Business rule: SN yang sama boleh dipakai di lebih dari 1
-            // penyiapan sekaligus — jadi unit yang statusnya masih
-            // DALAM_PENYIAPAN (sedang dipakai penyiapan lain) TETAP muncul
-            // di pencarian ini, bukan cuma SIAP_JUAL. Yang TIDAK ditampilkan
-            // cuma unit yang sudah benar-benar SOLD/RESERVED/HELD/PACKING
-            // (sudah terjual/diproses via jalur transaksi).
-            .in("status", ["SIAP_JUAL", "DALAM_PENYIAPAN"])
+            // Unit yang statusnya sudah terjual/diproses via jalur transaksi
+            // (SOLD/RESERVED/HELD/PACKING) tidak ditampilkan. "Sedang dipakai
+            // di penyiapan lain" TIDAK LAGI dibaca dari status unit —
+            // Penyiapan tidak pernah mengubah laptop_units.status sama
+            // sekali — dihitung terpisah lewat preparation_items aktif
+            // (lihat blok activeInPrepIds di bawah).
+            .eq("status", "SIAP_JUAL")
             .limit(8)
             .order("serial_number"),
 
@@ -78,6 +78,24 @@ export const GET = withAuth(async (req: NextRequest) => {
     if (laptopResult.error) console.error("search-sn laptop error:", laptopResult.error);
     if (accessoryResult.error) console.error("search-sn accessory error:", accessoryResult.error);
 
+    // ── Cek unit mana yang SEDANG dipakai di penyiapan lain yang masih aktif ──
+    // Business rule: SN yang sama boleh dipakai di lebih dari 1 penyiapan
+    // sekaligus — ini murni informasi/hint buat sales, BUKAN pembatas. Karena
+    // laptop_units.status tidak lagi berubah saat Penyiapan dibuat, deteksinya
+    // sekarang lewat preparation_items yang masih aktif (belum dibatalkan &
+    // order-nya belum SELESAI/DIBATALKAN).
+    const laptopUnitIds = (laptopResult.data || []).map((u: any) => u.id);
+    let activeInPrepIds = new Set<string>();
+    if (laptopUnitIds.length > 0) {
+        const { data: activePrepItems } = await supabase
+            .from("preparation_items")
+            .select("unit_id, preparation_orders!inner(status)")
+            .in("unit_id", laptopUnitIds)
+            .eq("is_cancelled", false)
+            .in("preparation_orders.status", ["MENUNGGU", "DIPROSES", "SIAP_KIRIM", "MENUNGGU_PENGANTAR", "DIKIRIM"]);
+        activeInPrepIds = new Set((activePrepItems || []).map((it: any) => it.unit_id).filter(Boolean));
+    }
+
     // ── Format laptop units ───────────────────────────────────────────────────
    const laptopFormatted = (laptopResult.data || []).map((u: any) => ({
         id: u.id,
@@ -91,10 +109,10 @@ export const GET = withAuth(async (req: NextRequest) => {
         laptop_name: u.laptops?.laptop_name ?? "",
         // Penanda tipe — dipakai di frontend untuk render berbeda
         unit_type: "laptop" as const,
-        // True kalau unit ini SEDANG dipakai penyiapan lain (masih boleh
-        // dipilih lagi — lihat business rule di query di atas) — dipakai FE
-        // untuk kasih hint visual, bukan untuk memblokir apapun.
-        in_other_preparation: u.status === "DALAM_PENYIAPAN",
+        // True kalau unit ini SEDANG dipakai di penyiapan lain yang masih
+        // aktif (lihat query activeInPrepIds di atas) — dipakai FE untuk
+        // kasih hint visual, bukan untuk memblokir apapun.
+        in_other_preparation: activeInPrepIds.has(u.id),
     }));
 
     // ── Format accessory units ────────────────────────────────────────────────

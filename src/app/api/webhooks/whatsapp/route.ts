@@ -1,13 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { findOrCreateConversation, saveIncomingMessage, refreshCustomerName, updateMessageDeliveryStatus } from "@/lib/leadsChat";
 
 // PUBLIC (lihat edit middleware.ts di bawah) karena yang manggil server Fonnte,
 // bukan browser user Solit POS — gak ada cookie token JWT. Keamanan dijaga pakai
 // secret key di query string yang kita set sendiri saat register webhook URL.
+
+// ✅ SECURITY FIX (webhook forgery): dulu secret dibandingkan pakai `!==`
+// biasa — perbandingan string non-constant-time berhenti di karakter
+// pertama yang beda, jadi secara teori bisa dipakai menebak secret
+// karakter-per-karakter lewat selisih waktu respons (timing attack).
+// Dibandingkan pakai timingSafeEqual yang waktunya konstan.
+function isValidWebhookKey(provided: string | null): boolean {
+  const expected = process.env.FONNTE_WEBHOOK_SECRET;
+  if (!provided || !expected) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
 export async function POST(req: NextRequest) {
   const key = req.nextUrl.searchParams.get("key");
-  if (!key || key !== process.env.FONNTE_WEBHOOK_SECRET) {
+  if (!isValidWebhookKey(key)) {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 

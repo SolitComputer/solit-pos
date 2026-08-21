@@ -103,6 +103,12 @@ function isSoOnlyRestrictedPath(pathname: string): boolean {
   if (/^\/api\/laptops\/[^/]+\/so$/.test(pathname)) return false;
   // GET detail 1 laptop by id (dipakai saat buka Detail/Unit popup)
   if (/^\/api\/laptops\/[^/]+$/.test(pathname) && pathname !== "/api/laptops/create" && pathname !== "/api/laptops/minus") return false;
+  // ✅ FIX: SO per-unit (GET riwayat & PATCH toggle) di halaman Units —
+  // sebelumnya belum di-whitelist di sini, padahal niat pembatasan akun ini
+  // (lihat komentar SO_ONLY_USER_IDS) memang boleh "toggle SO/UnSO". Tanpa
+  // baris ini, tombol SO di /dashboard/laptops/[id]/units selalu 403 untuk
+  // akun ini walau halamannya sendiri bisa dibuka.
+  if (/^\/api\/units\/[^/]+\/so$/.test(pathname)) return false;
 
   return true; // selain itu (data-barang, accessories, units summary, ready, minus, monitoring, dll) → blocked
 }

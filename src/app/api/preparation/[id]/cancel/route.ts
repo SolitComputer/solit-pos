@@ -15,29 +15,11 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
             return NextResponse.json({ success: false, message: `Tidak bisa dibatalkan, status "${order.status}"` }, { status: 400 });
         }
 
-        // ── Kembalikan stok "Siap Jual" ──
-        // Ambil semua unit dari order ini, lalu kembalikan ke SIAP_JUAL —
-        // TAPI hanya unit yang statusnya masih RESERVED. Kalau sudah SOLD
-        // (lunas via confirm-payment), JANGAN disentuh (amankan Data Barang).
-        const { data: items, error: itemsFetchError } = await supabase
-            .from("preparation_items")
-            .select("unit_id, is_cancelled")
-            .eq("preparation_id", id);
-        if (itemsFetchError) throw itemsFetchError;
-
-        const unitIdsToRestore = (items ?? [])
-            .filter((it) => !it.is_cancelled && it.unit_id)
-            .map((it) => it.unit_id as string);
-
-        if (unitIdsToRestore.length > 0) {
-            const { error: restoreError } = await supabase
-                .from("laptop_units")
-                .update({ status: "SIAP_JUAL" })
-                .in("id", unitIdsToRestore)
-                .eq("status", "DALAM_PENYIAPAN"); // guard: unit yang sudah SOLD tidak ikut ter-restore
-            if (restoreError) throw restoreError;
-        }
-
+        // ── TIDAK ADA lagi restore ke laptop_units di sini ──
+        // Dulu blok ini mengembalikan status unit DALAM_PENYIAPAN → SIAP_JUAL
+        // saat order dibatalkan. Sekarang Penyiapan sama sekali tidak pernah
+        // mengubah laptop_units.status (lihat api/preparation/route.ts), jadi
+        // tidak ada lagi apa pun yang perlu "dikembalikan" di sini.
         const now = new Date().toISOString();
         const { data, error } = await supabase
             .from("preparation_orders")

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
-import { SO_ROLES } from "@/lib/permissions";
+import { SO_ROLES, SO_LIMITED_USER_IDS, expandRolesWithParents } from "@/lib/permissions";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -10,6 +10,15 @@ interface Props {
 
 //  Harus sama dengan SO_TTL_MS di src/app/dashboard/laptops/[id]/units/page.tsx (1 hari).
 const SO_TTL_MS = 1 * 24 * 60 * 60 * 1000;
+
+// Sama polanya dgn canSoLaptop() di /api/laptops/[id]/so — bedanya di sini
+// cek status unit itu SENDIRI (bukan agregat), karena 1 unit = 1 baris.
+async function canSoUnit(user: AuthUser, unitStatus: string, isPriceComplete: boolean): Promise<boolean> {
+  const effectiveRoles = expandRolesWithParents(user.roles ?? [user.role]);
+  if (effectiveRoles.some((r) => (SO_ROLES as string[]).includes(r))) return true;
+  if (SO_LIMITED_USER_IDS.includes(user.id)) return unitStatus === "SIAP_JUAL" && isPriceComplete;
+  return false;
+}
 
 async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
@@ -119,5 +128,5 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
   }
 }
 
-export const GET = withAuth(getHandler, SO_ROLES);
-export const PATCH = withAuth(patchHandler, SO_ROLES);
+export const GET = withAuth(getHandler);
+export const PATCH = withAuth(patchHandler);
