@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { withAuth, AuthUser } from "@/lib/auth";
 import {
   PREPARATION_DISPATCH_ROLES,
@@ -7,12 +6,7 @@ import {
   PREPARATION_DELIVERY_PERSON_ROLES,
 } from "@/lib/permissions";
 
-// Admin client — bypass RLS, sama seperti di history/route.ts
-const admin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
+import { supabaseAdmin as admin } from "@/services/supabaseAdmin";
 
 // Yang boleh ambil daftar pengantar = dispatch (Sales) + done (Penyedia) + Admin
 const ASSIGN_DRIVER_ROLES = [

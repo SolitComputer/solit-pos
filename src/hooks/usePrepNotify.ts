@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/services/supabase";
 import { hasAnyRole, PREPARATION_DONE_ROLES, PREPARATION_DISPATCH_ROLES } from "@/lib/permissions";
 import { ALARM_KEYS, isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
@@ -37,31 +37,39 @@ export function usePrepNotify(userRoles: string[], userId?: string | null) {
   const [siapKirimIds, setSiapKirimIds] = useState<string[]>([]);
   const [menungguAck, setMenungguAck] = useState<Set<string>>(() => readAck(ALARM_KEYS.MENUNGGU));
   const [siapKirimAck, setSiapKirimAck] = useState<Set<string>>(() => readAck(ALARM_KEYS.SIAP_KIRIM));
+  const inFlightRef = useRef(false);
 
   const fetchData = useCallback(async () => {
+    if (inFlightRef.current) return;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    inFlightRef.current = true;
     try {
       // MENUNGGU (format baru) → hanya penyedia barang yang bunyi
       if (canHearMenunggu) {
-        const r = await (await fetch("/api/preparation?status=MENUNGGU", { cache: "no-store" })).json();
+        const res = await fetch("/api/preparation?status=MENUNGGU", { cache: "no-store" });
+        const r = await res.json();
         setMenungguIds((r.data ?? []).map((o: any) => o.id));
       } else setMenungguIds([]);
 
       // SIAP_KIRIM (penyedia done) → HANYA order yang dibuat user ini (sales pembuat format)
       if (canHearSiapKirim) {
-        const r = await (await fetch("/api/preparation?status=SIAP_KIRIM", { cache: "no-store" })).json();
+        const res = await fetch("/api/preparation?status=SIAP_KIRIM", { cache: "no-store" });
+        const r = await res.json();
         setSiapKirimIds(
           (r.data ?? [])
             .filter((o: any) => o.created_by === userId)  // ← kunci: cuma pembuat format
             .map((o: any) => o.id)
         );
       } else setSiapKirimIds([]);
-    } catch { /* ignore */ }
+    } catch { /* ignore */ } finally {
+      inFlightRef.current = false;
+    }
   }, [canHearMenunggu, canHearSiapKirim, userId]);
 
   useEffect(() => {
     if (!rolesKey) return;
     fetchData();
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, 60000); // 60s fallback, primary updates come from Realtime
     return () => clearInterval(interval);
   }, [rolesKey, fetchData]);
 

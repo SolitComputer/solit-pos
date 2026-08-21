@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin as admin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import {
   DELIVERY_LEADERBOARD_VIEW_ROLES,
   PREPARATION_DELIVERY_PERSON_ROLES,
 } from "@/lib/permissions";
-
-// Admin client — bypass RLS, sama seperti route pengantaran lainnya
-const admin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
-
 // Periode (rolling window) — sesuai papan: 1 hari, 7 hari, 1 bulan, 3 bulan, 1 tahun
 const RANGE_DAYS: Record<string, number> = {
   "1d": 1,
