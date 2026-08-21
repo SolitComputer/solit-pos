@@ -211,6 +211,14 @@ export const PREPARATION_DISPATCH_ROLES: UserRole[] = Array.from(new Set<UserRol
   ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
 ]));
 
+// ─── Pengantaran Langsung (skip Penyedia Barang) ──────────────────────────────
+// Sengaja dipisah dari PREPARATION_DISPATCH_ROLES walau isinya sama persis
+// sekarang — kalau nanti mau dibedakan (mis. PKL gak boleh bikin langsung),
+// tinggal ubah konstanta ini tanpa nyentuh alur dispatch normal.
+export const PREPARATION_DIRECT_DELIVERY_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
+]));
+
 export const PREPARATION_CANCEL_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "KEPALA_ZENITH",];
 export const PREPARATION_FORCE_COMPLETE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_SOTECH", "KEPALA_ONPOINT",];
 
@@ -489,13 +497,15 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/preparation/antrian": [...PREPARATION_ANTRIAN_VIEW_ROLES],
   "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
   "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
-  "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
+   "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
+  "/dashboard/preparation/buat-pengantaran": [...PREPARATION_DIRECT_DELIVERY_ROLES],
   "/dashboard/preparation/history": [...PREPARATION_VIEW_ROLES],
   "/dashboard/preparation/statistik": [...DELIVERY_LEADERBOARD_VIEW_ROLES],
 
   "/api/preparation": [...PREPARATION_VIEW_ROLES],
   "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
   "/api/preparation/dispatch": [...PREPARATION_DISPATCH_ROLES],
+  "/api/preparation/direct": [...PREPARATION_DIRECT_DELIVERY_ROLES],
 
   "/dashboard/preparation/riwayat-penyedia": [...PROVIDER_PERFORMANCE_VIEW_ROLES],
   "/api/preparation/provider-performance": [...PROVIDER_PERFORMANCE_VIEW_ROLES],
@@ -661,6 +671,7 @@ export const PERMISSIONS = {
   CREATE_PREPARATION: [...PREPARATION_CREATE_ROLES] as UserRole[],
   DONE_PREPARATION: [...PREPARATION_DONE_ROLES] as UserRole[],
   DISPATCH_PREPARATION: [...PREPARATION_DISPATCH_ROLES] as UserRole[],
+  CREATE_DIRECT_DELIVERY: [...PREPARATION_DIRECT_DELIVERY_ROLES] as UserRole[],
   DELIVERY_PREPARATION: [...PREPARATION_DELIVERY_ROLES] as UserRole[],
   CANCEL_PREPARATION: [...PREPARATION_CANCEL_ROLES] as UserRole[],
   FORCE_COMPLETE_PREPARATION: [...PREPARATION_FORCE_COMPLETE_ROLES] as UserRole[],

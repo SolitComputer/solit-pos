@@ -53,6 +53,7 @@ function isItemActive(href: string, pathname: string): boolean {
       pathname === "/dashboard/preparation" ||
       (pathname.startsWith("/dashboard/preparation/") &&
         !pathname.startsWith("/dashboard/preparation/antrian") &&
+        !pathname.startsWith("/dashboard/preparation/buat-pengantaran") &&
         !pathname.startsWith("/dashboard/preparation/done") &&
         !pathname.startsWith("/dashboard/preparation/history") &&
         !pathname.startsWith("/dashboard/preparation/pengantaran") &&
@@ -139,7 +140,7 @@ const Icons = {
   cashflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h13" /><path d="M13 3l4 4-4 4" /><path d="M20 17H7" /><path d="M11 21l-4-4 4-4" /></svg>),
   managementSeller: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2" /><path d="M3 20a6 6 0 0112 0" /><circle cx="17.5" cy="9.5" r="2.3" /><path d="M15.5 20a5 5 0 016.5-3.8" /></svg>),
   deliveryRoute: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="19" r="2.2" /><circle cx="18" cy="5" r="2.2" /><path d="M8 19h6a3 3 0 003-3V9M16 5H10a3 3 0 00-3 3v3" /></svg>),
-  notifSound: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15V9h4l5-4v14l-5-4H4z" /><path d="M17 8.5a5 5 0 010 7" /><path d="M19.5 6a8 8 0 010 12" /></svg>),
+  buatPengantaran: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg>), notifSound: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15V9h4l5-4v14l-5-4H4z" /><path d="M17 8.5a5 5 0 010 7" /><path d="M19.5 6a8 8 0 010 12" /></svg>),
   missions: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v18" /><path d="M6 4h11l-2.5 4L17 12H6" /></svg>),
   ccReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="15" height="14" rx="2" /><path d="M17 9l5-3v12l-5-3" /></svg>),
   missionDashboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></svg>),
@@ -194,6 +195,7 @@ const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashbo
 const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboard/employee-birthdays", icon: Icons.employeeBirthday };
 
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
+const ITEM_BUAT_PENGANTARAN: MenuItem = { name: "Buat Pengantaran", href: "/dashboard/preparation/buat-pengantaran", icon: Icons.buatPengantaran }; 
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
 const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang?tab=laptops", icon: Icons.barang };
 const ITEM_AUDIT_OUTFLOW: MenuItem = { name: "Audit Barang Keluar", href: "/dashboard/audit-barang-keluar", icon: Icons.auditOutflow };
@@ -253,6 +255,7 @@ const PREPARATION_SALES_MENU: MenuGroup = {
 const PREPARATION_SALES_DELIVERY_MENU: MenuGroup = {
   label: "Pengantaran",
   items: [
+    ITEM_BUAT_PENGANTARAN,
     { name: "Dashboard Pengantaran", href: "/dashboard/preparation/statistik", icon: Icons.dashboard },
     { name: "Siap Dikirim ", href: "/dashboard/preparation/siap-kirim", icon: Icons.serviceQueue },
     { name: "Sedang Diantar", href: "/dashboard/preparation/sedang-diantar", icon: Icons.deliveryRoute },
@@ -439,6 +442,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     SALES_TRANSAKSI,
     PREPARATION_SALES_MENU,
     PREPARATION_PENYEDIA_VIEW_MENU,
+    PREPARATION_SALES_DELIVERY_MENU,
   ],
 
   CREW_SALES: [

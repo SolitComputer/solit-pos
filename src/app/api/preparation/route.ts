@@ -3,32 +3,13 @@ import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { PREPARATION_VIEW_ROLES, PREPARATION_CREATE_ROLES } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
+import { generateOrderNumber } from "@/lib/preparationOrderNumber";
 
 // helper: "besok" dalam WIB (Vercel jalan di UTC)
 function tomorrowWIB(): string {
   const nowWIB = new Date(Date.now() + 7 * 3600_000);
   nowWIB.setUTCDate(nowWIB.getUTCDate() + 1);
   return nowWIB.toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
-// Nomor order: PREP-YYYYMMDD-XXXX
-async function generateOrderNumber(): Promise<string> {
-  const now = new Date();
-  const prefix = `PREP-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-
-  const { data } = await supabase
-    .from("preparation_orders")
-    .select("order_number")
-    .like("order_number", `${prefix}%`)
-    .order("order_number", { ascending: false })
-    .limit(1);
-
-  let seq = 1;
-  if (data && data.length > 0) {
-    const lastNum = parseInt(data[0].order_number.split("-").pop() ?? "0", 10);
-    if (!isNaN(lastNum)) seq = lastNum + 1;
-  }
-  return `${prefix}-${String(seq).padStart(4, "0")}`;
 }
 
 async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
@@ -196,17 +177,12 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       schedDate = scheduled_delivery_date;
     }
 
-    // ── Bypass validasi ketersediaan unit (business rule fase Preparation) ──
-    // Fase Preparation TIDAK BOLEH error walau SN sama diinput dua kali/lebih,
-    // atau SN yang sedang dipakai order lain (status DALAM_PENYIAPAN) dipakai
-    // lagi. Makanya di sini SENGAJA TIDAK ada pengecekan status yang bisa
-    // menolak request (tidak ada lagi response 409).
-    // Guard "SIAP_JUAL" tetap dipasang di query UPDATE di bawah — itu cukup
-    // untuk mencegah unit yang sudah DALAM_PENYIAPAN/SOLD ikut ter-update
-    // (jadi Data Barang tidak salah hitung), tapi TIDAK membuat request ini gagal.
-    const unitIds = [...new Set(cleanItems.map((it) => it.unit_id).filter(Boolean))] as string[];
-    const unitsToReserve: { id: string }[] = unitIds.map((id) => ({ id }));
-
+    // ── Preparation TIDAK mengunci/mengubah status unit sama sekali ──
+    // Business rule baru: Data Barang, Penyedia Barang, Pengantaran, dan
+    // Transaksi berdiri sendiri-sendiri (tidak ada relasi otomatis). SN yang
+    // sama boleh diinput berkali-kali baik dalam satu order maupun lintas
+    // order, tanpa validasi konflik apa pun — preparation_items cuma
+    // catatan/riwayat, bukan penanda stok.
     const order_number = await generateOrderNumber();
 
     const { data: order, error: orderError } = await supabase
@@ -237,27 +213,14 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       throw itemsError;
     }
 
-   // ── Kurangi stok "Siap Jual" — BUKAN "Data Barang" ──
-    // Unit pindah SIAP_JUAL → DALAM_PENYIAPAN begitu masuk antrian penyiapan.
-    // SENGAJA BUKAN "RESERVED" — status itu sudah dipakai untuk unit yang
-    // di-DP oleh customer (lihat units/reserve & confirm-payment), dan
-    // LaptopsContent.tsx sengaja MENGECUALIKAN "RESERVED" dari stok_tersedia
-    // (Data Barang). Kalau kita reuse "RESERVED" di sini, Data Barang akan
-    // ikut berkurang saat antrian penyiapan dibuat — melanggar business rule.
-    // "DALAM_PENYIAPAN" TETAP dihitung sebagai stok_tersedia di LaptopsContent.
-    if (unitsToReserve.length > 0) {
-      const { error: reserveError } = await supabase
-        .from("laptop_units")
-        .update({ status: "DALAM_PENYIAPAN" })
-        .in("id", unitsToReserve.map((u) => u.id))
-        .eq("status", "SIAP_JUAL"); // guard tambahan terhadap race condition
-
-      if (reserveError) {
-        await supabase.from("preparation_items").delete().eq("preparation_id", order.id);
-        await supabase.from("preparation_orders").delete().eq("id", order.id);
-        throw reserveError;
-      }
-    }
+      // ── SENGAJA TIDAK ADA update ke laptop_units di sini ──
+    // Dulu di titik ini status unit diubah SIAP_JUAL → DALAM_PENYIAPAN, itu
+    // yang bikin unit hilang dari "Barang Siap Jual" tiap kali Sales bikin
+    // Penyiapan. Sekarang dihapus total: unit_id tetap tersimpan di
+    // preparation_items (untuk riwayat & pencarian), tapi laptop_units.status
+    // TIDAK PERNAH disentuh oleh alur Penyiapan. Stok Siap Jual baru
+    // berkurang saat Transaksi (penjualan) benar-benar dibuat — lihat
+    // transaction/create & units/confirm-payment.
 
     await logActivity({
       userId: user.id, userName: user.name, userRole: user.role,
