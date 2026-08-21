@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
+import { UserRole, PERMISSIONS, hasPermission, hasAnyRole, MINUS_REVIEW_ROLES } from "@/lib/permissions";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import {
   RefreshCw, Pause, Ban, Skull, Search, CheckCircle2, FileText,
@@ -25,6 +25,7 @@ interface MinusUnit {
   // ── BARU ──
   analisa: string | null;
   progress_pengerjaan: string | null;
+  minus_status: string; // 'BELUM_DIATASI' | 'SUDAH_DIATASI'
   created_at: string;
   laptop?: {
     id: string;
@@ -60,10 +61,14 @@ function EditRepairModal({
   unit,
   onClose,
   onSuccess,
+  canReview,
+  onDecision,
 }: {
   unit: MinusUnit;
   onClose: () => void;
   onSuccess: (updated: MinusUnit) => void;
+  canReview: boolean;
+  onDecision: (unitId: string, decision: "OKE" | "NO_OKE", keterangan: string) => Promise<void>;
 }) {
   const [repairStatus, setRepairStatus] = useState(unit.repair_status || "NOT_STARTED");
   const [repairNotes, setRepairNotes] = useState(unit.repair_notes || "");
@@ -72,6 +77,8 @@ function EditRepairModal({
   const [unitStatus, setUnitStatus] = useState(unit.status);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [minusStatus, setMinusStatus] = useState(unit.minus_status || "BELUM_DIATASI");
+  const [decisionLoading, setDecisionLoading] = useState<"OKE" | "NO_OKE" | null>(null);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -106,6 +113,7 @@ function EditRepairModal({
           analisa: analisa.trim() || null,
           progress_pengerjaan: progressPengerjaan.trim() || null,
           status: unitStatus,
+          minus_status: minusStatus,
         }),
       });
       const result = await res.json();
@@ -117,6 +125,7 @@ function EditRepairModal({
         analisa: analisa.trim() || null,
         progress_pengerjaan: progressPengerjaan.trim() || null,
         status: unitStatus,
+        minus_status: minusStatus,
       });
       onClose();
     } catch {
@@ -254,6 +263,54 @@ function EditRepairModal({
             />
           </div>
 
+          {/* ── 3.5 Kategori Minus: Belum Diatasi / Sudah Diatasi ── */}
+          <div className="border-t border-gray-100 pt-4">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Kategori Penanganan
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setMinusStatus("BELUM_DIATASI")}
+                className={`py-2.5 px-3 rounded-xl border-2 text-left transition-all ${minusStatus === "BELUM_DIATASI" ? "border-gray-500 bg-gray-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                <p className="text-sm font-bold text-gray-700">Belum Diatasi</p>
+              </button>
+              <button type="button" onClick={() => setMinusStatus("SUDAH_DIATASI")}
+                className={`py-2.5 px-3 rounded-xl border-2 text-left transition-all ${minusStatus === "SUDAH_DIATASI" ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                <p className="text-sm font-bold text-blue-700">Sudah Diatasi</p>
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1.5">
+              Klik "Sudah Diatasi" lalu Simpan — {canReview ? "Anda" : "Kepala Teknisi/Pengelola Barang/Admin"} bisa putuskan Oke/Tidak Oke di bawah.
+            </p>
+
+            {minusStatus === "SUDAH_DIATASI" && canReview && (
+              <div className="mt-3 bg-blue-50/60 border border-blue-100 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-semibold text-blue-700">Keputusan Akhir</p>
+                <div className="flex gap-2">
+                  <button type="button" disabled={decisionLoading !== null}
+                    onClick={async () => {
+                      setDecisionLoading("OKE");
+                      try { await onDecision(unit.id, "OKE", ""); onClose(); }
+                      finally { setDecisionLoading(null); }
+                    }}
+                    className="flex-1 h-9 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50">
+                    {decisionLoading === "OKE" ? "Memproses..." : "✓ Oke, Bisa Dijual"}
+                  </button>
+                  <button type="button" disabled={decisionLoading !== null}
+                    onClick={async () => {
+                      const kt = window.prompt("Keterangan untuk Aset Matot (opsional):", analisa || "");
+                      if (kt === null) return;
+                      setDecisionLoading("NO_OKE");
+                      try { await onDecision(unit.id, "NO_OKE", kt); onClose(); }
+                      finally { setDecisionLoading(null); }
+                    }}
+                    className="flex-1 h-9 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition disabled:opacity-50">
+                    {decisionLoading === "NO_OKE" ? "Memproses..." : "✕ Tidak Oke → Aset Matot"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* ── 4. Status Perbaikan ── */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2.5">
@@ -345,11 +402,13 @@ function MinusContent() {
   const [units, setUnits] = useState<MinusUnit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
 
   // Filters
   const [search, setSearch] = useState("");
   const [filterRepair, setFilterRepair] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
+  const [filterMinusStatus, setFilterMinusStatus] = useState<"ALL" | "BELUM_DIATASI" | "SUDAH_DIATASI">("ALL");
 
   // Modals
   const [editTarget, setEditTarget] = useState<MinusUnit | null>(null);
@@ -358,11 +417,19 @@ function MinusContent() {
   const canEdit = userRole
     ? hasPermission(userRole, (PERMISSIONS.EDIT_MINUS_LAPTOPS ?? ["ADMIN", "PENGELOLA_BARANG", "TEKNISI"]) as UserRole[])
     : false;
+  const canReview = hasAnyRole(userRoles, MINUS_REVIEW_ROLES);
 
   useEffect(() => {
     getAuthUser().then(u => ({ success: true, user: u }))
-      .then(r => setUserRole(r.user?.role ?? null))
-      .catch(() => setUserRole(null));
+      .then(r => {
+        setUserRole(r.user?.role ?? null);
+        const roles: string[] =
+          Array.isArray(r.user?.roles) && r.user.roles.length > 0
+            ? r.user.roles
+            : r.user?.role ? [r.user.role] : [];
+        setUserRoles(roles as UserRole[]);
+      })
+      .catch(() => { setUserRole(null); setUserRoles([]); });
   }, []);
 
   const fetchUnits = async () => {
@@ -386,9 +453,26 @@ function MinusContent() {
 
   useEffect(() => { fetchUnits(); }, []);
 
+  const handleDecision = async (unitId: string, decision: "OKE" | "NO_OKE", keterangan: string) => {
+    try {
+      const res = await fetch("/api/laptops/minus/decision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unit_id: unitId, decision, keterangan }),
+      });
+      const result = await res.json();
+      if (!result.success) { setAlertMsg(result.message || "Gagal memproses keputusan"); return; }
+      setUnits(prev => prev.filter(u => u.id !== unitId));
+      setAlertMsg(decision === "OKE" ? "Unit dipindahkan ke Siap Jual" : "Unit dipindahkan ke Aset Matot");
+    } catch {
+      setAlertMsg("Terjadi kesalahan koneksi");
+    }
+  };
+
   const filtered = useMemo(() => {
     let list = [...units];
     if (filterStatus !== "ALL") list = list.filter(u => u.status === filterStatus);
+    if (filterMinusStatus !== "ALL") list = list.filter(u => (u.minus_status || "BELUM_DIATASI") === filterMinusStatus);
     if (filterRepair !== "ALL") {
       if (filterRepair === "NONE") list = list.filter(u => !u.repair_status);
       else list = list.filter(u => u.repair_status === filterRepair);
@@ -415,7 +499,7 @@ function MinusContent() {
       return (a.laptop?.laptop_name ?? "").localeCompare(b.laptop?.laptop_name ?? "", "id");
     });
     return list;
-  }, [units, filterStatus, filterRepair, search]);
+  }, [units, filterStatus, filterMinusStatus, filterRepair, search]);
 
   // Counts
   const repairCounts = useMemo(() => {
@@ -538,6 +622,19 @@ function MinusContent() {
 
             <div className="flex gap-2 flex-wrap">
               {[
+                { value: "ALL", label: "Semua Kategori" },
+                { value: "BELUM_DIATASI", label: "Belum Diatasi" },
+                { value: "SUDAH_DIATASI", label: "Sudah Diatasi" },
+              ].map(opt => (
+                <button key={opt.value} onClick={() => setFilterMinusStatus(opt.value as typeof filterMinusStatus)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${filterMinusStatus === opt.value ? "bg-blue-600 text-white border-blue-600 shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              {[
                 { value: "ALL", label: "Semua Status", count: statusCounts.ALL, icon: <ClipboardList size={14} /> },
                 { value: "SERVICE", label: "Service", count: statusCounts.SERVICE, icon: <Wrench size={14} /> },
                 { value: "BELUM_SIAP", label: "Belum Siap", count: statusCounts.BELUM_SIAP, icon: <Clock size={14} /> },
@@ -642,6 +739,11 @@ function MinusContent() {
                             ) : (
                               <span className="text-xs text-gray-300 italic">Belum diset</span>
                             )}
+                            <div className="mt-1">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${(unit.minus_status || "BELUM_DIATASI") === "SUDAH_DIATASI" ? "bg-blue-50 text-blue-700" : "bg-gray-50 text-gray-400"}`}>
+                                {(unit.minus_status || "BELUM_DIATASI") === "SUDAH_DIATASI" ? "Sudah Diatasi" : "Belum Diatasi"}
+                              </span>
+                            </div>
                           </td>
                           {/* Kolom Analisa */}
                           <td className="px-4 py-3.5 max-w-[200px]">
@@ -696,6 +798,8 @@ function MinusContent() {
       {editTarget && (
         <EditRepairModal
           unit={editTarget}
+          canReview={canReview}
+          onDecision={handleDecision}
           onClose={() => setEditTarget(null)}
           onSuccess={(updated) => {
             setUnits(prev => prev

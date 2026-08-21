@@ -63,7 +63,7 @@ const STATUS_CONFIG: Record<string, { badge: string; dot: string; label: string 
     RESERVED: { badge: "bg-violet-50 text-violet-700 border-violet-200", dot: "bg-violet-500", label: "Dipesan (DP)" },
 };
 
-const selectCls = "h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-gray-400 transition cursor-pointer font-medium w-full";
+const selectCls = "h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-400/20 focus:border-violet-400 focus:bg-white transition cursor-pointer font-medium w-full";
 
 // ─── AlertModal ───────────────────────────────────────────────────────────────
 function AlertModal({ message, onClose }: { message: string; onClose: () => void }) {
@@ -82,7 +82,7 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
                     </svg>
                 </div>
                 <p className="text-gray-700 text-sm font-medium mb-5">{message}</p>
-                <button onClick={onClose} className="w-full h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition-all duration-200 shadow-md">OK</button>
+                <button onClick={onClose} className="w-full h-11 bg-gradient-to-r from-[#1a1545] to-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-all duration-200 shadow-md shadow-[#1a1545]/25">OK</button>
             </div>
         </div>
     );
@@ -119,7 +119,7 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center animate-fadeIn">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
-                <div className="bg-gray-800 px-5 py-4 flex-shrink-0">
+                <div className="bg-gradient-to-br from-[#1a1545] to-[#0f0c29] px-5 py-4 flex-shrink-0">
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                             <h3 className="font-bold text-white truncate">{unit.laptop?.laptop_name || "—"}</h3>
@@ -220,11 +220,11 @@ function TotalBar({ totalSelling, count }: { totalSelling: number; count: number
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 sm:px-5 py-3.5 sm:py-4 flex divide-x divide-gray-100 animate-fadeUp">
             <div className="flex-1 pr-4 sm:pr-6">
                 <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Unit (difilter)</p>
-                <p className="text-xl sm:text-2xl font-black text-gray-900 tabular-nums">{count}</p>
+                <p className="text-xl sm:text-2xl font-black bg-gradient-to-r from-[#1a1545] to-[#0f0c29] bg-clip-text text-transparent tabular-nums">{count}</p>
             </div>
             <div className="flex-1 pl-4 sm:pl-6">
                 <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Harga Jual</p>
-                <p className="text-lg sm:text-xl font-black text-gray-800 tabular-nums">{fmt(totalSelling)}</p>
+                <p className="text-lg sm:text-xl font-black text-emerald-700 tabular-nums">{fmt(totalSelling)}</p>
             </div>
         </div>
     );
@@ -763,8 +763,8 @@ function ReadyContent() {
                     <div className="flex items-center justify-between gap-2 sm:gap-3 animate-slideIn">
                         {/* Kiri: ikon + judul */}
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                            <div className="w-1 h-7 sm:h-8 rounded-full bg-gray-800 flex-shrink-0" />
-                            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gray-800 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+                            <div className="w-1 h-7 sm:h-8 rounded-full bg-gradient-to-b from-[#1a1545] to-[#0f0c29] flex-shrink-0" />
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-[#1a1545] to-[#0f0c29] rounded-xl flex items-center justify-center shadow-md shadow-[#1a1545]/25 flex-shrink-0">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                                     <path d="M9 12l2 2 4-4" />
                                     <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -830,7 +830,7 @@ function ReadyContent() {
                      * - StatCard sendiri sudah di-scale via komponen di atas
                      */}
                     <div className="grid grid-cols-3 gap-2 sm:gap-3 animate-fadeUp">
-                        <StatCard label="Total Unit" value={counts.all} icon={<Laptop size={18} className="text-white" />} color="text-gray-900" bg="bg-white" bar="bg-gray-800" />
+                        <StatCard label="Total Unit" value={counts.all} icon={<Laptop size={18} className="text-white" />} color="bg-gradient-to-r from-[#1a1545] to-[#0f0c29] bg-clip-text text-transparent" bg="bg-white" bar="bg-gradient-to-br from-[#1a1545] to-[#0f0c29]" />
                         <StatCard label="Siap Jual" value={counts.siap} icon={<CheckCircle2 size={18} className="text-white" />} color="text-emerald-600" bg="bg-emerald-50" bar="bg-emerald-500" />
                         <StatCard label="Dipesan" value={counts.reserved} icon={<Lock size={18} className="text-white" />} color="text-violet-600" bg="bg-violet-50" bar="bg-violet-500" />
                     </div>
@@ -847,7 +847,7 @@ function ReadyContent() {
                                     placeholder="Cari nama, brand, CPU, RAM, storage..."
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
-                                    className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition"
+                                    className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 focus:border-violet-400 focus:bg-white transition"
                                 />
                             </div>
                             {/* Search SN — full width di mobile (col-span-2) */}
@@ -860,7 +860,7 @@ function ReadyContent() {
                                     placeholder="Cari Serial Number..."
                                     value={filterSN}
                                     onChange={e => setFilterSN(e.target.value)}
-                                    className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-400 focus:bg-white transition"
+                                    className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 focus:border-violet-400 focus:bg-white transition"
                                 />
                             </div>
                             <select value={filterBrand} onChange={e => setFilterBrand(e.target.value)} className={selectCls}>
@@ -1092,7 +1092,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden animate-slideUp">
 
-                <div className="bg-gray-800 px-5 py-4 flex-shrink-0">
+                <div className="bg-gradient-to-br from-[#1a1545] to-[#0f0c29] px-5 py-4 flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
@@ -1188,7 +1188,7 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
                     <button
                         onClick={handleConfirm}
                         disabled={loading || uploadingProof}
-                        className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md"
+                        className="flex-1 h-11 bg-gradient-to-r from-[#1a1545] to-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md shadow-[#1a1545]/25"
                     >
                         {loading ? (
                             <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
