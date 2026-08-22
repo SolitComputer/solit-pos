@@ -437,6 +437,9 @@ export function LaptopsContent() {
     //  Riwayat SO — laptop yang sedang dibuka riwayatnya di SoHistoryModal
     const [soHistoryTarget, setSoHistoryTarget] = useState<{ id: string; name: string } | null>(null);
 
+    //  Isi Massal Harga Modal — laptop yang sedang dibuka modal isi massalnya
+    const [bulkPriceTarget, setBulkPriceTarget] = useState<{ id: string; name: string } | null>(null);
+
     const showAlert = (msg: string) => setAlertModal(msg);
 
     //  Toggle audit 1 model laptop. Server yang menentukan set/clear-nya,
@@ -1319,6 +1322,19 @@ export function LaptopsContent() {
                                                 membuka Pop-up Detail, dan "Tambah Unit" untuk kasus ini sudah ada
                                                 LANGSUNG di dalam pop-up itu (lihat UnitDetailModal → tombol
                                                 "+ Tambah Unit", buka form tambah unit tanpa pindah halaman). */}
+                                            {canFullAccessBarang && row.stok_tersisa > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setBulkPriceTarget({ id: l.id, name: l.laptop_name }); }}
+                                                    className="h-7 px-2.5 text-[11px] font-semibold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-all duration-150 flex items-center gap-1"
+                                                    title="Isi harga modal untuk semua unit sekaligus"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                                                    </svg>
+                                                    Isi Modal
+                                                </button>
+                                            )}
                                             {canViewUnits && row.stok_tersisa > 1 && (
                                                 <Link href={`/dashboard/laptops/${l.id}/units`}
                                                     className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all duration-150 flex items-center gap-1">
@@ -1636,6 +1652,19 @@ export function LaptopsContent() {
                     onConfirm={(note) => handleConfirmLaptopSo(soPromptLaptop.id, note)}
                     onClose={() => setSoPromptLaptop(null)}
                     loading={soingId === soPromptLaptop.id}
+                />
+            )}
+            {bulkPriceTarget && (
+                <BulkPriceModal
+                    laptopId={bulkPriceTarget.id}
+                    laptopName={bulkPriceTarget.name}
+                    showAlert={showAlert}
+                    onClose={() => setBulkPriceTarget(null)}
+                    onSuccess={(count) => {
+                        setBulkPriceTarget(null);
+                        fetchLaptops();
+                        showAlert(`Harga modal berhasil diperbarui untuk ${count} unit`);
+                    }}
                 />
             )}
             {deleteConfirmModal && (
@@ -2114,6 +2143,156 @@ function SoHistoryModal({ laptopId, laptopName, onClose }: {
                     <button onClick={onClose}
                         className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
                         Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+//  Isi Massal Harga Modal — untuk model laptop dengan banyak unit (mis. 10 unit
+//  Dell Latitude 3420 dibeli dengan harga sama), supaya tidak perlu input satu-satu.
+interface BulkUnitLite {
+    id: string;
+    serial_number: string;
+    purchase_price?: number | null;
+    sparepart_cost?: number | null;
+    status: string;
+}
+
+function BulkPriceModal({
+    laptopId, laptopName, onClose, onSuccess, showAlert,
+}: {
+    laptopId: string;
+    laptopName: string;
+    onClose: () => void;
+    onSuccess: (count: number) => void;
+    showAlert: (msg: string) => void;
+}) {
+    const [units, setUnits] = useState<BulkUnitLite[]>([]);
+    const [loadingUnits, setLoadingUnits] = useState(true);
+    const [purchasePrice, setPurchasePrice] = useState("");
+    const [sparepartCost, setSparepartCost] = useState("");
+    const [onlyEmpty, setOnlyEmpty] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    //  Ambil daftar unit aktif (bukan SOLD) milik laptop ini — dipakai untuk
+    //  tahu berapa unit yang akan kena update, dan kirim unit_ids ke server.
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            try {
+                const res = await fetch(`/api/laptops/${laptopId}/units`);
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.message || "Gagal memuat daftar unit");
+                const activeUnits = (json.data as BulkUnitLite[]).filter(u => u.status !== "SOLD");
+                if (active) setUnits(activeUnits);
+            } catch (e) {
+                if (active) showAlert(e instanceof Error ? e.message : "Gagal memuat daftar unit");
+            } finally {
+                if (active) setLoadingUnits(false);
+            }
+        })();
+        return () => { active = false; };
+    }, [laptopId, showAlert]);
+
+    const targetUnits = useMemo(
+        () => onlyEmpty ? units.filter(u => !u.purchase_price || u.purchase_price <= 0) : units,
+        [units, onlyEmpty]
+    );
+
+    const handleSubmit = async () => {
+        const price = Number(purchasePrice);
+        if (!Number.isFinite(price) || price <= 0) {
+            showAlert("Harga modal tidak valid");
+            return;
+        }
+        if (targetUnits.length === 0) {
+            showAlert("Tidak ada unit yang akan diperbarui");
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const res = await fetch(`/api/laptops/${laptopId}/bulk-price`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    purchase_price: price,
+                    sparepart_cost: sparepartCost.trim() === "" ? undefined : Number(sparepartCost),
+                    unit_ids: targetUnits.map(u => u.id),
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan");
+            onSuccess(json.count ?? targetUnits.length);
+        } catch (e) {
+            showAlert(e instanceof Error ? e.message : "Terjadi kesalahan");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-indigo-400 via-indigo-600 to-indigo-800" />
+                <div className="px-5 py-4 border-b border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Isi Massal Harga Modal</p>
+                    <h3 className="text-sm font-bold text-gray-900 truncate">{laptopName}</h3>
+                </div>
+
+                <div className="p-5 space-y-4">
+                    {loadingUnits ? (
+                        <div className="h-10 rounded-xl bg-gray-100 animate-pulse" />
+                    ) : (
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3.5 py-2.5 text-[12px] text-indigo-700 font-medium">
+                            {targetUnits.length} dari {units.length} unit aktif akan diperbarui
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Harga Modal (Rp)</label>
+                        <input
+                            type="number" min={0} value={purchasePrice}
+                            onChange={e => setPurchasePrice(e.target.value)}
+                            placeholder="Contoh: 3328403"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            autoFocus
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Modal Sparepart (Rp) — opsional</label>
+                        <input
+                            type="number" min={0} value={sparepartCost}
+                            onChange={e => setSparepartCost(e.target.value)}
+                            placeholder="Kosongkan jika tidak diubah"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        />
+                    </div>
+
+                    <label className="flex items-center gap-2 text-[12px] text-gray-600 font-medium select-none cursor-pointer">
+                        <input type="checkbox" checked={onlyEmpty} onChange={e => setOnlyEmpty(e.target.checked)}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-400" />
+                        Hanya isi unit yang harga modalnya masih kosong
+                    </label>
+                </div>
+
+                <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+                    <button onClick={onClose}
+                        className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">
+                        Batal
+                    </button>
+                    <button onClick={handleSubmit} disabled={submitting || loadingUnits}
+                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-sm font-semibold transition disabled:opacity-60 active:scale-[0.98]">
+                        {submitting ? "Menyimpan…" : `Terapkan ke ${targetUnits.length} Unit`}
                     </button>
                 </div>
             </div>
