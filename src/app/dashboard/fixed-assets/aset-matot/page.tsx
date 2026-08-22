@@ -33,6 +33,7 @@ export default function AsetMatotPage() {
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/dead-assets", { cache: "no-store" });
       const d = await res.json();

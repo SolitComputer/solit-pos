@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { FIXED_ASSET_ROLES } from "@/lib/permissions";
+import { getCurrentUser } from "@/lib/auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,17 +9,35 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-function hasAccess(request: NextRequest): boolean {
+async function getAuthContext(request: NextRequest): Promise<{ hasAccess: boolean; userName: string | null }> {
   const rolesHeader = request.headers.get("x-user-roles") || "";
   const singleRole = request.headers.get("x-user-role");
-  const roles = rolesHeader ? rolesHeader.split(",").filter(Boolean) : singleRole ? [singleRole] : [];
-  return roles.some((r) => (FIXED_ASSET_ROLES as string[]).includes(r));
+  let roles = rolesHeader ? rolesHeader.split(",").filter(Boolean) : singleRole ? [singleRole] : [];
+  let userName = decodeURIComponent(request.headers.get("x-user-name") || "");
+
+  if (roles.length === 0 || !userName) {
+    try {
+      const user = await getCurrentUser();
+      if (user) {
+        if (roles.length === 0) {
+          roles = Array.isArray(user.roles) && user.roles.length > 0 ? user.roles : [user.role];
+        }
+        if (!userName) userName = user.name;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const allowed = roles.some((r) => (FIXED_ASSET_ROLES as string[]).includes(r));
+  return { hasAccess: allowed, userName };
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const auth = await getAuthContext(request);
 
-  if (!hasAccess(request)) {
+  if (!auth.hasAccess) {
     return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
   }
 
@@ -32,15 +51,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
   }
 
-  const userName = decodeURIComponent(request.headers.get("x-user-name") || "");
-
   const { data, error } = await supabase
     .from("fixed_assets")
     .update({
       nama_aset: body.nama_aset.trim(),
       nominal,
       keterangan: body.keterangan ? String(body.keterangan).trim() : null,
-      updated_by_name: userName || null,
+      updated_by_name: auth.userName || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -56,8 +73,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const auth = await getAuthContext(request);
 
-  if (!hasAccess(request)) {
+  if (!auth.hasAccess) {
     return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { DEAD_ASSET_ROLES } from "@/lib/permissions";
+import { getCurrentUser } from "@/lib/auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,16 +9,29 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-function hasAccess(request: NextRequest): boolean {
+async function hasAccess(request: NextRequest): Promise<boolean> {
   const rolesHeader = request.headers.get("x-user-roles") || "";
   const singleRole = request.headers.get("x-user-role");
-  const roles = rolesHeader ? rolesHeader.split(",").filter(Boolean) : singleRole ? [singleRole] : [];
+  let roles = rolesHeader ? rolesHeader.split(",").filter(Boolean) : singleRole ? [singleRole] : [];
+  
+  if (roles.length === 0) {
+    try {
+      const user = await getCurrentUser();
+      if (user) {
+        roles = Array.isArray(user.roles) && user.roles.length > 0 ? user.roles : [user.role];
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return roles.some((r) => (DEAD_ASSET_ROLES as string[]).includes(r));
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!hasAccess(request)) {
+  const allowed = await hasAccess(request);
+  if (!allowed) {
     return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
   }
   const { error } = await supabase.from("dead_assets").delete().eq("id", id);
