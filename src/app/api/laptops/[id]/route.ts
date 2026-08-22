@@ -161,21 +161,18 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const unitIds = (unitRows ?? []).map((u: { id: string }) => u.id);
 
-    // ✅ GUARD: cegah model terhapus kalau masih ada unit berstatus SOLD —
-    // menghapusnya akan membuat SN itu hilang selamanya dari Barang Terjual
-    // walau transaksinya masih tercatat di Riwayat Transaksi.
     if (unitIds.length > 0) {
-      const { data: soldUnits } = await supabase
+      const { data: blockedUnits } = await supabase
         .from("laptop_units")
-        .select("id, serial_number")
+        .select("id, serial_number, status")
         .in("id", unitIds)
-        .eq("status", "SOLD");
+        .in("status", ["SOLD", "RESERVED", "HELD", "PACKING"]);
 
-      if (soldUnits && soldUnits.length > 0) {
+      if (blockedUnits && blockedUnits.length > 0) {
         return NextResponse.json(
           {
             success: false,
-            message: `Tidak bisa menghapus: masih ada ${soldUnits.length} unit berstatus Terjual (SN: ${soldUnits.map(u => u.serial_number).join(", ")}). Hapus hanya bisa dilakukan kalau semua unit Terjual sudah dipindahkan/diarsipkan.`,
+            message: `Tidak bisa menghapus: masih ada ${blockedUnits.length} unit berstatus Terjual atau sedang dalam transaksi (SN: ${blockedUnits.map(u => u.serial_number).join(", ")}). Selesaikan/batalkan transaksinya dulu sebelum menghapus model ini.`,
           },
           { status: 409 }
         );
