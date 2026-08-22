@@ -88,7 +88,7 @@ const COLOR_STYLES: Record<string, { bg: string; text: string; border: string; l
 function formatRupiah(n: number) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n);
 }
-function fmtTime(iso: string | null) {
+function fmtTime(iso: string | null | undefined) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
 }
