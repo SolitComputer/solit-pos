@@ -586,7 +586,7 @@ export async function middleware(request: NextRequest) {
     hasRouteAccess = true;
   }
 
- if (!hasRouteAccess) {
+  if (!hasRouteAccess) {
     if (!isPageRoute) {
       return NextResponse.json(
         { success: false, message: "Forbidden: role Anda tidak punya akses ke endpoint ini" },
@@ -690,6 +690,7 @@ export const config = {
     "/api/akutansi/:path*",
     "/dashboard/fixed-assets/:path*",
     "/api/fixed-assets/:path*",
+    "/api/dead-assets/:path*",
     "/dashboard/ai-ceo/:path*",
     "/api/ai-ceo/:path*",
     "/dashboard/tanya-ceo/:path*",
