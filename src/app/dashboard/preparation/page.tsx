@@ -5,7 +5,7 @@ import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import { supabase } from "@/services/supabase";
-import { playNotifSound, unlockAudio } from "@/lib/preparationSound";
+import { startLoopingSound, stopLoopingSound, unlockAudio } from "@/lib/preparationSound";
 import { OrderCard, type PrepOrder } from "@/components/preparation/prepShared";
 import { isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
 import { Clock, AlertCircle, Inbox, Camera, X, CheckCircle2, CalendarDays, Package, Wrench, Truck, FileText, Bike, List } from "lucide-react";
@@ -667,14 +667,19 @@ export default function PreparationPage() {
 
   useEffect(() => {
     soundOnRef.current = soundOn;
+    if (!soundOn) stopLoopingSound(); // langsung matikan alarm yg lagi bunyi begitu di-mute
   }, [soundOn]);
 
 
   const showToast = useCallback((title: string, sub: string) => {
     setToast({ title, sub });
-    if (soundOnRef.current) playNotifSound();
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToast(null), 7000);
+    if (soundOnRef.current) startLoopingSound("default");
+  }, []);
+
+  // Dipanggil pas toast di-klik — inilah satu-satunya cara suara alarm berhenti
+  const dismissToast = useCallback(() => {
+    stopLoopingSound();
+    setToast(null);
   }, []);
 
   useEffect(() => {
@@ -873,6 +878,7 @@ export default function PreparationPage() {
   useEffect(
     () => () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      stopLoopingSound();
     },
     []
   );
@@ -972,8 +978,13 @@ export default function PreparationPage() {
   return (
     <DashboardLayout>
       <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
-        {toast && (
-          <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 fade-in duration-300">
+               {toast && (
+          <div
+            onClick={dismissToast}
+            role="button"
+            tabIndex={0}
+            className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 fade-in duration-300 cursor-pointer"
+          >
             <div className="bg-white border-2 border-emerald-300 rounded-2xl shadow-2xl shadow-emerald-900/20 px-4 py-3.5 flex items-center gap-3 max-w-sm">
               <div className="w-11 h-11 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0 animate-bounce">
                 <svg
@@ -995,7 +1006,7 @@ export default function PreparationPage() {
                 <p className="text-xs text-gray-500 truncate mt-0.5">{toast.sub}</p>
               </div>
               <button
-                onClick={() => setToast(null)}
+                onClick={dismissToast}
                 className="text-gray-300 hover:text-gray-500 flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
