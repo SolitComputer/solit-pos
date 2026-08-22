@@ -410,9 +410,14 @@ function CreateModal({
                       {u.laptop_name}
                       {u.grade ? ` · Grade ${u.grade}` : ""}
                     </p>
-                    {u.in_other_preparation && (
+                                        {u.in_other_preparation && (
                       <p className="text-[10px] text-amber-600 font-semibold mt-0.5">
                         ⚠ Sedang dipakai di penyiapan lain — masih boleh dipilih
+                      </p>
+                    )}
+                    {u.unit_type === "laptop" && u.status !== "SIAP_JUAL" && (
+                      <p className="text-[10px] text-orange-600 font-semibold mt-0.5">
+                        ⚠ Status unit: {u.status} — pastikan unit ini memang tersedia
                       </p>
                     )}
                   </button>
