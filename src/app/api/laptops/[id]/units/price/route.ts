@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
+import { hasAnyRole, OFFICIAL_PRICE_EDIT_ROLES } from "@/lib/permissions";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -39,7 +40,23 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
       updatePayload.sparepart_cost = price;
     }
 
-    if (official_price !== undefined && official_price !== null) {
+        if (official_price !== undefined && official_price !== null) {
+      // 🔒 Field-level auth — di frontend field ini cuma di-disable untuk
+      // non-admin, itu bukan proteksi (bisa dilewati via direct API call
+      // pakai Postman/curl). Guard ini yang benar-benar cegah role selain
+      // OFFICIAL_PRICE_EDIT_ROLES ubah Harga Official, sama polanya dgn
+      // proteksi field SN/Sumber Barang di PUT /api/units/[id]/route.ts.
+      const effectiveRoles: string[] =
+        Array.isArray((user as { roles?: string[] }).roles) && (user as { roles?: string[] }).roles!.length > 0
+          ? (user as { roles?: string[] }).roles!
+          : [user.role];
+      if (!hasAnyRole(effectiveRoles, OFFICIAL_PRICE_EDIT_ROLES)) {
+        return NextResponse.json(
+          { success: false, message: "Harga Official hanya bisa diubah oleh Admin" },
+          { status: 403 }
+        );
+      }
+
       const price = Math.round(Number(official_price));
       if (!Number.isFinite(price) || price < 0) {
         return NextResponse.json(
