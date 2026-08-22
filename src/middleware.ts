@@ -551,7 +551,7 @@ export async function middleware(request: NextRequest) {
 
     if (!exempt && isWithinSystemHours() && !hasAttended) {
       return NextResponse.redirect(
-        new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
+        new URL(`/face-veripfy?from=${encodeURIComponent(pathname)}`, request.url)
       );
     }
   }

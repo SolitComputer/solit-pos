@@ -335,12 +335,27 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const { id } = await props.params;
 
-    // Ambil data unit sebelum dihapus (untuk log)
     const { data: unit } = await supabase
       .from("laptop_units")
       .select("*")
       .eq("id", id)
       .single();
+
+    if (unit?.status && ["SOLD", "RESERVED", "HELD", "PACKING"].includes(unit.status)) {
+      const statusLabel: Record<string, string> = {
+        SOLD: "Terjual",
+        RESERVED: "DP (Reserved)",
+        HELD: "Ambil Dulu",
+        PACKING: "Packing",
+      };
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Tidak bisa menghapus unit SN "${unit.serial_number}" — statusnya masih ${statusLabel[unit.status]}. Selesaikan/batalkan transaksinya dulu sebelum menghapus unit ini.`,
+        },
+        { status: 409 }
+      );
+    }
 
     // ── Bersihkan unit_ids array di transactions (multi-unit) ──────────────
     // transactions.unit_id (single) sudah ditangani oleh FK ON DELETE SET NULL.

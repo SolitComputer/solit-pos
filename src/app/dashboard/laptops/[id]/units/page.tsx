@@ -287,9 +287,9 @@ export default function UnitsPage() {
     const [sourceInput, setSourceInput] = useState("");
     const [sourceSaving, setSourceSaving] = useState(false);
 
-    //  Bulk edit "Harga Store", "Harga Sparepart" & "Harga Official" — set 1x untuk semua unit model ini
+    //  Bulk edit "Harga Modal", "Harga Store", "Harga Sparepart" & "Harga Official" — set 1x untuk semua unit model ini
     const [showPriceModal, setShowPriceModal] = useState(false);
-    const [priceInput, setPriceInput] = useState({ selling_price: "", sparepart_cost: "", official_price: "" });
+    const [priceInput, setPriceInput] = useState({ purchase_price: "", selling_price: "", sparepart_cost: "", official_price: "" });
     const [priceSaving, setPriceSaving] = useState(false);
 
     //  Sort kolom tabel — pola sama persis dgn LaptopsContent.tsx supaya klik header konsisten
@@ -685,10 +685,12 @@ export default function UnitsPage() {
 
     //  Buka modal set-harga. Prefill kalau semua unit harganya sudah sama.
     const openPriceModal = () => {
+        const purchasePrices = Array.from(new Set(activeUnits.map(u => u.purchase_price ?? 0)));
         const sellPrices = Array.from(new Set(activeUnits.map(u => u.selling_price)));
         const sparePrices = Array.from(new Set(activeUnits.map(u => u.sparepart_cost ?? 0)));
         const officialPrices = Array.from(new Set(activeUnits.map(u => u.official_price ?? 0)));
         setPriceInput({
+            purchase_price: purchasePrices.length === 1 ? String(purchasePrices[0]) : "",
             selling_price: sellPrices.length === 1 ? String(sellPrices[0]) : "",
             sparepart_cost: sparePrices.length === 1 ? String(sparePrices[0]) : "",
             official_price: officialPrices.length === 1 ? String(officialPrices[0]) : "",
@@ -696,30 +698,53 @@ export default function UnitsPage() {
         setShowPriceModal(true);
     };
 
-    //  Update Harga Store, Harga Sparepart & Harga Official SEMUA unit laptop ini
-    //  sekaligus. Field yang dikosongkan tidak ikut diubah (bisa update sebagian saja).
+    //  Update Harga Modal (via endpoint /bulk-price — sama dgn tombol "Isi Modal"
+    //  di halaman Data Laptop), serta Harga Store, Harga Sparepart & Harga Official
+    //  (via endpoint /units/price) untuk SEMUA unit laptop ini sekaligus.
+    //  Field yang dikosongkan tidak ikut diubah (bisa update sebagian saja).
     const handleBulkPrice = async () => {
         setPriceSaving(true);
         try {
+            let updatedCount = 0;
+
+            // Harga Modal — reuse endpoint /bulk-price yang sudah ada, biar
+            // logic sync-nya cuma 1 sumber (tidak duplikat di 2 tempat).
+            if (priceInput.purchase_price.trim() !== "") {
+                const resModal = await fetch(`/api/laptops/${laptopId}/bulk-price`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        purchase_price: Number(priceInput.purchase_price),
+                        unit_ids: activeUnits.map(u => u.id),
+                    }),
+                });
+                const jsonModal = await resModal.json();
+                if (!resModal.ok || !jsonModal.success) throw new Error(jsonModal.message || "Gagal memperbarui harga modal");
+                updatedCount = Math.max(updatedCount, jsonModal.count ?? 0);
+            }
+
             const body: Record<string, number> = {};
             if (priceInput.selling_price.trim() !== "") body.selling_price = Number(priceInput.selling_price);
             if (priceInput.sparepart_cost.trim() !== "") body.sparepart_cost = Number(priceInput.sparepart_cost);
             if (priceInput.official_price.trim() !== "") body.official_price = Number(priceInput.official_price);
 
-            const res = await fetch(`/api/laptops/${laptopId}/units/price`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-            });
-            const json = await res.json();
-            if (!res.ok || !json.success) throw new Error(json.message || "Gagal memperbarui harga");
+            if (Object.keys(body).length > 0) {
+                const res = await fetch(`/api/laptops/${laptopId}/units/price`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+                const json = await res.json();
+                if (!res.ok || !json.success) throw new Error(json.message || "Gagal memperbarui harga");
+                updatedCount = Math.max(updatedCount, json.updated ?? 0);
+            }
 
             const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
             const freshData = await freshRes.json();
             setUnits(freshData.data || []);
 
             setShowPriceModal(false);
-            setToast(`Harga ${json.updated ?? 0} unit berhasil diperbarui!`);
+            setToast(`Harga ${updatedCount} unit berhasil diperbarui!`);
         } catch (e) {
             setAlertModal(e instanceof Error ? e.message : "Gagal memperbarui harga");
         } finally {
@@ -1256,6 +1281,7 @@ export default function UnitsPage() {
                     onCancel={() => setShowPriceModal(false)}
                     onSave={handleBulkPrice}
                     canEditOfficialPrice={hasAnyRole(userRoles, OFFICIAL_PRICE_EDIT_ROLES)}
+                    canEditPurchasePrice={canFullAccessBarang}
                 />
             )}
         </DashboardLayout>
@@ -1356,13 +1382,16 @@ function SourceBulkModal({ value, onChange, saving, onCancel, onSave }: {
     );
 }
 
-//  Modal set "Harga Store", "Harga Sparepart" & "Harga Official" untuk SEMUA unit satu model sekaligus.
-function PriceBulkModal({ value, onChange, saving, onCancel, onSave, canEditOfficialPrice }: {
-    value: { selling_price: string; sparepart_cost: string; official_price: string };
-    onChange: (v: { selling_price: string; sparepart_cost: string; official_price: string }) => void;
+//  Modal set "Harga Modal", "Harga Store", "Harga Sparepart" & "Harga Official" untuk SEMUA unit satu model sekaligus.
+//  Harga Modal cuma tampil kalau canEditPurchasePrice true (role Full Access Barang) —
+//  disamakan levelnya dgn tombol "Isi Modal" di halaman Data Laptop karena data sensitif.
+function PriceBulkModal({ value, onChange, saving, onCancel, onSave, canEditOfficialPrice, canEditPurchasePrice }: {
+    value: { purchase_price: string; selling_price: string; sparepart_cost: string; official_price: string };
+    onChange: (v: { purchase_price: string; selling_price: string; sparepart_cost: string; official_price: string }) => void;
     saving: boolean;
     onCancel: () => void; onSave: () => void;
     canEditOfficialPrice: boolean;
+    canEditPurchasePrice: boolean;
 }) {
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
@@ -1371,6 +1400,7 @@ function PriceBulkModal({ value, onChange, saving, onCancel, onSave, canEditOffi
     }, [onCancel]);
 
     const canSave = !saving && (
+        value.purchase_price.trim() !== "" ||
         value.selling_price.trim() !== "" ||
         value.sparepart_cost.trim() !== "" ||
         value.official_price.trim() !== ""
@@ -1388,11 +1418,24 @@ function PriceBulkModal({ value, onChange, saving, onCancel, onSave, canEditOffi
                     </div>
                     <div className="min-w-0">
                         <h3 className="text-sm font-bold text-gray-800">Set Harga Semua Unit</h3>
-                        <p className="text-[11px] text-gray-400">Isi salah satu atau keduanya → langsung berlaku ke semua unit model ini</p>
+                        <p className="text-[11px] text-gray-400">Isi salah satu atau beberapa → langsung berlaku ke semua unit model ini</p>
                     </div>
                 </div>
 
                 <div className="space-y-3">
+                    {canEditPurchasePrice && (
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Modal (Rp)</label>
+                            <input
+                                type="number"
+                                min={0}
+                                value={value.purchase_price}
+                                onChange={e => onChange({ ...value, purchase_price: e.target.value })}
+                                placeholder="Kosongkan kalau tidak diubah"
+                                className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition"
+                            />
+                        </div>
+                    )}
                     <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">Harga Store (Rp)</label>
                         <input

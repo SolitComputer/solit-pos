@@ -40,9 +40,9 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
     const safeData = canSeePrivate
       ? data
       : (() => {
-          const { purchase_price, sparepart_cost, ...rest } = data as Record<string, any>;
-          return rest;
-        })();
+        const { purchase_price, sparepart_cost, ...rest } = data as Record<string, any>;
+        return rest;
+      })();
 
     return NextResponse.json({ success: true, data: safeData });
   } catch {
@@ -114,11 +114,35 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       .select()
       .single();
 
-    if (error) {
+        if (error) {
       return NextResponse.json(
         { success: false, message: error.message },
         { status: 400 }
       );
+    }
+
+    // ✅ CASCADE FIX: dulu ubah "Harga Store" di Edit Laptop cuma update
+    // tabel `laptops`, padahal tiap unit di `laptop_units` punya kolom
+    // selling_price SENDIRI (dipakai untuk Gross Profit & is_price_complete).
+    // Efeknya: harga baru TIDAK ikut berubah di unit yang sudah ada.
+    // Sekarang: kalau selling_price diubah, SEMUA unit AKTIF (bukan SOLD)
+    // milik laptop ini ikut di-update ke harga yang sama.
+    if (updatePayload.selling_price !== undefined) {
+      const { error: cascadeError } = await supabase
+        .from("laptop_units")
+        .update({ selling_price: updatePayload.selling_price })
+        .eq("laptop_id", id)
+        .neq("status", "SOLD");
+
+      if (cascadeError) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Laptop tersimpan, tapi gagal menyamakan harga jual ke semua unit: " + cascadeError.message,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     await logActivity({
@@ -160,6 +184,24 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
       .eq("laptop_id", id);
 
     const unitIds = (unitRows ?? []).map((u: { id: string }) => u.id);
+
+    if (unitIds.length > 0) {
+      const { data: blockedUnits } = await supabase
+        .from("laptop_units")
+        .select("id, serial_number, status")
+        .in("id", unitIds)
+        .in("status", ["SOLD", "RESERVED", "HELD", "PACKING"]);
+
+      if (blockedUnits && blockedUnits.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Tidak bisa menghapus: masih ada ${blockedUnits.length} unit berstatus Terjual atau sedang dalam transaksi (SN: ${blockedUnits.map(u => u.serial_number).join(", ")}). Selesaikan/batalkan transaksinya dulu sebelum menghapus model ini.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     // ── Bersihkan unit_ids array di transactions (multi-unit) ──────────────
     // FK ON DELETE SET NULL hanya handle transactions.unit_id (single).
