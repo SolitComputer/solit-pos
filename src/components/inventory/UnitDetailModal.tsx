@@ -159,11 +159,14 @@ export default function UnitDetailModal({
             const res = await fetch(`/api/units/${unit.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+                               body: JSON.stringify({
                     serial_number: form.serial_number.trim(),
                     grade: form.grade,
                     condition_note: form.condition_note,
-                    source: form.source.trim() || null,
+                    // Hanya kirim `source` kalau memang diubah dari nilai awal —
+                    // backend PUT /api/units/[id] menolak (403) request non-Full-Access
+                    // yang membawa field `source` sama sekali, walau nilainya sama persis.
+                    ...(form.source.trim() !== (unit.source ?? "") && { source: form.source.trim() || null }),
                     purchase_price: Number(form.purchase_price) || 0,
                     sparepart_cost: Number(form.sparepart_cost) || 0,
                     selling_price: Number(form.selling_price) || 0,
