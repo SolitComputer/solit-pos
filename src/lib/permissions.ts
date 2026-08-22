@@ -144,11 +144,11 @@ export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOU
 // ─── Data Aset Tetap (Fixed Assets) ───────────────────────────────────────────
 // Input manual murni (nama aset + nominal), tidak terhubung ke modul akutansi/inventaris lain.
 // Hapus "PROGRAMMER" di bawah kalau mau strict cuma Admin + Accounting.
-export const FIXED_ASSET_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
+export const FIXED_ASSET_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
 
 // ─── Aset Matot (Dead Assets) — sub-bagian dari Aset Tetap ────────────────────
 export const MINUS_REVIEW_ROLES: UserRole[] = [
-  "ADMIN", "PROGRAMMER", "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
 ];
 export const DEAD_ASSET_ROLES: UserRole[] = [
   ...FIXED_ASSET_ROLES, "KEPALA_TEKNISI", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
