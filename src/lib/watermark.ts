@@ -104,7 +104,7 @@ export async function addTimestampWatermark(
     if (typeof source === "string") {
       srcUrl = source;
     } else {
-      srcUrl = URL.createObjectURL(source);
+      srcUrl = URL.createObjectURL(source as Blob);
       shouldRevoke = true;
     }
 
