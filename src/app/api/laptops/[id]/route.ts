@@ -40,9 +40,9 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
     const safeData = canSeePrivate
       ? data
       : (() => {
-          const { purchase_price, sparepart_cost, ...rest } = data as Record<string, any>;
-          return rest;
-        })();
+        const { purchase_price, sparepart_cost, ...rest } = data as Record<string, any>;
+        return rest;
+      })();
 
     return NextResponse.json({ success: true, data: safeData });
   } catch {
@@ -160,6 +160,27 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
       .eq("laptop_id", id);
 
     const unitIds = (unitRows ?? []).map((u: { id: string }) => u.id);
+
+    // ✅ GUARD: cegah model terhapus kalau masih ada unit berstatus SOLD —
+    // menghapusnya akan membuat SN itu hilang selamanya dari Barang Terjual
+    // walau transaksinya masih tercatat di Riwayat Transaksi.
+    if (unitIds.length > 0) {
+      const { data: soldUnits } = await supabase
+        .from("laptop_units")
+        .select("id, serial_number")
+        .in("id", unitIds)
+        .eq("status", "SOLD");
+
+      if (soldUnits && soldUnits.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Tidak bisa menghapus: masih ada ${soldUnits.length} unit berstatus Terjual (SN: ${soldUnits.map(u => u.serial_number).join(", ")}). Hapus hanya bisa dilakukan kalau semua unit Terjual sudah dipindahkan/diarsipkan.`,
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     // ── Bersihkan unit_ids array di transactions (multi-unit) ──────────────
     // FK ON DELETE SET NULL hanya handle transactions.unit_id (single).
