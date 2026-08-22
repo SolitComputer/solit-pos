@@ -340,12 +340,18 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
       .select("*")
       .eq("id", id)
       .single();
-      
-    if (unit?.status === "SOLD") {
+
+    if (unit?.status && ["SOLD", "RESERVED", "HELD", "PACKING"].includes(unit.status)) {
+      const statusLabel: Record<string, string> = {
+        SOLD: "Terjual",
+        RESERVED: "DP (Reserved)",
+        HELD: "Ambil Dulu",
+        PACKING: "Packing",
+      };
       return NextResponse.json(
         {
           success: false,
-          message: `Tidak bisa menghapus unit SN "${unit.serial_number}" — statusnya masih Terjual. Menghapus unit Terjual akan menghilangkannya secara permanen dari riwayat Barang Terjual.`,
+          message: `Tidak bisa menghapus unit SN "${unit.serial_number}" — statusnya masih ${statusLabel[unit.status]}. Selesaikan/batalkan transaksinya dulu sebelum menghapus unit ini.`,
         },
         { status: 409 }
       );
