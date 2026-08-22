@@ -432,7 +432,7 @@ export async function POST(request: Request) {
           minutes = computeCombinedOvertimeMinutes(beforeIn, afterOut);
           actualStart = effectiveTodayIn.created_at; actualEnd = todayOut.created_at;
         }
-      }
+      
 
       if (minutes <= 0) {
         return NextResponse.json({ success: false, message: "Tidak ada potensi lembur untuk kategori ini." }, { status: 400 });
