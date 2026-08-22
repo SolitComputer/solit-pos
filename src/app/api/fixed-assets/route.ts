@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { FIXED_ASSET_ROLES } from "@/lib/permissions";
+import { getCurrentUser } from "@/lib/auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,17 +9,35 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-// Defense-in-depth: middleware.ts sudah gate route ini lewat ROUTE_PERMISSIONS,
-// tapi dicek ulang di sini supaya route handler tidak bergantung 100% pada middleware.
-function hasAccess(request: NextRequest): boolean {
+async function getAuthContext(request: NextRequest): Promise<{ hasAccess: boolean; userId: string | null; userName: string | null }> {
   const rolesHeader = request.headers.get("x-user-roles") || "";
   const singleRole = request.headers.get("x-user-role");
-  const roles = rolesHeader ? rolesHeader.split(",").filter(Boolean) : singleRole ? [singleRole] : [];
-  return roles.some((r) => (FIXED_ASSET_ROLES as string[]).includes(r));
+  let roles = rolesHeader ? rolesHeader.split(",").filter(Boolean) : singleRole ? [singleRole] : [];
+  let userId = request.headers.get("x-user-id");
+  let userName = decodeURIComponent(request.headers.get("x-user-name") || "");
+
+  if (roles.length === 0 || !userId) {
+    try {
+      const user = await getCurrentUser();
+      if (user) {
+        if (roles.length === 0) {
+          roles = Array.isArray(user.roles) && user.roles.length > 0 ? user.roles : [user.role];
+        }
+        if (!userId) userId = user.id;
+        if (!userName) userName = user.name;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const allowed = roles.some((r) => (FIXED_ASSET_ROLES as string[]).includes(r));
+  return { hasAccess: allowed, userId, userName };
 }
 
 export async function GET(request: NextRequest) {
-  if (!hasAccess(request)) {
+  const auth = await getAuthContext(request);
+  if (!auth.hasAccess) {
     return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
   }
 
@@ -35,7 +54,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!hasAccess(request)) {
+  const auth = await getAuthContext(request);
+  if (!auth.hasAccess) {
     return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
   }
 
@@ -49,17 +69,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: "Nominal tidak valid" }, { status: 400 });
   }
 
-  const userId = request.headers.get("x-user-id");
-  const userName = decodeURIComponent(request.headers.get("x-user-name") || "");
-
   const { data, error } = await supabase
     .from("fixed_assets")
     .insert({
       nama_aset: body.nama_aset.trim(),
       nominal,
       keterangan: body.keterangan ? String(body.keterangan).trim() : null,
-      created_by: userId || null,
-      created_by_name: userName || null,
+      created_by: auth.userId || null,
+      created_by_name: auth.userName || null,
     })
     .select()
     .single();
