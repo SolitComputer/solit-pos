@@ -22,7 +22,7 @@ export const GET = withAuth(async (req: NextRequest) => {
         return NextResponse.json({ data: [] });
     }
 
-   const [laptopResult, accessoryResult] = await Promise.all([
+    const [laptopResult, accessoryResult] = await Promise.all([
         supabase
             .from("laptop_units")
             .select(`
@@ -40,14 +40,19 @@ export const GET = withAuth(async (req: NextRequest) => {
                     laptop_bag_price
                 )
             `)
-          .ilike("serial_number", `%${q}%`)
+            .ilike("serial_number", `%${q}%`)
             // Unit yang statusnya sudah terjual/diproses via jalur transaksi
-            // (SOLD/RESERVED/HELD/PACKING) tidak ditampilkan. "Sedang dipakai
-            // di penyiapan lain" TIDAK LAGI dibaca dari status unit —
-            // Penyiapan tidak pernah mengubah laptop_units.status sama
-            // sekali — dihitung terpisah lewat preparation_items aktif
-            // (lihat blok activeInPrepIds di bawah).
-            .eq("status", "SIAP_JUAL")
+            // (SOLD/RESERVED/HELD/PACKING) tidak ditampilkan — sisanya
+            // (SIAP_JUAL, BELUM_SIAP, DEAD, dll) tetap muncul di search.
+            // Dulu di sini pakai .eq("status","SIAP_JUAL") yang salah:
+            // itu whitelist HANYA 1 status, jadi unit valid dgn status
+            // lain (mis. BELUM_SIAP) hilang dari search walau masih ada
+            // di Data Barang. "Sedang dipakai di penyiapan lain" TIDAK
+            // LAGI dibaca dari status unit — Penyiapan tidak pernah
+            // mengubah laptop_units.status sama sekali — dihitung
+            // terpisah lewat preparation_items aktif (lihat blok
+            // activeInPrepIds di bawah).
+            .not("status", "in", "(SOLD,RESERVED,HELD,PACKING)")
             .limit(8)
             .order("serial_number"),
 
@@ -97,7 +102,7 @@ export const GET = withAuth(async (req: NextRequest) => {
     }
 
     // ── Format laptop units ───────────────────────────────────────────────────
-   const laptopFormatted = (laptopResult.data || []).map((u: any) => ({
+    const laptopFormatted = (laptopResult.data || []).map((u: any) => ({
         id: u.id,
         serial_number: u.serial_number,
         grade: u.grade,
