@@ -335,12 +335,21 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const { id } = await props.params;
 
-    // Ambil data unit sebelum dihapus (untuk log)
     const { data: unit } = await supabase
       .from("laptop_units")
       .select("*")
       .eq("id", id)
       .single();
+      
+    if (unit?.status === "SOLD") {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Tidak bisa menghapus unit SN "${unit.serial_number}" — statusnya masih Terjual. Menghapus unit Terjual akan menghilangkannya secara permanen dari riwayat Barang Terjual.`,
+        },
+        { status: 409 }
+      );
+    }
 
     // ── Bersihkan unit_ids array di transactions (multi-unit) ──────────────
     // transactions.unit_id (single) sudah ditangani oleh FK ON DELETE SET NULL.
