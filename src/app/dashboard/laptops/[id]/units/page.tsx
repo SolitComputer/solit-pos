@@ -741,7 +741,17 @@ export default function UnitsPage() {
 
             const freshRes = await fetch(`/api/laptops/${laptopId}/units`);
             const freshData = await freshRes.json();
-            setUnits(freshData.data || []);
+            // Normalisasi angka sama persis kayak di fetchData() — tanpa ini,
+            // kalau API balikin string/desimal, fmt() bisa nampilin nilai yang
+            // kelihatan "tidak berubah" walau data di DB sudah benar ter-update.
+            const freshUnits: LaptopUnit[] = (freshData.data || []).map((u: LaptopUnit) => ({
+                ...u,
+                purchase_price: Math.round(Number(u.purchase_price) || 0),
+                sparepart_cost: Math.round(Number(u.sparepart_cost) || 0),
+                selling_price: Math.round(Number(u.selling_price) || 0),
+                official_price: Math.round(Number(u.official_price) || 0),
+            }));
+            setUnits(freshUnits);
 
             setShowPriceModal(false);
             setToast(`Harga ${updatedCount} unit berhasil diperbarui!`);
