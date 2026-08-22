@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Camera } from "lucide-react";
+import { Camera, X, Loader2, RefreshCw } from "lucide-react";
+import { addTimestampWatermark } from "@/lib/watermark";
 import {
   getOvertimeColor,
   formatOvertimeMinutes,
@@ -25,12 +26,42 @@ export interface OvertimeTableRow {
   total_pay: number | null;
   actual_start: string | null;
   actual_end: string | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
   is_holiday?: boolean | null;
   is_late?: boolean | null;
   requested_start?: string | null;
+  created_at?: string | null;
+  completed_at?: string | null;
   users?: { id: string; name: string; role: string } | null;
   approver?: { id: string; name: string } | null;
   auditor?: { id: string; name: string } | null;
+}
+
+const DAYS_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+const MONTHS_ID = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+];
+
+function formatFullDateIndo(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr + (dateStr.includes("T") ? "" : "T12:00:00"));
+  if (isNaN(d.getTime())) return dateStr;
+  return `${DAYS_ID[d.getDay()]}, ${d.getDate()} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function formatOvertimeTimestamp(row: OvertimeTableRow): string {
+  const ts = row.completed_at || row.created_at;
+  if (ts) {
+    const d = new Date(ts);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Jakarta" }) + " WIB";
+    }
+  }
+  const s = fmtTime(row.actual_start || row.scheduled_start);
+  const e = fmtTime(row.actual_end || row.scheduled_end);
+  return `${s} – ${e} WIB`;
 }
 
 function detectLateFromTimeStr(timeStr: string | null | undefined): boolean {
@@ -133,7 +164,7 @@ export function OvertimeTable({
   onOpenDetail?: (row: OvertimeTableRow) => void;
 }) {
   const [detailModalRow, setDetailModalRow] = useState<OvertimeTableRow | null>(null);
-  const [photoModalUrl, setPhotoModalUrl] = useState<string | null>(null);
+  const [photoModalRow, setPhotoModalRow] = useState<OvertimeTableRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectModalRow, setRejectModalRow] = useState<OvertimeTableRow | null>(null);
 
@@ -220,8 +251,12 @@ export function OvertimeTable({
                   </td>
                   <td className="px-4 py-3 text-center">
                     {o.proof_photo_url ? (
-                      <button onClick={() => setPhotoModalUrl(o.proof_photo_url)} className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 inline-block">
-                        <img src={o.proof_photo_url} alt="bukti" className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => setPhotoModalRow(o)}
+                        className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 inline-block hover:border-violet-400 hover:ring-2 hover:ring-violet-300 transition-all cursor-pointer group"
+                        title="Klik untuk melihat bukti foto & timestamp"
+                      >
+                        <img src={o.proof_photo_url} alt="bukti" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                       </button>
                     ) : <span className="text-gray-300"><Camera size={16} className="inline" /></span>}
                   </td>
@@ -257,9 +292,51 @@ export function OvertimeTable({
         </table>
       </div>
 
-      {photoModalUrl && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }} onClick={() => setPhotoModalUrl(null)}>
-          <img src={photoModalUrl} alt="Bukti lembur" className="max-w-full max-h-full rounded-xl" onClick={(e) => e.stopPropagation()} />
+      {photoModalRow && photoModalRow.proof_photo_url && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-5" style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)" }} onClick={() => setPhotoModalRow(null)}>
+          <div className="relative w-full max-w-2xl bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-gray-800 flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="w-full flex items-center justify-between px-5 py-3.5 bg-gray-900 border-b border-gray-800 text-white">
+              <div>
+                <span className="text-xs font-bold text-gray-100 block">Bukti Foto Lembur — {photoModalRow.users?.name ?? "Karyawan"}</span>
+                <span className="text-[10px] text-gray-400 font-medium">{formatFullDateIndo(photoModalRow.request_date)}</span>
+              </div>
+              <button onClick={() => setPhotoModalRow(null)} className="w-8 h-8 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-300 hover:text-white transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            
+            <div className="relative p-3 bg-black flex items-center justify-center min-h-[300px] max-h-[65vh] overflow-hidden">
+              <img src={photoModalRow.proof_photo_url} alt="Bukti lembur" className="max-w-full max-h-[62vh] object-contain rounded-xl" />
+              
+              {/* Floating Timestamp Badge Overlay */}
+              <div className="absolute bottom-5 left-5 right-5 sm:right-auto bg-slate-950/90 backdrop-blur-md border border-white/20 rounded-2xl p-3.5 text-white shadow-2xl space-y-1 max-w-sm pointer-events-none">
+                <div className="flex items-center gap-1.5 text-orange-400 font-bold text-[10px] tracking-wider uppercase">
+                  <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse inline-block" />
+                  SOLIT POS • BUKTI LEMBUR
+                </div>
+                <p className="font-mono font-bold text-base text-white leading-tight">
+                  {formatOvertimeTimestamp(photoModalRow)}
+                </p>
+                <p className="text-[11px] text-gray-200 font-medium">
+                  {formatFullDateIndo(photoModalRow.request_date)}
+                </p>
+                <div className="pt-1 mt-1 border-t border-white/10 flex items-center justify-between text-[10px] text-gray-400">
+                  <span>Karyawan: <strong className="text-white">{photoModalRow.users?.name ?? "Karyawan"}</strong></span>
+                  {photoModalRow.duration_minutes ? <span className="font-mono text-orange-300 font-semibold">{formatOvertimeMinutes(photoModalRow.duration_minutes)}</span> : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-5 py-3 bg-gray-900 border-t border-gray-800 flex items-center justify-between text-xs text-gray-300">
+              <div className="truncate pr-3">
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Keterangan:</span>
+                <span className="text-gray-200 text-xs truncate">{photoModalRow.work_description || "—"}</span>
+              </div>
+              <button onClick={() => setPhotoModalRow(null)} className="flex-shrink-0 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-semibold transition-colors">
+                Tutup
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {detailModalRow && detailModalRow.status === "PENDING" && <OvertimeQuickDetailForm row={detailModalRow} onClose={() => setDetailModalRow(null)} onSaved={onRefresh} />}
@@ -352,7 +429,28 @@ function OvertimeProofUploadForm({ row, onClose, onSaved }: { row: OvertimeTable
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
+    setError("");
+    setProcessing(true);
+    try {
+      const watermarked = await addTimestampWatermark(rawFile, {
+        tag: "SOLIT POS • BUKTI LEMBUR",
+        subTag: row.users?.name ? `Karyawan: ${row.users.name}` : undefined,
+      });
+      setFile(watermarked.file);
+      setPreview(watermarked.dataUrl);
+    } catch (err: any) {
+      console.error("[WatermarkError]", err);
+      setError("Gagal memproses timestamp pada foto. Silakan coba lagi.");
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   const submit = async () => {
     if (!file) { setError("Pilih atau ambil foto dulu."); return; }
@@ -375,26 +473,84 @@ function OvertimeProofUploadForm({ row, onClose, onSaved }: { row: OvertimeTable
   };
 
   return (
-    <div className="fixed inset-0 z-[105] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
-      <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3.5">
-        <p className="font-bold text-sm text-gray-800">Upload Bukti Lembur</p>
-        <p className="text-[11px] text-gray-400">Wajib sebelum lemburmu bisa diaudit dan mendapat nominal (poin 6).</p>
+    <div className="fixed inset-0 z-[105] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}>
+      <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3.5 shadow-2xl border border-gray-100">
+        <div>
+          <p className="font-bold text-sm text-gray-800">Upload Bukti Lembur</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">
+            Foto otomatis dilengkapi watermark tanggal, hari, jam, menit & detik WIB.
+          </p>
+        </div>
+
         {error && <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg">{error}</div>}
-        {preview ? (
-          <img src={preview} alt="preview" className="w-full h-40 object-cover rounded-xl border border-gray-100" />
+
+        {processing ? (
+          <div className="h-44 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 flex flex-col items-center justify-center gap-2">
+            <Loader2 className="w-6 h-6 text-violet-600 animate-spin" />
+            <p className="text-xs font-semibold text-violet-700">Mencetak timestamp ke foto...</p>
+          </div>
+        ) : preview ? (
+          <div className="space-y-2">
+            <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-black aspect-video max-h-48 flex items-center justify-center">
+              <img src={preview} alt="preview bukti ber-timestamp" className="w-full h-full object-contain" />
+            </div>
+            <label className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-violet-600 hover:text-violet-700 cursor-pointer py-1">
+              <RefreshCw size={13} />
+              <span>Ganti / Ambil Ulang Foto</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileSelected}
+              />
+            </label>
+          </div>
         ) : (
-          <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-xl p-6 cursor-pointer hover:border-violet-300">
-            <Camera size={18} className="text-gray-400" />
-            <span className="text-xs font-semibold text-gray-600">Pilih Foto</span>
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => {
-              const f = e.target.files?.[0]; if (!f) return;
-              setFile(f); setPreview(URL.createObjectURL(f));
-            }} />
-          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-gray-200 rounded-xl p-4 cursor-pointer hover:border-violet-400 hover:bg-violet-50/30 transition-all text-center group">
+              <div className="w-8 h-8 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Camera size={16} />
+              </div>
+              <span className="text-[11px] font-bold text-gray-700">Kamera</span>
+              <span className="text-[9px] text-gray-400">Ambil foto langsung</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleFileSelected}
+              />
+            </label>
+
+            <label className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-gray-200 rounded-xl p-4 cursor-pointer hover:border-violet-400 hover:bg-violet-50/30 transition-all text-center group">
+              <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <span className="text-[11px] font-bold text-gray-700">Galeri / File</span>
+              <span className="text-[9px] text-gray-400">Pilih dari HP/PC</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileSelected}
+              />
+            </label>
+          </div>
         )}
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 h-9 bg-gray-100 rounded-xl text-xs font-semibold text-gray-600">Batal</button>
-          <button onClick={submit} disabled={uploading || !file} className="flex-1 h-9 bg-orange-600 rounded-xl text-xs font-bold text-white disabled:opacity-50">{uploading ? "Mengupload..." : "Upload & Kirim"}</button>
+
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 h-9 bg-gray-100 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-200 transition-colors">
+            Batal
+          </button>
+          <button
+            onClick={submit}
+            disabled={uploading || processing || !file}
+            className="flex-1 h-9 bg-orange-600 hover:bg-orange-700 rounded-xl text-xs font-bold text-white disabled:opacity-50 transition-all"
+          >
+            {uploading ? "Mengupload..." : "Upload & Kirim"}
+          </button>
         </div>
       </div>
     </div>

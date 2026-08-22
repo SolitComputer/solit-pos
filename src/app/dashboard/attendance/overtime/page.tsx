@@ -4,13 +4,14 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2, AlertTriangle, Camera, Inbox, Pencil, Play, Check, X, Ban, ClipboardList, Circle, HelpCircle, Trophy, type LucideIcon } from "lucide-react";
+import { Plus, Clock, CalendarDays, FileText, Loader2, CheckCircle2, AlertTriangle, Camera, Inbox, Pencil, Play, Check, X, Ban, ClipboardList, Circle, HelpCircle, Trophy, RefreshCw, type LucideIcon } from "lucide-react";
 import { OvertimeTable, type OvertimeTableRow } from "@/components/attendance/OvertimeTable"; // ✅ NEW poin 15
 import { OvertimeFillDetailModal } from "@/components/attendance/OvertimeFillDetailModal"; // ✅ NEW
 import { OvertimeSOPBanner } from "@/components/attendance/OvertimeSOPBanner";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { OvertimePendingPopup } from "@/components/attendance/OvertimePendingPopup";
 import { OvertimeRecapTable } from "@/components/attendance/OvertimeRecapTable"; // ✅ NEW — rekap bulanan
+import { addTimestampWatermark } from "@/lib/watermark";
 
 type OvertimeRequest = {
   id: string; user_id: string; request_date: string;
@@ -130,28 +131,7 @@ function detectLateFromTime(timeStr: string | null | undefined): boolean {
   return totalMin >= LATE_THRESHOLD;
 }
 
-function addWatermarkToImage(imageDataUrl: string, callback: (blob: Blob, url: string) => void) {
-  const img = new Image();
-  img.onload = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = img.width; canvas.height = img.height;
-    const ctx = canvas.getContext("2d"); if (!ctx) return;
-    ctx.drawImage(img, 0, 0);
-    const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
-    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-    const txt = `${now.getUTCDate()}-${months[now.getUTCMonth()]}-${now.getUTCFullYear()} (${days[now.getUTCDay()]}) \u2022 ${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")} WIB`;
-    const pad = 12, fs = Math.max(16, canvas.width / 40);
-    ctx.font = `bold ${fs}px Arial`;
-    const tw = ctx.measureText(txt).width;
-    const bx = pad, by = canvas.height - fs - pad - 10, bw = tw + pad * 2, bh = fs + pad;
-    ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(bx, by, bw, bh);
-    ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 2; ctx.strokeRect(bx, by, bw, bh);
-    ctx.fillStyle = "white"; ctx.textBaseline = "middle"; ctx.fillText(txt, bx + pad, by + bh / 2);
-    canvas.toBlob(blob => { if (blob) callback(blob, URL.createObjectURL(blob)); }, "image/jpeg", 0.95);
-  };
-  img.onerror = () => console.error("Failed to load image"); img.src = imageDataUrl;
-}
+
 
 // ─── STATUS CONFIG ─────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; icon: LucideIcon; bg: string; text: string; border: string; dot: string }> = {
@@ -397,7 +377,7 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
 
   useEffect(() => { startCamera(facing); return () => { streamRef.current?.getTracks().forEach(t => t.stop()); }; }, [facing, startCamera]);
 
-  const capture = () => {
+  const capture = async () => {
     if (!videoRef.current || !ready) return;
     const v = videoRef.current;
     const c = document.createElement("canvas"); c.width = v.videoWidth || 1280; c.height = v.videoHeight || 720;
@@ -406,10 +386,32 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
     ctx.drawImage(v, 0, 0, c.width, c.height);
     if (facing === "user") ctx.setTransform(1, 0, 0, 1, 0, 0);
     setProcessing(true);
-    addWatermarkToImage(c.toDataURL("image/jpeg", 0.95), (blob, url) => {
-      const file = new File([blob], `overtime-${Date.now()}.jpg`, { type: "image/jpeg" });
-      setProcessing(false); streamRef.current?.getTracks().forEach(t => t.stop()); onCapture(file, url);
-    });
+    try {
+      const res = await addTimestampWatermark(c, { tag: "SOLIT POS • BUKTI LEMBUR" });
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      onCapture(res.file, res.dataUrl);
+    } catch (err: any) {
+      console.error("[WatermarkError]", err);
+      setError("Gagal memproses watermark pada foto");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleGalleryFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProcessing(true);
+    try {
+      const res = await addTimestampWatermark(file, { tag: "SOLIT POS • BUKTI LEMBUR" });
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      onCapture(res.file, res.dataUrl);
+    } catch (err: any) {
+      console.error("[WatermarkError]", err);
+      setError("Gagal memproses watermark pada gambar galeri");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (
@@ -418,13 +420,11 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
         <div className="rounded-xl bg-red-50 border border-red-200 p-5 text-center space-y-3">
           <p className="text-sm font-bold text-red-700">{error}</p>
           <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 cursor-pointer hover:bg-gray-50 transition-all shadow-sm">
-            Pilih dari Galeri
-            <input type="file" accept="image/*" className="hidden" onChange={e => {
-              const file = e.target.files?.[0]; if (!file) return;
-              const reader = new FileReader();
-              reader.onload = ev => { const url = ev.target?.result as string; setProcessing(true); addWatermarkToImage(url, (blob, pu) => { const f = new File([blob], file.name, { type: "image/jpeg" }); setProcessing(false); onCapture(f, pu); }); };
-              reader.readAsDataURL(file);
-            }} />
+            <svg className="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Pilih dari Galeri / File
+            <input type="file" accept="image/*" className="hidden" onChange={handleGalleryFile} />
           </label>
         </div>
       ) : (
@@ -436,48 +436,102 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
               <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             </div>
           )}
-          <button onClick={() => setFacing(p => p === "environment" ? "user" : "environment")}
-            className="absolute top-2.5 right-2.5 w-8 h-8 rounded-xl bg-black/50 backdrop-blur-sm flex items-center justify-center text-white text-xs hover:bg-black/70 transition-all"></button>
+          <button
+            type="button"
+            onClick={() => setFacing(p => p === "environment" ? "user" : "environment")}
+            className="absolute top-2.5 right-2.5 px-2.5 py-1.5 rounded-lg bg-black/60 backdrop-blur-sm flex items-center gap-1.5 text-white text-[10px] font-semibold hover:bg-black/80 transition-all border border-white/20"
+          >
+            <RefreshCw size={12} />
+            <span>Putar Kamera</span>
+          </button>
         </div>
       )}
+
       {processing && (
-        <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-2.5">
-          <div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-          <p className="text-xs text-gray-500">Menambahkan watermark...</p>
+        <div className="flex items-center gap-2.5 bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-2.5">
+          <Loader2 className="w-4 h-4 text-violet-600 animate-spin flex-shrink-0" />
+          <p className="text-xs text-violet-700 font-medium">Mencetak timestamp (hari, tanggal, jam, menit, detik WIB)...</p>
         </div>
       )}
-      <div className="flex gap-2.5">
-        <button onClick={onCancel} className={secondaryBtn} style={{ flex: "0 0 auto", padding: "0 16px" }}>Batal</button>
+
+      <div className="flex items-center gap-2">
+        <label className="flex-1 h-10 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
+          <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span>Pilih Galeri</span>
+          <input type="file" accept="image/*" className="hidden" onChange={handleGalleryFile} />
+        </label>
+
         <button onClick={capture} disabled={!ready || processing || !!error} className={primaryBtn}>
           {processing ? <Spinner /> : <><Camera size={16} /><span>Ambil Foto</span></>}
         </button>
+
+        <button onClick={onCancel} className={secondaryBtn} style={{ flex: "0 0 auto", padding: "0 16px" }}>Batal</button>
       </div>
     </div>
   );
 }
 
-// ─── PROOF PHOTO MODAL ─────────────────────────────────────────────────────
 function ProofPhotoModal({ overtime: o, onClose, canViewPay: showPay }: { overtime: OvertimeRequest; onClose: () => void; canViewPay?: boolean }) {
   if (!o.proof_photo_url) return null;
+  const timeFormatted = (() => {
+    const ts = o.completed_at || o.created_at;
+    if (ts) {
+      const d = new Date(ts);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Jakarta" }) + " WIB";
+      }
+    }
+    return `${formatTime(o.actual_start ?? o.scheduled_start)} – ${formatTime(o.actual_end ?? o.scheduled_end)} WIB`;
+  })();
+
+  const dateFormatted = new Date(o.request_date + (o.request_date.includes("T") ? "" : "T12:00:00")).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="" title="Bukti Lemburan" sub={o.users?.name} onClose={onClose} />
+      <ModalHead icon="" title="Bukti Lemburan" sub={`${o.users?.name ?? "Karyawan"} · ${dateFormatted}`} onClose={onClose} />
       <div className="px-5 py-4 space-y-3 max-h-[75vh] overflow-y-auto">
-        <img src={o.proof_photo_url} alt="Bukti" className="w-full h-56 object-cover rounded-xl border border-gray-100 shadow-sm" />
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5">
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1.5">Tanggal</p>
-            <p className="font-semibold text-gray-800 text-xs">{new Date(o.request_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
+        <div className="relative rounded-2xl overflow-hidden bg-black flex items-center justify-center min-h-[220px] shadow-sm">
+          <img src={o.proof_photo_url} alt="Bukti" className="w-full max-h-72 object-contain rounded-2xl" />
+          {/* Floating Timestamp Badge Overlay */}
+          <div className="absolute bottom-3 left-3 right-3 sm:right-auto bg-slate-950/90 backdrop-blur-md border border-white/20 rounded-2xl p-3 text-white shadow-2xl space-y-0.5 max-w-xs pointer-events-none">
+            <div className="flex items-center gap-1.5 text-orange-400 font-bold text-[9px] tracking-wider uppercase">
+              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse inline-block" />
+              SOLIT POS • BUKTI LEMBUR
+            </div>
+            <p className="font-mono font-bold text-sm text-white leading-tight">
+              {timeFormatted}
+            </p>
+            <p className="text-[10px] text-gray-200 font-medium">
+              {dateFormatted}
+            </p>
+            <p className="text-[9px] text-gray-400 pt-0.5 border-t border-white/10">
+              Karyawan: <strong className="text-white">{o.users?.name ?? "Karyawan"}</strong>
+            </p>
           </div>
-          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5">
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1.5">Waktu</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Tanggal</p>
+            <p className="font-semibold text-gray-800 text-xs">{dateFormatted}</p>
+          </div>
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Waktu</p>
             <p className="font-semibold text-gray-800 text-xs font-mono">{formatTime(o.actual_start ?? o.scheduled_start)} – {formatTime(o.actual_end ?? o.scheduled_end)}</p>
           </div>
         </div>
+        {o.work_description && (
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Rincian Pekerjaan</p>
+            <p className="text-xs text-gray-700 leading-relaxed">{o.work_description}</p>
+          </div>
+        )}
         {showPay && o.total_pay != null && (
-          <div className="rounded-xl p-4 bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1.5">Total Bayaran</p>
-            <p className="text-xl font-bold">{formatRupiah(o.total_pay)}</p>
+          <div className="rounded-xl p-3.5 bg-gradient-to-br from-gray-900 to-gray-800 text-white">
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1">Total Bayaran</p>
+            <p className="text-lg font-bold">{formatRupiah(o.total_pay)}</p>
           </div>
         )}
       </div>
