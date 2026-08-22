@@ -152,6 +152,24 @@ export function playNotifSound() {
   playSoundByKey("default");
 }
 
+// ── Loop notif: bunyi berulang terus sampai dimatikan lewat stopLoopingSound() ──
+let loopIntervalId: ReturnType<typeof setInterval> | null = null;
+
+export function startLoopingSound(key: string, customUrl?: string | null, intervalMs = 2000) {
+  stopLoopingSound(); // matikan loop lama dulu biar nggak numpuk 2 interval jalan bareng
+  playSoundByKey(key, customUrl); // bunyi pertama langsung, nggak nunggu interval pertama
+  loopIntervalId = setInterval(() => {
+    playSoundByKey(key, customUrl);
+  }, intervalMs);
+}
+
+export function stopLoopingSound() {
+  if (loopIntervalId) {
+    clearInterval(loopIntervalId);
+    loopIntervalId = null;
+  }
+}
+
 export function unlockAudio() {
   try {
     const ctx = getCtx();
