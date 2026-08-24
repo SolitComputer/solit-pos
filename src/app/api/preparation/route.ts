@@ -260,6 +260,9 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     // stok Siap Jual di Data Barang otomatis berkurang, (3) link invoice-nya
     // ke preparation_orders ini — supaya muncul juga di Riwayat Transaksi &
     // Riwayat Pending (keduanya sudah generic terhadap status PACKING).
+    // Ditaruh di luar try/catch supaya bisa dibaca lagi saat menyusun
+    // response di akhir function, baik jalur sukses maupun jalur catch.
+    let ecomWarning: string | null = null;
     if (salesChannel === "ECOMMERCE") {
       try {
         // Resolve unit_id yang belum ada (SN diketik manual/scan barcode)
@@ -274,67 +277,114 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         // diketik manual tetap Siap Jual walau transaksinya sudah Packing.
         const missingSnItems = cleanItems.filter((it) => !it.unit_id && it.serial_number);
         if (missingSnItems.length > 0) {
+          // select laptop_id juga — SN yang diketik manual/scan (addManual
+          // di page.tsx) tidak pernah bawa laptop_id dari frontend, padahal
+          // transaction_items.laptop_id NOT NULL tanpa default. Kolom ini
+          // WAJIB ke-isi dari sini, bukan dari input sales.
           const { data: matchedUnits, error: resolveError } = await supabaseAdmin
             .from("laptop_units")
-            .select("id, serial_number")
+            .select("id, serial_number, laptop_id")
             .in("serial_number", missingSnItems.map((it) => it.serial_number));
 
           if (resolveError) {
             console.error("[POST /api/preparation] gagal resolve unit_id dari SN:", resolveError.message);
           }
 
-          const snToUnitId = new Map((matchedUnits ?? []).map((u: any) => [u.serial_number, u.id]));
+          const snToUnit = new Map((matchedUnits ?? []).map((u: any) => [u.serial_number, u]));
           for (const it of missingSnItems) {
-            const resolved = snToUnitId.get(it.serial_number);
-            if (resolved) it.unit_id = resolved;
-          }
-
-          const stillUnresolved = missingSnItems.filter((it) => !it.unit_id);
-          if (stillUnresolved.length > 0) {
-            console.warn(
-              "[POST /api/preparation] SN berikut TIDAK ditemukan di laptop_units, unit_id tidak ke-resolve:",
-              stillUnresolved.map((it) => it.serial_number).join(", ")
-            );
+            const resolved = snToUnit.get(it.serial_number);
+            if (resolved) {
+              it.unit_id = resolved.id;
+              if (!it.laptop_id) it.laptop_id = resolved.laptop_id ?? undefined;
+            }
           }
         }
 
+        // ── Lengkapi laptop_name yang masih kosong ──────────────────────────
+        // laptop_name NOT NULL. SN manual/scan tidak bawa laptop_name dari
+        // frontend — laptop_id-nya sudah ke-isi di blok atas, tinggal
+        // di-lookup nama laptopnya dari situ.
+        const missingNameLaptopIds = [
+          ...new Set(
+            cleanItems.filter((it) => !it.laptop_name && it.laptop_id).map((it) => it.laptop_id as string)
+          ),
+        ];
+        if (missingNameLaptopIds.length > 0) {
+          const { data: laptopRows } = await supabaseAdmin
+            .from("laptops")
+            .select("id, laptop_name")
+            .in("id", missingNameLaptopIds);
+          const laptopNameMap = new Map((laptopRows ?? []).map((l: any) => [l.id, l.laptop_name]));
+          for (const it of cleanItems) {
+            if (!it.laptop_name && it.laptop_id) it.laptop_name = laptopNameMap.get(it.laptop_id) ?? undefined;
+          }
+        }
+
+        // ── Pisahkan item yang BISA vs TIDAK BISA masuk transaction_items ───
+        // laptop_id NOT NULL tanpa default — SN yang SAMA SEKALI tidak
+        // ketemu di laptop_units (typo, belum pernah diinput ke Data
+        // Barang) tidak punya laptop_id yang valid dan TIDAK BOLEH
+        // dipaksa insert (pasti gagal lagi). Item ini tetap aman tersimpan
+        // di preparation_items — cuma tidak ikut jadi baris transaksi.
+        const insertableItems = cleanItems.filter((it) => it.laptop_id);
+        const unresolvedItems = cleanItems.filter((it) => !it.laptop_id);
+        if (unresolvedItems.length > 0) {
+          ecomWarning = `SN berikut TIDAK ditemukan di Data Barang, TIDAK ikut masuk transaksi & statusnya TIDAK berubah jadi Packing: ${unresolvedItems.map((it) => it.serial_number).join(", ")}. Cek manual di Data Barang.`;
+          console.warn(
+            "[POST /api/preparation] SN berikut TIDAK ketemu di laptop_units, dikeluarkan dari transaction_items:",
+            unresolvedItems.map((it) => it.serial_number).join(", ")
+          );
+        }
+
         const invoice_number = await generateInvoice();
-        const unitIds = cleanItems.map((it) => it.unit_id).filter(Boolean) as string[];
+        const unitIds = [...new Set(insertableItems.map((it) => it.unit_id).filter(Boolean))] as string[];
         const serialNumbers = cleanItems.map((it) => it.serial_number).filter(Boolean);
 
-        const { error: trxError } = await supabase.from("transactions").insert({
-          invoice_number,
-          status: "PACKING",
-          customer_name: String(customer_name).trim(),
-          customer_phone: customer_phone ?? null,
-          laptop_name: cleanItems.length === 1 ? cleanItems[0].laptop_name : `${cleanItems.length} Laptop`,
-          serial_number: cleanItems.length === 1 ? cleanItems[0].serial_number : null,
-          serial_numbers: serialNumbers,
-          unit_id: unitIds.length === 1 ? unitIds[0] : null,
-          unit_ids: unitIds,
-          laptop_id: cleanItems.length === 1 ? cleanItems[0].laptop_id : null,
-          deal_price: dealPriceNum,
-          amount: dealPriceNum,
-          dp_amount: 0,
-          payment_method: "E-COMMERCE",
-          source_platform: ecommercePlatform,
-          item_kind: "laptop",
-          notes: notes ?? null,
-          sales_id: user.id,
-          sales_name: user.name,
-        });
+        // ✅ FIX: transaction_items.transaction_id kolom NOT NULL (FK ke
+        // transactions.id) tapi dulu tidak pernah diisi saat insert
+        // transaction_items di bawah — insert-nya SELALU gagal & throw,
+        // makanya blok update laptop_units.status jadi PACKING (di bawahnya)
+        // tidak pernah sempat jalan. Sekarang insert transactions pakai
+        // .select("id").single() supaya id-nya bisa dipakai di transaction_items.
+        const { data: trxRow, error: trxError } = await supabase
+          .from("transactions")
+          .insert({
+            invoice_number,
+            status: "PACKING",
+            customer_name: String(customer_name).trim(),
+            customer_phone: customer_phone ?? null,
+            laptop_name: cleanItems.length === 1 ? cleanItems[0].laptop_name : `${cleanItems.length} Laptop`,
+            serial_number: cleanItems.length === 1 ? cleanItems[0].serial_number : null,
+            serial_numbers: serialNumbers,
+            unit_id: unitIds.length === 1 ? unitIds[0] : null,
+            unit_ids: unitIds,
+            laptop_id: cleanItems.length === 1 ? cleanItems[0].laptop_id : null,
+            deal_price: dealPriceNum,
+            amount: dealPriceNum,
+            dp_amount: 0,
+            payment_method: "E-COMMERCE",
+            source_platform: ecommercePlatform,
+            item_kind: "laptop",
+            notes: notes ?? null,
+            sales_id: user.id,
+            sales_name: user.name,
+          })
+          .select("id")
+          .single();
         if (trxError) throw trxError;
 
-        if (cleanItems.length > 0) {
-          const perUnitPrice = cleanItems.length > 1 ? Math.round(dealPriceNum / cleanItems.length) : dealPriceNum;
+        if (insertableItems.length > 0) {
+          const perUnitPrice = insertableItems.length > 1 ? Math.round(dealPriceNum / insertableItems.length) : dealPriceNum;
           const { error: trxItemsError } = await supabase.from("transaction_items").insert(
-            cleanItems.map((it) => ({
+            insertableItems.map((it) => ({
+              transaction_id: trxRow.id,
               invoice_number,
               item_type: "laptop",
               unit_id: it.unit_id,
-              laptop_id: it.laptop_id,
+              laptop_id: it.laptop_id, // aman — insertableItems sudah difilter cuma yang punya laptop_id
               serial_number: it.serial_number,
-              item_name: it.laptop_name,
+              laptop_name: it.laptop_name ?? it.serial_number, // kolom NOT NULL, fallback kalau lookup gagal
+              item_name: it.laptop_name ?? it.serial_number,
               quantity: 1,
               deal_price: perUnitPrice,
             }))
@@ -342,7 +392,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
           if (trxItemsError) throw trxItemsError;
         }
 
-         if (unitIds.length > 0) {
+        if (unitIds.length > 0) {
           // ── PENTING: status unit di sini HARUS "PACKING", BUKAN "SOLD" ──
           // "SOLD" baru boleh dipasang oleh /api/units/confirm-payment saat
           // dana marketplace benar-benar cair dan sales klik "Konfirmasi
@@ -382,10 +432,12 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
           .eq("id", order.id);
 
         order.transaction_invoice = invoice_number;
-      } catch (ecomErr) {
+      } catch (ecomErr: any) {
         // Penyiapan tetap dibuat walau link transaksi e-commerce gagal, biar
-        // SN yang sudah diinput sales tidak hilang — errornya dicatat saja.
+        // SN yang sudah diinput sales tidak hilang — tapi sekarang errornya
+        // juga dikirim ke response, tidak cuma dicatat di log server.
         console.error("[POST /api/preparation] gagal buat transaksi e-commerce:", ecomErr);
+        ecomWarning = `Penyiapan tersimpan, TAPI transaksi/stok e-commerce gagal dibuat otomatis (${ecomErr?.message ?? "unknown error"}). Cek manual di Data Barang & Riwayat Transaksi.`;
       }
     }
 
@@ -399,6 +451,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({
       success: true, data: order,
       message: `Penyiapan ${order_number} dibuat (${cleanItems.length} unit)`,
+      warning: ecomWarning, // ← null kalau tidak ada masalah; diisi kalau update status unit gagal/partial
     });
   } catch (err: any) {
     console.error("[POST /api/preparation]", err);
