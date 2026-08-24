@@ -202,7 +202,7 @@ const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashbo
 const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboard/employee-birthdays", icon: Icons.employeeBirthday };
 
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
-const ITEM_BUAT_PENGANTARAN: MenuItem = { name: "Buat Pengantaran", href: "/dashboard/preparation/buat-pengantaran", icon: Icons.buatPengantaran }; 
+const ITEM_BUAT_PENGANTARAN: MenuItem = { name: "Buat Pengantaran", href: "/dashboard/preparation/buat-pengantaran", icon: Icons.buatPengantaran };
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
 const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang?tab=laptops", icon: Icons.barang };
 const ITEM_AUDIT_OUTFLOW: MenuItem = { name: "Audit Barang Keluar", href: "/dashboard/audit-barang-keluar", icon: Icons.auditOutflow };
@@ -1342,7 +1342,8 @@ export default function Sidebar() {
   usePrepAlarm(isSilentAdmin ? [] : leadsChat.unreadUnacked.map((id) => ({ id })), ALARM_KEYS.LEADS_CHAT, !isSilentAdmin, 4000, notifSoundKey, notifCustomUrl);
 
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
-  const reminderUnread = useReminderBadge(user?.id);
+  // isSilentAdmin → pass null agar hook tidak fetch & tidak bunyi playReminderBeep()
+  const reminderUnread = useReminderBadge(isSilentAdmin ? null : user?.id);
   const onTanyaCeoPage = pathname.startsWith("/dashboard/tanya-ceo");
   const aiCeoEscalationCount = useEscalationBadge(user?.id, userRoles.some(r => AI_CEO_ROLES.includes(r as any)));
   const badges: Record<string, number> = {
