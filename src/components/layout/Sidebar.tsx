@@ -125,7 +125,7 @@ const Icons = {
   payment: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /><path d="M6 15h4" /></svg>),
   scanner: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8V6a2 2 0 012-2h2" /><path d="M16 4h2a2 2 0 012 2v2" /><path d="M20 16v2a2 2 0 01-2 2h-2" /><path d="M8 20H6a2 2 0 01-2-2v-2" /><path d="M4 12h16" /></svg>),
   logout: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H6a2 2 0 01-2-2V5a2 2 0 012-2h3" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>),
-  log: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3a1 1 0 011-1h4a1 1 0 011 1v1" /><path d="M9 13l2 2 4-4.5" /></svg>),
+  log: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3a1 1 0 011-1h4a1 1 0 011 1v1" /><path d="M9 13l2 2 4-4" /></svg>),
   loginLog: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 21h3a2 2 0 002-2V5a2 2 0 00-2-2h-3" /><path d="M8 17l-5-5 5-5" /><path d="M3 12h12" /></svg>),
   reports: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v16a2 2 0 002 2h16" /><rect x="7" y="13" width="3" height="5" rx="0.5" /><rect x="12" y="9" width="3" height="9" rx="0.5" /><rect x="17" y="6" width="3" height="12" rx="0.5" /></svg>),
   laptopReady: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M2 20h20" /><path d="M9 10l2 2 4-4" /></svg>),
@@ -159,7 +159,7 @@ const Icons = {
   missionAll: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 6l1.5 1.5L9 5" /><path d="M12 6h9" /><path d="M5 12l1.5 1.5L9 11" /><path d="M12 12h9" /><path d="M5 18l1.5 1.5L9 17" /><path d="M12 18h9" /></svg>),
   todo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="6" height="6" rx="1.2" /><path d="M4.5 7l1.2 1.2L7.5 6" /><rect x="3" y="14" width="6" height="6" rx="1.2" /><path d="M4.5 17l1.2 1.2L7.5 16" /><path d="M12 6h9M12 17h9" /></svg>),
   accounting: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 4.5c2.5-1 5.5-1 8 .3v14c-2.5-1.3-5.5-1.3-8-.3z" /><path d="M22 4.5c-2.5-1-5.5-1-8 .3v14c2.5-1.3 5.5-1.3 8-.3z" /></svg>),
-  patchNotes: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>),
+  patchNotes: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>),
   aiCeo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8z" /><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" /></svg>),
   tanyaCeo: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11a8 8 0 01-8.5 8 8.3 8.3 0 01-3.3-.7L3 20l1.7-3.8A8 8 0 1121 11z" /><path d="M12 8.5l.8 1.9L14.7 11l-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z" /></svg>),
   profile: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" /></svg>),
@@ -167,6 +167,7 @@ const Icons = {
   fingerprint: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 015 5v2" /><path d="M7 9V7a5 5 0 019.8-1.5" /><path d="M4.5 10.5V9a7.5 7.5 0 011-3.8" /><path d="M12 9v3.5a5.5 5.5 0 01-1.2 3.4" /><path d="M16 9v2.5c0 3-1 5.5-3 7" /><path d="M8.5 9v3c0 3.5-1 6-3 8" /><path d="M19.5 9v1.5c0 4.5-1.5 8-4 10.5" /></svg>),
   auditOutflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12l2 2 4-4" /></svg>),
   fixedAsset: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01" /></svg>),
+  assetMatot: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M4.5 4.5l15 15" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -206,7 +207,7 @@ const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dash
 const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang?tab=laptops", icon: Icons.barang };
 const ITEM_AUDIT_OUTFLOW: MenuItem = { name: "Audit Barang Keluar", href: "/dashboard/audit-barang-keluar", icon: Icons.auditOutflow };
 const ITEM_FIXED_ASSETS: MenuItem = { name: "Data Aset Tetap", href: "/dashboard/fixed-assets", icon: Icons.fixedAsset };
-const ITEM_ASET_MATOT: MenuItem = { name: "Aset Matot", href: "/dashboard/fixed-assets/aset-matot", icon: Icons.fixedAsset };
+const ITEM_ASET_MATOT: MenuItem = { name: "Aset Matot", href: "/dashboard/fixed-assets/aset-matot", icon: Icons.assetMatot };
 const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Barang Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
 const ITEM_LAPTOP_MINUS: MenuItem = { name: "Barang Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LAPTOP_MONITORING: MenuItem = { name: "Monitoring Stok", href: "/dashboard/laptops/monitoring", icon: Icons.laptopMonitoring };
@@ -898,7 +899,7 @@ function RoleBadges({ user }: { user: any }) {
       {roles.map((role) => {
         const meta = ROLE_META[role as UserRole];
         return (
-          <span key={role} className={`inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-gray-50 text-gray-700"}`}>
+          <span key={role} className={`inline-block text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-gray-50 text-gray-700"}`}>
             {meta?.label ?? role}
           </span>
         );
@@ -913,7 +914,7 @@ function NavItem({ item, isActive, onClick, badge, rail }: { item: MenuItem; isA
       href={item.href}
       onClick={onClick}
       title={rail ? item.name : undefined}
-      className={`group relative flex items-center rounded-xl text-sm font-medium outline-none transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2 hover:translate-x-0.5"} ${isActive ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20" : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"}`}
+      className={`group relative flex items-center rounded-xl text-sm font-medium tracking-[-0.005em] outline-none transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2 hover:translate-x-0.5"} ${isActive ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20" : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"}`}
     >
       {!rail && (
         <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-white transition-all duration-300 ease-out ${isActive ? "h-5 opacity-90" : "h-0 opacity-0"}`} />
@@ -967,12 +968,12 @@ function SidebarContent({
             <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-[#1a1a2e]">
               <img src="/assets/solit03.jpeg" alt="Solit" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
-            {!rail && <span className="text-sm font-bold text-[#1a1a2e] tracking-tight">Solit POS</span>}
+            {!rail && <span className="text-sm font-extrabold text-[#1a1a2e] tracking-[-0.01em]">Solit POS</span>}
           </div>
           <div className="flex items-center gap-1">
             {onToggleRail && (
               <button onClick={onToggleRail} className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition ${rail ? "mx-auto mt-2" : ""}`} title={rail ? "Perbesar sidebar" : "Perkecil sidebar"} aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" style={{ transform: rail ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ transform: rail ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
                   <polyline points="11 17 6 12 11 7" />
                   <polyline points="18 17 13 12 18 7" />
                 </svg>
@@ -980,7 +981,7 @@ function SidebarContent({
             )}
             {onClose && (
               <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition" aria-label="Tutup sidebar">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -1015,7 +1016,7 @@ function SidebarContent({
                 : initials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-800 truncate group-hover/profile:underline">{user?.name || "—"}</p>
+              <p className="text-sm font-semibold text-gray-800 tracking-tight truncate group-hover/profile:underline">{user?.name || "—"}</p>
               <RoleBadges user={user} />
             </div>
           </Link>
@@ -1046,7 +1047,7 @@ function SidebarContent({
             return (
               <div key={group.label} style={{ animation: "solitGroupIn 0.3s ease-out both", animationDelay: `${gi * 50}ms` }}>
                 <button onClick={() => onToggleGroup(group.label)} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition group/cat">
-                  <span className={`text-[10px] font-bold uppercase tracking-[0.07em] flex-1 text-left truncate ${hasActive ? "text-[#1a1a2e]" : "text-gray-400 group-hover/cat:text-gray-600"}`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-[0.08em] flex-1 text-left truncate ${hasActive ? "text-[#1a1a2e]" : "text-gray-400 group-hover/cat:text-gray-600"}`}>
                     {group.label}
                   </span>
                   {hasActive && !isOpen && <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse" />}
@@ -1368,7 +1369,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: "@keyframes solitNavIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } } @keyframes solitGroupIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } } @keyframes solitBadgePop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }" }} />
+      <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'); .solit-sidebar-scope, .solit-sidebar-scope * { font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif; font-feature-settings: 'cv02','cv03','cv04','cv11'; } @keyframes solitNavIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } } @keyframes solitGroupIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } } @keyframes solitBadgePop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }" }} />
 
       {!onAntrian && prep.menungguUnacked.length > 0 && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-full max-w-sm px-2">
@@ -1390,7 +1391,7 @@ export default function Sidebar() {
               aria-label="Tutup notifikasi"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
@@ -1416,7 +1417,7 @@ export default function Sidebar() {
               aria-label="Tutup notifikasi"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
@@ -1458,7 +1459,7 @@ export default function Sidebar() {
                 aria-label="Tutup notifikasi"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
@@ -1507,7 +1508,7 @@ export default function Sidebar() {
               aria-label="Tutup notifikasi"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
@@ -1515,7 +1516,7 @@ export default function Sidebar() {
       )}
 
       <button onClick={() => setOpen(true)} className="lg:hidden fixed top-0 left-0 z-50 w-12 h-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition" aria-label="Buka menu">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <line x1="3" y1="6" x2="21" y2="6" />
           <line x1="3" y1="12" x2="21" y2="12" />
           <line x1="3" y1="18" x2="21" y2="18" />
@@ -1524,11 +1525,11 @@ export default function Sidebar() {
 
       <div className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} onClick={() => setOpen(false)} aria-hidden="true" />
 
-      <aside className={`lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`solit-sidebar-scope lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <SidebarContent {...sharedContentProps} onClose={() => setOpen(false)} />
       </aside>
 
-      <aside style={{ width: rail ? RAIL_W : width, transition: dragging || !hydrated ? "none" : "width 0.2s ease-out" }} className="relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start">
+      <aside style={{ width: rail ? RAIL_W : width, transition: dragging || !hydrated ? "none" : "width 0.2s ease-out" }} className="solit-sidebar-scope relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start">
         <SidebarContent {...sharedContentProps} rail={rail} onToggleRail={toggleRail} />
         {!rail && (
           <div onMouseDown={startResize} className="absolute top-0 right-0 z-20 h-full w-1.5 cursor-col-resize group/resize" title="Geser untuk ubah lebar">
