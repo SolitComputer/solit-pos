@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers, Undo2, Sparkles } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers, Undo2, Sparkles, RefreshCw } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -48,6 +48,7 @@ interface JournalEntry {
     source_id: string | null;
     total: number;
     is_edited: boolean;
+    sync_available?: boolean;
     lines: JournalLine[];
     created_by_user?: { id: string; name: string } | null;
     updated_by_user?: { id: string; name: string } | null;
@@ -154,6 +155,7 @@ export default function JurnalUmum({ period }: { period: string }) {
     const [bulkBusy, setBulkBusy] = useState(false);
     const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
     const [showOnlyWarnings, setShowOnlyWarnings] = useState(false);
+    const [showOnlyOutOfSync, setShowOnlyOutOfSync] = useState(false);
     const [showSortSourceModal, setShowSortSourceModal] = useState(false);
     const [undoState, setUndoState] = useState<{ previousEntries: JournalEntry[]; batches: { date: string; orderedIds: string[] }[] } | null>(null);
     const [reorderingBusy, setReorderingBusy] = useState(false);
@@ -280,10 +282,26 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
     };
 
+    const handleSyncNominal = async (entry: JournalEntry) => {
+        if (!confirm(`Sinkronkan nominal jurnal "${entry.keterangan}" sesuai data sumber terbaru (Transaksi/Cashflow/Service)?`)) return;
+        setBusy(true);
+        try {
+            const res = await fetch(`/api/akutansi/jurnal/${entry.id}/sync`, { method: "POST" });
+            const json = await res.json();
+            if (!json.success) { setToast(json.message ?? "Gagal sinkronisasi"); return; }
+            setToast("Nominal jurnal disinkronkan");
+            await load(false);
+        } catch {
+            setToast("Koneksi bermasalah saat sinkronisasi");
+        } finally {
+            setBusy(false);
+        }
+    };
+
     // Reset display limit when period or filter changes
     useEffect(() => {
         setDisplayLimit(50);
-    }, [period, search, searchNominal, accountCodeFilter, showOnlyWarnings, sortOrder]);
+    }, [period, search, searchNominal, accountCodeFilter, showOnlyWarnings, showOnlyOutOfSync, sortOrder]);
 
     const toggleEntrySelected = useCallback((id: string) => {
         setSelectedEntryIds((prev) => {
@@ -683,9 +701,11 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
     }, [load]);
 
-    // Helper & hitung jumlah penanda (khusus entry yang ditandai manual lewat tombol Penanda di kolom AKSI)
     const hasWarning = useCallback((e: JournalEntry) => Boolean(e.has_warning), []);
     const warningCount = useMemo(() => entries.filter(hasWarning).length, [entries, hasWarning]);
+
+    const isOutOfSync = useCallback((e: JournalEntry) => Boolean(e.sync_available), []);
+    const outOfSyncCount = useMemo(() => entries.filter(isOutOfSync).length, [entries, isOutOfSync]);
 
     const filtered = useMemo(() => {
         const q = deferredSearch.trim().toLowerCase();
@@ -694,6 +714,10 @@ export default function JurnalUmum({ period }: { period: string }) {
 
         if (showOnlyWarnings) {
             result = result.filter(hasWarning);
+        }
+
+        if (showOnlyOutOfSync) {
+            result = result.filter(isOutOfSync);
         }
 
         if (q || qNom) {
@@ -720,7 +744,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         }
 
         return result;
-    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning]);
+    }, [entries, deferredSearch, deferredSearchNominal, accountCodeFilter, showOnlyWarnings, hasWarning, showOnlyOutOfSync, isOutOfSync]);
 
     const visibleEntries = useMemo(() => {
         return filtered.slice(0, displayLimit);
@@ -870,7 +894,7 @@ export default function JurnalUmum({ period }: { period: string }) {
         }, 0);
     }, [filtered, accountCodeFilter]);
 
-    const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || showOnlyWarnings;
+    const isFiltered = search.trim() !== "" || searchNominal.trim() !== "" || accountCodeFilter.size > 0 || showOnlyWarnings || showOnlyOutOfSync;
 
     useEffect(() => {
         if (!toast) return;
@@ -1075,6 +1099,24 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 )}
                             </button>
                             <button
+                                onClick={() => setShowOnlyOutOfSync((v) => !v)}
+                                title={showOnlyOutOfSync ? "Tampilkan semua data" : "Filter hanya data yang nominalnya berubah di sumber (Transaksi/Cashflow/Service)"}
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all duration-150 ${showOnlyOutOfSync
+                                    ? "bg-blue-600 text-white shadow-2xs font-bold ring-2 ring-blue-300"
+                                    : outOfSyncCount > 0
+                                        ? "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+                                        : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                                    }`}
+                            >
+                                <RefreshCw className={`w-3.5 h-3.5 ${showOnlyOutOfSync ? "text-white" : outOfSyncCount > 0 ? "text-blue-600" : "text-slate-400"}`} />
+                                <span>Nominal Berubah</span>
+                                {outOfSyncCount > 0 && (
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${showOnlyOutOfSync ? "bg-white/20 text-white" : "bg-blue-600 text-white"}`}>
+                                        {outOfSyncCount}
+                                    </span>
+                                )}
+                            </button>
+                            <button
                                 onClick={() => setShowSortSourceModal(true)}
                                 disabled={reorderingBusy || entries.length === 0}
                                 title="Rapikan urutan tiap tanggal: Manual → Service → Transaksi → Cashflow"
@@ -1176,7 +1218,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                 )}
 
                 {/* ── Filter akun / warning aktif — muncul kalau ada filter yang diaktifkan ── */}
-                {(accountCodeFilter.size > 0 || showOnlyWarnings) && (
+                {(accountCodeFilter.size > 0 || showOnlyWarnings || showOnlyOutOfSync) && (
                     <div className="flex flex-wrap items-center justify-between gap-2 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2">
                         <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Filter aktif:</span>
@@ -1186,6 +1228,14 @@ export default function JurnalUmum({ period }: { period: string }) {
                                     className="inline-flex items-center gap-1 text-[11px] font-bold bg-red-600 text-white px-2.5 py-0.5 rounded-full hover:bg-red-700 active:scale-95 transition-all duration-150 shadow-sm"
                                 >
                                     <AlertTriangle className="w-3 h-3 text-white" /> Penanda Only ({warningCount}) <X className="w-3 h-3" />
+                                </button>
+                            )}
+                            {showOnlyOutOfSync && (
+                                <button
+                                    onClick={() => setShowOnlyOutOfSync(false)}
+                                    className="inline-flex items-center gap-1 text-[11px] font-bold bg-blue-600 text-white px-2.5 py-0.5 rounded-full hover:bg-blue-700 active:scale-95 transition-all duration-150 shadow-sm"
+                                >
+                                    <RefreshCw className="w-3 h-3 text-white" /> Nominal Berubah Only ({outOfSyncCount}) <X className="w-3 h-3" />
                                 </button>
                             )}
                             {Array.from(accountCodeFilter).map((code) => (
@@ -1198,7 +1248,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                 </button>
                             ))}
                             <button
-                                onClick={() => { setAccountCodeFilter(new Set()); setShowOnlyWarnings(false); }}
+                                onClick={() => { setAccountCodeFilter(new Set()); setShowOnlyWarnings(false); setShowOnlyOutOfSync(false); }}
                                 className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 underline ml-1"
                             >
                                 Hapus semua
@@ -1395,6 +1445,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                 onEdit={setEditEntry}
                                                 onLog={setLogEntry}
                                                 onDelete={handleDelete}
+                                                onSync={handleSyncNominal}
                                                 onToggleChecked={toggleEntryChecked}
                                                 onUpdated={handleUpdated}
                                                 onToggleWarningState={handleToggleWarningState}
@@ -1407,7 +1458,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                             )}
                         </Droppable>
                     </DragDropContext>
-               </div>
+                </div>
             </div>
 
             {!loading && visibleEntries.length < filtered.length && (
@@ -1507,7 +1558,7 @@ function WarningToggle({
     const [reason, setReason] = useState("");
     const [busy, setBusy] = useState(false);
 
-       const computePos = () => {
+    const computePos = () => {
         const btn = btnRef.current;
         if (!btn) return;
         const rect = btn.getBoundingClientRect();
@@ -1603,7 +1654,7 @@ function WarningToggle({
                 </button>
                 {showPopover && popPos && (
                     <div
-                                              className="fixed z-[95] w-72 max-h-[80vh] overflow-y-auto bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
+                        className="fixed z-[95] w-72 max-h-[80vh] overflow-y-auto bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
                         style={{ top: popPos.top, left: popPos.left }}
                     >
                         <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-gray-100">
@@ -2217,6 +2268,7 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
         DELETE: "Dihapus",
         ACTIVATE: "Ditandai Bermasalah",
         DEACTIVATE: "Tanda Bermasalah Dicabut",
+        SYNC: "Disinkronkan dari Transaksi",
     };
 
     return (
@@ -2489,7 +2541,6 @@ function SortBySourceModal({ period, onClose, onConfirm, busy }: SortBySourceMod
     );
 }
 
-// ─── Journal Entry Row (Memoized for 60 FPS performance) ────────────────────
 interface JournalEntryRowProps {
     entry: JournalEntry;
     index: number;
@@ -2500,6 +2551,7 @@ interface JournalEntryRowProps {
     onEdit: (entry: JournalEntry) => void;
     onLog: (entry: JournalEntry) => void;
     onDelete: (entry: JournalEntry) => void;
+    onSync: (entry: JournalEntry) => void;
     onToggleChecked: (entry: JournalEntry, checked: boolean) => void;
     onUpdated: (showLoader?: boolean) => void;
     onToggleWarningState: (entryId: string, hasWarn: boolean) => void;
@@ -2516,6 +2568,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
     onEdit,
     onLog,
     onDelete,
+    onSync,
     onToggleChecked,
     onUpdated,
     onToggleWarningState,
@@ -2564,6 +2617,14 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
         () => validLinesForCheck.length > 0 && validLinesForCheck.every((l) => l.checked),
         [validLinesForCheck]
     );
+
+    const latestCheckedAt = useMemo(() => {
+        const timestamps = validLinesForCheck
+            .map((l) => l.checked_at)
+            .filter((t): t is string => Boolean(t));
+        if (timestamps.length === 0) return null;
+        return timestamps.reduce((max, t) => (t > max ? t : max));
+    }, [validLinesForCheck]);
 
     return (
         <Draggable draggableId={entry.id} index={index}>
@@ -2701,6 +2762,15 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                             >
                                                 <Pencil className="w-4 h-4" />
                                             </button>
+                                            {entry.sync_available && (
+                                                <button
+                                                    onClick={() => onSync(entry)}
+                                                    className="p-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-300 active:scale-90 transition-all duration-150"
+                                                    title="Nominal berubah di sumber (Transaksi/Cashflow/Service) — klik untuk sinkronkan"
+                                                >
+                                                    <RefreshCw className="w-4 h-4" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => onLog(entry)}
                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"
@@ -2725,7 +2795,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                 onClick={() => onToggleChecked(entry, !isEntryChecked)}
                                                 title={
                                                     isEntryChecked
-                                                        ? "Sudah dicek (Klik untuk batalkan)"
+                                                        ? `Sudah dicek pada ${fmtWaktu(latestCheckedAt ?? undefined)} (Klik untuk batalkan)`
                                                         : "Tandai sudah dicek"
                                                 }
                                                 className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${isEntryChecked
