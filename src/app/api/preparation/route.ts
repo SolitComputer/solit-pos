@@ -264,16 +264,37 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       try {
         // Resolve unit_id yang belum ada (SN diketik manual/scan barcode)
         // lewat serial_number, sama seperti pola resolve di GET /api/preparation.
+        //
+        // ── WAJIB pakai supabaseAdmin, BUKAN supabase biasa ─────────────────
+        // Kalau SELECT ini kena RLS dan balik kosong (silent, tanpa error),
+        // unit_id tidak pernah ke-resolve → unitIds jadi array kosong →
+        // blok update status PACKING di bawah otomatis DI-SKIP (bukan
+        // gagal — memang tidak dijalankan karena length-nya 0), dan seluruh
+        // proses tetap "sukses" tanpa error apa pun. Ini penyebab SN yang
+        // diketik manual tetap Siap Jual walau transaksinya sudah Packing.
         const missingSnItems = cleanItems.filter((it) => !it.unit_id && it.serial_number);
         if (missingSnItems.length > 0) {
-          const { data: matchedUnits } = await supabase
+          const { data: matchedUnits, error: resolveError } = await supabaseAdmin
             .from("laptop_units")
             .select("id, serial_number")
             .in("serial_number", missingSnItems.map((it) => it.serial_number));
+
+          if (resolveError) {
+            console.error("[POST /api/preparation] gagal resolve unit_id dari SN:", resolveError.message);
+          }
+
           const snToUnitId = new Map((matchedUnits ?? []).map((u: any) => [u.serial_number, u.id]));
           for (const it of missingSnItems) {
             const resolved = snToUnitId.get(it.serial_number);
             if (resolved) it.unit_id = resolved;
+          }
+
+          const stillUnresolved = missingSnItems.filter((it) => !it.unit_id);
+          if (stillUnresolved.length > 0) {
+            console.warn(
+              "[POST /api/preparation] SN berikut TIDAK ditemukan di laptop_units, unit_id tidak ke-resolve:",
+              stillUnresolved.map((it) => it.serial_number).join(", ")
+            );
           }
         }
 
