@@ -75,7 +75,23 @@ export default function PreparationSiapKirimPage() {
 
     useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
-    // Realtime: dengarkan UPDATE ke SIAP_KIRIM
+     // Realtime: dengarkan UPDATE ke SIAP_KIRIM
+    //
+    // ── FIX 408 "Terlalu banyak request" ────────────────────────────────
+    // Subscription ini tidak difilter kolom, jadi SEMUA perubahan di tabel
+    // preparation_orders ikut trigger fetchOrders() — termasuk update
+    // tracking_last_ping yang jalan tiap beberapa detik selama ADA SAJA
+    // pengantaran GPS aktif di order lain (tidak ada hubungannya dengan
+    // status SIAP_KIRIM). Tanpa debounce, tiap ping itu langsung memicu
+    // fetch baru ke /api/preparation, menumpuk jadi puluhan request per
+    // menit dan kena rate limiter backend. Sekarang beberapa event yang
+    // datang beruntun (dalam 1 detik) digabung jadi 1 kali fetchOrders().
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const debouncedFetchOrders = useCallback(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => { fetchOrders(); }, 1000);
+    }, [fetchOrders]);
+
     useEffect(() => {
         const channel = supabase
             .channel("prep-siap-kirim-realtime")
@@ -91,13 +107,16 @@ export default function PreparationSiapKirimPage() {
                     setNewIds(prev => { const n = new Set(prev); n.add(row.id); return n; });
                     setTimeout(() => setNewIds(prev => { const n = new Set(prev); n.delete(row.id); return n; }), 12000);
                 }
-                fetchOrders();
+                debouncedFetchOrders();
             })
-            .on("postgres_changes", { event: "INSERT", schema: "public", table: "preparation_orders" }, () => fetchOrders())
-            .on("postgres_changes", { event: "DELETE", schema: "public", table: "preparation_orders" }, () => fetchOrders())
+            .on("postgres_changes", { event: "INSERT", schema: "public", table: "preparation_orders" }, () => debouncedFetchOrders())
+            .on("postgres_changes", { event: "DELETE", schema: "public", table: "preparation_orders" }, () => debouncedFetchOrders())
             .subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, [showToast, fetchOrders, userId, silent]);
+        return () => {
+            supabase.removeChannel(channel);
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, [showToast, debouncedFetchOrders, userId, silent]);
 
     useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
