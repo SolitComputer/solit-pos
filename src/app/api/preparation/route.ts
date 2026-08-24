@@ -4,6 +4,8 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { PREPARATION_VIEW_ROLES, PREPARATION_CREATE_ROLES } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
 import { generateOrderNumber } from "@/lib/preparationOrderNumber";
+import { generateInvoice } from "@/lib/invoice";
+import { recalcLaptopParentQty } from "@/lib/laptopStock";
 
 // helper: "besok" dalam WIB (Vercel jalan di UTC)
 function tomorrowWIB(): string {
@@ -39,7 +41,7 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
     let query = supabase
       .from("preparation_orders")
       .select(
-       `*, preparation_items ( id, serial_number, laptop_name, laptop_id, is_checked, check_note, is_cancelled, cancel_reason )`,
+        `*, preparation_items ( id, serial_number, laptop_name, laptop_id, is_checked, check_note, is_cancelled, cancel_reason )`,
         { count: "exact" }
       )
       .order("created_at", { ascending: false });
@@ -142,7 +144,10 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
     const body = await req.json();
-    const { customer_name, customer_phone, notes, items, delivery_address, scheduled_delivery_date } = body;
+    const {
+      customer_name, customer_phone, notes, items, delivery_address, scheduled_delivery_date,
+      sales_channel, ecommerce_platform, deal_price,
+    } = body;
 
     if (!customer_name || !String(customer_name).trim()) {
       return NextResponse.json({ success: false, message: "Nama customer wajib diisi" }, { status: 400 });
@@ -162,6 +167,28 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     if (cleanItems.length === 0) {
       return NextResponse.json({ success: false, message: "Serial number tidak boleh kosong" }, { status: 400 });
+    }
+
+    // ── Channel penjualan: MANUAL (default) atau ECOMMERCE ──────────────────
+    // ECOMMERCE = order dari marketplace (Shopee/Tokopedia/TikTok/Lazada).
+    // Nominal (deal_price) WAJIB untuk MANUAL, OPSIONAL untuk ECOMMERCE.
+    const ECOMMERCE_PLATFORMS = ["SHOPEE", "TOKOPEDIA", "TIKTOK", "LAZADA"];
+    const salesChannel: "MANUAL" | "ECOMMERCE" = sales_channel === "ECOMMERCE" ? "ECOMMERCE" : "MANUAL";
+    const ecommercePlatform = salesChannel === "ECOMMERCE" ? String(ecommerce_platform ?? "").toUpperCase() : null;
+
+    if (salesChannel === "ECOMMERCE" && !ECOMMERCE_PLATFORMS.includes(ecommercePlatform ?? "")) {
+      return NextResponse.json(
+        { success: false, message: "Pilih e-commerce (Shopee/Tokopedia/TikTok/Lazada)" },
+        { status: 400 }
+      );
+    }
+
+    let dealPriceNum = Number(deal_price) || 0;
+    if (salesChannel === "MANUAL" && dealPriceNum <= 0) {
+      return NextResponse.json(
+        { success: false, message: "Nominal harga jual wajib diisi" },
+        { status: 400 }
+      );
     }
 
     // validasi jadwal antar — minimal besok (req 8)
@@ -198,6 +225,9 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         created_by: user.id,
         created_by_name: user.name,
         created_by_role: user.role,
+        sales_channel: salesChannel,           // ← baru: MANUAL | ECOMMERCE
+        ecommerce_platform: ecommercePlatform, // ← baru
+        deal_price: dealPriceNum,              // ← baru
       })
       .select()
       .single();
@@ -213,14 +243,125 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       throw itemsError;
     }
 
-      // ── SENGAJA TIDAK ADA update ke laptop_units di sini ──
+    // ── SENGAJA TIDAK ADA update ke laptop_units di sini untuk channel MANUAL ──
     // Dulu di titik ini status unit diubah SIAP_JUAL → DALAM_PENYIAPAN, itu
     // yang bikin unit hilang dari "Barang Siap Jual" tiap kali Sales bikin
     // Penyiapan. Sekarang dihapus total: unit_id tetap tersimpan di
     // preparation_items (untuk riwayat & pencarian), tapi laptop_units.status
-    // TIDAK PERNAH disentuh oleh alur Penyiapan. Stok Siap Jual baru
+    // TIDAK PERNAH disentuh oleh alur Penyiapan MANUAL. Stok Siap Jual baru
     // berkurang saat Transaksi (penjualan) benar-benar dibuat — lihat
     // transaction/create & units/confirm-payment.
+    //
+    // ── KECUALI channel ECOMMERCE ────────────────────────────────────────
+    // Order marketplace (Shopee/Tokopedia/TikTok/Lazada) dianggap sudah pasti
+    // laku begitu di-input, jadi langsung: (1) buat baris `transactions`
+    // berstatus "PACKING", (2) tandai laptop_units terkait jadi "SOLD" biar
+    // stok Siap Jual di Data Barang otomatis berkurang, (3) link invoice-nya
+    // ke preparation_orders ini — supaya muncul juga di Riwayat Transaksi &
+    // Riwayat Pending (keduanya sudah generic terhadap status PACKING).
+    if (salesChannel === "ECOMMERCE") {
+      try {
+        // Resolve unit_id yang belum ada (SN diketik manual/scan barcode)
+        // lewat serial_number, sama seperti pola resolve di GET /api/preparation.
+        const missingSnItems = cleanItems.filter((it) => !it.unit_id && it.serial_number);
+        if (missingSnItems.length > 0) {
+          const { data: matchedUnits } = await supabase
+            .from("laptop_units")
+            .select("id, serial_number")
+            .in("serial_number", missingSnItems.map((it) => it.serial_number));
+          const snToUnitId = new Map((matchedUnits ?? []).map((u: any) => [u.serial_number, u.id]));
+          for (const it of missingSnItems) {
+            const resolved = snToUnitId.get(it.serial_number);
+            if (resolved) it.unit_id = resolved;
+          }
+        }
+
+        const invoice_number = await generateInvoice();
+        const unitIds = cleanItems.map((it) => it.unit_id).filter(Boolean) as string[];
+        const serialNumbers = cleanItems.map((it) => it.serial_number).filter(Boolean);
+
+        const { error: trxError } = await supabase.from("transactions").insert({
+          invoice_number,
+          status: "PACKING",
+          customer_name: String(customer_name).trim(),
+          customer_phone: customer_phone ?? null,
+          laptop_name: cleanItems.length === 1 ? cleanItems[0].laptop_name : `${cleanItems.length} Laptop`,
+          serial_number: cleanItems.length === 1 ? cleanItems[0].serial_number : null,
+          serial_numbers: serialNumbers,
+          unit_id: unitIds.length === 1 ? unitIds[0] : null,
+          unit_ids: unitIds,
+          laptop_id: cleanItems.length === 1 ? cleanItems[0].laptop_id : null,
+          deal_price: dealPriceNum,
+          amount: dealPriceNum,
+          dp_amount: 0,
+          payment_method: "E-COMMERCE",
+          source_platform: ecommercePlatform,
+          item_kind: "laptop",
+          notes: notes ?? null,
+          sales_id: user.id,
+          sales_name: user.name,
+        });
+        if (trxError) throw trxError;
+
+        if (cleanItems.length > 0) {
+          const perUnitPrice = cleanItems.length > 1 ? Math.round(dealPriceNum / cleanItems.length) : dealPriceNum;
+          const { error: trxItemsError } = await supabase.from("transaction_items").insert(
+            cleanItems.map((it) => ({
+              invoice_number,
+              item_type: "laptop",
+              unit_id: it.unit_id,
+              laptop_id: it.laptop_id,
+              serial_number: it.serial_number,
+              item_name: it.laptop_name,
+              quantity: 1,
+              deal_price: perUnitPrice,
+            }))
+          );
+          if (trxItemsError) throw trxItemsError;
+        }
+
+        if (unitIds.length > 0) {
+          // ── PENTING: status unit di sini HARUS "PACKING", BUKAN "SOLD" ──
+          // "SOLD" baru boleh dipasang oleh /api/units/confirm-payment saat
+          // dana marketplace benar-benar cair dan sales klik "Konfirmasi
+          // Lunas". Kalau di sini langsung "SOLD", nanti confirm-payment akan
+          // MENOLAK proses pelunasan dengan pesan "sudah terjual lewat
+          // transaksi lain" (lihat guard `unit.status === "SOLD"` di sana),
+          // padahal itu transaksi yang sama — prosesnya jadi macet permanen.
+          //
+          // Status "PACKING" di level unit sudah jadi konvensi resmi sistem
+          // ini (lihat LaptopsContent.tsx: PACKING tidak dihitung di
+          // stok_tersedia, tapi dihitung di belum_lunas) — otomatis mengurangi
+          // stok tersedia di Data Barang, tanpa memblokir pelunasan nanti.
+          await supabase.from("laptop_units").update({ status: "PACKING" }).in("id", unitIds);
+
+          // ── Sinkronkan cache qty/status di tabel `laptops` ──────────────
+          // Data Barang (LaptopsContent.tsx) sendiri sudah otomatis berkurang
+          // stoknya karena dia hitung ulang langsung dari laptop_units tiap
+          // fetch — tapi kolom cache di tabel `laptops` (dipakai halaman lain
+          // seperti Ready to Sell / situs publik) perlu di-recalc manual,
+          // sama seperti pola di api/laptops/[id]/units/route.ts setelah
+          // CRUD unit.
+          const { data: packingUnits } = await supabase
+            .from("laptop_units")
+            .select("laptop_id")
+            .in("id", unitIds);
+          const affectedLaptopIds = [...new Set((packingUnits ?? []).map((u: any) => u.laptop_id).filter(Boolean))] as string[];
+          await Promise.allSettled(affectedLaptopIds.map((lid) => recalcLaptopParentQty(supabase, lid)));
+        }
+
+        await supabase
+          .from("preparation_orders")
+          .update({ transaction_invoice: invoice_number, transaction_linked_at: new Date().toISOString() })
+          .eq("id", order.id);
+
+        order.transaction_invoice = invoice_number;
+      } catch (ecomErr) {
+        // Penyiapan tetap dibuat walau link transaksi e-commerce gagal, biar
+        // SN yang sudah diinput sales tidak hilang — errornya dicatat saja.
+        console.error("[POST /api/preparation] gagal buat transaksi e-commerce:", ecomErr);
+      }
+    }
 
     await logActivity({
       userId: user.id, userName: user.name, userRole: user.role,

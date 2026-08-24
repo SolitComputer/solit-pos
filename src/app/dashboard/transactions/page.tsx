@@ -189,6 +189,7 @@ function getSourcePlatformBadge(platform: string): { text: string; color: string
   const p = (platform ?? "").toUpperCase();
   if (p.includes("SHOPEE")) return { text: " Shopee", color: "bg-orange-50 text-orange-700 ring-1 ring-orange-200" };
   if (p.includes("TOKOPEDIA")) return { text: " Toped", color: "bg-green-50 text-green-700 ring-1 ring-green-200" };
+  if (p.includes("LAZADA")) return { text: " Lazada", color: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" };
   if (p.includes("COD") || p.includes("CASH ON DELIVERY")) return { text: " COD", color: "bg-blue-50 text-blue-700 ring-1 ring-blue-200" };
   if (p.includes("ADS INSTAGRAM")) return { text: " Ads IG", color: "bg-pink-50 text-pink-700 ring-1 ring-pink-200" };
   if (p.includes("ADS FACEBOOK")) return { text: " Ads FB", color: "bg-violet-50 text-violet-700 ring-1 ring-violet-200" };
@@ -321,7 +322,7 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
           <p className="font-semibold text-white text-sm">Pembayaran</p>
           <p className="text-xs text-white/60 mt-0.5 font-mono">{item.invoice_number}</p>
         </div>
-       <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4">
           {/* ── REVISI: Ringkasan transaksi selalu tampil — sebelumnya modal ini
                kosong untuk status non-RESERVED (HELD/PACKING/PENDING) karena semua
                konten di bawah cuma tampil kalau isReserved ── */}
@@ -398,7 +399,7 @@ function ConfirmPaymentModal({ item, confirmSN, setConfirmSN, confirmError, setC
             </div>
           )}
 
-         {/* ── REVISI: Foto bukti pembayaran wajib diisi setiap konfirmasi lewat
+          {/* ── REVISI: Foto bukti pembayaran wajib diisi setiap konfirmasi lewat
                tombol centang di Riwayat Transaksi ── */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -626,7 +627,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING" || item.status === "PENDING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
- const handleConfirmPayment = async () => {
+  const handleConfirmPayment = async () => {
     if (!confirmPhoto) { setConfirmError("Foto bukti pembayaran wajib diupload"); return; }
 
     const isCicilan = item.status === "RESERVED" && payMode === "CICILAN";
@@ -944,7 +945,7 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
 
       {alertModal && <AlertModal message={alertModal} onClose={() => setAlertModal(null)} />}
       {showRestoreModal && <RestoreModal item={item} isPending={isPending} restoring={restoring} onConfirm={handleRestore} onClose={() => setShowRestoreModal(false)} />}
-     {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} confirmPhoto={confirmPhoto} setConfirmPhoto={setConfirmPhoto} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
+      {showConfirmModal && <ConfirmPaymentModal item={item} confirmSN={confirmSN} setConfirmSN={setConfirmSN} confirmError={confirmError} setConfirmError={setConfirmError} confirming={confirming} payMode={payMode} setPayMode={setPayMode} cicilanAmount={cicilanAmount} setCicilanAmount={setCicilanAmount} confirmPhoto={confirmPhoto} setConfirmPhoto={setConfirmPhoto} onConfirm={handleConfirmPayment} onClose={() => setShowConfirmModal(false)} />}
     </div>
   );
 }
@@ -1165,7 +1166,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
   const datePart = formatDate(item.created_at);
   const timePart = new Date(item.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
- const renderLaptopCell = () => {
+  const renderLaptopCell = () => {
     const grouped: any[] = item.grouped_items ?? [];
     const accs: any[] = item.accessory_items ?? [];
 
@@ -2173,38 +2174,38 @@ export default function Page() {
 
         {/* ── Header ── */}
         <div>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 bg-[#0f0c29] rounded-xl flex items-center justify-center shadow-lg shadow-[#0f0c29]/25 flex-shrink-0">
-              <Receipt className="w-4.5 h-4.5 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-lg sm:text-xl font-black text-[#0f0c29] leading-none tracking-tight">Riwayat Transaksi</h1>
-              <p className="text-xs text-gray-400 mt-1">Kelola dan pantau semua transaksi</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {!isLoading && (
-              <div className="flex items-center gap-1.5 bg-gray-100 px-3 h-9 rounded-xl">
-                <span className="text-xs font-bold text-[#0f0c29] tabular-nums">{totalCount}</span>
-                <span className="text-xs text-gray-400">transaksi</span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 bg-[#0f0c29] rounded-xl flex items-center justify-center shadow-lg shadow-[#0f0c29]/25 flex-shrink-0">
+                <Receipt className="w-4.5 h-4.5 text-white" />
               </div>
-            )}
-            {!isLoading && totalCount > 0 && (
-              <button
-                onClick={handleExportExcel} disabled={isExporting}
-                className="inline-flex items-center gap-1.5 px-3 h-9 bg-white border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {isExporting ? (
-                  <><svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Export... {exportProgress}%</>) : (
-                  <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><polyline points="8 13 12 17 16 13" /><line x1="12" y1="17" x2="12" y2="11" /></svg>Export Excel</>
-                )}
-              </button>
-            )}
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-black text-[#0f0c29] leading-none tracking-tight">Riwayat Transaksi</h1>
+                <p className="text-xs text-gray-400 mt-1">Kelola dan pantau semua transaksi</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {!isLoading && (
+                <div className="flex items-center gap-1.5 bg-gray-100 px-3 h-9 rounded-xl">
+                  <span className="text-xs font-bold text-[#0f0c29] tabular-nums">{totalCount}</span>
+                  <span className="text-xs text-gray-400">transaksi</span>
+                </div>
+              )}
+              {!isLoading && totalCount > 0 && (
+                <button
+                  onClick={handleExportExcel} disabled={isExporting}
+                  className="inline-flex items-center gap-1.5 px-3 h-9 bg-white border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isExporting ? (
+                    <><svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Export... {exportProgress}%</>) : (
+                    <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><polyline points="8 13 12 17 16 13" /><line x1="12" y1="17" x2="12" y2="11" /></svg>Export Excel</>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="mt-3 h-px bg-gradient-to-r from-[#b8935a]/50 via-gray-200 to-transparent" />
+          <div className="mt-3 h-px bg-gradient-to-r from-[#b8935a]/50 via-gray-200 to-transparent" />
         </div>
 
         {/* ── Deep-link banner ── */}
