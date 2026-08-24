@@ -9,10 +9,15 @@ import {
   isBalanced,
   isValidPeriod,
   cleanManualLines,
+  linesEqual,
   periodFromDate,
   totalOf,
 } from "@/lib/accounting";
-import { draftToLineRows, getTransactionMetaByInvoices } from "@/lib/accountingSource";
+import {
+  draftToLineRows,
+  getTransactionMetaByInvoices,
+  getTransactionSyncDraftsByInvoices,
+} from "@/lib/accountingSource";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -77,11 +82,32 @@ export const GET = withAuth(async (req) => {
     ),
   ];
 
-  const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
+    const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
+
+  const isKasShapedEntry = (e: any) =>
+    (e.lines ?? []).some(
+      (l: any) => l.side === "DEBIT" && (l.account_code === AKUN.KAS_SALDO || l.account_code === AKUN.KAS_CASH)
+    );
+
+  const primaryTrxInvoiceNumbers = [
+    ...new Set(
+      entries
+        .filter(
+          (e: any) =>
+            e.source_type === "TRANSACTION" &&
+            e.source_id &&
+            !(e.source_id as string).includes("__") &&
+            isKasShapedEntry(e)
+        )
+        .map((e: any) => e.source_id as string)
+    ),
+  ];
+
+  const syncDraftMap = await getTransactionSyncDraftsByInvoices(supabase, primaryTrxInvoiceNumbers);
 
   const entriesWithMeta = entries.map((e: any) => {
     if (e.source_type !== "TRANSACTION" || !e.source_id) {
-      return { ...e, trx_meta: null };
+      return { ...e, trx_meta: null, sync_available: false };
     }
     const baseInvoice = (e.source_id as string).split("__")[0];
     const baseMeta = trxMetaMap.get(baseInvoice) ?? null;
@@ -90,12 +116,17 @@ export const GET = withAuth(async (req) => {
     );
     const hasModalLine = (e.lines ?? []).some((l: any) => l.account_code === AKUN.HPP);
     const modalAddressed = hasModalLine || e.is_edited === true;
+
+    const syncDraft = syncDraftMap.get(e.source_id as string);
+    const syncAvailable = !!syncDraft && !linesEqual(e.lines ?? [], syncDraft.lines);
+
     return {
       ...e,
       trx_meta: {
         ...(baseMeta ?? {}),
         modal_missing: isRevenueEntry && !modalAddressed,
       },
+      sync_available: syncAvailable,
     };
   });
 
