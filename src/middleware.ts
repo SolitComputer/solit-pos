@@ -586,7 +586,7 @@ export async function middleware(request: NextRequest) {
     hasRouteAccess = true;
   }
 
- if (!hasRouteAccess) {
+  if (!hasRouteAccess) {
     if (!isPageRoute) {
       return NextResponse.json(
         { success: false, message: "Forbidden: role Anda tidak punya akses ke endpoint ini" },
