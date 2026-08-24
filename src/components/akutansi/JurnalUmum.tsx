@@ -2703,11 +2703,6 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                         <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Modal Rp0
                                                     </span>
                                                 )}
-                                                {entry.sync_available && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 inline-flex items-center gap-1 shrink-0" title="Data sumber berubah (Transaksi/Cashflow/Service) — nominal jurnal belum sinkron">
-                                                        <RefreshCw className="w-2.5 h-2.5 text-blue-600" /> Nominal Berubah
-                                                    </span>
-                                                )}
                                             </div>
                                             <div className="text-sm font-bold text-gray-900 mt-1 mb-0.5 leading-snug">
                                                 {entry.keterangan}
@@ -2767,11 +2762,11 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                             >
                                                 <Pencil className="w-4 h-4" />
                                             </button>
-                                            {entry.source_type === "TRANSACTION" && entry.sync_available && (
+                                            {entry.sync_available && (
                                                 <button
                                                     onClick={() => onSync(entry)}
-                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"
-                                                    title="Sinkronkan nominal sesuai data transaksi terbaru"
+                                                    className="p-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-300 active:scale-90 transition-all duration-150"
+                                                    title="Nominal berubah di sumber (Transaksi/Cashflow/Service) — klik untuk sinkronkan"
                                                 >
                                                     <RefreshCw className="w-4 h-4" />
                                                 </button>
