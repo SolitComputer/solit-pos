@@ -134,7 +134,8 @@ export async function GET(request: Request) {
       .from("overtime_requests")
       .update({ status: "NEED_PROOF", updated_at: new Date().toISOString() })
       .eq("status", "COMPLETED")
-      .is("proof_photo_url", null);
+      .is("proof_photo_url", null)
+      .abortSignal(AbortSignal.timeout(8000));
 
     // ── Server-side auto-complete overtime yang melewati scheduled_end ─────
     const now = new Date().toISOString();
@@ -143,7 +144,8 @@ export async function GET(request: Request) {
       .select("id, user_id, actual_start, scheduled_end, rate_per_hour")
       .eq("status", "ONGOING")
       .not("scheduled_end", "is", null)
-      .lt("scheduled_end", now);
+      .lt("scheduled_end", now)
+      .abortSignal(AbortSignal.timeout(8000));
 
     if (expiredOvertimes && expiredOvertimes.length > 0) {
       for (const expired of expiredOvertimes) {
@@ -167,7 +169,8 @@ export async function GET(request: Request) {
             auto_completed: true,
             updated_at: now,
           })
-          .eq("id", expired.id);
+          .eq("id", expired.id)
+          .abortSignal(AbortSignal.timeout(8000));
 
         console.log(`[SERVER AUTO-COMPLETE] ${expired.id} → NEED_PROOF, actual_end: ${actualEnd}`);
       }
@@ -238,7 +241,7 @@ export async function GET(request: Request) {
       q = q.eq("user_id", user.id);
     }
 
-    const { data: overtimes, error } = await q;
+    const { data: overtimes, error } = await q.abortSignal(AbortSignal.timeout(8000));
     if (error) {
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }

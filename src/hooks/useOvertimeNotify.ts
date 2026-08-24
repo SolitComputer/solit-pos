@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { startJitteredPolling } from "@/lib/pollingScheduler";
 
 export interface PendingOvertimeItem {
   id: string;
@@ -31,7 +32,7 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
     // Skip fetch saat tab hidden — hemat request
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
     try {
-      const res = await fetch("/api/attendance/overtime/pending-acc");
+      const res = await fetch("/api/attendance/overtime/pending-acc", { signal: AbortSignal.timeout(8000) });
       const d = await res.json();
       if (d.success) {
         const items: PendingOvertimeItem[] = d.data || [];
@@ -56,7 +57,8 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
 
   useEffect(() => {
     fetchPending();
-    const id = setInterval(fetchPending, POLL_MS);
+    // jitter → hindari semua client nembak di detik yang sama
+    const stop = startJitteredPolling(fetchPending, POLL_MS);
 
     // Saat tab kembali visible, langsung fetch (bukan nunggu interval berikutnya)
     const onVisible = () => {
@@ -65,7 +67,7 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      clearInterval(id);
+      stop();
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [fetchPending]);

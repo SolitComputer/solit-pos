@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/services/supabase";
 import { playReminderBeep } from "@/lib/reminderSound";
+import { startJitteredPolling } from "@/lib/pollingScheduler";
 
 export interface CeoReminderItem {
   id: string;
@@ -25,7 +26,7 @@ export function useCeoReminderNotify(userId?: string | null) {
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
     inFlightRef.current = true;
     try {
-      const res = await fetch("/api/ai-assistant/reminders", { cache: "no-store" });
+      const res = await fetch("/api/ai-assistant/reminders", { cache: "no-store", signal: AbortSignal.timeout(8000) });
       const json = await res.json();
       if (json.success) {
         const rows: CeoReminderItem[] = json.data ?? [];
@@ -52,7 +53,8 @@ export function useCeoReminderNotify(userId?: string | null) {
   useEffect(() => {
     if (!userId) return;
     load();
-    const interval = setInterval(load, 60_000); // 60s fallback, primary updates come from Realtime
+    // 60–75s + jitter → client tidak sinkron nembak di detik yang sama (fallback; primary via Realtime)
+    const stopPoll = startJitteredPolling(load, 60_000);
 
     const onVisible = () => {
       if (document.visibilityState === "visible") load();
@@ -77,7 +79,7 @@ export function useCeoReminderNotify(userId?: string | null) {
       .subscribe();
 
     return () => {
-      clearInterval(interval);
+      stopPoll();
       document.removeEventListener("visibilitychange", onVisible);
       supabase.removeChannel(channel);
     };

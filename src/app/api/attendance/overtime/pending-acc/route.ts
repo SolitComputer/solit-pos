@@ -74,7 +74,7 @@ export async function GET() {
       query = query.in("user_id", allowedUserIds);
     }
 
-    const { data, error } = await query;
+    const { data, error } = await query.abortSignal(AbortSignal.timeout(8000));
     if (error) {
       console.error("[pending-acc] query overtime_requests error:", error.message);
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
