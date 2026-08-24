@@ -82,7 +82,7 @@ const TOOL_THINKING_LABEL: Record<string, string> = {
 };
 const DEFAULT_THINKING_LABEL = "Memikirkan jawaban...";
 
-function UsageBar({ counts, blocked, tokens, limits }: { counts: Record<string, number>; blocked: Record<string, boolean>; tokens: Record<string, { prompt: number; completion: number; total: number }>; limits?: ProviderUsageStatus | null }) {
+function UsagePopover({ counts, blocked, tokens, limits }: { counts: Record<string, number>; blocked: Record<string, boolean>; tokens: Record<string, { prompt: number; completion: number; total: number }>; limits?: ProviderUsageStatus | null }) {
     const deepseek = counts.deepseek ?? 0;
     const gemini = counts.gemini ?? 0;
     const groq = counts.groq ?? 0;
@@ -92,59 +92,108 @@ function UsageBar({ counts, blocked, tokens, limits }: { counts: Record<string, 
     const geminiPct = total > 0 ? Math.round((gemini / total) * 100) : 0;
     const groqPct = total > 0 ? Math.max(0, 100 - deepseekPct - geminiPct) : 0;
 
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    // Tutup popover saat klik di luar
+    useEffect(() => {
+        if (!open) return;
+        const onDown = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener("mousedown", onDown);
+        return () => document.removeEventListener("mousedown", onDown);
+    }, [open]);
+
+    const anyBlocked = Boolean(
+        blocked?.deepseek || blocked?.gemini || blocked?.groq ||
+        limits?.deepseek.blocked || limits?.groq.blocked || limits?.gemini.blocked
+    );
+
+    const rows = [
+        { key: "deepseek", label: "DeepSeek", count: deepseek, pct: deepseekPct, color: PROVIDER_COLOR.deepseek, cooldown: blocked?.deepseek, token: tokens.deepseek?.total ?? 0 },
+        { key: "gemini", label: "Gemini", count: gemini, pct: geminiPct, color: PROVIDER_COLOR.gemini, cooldown: blocked?.gemini, token: tokens.gemini?.total ?? 0 },
+        { key: "groq", label: "Groq", count: groq, pct: groqPct, color: PROVIDER_COLOR.groq, cooldown: blocked?.groq, token: tokens.groq?.total ?? 0 },
+    ];
+
+    // Segmen distribusi dipakai di trigger & di dalam popover
+    const DistBar = ({ h }: { h: string }) => (
+        <div className={`flex ${h} rounded-full overflow-hidden bg-gray-200`}>
+            {deepseek > 0 && <div style={{ width: `${deepseekPct}%`, backgroundColor: PROVIDER_COLOR.deepseek }} />}
+            {gemini > 0 && <div style={{ width: `${geminiPct}%`, backgroundColor: PROVIDER_COLOR.gemini }} />}
+            {groq > 0 && <div style={{ width: `${groqPct}%`, backgroundColor: PROVIDER_COLOR.groq }} />}
+        </div>
+    );
+
     return (
-        <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-700">
-            <div className="flex flex-col gap-0.5 min-w-[110px] sm:min-w-[150px]">
-                <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-gray-600">
-                    <span className="flex items-center gap-1">
-                        <Activity className="w-3 h-3 text-[#1a1a2e]" />
-                        <span>Distribusi AI</span>
-                    </span>
-                    <span className="text-[#1a1a2e] font-bold">{total} pesan</span>
+        <div className="relative" ref={ref}>
+            <button
+                onClick={() => setOpen((v) => !v)}
+                className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs text-gray-700 transition"
+                title="Detail pemakaian AI"
+            >
+                <Activity className="w-3.5 h-3.5 text-[#1a1a2e] flex-shrink-0" />
+                <div className="hidden sm:block w-14">
+                    <DistBar h="h-1.5" />
                 </div>
-                <div className="flex h-1.5 rounded-full overflow-hidden bg-gray-200">
-                    {deepseek > 0 && <div style={{ width: `${deepseekPct}%`, backgroundColor: PROVIDER_COLOR.deepseek }} />}
-                    {gemini > 0 && <div style={{ width: `${geminiPct}%`, backgroundColor: PROVIDER_COLOR.gemini }} />}
-                    {groq > 0 && <div style={{ width: `${groqPct}%`, backgroundColor: PROVIDER_COLOR.groq }} />}
-                </div>
-            </div>
+                <span className="font-semibold whitespace-nowrap">
+                    <strong className="text-[#1a1a2e]">{total}</strong>
+                    <span className="hidden sm:inline text-gray-500 font-medium"> pesan</span>
+                </span>
+                {anyBlocked && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" title="Ada provider cooldown / kuota habis" />}
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
 
-            <div className="hidden sm:flex items-center gap-2 text-[10px] text-gray-500 font-medium pl-2 border-l border-gray-200">
-                <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.deepseek }} />
-                    DeepSeek: <strong className="text-gray-800">{deepseek}</strong> ({deepseekPct}%)
-                    {blocked?.deepseek && <span className="text-amber-600 font-bold">· Cooldown</span>}
-                </span>
-                <span className="flex items-center gap-1 pl-2 border-l border-gray-200">
-                    <span className="text-gray-400">Token DeepSeek:</span>
-                    <strong className="text-gray-800">{(tokens.deepseek?.total ?? 0).toLocaleString("id-ID")}</strong>
-                </span>
-                <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.gemini }} />
-                    Gemini: <strong className="text-gray-800">{gemini}</strong> ({geminiPct}%)
-                    {blocked?.gemini && <span className="text-amber-600 font-bold">· Cooldown</span>}
-                </span>
-                <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PROVIDER_COLOR.groq }} />
-                    Groq: <strong className="text-gray-800">{groq}</strong> ({groqPct}%)
-                    {blocked?.groq && <span className="text-amber-600 font-bold">· Cooldown</span>}
-                </span>
-            </div>
+            {open && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl border border-gray-200 shadow-lg p-3 z-50 text-xs">
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
+                        <span className="flex items-center gap-1.5 font-bold text-[#1a1a2e]">
+                            <Activity className="w-3.5 h-3.5" /> Distribusi AI
+                        </span>
+                        <span className="text-gray-500 font-semibold">{total} pesan</span>
+                    </div>
 
-            {limits && (
-                <div className="hidden md:flex items-center gap-2.5 text-[10px] font-medium pl-2 border-l border-gray-200">
-                    <span className={`flex items-center gap-1 ${limits.deepseek.blocked ? "text-rose-600 font-bold" : "text-gray-500"}`}>
-                        Saldo DeepSeek: <strong>${limits.deepseek.toppedUpBalance.toFixed(2)}</strong>
-                        {limits.deepseek.blocked && <span>· Habis</span>}
-                    </span>
-                    <span className={`flex items-center gap-1 ${limits.groq.blocked ? "text-rose-600 font-bold" : "text-gray-500"}`}>
-                        Kuota Groq: <strong>{limits.groq.remainingRequests ?? "-"}</strong> req
-                        {limits.groq.blocked && <span>· Habis</span>}
-                    </span>
-                    <span className={`flex items-center gap-1 ${limits.gemini.blocked ? "text-rose-600 font-bold" : "text-gray-500"}`}>
-                        Budget Gemini: <strong>{limits.gemini.percentUsed}%</strong>
-                        {limits.gemini.blocked && <span>· Habis</span>}
-                    </span>
+                    <div className="mb-3"><DistBar h="h-2" /></div>
+
+                    <div className="space-y-1.5">
+                        {rows.map((r) => (
+                            <div key={r.key} className="flex items-center justify-between">
+                                <span className="flex items-center gap-1.5 font-medium text-gray-700">
+                                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
+                                    {r.label}
+                                    {r.cooldown && <span className="text-amber-600 font-bold text-[10px]">· Cooldown</span>}
+                                </span>
+                                <span className="flex items-center gap-2 text-gray-500">
+                                    <span><strong className="text-gray-800">{r.count}</strong> ({r.pct}%)</span>
+                                    <span className="text-gray-400">{r.token.toLocaleString("id-ID")} tok</span>
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {limits && (
+                        <div className="mt-3 pt-2 border-t border-gray-100 space-y-1.5">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Sisa Kuota</div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-600">Saldo DeepSeek</span>
+                                <span className={limits.deepseek.blocked ? "text-rose-600 font-bold" : "text-gray-800 font-semibold"}>
+                                    ${limits.deepseek.toppedUpBalance.toFixed(2)}{limits.deepseek.blocked && " · Habis"}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-600">Kuota Groq</span>
+                                <span className={limits.groq.blocked ? "text-rose-600 font-bold" : "text-gray-800 font-semibold"}>
+                                    {limits.groq.remainingRequests ?? "-"} req{limits.groq.blocked && " · Habis"}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-600">Budget Gemini</span>
+                                <span className={limits.gemini.blocked ? "text-rose-600 font-bold" : "text-gray-800 font-semibold"}>
+                                    {limits.gemini.percentUsed}%{limits.gemini.blocked && " · Habis"}
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -536,9 +585,9 @@ export default function AiCeoWorkspace() {
                             </div>
                         </div>
 
-                        {/* Directly Visible Pemakaian Token / Message Usage Bar */}
-                        <div className="flex items-center gap-2">
-                            <UsageBar counts={usage} blocked={providerBlocked} tokens={tokens} limits={limits} />
+                        {/* Ringkasan pemakaian AI — ringkas di header, detail di popover */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <UsagePopover counts={usage} blocked={providerBlocked} tokens={tokens} limits={limits} />
                         </div>
                     </header>
 
