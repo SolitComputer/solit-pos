@@ -2585,6 +2585,14 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
         [validLinesForCheck]
     );
 
+    const latestCheckedAt = useMemo(() => {
+        const timestamps = validLinesForCheck
+            .map((l) => l.checked_at)
+            .filter((t): t is string => Boolean(t));
+        if (timestamps.length === 0) return null;
+        return timestamps.reduce((max, t) => (t > max ? t : max));
+    }, [validLinesForCheck]);
+
     return (
         <Draggable draggableId={entry.id} index={index}>
             {(provided, snapshot) => (
@@ -2759,7 +2767,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                 onClick={() => onToggleChecked(entry, !isEntryChecked)}
                                                 title={
                                                     isEntryChecked
-                                                        ? "Sudah dicek (Klik untuk batalkan)"
+                                                        ? `Sudah dicek pada ${fmtWaktu(latestCheckedAt ?? undefined)} (Klik untuk batalkan)`
                                                         : "Tandai sudah dicek"
                                                 }
                                                 className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${isEntryChecked
