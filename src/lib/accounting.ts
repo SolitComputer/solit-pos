@@ -258,6 +258,32 @@ export function cleanManualLines(lines: DraftLine[]): DraftLine[] {
   return lines.filter((l) => Number.isFinite(Number(l.nominal)) && Number(l.nominal) >= 0).map((l) => ({ ...l }));
 }
 
+/** Bandingkan 2 kumpulan baris jurnal (abaikan urutan) — dipakai fitur
+ *  Sinkronisasi Nominal untuk mendeteksi apakah baris yang tersimpan di DB
+ *  masih sama persis dengan draft yang dihitung ulang dari data sumber. */
+export function linesEqual(
+  a: { account_code: string; side: string; nominal: number }[],
+  b: { account_code: string; side: string; nominal: number }[]
+): boolean {
+  const toMap = (lines: typeof a) => {
+    const m = new Map<string, number>();
+    for (const l of lines) {
+      const nominal = Math.round(Number(l.nominal || 0));
+      if (nominal <= 0) continue;
+      const key = `${l.side}:${l.account_code}`;
+      m.set(key, (m.get(key) ?? 0) + nominal);
+    }
+    return m;
+  };
+  const mapA = toMap(a);
+  const mapB = toMap(b);
+  if (mapA.size !== mapB.size) return false;
+  for (const [key, val] of mapA) {
+    if (mapB.get(key) !== val) return false;
+  }
+  return true;
+}
+
 // ─── Template jurnal manual ───────────────────────────────────────────────────
 export const MANUAL_TEMPLATES: {
   key: string;

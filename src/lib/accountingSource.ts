@@ -120,7 +120,7 @@ export async function getTransactionMetaByInvoices(
     }
   }
 
-  for (const t of trxs as any[]) {
+    for (const t of trxs as any[]) {
     let resolvedLaptopId: string | undefined = t.laptop_id ?? undefined;
     if (!resolvedLaptopId) {
       const ids: string[] =
@@ -142,7 +142,296 @@ export async function getTransactionMetaByInvoices(
   return map;
 }
 
-// ── TRANSAKSI ────────────────────────────────────────────────────────────────
+export interface TransactionSyncDraft {
+  lines: DraftLine[];
+  total: number;
+  modal: number;
+  modalMissing: boolean;
+}
+
+/**
+ * Sama seperti getTransactionMetaByInvoices(), tapi untuk fitur "Sinkronisasi
+ * Nominal" di Jurnal Umum: bangun ulang draft baris (Kas + Revenue + Modal)
+ * versi TERBARU untuk sekumpulan invoice sekaligus (BATCH), dari data
+ * transactions/laptop_units/transaction_items yang PALING BARU — bukan dari
+ * data yang dipakai saat awal posting.
+ *
+ * Draft ini dibandingkan dengan journal_lines yang tersimpan untuk deteksi
+ * "apakah harga jual/harga modal transaksi pernah diedit setelah jurnalnya
+ * diposting". Sengaja HANYA menghitung untuk transaksi berstatus PAID —
+ * transaksi RESERVED/HELD/PACKING (accrual, debit Piutang) atau CANCELLED
+ * tidak dimasukkan ke map hasil, supaya tidak pernah dipakai untuk
+ * "mengubah tipe" entry Piutang jadi Kas atau sebaliknya.
+ */
+export async function getTransactionSyncDraftsByInvoices(
+  supabase: SupabaseClient,
+  invoiceNumbers: string[]
+): Promise<Map<string, TransactionSyncDraft>> {
+  const result = new Map<string, TransactionSyncDraft>();
+  if (invoiceNumbers.length === 0) return result;
+
+  const trxs: any[] = [];
+  for (const batch of chunkArray(invoiceNumbers, 150)) {
+    const { data, error } = await supabase
+      .from("transactions")
+      .select(
+        "invoice_number, status, deal_price, amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, item_kind"
+      )
+      .in("invoice_number", batch);
+    if (error) {
+      console.error("[akuntansi] fetch transactions (sync):", error.message);
+      return result;
+    }
+    if (data) trxs.push(...data);
+  }
+  if (trxs.length === 0) return result;
+
+  const unitIds = new Set<string>();
+  for (const t of trxs as any[]) {
+    if (t.unit_id) unitIds.add(t.unit_id);
+    if (Array.isArray(t.unit_ids)) for (const u of t.unit_ids) if (u) unitIds.add(u);
+  }
+
+  const purchasePriceMap = new Map<string, number>();
+  if (unitIds.size > 0) {
+    for (const batch of chunkArray(Array.from(unitIds), 150)) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, purchase_price")
+        .in("id", batch);
+      for (const u of units ?? []) {
+        purchasePriceMap.set(u.id as string, Math.round(Number(u.purchase_price ?? 0)));
+      }
+    }
+  }
+
+  const mixedInvoiceNumbers = (trxs as any[])
+    .filter((t) => t.item_kind === "mixed")
+    .map((t) => t.invoice_number as string);
+
+  const accessoryDealByInvoice = new Map<string, number>();
+  if (mixedInvoiceNumbers.length > 0) {
+    for (const batch of chunkArray(mixedInvoiceNumbers, 150)) {
+      const { data: itemRows } = await supabase
+        .from("transaction_items")
+        .select("invoice_number, item_type, accessory_id, unit_id, deal_price")
+        .in("invoice_number", batch);
+      for (const it of (itemRows ?? []) as any[]) {
+        const isAccessoryItem = it.item_type === "accessory" || (Boolean(it.accessory_id) && !it.unit_id);
+        if (!isAccessoryItem) continue;
+        const cur = accessoryDealByInvoice.get(it.invoice_number as string) ?? 0;
+        accessoryDealByInvoice.set(it.invoice_number as string, cur + Math.round(Number(it.deal_price ?? 0)));
+      }
+    }
+  }
+
+  for (const t of trxs as any[]) {
+    if (t.status !== "PAID") continue; // lihat catatan di JSDoc — accrual/cancelled tidak disinkronkan
+
+    const deal = Math.round(Number(t.deal_price ?? t.amount ?? 0));
+    if (deal <= 0) continue;
+
+    const ids: string[] =
+      Array.isArray(t.unit_ids) && t.unit_ids.length > 0 ? t.unit_ids : t.unit_id ? [t.unit_id] : [];
+
+    let modal = 0;
+    for (const id of ids) modal += purchasePriceMap.get(id) ?? 0;
+
+    const effectiveItemKind: "laptop" | "accessory" | "mixed" =
+      t.item_kind === "mixed" || t.item_kind === "accessory" || t.item_kind === "laptop"
+        ? t.item_kind
+        : ids.length > 0
+          ? "laptop"
+          : "accessory";
+
+    const lines: DraftLine[] = [];
+
+    const m2 = (t.payment_method_2 ?? "").trim();
+    const a1 = Math.round(Number(t.amount_method_1 ?? 0));
+    const a2 = Math.round(Number(t.amount_method_2 ?? 0));
+    const isSplitPayment = !!m2 && a1 > 0 && a2 > 0;
+
+    if (isSplitPayment) {
+      const account2 = kasAccountFromPaymentMethod(m2);
+      const account1 = account2 === AKUN.KAS_CASH ? AKUN.KAS_SALDO : AKUN.KAS_CASH;
+      const a2Final = deal - a1;
+      lines.push({ account_code: account1, side: "DEBIT", nominal: a1 });
+      if (a2Final > 0) lines.push({ account_code: account2, side: "DEBIT", nominal: a2Final });
+    } else {
+      lines.push({ account_code: kasAccountFromPaymentMethod(t.payment_method), side: "DEBIT", nominal: deal });
+    }
+
+    if (effectiveItemKind === "accessory") {
+      lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: deal });
+    } else if (effectiveItemKind === "mixed") {
+      const accessoryDeal = Math.max(0, Math.min(deal, accessoryDealByInvoice.get(t.invoice_number as string) ?? 0));
+      const laptopDeal = deal - accessoryDeal;
+      if (laptopDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: laptopDeal });
+      if (accessoryDeal > 0) lines.push({ account_code: AKUN.PENJUALAN_AKSESORIS, side: "KREDIT", nominal: accessoryDeal });
+    } else {
+      lines.push({ account_code: AKUN.PENJUALAN_LAPTOP, side: "KREDIT", nominal: deal });
+    }
+
+    if (modal > 0) {
+      lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+      lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+    }
+
+        const merged = mergeLines(lines);
+    result.set(t.invoice_number as string, {
+      lines: merged,
+      total: totalOf(merged),
+      modal,
+      modalMissing: modal === 0,
+    });
+  }
+
+  return result;
+}
+
+export interface JournalSyncDraft {
+  lines: DraftLine[];
+  total: number;
+}
+
+/**
+ * Sinkronisasi Nominal untuk entry CASHFLOW: bangun ulang draft baris dari
+ * data cashflow_entries TERBARU (nominal/kategori/metode bayar bisa saja
+ * sudah diedit lewat halaman Cashflow setelah jurnalnya diposting). Cuma
+ * cashflow_entries dengan source_type "MANUAL" yang pernah diposting ke
+ * Jurnal Umum (lihat buildCashflowDrafts di atas) — jadi cuma itu yang
+ * dicek di sini.
+ */
+export async function getCashflowSyncDraftsByIds(
+  supabase: SupabaseClient,
+  ids: string[]
+): Promise<Map<string, JournalSyncDraft>> {
+  const result = new Map<string, JournalSyncDraft>();
+  if (ids.length === 0) return result;
+
+  const rows: any[] = [];
+  for (const batch of chunkArray(ids, 150)) {
+    const { data, error } = await supabase
+      .from("cashflow_entries")
+      .select("id, direction, category, nominal, payment_method, source_type")
+      .eq("source_type", "MANUAL")
+      .in("id", batch);
+    if (error) {
+      console.error("[akuntansi] fetch cashflow (sync):", error.message);
+      return result;
+    }
+    if (data) rows.push(...data);
+  }
+
+  for (const e of rows as any[]) {
+    const nominal = Math.round(Number(e.nominal ?? 0));
+    if (nominal <= 0) continue;
+
+    const kasAccount = kasAccountFromCashflow(e.payment_method);
+    const lines: DraftLine[] =
+      e.direction === "OUT"
+        ? [
+            { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
+            { account_code: kasAccount, side: "KREDIT", nominal },
+          ]
+        : [
+            { account_code: kasAccount, side: "DEBIT", nominal },
+            { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
+          ];
+
+    const merged = mergeLines(lines);
+    result.set(String(e.id), { lines: merged, total: totalOf(merged) });
+  }
+
+  return result;
+}
+
+/**
+ * Sinkronisasi Nominal untuk entry SERVICE: bangun ulang draft baris dari
+ * payment_amount/payment_method TERBARU di service_orders. Sengaja HANYA
+ * berlaku untuk service yang jurnalnya PERSIS SATU entry (entry utama,
+ * belum pernah dipecah jadi DP/Cicilan/Pelunasan terpisah — lihat akhiran
+ * "__DP{n}"/"__PELUNASAN" di buildServiceDrafts) — supaya sync tidak pernah
+ * salah hitung ulang delta pembayaran bertahap.
+ *
+ * Baris modal sparepart (MODAL_SERVICE_KELUAR/AKSESORIS_SERVICE), kalau
+ * ada di entry yang sudah tersimpan, TIDAK ikut dihitung ulang — dipertahankan
+ * apa adanya, karena sync ini cuma untuk kasus nominal jasa service yang
+ * diedit lewat "Edit Payment" di Riwayat Servis.
+ */
+export async function getServiceSyncDraftsByIds(
+  supabase: SupabaseClient,
+  baseIds: string[]
+): Promise<Map<string, JournalSyncDraft>> {
+  const result = new Map<string, JournalSyncDraft>();
+  if (baseIds.length === 0) return result;
+
+  const entryMap = new Map<string, { sourceIds: string[]; baseLines: any[] }>();
+  for (const batch of chunkArray(baseIds, 75)) {
+    const orFilter = batch.map((sid) => `source_id.eq.${sid},source_id.like.${sid}__*`).join(",");
+    const { data: existingEntries } = await supabase
+      .from("journal_entries")
+      .select("source_id, lines:journal_lines(account_code, side, nominal)")
+      .eq("source_type", "SERVICE")
+      .or(orFilter);
+
+    for (const e of (existingEntries ?? []) as any[]) {
+      const rawSourceId = e.source_id as string;
+      const baseId = rawSourceId.split("__")[0];
+      const cur = entryMap.get(baseId) ?? { sourceIds: [], baseLines: [] };
+      cur.sourceIds.push(rawSourceId);
+      if (rawSourceId === baseId) cur.baseLines = e.lines ?? [];
+      entryMap.set(baseId, cur);
+    }
+  }
+
+  // Cuma service dengan TEPAT SATU entry jurnal, dan entry itu adalah entry
+  // utama (bukan akhiran __DP/__PELUNASAN), yang ditawarkan sync.
+  const eligibleIds = baseIds.filter((id) => {
+    const info = entryMap.get(id);
+    return !!info && info.sourceIds.length === 1 && info.sourceIds[0] === id;
+  });
+  if (eligibleIds.length === 0) return result;
+
+  const svcRows: any[] = [];
+  for (const batch of chunkArray(eligibleIds, 150)) {
+    const { data, error } = await supabase
+      .from("service_orders")
+      .select("id, payment_amount, payment_method")
+      .in("id", batch);
+    if (error) {
+      console.error("[akuntansi] fetch service_orders (sync):", error.message);
+      return result;
+    }
+    if (data) svcRows.push(...data);
+  }
+
+  for (const s of svcRows as any[]) {
+    const bayar = Math.round(Number(s.payment_amount ?? 0));
+    if (bayar <= 0) continue;
+
+    const baseLines = entryMap.get(String(s.id))?.baseLines ?? [];
+    const sparepartLines: DraftLine[] = baseLines
+      .filter((l: any) => l.account_code === AKUN.MODAL_SERVICE_KELUAR || l.account_code === AKUN.AKSESORIS_SERVICE)
+      .map((l: any) => ({
+        account_code: l.account_code as string,
+        side: l.side as "DEBIT" | "KREDIT",
+        nominal: Math.round(Number(l.nominal)),
+      }));
+
+    const lines: DraftLine[] = [
+      { account_code: kasAccountFromPaymentMethod(s.payment_method), side: "DEBIT", nominal: bayar },
+      { account_code: AKUN.JASA_SERVICE, side: "KREDIT", nominal: bayar },
+      ...sparepartLines,
+    ];
+
+    const merged = mergeLines(lines);
+    result.set(String(s.id), { lines: merged, total: totalOf(merged) });
+  }
+
+  return result;
+}
+
 async function buildTransactionDrafts(
   supabase: SupabaseClient,
   startISO: string,

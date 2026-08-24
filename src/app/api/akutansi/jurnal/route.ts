@@ -9,10 +9,17 @@ import {
   isBalanced,
   isValidPeriod,
   cleanManualLines,
+  linesEqual,
   periodFromDate,
   totalOf,
 } from "@/lib/accounting";
-import { draftToLineRows, getTransactionMetaByInvoices } from "@/lib/accountingSource";
+import {
+  draftToLineRows,
+  getTransactionMetaByInvoices,
+  getTransactionSyncDraftsByInvoices,
+  getCashflowSyncDraftsByIds,
+  getServiceSyncDraftsByIds,
+} from "@/lib/accountingSource";
 
 function getAdmin(): SupabaseClient {
   return createClient(
@@ -77,11 +84,71 @@ export const GET = withAuth(async (req) => {
     ),
   ];
 
-  const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
+    const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
+
+  const isKasShapedEntry = (e: any) =>
+    (e.lines ?? []).some(
+      (l: any) => l.side === "DEBIT" && (l.account_code === AKUN.KAS_SALDO || l.account_code === AKUN.KAS_CASH)
+    );
+
+  const primaryTrxInvoiceNumbers = [
+    ...new Set(
+      entries
+        .filter(
+          (e: any) =>
+            e.source_type === "TRANSACTION" &&
+            e.source_id &&
+            !(e.source_id as string).includes("__") &&
+            isKasShapedEntry(e)
+        )
+        .map((e: any) => e.source_id as string)
+    ),
+  ];
+
+  // Sinkronisasi Nominal juga berlaku untuk CASHFLOW (entry manual) dan SERVICE
+  // (entry tunggal, belum pernah dipecah DP/Cicilan/Pelunasan) — lihat JSDoc
+  // masing-masing fungsi di accountingSource.ts untuk batasannya.
+  const primaryCashflowIds = [
+    ...new Set(
+      entries
+        .filter((e: any) => e.source_type === "CASHFLOW" && e.source_id)
+        .map((e: any) => e.source_id as string)
+    ),
+  ];
+
+  const primaryServiceIds = [
+    ...new Set(
+      entries
+        .filter(
+          (e: any) =>
+            e.source_type === "SERVICE" && e.source_id && !(e.source_id as string).includes("__")
+        )
+        .map((e: any) => e.source_id as string)
+    ),
+  ];
+
+  const [syncDraftMap, cashflowSyncDraftMap, serviceSyncDraftMap] = await Promise.all([
+    getTransactionSyncDraftsByInvoices(supabase, primaryTrxInvoiceNumbers),
+    getCashflowSyncDraftsByIds(supabase, primaryCashflowIds),
+    getServiceSyncDraftsByIds(supabase, primaryServiceIds),
+  ]);
 
   const entriesWithMeta = entries.map((e: any) => {
+    if (e.source_type === "CASHFLOW" && e.source_id) {
+      const syncDraft = cashflowSyncDraftMap.get(e.source_id as string);
+      const syncAvailable = !!syncDraft && !linesEqual(e.lines ?? [], syncDraft.lines);
+      return { ...e, trx_meta: null, sync_available: syncAvailable };
+    }
+
+    if (e.source_type === "SERVICE" && e.source_id) {
+      const baseId = (e.source_id as string).split("__")[0];
+      const syncDraft = serviceSyncDraftMap.get(baseId);
+      const syncAvailable = !!syncDraft && !linesEqual(e.lines ?? [], syncDraft.lines);
+      return { ...e, trx_meta: null, sync_available: syncAvailable };
+    }
+
     if (e.source_type !== "TRANSACTION" || !e.source_id) {
-      return { ...e, trx_meta: null };
+      return { ...e, trx_meta: null, sync_available: false };
     }
     const baseInvoice = (e.source_id as string).split("__")[0];
     const baseMeta = trxMetaMap.get(baseInvoice) ?? null;
@@ -90,12 +157,17 @@ export const GET = withAuth(async (req) => {
     );
     const hasModalLine = (e.lines ?? []).some((l: any) => l.account_code === AKUN.HPP);
     const modalAddressed = hasModalLine || e.is_edited === true;
+
+    const syncDraft = syncDraftMap.get(e.source_id as string);
+    const syncAvailable = !!syncDraft && !linesEqual(e.lines ?? [], syncDraft.lines);
+
     return {
       ...e,
       trx_meta: {
         ...(baseMeta ?? {}),
         modal_missing: isRevenueEntry && !modalAddressed,
       },
+      sync_available: syncAvailable,
     };
   });
 
