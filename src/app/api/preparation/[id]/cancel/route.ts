@@ -11,8 +11,15 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
         const { data: order } = await supabase.from("preparation_orders").select("*").eq("id", id).single();
         if (!order) return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
 
-        if (order.status === "SELESAI" || order.status === "DIBATALKAN") {
-            return NextResponse.json({ success: false, message: `Tidak bisa dibatalkan, status "${order.status}"` }, { status: 400 });
+        // Disamakan persis dengan canShowCancel di frontend
+        // ([id]/page.tsx): SELESAI boleh dibatalkan (customer bisa batal
+        // beli setelah barang sampai), yang diblokir cuma order yang
+        // sudah pernah DIBATALKAN atau sudah terhubung ke transaksi.
+        if (order.status === "DIBATALKAN" || order.transaction_invoice) {
+            const message = order.transaction_invoice
+                ? "Tidak bisa dibatalkan, pesanan sudah terhubung ke transaksi"
+                : `Tidak bisa dibatalkan, status "${order.status}"`;
+            return NextResponse.json({ success: false, message }, { status: 400 });
         }
 
         // ── TIDAK ADA lagi restore ke laptop_units di sini ──
