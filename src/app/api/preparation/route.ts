@@ -6,6 +6,7 @@ import { logActivity } from "@/lib/activityLogger";
 import { generateOrderNumber } from "@/lib/preparationOrderNumber";
 import { generateInvoice } from "@/lib/invoice";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
 
 // helper: "besok" dalam WIB (Vercel jalan di UTC)
 function tomorrowWIB(): string {
@@ -320,34 +321,38 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
           if (trxItemsError) throw trxItemsError;
         }
 
-        if (unitIds.length > 0) {
+         if (unitIds.length > 0) {
           // ── PENTING: status unit di sini HARUS "PACKING", BUKAN "SOLD" ──
           // "SOLD" baru boleh dipasang oleh /api/units/confirm-payment saat
           // dana marketplace benar-benar cair dan sales klik "Konfirmasi
           // Lunas". Kalau di sini langsung "SOLD", nanti confirm-payment akan
           // MENOLAK proses pelunasan dengan pesan "sudah terjual lewat
-          // transaksi lain" (lihat guard `unit.status === "SOLD"` di sana),
-          // padahal itu transaksi yang sama — prosesnya jadi macet permanen.
+          // transaksi lain" — prosesnya jadi macet permanen.
           //
-          // Status "PACKING" di level unit sudah jadi konvensi resmi sistem
-          // ini (lihat LaptopsContent.tsx: PACKING tidak dihitung di
-          // stok_tersedia, tapi dihitung di belum_lunas) — otomatis mengurangi
-          // stok tersedia di Data Barang, tanpa memblokir pelunasan nanti.
-          await supabase.from("laptop_units").update({ status: "PACKING" }).in("id", unitIds);
+          // ── PENTING #2: WAJIB pakai supabaseAdmin, BUKAN supabase biasa ──
+          // UPDATE laptop_units.status dari client role sales kena RLS —
+          // baris tidak ter-update TAPI Supabase tidak melempar error (cuma
+          // balas sukses dengan 0 baris ter-update), jadi gagal-nya diam-diam
+          // dan tidak pernah masuk catch di bawah. Ini sebabnya SN yang
+          // dipakai order e-commerce sempat tetap muncul "Siap Jual" di Data
+          // Barang walau transaksinya sudah Packing. Pola supabaseAdmin ini
+          // sama persis dengan yang dipakai units/confirm-payment/route.ts.
+          const { data: updatedUnits, error: unitUpdateError } = await supabaseAdmin
+            .from("laptop_units")
+            .update({ status: "PACKING" })
+            .in("id", unitIds)
+            .select("id, laptop_id");
+
+          if (unitUpdateError) throw unitUpdateError;
+          if (!updatedUnits || updatedUnits.length !== unitIds.length) {
+            throw new Error(
+              `Hanya ${updatedUnits?.length ?? 0} dari ${unitIds.length} unit berhasil ditandai PACKING — cek RLS/permission tabel laptop_units`
+            );
+          }
 
           // ── Sinkronkan cache qty/status di tabel `laptops` ──────────────
-          // Data Barang (LaptopsContent.tsx) sendiri sudah otomatis berkurang
-          // stoknya karena dia hitung ulang langsung dari laptop_units tiap
-          // fetch — tapi kolom cache di tabel `laptops` (dipakai halaman lain
-          // seperti Ready to Sell / situs publik) perlu di-recalc manual,
-          // sama seperti pola di api/laptops/[id]/units/route.ts setelah
-          // CRUD unit.
-          const { data: packingUnits } = await supabase
-            .from("laptop_units")
-            .select("laptop_id")
-            .in("id", unitIds);
-          const affectedLaptopIds = [...new Set((packingUnits ?? []).map((u: any) => u.laptop_id).filter(Boolean))] as string[];
-          await Promise.allSettled(affectedLaptopIds.map((lid) => recalcLaptopParentQty(supabase, lid)));
+          const affectedLaptopIds = [...new Set(updatedUnits.map((u: any) => u.laptop_id).filter(Boolean))] as string[];
+          await Promise.allSettled(affectedLaptopIds.map((lid) => recalcLaptopParentQty(supabaseAdmin, lid)));
         }
 
         await supabase
