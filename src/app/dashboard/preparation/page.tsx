@@ -206,6 +206,9 @@ function CreateModal({
   const [customerPhone, setCustomerPhone] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [notes, setNotes] = useState("");
+  const [salesChannel, setSalesChannel] = useState<"MANUAL" | "ECOMMERCE">("MANUAL");
+  const [ecommercePlatform, setEcommercePlatform] = useState<"SHOPEE" | "TOKOPEDIA" | "TIKTOK" | "LAZADA" | "">("");
+  const [dealPrice, setDealPrice] = useState("");
   const [items, setItems] = useState<
     {
       serial_number: string;
@@ -268,7 +271,7 @@ function CreateModal({
   const removeItem = (idx: number) =>
     setItems((prev) => prev.filter((_, i) => i !== idx));
 
-  const submit = async () => {
+   const submit = async () => {
     setError("");
     if (!customerName.trim()) {
       setError("Nama customer wajib diisi");
@@ -276,6 +279,14 @@ function CreateModal({
     }
     if (items.length === 0) {
       setError("Tambahkan minimal 1 serial number");
+      return;
+    }
+    if (salesChannel === "ECOMMERCE" && !ecommercePlatform) {
+      setError("Pilih e-commerce-nya dulu (Shopee/Tokopedia/TikTok/Lazada)");
+      return;
+    }
+    if (salesChannel === "MANUAL" && (!dealPrice || Number(dealPrice) <= 0)) {
+      setError("Nominal harga jual wajib diisi");
       return;
     }
     setSaving(true);
@@ -289,6 +300,9 @@ function CreateModal({
           delivery_address: deliveryAddress.trim() || null,
           notes: notes.trim() || null,
           items,
+          sales_channel: salesChannel,
+          ecommerce_platform: salesChannel === "ECOMMERCE" ? ecommercePlatform : null,
+          deal_price: dealPrice ? Number(dealPrice) : 0,
         }),
       });
       const result = await res.json();
@@ -365,6 +379,55 @@ function CreateModal({
               value={deliveryAddress}
               onChange={(e) => setDeliveryAddress(e.target.value)}
               placeholder="Alamat tujuan"
+              className={inputCls}
+            />
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              Channel Penjualan
+            </label>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => { setSalesChannel("MANUAL"); setEcommercePlatform(""); }}
+                className={`h-10 rounded-xl text-sm font-semibold border transition ${salesChannel === "MANUAL" ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              >
+                Manual / Langsung
+              </button>
+              <button
+                type="button"
+                onClick={() => setSalesChannel("ECOMMERCE")}
+                className={`h-10 rounded-xl text-sm font-semibold border transition ${salesChannel === "ECOMMERCE" ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              >
+                E-commerce
+              </button>
+            </div>
+
+            {salesChannel === "ECOMMERCE" && (
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                {(["SHOPEE", "TOKOPEDIA", "TIKTOK", "LAZADA"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setEcommercePlatform(p)}
+                    className={`h-10 rounded-xl text-xs font-bold border transition ${ecommercePlatform === p ? "bg-orange-500 text-white border-orange-500" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+                  >
+                    {p === "SHOPEE" ? "Shopee" : p === "TOKOPEDIA" ? "Tokopedia" : p === "TIKTOK" ? "TikTok" : "Lazada"}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              Nominal / Harga Jual {salesChannel === "MANUAL" && <span className="text-red-500">*</span>}
+              {salesChannel === "ECOMMERCE" && <span className="text-gray-400 font-normal"> (opsional)</span>}
+            </label>
+            <input
+              type="number"
+              value={dealPrice}
+              onChange={(e) => setDealPrice(e.target.value)}
+              placeholder="Contoh: 3500000"
               className={inputCls}
             />
           </div>

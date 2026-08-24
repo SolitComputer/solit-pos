@@ -54,6 +54,7 @@ interface PrepOrder {
     // ── batalkan pesanan (item 4) ──
     cancelled_at: string | null; cancelled_by_name: string | null; cancel_reason: string | null;
     created_at: string; preparation_items: PrepItem[]; scheduled_delivery_date: string | null;
+    sales_channel?: "MANUAL" | "ECOMMERCE" | null; ecommerce_platform?: string | null; deal_price?: number | null;
 }
 
 const fmtFull = (iso: string) =>
@@ -798,7 +799,7 @@ export default function PreparationDetailPage() {
         </DashboardLayout>
     );
 
-   const sm = STATUS_META[order.status] ?? STATUS_META.MENUNGGU;
+    const sm = STATUS_META[order.status] ?? STATUS_META.MENUNGGU;
     const activeItems = order.preparation_items.filter(it => !it.is_cancelled);
     const cancelledItems = order.preparation_items.filter(it => it.is_cancelled);
     // Unit yang sudah kedeteksi "sold_elsewhere" (terjual lewat pesanan lain)
@@ -869,6 +870,11 @@ export default function PreparationDetailPage() {
                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold border ${sm.badge}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`} />{sm.label}
                                     </span>
+                                    {order.sales_channel === "ECOMMERCE" && (
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold border bg-orange-50 text-orange-700 border-orange-200">
+                                            {order.ecommerce_platform ?? "E-COMMERCE"}
+                                        </span>
+                                    )}
                                 </div>
                                 <h1 className="text-lg font-black text-gray-900">{order.customer_name}</h1>
                                 {order.customer_phone && <p className="text-sm text-gray-500"> {order.customer_phone}</p>}
@@ -1067,7 +1073,7 @@ export default function PreparationDetailPage() {
                                 <span className="text-xs font-semibold text-blue-600">{checked}/{checkableItems.length} dicek</span>
                             )}
                         </div>
-                       <div className="space-y-2">
+                        <div className="space-y-2">
                             {order.preparation_items.map(it => {
                                 const interactive = order.status === "DIPROSES" && canDone && !it.is_cancelled && !it.sold_elsewhere;
                                 return (
@@ -1295,7 +1301,7 @@ export default function PreparationDetailPage() {
                                 </p>
                             )}
 
-                          <div className="mt-4">
+                            <div className="mt-4">
                                 {order.transaction_invoice ? (
                                     <Link href={`/receipt/${order.transaction_invoice}`} className="inline-flex items-center gap-2 h-10 px-5 bg-emerald-700 text-white rounded-xl text-sm font-bold hover:bg-emerald-800 transition">
                                         Lihat Transaksi →
@@ -1341,7 +1347,7 @@ export default function PreparationDetailPage() {
                             <div className="flex items-center gap-3">
                                 <AlertCircle className="w-5 h-5 inline text-white" />
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-bold text-white">Override Supervisor</p>
+                                    <p className="text-sm font-bold text-white">Override Supervisor</p>
                                     <p className="text-[11px] text-gray-300 mt-0.5">Khusus Admin, Kepala Sales, Kepala Zenith, Kepala Sotech & Kepala Onpoint — pindah pengantar atau ubah status manual.</p>
                                 </div>
                             </div>
