@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { startJitteredPolling } from "@/lib/pollingScheduler";
+import { isPrepSilent } from "@/lib/prepAlarm";
 
 export interface PendingOvertimeItem {
   id: string;
@@ -37,7 +38,8 @@ export function useOvertimeNotify(userRoles: string[], userId?: string) {
       if (d.success) {
         const items: PendingOvertimeItem[] = d.data || [];
         const isNew = items.some((p) => !seenIdsRef.current.has(p.id));
-        if (isNew && items.length > 0 && !isFirstLoadRef.current) {
+        const isSilent = isPrepSilent(null, userRoles);
+        if (isNew && items.length > 0 && !isFirstLoadRef.current && !isSilent) {
           if (!audioRef.current) {
             audioRef.current = new Audio(SOUND_URL);
           }

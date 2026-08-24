@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
-import { usePrepAlarm, ALARM_KEYS } from "@/lib/prepAlarm";
+import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
 import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES } from "@/lib/permissions";
@@ -202,7 +202,7 @@ const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashbo
 const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboard/employee-birthdays", icon: Icons.employeeBirthday };
 
 const ITEM_ANTRIAN_MASUK: MenuItem = { name: "Antrian Masuk", href: "/dashboard/preparation/antrian", icon: Icons.serviceQueue };
-const ITEM_BUAT_PENGANTARAN: MenuItem = { name: "Buat Pengantaran", href: "/dashboard/preparation/buat-pengantaran", icon: Icons.buatPengantaran }; 
+const ITEM_BUAT_PENGANTARAN: MenuItem = { name: "Buat Pengantaran", href: "/dashboard/preparation/buat-pengantaran", icon: Icons.buatPengantaran };
 const ITEM_RIWAYAT_PENYEDIA: MenuItem = { name: "Dashboard Barang", href: "/dashboard/riwayat-penyedia", icon: Icons.leaderboard };
 const ITEM_DATA_BARANG: MenuItem = { name: "Data Barang", href: "/dashboard/data-barang?tab=laptops", icon: Icons.barang };
 const ITEM_AUDIT_OUTFLOW: MenuItem = { name: "Audit Barang Keluar", href: "/dashboard/audit-barang-keluar", icon: Icons.auditOutflow };
@@ -1335,12 +1335,15 @@ export default function Sidebar() {
   const onSiapKirim = pathname.startsWith("/dashboard/preparation/siap-kirim");
   const onOvertimePage = pathname.startsWith("/dashboard/attendance/overtime");
 
-  usePrepAlarm(onAntrian ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, true, 4000, notifSoundKey, notifCustomUrl);
-  usePrepAlarm(onSiapKirim ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, true, 4000, notifSoundKey, notifCustomUrl);
-  usePrepAlarm(leadsChat.unreadUnacked.map((id) => ({ id })), ALARM_KEYS.LEADS_CHAT, true, 4000, notifSoundKey, notifCustomUrl);
+  const isSilentAdmin = isPrepSilent(null, effectiveRoles);
+
+  usePrepAlarm(onAntrian || isSilentAdmin ? [] : prep.menungguUnacked.map((id) => ({ id })), ALARM_KEYS.MENUNGGU, !isSilentAdmin, 4000, notifSoundKey, notifCustomUrl);
+  usePrepAlarm(onSiapKirim || isSilentAdmin ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, !isSilentAdmin, 4000, notifSoundKey, notifCustomUrl);
+  usePrepAlarm(isSilentAdmin ? [] : leadsChat.unreadUnacked.map((id) => ({ id })), ALARM_KEYS.LEADS_CHAT, !isSilentAdmin, 4000, notifSoundKey, notifCustomUrl);
 
   const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
-  const reminderUnread = useReminderBadge(user?.id);
+  // isSilentAdmin → pass null agar hook tidak fetch & tidak bunyi playReminderBeep()
+  const reminderUnread = useReminderBadge(isSilentAdmin ? null : user?.id);
   const onTanyaCeoPage = pathname.startsWith("/dashboard/tanya-ceo");
   const aiCeoEscalationCount = useEscalationBadge(user?.id, userRoles.some(r => AI_CEO_ROLES.includes(r as any)));
   const badges: Record<string, number> = {

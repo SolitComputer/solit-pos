@@ -2,7 +2,7 @@
 // src/components/akutansi/JurnalUmum.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers, Undo2, Sparkles } from "lucide-react";
+import { Inbox, Pencil, Clock, Trash2, X, Check, Search, GripVertical, ArrowUpDown, AlertTriangle, ChevronDown, Plus, Calendar, Layers, Undo2, Sparkles, RefreshCw } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult, DragStart } from "@hello-pangea/dnd";
 import {
     ACCOUNTS,
@@ -48,6 +48,7 @@ interface JournalEntry {
     source_id: string | null;
     total: number;
     is_edited: boolean;
+    sync_available?: boolean;
     lines: JournalLine[];
     created_by_user?: { id: string; name: string } | null;
     updated_by_user?: { id: string; name: string } | null;
@@ -275,6 +276,22 @@ export default function JurnalUmum({ period }: { period: string }) {
                 return next;
             });
             await load(false);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handleSyncNominal = async (entry: JournalEntry) => {
+        if (!confirm(`Sinkronkan nominal jurnal "${entry.keterangan}" sesuai data transaksi terbaru?`)) return;
+        setBusy(true);
+        try {
+            const res = await fetch(`/api/akutansi/jurnal/${entry.id}/sync`, { method: "POST" });
+            const json = await res.json();
+            if (!json.success) { setToast(json.message ?? "Gagal sinkronisasi"); return; }
+            setToast("Nominal jurnal disinkronkan");
+            await load(false);
+        } catch {
+            setToast("Koneksi bermasalah saat sinkronisasi");
         } finally {
             setBusy(false);
         }
@@ -1395,6 +1412,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                 onEdit={setEditEntry}
                                                 onLog={setLogEntry}
                                                 onDelete={handleDelete}
+                                                onSync={handleSyncNominal}
                                                 onToggleChecked={toggleEntryChecked}
                                                 onUpdated={handleUpdated}
                                                 onToggleWarningState={handleToggleWarningState}
@@ -1407,7 +1425,7 @@ export default function JurnalUmum({ period }: { period: string }) {
                             )}
                         </Droppable>
                     </DragDropContext>
-               </div>
+                </div>
             </div>
 
             {!loading && visibleEntries.length < filtered.length && (
@@ -1507,7 +1525,7 @@ function WarningToggle({
     const [reason, setReason] = useState("");
     const [busy, setBusy] = useState(false);
 
-       const computePos = () => {
+    const computePos = () => {
         const btn = btnRef.current;
         if (!btn) return;
         const rect = btn.getBoundingClientRect();
@@ -1603,7 +1621,7 @@ function WarningToggle({
                 </button>
                 {showPopover && popPos && (
                     <div
-                                              className="fixed z-[95] w-72 max-h-[80vh] overflow-y-auto bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
+                        className="fixed z-[95] w-72 max-h-[80vh] overflow-y-auto bg-white border border-red-200 rounded-xl shadow-xl p-3 text-left"
                         style={{ top: popPos.top, left: popPos.left }}
                     >
                         <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-gray-100">
@@ -2217,6 +2235,7 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
         DELETE: "Dihapus",
         ACTIVATE: "Ditandai Bermasalah",
         DEACTIVATE: "Tanda Bermasalah Dicabut",
+        SYNC: "Disinkronkan dari Transaksi",
     };
 
     return (
@@ -2489,7 +2508,6 @@ function SortBySourceModal({ period, onClose, onConfirm, busy }: SortBySourceMod
     );
 }
 
-// ─── Journal Entry Row (Memoized for 60 FPS performance) ────────────────────
 interface JournalEntryRowProps {
     entry: JournalEntry;
     index: number;
@@ -2500,6 +2518,7 @@ interface JournalEntryRowProps {
     onEdit: (entry: JournalEntry) => void;
     onLog: (entry: JournalEntry) => void;
     onDelete: (entry: JournalEntry) => void;
+    onSync: (entry: JournalEntry) => void;
     onToggleChecked: (entry: JournalEntry, checked: boolean) => void;
     onUpdated: (showLoader?: boolean) => void;
     onToggleWarningState: (entryId: string, hasWarn: boolean) => void;
@@ -2516,6 +2535,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
     onEdit,
     onLog,
     onDelete,
+    onSync,
     onToggleChecked,
     onUpdated,
     onToggleWarningState,
@@ -2564,6 +2584,14 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
         () => validLinesForCheck.length > 0 && validLinesForCheck.every((l) => l.checked),
         [validLinesForCheck]
     );
+
+    const latestCheckedAt = useMemo(() => {
+        const timestamps = validLinesForCheck
+            .map((l) => l.checked_at)
+            .filter((t): t is string => Boolean(t));
+        if (timestamps.length === 0) return null;
+        return timestamps.reduce((max, t) => (t > max ? t : max));
+    }, [validLinesForCheck]);
 
     return (
         <Draggable draggableId={entry.id} index={index}>
@@ -2642,6 +2670,11 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                         <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Modal Rp0
                                                     </span>
                                                 )}
+                                                {entry.sync_available && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 inline-flex items-center gap-1 shrink-0" title="Data transaksi berubah — nominal jurnal belum sinkron">
+                                                        <RefreshCw className="w-2.5 h-2.5 text-blue-600" /> Nominal Berubah
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="text-sm font-bold text-gray-900 mt-1 mb-0.5 leading-snug">
                                                 {entry.keterangan}
@@ -2701,6 +2734,15 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                             >
                                                 <Pencil className="w-4 h-4" />
                                             </button>
+                                            {entry.source_type === "TRANSACTION" && entry.sync_available && (
+                                                <button
+                                                    onClick={() => onSync(entry)}
+                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"
+                                                    title="Sinkronkan nominal sesuai data transaksi terbaru"
+                                                >
+                                                    <RefreshCw className="w-4 h-4" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => onLog(entry)}
                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"
@@ -2725,7 +2767,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                 onClick={() => onToggleChecked(entry, !isEntryChecked)}
                                                 title={
                                                     isEntryChecked
-                                                        ? "Sudah dicek (Klik untuk batalkan)"
+                                                        ? `Sudah dicek pada ${fmtWaktu(latestCheckedAt ?? undefined)} (Klik untuk batalkan)`
                                                         : "Tandai sudah dicek"
                                                 }
                                                 className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${isEntryChecked
