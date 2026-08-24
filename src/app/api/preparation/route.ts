@@ -314,33 +314,44 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         const unitIds = [...new Set(cleanItems.map((it) => it.unit_id).filter(Boolean))] as string[];
         const serialNumbers = cleanItems.map((it) => it.serial_number).filter(Boolean);
 
-        const { error: trxError } = await supabase.from("transactions").insert({
-          invoice_number,
-          status: "PACKING",
-          customer_name: String(customer_name).trim(),
-          customer_phone: customer_phone ?? null,
-          laptop_name: cleanItems.length === 1 ? cleanItems[0].laptop_name : `${cleanItems.length} Laptop`,
-          serial_number: cleanItems.length === 1 ? cleanItems[0].serial_number : null,
-          serial_numbers: serialNumbers,
-          unit_id: unitIds.length === 1 ? unitIds[0] : null,
-          unit_ids: unitIds,
-          laptop_id: cleanItems.length === 1 ? cleanItems[0].laptop_id : null,
-          deal_price: dealPriceNum,
-          amount: dealPriceNum,
-          dp_amount: 0,
-          payment_method: "E-COMMERCE",
-          source_platform: ecommercePlatform,
-          item_kind: "laptop",
-          notes: notes ?? null,
-          sales_id: user.id,
-          sales_name: user.name,
-        });
+        // ✅ FIX: transaction_items.transaction_id kolom NOT NULL (FK ke
+        // transactions.id) tapi dulu tidak pernah diisi saat insert
+        // transaction_items di bawah — insert-nya SELALU gagal & throw,
+        // makanya blok update laptop_units.status jadi PACKING (di bawahnya)
+        // tidak pernah sempat jalan. Sekarang insert transactions pakai
+        // .select("id").single() supaya id-nya bisa dipakai di transaction_items.
+        const { data: trxRow, error: trxError } = await supabase
+          .from("transactions")
+          .insert({
+            invoice_number,
+            status: "PACKING",
+            customer_name: String(customer_name).trim(),
+            customer_phone: customer_phone ?? null,
+            laptop_name: cleanItems.length === 1 ? cleanItems[0].laptop_name : `${cleanItems.length} Laptop`,
+            serial_number: cleanItems.length === 1 ? cleanItems[0].serial_number : null,
+            serial_numbers: serialNumbers,
+            unit_id: unitIds.length === 1 ? unitIds[0] : null,
+            unit_ids: unitIds,
+            laptop_id: cleanItems.length === 1 ? cleanItems[0].laptop_id : null,
+            deal_price: dealPriceNum,
+            amount: dealPriceNum,
+            dp_amount: 0,
+            payment_method: "E-COMMERCE",
+            source_platform: ecommercePlatform,
+            item_kind: "laptop",
+            notes: notes ?? null,
+            sales_id: user.id,
+            sales_name: user.name,
+          })
+          .select("id")
+          .single();
         if (trxError) throw trxError;
 
         if (cleanItems.length > 0) {
           const perUnitPrice = cleanItems.length > 1 ? Math.round(dealPriceNum / cleanItems.length) : dealPriceNum;
           const { error: trxItemsError } = await supabase.from("transaction_items").insert(
             cleanItems.map((it) => ({
+              transaction_id: trxRow.id, // ← WAJIB: kolom NOT NULL, sebelumnya tidak pernah diisi
               invoice_number,
               item_type: "laptop",
               unit_id: it.unit_id,
