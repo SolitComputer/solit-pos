@@ -277,41 +277,67 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         // diketik manual tetap Siap Jual walau transaksinya sudah Packing.
         const missingSnItems = cleanItems.filter((it) => !it.unit_id && it.serial_number);
         if (missingSnItems.length > 0) {
+          // select laptop_id juga — SN yang diketik manual/scan (addManual
+          // di page.tsx) tidak pernah bawa laptop_id dari frontend, padahal
+          // transaction_items.laptop_id NOT NULL tanpa default. Kolom ini
+          // WAJIB ke-isi dari sini, bukan dari input sales.
           const { data: matchedUnits, error: resolveError } = await supabaseAdmin
             .from("laptop_units")
-            .select("id, serial_number")
+            .select("id, serial_number, laptop_id")
             .in("serial_number", missingSnItems.map((it) => it.serial_number));
 
           if (resolveError) {
             console.error("[POST /api/preparation] gagal resolve unit_id dari SN:", resolveError.message);
           }
 
-          const snToUnitId = new Map((matchedUnits ?? []).map((u: any) => [u.serial_number, u.id]));
+          const snToUnit = new Map((matchedUnits ?? []).map((u: any) => [u.serial_number, u]));
           for (const it of missingSnItems) {
-            const resolved = snToUnitId.get(it.serial_number);
-            if (resolved) it.unit_id = resolved;
-          }
-
-          const stillUnresolved = missingSnItems.filter((it) => !it.unit_id);
-          if (stillUnresolved.length > 0) {
-            // Dulu cuma console.warn — sales/admin tidak pernah tahu kecuali
-            // buka log Vercel. Sekarang dikumpulkan supaya bisa dikirim balik
-            // ke response (lihat penyusunan response di akhir function).
-            ecomWarning = `SN berikut TIDAK ditemukan di Data Barang, statusnya TIDAK otomatis berubah jadi Packing: ${stillUnresolved.map((it) => it.serial_number).join(", ")}. Cek manual di Data Barang.`;
-            console.warn(
-              "[POST /api/preparation] SN berikut TIDAK ditemukan di laptop_units, unit_id tidak ke-resolve:",
-              stillUnresolved.map((it) => it.serial_number).join(", ")
-            );
+            const resolved = snToUnit.get(it.serial_number);
+            if (resolved) {
+              it.unit_id = resolved.id;
+              if (!it.laptop_id) it.laptop_id = resolved.laptop_id ?? undefined;
+            }
           }
         }
 
+        // ── Lengkapi laptop_name yang masih kosong ──────────────────────────
+        // laptop_name NOT NULL. SN manual/scan tidak bawa laptop_name dari
+        // frontend — laptop_id-nya sudah ke-isi di blok atas, tinggal
+        // di-lookup nama laptopnya dari situ.
+        const missingNameLaptopIds = [
+          ...new Set(
+            cleanItems.filter((it) => !it.laptop_name && it.laptop_id).map((it) => it.laptop_id as string)
+          ),
+        ];
+        if (missingNameLaptopIds.length > 0) {
+          const { data: laptopRows } = await supabaseAdmin
+            .from("laptops")
+            .select("id, laptop_name")
+            .in("id", missingNameLaptopIds);
+          const laptopNameMap = new Map((laptopRows ?? []).map((l: any) => [l.id, l.laptop_name]));
+          for (const it of cleanItems) {
+            if (!it.laptop_name && it.laptop_id) it.laptop_name = laptopNameMap.get(it.laptop_id) ?? undefined;
+          }
+        }
+
+        // ── Pisahkan item yang BISA vs TIDAK BISA masuk transaction_items ───
+        // laptop_id NOT NULL tanpa default — SN yang SAMA SEKALI tidak
+        // ketemu di laptop_units (typo, belum pernah diinput ke Data
+        // Barang) tidak punya laptop_id yang valid dan TIDAK BOLEH
+        // dipaksa insert (pasti gagal lagi). Item ini tetap aman tersimpan
+        // di preparation_items — cuma tidak ikut jadi baris transaksi.
+        const insertableItems = cleanItems.filter((it) => it.laptop_id);
+        const unresolvedItems = cleanItems.filter((it) => !it.laptop_id);
+        if (unresolvedItems.length > 0) {
+          ecomWarning = `SN berikut TIDAK ditemukan di Data Barang, TIDAK ikut masuk transaksi & statusnya TIDAK berubah jadi Packing: ${unresolvedItems.map((it) => it.serial_number).join(", ")}. Cek manual di Data Barang.`;
+          console.warn(
+            "[POST /api/preparation] SN berikut TIDAK ketemu di laptop_units, dikeluarkan dari transaction_items:",
+            unresolvedItems.map((it) => it.serial_number).join(", ")
+          );
+        }
+
         const invoice_number = await generateInvoice();
-        // dedupe: SN yang sama boleh diinput berkali-kali dalam satu order,
-        // tapi unit_id yang sama tidak boleh dikirim dobel ke .in() di bawah —
-        // kalau dobel, jumlah baris yang balik dari Supabase akan lebih
-        // sedikit dari unitIds.length dan memicu false-alarm error di baris
-        // pengecekan updatedUnits.length !== unitIds.length.
-        const unitIds = [...new Set(cleanItems.map((it) => it.unit_id).filter(Boolean))] as string[];
+        const unitIds = [...new Set(insertableItems.map((it) => it.unit_id).filter(Boolean))] as string[];
         const serialNumbers = cleanItems.map((it) => it.serial_number).filter(Boolean);
 
         // ✅ FIX: transaction_items.transaction_id kolom NOT NULL (FK ke
@@ -347,17 +373,18 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
           .single();
         if (trxError) throw trxError;
 
-        if (cleanItems.length > 0) {
-          const perUnitPrice = cleanItems.length > 1 ? Math.round(dealPriceNum / cleanItems.length) : dealPriceNum;
+        if (insertableItems.length > 0) {
+          const perUnitPrice = insertableItems.length > 1 ? Math.round(dealPriceNum / insertableItems.length) : dealPriceNum;
           const { error: trxItemsError } = await supabase.from("transaction_items").insert(
-            cleanItems.map((it) => ({
-              transaction_id: trxRow.id, // ← WAJIB: kolom NOT NULL, sebelumnya tidak pernah diisi
+            insertableItems.map((it) => ({
+              transaction_id: trxRow.id,
               invoice_number,
               item_type: "laptop",
               unit_id: it.unit_id,
-              laptop_id: it.laptop_id,
+              laptop_id: it.laptop_id, // aman — insertableItems sudah difilter cuma yang punya laptop_id
               serial_number: it.serial_number,
-              item_name: it.laptop_name,
+              laptop_name: it.laptop_name ?? it.serial_number, // kolom NOT NULL, fallback kalau lookup gagal
+              item_name: it.laptop_name ?? it.serial_number,
               quantity: 1,
               deal_price: perUnitPrice,
             }))
