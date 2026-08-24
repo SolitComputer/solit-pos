@@ -304,8 +304,13 @@ export async function middleware(request: NextRequest) {
   // wajar tidak ikut kena limit yang didesain untuk nahan abuse/scanner.
   const isMutating = !["GET", "HEAD"].includes(request.method);
   const rlBucket = isMutating ? `mw-global-write:${rlIp}` : `mw-global-read:${rlIp}`;
-  const rlLimit = isMutating ? 200 : 1200;
-  if (isRateLimited(rlBucket, rlLimit, 10_000)) {
+  // Limit lebih longgar: 1 IP kantor dipakai bersama banyak staff + banyak
+  // polling hook (presence, badge notif, leads-chat, dll). Window 60 detik
+  // dengan limit 600 write / 3000 read → masih aman dari flood otomatis
+  // (script abuse biasanya ribuan request per detik), tapi tidak kena rate
+  // limit saat trafik kantor normal jam kerja.
+  const rlLimit = isMutating ? 600 : 3000;
+  if (isRateLimited(rlBucket, rlLimit, 60_000)) {
     return NextResponse.json(
       { success: false, message: "Terlalu banyak request, coba lagi sebentar lagi" },
       { status: 429 }
