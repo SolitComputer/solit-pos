@@ -14,10 +14,6 @@ function formatMinutesShort(min: number): string {
     return `${h}j ${m}m`;
 }
 
-// ✅ NEW — popup modal otomatis (bukan cuma badge+suara) begitu ada lemburan
-// PENDING baru yang siap di-ACC. Muncul cuma untuk item yang belum pernah
-// ditampilkan sesi ini; kalau ditutup ("Nanti Saja"), tidak muncul lagi
-// sampai ada item PENDING baru lainnya.
 export function OvertimePendingPopup({ pending }: { pending: PendingOvertimeItem[] }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
