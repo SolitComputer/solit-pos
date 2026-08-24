@@ -260,6 +260,9 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     // stok Siap Jual di Data Barang otomatis berkurang, (3) link invoice-nya
     // ke preparation_orders ini — supaya muncul juga di Riwayat Transaksi &
     // Riwayat Pending (keduanya sudah generic terhadap status PACKING).
+    // Ditaruh di luar try/catch supaya bisa dibaca lagi saat menyusun
+    // response di akhir function, baik jalur sukses maupun jalur catch.
+    let ecomWarning: string | null = null;
     if (salesChannel === "ECOMMERCE") {
       try {
         // Resolve unit_id yang belum ada (SN diketik manual/scan barcode)
@@ -291,6 +294,10 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
           const stillUnresolved = missingSnItems.filter((it) => !it.unit_id);
           if (stillUnresolved.length > 0) {
+            // Dulu cuma console.warn — sales/admin tidak pernah tahu kecuali
+            // buka log Vercel. Sekarang dikumpulkan supaya bisa dikirim balik
+            // ke response (lihat penyusunan response di akhir function).
+            ecomWarning = `SN berikut TIDAK ditemukan di Data Barang, statusnya TIDAK otomatis berubah jadi Packing: ${stillUnresolved.map((it) => it.serial_number).join(", ")}. Cek manual di Data Barang.`;
             console.warn(
               "[POST /api/preparation] SN berikut TIDAK ditemukan di laptop_units, unit_id tidak ke-resolve:",
               stillUnresolved.map((it) => it.serial_number).join(", ")
@@ -299,7 +306,12 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         }
 
         const invoice_number = await generateInvoice();
-        const unitIds = cleanItems.map((it) => it.unit_id).filter(Boolean) as string[];
+        // dedupe: SN yang sama boleh diinput berkali-kali dalam satu order,
+        // tapi unit_id yang sama tidak boleh dikirim dobel ke .in() di bawah —
+        // kalau dobel, jumlah baris yang balik dari Supabase akan lebih
+        // sedikit dari unitIds.length dan memicu false-alarm error di baris
+        // pengecekan updatedUnits.length !== unitIds.length.
+        const unitIds = [...new Set(cleanItems.map((it) => it.unit_id).filter(Boolean))] as string[];
         const serialNumbers = cleanItems.map((it) => it.serial_number).filter(Boolean);
 
         const { error: trxError } = await supabase.from("transactions").insert({
@@ -342,7 +354,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
           if (trxItemsError) throw trxItemsError;
         }
 
-         if (unitIds.length > 0) {
+        if (unitIds.length > 0) {
           // ── PENTING: status unit di sini HARUS "PACKING", BUKAN "SOLD" ──
           // "SOLD" baru boleh dipasang oleh /api/units/confirm-payment saat
           // dana marketplace benar-benar cair dan sales klik "Konfirmasi
@@ -382,10 +394,12 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
           .eq("id", order.id);
 
         order.transaction_invoice = invoice_number;
-      } catch (ecomErr) {
+      } catch (ecomErr: any) {
         // Penyiapan tetap dibuat walau link transaksi e-commerce gagal, biar
-        // SN yang sudah diinput sales tidak hilang — errornya dicatat saja.
+        // SN yang sudah diinput sales tidak hilang — tapi sekarang errornya
+        // juga dikirim ke response, tidak cuma dicatat di log server.
         console.error("[POST /api/preparation] gagal buat transaksi e-commerce:", ecomErr);
+        ecomWarning = `Penyiapan tersimpan, TAPI transaksi/stok e-commerce gagal dibuat otomatis (${ecomErr?.message ?? "unknown error"}). Cek manual di Data Barang & Riwayat Transaksi.`;
       }
     }
 
@@ -399,6 +413,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     return NextResponse.json({
       success: true, data: order,
       message: `Penyiapan ${order_number} dibuat (${cleanItems.length} unit)`,
+      warning: ecomWarning, // ← null kalau tidak ada masalah; diisi kalau update status unit gagal/partial
     });
   } catch (err: any) {
     console.error("[POST /api/preparation]", err);
