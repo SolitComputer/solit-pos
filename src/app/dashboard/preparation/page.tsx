@@ -312,6 +312,12 @@ function CreateModal({
       }
       onCreated();
       onClose();
+      // Order tetap berhasil dibuat, tapi kalau ada unit yang gagal ditandai
+      // Packing (mis. SN tidak ditemukan di Data Barang), sales perlu tahu
+      // SEKARANG juga, bukan nemu sendiri pas SN masih muncul di Siap Jual.
+      if (result.warning) {
+        alert(result.warning);
+      }
     } catch {
       setError("Terjadi kesalahan koneksi");
     } finally {

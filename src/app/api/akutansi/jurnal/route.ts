@@ -17,6 +17,8 @@ import {
   draftToLineRows,
   getTransactionMetaByInvoices,
   getTransactionSyncDraftsByInvoices,
+  getCashflowSyncDraftsByIds,
+  getServiceSyncDraftsByIds,
 } from "@/lib/accountingSource";
 
 function getAdmin(): SupabaseClient {
@@ -103,9 +105,48 @@ export const GET = withAuth(async (req) => {
     ),
   ];
 
-  const syncDraftMap = await getTransactionSyncDraftsByInvoices(supabase, primaryTrxInvoiceNumbers);
+  // Sinkronisasi Nominal juga berlaku untuk CASHFLOW (entry manual) dan SERVICE
+  // (entry tunggal, belum pernah dipecah DP/Cicilan/Pelunasan) — lihat JSDoc
+  // masing-masing fungsi di accountingSource.ts untuk batasannya.
+  const primaryCashflowIds = [
+    ...new Set(
+      entries
+        .filter((e: any) => e.source_type === "CASHFLOW" && e.source_id)
+        .map((e: any) => e.source_id as string)
+    ),
+  ];
+
+  const primaryServiceIds = [
+    ...new Set(
+      entries
+        .filter(
+          (e: any) =>
+            e.source_type === "SERVICE" && e.source_id && !(e.source_id as string).includes("__")
+        )
+        .map((e: any) => e.source_id as string)
+    ),
+  ];
+
+  const [syncDraftMap, cashflowSyncDraftMap, serviceSyncDraftMap] = await Promise.all([
+    getTransactionSyncDraftsByInvoices(supabase, primaryTrxInvoiceNumbers),
+    getCashflowSyncDraftsByIds(supabase, primaryCashflowIds),
+    getServiceSyncDraftsByIds(supabase, primaryServiceIds),
+  ]);
 
   const entriesWithMeta = entries.map((e: any) => {
+    if (e.source_type === "CASHFLOW" && e.source_id) {
+      const syncDraft = cashflowSyncDraftMap.get(e.source_id as string);
+      const syncAvailable = !!syncDraft && !linesEqual(e.lines ?? [], syncDraft.lines);
+      return { ...e, trx_meta: null, sync_available: syncAvailable };
+    }
+
+    if (e.source_type === "SERVICE" && e.source_id) {
+      const baseId = (e.source_id as string).split("__")[0];
+      const syncDraft = serviceSyncDraftMap.get(baseId);
+      const syncAvailable = !!syncDraft && !linesEqual(e.lines ?? [], syncDraft.lines);
+      return { ...e, trx_meta: null, sync_available: syncAvailable };
+    }
+
     if (e.source_type !== "TRANSACTION" || !e.source_id) {
       return { ...e, trx_meta: null, sync_available: false };
     }
