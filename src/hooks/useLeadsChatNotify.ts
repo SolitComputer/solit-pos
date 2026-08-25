@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { LEADS_CHAT_ROLES } from "@/lib/permissions";
+import { startJitteredPolling } from "@/lib/pollingScheduler";
 
 interface ConversationSummary { id: string; unread_count: number }
 
@@ -17,7 +18,7 @@ export function useLeadsChatNotify(userRoles: string[], userId?: string) {
     if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
     inFlightRef.current = true;
     try {
-      const res = await fetch("/api/leads-chat/conversations?limit=50");
+      const res = await fetch("/api/leads-chat/conversations?limit=50", { signal: AbortSignal.timeout(8000) });
       const data = await res.json();
       if (data.success) setConversations(data.conversations ?? []);
     } catch { /* badge/alarm cosmetic — diamkan kalau gagal */ }
@@ -28,7 +29,8 @@ export function useLeadsChatNotify(userRoles: string[], userId?: string) {
 
   useEffect(() => {
     fetchUnread();
-    const interval = setInterval(fetchUnread, POLL_INTERVAL_MS);
+    // jitter → hindari semua client nembak di detik yang sama
+    const stop = startJitteredPolling(fetchUnread, POLL_INTERVAL_MS);
 
     const onVisible = () => {
       if (document.visibilityState === "visible") fetchUnread();
@@ -36,7 +38,7 @@ export function useLeadsChatNotify(userRoles: string[], userId?: string) {
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      clearInterval(interval);
+      stop();
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [fetchUnread]);

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/services/supabase";
 import { hasAnyRole, PREPARATION_DONE_ROLES, PREPARATION_DISPATCH_ROLES } from "@/lib/permissions";
 import { ALARM_KEYS, isPrepProvider, isPrepSilent } from "@/lib/prepAlarm";
+import { startJitteredPolling } from "@/lib/pollingScheduler";
 
 function readAck(key: string): Set<string> {
   if (typeof window === "undefined") return new Set();
@@ -46,14 +47,14 @@ export function usePrepNotify(userRoles: string[], userId?: string | null) {
     try {
       // MENUNGGU (format baru) → hanya penyedia barang yang bunyi
       if (canHearMenunggu) {
-        const res = await fetch("/api/preparation?status=MENUNGGU", { cache: "no-store" });
+        const res = await fetch("/api/preparation?status=MENUNGGU", { cache: "no-store", signal: AbortSignal.timeout(8000) });
         const r = await res.json();
         setMenungguIds((r.data ?? []).map((o: any) => o.id));
       } else setMenungguIds([]);
 
       // SIAP_KIRIM (penyedia done) → HANYA order yang dibuat user ini (sales pembuat format)
       if (canHearSiapKirim) {
-        const res = await fetch("/api/preparation?status=SIAP_KIRIM", { cache: "no-store" });
+        const res = await fetch("/api/preparation?status=SIAP_KIRIM", { cache: "no-store", signal: AbortSignal.timeout(8000) });
         const r = await res.json();
         setSiapKirimIds(
           (r.data ?? [])
@@ -69,8 +70,9 @@ export function usePrepNotify(userRoles: string[], userId?: string | null) {
   useEffect(() => {
     if (!rolesKey) return;
     fetchData();
-    const interval = setInterval(fetchData, 60000); // 60s fallback, primary updates come from Realtime
-    return () => clearInterval(interval);
+    // 60–75s + jitter → client tidak sinkron nembak di detik yang sama (fallback; primary via Realtime)
+    const stop = startJitteredPolling(fetchData, 60000);
+    return stop;
   }, [rolesKey, fetchData]);
 
   useEffect(() => {
