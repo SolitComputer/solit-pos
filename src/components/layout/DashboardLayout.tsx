@@ -16,6 +16,8 @@ import { unlockReminderAudio } from "@/lib/reminderSound";
 import PatchNoteFab from "@/components/ui/PatchNoteFab";
 import BackButton from "@/components/ui/BackButton";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { isPrepSilent } from "@/lib/prepAlarm";
+import { expandRolesWithParents } from "@/lib/permissions";
 
 
 function ScrollRestorer() {
@@ -56,6 +58,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user: authUser } = useAuthUser();
   const soundUserId = authUser?.id ?? null;
 
+  // ── Role-based global mute: ADMIN/PROGRAMMER/ASISTEN_CEO tidak bunyi apapun ─
+  const authUserRoles: string[] = Array.isArray(authUser?.roles) && authUser.roles.length > 0
+    ? authUser.roles
+    : authUser?.role ? [authUser.role] : [];
+  const isSilentAdmin = isPrepSilent(null, expandRolesWithParents(authUserRoles));
+
   // ── Mission sound ──────────────────────────────────────────────────────────
   const { playMissionSound, unlockAudio } = useMissionSound();
 
@@ -78,15 +86,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         <ScrollRestorer />
         <Sidebar />
-        <DeliveryAlertListener />
+        {!isSilentAdmin && <DeliveryAlertListener />}
 
-        <MissionSoundNotifier
-          userId={soundUserId}
-          unlockAudio={unlockAudio}
-          playMissionSound={playMissionSound}
-        />
+        {!isSilentAdmin && (
+          <MissionSoundNotifier
+            userId={soundUserId}
+            unlockAudio={unlockAudio}
+            playMissionSound={playMissionSound}
+          />
+        )}
 
-        <SellerReminderNotifier userId={soundUserId} />
+        <SellerReminderNotifier userId={isSilentAdmin ? null : soundUserId} />
         <ReminderPopupModal userId={soundUserId} />
         <PatchNoteFab />
 

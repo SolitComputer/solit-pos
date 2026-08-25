@@ -295,8 +295,22 @@ export async function middleware(request: NextRequest) {
   // multi-instance), rate limit in-memory di sini efektif menahan flood dari
   // satu/segelintir sumber (script abuse, scanner) sebelum sempat menyentuh
   // DB atau hitung bcrypt — mengurangi biaya server per request jahat.
-  const rlIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (isRateLimited(`mw-global:${rlIp}`, 400, 10_000)) {
+    const rlIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  // 1 kantor = 1 IP publik bersama (sudah dikonfirmasi lewat insiden 403
+  // Hostinger sebelumnya), plus app ini banyak fitur polling (presence,
+  // badge notifikasi, leads-chat, dll) — GET dari banyak staff gampang
+  // numpuk di 1 bucket IP yang sama. Pisahkan limit baca (GET/HEAD, murah
+  // & sering) dari limit tulis (mahal & jarang) supaya trafik baca yang
+  // wajar tidak ikut kena limit yang didesain untuk nahan abuse/scanner.
+  const isMutating = !["GET", "HEAD"].includes(request.method);
+  const rlBucket = isMutating ? `mw-global-write:${rlIp}` : `mw-global-read:${rlIp}`;
+  // Limit lebih longgar: 1 IP kantor dipakai bersama banyak staff + banyak
+  // polling hook (presence, badge notif, leads-chat, dll). Window 60 detik
+  // dengan limit 600 write / 3000 read → masih aman dari flood otomatis
+  // (script abuse biasanya ribuan request per detik), tapi tidak kena rate
+  // limit saat trafik kantor normal jam kerja.
+  const rlLimit = isMutating ? 600 : 3000;
+  if (isRateLimited(rlBucket, rlLimit, 60_000)) {
     return NextResponse.json(
       { success: false, message: "Terlalu banyak request, coba lagi sebentar lagi" },
       { status: 429 }
@@ -551,7 +565,7 @@ export async function middleware(request: NextRequest) {
 
     if (!exempt && isWithinSystemHours() && !hasAttended) {
       return NextResponse.redirect(
-        new URL(`/face-veripfy?from=${encodeURIComponent(pathname)}`, request.url)
+        new URL(`/face-verify?from=${encodeURIComponent(pathname)}`, request.url)
       );
     }
   }
