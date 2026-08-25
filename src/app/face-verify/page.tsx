@@ -111,6 +111,8 @@ export default function FaceVerifyPage() {
   const [earlyCheckoutError, setEarlyCheckoutError] = useState("");
 
   const [userShift, setUserShift] = useState<ShiftType>("PAGI");
+  const [userName, setUserName] = useState<string>("");
+  const [userRole, setUserRole] = useState<string>("");
   const [needEnrollState, setNeedEnrollState] = useState(false);
   const [scheduleInfo, setScheduleInfo] = useState<{
     openAt: string; closeAt: string; lateAt: string;
@@ -288,6 +290,8 @@ export default function FaceVerifyPage() {
 
         const shift: ShiftType = (statusResult.shift as ShiftType) ?? "PAGI";
         setUserShift(shift);
+        if (statusResult.userName) setUserName(statusResult.userName);
+        if (statusResult.userRole) setUserRole(statusResult.userRole);
         setNeedEnrollState(statusResult.needEnroll ?? false);
 
         if (statusResult.scheduleToday) {
@@ -947,7 +951,7 @@ export default function FaceVerifyPage() {
         </div>
 
         {/* Title */}
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <div style={{ textAlign: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 17, fontWeight: 600, color: "var(--text)", letterSpacing: 0.1, marginBottom: 4 }}>
             {stage === "enroll" || stage === "enrolling"
               ? "Daftarkan Wajah"
@@ -958,6 +962,97 @@ export default function FaceVerifyPage() {
             {isHolidayToday && <span style={{ color: "rgba(251,146,60,0.75)" }}> · Hari Libur (Lembur)</span>}
           </div>
         </div>
+
+        {/* User Identity Confirmation Card (Besar & Jelas) */}
+        {userName && !["loading", "checking", "success", "out-of-time", "day-off", "early-checkout-request"].includes(stage) && (
+          <div style={{
+            background: "linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.7) 100%)",
+            border: "1.5px solid rgba(96, 165, 250, 0.45)",
+            borderRadius: "14px",
+            padding: "14px 16px",
+            marginBottom: "16px",
+            textAlign: "center",
+            boxShadow: "0 8px 24px -6px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12)",
+            position: "relative",
+          }}>
+            <div style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              color: "rgba(147, 197, 253, 0.95)",
+              letterSpacing: "0.5px",
+              textTransform: "uppercase",
+              marginBottom: "5px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px"
+            }}>
+              <span>👤</span> Anda akan absen sebagai:
+            </div>
+            
+            <div style={{
+              fontSize: "20px",
+              fontWeight: 800,
+              color: "#ffffff",
+              letterSpacing: "0.2px",
+              lineHeight: 1.25,
+              marginBottom: "6px",
+              textShadow: "0 2px 12px rgba(0,0,0,0.6)"
+            }}>
+              {userName}
+            </div>
+
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              fontSize: "11px",
+              color: "rgba(255, 255, 255, 0.65)",
+              marginBottom: "10px"
+            }}>
+              <span style={{
+                background: "rgba(255, 255, 255, 0.1)",
+                padding: "2px 8px",
+                borderRadius: "6px",
+                fontWeight: 500
+              }}>
+                {userRole}
+              </span>
+              <span>•</span>
+              <span style={{
+                background: "rgba(255, 255, 255, 0.1)",
+                padding: "2px 8px",
+                borderRadius: "6px",
+                fontWeight: 500
+              }}>
+                Shift {userShift}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                background: "rgba(239, 68, 68, 0.16)",
+                border: "1px solid rgba(239, 68, 68, 0.45)",
+                borderRadius: "8px",
+                padding: "6px 14px",
+                color: "#fca5a5",
+                fontSize: "11px",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px"
+              }}
+            >
+              <span>⚠️ Bukan akun Anda?</span>
+              <span style={{ textDecoration: "underline", color: "#ffffff" }}>Ganti Akun / Logout</span>
+            </button>
+          </div>
+        )}
 
         {/* Loading / Checking */}
         {(stage === "loading" || stage === "checking") && (
@@ -1408,7 +1503,7 @@ export default function FaceVerifyPage() {
             <div className="status-chip">
               <div className={`s-dot ${isProcessing ? "s-dot-amber" : faceDetected ? "s-dot-green" : "s-dot-gray"}`} />
               <div style={{ flex: 1, fontSize: 11, color: isProcessing ? "var(--warn)" : faceDetected ? "rgba(255,255,255,0.72)" : "var(--text-dim)", letterSpacing: 0.2 }}>
-                {isProcessing ? message : faceDetected ? "Wajah terdeteksi — tahan sebentar" : "Arahkan wajah ke bingkai"}
+                {isProcessing ? message : faceDetected ? `Wajah terdeteksi — tahan untuk ${userName || "absen"}` : `Posisikan wajah ${userName ? `(${userName})` : ""}`}
               </div>
               <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)" }}>{attempts}/{MAX_ATTEMPTS}</div>
             </div>
@@ -1425,7 +1520,7 @@ export default function FaceVerifyPage() {
                   <span className="fc fc-bl" /><span className="fc fc-br" />
                 </div>
               </div>
-              <div className="hud hud-tl"><div>cam·0</div><div className="blink" style={{ color: "rgba(255,255,255,0.45)" }}>● rec</div></div>
+              <div className="hud hud-tl"><div>cam·0</div><div className="blink" style={{ color: "rgba(255,255,255,0.45)" }}>● rec</div>{userName && <div style={{ color: "#93c5fd", fontWeight: 600, marginTop: 2 }}>{userName}</div>}</div>
               <div className="hud hud-tr"><div>640×480</div><div style={{ color: confColor }}>{confidence}%</div></div>
               <div className="hud hud-bl" style={{ color: confColor, fontSize: 9 }}>{confidence >= AUTO_CAPTURE_CONFIDENCE * 100 ? "conf: lock " : "conf: scan"}</div>
               <div className="hud hud-br">{currentDistance != null ? ` ${currentDistance}m` : clockStr}</div>
