@@ -1,4 +1,3 @@
-// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
@@ -20,9 +19,6 @@ import { withTimeout } from "@/lib/withTimeout";
 import { fetchWithTimeout } from "@/lib/supabaseFetchWithTimeout";
 import { isRateLimited } from "@/lib/rateLimit";
 
-// Batas waktu tiap call Supabase di middleware. Middleware jalan di HAMPIR
-// SETIAP request, jadi kalau Supabase lambat/hang, ini yang mencegah request
-// nge-gantung sampai proxy di depan (nginx/LiteSpeed) motong paksa (408).
 const SUPABASE_TIMEOUT_MS = 5000;
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout", "/scan"];
@@ -59,15 +55,8 @@ const FACE_API_WHITELIST = [
 
 const PKL_BLOCKED_ROUTES = ["/dashboard/users"];
 
-// ── Pembatasan khusus 1 akun: Raffi Fahrezi (PKL_PENGELOLA_BARANG) hanya
-// boleh buka halaman Data Laptop untuk cari unit + toggle SO/UnSO. Blok ini
-// SELALU mengurangi akses (AND tambahan setelah cek role normal di bawah),
-// tidak pernah menambah — jadi kalau role-nya nanti berubah dan ROUTE_PERMISSIONS
-// sudah tidak mengizinkan sebuah path, blok ini tetap konsisten (tidak override).
 const SO_ONLY_USER_IDS = ["203810b5-f9e0-4de4-9495-e1378451fa29"];
 
-// Domain yang dibatasi buat akun di atas — di luar prefix ini akses jalan normal
-// (absensi, chat, profil, dsb SAMA SEKALI tidak disentuh).
 const SO_ONLY_DOMAIN_PREFIXES = [
   "/dashboard/data-barang",
   "/dashboard/accessories",
@@ -85,25 +74,15 @@ function isSoOnlyRestrictedPath(pathname: string): boolean {
   );
   if (!inDomain) return false;
 
-  // Halaman Data Laptop (list + tombol SO)
   if (pathname === "/dashboard/laptops") return false;
-  // GET list laptop
   if (pathname === "/api/laptops") return false;
-  // Halaman Units per-model (cari unit saat stok > 1)
   if (/^\/dashboard\/laptops\/[^/]+\/units$/.test(pathname)) return false;
-  // GET units per-model + GET/PATCH SO (toggle & riwayat)
   if (/^\/api\/laptops\/[^/]+\/units$/.test(pathname)) return false;
   if (/^\/api\/laptops\/[^/]+\/so$/.test(pathname)) return false;
-  // GET detail 1 laptop by id (dipakai saat buka Detail/Unit popup)
   if (/^\/api\/laptops\/[^/]+$/.test(pathname) && pathname !== "/api/laptops/create" && pathname !== "/api/laptops/minus") return false;
-  // ✅ FIX: SO per-unit (GET riwayat & PATCH toggle) di halaman Units —
-  // sebelumnya belum di-whitelist di sini, padahal niat pembatasan akun ini
-  // (lihat komentar SO_ONLY_USER_IDS) memang boleh "toggle SO/UnSO". Tanpa
-  // baris ini, tombol SO di /dashboard/laptops/[id]/units selalu 403 untuk
-  // akun ini walau halamannya sendiri bisa dibuka.
   if (/^\/api\/units\/[^/]+\/so$/.test(pathname)) return false;
 
-  return true; // selain itu (data-barang, accessories, units summary, ready, minus, monitoring, dll) → blocked
+  return true; 
 }
 
 const PROTECTED_PREFIXES = ["/dashboard", "/payment"];
@@ -119,7 +98,7 @@ function isContractExempt(role?: string): boolean {
 }
 
 async function hasApprovedContract(userId: string): Promise<boolean> {
-  if (!CONTRACT_GATE_ENABLED) return true; // 🔴 gate dimatikan sementara
+  if (!CONTRACT_GATE_ENABLED) return true; 
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -138,9 +117,6 @@ async function hasApprovedContract(userId: string): Promise<boolean> {
       SUPABASE_TIMEOUT_MS,
       { data: null, error: { message: "timeout" } }
     );
-    // Query nge-hang (bukan error dilempar, cuma gak pernah resolve) ->
-    // fail-closed, sama kayak behavior `catch` di bawah, daripada nunggu
-    // tanpa batas sampai proxy motong koneksinya.
     if (error) return false;
 
     const status = data?.contract_status ?? "NONE";
