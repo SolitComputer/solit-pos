@@ -107,20 +107,22 @@ export async function getTransactionMetaByInvoices(
 
   const laptopSpecMap = new Map<string, { cpu?: string; ram?: string; storage?: string }>();
   if (laptopIds.size > 0) {
-    const { data: laptops } = await supabase
-      .from("laptops")
-      .select("id, cpu, ram, storage")
-      .in("id", Array.from(laptopIds));
-    for (const l of laptops ?? []) {
-      laptopSpecMap.set(l.id as string, {
-        cpu: (l.cpu as string) ?? undefined,
-        ram: (l.ram as string) ?? undefined,
-        storage: (l.storage as string) ?? undefined,
-      });
+    for (const batch of chunkArray(Array.from(laptopIds), 150)) {
+      const { data: laptops } = await supabase
+        .from("laptops")
+        .select("id, cpu, ram, storage")
+        .in("id", batch);
+      for (const l of laptops ?? []) {
+        laptopSpecMap.set(l.id as string, {
+          cpu: (l.cpu as string) ?? undefined,
+          ram: (l.ram as string) ?? undefined,
+          storage: (l.storage as string) ?? undefined,
+        });
+      }
     }
   }
 
-    for (const t of trxs as any[]) {
+  for (const t of trxs as any[]) {
     let resolvedLaptopId: string | undefined = t.laptop_id ?? undefined;
     if (!resolvedLaptopId) {
       const ids: string[] =
@@ -277,7 +279,7 @@ export async function getTransactionSyncDraftsByInvoices(
       lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
     }
 
-        const merged = mergeLines(lines);
+    const merged = mergeLines(lines);
     result.set(t.invoice_number as string, {
       lines: merged,
       total: totalOf(merged),
@@ -331,13 +333,13 @@ export async function getCashflowSyncDraftsByIds(
     const lines: DraftLine[] =
       e.direction === "OUT"
         ? [
-            { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
-            { account_code: kasAccount, side: "KREDIT", nominal },
-          ]
+          { account_code: expenseAccountForCashflow(e.category), side: "DEBIT", nominal },
+          { account_code: kasAccount, side: "KREDIT", nominal },
+        ]
         : [
-            { account_code: kasAccount, side: "DEBIT", nominal },
-            { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
-          ];
+          { account_code: kasAccount, side: "DEBIT", nominal },
+          { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
+        ];
 
     const merged = mergeLines(lines);
     result.set(String(e.id), { lines: merged, total: totalOf(merged) });
