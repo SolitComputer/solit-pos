@@ -25,7 +25,7 @@ import { isRateLimited } from "@/lib/rateLimit";
 // nge-gantung sampai proxy di depan (nginx/LiteSpeed) motong paksa (408).
 const SUPABASE_TIMEOUT_MS = 5000;
 
-const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
+const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout", "/scan"];
 // ✅ SECURITY FIX: `/receipt/` DULU publik penuh — halaman struk `/receipt/INV-...`
 // bisa dibuka siapa saja tanpa login, padahal nomor invoice berurutan & mudah
 // ditebak → data pelanggan (nama/HP/alamat/nominal) bisa dipanen dengan enumerasi.
