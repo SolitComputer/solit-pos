@@ -75,7 +75,7 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
 };
 
 // ─── Base Role Groups ─────────────────────────────────────────────────────────
-const FULL_ACCESS: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
+const FULL_ACCESS: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
 const ALL_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -134,7 +134,7 @@ export const SELLER_PIC_CANDIDATE_ROLES: UserRole[] = ["CREW_SALES", "KEPALA_MAR
 
 /** Role yang bisa akses halaman "Semua Unit" (global inventory view lintas laptop) */
 export const ALL_UNITS_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "PENGELOLA_BARANG",
+  ...FULL_ACCESS, "ACCOUNTING", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "PENGELOLA_BARANG",
 ];
 // ─── Akuntansi ────────────────────────────────────────────────────────────────
 export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
@@ -172,7 +172,7 @@ export function getLegacyPageAccess(role: string, pageRoute: string): boolean {
 
 // ─── Pengambilan Barang (Item Outflow) ────────────────────────────────────
 export const ITEM_OUTFLOW_ROLES: UserRole[] = [
-  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING",
   "TEKNISI", "KEPALA_TEKNISI",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
   "KEPALA_ZENITH",
@@ -251,6 +251,7 @@ export const PROVIDER_PERFORMANCE_VIEW_ROLES: UserRole[] = [...PREPARATION_ANTRI
 
 export const PREPARATION_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS,
+  "ACCOUNTING",
   ...PREPARATION_SALES_ROLES,
   ...PREPARATION_PENYEDIA_ROLES,
   ...PREPARATION_PENYEDIA_EXTRA_ROLES,
@@ -281,7 +282,7 @@ export const DELIVERY_VOICE_TARGET_ROLES: UserRole[] = [
 
 // ─── Service Roles ────────────────────────────────────────────────────────────
 export const SERVICE_VIEW_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
+  ...FULL_ACCESS, "ACCOUNTING", "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
 ];
 export const SERVICE_CREATE_ROLES: UserRole[] = [
   ...FULL_ACCESS, "KEPALA_TEKNISI", "CUSTOMER_SERVICE", "TEKNISI",
@@ -295,20 +296,20 @@ export const CASHFLOW_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", 
 export const ACCESSORY_ONLY_SALES_ROLES: UserRole[] = ["CUSTOMER_SERVICE"];
 export const CASHFLOW_AUDIT_OUT_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 
-export const CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
+export const CASHFLOW_AUDIT_ACCESS_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 
 export const CC_REPORT_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING", "KONTEN",
+  ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING", "MARKETING", "KONTEN",
 ];
 export const CC_REPORT_MANAGE_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "KEPALA_MARKETING",
+  ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING",
 ];
 
 export const LEADS_CHAT_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "KEPALA_MARKETING", "MARKETING", "KONTEN",
+  ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING", "MARKETING", "KONTEN",
 ];
 export const LEADS_CHAT_MANAGE_ROLES: UserRole[] = [
-  ...FULL_ACCESS, "KEPALA_MARKETING",
+  ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING",
 ];
 
 export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
@@ -348,11 +349,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
-  "/dashboard/laptops/monitoring": [
-    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
+    "/dashboard/laptops/monitoring": [
+    ...FULL_ACCESS, "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
   ],
 
-  "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
+    "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
   "/dashboard/audit-barang-keluar": [...ITEM_OUTFLOW_ROLES],
 
   "/dashboard/warranty": [
@@ -672,7 +673,7 @@ export const PERMISSIONS = {
   CREATE_SERVICE: [...SERVICE_CREATE_ROLES] as UserRole[],
   UPDATE_SERVICE_STATUS: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
-  CONFIRM_SERVICE_PICKUP: [...SERVICE_VIEW_ROLES] as UserRole[],
+   CONFIRM_SERVICE_PICKUP: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE"] as UserRole[],
 
   // ── Management Seller ──────────────────────────────────────────────────────
   VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
@@ -1026,6 +1027,7 @@ export function canSoUnit(
 // Kepala Sales, Kepala Zenith, Kepala Onpoint, Kepala Sotech, Crew Sales, dan Sales tidak diperbolehkan.
 export const DATA_BARANG_LAPTOP_ROLES: UserRole[] = [
   ...FULL_ACCESS,
+  "ACCOUNTING",
   "PURCHASING",
   "PENGELOLA_BARANG",
   "KEPALA_PENGELOLA_BARANG",

@@ -26,13 +26,6 @@ import { isRateLimited } from "@/lib/rateLimit";
 const SUPABASE_TIMEOUT_MS = 5000;
 
 const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout", "/scan"];
-// ✅ SECURITY FIX: `/receipt/` DULU publik penuh — halaman struk `/receipt/INV-...`
-// bisa dibuka siapa saja tanpa login, padahal nomor invoice berurutan & mudah
-// ditebak → data pelanggan (nama/HP/alamat/nominal) bisa dipanen dengan enumerasi.
-// Faktanya link struk HANYA dipakai dari halaman dashboard/payment (staff login);
-// pelanggan cuma menerima RINGKASAN TEKS via WA, bukan URL halaman ini. Jadi
-// struk transaksi sekarang wajib login. `/receipt/salary-slip/` tetap publik
-// (pakai UUID acak, bukan enumerable) agar perilaku slip gaji tidak berubah.
 const PUBLIC_PREFIXES = ["/receipt/salary-slip/", "/scan/"];
 const PUBLIC_API_ROUTES = [
   "/api/warranty/check",

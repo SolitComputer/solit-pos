@@ -303,6 +303,40 @@ const ADMIN_PENGANTARAN_MENU: MenuGroup = {
   ],
 };
 
+// ── Menu khusus ACCOUNTING: Inventaris tanpa "Barang Minus" (Aset Tetap & Aset
+// Matot otomatis nempel lewat blok auto-inject FIXED_ASSET_ROLES/DEAD_ASSET_ROLES
+// di bawah, jangan didaftarkan manual di sini biar tidak dobel).
+// ── Absensi ACCOUNTING: tanpa Daftar Hadir & Laporan Kerja PKL.
+const ACCOUNTING_ABSENSI: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_LEMBUR] };
+
+// ── Ultah ACCOUNTING: cuma Ultah Karyawan, tanpa Ultah Customer.
+const ACCOUNTING_ULTAH: MenuGroup = { label: "Ultah", items: [ITEM_ULTAH_KARYAWAN] };
+
+const ACCOUNTING_INVENTARIS: MenuGroup = {
+  label: "Inventaris",
+  items: [
+    ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL, ITEM_ALL_UNITS,
+  ],
+};
+
+// ── Transaksi ACCOUNTING: view-only, tidak ada Buat Payment/Management Seller/Scanner.
+const ACCOUNTING_TRANSAKSI: MenuGroup = {
+  label: "Transaksi",
+  items: [
+    { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
+    { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
+  ],
+};
+
+// ── Penyedia Barang ACCOUNTING: cuma "Semua Penyiapan" (view dashboard), tanpa
+// Antrian Masuk / Selesai Disiapkan (itu aksi terima & cek unit).
+const ACCOUNTING_PENYEDIA_MENU: MenuGroup = {
+  label: "Penyedia Barang",
+  items: [
+    { name: "Semua Penyiapan", href: "/dashboard/preparation", icon: Icons.pendingOrders },
+  ],
+};
+
 const ADMIN_UTAMA: MenuGroup = {
   label: "Utama",
   items: [ITEM_DASHBOARD, ITEM_LEADERBOARD_PEKERJAAN, ITEM_TODOS, ITEM_PATCH_NOTES],
@@ -512,13 +546,11 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
 
   ACCOUNTING: [
     { label: "Utama", items: [ITEM_DASHBOARD] },
-    GROUP_ABSENSI_WITH_PKL,
-    GROUP_LOG,
+    ACCOUNTING_ABSENSI,
     GROUP_KEUANGAN,
-    { label: "Management", items: [ITEM_USERS, ITEM_MONITOR_CHAT] },
-    { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT, ITEM_HASIL_PENJUALAN] },
-    GROUP_ULTAH,
-    ADMIN_INVENTARIS, ADMIN_TRANSAKSI, ADMIN_PENYEDIA_MENU, ADMIN_PENGANTARAN_MENU, SERVICE_MENU,
+    { label: "Management", items: [ITEM_USERS] },
+    ACCOUNTING_ULTAH,
+    ACCOUNTING_INVENTARIS, ACCOUNTING_TRANSAKSI, ACCOUNTING_PENYEDIA_MENU, SERVICE_MENU,
   ],
 
   PURCHASING: [
@@ -753,7 +785,7 @@ function sortGroupsByCanonicalOrder(groups: MenuGroup[]): MenuGroup[] {
 });
 
 const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
-  "ADMIN", "PROGRAMMER", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH",
+  "ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH",
   "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH",
 ]);
 
@@ -785,13 +817,10 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   }
 });
 
-// ── Audit Barang Keluar: hanya role yang sudah punya akses ITEM_OUTFLOW_ROLES.
-// Pakai .map() bikin objek grup BARU per-role (bukan .push() ke grup yang
-// di-share banyak role, misal ADMIN_INVENTARIS dipakai ADMIN+PROGRAMMER+
-// ASISTEN_CEO+ACCOUNTING) — supaya ACCOUNTING dkk yang TIDAK ada di
-// ITEM_OUTFLOW_ROLES gak ikut kebagian menu ini gara-gara referensi objek sama.
+
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   if (!(ITEM_OUTFLOW_ROLES as string[]).includes(role)) return;
+  if (role === "ACCOUNTING") return;
   let hasInventaris = false;
   ROLE_MENUS[role] = ROLE_MENUS[role].map((g) => {
     if (g.label !== "Inventaris") return g;
@@ -804,9 +833,6 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   }
 });
 
-// ── Data Aset Tetap: pola sama persis dengan blok Audit Barang Keluar di atas —
-// pakai .map() bikin objek grup Inventaris BARU per-role, supaya role lain yang
-// nebeng ADMIN_INVENTARIS (mis. ASISTEN_CEO) TIDAK ikut kebagian menu ini.
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
   if (!(FIXED_ASSET_ROLES as string[]).includes(role)) return;
   let hasInventaris = false;
