@@ -476,55 +476,86 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
         : [];
 
     if (unitIds.length > 0) {
+      // ── FIX: unit & laptop di-fetch TERPISAH (bukan nested join
+      // `laptop:laptops(...)`) supaya tidak tergantung bentuk relasi yang
+      // dikembalikan Supabase (object vs array — sering jadi array kalau FK
+      // tidak terdeteksi unik, bikin `.laptop_name` selalu undefined).
+      // Grouping dihitung FRESH dari unit_ids transaksi SAAT INI — bukan dari
+      // snapshot tx.grouped_items yang basi. Snapshot itu TIDAK PERNAH
+      // di-update ulang oleh PUT (termasuk saat "Tukar SN"), jadi serial
+      // number di dalamnya bisa sudah tidak match unit yang sekarang aktif
+      // → pencocokan gagal → Modal/Jual nyangkut Rp0 walau datanya ada.
       const { data: units } = await supabase
         .from("laptop_units")
-        .select(
-          "id, serial_number, purchase_price, laptop_id, laptop:laptops(laptop_name, cpu, ram, storage)"
-        )
+        .select("id, serial_number, purchase_price, laptop_id, selling_price")
         .in("id", unitIds);
 
       if (units && units.length > 0) {
-        const totalModalFromUnits = units.reduce(
-          (sum: number, u: any) => sum + Number(u.purchase_price ?? 0),
-          0
-        );
+        const laptopIds = [...new Set(units.map((u: any) => u.laptop_id).filter(Boolean))];
+        const { data: laptopsData } = laptopIds.length > 0
+          ? await supabase.from("laptops").select("id, laptop_name, cpu, ram, storage, gpu").in("id", laptopIds)
+          : { data: [] as any[] };
+        const laptopSpecMap = new Map((laptopsData ?? []).map((l: any) => [l.id, l]));
+        const unitMap = new Map(units.map((u: any) => [u.id, u]));
 
-        const enriched = (tx.grouped_items ?? []).map((g: any) => {
-          const matchingUnits = units.filter((u: any) => {
-            const snsInGroup: string[] = Array.isArray(g.serial_numbers)
-              ? g.serial_numbers
-              : [];
-            return (
-              snsInGroup.includes(u.serial_number) ||
-              (u.laptop as any)?.laptop_name === g.laptop_name
-            );
-          });
+        // Deal price per unit — ambil dari transaction_items (fresh), bukan snapshot lama
+        const itemDealPriceMap = new Map<string, number>();
+        for (const item of itemsPayload) {
+          if (item.unit_id) itemDealPriceMap.set(item.unit_id, Number(item.deal_price ?? 0));
+        }
 
-          const purchase_price_total = matchingUnits.reduce(
-            (sum: number, u: any) => sum + Number(u.purchase_price ?? 0),
-            0
-          );
+        // Group ulang berdasarkan laptop_id dari unit_ids transaksi SEKARANG
+        const groupMap = new Map<string, any>();
+        for (const uid of unitIds) {
+          const u = unitMap.get(uid);
+          if (!u) continue;
+          const laptopId = u.laptop_id ?? "unknown";
+          const specs = laptopSpecMap.get(laptopId);
+          if (!groupMap.has(laptopId)) {
+            groupMap.set(laptopId, {
+              laptop_id: laptopId,
+              laptop_name: specs?.laptop_name ?? tx.laptop_name ?? "—",
+              cpu: specs?.cpu,
+              ram: specs?.ram,
+              storage: specs?.storage,
+              vga: specs?.gpu,
+              serial_numbers: [] as string[],
+              purchase_price_total: 0,
+              selling_price_total: 0,
+              allocated_deal_price: 0,
+              unit_count: 0,
+            });
+          }
+          const grp = groupMap.get(laptopId)!;
+          if (u.serial_number) grp.serial_numbers.push(u.serial_number);
+          grp.purchase_price_total += Number(u.purchase_price ?? 0);
+          grp.selling_price_total += Number(u.selling_price ?? 0);
+          grp.allocated_deal_price += itemDealPriceMap.get(uid) ?? 0;
+          grp.unit_count += 1;
+        }
 
+        // Fallback alokasi deal price kalau transaction_items belum punya
+        // deal_price per unit (transaksi legacy) — logic disamakan dengan
+        // /api/transaction (list) supaya kedua endpoint konsisten.
+        const dealPriceTx = Number(tx.deal_price ?? tx.amount ?? 0);
+        const totalAllocated = Array.from(groupMap.values()).reduce((s, g) => s + g.allocated_deal_price, 0);
+        const totalSellingAllGroups = Array.from(groupMap.values()).reduce((s, g) => s + g.selling_price_total, 0);
+
+        const enriched = Array.from(groupMap.values()).map((g) => {
+          let finalDealPrice = g.allocated_deal_price;
+          if (groupMap.size === 1) {
+            finalDealPrice = dealPriceTx;
+          } else if (totalAllocated === 0) {
+            finalDealPrice = totalSellingAllGroups > 0
+              ? Math.round(dealPriceTx * (g.selling_price_total / totalSellingAllGroups))
+              : Math.round(dealPriceTx * (g.unit_count / unitIds.length));
+          }
           return {
             ...g,
-            purchase_price_total,
-            margin: Number(g.allocated_deal_price ?? 0) - purchase_price_total,
+            allocated_deal_price: finalDealPrice,
+            margin: finalDealPrice - g.purchase_price_total,
           };
         });
-
-        if (enriched.length === 0 && units.length > 0) {
-          return NextResponse.json({
-            success: true,
-            data: {
-              ...tx,
-              transaction_items: itemsPayload,
-              accessory_items,
-              purchase_price_total: totalModalFromUnits,
-              inventory_price: totalModalFromUnits,
-              other: Number(tx.deal_price ?? tx.amount ?? 0) - totalModalFromUnits,
-            },
-          });
-        }
 
         const enrichedTotal = enriched.reduce(
           (s: number, g: any) => s + Number(g.purchase_price_total ?? 0),

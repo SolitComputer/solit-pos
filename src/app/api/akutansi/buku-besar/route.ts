@@ -95,17 +95,29 @@ export const GET = withAuth(async (req) => {
 
     const saldoAwal = openingSigned + mutasiSebelumPeriode;
 
-    // ── 2) Semua entry di periode berjalan ──
-    const { data: periodEntries, error: entryErr } = await supabase
-      .from("journal_entries")
-      .select("id, tanggal, keterangan, ref, source_type, source_id, created_at")
-      .eq("period", period)
-      .order("tanggal", { ascending: true });
+    const periodEntries: (EntryRow & { created_at: string })[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: page, error: entryErr } = await supabase
+          .from("journal_entries")
+          .select("id, tanggal, keterangan, ref, source_type, source_id, created_at")
+          .eq("period", period)
+          .order("tanggal", { ascending: true })
+          .order("id", { ascending: true }) 
+          .range(from, from + PAGE_SIZE - 1);
 
-    if (entryErr) throw entryErr;
+        if (entryErr) throw entryErr;
+        if (!page || page.length === 0) break;
+        periodEntries.push(...(page as (EntryRow & { created_at: string })[]));
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+    }
 
     const entryMap = new Map<string, EntryRow & { created_at: string }>();
-    for (const e of (periodEntries ?? []) as (EntryRow & { created_at: string })[]) entryMap.set(e.id, e);
+    for (const e of periodEntries) entryMap.set(e.id, e);
 
     const trxInvoiceNumbers = Array.from(entryMap.values())
       .filter((e) => e.source_type === "TRANSACTION" && e.source_id)

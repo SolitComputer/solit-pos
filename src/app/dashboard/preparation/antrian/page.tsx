@@ -52,10 +52,10 @@ export default function PreparationAntrianPage() {
 
   const showToast = useCallback((title: string, sub: string) => {
     setToast({ title, sub });
-    if (soundOnRef.current) playNotifSound();
+    if (soundOnRef.current && canHearIncoming) playNotifSound();
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(null), 7000);
-  }, []);
+  }, [canHearIncoming]);
 
   useEffect(() => {
     const unlock = () => { unlockAudio(); window.removeEventListener("pointerdown", unlock); };

@@ -39,10 +39,10 @@ export default function PreparationSiapKirimPage() {
 
     const showToast = useCallback((title: string, sub: string) => {
         setToast({ title, sub });
-        if (soundOnRef.current) playNotifSound();
+        if (soundOnRef.current && !silent) playNotifSound();
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         toastTimerRef.current = setTimeout(() => setToast(null), 7000);
-    }, []);
+    }, [silent]);
 
     const { unackedCount: alarmCount, unackedIds: alarmIds, acknowledge: ackOrder } = usePrepAlarm(
         myOrders,
