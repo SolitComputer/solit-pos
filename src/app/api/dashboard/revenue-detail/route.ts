@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, PERMISSIONS } from "@/lib/auth";
 import { fetchAllRows } from "@/lib/supabaseFetch";
+import { chunkArray } from "@/lib/chunkArray";
 
 function getWIBOffset() { return 7 * 60 * 60 * 1000; }
 
@@ -83,12 +84,15 @@ async function handler(req: NextRequest) {
 
         const unitMap = new Map<string, number>();
         if (allUnitIds.size > 0) {
-            const { data: units } = await supabase
-                .from("laptop_units")
-                .select("id, purchase_price")
-                .in("id", Array.from(allUnitIds));
-            for (const unit of units ?? []) {
-                unitMap.set(unit.id, Number(unit.purchase_price ?? 0));
+            const chunks = chunkArray(Array.from(allUnitIds), 150);
+            for (const chunk of chunks) {
+                const { data: units } = await supabase
+                    .from("laptop_units")
+                    .select("id, purchase_price")
+                    .in("id", chunk);
+                for (const unit of units ?? []) {
+                    unitMap.set(unit.id, Number(unit.purchase_price ?? 0));
+                }
             }
         }
         // ─────────────────────────────────────────────────────────────────────

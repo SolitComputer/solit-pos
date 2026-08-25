@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { PERMISSIONS, withAuth, AuthUser } from "@/lib/auth";
 import { fetchAllRows } from "@/lib/supabaseFetch";
+import { chunkArray } from "@/lib/chunkArray";
 
 function getTodayWIB(): string {
   const WIB = 7 * 60 * 60 * 1000;
@@ -31,13 +32,17 @@ async function buildUnitMap(
   }
   if (allUnitIds.size === 0) return new Map();
 
-  const { data: units } = await supabase
-    .from("laptop_units")
-    .select("id, purchase_price")
-    .in("id", Array.from(allUnitIds));
-
   const map = new Map<string, number>();
-  for (const u of units ?? []) map.set(u.id, Number(u.purchase_price ?? 0));
+  if (allUnitIds.size > 0) {
+    const chunks = chunkArray(Array.from(allUnitIds), 150);
+    for (const chunk of chunks) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, purchase_price")
+        .in("id", chunk);
+      for (const u of units ?? []) map.set(u.id, Number(u.purchase_price ?? 0));
+    }
+  }
   return map;
 }
 
