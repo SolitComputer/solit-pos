@@ -105,20 +105,21 @@ const ANOMALY_BADGE: Record<string, { bg: string; icon: typeof AlertTriangle; la
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+// RESPONSIVE FIX: padding, gap, icon, dan font MetricCard di-scale untuk HP
 function MetricCard({
   icon: Icon, label, value, sub, color,
 }: {
   icon: typeof Package; label: string; value: string | number; sub?: string; color: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-        <Icon className="w-5 h-5" />
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-5 flex items-start gap-2.5 sm:gap-4 hover:shadow-md transition-shadow">
+      <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
       <div className="min-w-0">
-        <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">{label}</p>
-        <p className="text-xl font-bold text-gray-800 mt-0.5">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5 truncate">{sub}</p>}
+        <p className="text-[10px] sm:text-[11px] font-medium text-gray-400 uppercase tracking-wider truncate">{label}</p>
+        <p className="text-lg sm:text-xl font-bold text-gray-800 mt-0.5">{value}</p>
+        {sub && <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5 truncate">{sub}</p>}
       </div>
     </div>
   );
@@ -160,11 +161,11 @@ function Toast({ message, type = "success", onDone }: { message: string; type?: 
 
 function SkeletonCards() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+        <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-5 space-y-3">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-gray-100 rounded-xl animate-pulse" />
+            <div className="w-9 h-9 sm:w-11 sm:h-11 bg-gray-100 rounded-xl animate-pulse" />
             <div className="space-y-1.5 flex-1">
               <div className="h-2.5 bg-gray-100 rounded w-16 animate-pulse" />
               <div className="h-5 bg-gray-100 rounded w-12 animate-pulse" />
@@ -316,18 +317,19 @@ export default function MonitoringPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout>
-      <div className="px-4 sm:px-6 py-6 max-w-[1400px] mx-auto space-y-6">
+      <div className="px-3 sm:px-6 py-4 sm:py-6 max-w-[1400px] mx-auto space-y-4 sm:space-y-6">
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">Monitoring Stok</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-gray-800">Monitoring Stok</h1>
             <p className="text-xs text-gray-400 mt-0.5">Pantau kondisi barang siap jual vs terjual secara real-time</p>
           </div>
-          <div className="flex items-center gap-2">
+          {/* RESPONSIVE FIX: tombol Refresh & Sinkronkan Stok full-width & sejajar (flex-1) di HP */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={fetchData}
               disabled={loading}
-              className="h-9 px-3.5 bg-gray-100 text-gray-600 rounded-xl text-xs font-medium hover:bg-gray-200 transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
+              className="h-9 px-3.5 bg-gray-100 text-gray-600 rounded-xl text-xs font-medium hover:bg-gray-200 transition-all inline-flex items-center justify-center gap-1.5 disabled:opacity-50 flex-1 sm:flex-none"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -335,14 +337,14 @@ export default function MonitoringPage() {
             <button
               onClick={() => { setReconcileStep(1); setReconcileConfirmInput(""); }}
               disabled={reconciling || loading}
-              className="h-9 px-3.5 bg-amber-600 text-white rounded-xl text-xs font-semibold hover:bg-amber-700 transition-all inline-flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
+              className="h-9 px-3.5 bg-amber-600 text-white rounded-xl text-xs font-semibold hover:bg-amber-700 transition-all inline-flex items-center justify-center gap-1.5 disabled:opacity-50 shadow-sm flex-1 sm:flex-none"
             >
               {reconciling ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
                 <Wrench className="w-3.5 h-3.5" />
               )}
-              Sinkronkan Stok
+              <span className="truncate">Sinkronkan Stok</span>
             </button>
           </div>
         </div>
@@ -355,11 +357,11 @@ export default function MonitoringPage() {
           </div>
         )}
 
-        {/* ── Metric Cards ────────────────────────────────────────────────── */}
+        {/* ── Metric Cards — RESPONSIVE FIX: gap di-scale ────────────────────── */}
         {loading && !data ? (
           <SkeletonCards />
         ) : data ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
             <MetricCard
               icon={PackageCheck}
               label="Siap Jual"
@@ -392,10 +394,10 @@ export default function MonitoringPage() {
 
         {/* ── Health Check Banner ──────────────────────────────────────────── */}
         {data && data.anomalyCount > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-amber-800">
                   Ditemukan {data.anomalyCount} anomali stok
                 </p>
@@ -422,8 +424,8 @@ export default function MonitoringPage() {
 
         {/* ── Reconcile Result ─────────────────────────────────────────────── */}
         {reconcileResult && reconcileResult.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-3">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h3 className="text-sm font-semibold text-gray-700">Hasil Sinkronisasi ({reconcileResult.length} item diperbaiki)</h3>
               <button onClick={() => setReconcileResult(null)} className="text-xs text-gray-400 hover:text-gray-600 transition">
                 Tutup
@@ -518,7 +520,8 @@ export default function MonitoringPage() {
             {/* ── 2-Step Verification Modal ────────────────────────────────────── */}
             {reconcileStep > 0 && (
               <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-2xl max-w-md w-full p-6 space-y-5 animate-in zoom-in-95 duration-150">
+                {/* RESPONSIVE FIX: p-5 di HP, max-h + overflow-y-auto biar gak kepotong keyboard/viewport pendek */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-2xl max-w-md w-full p-5 sm:p-6 space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
                   {reconcileStep === 1 && (
                     <>
                       <div className="flex items-center gap-3">
@@ -542,16 +545,17 @@ export default function MonitoringPage() {
                         </ul>
                       </div>
 
-                      <div className="flex gap-2 justify-end pt-2">
+                      {/* RESPONSIVE FIX: tombol stack full-width di HP (flex-col-reverse), sejajar di ≥ sm */}
+                      <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2">
                         <button
                           onClick={() => setReconcileStep(0)}
-                          className="h-9 px-4 rounded-xl text-xs font-semibold text-gray-500 hover:bg-gray-100 transition"
+                          className="h-9 px-4 rounded-xl text-xs font-semibold text-gray-500 hover:bg-gray-100 transition w-full sm:w-auto"
                         >
                           Batal
                         </button>
                         <button
                           onClick={() => setReconcileStep(2)}
-                          className="h-9 px-4 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-sm transition"
+                          className="h-9 px-4 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-sm transition w-full sm:w-auto"
                         >
                           Lanjut ke Langkah 2 &rarr;
                         </button>
@@ -585,10 +589,11 @@ export default function MonitoringPage() {
                         />
                       </div>
 
-                      <div className="flex gap-2 justify-end pt-2">
+                      {/* RESPONSIVE FIX: tombol stack full-width di HP */}
+                      <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2">
                         <button
                           onClick={() => setReconcileStep(1)}
-                          className="h-9 px-3.5 rounded-xl text-xs font-semibold text-gray-500 hover:bg-gray-100 transition"
+                          className="h-9 px-3.5 rounded-xl text-xs font-semibold text-gray-500 hover:bg-gray-100 transition w-full sm:w-auto"
                         >
                           &larr; Kembali
                         </button>
@@ -598,7 +603,7 @@ export default function MonitoringPage() {
                             handleReconcile();
                           }}
                           disabled={reconcileConfirmInput.trim().toUpperCase() !== "SINKRON" || reconciling}
-                          className="h-9 px-4 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm disabled:opacity-40 transition flex items-center gap-1.5"
+                          className="h-9 px-4 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm disabled:opacity-40 transition flex items-center justify-center gap-1.5 w-full sm:w-auto"
                         >
                           {reconciling && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                           Jalankan Rekonsiliasi Sekarang

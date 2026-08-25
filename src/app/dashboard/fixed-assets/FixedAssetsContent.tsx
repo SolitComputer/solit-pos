@@ -206,22 +206,22 @@ export default function FixedAssetsContent() {
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-6 pb-5 border-b border-gray-100 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-[#1a1a2e] flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#1a1a2e]/20">
+        {/* Header — RESPONSIVE FIX: judul & deskripsi di-scale, tombol lebih compact di HP */}
+        <div className="flex items-start justify-between gap-3 sm:gap-4 mb-5 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-100 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#1a1a2e] flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#1a1a2e]/20">
               <AssetIcon className="text-white" />
             </div>
-            <div>
-              <h1 className="text-2xl font-black text-[#1a1a2e] tracking-tight">Data Aset Tetap</h1>
-              <p className="text-sm text-gray-400 mt-0.5">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-black text-[#1a1a2e] tracking-tight">Data Aset Tetap</h1>
+              <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
                 Catatan aset tetap perusahaan — input manual, tidak terhubung ke modul lain
               </p>
             </div>
           </div>
           <button
             onClick={openCreateModal}
-            className="inline-flex items-center gap-2 rounded-full bg-[#1a1a2e] text-white text-sm font-semibold pl-4 pr-5 py-2.5 hover:bg-[#2d2d4a] active:scale-[0.98] transition-all shadow-lg shadow-[#1a1a2e]/25"
+            className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-[#1a1a2e] text-white text-xs sm:text-sm font-semibold pl-3.5 pr-4 sm:pl-4 sm:pr-5 py-2 sm:py-2.5 hover:bg-[#2d2d4a] active:scale-[0.98] transition-all shadow-lg shadow-[#1a1a2e]/25 flex-shrink-0"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19" />
@@ -328,9 +328,10 @@ export default function FixedAssetsContent() {
                 return (
                   <div
                     key={asset.id}
-                    className="group flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50/60 transition-colors"
+                    // RESPONSIVE FIX: padding row & gap dikurangi di HP biar lega untuk teks
+                    className="group flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 sm:py-3.5 hover:bg-gray-50/60 transition-colors"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-[#1a1a2e]/5 flex items-center justify-center flex-shrink-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#1a1a2e]/5 flex items-center justify-center flex-shrink-0">
                       <AssetIcon className="text-[#1a1a2e]/70" />
                     </div>
 
@@ -351,8 +352,9 @@ export default function FixedAssetsContent() {
                     </div>
 
                     <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold text-[#1a1a2e] tabular-nums">{formatIDR(asset.nominal)}</p>
-                      <p className="text-[11px] text-gray-300 mt-0.5">{formatDate(asset.created_at)}</p>
+                      {/* RESPONSIVE FIX: nominal text-xs di HP biar baris gak sempit karena angka panjang */}
+                      <p className="text-xs sm:text-sm font-bold text-[#1a1a2e] tabular-nums">{formatIDR(asset.nominal)}</p>
+                      <p className="text-[10px] sm:text-[11px] text-gray-300 mt-0.5">{formatDate(asset.created_at)}</p>
                     </div>
 
                     <div className="flex items-center gap-0.5 flex-shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
@@ -384,14 +386,14 @@ export default function FixedAssetsContent() {
           )}
         </div>
 
-        {/* Add/Edit modal */}
+        {/* Add/Edit modal — RESPONSIVE FIX: padding p-5 di HP + max-h/overflow-y-auto biar aman saat keyboard muncul */}
         {modalOpen && (
           <div
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
             onClick={closeModal}
           >
             <div
-              className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-sm p-6"
+              className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-sm p-5 sm:p-6 max-h-[92dvh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-3 mb-5">
@@ -467,14 +469,14 @@ export default function FixedAssetsContent() {
           </div>
         )}
 
-        {/* Delete confirm modal */}
+        {/* Delete confirm modal — RESPONSIVE FIX: padding p-5 di HP */}
         {deleteTarget && (
           <div
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
             onClick={() => !deleting && setDeleteTarget(null)}
           >
             <div
-              className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-xs p-6"
+              className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-xs p-5 sm:p-6"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center mb-4">

@@ -21,7 +21,7 @@ import { isRateLimited } from "@/lib/rateLimit";
 
 const SUPABASE_TIMEOUT_MS = 5000;
 
-const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout"];
+const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout", "/scan"];
 const PUBLIC_PREFIXES = ["/receipt/salary-slip/", "/scan/"];
 const PUBLIC_API_ROUTES = [
   "/api/warranty/check",
