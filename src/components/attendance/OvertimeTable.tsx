@@ -117,10 +117,8 @@ function computeRowState(
   // sudah nolak ini, tapi tombolnya sempat tetap nongol di UI karena
   // fungsi canApprove(targetRole) di sini gak tau siapa target
   // user-nya). Full-access (Admin) tetap boleh self-approve, sesuai server.
-  // ✅ CHANGED — ACC sekarang juga butuh foto bukti sudah ada (upload
-  // dilakukan di step Isi Detail, sebelum atasan meng-ACC).
-  const canAccThis = o.status === "PENDING" && !!o.category && !!o.work_description && !!o.proof_photo_url && opts.canApprove(o.users?.role ?? "") && !(isOwner && !opts.canAudit);
-  const canFillDetail = o.status === "PENDING" && isOwner && (!o.category || !o.work_description || !o.proof_photo_url);
+  const canAccThis = o.status === "PENDING" && !!o.category && !!o.work_description && opts.canApprove(o.users?.role ?? "") && !(isOwner && !opts.canAudit);
+  const canFillDetail = o.status === "PENDING" && isOwner && (!o.category || !o.work_description);
   const canUploadProof = o.status === "NEED_PROOF" && isOwner;
   const canAuditThis = o.status === "COMPLETED" && o.audit_status === "PENDING" && opts.canAudit;
   return { style, canAccThis, canFillDetail, canUploadProof, canAuditThis };
@@ -222,10 +220,8 @@ export function OvertimeTable({
               // sudah nolak ini, tapi tombolnya sempat tetap nongol di UI karena
               // fungsi canApprove(targetRole) di sini gak tau siapa target
               // user-nya). Full-access (Admin) tetap boleh self-approve, sesuai server.
-              // ✅ CHANGED — ACC sekarang juga butuh foto bukti sudah ada
-                  // (upload dilakukan di step Isi Detail, sebelum di-ACC).
-                  const canAccThis = o.status === "PENDING" && !!o.category && !!o.work_description && !!o.proof_photo_url && canApprove(o.users?.role ?? "") && !(isOwner && !canAudit);
-                  const canFillDetail = o.status === "PENDING" && isOwner && (!o.category || !o.work_description || !o.proof_photo_url);
+              const canAccThis = o.status === "PENDING" && !!o.category && !!o.work_description && canApprove(o.users?.role ?? "") && !(isOwner && !canAudit);
+              const canFillDetail = o.status === "PENDING" && isOwner && (!o.category || !o.work_description);
               const canUploadProof = o.status === "NEED_PROOF" && isOwner;
               const canAuditThis = o.status === "COMPLETED" && o.audit_status === "PENDING" && canAudit;
               const isBusy = busyId === o.id;
@@ -390,68 +386,26 @@ function OvertimeRejectForm({ row, onClose, onSaved }: { row: OvertimeTableRow; 
 function OvertimeQuickDetailForm({ row, onClose, onSaved }: { row: OvertimeTableRow; onClose: () => void; onSaved: () => void }) {
   const [category, setCategory] = useState<OvertimeCategory | "">((row.category as OvertimeCategory) || "");
   const [desc, setDesc] = useState(row.work_description ?? "");
-  // ✅ NEW — foto bukti sekarang wajib diisi di step ini juga (versi tabel),
-  // konsisten dengan OvertimeFillDetailModal. Kalau row sudah punya foto
-  // dari sebelumnya (modal dibuka ulang), tampilkan sebagai preview awal.
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(row.proof_photo_url ?? null);
-  const [processingPhoto, setProcessingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawFile = e.target.files?.[0];
-    if (!rawFile) return;
-    setError("");
-    setProcessingPhoto(true);
-    try {
-      const watermarked = await addTimestampWatermark(rawFile, {
-        tag: "SOLIT POS • BUKTI LEMBUR",
-        subTag: row.users?.name ? `Karyawan: ${row.users.name}` : undefined,
-      });
-      setFile(watermarked.file);
-      setPreview(watermarked.dataUrl);
-    } catch (err: any) {
-      console.error("[WatermarkError]", err);
-      setError("Gagal memproses timestamp pada foto. Silakan coba lagi.");
-    } finally {
-      setProcessingPhoto(false);
-    }
-  };
 
   const save = async () => {
     if (!category) { setError("Kategori wajib dipilih."); return; }
     if (!desc.trim()) { setError("Keterangan wajib diisi."); return; }
-    // ✅ NEW — foto bukti wajib ada (file baru dipilih ATAU sudah tersimpan
-    // sebelumnya di row) sebelum bisa dikirim ke atasan.
-    if (!file && !row.proof_photo_url) { setError("Foto bukti lembur wajib diupload sebelum bisa dikirim ke atasan."); return; }
     setSaving(true); setError("");
-    try {
-      let proofPhotoUrl = row.proof_photo_url ?? null;
-      if (file) {
-        const fd = new FormData(); fd.append("file", file);
-        const upRes = await fetch("/api/attendance/overtime/upload", { method: "POST", body: fd });
-        const upData = await upRes.json();
-        if (!upData.success) { setError(upData.message || "Upload foto gagal"); setSaving(false); return; }
-        proofPhotoUrl = upData.url;
-      }
-      const res = await fetch("/api/attendance/overtime", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: row.id, action: "SUBMIT_DETAIL", category, work_description: desc.trim(), proof_photo_url: proofPhotoUrl }),
-      });
-      const d = await res.json();
-      if (!d.success) { setError(d.message); return; }
-      onSaved(); onClose();
-    } catch (err: any) {
-      setError(err?.message || "Gagal menyimpan — periksa koneksi internet.");
-    } finally {
-      setSaving(false);
-    }
+    const res = await fetch("/api/attendance/overtime", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: row.id, action: "SUBMIT_DETAIL", category, work_description: desc.trim() }),
+    });
+    const d = await res.json();
+    setSaving(false);
+    if (!d.success) { setError(d.message); return; }
+    onSaved(); onClose();
   };
 
   return (
     <div className="fixed inset-0 z-[105] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
-      <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3.5 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3.5">
         <p className="font-bold text-sm text-gray-800">Isi Detail Lembur</p>
         {error && <div className="bg-red-50 text-red-700 text-xs px-3 py-2 rounded-lg">{error}</div>}
         <div className="space-y-2">
@@ -462,45 +416,9 @@ function OvertimeQuickDetailForm({ row, onClose, onSaved }: { row: OvertimeTable
           ))}
         </div>
         <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Keterangan pekerjaan..." className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs resize-none" />
-        {/* ✅ NEW — foto bukti wajib diupload di sini, sebelum bisa disimpan/dikirim ke atasan */}
-        <div>
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Foto Bukti Lembur *</label>
-          {processingPhoto ? (
-            <div className="h-32 rounded-xl border border-dashed border-violet-200 bg-violet-50/40 flex flex-col items-center justify-center gap-2">
-              <Loader2 className="w-5 h-5 text-violet-600 animate-spin" />
-              <p className="text-[11px] font-semibold text-violet-700">Mencetak timestamp ke foto...</p>
-            </div>
-          ) : preview ? (
-            <div className="space-y-1.5">
-              <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-black aspect-video max-h-32 flex items-center justify-center">
-                <img src={preview} alt="preview bukti lembur" className="w-full h-full object-contain" />
-              </div>
-              <label className="flex items-center justify-center gap-1.5 text-[10px] font-semibold text-violet-600 hover:text-violet-700 cursor-pointer py-0.5">
-                <RefreshCw size={12} />
-                <span>Ganti Foto</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleFileSelected} />
-              </label>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-orange-300 bg-orange-50/40 rounded-xl p-3 cursor-pointer hover:border-orange-400 hover:bg-orange-50/70 transition-all text-center">
-                <Camera size={16} className="text-orange-500" />
-                <span className="text-[10px] font-bold text-orange-700">Kamera</span>
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelected} />
-              </label>
-              <label className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-orange-300 bg-orange-50/40 rounded-xl p-3 cursor-pointer hover:border-orange-400 hover:bg-orange-50/70 transition-all text-center">
-                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="text-[10px] font-bold text-orange-700">Galeri</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleFileSelected} />
-              </label>
-            </div>
-          )}
-        </div>
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 h-9 bg-gray-100 rounded-xl text-xs font-semibold text-gray-600">Batal</button>
-          <button onClick={save} disabled={saving || processingPhoto} className="flex-1 h-9 bg-violet-600 rounded-xl text-xs font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan"}</button>
+          <button onClick={save} disabled={saving} className="flex-1 h-9 bg-violet-600 rounded-xl text-xs font-bold text-white disabled:opacity-50">{saving ? "Menyimpan..." : "Simpan"}</button>
         </div>
       </div>
     </div>
