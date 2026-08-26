@@ -1839,7 +1839,7 @@ function SyncHistoryToggle({
             <button
                 ref={btnRef}
                 onClick={openPopover}
-                title="Nominal berubah di sumber — klik untuk lihat & sinkronkan"
+                title="Nominal/keterangan berubah di sumber — klik untuk lihat & sinkronkan"
                 className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${showPopover ? "bg-blue-100 text-blue-700 border-blue-300" : "text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100"
                     }`}
             >
@@ -1855,7 +1855,7 @@ function SyncHistoryToggle({
                     </p>
 
                     <p className="text-[11px] text-gray-500 mb-2">
-                        Nominal jurnal ini belum sama dengan data sumber (Transaksi/Cashflow/Service) terbaru.
+                        Nominal dan/atau keterangan jurnal ini belum sama dengan data sumber (Transaksi/Cashflow/Service) terbaru.
                     </p>
 
                     {!confirming ? (
@@ -1893,12 +1893,20 @@ function SyncHistoryToggle({
                         ) : (
                             logs.map((l) => {
                                 const diff = computeLineDiff(l.before_data?.lines ?? [], l.after_data?.lines ?? []).filter((d) => d.changed);
+                                const keteranganChanged = (l.before_data?.keterangan ?? "") !== (l.after_data?.keterangan ?? "");
                                 return (
                                     <div key={l.id} className="text-[11px] border-b border-gray-50 pb-1.5 last:border-0 last:pb-0">
                                         <p className="font-bold text-blue-700">
                                             Disinkronkan · {l.changed_by_user?.name ?? "—"}
                                         </p>
                                         <p className="text-[9px] text-gray-300 mb-1">{fmtWaktu(l.changed_at)}</p>
+                                        {keteranganChanged && (
+                                            <p className="text-gray-500 text-[10px] mb-1">
+                                                <span className="text-red-500 line-through">{l.before_data?.keterangan}</span>
+                                                {" → "}
+                                                <span className="text-emerald-600 font-bold">{l.after_data?.keterangan}</span>
+                                            </p>
+                                        )}
                                         {diff.map((d) => (
                                             <p key={`${d.account_code}-${d.side}`} className="text-gray-500 font-mono text-[10px]">
                                                 {d.account_code} · {d.account_name}: {rp(d.before)} → <span className="text-emerald-600 font-bold">{rp(d.after)}</span>
@@ -2473,6 +2481,18 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
                                 )}
                                 {l.action === "SYNC" && l.before_data && (
                                     <div className="mt-2 space-y-1">
+                                        {(l.before_data?.keterangan ?? "") !== (l.after_data?.keterangan ?? "") && (
+                                            <div className="mb-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                                                <div className="bg-white border border-red-100 rounded-lg p-2">
+                                                    <p className="text-red-500 font-bold mb-0.5">Keterangan Sebelum</p>
+                                                    <p className="text-gray-600">{l.before_data?.keterangan}</p>
+                                                </div>
+                                                <div className="bg-white border border-emerald-100 rounded-lg p-2">
+                                                    <p className="text-emerald-600 font-bold mb-0.5">Keterangan Sesudah</p>
+                                                    <p className="text-gray-600">{l.after_data?.keterangan}</p>
+                                                </div>
+                                            </div>
+                                        )}
                                         <p className="text-[10px] font-bold text-blue-600 mb-1">Perubahan Nominal:</p>
                                         {computeLineDiff(l.before_data.lines ?? [], l.after_data?.lines ?? [])
                                             .filter((d) => d.changed)
