@@ -95,21 +95,37 @@ export const GET = withAuth(async (req) => {
 
     const saldoAwal = openingSigned + mutasiSebelumPeriode;
 
-    // ── 2) Semua entry di periode berjalan ──
-    const { data: periodEntries, error: entryErr } = await supabase
-      .from("journal_entries")
-      .select("id, tanggal, keterangan, ref, source_type, source_id, created_at")
-      .eq("period", period)
-      .order("tanggal", { ascending: true });
+    const periodEntries: (EntryRow & { created_at: string })[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      while (true) {
+        const { data: page, error: entryErr } = await supabase
+          .from("journal_entries")
+          .select("id, tanggal, keterangan, ref, source_type, source_id, created_at")
+          .eq("period", period)
+          .order("tanggal", { ascending: true })
+          .order("id", { ascending: true }) 
+          .range(from, from + PAGE_SIZE - 1);
 
-    if (entryErr) throw entryErr;
+        if (entryErr) throw entryErr;
+        if (!page || page.length === 0) break;
+        periodEntries.push(...(page as (EntryRow & { created_at: string })[]));
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+    }
 
     const entryMap = new Map<string, EntryRow & { created_at: string }>();
-    for (const e of (periodEntries ?? []) as (EntryRow & { created_at: string })[]) entryMap.set(e.id, e);
+    for (const e of periodEntries) entryMap.set(e.id, e);
 
-    const trxInvoiceNumbers = Array.from(entryMap.values())
-      .filter((e) => e.source_type === "TRANSACTION" && e.source_id)
-      .map((e) => e.source_id as string);
+    const trxInvoiceNumbers = [
+      ...new Set(
+        Array.from(entryMap.values())
+          .filter((e) => e.source_type === "TRANSACTION" && e.source_id)
+          .map((e) => (e.source_id as string).split("__")[0])
+      ),
+    ];
 
     const trxMetaMap = await getTransactionMetaByInvoices(supabase, trxInvoiceNumbers);
 
@@ -173,15 +189,19 @@ export const GET = withAuth(async (req) => {
 
     const checkedMap = new Map<string, string>(); // line_id -> checked_at
     if (ownLineIds.length > 0) {
-      const { data: checksData, error: checksErr } = await supabase
-        .from("journal_line_checks")
-        .select("line_id, checked_at")
-        .in("line_id", ownLineIds);
+      const CHUNK_SIZE = 150;
+      for (let i = 0; i < ownLineIds.length; i += CHUNK_SIZE) {
+        const chunk = ownLineIds.slice(i, i + CHUNK_SIZE);
+        const { data: checksData, error: checksErr } = await supabase
+          .from("journal_line_checks")
+          .select("line_id, checked_at")
+          .in("line_id", chunk);
 
-      if (checksErr) throw checksErr;
+        if (checksErr) throw checksErr;
 
-      for (const c of (checksData ?? []) as { line_id: string; checked_at: string }[]) {
-        checkedMap.set(c.line_id, c.checked_at);
+        for (const c of (checksData ?? []) as { line_id: string; checked_at: string }[]) {
+          checkedMap.set(c.line_id, c.checked_at);
+        }
       }
     }
 
@@ -193,9 +213,10 @@ export const GET = withAuth(async (req) => {
       running += debit - kredit;
       const ref = (counterMap.get(l.entry_id) ?? []).join(", ");
       const checkedAt = checkedMap.get(l.id) ?? null; // (baru)
+      const baseInvoice = entry.source_id ? entry.source_id.split("__")[0] : "";
       const trxMeta =
         entry.source_type === "TRANSACTION" && entry.source_id
-          ? trxMetaMap.get(entry.source_id) ?? null
+          ? trxMetaMap.get(entry.source_id) ?? trxMetaMap.get(baseInvoice) ?? null
           : null; // (baru) — badge toko & spek, null kalau bukan entry TRANSACTION
       return {
         id: l.id,
