@@ -134,16 +134,18 @@ export const GET = withAuth(async (req) => {
   ]);
 
   const entriesWithMeta = entries.map((e: any) => {
-    if (e.source_type === "CASHFLOW" && e.source_id) {
+       if (e.source_type === "CASHFLOW" && e.source_id) {
       const syncDraft = cashflowSyncDraftMap.get(e.source_id as string);
-      const syncAvailable = !!syncDraft && !linesEqual(e.lines ?? [], syncDraft.lines);
+      const syncAvailable =
+        !!syncDraft && (!linesEqual(e.lines ?? [], syncDraft.lines) || e.keterangan !== syncDraft.keterangan);
       return { ...e, trx_meta: null, sync_available: syncAvailable };
     }
 
-    if (e.source_type === "SERVICE" && e.source_id) {
+       if (e.source_type === "SERVICE" && e.source_id) {
       const baseId = (e.source_id as string).split("__")[0];
       const syncDraft = serviceSyncDraftMap.get(baseId);
-      const syncAvailable = !!syncDraft && !linesEqual(e.lines ?? [], syncDraft.lines);
+      const syncAvailable =
+        !!syncDraft && (!linesEqual(e.lines ?? [], syncDraft.lines) || e.keterangan !== syncDraft.keterangan);
       return { ...e, trx_meta: null, sync_available: syncAvailable };
     }
 
@@ -158,8 +160,9 @@ export const GET = withAuth(async (req) => {
     const hasModalLine = (e.lines ?? []).some((l: any) => l.account_code === AKUN.HPP);
     const modalAddressed = hasModalLine || e.is_edited === true;
 
-    const syncDraft = syncDraftMap.get(e.source_id as string);
-    const syncAvailable = !!syncDraft && !linesEqual(e.lines ?? [], syncDraft.lines);
+      const syncDraft = syncDraftMap.get(e.source_id as string);
+    const syncAvailable =
+      !!syncDraft && (!linesEqual(e.lines ?? [], syncDraft.lines) || e.keterangan !== syncDraft.keterangan);
 
     return {
       ...e,
