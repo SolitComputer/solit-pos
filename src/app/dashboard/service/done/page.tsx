@@ -557,6 +557,7 @@ export default function DonePage() {
     hasil_analisa?: string;
     payment_status?: "LUNAS" | "DP"; //  NEW
     total_tagihan?: number; //  NEW
+    payment_proof_url?: string; //  NEW
   }) => {
     if (!paymentOrder) return;
     const res = await fetch(`/api/service/${paymentOrder.id}`, {

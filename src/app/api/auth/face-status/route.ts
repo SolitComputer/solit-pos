@@ -100,7 +100,7 @@ export async function GET() {
         .lte("created_at", attendanceDayEnd)
         .order("created_at", { ascending: false }).limit(1)
         .maybeSingle(),
-      supabase.from("users").select("face_embedding, shift, biometric_enabled").eq("id", user.id).single(),
+      supabase.from("users").select("name, role, face_embedding, shift, biometric_enabled").eq("id", user.id).single(),
     ]);
 
     // ✅ NEW — cek terpisah apakah sudah absen PULANG hari ini
@@ -328,6 +328,8 @@ export async function GET() {
       isEarlyCheckout, 
       earlyCheckoutStatus,
       overtimeOptions, // ✅ NEW
+      userName: (userData as any)?.name ?? user.name ?? "Pengguna",
+      userRole: (userData as any)?.role ?? user.role ?? "STAFF",
       isManualCheckIn, // ✅ NEW — badge "Absen Manual" di kartu status hari ini
       manualCheckInByName, // ✅ NEW
     });

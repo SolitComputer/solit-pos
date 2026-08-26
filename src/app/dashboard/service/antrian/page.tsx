@@ -507,6 +507,7 @@ export default function AntrianPage() {
     total_tagihan?: number;
     payment_method: "CASH" | "TRANSFER" | "QRIS";
     payment_note?: string;
+    payment_proof_url: string; //  NEW — wajib, dari upload bukti di modal
   }) => {
     if (!prepaymentOrder) return;
     const res = await fetch(`/api/service/${prepaymentOrder.id}`, {
