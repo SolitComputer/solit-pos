@@ -3731,7 +3731,7 @@ export default function AttendanceDashboardPage() {
             fetchShiftSchedules(year, month),
             fetchShiftConfigs(),
         ];
-        Promise.all(tasks).finally(() => { if (!silent) setLoading(false); });
+        await Promise.all(tasks).finally(() => { if (!silent) setLoading(false); });
         if (userCanViewSalary(currentUser)) {
             fetchSalarySlips(year, month);
         }
@@ -4967,8 +4967,8 @@ export default function AttendanceDashboardPage() {
                                     <span className="text-lg font-bold text-gray-800 tracking-tight">{MONTH_NAMES[calMonth]} {calYear}</span>
                                     {calYear === new Date().getFullYear() && calMonth === new Date().getMonth() && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full">Bulan ini</span>}
                                 </div>
-                               <div className="hidden sm:flex items-center gap-4 flex-wrap">
-                                   {[["bg-emerald-400", "Tepat"], ["bg-amber-400", "Terlambat"], ["bg-gray-400", "Skip"], ["bg-blue-400", "Manual"], ["bg-red-300", "Libur"], ["bg-violet-400", "Sudah Pulang"], ["bg-orange-400", "Belum Pulang"]].map(([c, l]) => (
+                                <div className="hidden sm:flex items-center gap-4 flex-wrap">
+                                    {[["bg-emerald-400", "Tepat"], ["bg-amber-400", "Terlambat"], ["bg-gray-400", "Skip"], ["bg-blue-400", "Manual"], ["bg-red-300", "Libur"], ["bg-violet-400", "Sudah Pulang"], ["bg-orange-400", "Belum Pulang"]].map(([c, l]) => (
                                         <div key={l} className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</div>
                                     ))}
                                 </div>
@@ -5006,7 +5006,7 @@ export default function AttendanceDashboardPage() {
                                                     return dk >= startDate;
                                                 }).length > 0
                                                 : false;
-                                           // AFTER
+                                            // AFTER
                                             const hasManual = mc > 0;
                                             const showLiburLine = !tot && (isUserDayOff || hasAnyDayOff);
                                             // ✅ NEW — hitung status jam pulang (checkout) untuk tanggal ini
@@ -5022,7 +5022,7 @@ export default function AttendanceDashboardPage() {
                                                     <span className={`text-[11px] sm:text-xs font-semibold ${isSel ? "text-white/90" : isTod ? "text-blue-700" : isUserDayOff ? "text-red-500" : "text-gray-700"}`}>
                                                         {day}
                                                     </span>
-                                                   {tot > 0 ? (
+                                                    {tot > 0 ? (
                                                         <div className="mt-auto pt-1 w-full space-y-1">
                                                             {/* Garis progress: proporsi Tepat/Terlambat/Skip hari ini */}
                                                             <div className={`w-full h-1 sm:h-1.5 rounded-full overflow-hidden flex ${isSel ? "bg-white/20" : "bg-gray-200/70"}`}>
