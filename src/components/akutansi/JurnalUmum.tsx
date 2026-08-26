@@ -476,36 +476,16 @@ export default function JurnalUmum({ period }: { period: string }) {
         for (const [date, list] of dateGroups.entries()) {
             if (inScope(date)) {
                 const originalIds = list.map((e) => e.id);
-                // Stable sort by SOURCE_GROUP_RANK: MANUAL (0) -> SERVICE (1) -> TRANSACTION (2) -> CASHFLOW (3)
-                // Khusus sesama CASHFLOW: urutkan persis seperti di menu Cashflow (created_at → source_id)
+                // Urutkan murni berdasarkan waktu (terbaru di atas) agar persis seperti urutan kejadian di Cashflow.
                 const sortedList = [...list].sort((a, b) => {
-                    const rankA = SOURCE_GROUP_RANK[a.source_type] ?? 99;
-                    const rankB = SOURCE_GROUP_RANK[b.source_type] ?? 99;
-                    if (rankA !== rankB) {
-                        return rankA - rankB;
+                    const caA = a.created_at || "";
+                    const caB = b.created_at || "";
+                    if (caA !== caB) {
+                        return caB.localeCompare(caA); // DESC
                     }
-
-                    // Jika sama-sama CASHFLOW: samakan dengan urutan di menu Cashflow
-                    // (tanggal DESC → created_at DESC → id DESC — LIHAT compareEntries()
-                    // di src/app/dashboard/cashflow/page.tsx, urutannya FIXED desc, tidak
-                    // ikut toggle "sortOrder" punya Jurnal Umum). Sengaja TIDAK dibikin
-                    // ikut sortOrder di sini, supaya hasilnya tetap sama persis dengan
-                    // menu Cashflow walau Jurnal Umum lagi ditampilkan terlama-dulu (asc).
-                    // source_id di sini berisi UUID cashflow_entries.id — bukan angka,
-                    // jadi kita sort pakai created_at (journal_entries) dulu, lalu
-                    // source_id sebagai tiebreaker stabil.
-                    if (a.source_type === "CASHFLOW" && b.source_type === "CASHFLOW") {
-                        const caA = a.created_at || "";
-                        const caB = b.created_at || "";
-                        if (caA !== caB) {
-                            return caB.localeCompare(caA);
-                        }
-                        const idA = a.source_id || "";
-                        const idB = b.source_id || "";
-                        return idB.localeCompare(idA);
-                    }
-
-                    return 0;
+                    const idA = a.source_id || a.id || "";
+                    const idB = b.source_id || b.id || "";
+                    return idB.localeCompare(idA); // DESC
                 });
                 const sortedIds = sortedList.map((e) => e.id);
 

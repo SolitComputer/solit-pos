@@ -48,6 +48,7 @@ export interface ServiceOrder {
   payment_by?: string;
   payment_status?: "LUNAS" | "DP"; //  NEW — LUNAS = default, DP = masih ada sisa tagihan
   total_tagihan?: number | null; //  NEW — total biaya servis yang disepakati
+  payment_proof_url?: string | null; //  NEW — url foto bukti transfer/pembayaran
 
   // User tracking
   created_by?: string;
