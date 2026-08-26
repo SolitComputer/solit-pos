@@ -6,6 +6,7 @@ import { sendWhatsapp, buildPaymentMessage } from "@/service/whatsapp";
 import { logActivity } from "@/lib/activityLogger";
 import { recordOutflow } from "@/lib/accessoryOutflow";
 import { ACCESSORY_ONLY_SALES_ROLES, UserRole } from "@/lib/permissions";
+import { buildLineItemsFromTxItems } from "@/lib/receiptItems";
 
 function toNumber(value: any): number {
     if (value === null || value === undefined) return 0;
@@ -497,6 +498,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 pickup_method: body.pickup_method, pickup_date: body.pickup_date,
                 pickup_time: body.pickup_time, pickup_location: body.pickup_location,
                 software_request: body.software_request, customer_type: body.customer_type,
+                items: buildLineItemsFromTxItems([...laptopItems, ...accessoryItems]),
             });
             const waTimeout = new Promise<boolean>((r) => setTimeout(() => r(false), 15_000));
             try { await Promise.race([sendWhatsapp(body.customer_phone, message), waTimeout]); }

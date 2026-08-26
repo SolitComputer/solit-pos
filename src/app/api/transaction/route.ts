@@ -10,18 +10,10 @@ function splitSerials(raw: any): string[] {
   return [];
 }
 
-// ── Sanitasi term sebelum ditaruh mentah di string filter PostgREST (.or()) ──
-// Karakter koma/kurung punya arti khusus di syntax filter Supabase — kalau
-// tidak dibuang, user bisa menyisipkan kondisi filter tambahan lewat kotak
-// pencarian (filter injection). Dibuang saja karena tidak berguna untuk
-// pencarian teks biasa.
 function sanitizeFilterTerm(raw: string): string {
   return raw.replace(/[,()]/g, "").trim();
 }
 
-// ── Whitelist kolom yang boleh dipakai buat ORDER BY ──────────────────
-// Key = nilai `sortBy` yang dikirim client, value = nama kolom asli di tabel `transactions`.
-// Pakai whitelist supaya tidak ada celah injection lewat query string.
 const SORTABLE_COLUMNS: Record<string, string> = {
   invoice: "invoice_number",
   date: "created_at",
@@ -38,7 +30,6 @@ const SORTABLE_COLUMNS: Record<string, string> = {
   company: "company_name",
 };
 
-// ── Filter "Toko/Perusahaan" — replikasi persis logic yang dulu dikerjakan di client ──
 function applyCompanyFilter(query: any, companyName: string) {
   const q = companyName.toLowerCase();
   if (q === "sotech") return query.ilike("company_name", "%sotech%");

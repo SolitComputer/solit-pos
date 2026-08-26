@@ -2,6 +2,8 @@ import { supabase } from "@/services/supabase";
 import Link from "next/link";
 import ReceiptActions from "./ReceiptActions";
 import { User, Package, Shield, FileText } from "lucide-react";
+import ItemsTable from "@/components/receipt/ItemsTable";
+import { buildLineItemsFromTxItems, sumLineItems } from "@/lib/receiptItems";
 
 interface Props {
   params: Promise<{ invoice: string }>;
@@ -27,7 +29,7 @@ export default async function Page(props: Props) {
       .eq("invoice_number", params.invoice),
   ]);
 
-  const laptopItems = (txItems ?? []).filter((it: any) => it.item_type !== "accessory");
+    const laptopItems = (txItems ?? []).filter((it: any) => it.item_type !== "accessory");
   const accessoryItems = (txItems ?? []).filter((it: any) => it.item_type === "accessory");
   const itemKind: "laptop" | "accessory" | "mixed" =
     laptopItems.length > 0 && accessoryItems.length > 0
@@ -35,6 +37,8 @@ export default async function Page(props: Props) {
       : accessoryItems.length > 0
         ? "accessory"
         : "laptop";
+  const lineItems = buildLineItemsFromTxItems(txItems ?? []);
+  const itemsSubtotal = sumLineItems(lineItems) || Number(data?.amount ?? 0);
 
   if (!data || data.status !== "PAID") {
     return (
@@ -145,27 +149,16 @@ export default async function Page(props: Props) {
 
             <Separator />
 
-            {/* Detail Pembelian */}
+                        {/* Detail Pembelian — gaya struk Indomaret: keterangan kiri, nominal kanan */}
             <Section
               title={itemKind === "accessory" ? "Detail Aksesoris" : itemKind === "mixed" ? "Detail Pembelian" : "Detail Laptop"}
               icon={<Package className="w-4 h-4" />}
             >
-              {laptopItems.map((it: any, i: number) => (
-                <InfoRow
-                  key={`laptop-${i}`}
-                  label={it.serial_number ? `${it.item_name} (${it.serial_number})` : it.item_name}
-                  value={`Rp${Number(it.deal_price ?? 0).toLocaleString("id-ID")}`}
-                  mono
-                />
-              ))}
-              {accessoryItems.map((it: any, i: number) => (
-                <InfoRow
-                  key={`acc-${i}`}
-                  label={`${it.item_name}${it.quantity > 1 ? ` x${it.quantity}` : ""}`}
-                  value={it.is_bonus ? "Bonus" : `Rp${Number(it.deal_price ?? 0).toLocaleString("id-ID")}`}
-                  mono
-                />
-              ))}
+              <ItemsTable items={lineItems} />
+              <div className="flex justify-between items-center pt-2.5 mt-1 border-t border-dashed border-gray-200">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Subtotal</span>
+                <span className="text-sm font-bold text-gray-800 font-mono">Rp{itemsSubtotal.toLocaleString("id-ID")}</span>
+              </div>
             </Section>
 
             <Separator />
