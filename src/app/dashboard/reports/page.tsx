@@ -87,16 +87,17 @@ function getPreset(preset: string): { from: string; to: string } {
   return { from: todayStr, to: todayStr };
 }
 
+// RESPONSIVE FIX: grid 2 kolom di HP kecil, 3 di tablet, 5 di desktop; padding & ukuran skeleton di-scale
 function SummarySkeleton() {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
       {Array(5).fill(0).map((_, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 bg-gray-100 rounded-xl" />
+        <div key={i} className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-5 animate-pulse">
+          <div className="flex items-center gap-2 mb-2 sm:mb-3">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gray-100 rounded-xl" />
             <div className="h-3 bg-gray-100 rounded w-16" />
           </div>
-          <div className="h-7 bg-gray-100 rounded w-24 mb-1" />
+          <div className="h-6 sm:h-7 bg-gray-100 rounded w-20 sm:w-24 mb-1" />
           <div className="h-2 bg-gray-50 rounded w-12" />
         </div>
       ))}
@@ -104,6 +105,7 @@ function SummarySkeleton() {
   );
 }
 
+// RESPONSIVE FIX: padding & font StatCard di-scale untuk layar kecil
 function StatCard({
   label, value, sub, icon, rank,
 }: {
@@ -114,23 +116,23 @@ function StatCard({
   rank?: number;
 }) {
   return (
-    <div className="report-stat-card bg-white rounded-2xl border border-gray-100 p-5 relative overflow-hidden group hover:border-gray-200 transition-all duration-200">
+    <div className="report-stat-card bg-white rounded-2xl border border-gray-100 p-3 sm:p-5 relative overflow-hidden group hover:border-gray-200 transition-all duration-200">
       {/* Subtle corner accent */}
-      <div className="absolute top-0 right-0 w-16 h-16 rounded-bl-[40px] bg-gray-50 group-hover:bg-gray-100 transition-colors duration-200" />
+      <div className="absolute top-0 right-0 w-12 h-12 sm:w-16 sm:h-16 rounded-bl-[40px] bg-gray-50 group-hover:bg-gray-100 transition-colors duration-200" />
 
       <div className="relative z-10">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center text-base group-hover:bg-gray-100 transition-colors duration-200 border border-gray-100">
+        <div className="flex items-center gap-2 mb-2.5 sm:mb-4">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gray-50 rounded-xl flex items-center justify-center text-base group-hover:bg-gray-100 transition-colors duration-200 border border-gray-100 flex-shrink-0">
             {icon}
           </div>
-          <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">{label}</span>
+          <span className="text-[10px] sm:text-[11px] font-semibold text-gray-400 uppercase tracking-wider sm:tracking-widest truncate">{label}</span>
         </div>
-        <p className="text-xl font-bold text-gray-800 tracking-tight leading-none">{value}</p>
-        {sub && <p className="text-[11px] text-gray-400 mt-1.5">{sub}</p>}
+        <p className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight leading-none">{value}</p>
+        {sub && <p className="text-[10px] sm:text-[11px] text-gray-400 mt-1.5 truncate">{sub}</p>}
       </div>
 
       {rank !== undefined && (
-        <div className="absolute bottom-4 right-4 text-[10px] font-bold text-gray-300">
+        <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 text-[9px] sm:text-[10px] font-bold text-gray-300">
           #{rank}
         </div>
       )}
@@ -138,6 +140,7 @@ function StatCard({
   );
 }
 
+// RESPONSIVE FIX: padding card & header di-scale untuk HP
 function RankList({ title, icon, items, color, revenueKey = "revenue" }: {
   title: string;
   icon: React.ReactNode;
@@ -155,16 +158,16 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: {
   const maxVal = items[0]?.[revenueKey as keyof RankItem] as number ?? 1;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-gray-200 transition-all duration-200">
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 hover:border-gray-200 transition-all duration-200">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2.5">
-          <div className={`w-8 h-8 rounded-xl ${color} flex items-center justify-center text-sm border border-gray-100`}>
+      <div className="flex items-center justify-between mb-4 sm:mb-5 gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className={`w-8 h-8 rounded-xl ${color} flex items-center justify-center text-sm border border-gray-100 flex-shrink-0`}>
             {icon}
           </div>
-          <span className="font-bold text-gray-800 text-sm">{title}</span>
+          <span className="font-bold text-gray-800 text-sm truncate">{title}</span>
         </div>
-        <span className="text-[10px] text-gray-400 font-medium bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
+        <span className="text-[10px] text-gray-400 font-medium bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 flex-shrink-0">
           Top {Math.min(items.length, 8)}
         </span>
       </div>
@@ -175,7 +178,7 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: {
           const pct = Math.round((item[revenueKey] / maxVal) * 100);
           return (
             <div key={item.name} className="group/item">
-              <div className="flex items-center gap-3 mb-1.5">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1.5">
                 {/* Rank badge */}
                 <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center">
                   {i < 3 ? (
@@ -188,12 +191,12 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: {
                 </div>
 
                 {/* Name */}
-                <p className="text-xs text-gray-700 truncate flex-1 font-medium">
+                <p className="text-xs text-gray-700 truncate flex-1 font-medium min-w-0">
                   {item.name}
                 </p>
 
                 {/* Stats */}
-                <div className="text-right flex-shrink-0 flex items-center gap-2">
+                <div className="text-right flex-shrink-0 flex items-center gap-1.5 sm:gap-2">
                   <span className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-md border border-gray-100">
                     {item.count}x
                   </span>
@@ -202,7 +205,7 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: {
               </div>
 
               {/* Progress bar */}
-              <div className="ml-9 h-1 bg-gray-100 rounded-full overflow-hidden">
+              <div className="ml-8 sm:ml-9 h-1 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700"
                   style={{
@@ -219,9 +222,10 @@ function RankList({ title, icon, items, color, revenueKey = "revenue" }: {
   );
 }
 
+// RESPONSIVE FIX: padding vertikal dikurangi di HP
 function EmptyState() {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 py-24 text-center">
+    <div className="bg-white rounded-2xl border border-gray-100 py-16 sm:py-24 text-center">
       <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-gray-100">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5">
           <line x1="18" y1="20" x2="18" y2="10" />
@@ -434,10 +438,13 @@ export default function ReportsPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
+      {/* RESPONSIVE FIX: padding & spacing container di-scale untuk HP */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-3 sm:space-y-4">
 
-        {/* ── PAGE HEADER ── */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        {/* ── PAGE HEADER ──
+         * RESPONSIVE FIX: stack vertikal di HP (flex-col), tombol Refresh full-width di HP
+         */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-gray-800 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
@@ -448,9 +455,9 @@ export default function ReportsPage() {
                   <line x1="2" y1="20" x2="22" y2="20" />
                 </svg>
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 leading-none">Laporan Keuangan</h1>
-                <p className="text-xs text-gray-400 mt-0.5">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900 leading-none">Laporan Keuangan</h1>
+                <p className="text-xs text-gray-400 mt-0.5 truncate">
                   {activePresetLabel ? activePresetLabel : `${dateFrom} – ${dateTo}`}
                 </p>
               </div>
@@ -460,7 +467,7 @@ export default function ReportsPage() {
           <button
             onClick={() => fetchReport()}
             disabled={isLoading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all bg-white"
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 transition-all bg-white w-full sm:w-auto"
           >
             <svg
               className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`}
@@ -492,34 +499,34 @@ export default function ReportsPage() {
             ))}
           </div>
 
-          {/* Date range row */}
-          <div className="flex flex-wrap items-end gap-2 pt-3 border-t border-gray-100">
-            <div className="flex flex-col gap-1">
+          {/* Date range row — RESPONSIVE FIX: stack vertikal (full width) di HP, sejajar di ≥ sm */}
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-2 pt-3 border-t border-gray-100">
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Dari</label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={e => { setDateFrom(e.target.value); setActivePreset(""); setFilterError(""); }}
                 onKeyDown={e => { if (e.key === "Enter") applyManualFilter(); }}
-                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all"
+                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all w-full sm:w-auto"
               />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sampai</label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={e => { setDateTo(e.target.value); setActivePreset(""); setFilterError(""); }}
                 onKeyDown={e => { if (e.key === "Enter") applyManualFilter(); }}
-                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all"
+                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all w-full sm:w-auto"
               />
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Kelompok</label>
               <select
                 value={groupBy}
                 onChange={e => { setGroupBy(e.target.value); setFilterError(""); }}
-                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all cursor-pointer"
+                className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:border-gray-300 focus:bg-white transition-all cursor-pointer w-full sm:w-auto"
               >
                 <option value="day">Per Hari</option>
                 <option value="week">Per Minggu</option>
@@ -527,11 +534,11 @@ export default function ReportsPage() {
               </select>
             </div>
 
-            {/* Tombol apply filter manual */}
+            {/* Tombol apply filter manual — full width di HP */}
             <button
               onClick={applyManualFilter}
               disabled={isLoading}
-              className="h-9 px-5 rounded-xl bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="h-9 px-5 rounded-xl bg-gray-800 text-white text-xs font-semibold hover:bg-gray-900 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all w-full sm:w-auto"
             >
               {isLoading ? "Memuat..." : "Tampilkan"}
             </button>
@@ -542,11 +549,11 @@ export default function ReportsPage() {
           )}
         </div>
 
-        {/* ── SUMMARY CARDS ── */}
+        {/* ── SUMMARY CARDS — RESPONSIVE FIX: 2 kolom di HP, 3 di tablet, 5 di desktop ── */}
         {isLoading ? (
           <SummarySkeleton />
         ) : summary ? (
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
             <StatCard
               label="Total Omzet"
               value={fmtRupiah(summary.totalRevenue)}
@@ -583,19 +590,19 @@ export default function ReportsPage() {
 
 
 
-        {/* ── CHARTS ── */}
+        {/* ── CHARTS — RESPONSIVE FIX: padding & tinggi chart di-scale, header boleh wrap ── */}
         {trend.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
             {/* Line chart */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 lg:col-span-2">
-              <div className="flex items-center justify-between mb-5">
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 lg:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-5">
                 <div>
                   <h2 className="font-bold text-gray-800 text-sm">Tren Omzet & Profit</h2>
                   <p className="text-[11px] text-gray-400 mt-0.5">
                     {activePresetLabel ?? `${dateFrom} – ${dateTo}`}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <div className="flex items-center gap-1.5">
                     <span className="w-4 h-0.5 bg-gray-700 inline-block rounded-full" />
                     <span className="text-[10px] text-gray-400 font-medium">Omzet</span>
@@ -606,14 +613,14 @@ export default function ReportsPage() {
                   </div>
                 </div>
               </div>
-              <div style={{ height: 240 }}>
+              <div className="h-[200px] sm:h-[260px]">
                 <Line data={lineData} options={chartOpts} />
               </div>
             </div>
 
             {/* Bar chart */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="flex items-center justify-between mb-5">
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-5">
                 <div>
                   <h2 className="font-bold text-gray-800 text-sm">Jumlah Transaksi</h2>
                   <p className="text-[11px] text-gray-400 mt-0.5">Per periode</p>
@@ -622,16 +629,16 @@ export default function ReportsPage() {
                   {trend.reduce((sum, t) => sum + t.trxCount, 0)} total
                 </span>
               </div>
-              <div style={{ height: 240 }}>
+              <div className="h-[200px] sm:h-[260px]">
                 <Bar data={barData} options={barOpts} />
               </div>
             </div>
           </div>
         )}
 
-        {/* ── RANKING LISTS ── */}
+        {/* ── RANKING LISTS — RESPONSIVE FIX: 1 kolom di HP, 2 di tablet, 3 di desktop ── */}
         {(topSales.length > 0 || topLaptop.length > 0) && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <RankList title="Top Sales" icon={<Award className="w-5 h-5 text-gray-600" />} items={topSales} color="bg-gray-50" revenueKey="revenue" />
             <RankList title="Laptop Terlaris" icon={<Laptop className="w-5 h-5 text-gray-600" />} items={topLaptop} color="bg-gray-50" revenueKey="revenue" />
             <RankList title="Sumber Penjualan" icon={<Smartphone className="w-5 h-5 text-gray-600" />} items={topSource} color="bg-gray-50" revenueKey="revenue" />

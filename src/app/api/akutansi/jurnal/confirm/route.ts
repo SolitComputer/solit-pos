@@ -92,6 +92,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
     source_category: d.source_category,
     total: d.total,
     created_by: user.id,
+    created_at: d.sort_ts,
   }));
 
   let { data: inserted, error: entryErr } = await supabase
@@ -132,6 +133,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
       source_category: d.source_category,
       total: d.total,
       created_by: user.id,
+      created_at: d.sort_ts,
     }));
 
     const retry = await supabase

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { fetchAllRows } from "@/lib/supabaseFetch";
+import { chunkArray } from "@/lib/chunkArray";
 
 const TRX_DETAIL_SELECT =
   "id, invoice_number, customer_name, laptop_name, deal_price, amount, inventory_price, other, paid_at, created_at, source_platform, sales_name, status, unit_id, unit_ids";
@@ -159,12 +160,15 @@ async function buildUnitMap(rows: TransactionRow[]): Promise<Map<string, number>
 
   const unitMap = new Map<string, number>();
   if (allUnitIds.size > 0) {
-    const { data: units } = await supabase
-      .from("laptop_units")
-      .select("id, purchase_price")
-      .in("id", Array.from(allUnitIds));
-    for (const unit of units ?? []) {
-      unitMap.set(unit.id, Number(unit.purchase_price ?? 0));
+    const chunks = chunkArray(Array.from(allUnitIds), 150);
+    for (const chunk of chunks) {
+      const { data: units } = await supabase
+        .from("laptop_units")
+        .select("id, purchase_price")
+        .in("id", chunk);
+      for (const unit of units ?? []) {
+        unitMap.set(unit.id, Number(unit.purchase_price ?? 0));
+      }
     }
   }
   return unitMap;
@@ -183,20 +187,23 @@ async function buildItemsMap(rows: TransactionRow[]): Promise<Map<string, ItemIn
   const invoiceNumbers = [...new Set(rows.map(r => r.invoice_number).filter(Boolean))];
   if (invoiceNumbers.length === 0) return itemsMap;
 
-  const { data: items } = await supabase
-    .from("transaction_items")
-    .select("invoice_number, item_type, item_name, laptop_name, quantity, is_bonus")
-    .in("invoice_number", invoiceNumbers);
+  const chunks = chunkArray(invoiceNumbers, 150);
+  for (const chunk of chunks) {
+    const { data: items } = await supabase
+      .from("transaction_items")
+      .select("invoice_number, item_type, item_name, laptop_name, quantity, is_bonus")
+      .in("invoice_number", chunk);
 
-  for (const it of items ?? []) {
-    const list = itemsMap.get(it.invoice_number) ?? [];
-    list.push({
-      name: it.item_name || it.laptop_name || "—",
-      type: it.item_type === "accessory" ? "accessory" : "laptop",
-      quantity: Number(it.quantity) || 1,
-      is_bonus: Boolean(it.is_bonus),
-    });
-    itemsMap.set(it.invoice_number, list);
+    for (const it of items ?? []) {
+      const list = itemsMap.get(it.invoice_number) ?? [];
+      list.push({
+        name: it.item_name || it.laptop_name || "—",
+        type: it.item_type === "accessory" ? "accessory" : "laptop",
+        quantity: Number(it.quantity) || 1,
+        is_bonus: Boolean(it.is_bonus),
+      });
+      itemsMap.set(it.invoice_number, list);
+    }
   }
   return itemsMap;
 }
