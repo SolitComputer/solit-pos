@@ -217,6 +217,9 @@ export default function CreatePaymentPage() {
     const totalInventoryPrice = selectedUnits.reduce((s, u) => s + (u.purchase_price || 0), 0);
     const margin = rawDealPrice - totalInventoryPrice;
     const tradeInReceived = isTradeIn ? (rawDealPrice - tradeInValue) : 0;
+    // REVISI: khusus Payment Pending + E-Commerce, Harga Deal boleh kosong/0 —
+    // nominal final baru diisi saat pelunasan di Riwayat Pending.
+    const isEcommercePending = paymentFlow === "PENDING" && pendingSubType === "ECOMMERCE";
 
     useEffect(() => {
         if (fromScan || fromPrep) {
@@ -561,7 +564,7 @@ export default function CreatePaymentPage() {
             alert("Transaksi hanya berisi bonus. Tambahkan laptop atau aksesori berbayar."); return;
         }
 
-        if (!rawDealPrice || rawDealPrice < 1000) {
+        if (!isEcommercePending && (!rawDealPrice || rawDealPrice < 1000)) {
             alert("Harga deal minimal Rp1.000");
             return;
         }
@@ -1020,7 +1023,7 @@ export default function CreatePaymentPage() {
                                             {/* Harga Deal per Unit */}
                                             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-3">
                                                 <label className="text-xs text-gray-500 block">
-                                                    Harga Deal per Unit *
+                                                    Harga Deal per Unit {isEcommercePending ? <span className="text-gray-400 font-normal">(opsional)</span> : "*"}
                                                     <span className="ml-1.5 text-gray-400">({selectedUnits.length} unit)</span>
                                                 </label>
 
@@ -1284,11 +1287,11 @@ export default function CreatePaymentPage() {
 
                             <div className="flex gap-2 pt-1">
                                 <button type="button" onClick={() => setStep(1)} className={`${btnSecondary} inline-flex items-center justify-center gap-1.5`}><ChevronLeft size={16} /> Kembali</button>
-                                <button type="button" onClick={() => {
+                                                               <button type="button" onClick={() => {
                                     const paidAcc = selectedAccessories.filter(a => !a.is_bonus).length;
                                     if (!selectedUnits.length && selectedAccessories.length === 0) { alert("Pilih minimal 1 unit atau aksesori dulu"); return; }
                                     if (!selectedUnits.length && paidAcc === 0) { alert("Transaksi hanya berisi bonus. Tambahkan unit atau aksesori berbayar."); return; }
-                                    if (!rawDealPrice) { alert("Masukkan harga deal"); return; }
+                                    if (!isEcommercePending && !rawDealPrice) { alert("Masukkan harga deal"); return; }
                                     if (isTradeIn && !tradeInItem) { alert("Isi nama barang tukar"); return; }
                                     if (isTradeIn && !tradeInValue) { alert("Isi nilai barang tukar"); return; }
                                     setStep(3);
