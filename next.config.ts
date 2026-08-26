@@ -36,6 +36,7 @@ const withPWA = withPWAInit({
         options: {
           cacheName: "next-static",
           expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          cacheableResponse: { statuses: [0, 200] },
         },
       },
       {
@@ -45,6 +46,7 @@ const withPWA = withPWAInit({
         options: {
           cacheName: "assets",
           expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          cacheableResponse: { statuses: [0, 200] },
         },
       },
     ],
