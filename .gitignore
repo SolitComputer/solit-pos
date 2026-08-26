@@ -42,9 +42,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# PWA auto-generated files
-public/sw.js
-public/sw.js.map
-public/workbox-*.js
-public/workbox-*.js.map
-public/fallback-*.js
+# # PWA auto-generated files
+# public/sw.js
+# public/sw.js.map
+# public/workbox-*.js
+# public/workbox-*.js.map
+# public/fallback-*.js
