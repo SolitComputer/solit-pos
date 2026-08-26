@@ -1,8 +1,8 @@
 "use client";
 // src/components/service/ServicePaymentModal.tsx
 
-import { useState, useEffect } from "react";
-import { Banknote, Landmark, QrCode, Wallet, Check } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Banknote, Landmark, QrCode, Wallet, Check, Upload, Loader2 } from "lucide-react";
 import type { ServiceOrder } from "@/types/service";
 
 interface Props {
@@ -17,6 +17,7 @@ interface Props {
     pickup_type?: "SERVICE" | "GARANSI";
     payment_status?: "LUNAS" | "DP";
     total_tagihan?: number;
+    payment_proof_url?: string; //  NEW
   }) => Promise<void>;
 }
 
@@ -47,6 +48,13 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
   const [note, setNote] = useState("");
   const [method, setMethod] = useState<"CASH" | "TRANSFER" | "QRIS">("CASH");
   const [isDpMode, setIsDpMode] = useState(false); const [hasilAnalisa, setHasilAnalisa] = useState("");
+
+  //  NEW — bukti pembayaran, wajib diisi untuk mode Service (Lunas/DP), tidak untuk Garansi
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const [proofUrl, setProofUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -70,6 +78,49 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
     setDpAmount(digits ? fmtRupiah(parseInt(digits)) : "");
   };
 
+  //  NEW — upload foto bukti pembayaran ke storage
+  const handleFileSelect = async (file: File | null) => {
+    if (!file) return;
+    setError("");
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Format foto harus JPG, PNG, atau WEBP");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Ukuran foto maksimal 5MB");
+      return;
+    }
+
+    setProofPreview(URL.createObjectURL(file));
+    setProofUrl(null);
+    setUploading(true);
+
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("order_id", order.id);
+      const res = await fetch("/api/service/upload-payment-proof", {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || "Gagal upload bukti pembayaran");
+      setProofUrl(json.data.url);
+    } catch (e: any) {
+      setError(e.message || "Gagal upload bukti pembayaran");
+      setProofPreview(null);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveProof = () => { //  NEW
+    setProofPreview(null);
+    setProofUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleConfirm = async () => {
     const amountNum = isGaransi ? 0 : parseRupiah(amount);
     const isDp = !isGaransi && isDpMode;
@@ -89,6 +140,10 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
         return;
       }
     }
+    if (!isGaransi && !proofUrl) { //  NEW — foto bukti wajib untuk mode Service (Lunas/DP)
+      setError("Foto bukti pembayaran wajib diupload");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -100,6 +155,7 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
         pickup_type: isGaransi ? "GARANSI" : "SERVICE",
         payment_status: isDp ? "DP" : "LUNAS", //  NEW
         total_tagihan: isGaransi ? undefined : amountNum, //  NEW
+        payment_proof_url: !isGaransi ? (proofUrl ?? undefined) : undefined, //  NEW
       });
       // Reset semua state
       resetForm();
@@ -118,7 +174,11 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
     setMethod("CASH");
     setIsDpMode(false); // FIX
     setHasilAnalisa("");
+    setProofPreview(null); //  NEW
+    setProofUrl(null); //  NEW
+    setUploading(false); //  NEW
     setError("");
+    if (fileInputRef.current) fileInputRef.current.value = ""; //  NEW
   };
 
   const handleClose = () => {
@@ -429,6 +489,61 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
             </div>
           )}
 
+          {/*  NEW — Bukti Pembayaran, wajib untuk mode Service (Lunas/DP) */}
+          {!isGaransi && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                Foto Bukti Pembayaran
+                <span className="text-red-500 ml-0.5">*</span>
+              </label>
+
+              {!proofPreview ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-[#1a1a2e]/30 hover:text-[#1a1a2e] transition"
+                >
+                  <Upload className="w-5 h-5" />
+                  <span className="text-xs font-semibold">Upload foto bukti transfer / pembayaran</span>
+                  <span className="text-[10px] text-gray-300">JPG, PNG, atau WEBP · maks 5MB</span>
+                </button>
+              ) : (
+                <div className="relative w-full overflow-hidden rounded-xl border border-gray-200">
+                  <img src={proofPreview} alt="Bukti pembayaran" className="w-full max-h-56 object-contain bg-gray-50" />
+                  {uploading && (
+                    <div className="absolute inset-0 flex items-center justify-center gap-2 bg-white/80 text-xs font-semibold text-gray-500">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Mengupload...
+                    </div>
+                  )}
+                  {!uploading && proofUrl && (
+                    <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                      <Check className="w-3 h-3" /> Terupload
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleRemoveProof}
+                    disabled={uploading}
+                    className="absolute top-2 right-2 grid h-7 w-7 place-items-center rounded-lg bg-black/60 text-white hover:bg-black/80 transition"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={e => handleFileSelect(e.target.files?.[0] ?? null)}
+              />
+            </div>
+          )}
+
           {/* Catatan */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1.5">
@@ -466,7 +581,7 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
           </button>
           <button
             onClick={handleConfirm}
-            disabled={loading || (!isGaransi && !amountNum) || (isDp && !dpAmountNum)}
+            disabled={loading || uploading || (!isGaransi && !amountNum) || (isDp && !dpAmountNum) || (!isGaransi && !proofUrl)}
             className={`flex-2 px-6 py-2.5 text-sm font-semibold text-white rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2 ${isGaransi
               ? "bg-amber-500 hover:bg-amber-600"
               : "bg-emerald-600 hover:bg-emerald-700"

@@ -85,6 +85,7 @@ export async function PATCH(
     payment_status, //  NEW
     total_tagihan, //  NEW
     cicilan_amount, //  NEW
+    payment_proof_url, //  NEW — url foto bukti transfer
   } = body as {
     action: string;
     alasan?: string;
@@ -98,6 +99,7 @@ export async function PATCH(
     payment_status?: "LUNAS" | "DP"; //  NEW
     total_tagihan?: number; //  NEW
     cicilan_amount?: number; //  NEW
+    payment_proof_url?: string; //  NEW — wajib untuk action "bayar_dimuka"
   };
 
   const supabase = getAdmin();
@@ -238,6 +240,11 @@ export async function PATCH(
       if (oldStatus !== "DONE" && oldStatus !== "GAGAL_DIPERBAIKI")
         return NextResponse.json({ success: false, message: "Status tidak valid untuk diambil" }, { status: 400 });
 
+      //  NEW — kalau ada nominal payment yang ditagihkan (bukan Garansi gratis), foto bukti wajib
+      if (payment_amount !== undefined && payment_amount > 0 && !payment_proof_url?.trim()) {
+        return NextResponse.json({ success: false, message: "Foto bukti pembayaran wajib diupload" }, { status: 400 });
+      }
+
       if (payment_status === "DP") {
         //  NEW — bayar DP: order TETAP di status semula (DONE/GAGAL_DIPERBAIKI), belum diambil
         if (!payment_amount || payment_amount <= 0)
@@ -249,6 +256,7 @@ export async function PATCH(
           payment_amount,
           payment_note: payment_note || null,
           payment_method: payment_method || "CASH",
+          payment_proof_url: payment_proof_url?.trim() || null, //  NEW
           payment_by: user.id,
           payment_confirmed_at: new Date().toISOString(),
         };
@@ -264,6 +272,7 @@ export async function PATCH(
             total_tagihan: total_tagihan ?? payment_amount, //  NEW
             payment_note: payment_note || null,
             payment_method: payment_method || "CASH",
+            payment_proof_url: payment_proof_url?.trim() || null, //  NEW
             payment_by: user.id,
             payment_confirmed_at: new Date().toISOString(),
           } : {}),
@@ -339,6 +348,8 @@ export async function PATCH(
         return NextResponse.json({ success: false, message: "Order ini sudah punya catatan pembayaran. Gunakan tombol Lunas/Cicil." }, { status: 400 });
       if (!payment_amount || payment_amount <= 0)
         return NextResponse.json({ success: false, message: "Nominal pembayaran wajib diisi" }, { status: 400 });
+      if (!payment_proof_url?.trim()) //  NEW — foto bukti wajib, backend juga validasi (bukan cuma frontend)
+        return NextResponse.json({ success: false, message: "Foto bukti pembayaran wajib diupload" }, { status: 400 });
 
       const statusBayarDimuka = payment_status === "DP" ? "DP" : "LUNAS";
       const totalTagihanDimuka = statusBayarDimuka === "DP" ? Number(total_tagihan ?? payment_amount) : payment_amount;
@@ -350,6 +361,7 @@ export async function PATCH(
         total_tagihan: totalTagihanDimuka,
         payment_note: payment_note || null,
         payment_method: payment_method || "CASH",
+        payment_proof_url: payment_proof_url.trim(), //  NEW
         payment_by: user.id,
         payment_confirmed_at: new Date().toISOString(),
       };
