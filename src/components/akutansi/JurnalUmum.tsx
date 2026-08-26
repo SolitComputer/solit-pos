@@ -2910,7 +2910,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                         {line.account_code}
                                     </span>
                                     {first && entry.ref && (
-                                        <div className="text-[9px] text-gray-300 font-mono mt-0.5">{entry.ref}</div>
+                                        <div className="text-[9px] text-gray-300 font-mono mt-0.5 truncate max-w-[100px]" title={entry.ref}>{entry.ref}</div>
                                     )}
                                 </td>
 
