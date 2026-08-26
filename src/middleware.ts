@@ -278,7 +278,7 @@ export async function middleware(request: NextRequest) {
   // dengan limit 600 write / 3000 read → masih aman dari flood otomatis
   // (script abuse biasanya ribuan request per detik), tapi tidak kena rate
   // limit saat trafik kantor normal jam kerja.
-  const rlLimit = isMutating ? 600 : 3000;
+  const rlLimit = isMutating ? 1200 : 8000;
   if (isRateLimited(rlBucket, rlLimit, 60_000)) {
     return NextResponse.json(
       { success: false, message: "Terlalu banyak request, coba lagi sebentar lagi" },
