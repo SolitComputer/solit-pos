@@ -2343,7 +2343,7 @@ function EntryFormModal({
                                                                 value={l.nominal || ""}
                                                                 onChange={(e) => patch(i, { nominal: Math.max(0, Number(e.target.value)) })}
                                                                 placeholder="0"
-                                                                className="h-9 w-28 sm:w-36 shrink-0 border border-gray-200 rounded-lg px-2 text-xs font-mono text-right"
+                                                                className="h-9 w-28 sm:w-36 shrink-0 border border-gray-200 rounded-lg px-2 text-xs font-mono text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                             />
 
                                                             <button
@@ -2910,7 +2910,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                         {line.account_code}
                                     </span>
                                     {first && entry.ref && (
-                                        <div className="text-[9px] text-gray-300 font-mono mt-0.5 truncate max-w-[100px]" title={entry.ref}>{entry.ref}</div>
+                                        <div className="text-[9px] text-gray-300 font-mono mt-0.5 break-all max-w-[80px] mx-auto leading-tight" title={entry.ref}>{entry.ref}</div>
                                     )}
                                 </td>
 
