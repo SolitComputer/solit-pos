@@ -40,6 +40,26 @@ function fmtRupiah(n?: number | null) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(num);
 }
 
+// ── BARU: Helper filter periode (berdasarkan tanggal_masuk) ────────────────
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const ymd = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const localMidnightISO = (s: string) => new Date(`${s}T00:00:00`).toISOString();
+const nextDayISO = (s: string) => {
+  const d = new Date(`${s}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString();
+};
+const fmtRangeLabel = (s: string) =>
+  new Date(`${s}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+
+const DATE_PRESETS = [
+  { key: "today", label: "Hari Ini" },
+  { key: "7d", label: "7 Hari" },
+  { key: "month", label: "Bulan Ini" },
+  { key: "lastMonth", label: "Bulan Lalu" },
+  { key: "all", label: "Semua" },
+] as const;
+
 const HISTORY_STATUSES: ServiceStatus[] = ["SUDAH_DIAMBIL", "TIDAK_JADI"];
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -767,19 +787,64 @@ function HistoryPageContent() {
   const [editOrder, setEditOrder] = useState<ServiceOrder | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null); // ⬅️ BARU: id dari Cashflow (?id=) — sorot barisnya di tabel, bukan buka modal
 
+  // ── BARU: filter periode (berdasarkan tanggal_masuk) ──
+  const [fromDate, setFromDate] = useState(() => {
+    const now = new Date();
+    return ymd(new Date(now.getFullYear(), now.getMonth(), 1));
+  });
+  const [toDate, setToDate] = useState(() => ymd(new Date()));
+  const [allTime, setAllTime] = useState(true); // default: semua waktu, sama seperti perilaku sebelum fitur ini ada
+  const [activePreset, setActivePreset] = useState<string>("all");
+
+  const periodParams = useCallback(() => {
+    const qs = new URLSearchParams();
+    HISTORY_STATUSES.forEach(s => qs.append("status", s));
+    if (!allTime) {
+      qs.set("from", localMidnightISO(fromDate));
+      qs.set("to", nextDayISO(toDate));
+    }
+    return qs;
+  }, [allTime, fromDate, toDate]);
+
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const params = HISTORY_STATUSES.map(s => `status=${s}`).join("&");
-      const res = await fetch(`/api/service?${params}`);
+      const qs = periodParams();
+      const res = await fetch(`/api/service?${qs.toString()}`);
       const json = await res.json();
       if (json.success) setOrders(json.data ?? []);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [periodParams]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  // ── BARU: terapkan preset periode ──
+  const applyPreset = (key: string) => {
+    const now = new Date();
+    if (key === "today") {
+      const t = ymd(now);
+      setFromDate(t); setToDate(t); setAllTime(false);
+    } else if (key === "7d") {
+      setFromDate(ymd(new Date(Date.now() - 6 * 86400000)));
+      setToDate(ymd(now));
+      setAllTime(false);
+    } else if (key === "month") {
+      setFromDate(ymd(new Date(now.getFullYear(), now.getMonth(), 1)));
+      setToDate(ymd(now));
+      setAllTime(false);
+    } else if (key === "lastMonth") {
+      const f = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const t = new Date(now.getFullYear(), now.getMonth(), 0);
+      setFromDate(ymd(f));
+      setToDate(ymd(t));
+      setAllTime(false);
+    } else if (key === "all") {
+      setAllTime(true);
+    }
+    setActivePreset(key);
+  };
 
   // ⬅️ BARU: dibuka dari Cashflow (?id=<service_order_id>) — bukan fetch+modal lagi,
   // cukup pastikan baris itu tidak ketutup search/filter, lalu tandai untuk disorot.
@@ -910,6 +975,44 @@ function HistoryPageContent() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* ⬅️ BARU: Filter periode — berdasarkan tanggal masuk servis */}
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {DATE_PRESETS.map(p => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => applyPreset(p.key)}
+                className={`h-8 shrink-0 rounded-lg px-3 text-[11px] font-black tracking-tight outline-none transition active:scale-95 ${activePreset === p.key
+                  ? "bg-[#1a1a2e] text-white shadow-sm"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  }`}
+              >
+                {p.label}
+              </button>
+            ))}
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate}
+              disabled={allTime}
+              onChange={e => { setAllTime(false); setActivePreset("custom"); setFromDate(e.target.value); }}
+              className="h-8 rounded-lg border border-gray-100 bg-gray-50 px-2.5 text-[11px] font-semibold text-gray-600 outline-none transition focus:border-[#1a1a2e]/30 focus:bg-white disabled:opacity-50"
+            />
+            <span className="text-[11px] text-gray-300">—</span>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate}
+              max={ymd(new Date())}
+              disabled={allTime}
+              onChange={e => { setAllTime(false); setActivePreset("custom"); setToDate(e.target.value); }}
+              className="h-8 rounded-lg border border-gray-100 bg-gray-50 px-2.5 text-[11px] font-semibold text-gray-600 outline-none transition focus:border-[#1a1a2e]/30 focus:bg-white disabled:opacity-50"
+            />
+            <span className="ml-auto text-[11px] font-bold text-gray-400">
+              {allTime ? "Semua Waktu" : `${fmtRangeLabel(fromDate)} — ${fmtRangeLabel(toDate)}`}
+            </span>
           </div>
         </div>
 
