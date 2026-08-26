@@ -514,6 +514,20 @@ function HistoryDetailModal({
                     <span className="truncate text-[11px] italic text-emerald-100">{order.payment_note}</span>
                   )}
                 </div>
+                {order.payment_proof_url && (
+                  <a
+                    href={order.payment_proof_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 block overflow-hidden rounded-xl border border-white/30"
+                  >
+                    <img
+                      src={order.payment_proof_url}
+                      alt="Bukti pembayaran"
+                      className="max-h-40 w-full object-cover"
+                    />
+                  </a>
+                )}
               </div>
             ) : (
               <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4">

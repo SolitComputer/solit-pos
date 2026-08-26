@@ -1,10 +1,11 @@
 "use client";
 // src/components/service/ServicePrepaymentModal.tsx
 
-import { useEffect, useState } from "react";
+import { useState, useRef } from "react";
+import { Banknote, Landmark, QrCode, Check, Upload, X, Loader2 } from "lucide-react";
 import type { ServiceOrder } from "@/types/service";
 
-interface ServicePrepaymentModalProps {
+interface Props {
   open: boolean;
   order: ServiceOrder | null;
   onClose: () => void;
@@ -14,70 +15,129 @@ interface ServicePrepaymentModalProps {
     total_tagihan?: number;
     payment_method: "CASH" | "TRANSFER" | "QRIS";
     payment_note?: string;
+    payment_proof_url: string;
   }) => Promise<void>;
 }
 
-type StatusBayar = "LUNAS" | "DP";
-type Metode = "CASH" | "TRANSFER" | "QRIS";
+const METHOD_OPTIONS = [
+  { value: "CASH", label: "Cash", icon: Banknote },
+  { value: "TRANSFER", label: "Transfer", icon: Landmark },
+  { value: "QRIS", label: "QRIS", icon: QrCode },
+] as const;
 
-export default function ServicePrepaymentModal({
-  open,
-  order,
-  onClose,
-  onConfirm,
-}: ServicePrepaymentModalProps) {
-  const [statusBayar, setStatusBayar] = useState<StatusBayar>("LUNAS");
-  const [totalTagihan, setTotalTagihan] = useState("");
-  const [nominal, setNominal] = useState("");
-  const [metode, setMetode] = useState<Metode>("CASH");
-  const [catatan, setCatatan] = useState("");
+function fmtRupiah(n: number) {
+  if (!n) return "";
+  return new Intl.NumberFormat("id-ID").format(n);
+}
+function parseRupiah(s: string) {
+  return parseInt(s.replace(/\D/g, ""), 10) || 0;
+}
+
+export default function ServicePrepaymentModal({ open, order, onClose, onConfirm }: Props) {
+  const [status, setStatus] = useState<"LUNAS" | "DP">("LUNAS");
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<"CASH" | "TRANSFER" | "QRIS">("CASH");
+  const [note, setNote] = useState("");
+
+  // ── Bukti pembayaran — WAJIB ──
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const [proofUrl, setProofUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // Reset form tiap kali modal dibuka untuk order baru
-  useEffect(() => {
-    if (open) {
-      setStatusBayar("LUNAS");
-      setTotalTagihan("");
-      setNominal("");
-      setMetode("CASH");
-      setCatatan("");
-      setError("");
-    }
-  }, [open, order?.id]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!open || !order) return null;
 
-  const nominalNum = Number(nominal) || 0;
-  const totalNum = Number(totalTagihan) || 0;
+  const amountNum = parseRupiah(amount);
 
-  const handleSubmit = async () => {
+  const resetForm = () => {
+    setStatus("LUNAS");
+    setAmount("");
+    setMethod("CASH");
+    setNote("");
+    setProofPreview(null);
+    setProofUrl(null);
+    setUploading(false);
+    setError("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleClose = () => {
+    if (loading || uploading) return;
+    resetForm();
+    onClose();
+  };
+
+  const handleAmountChange = (v: string) => {
+    const digits = v.replace(/\D/g, "");
+    setAmount(digits ? fmtRupiah(parseInt(digits)) : "");
+  };
+
+  const handleFileSelect = async (file: File | null) => {
+    if (!file) return;
     setError("");
 
-    if (nominalNum <= 0) {
-      setError("Nominal pembayaran wajib diisi.");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Format foto harus JPG, PNG, atau WEBP");
       return;
     }
-    if (statusBayar === "DP") {
-      if (totalNum <= 0) {
-        setError("Total tagihan wajib diisi untuk DP.");
-        return;
-      }
-      if (nominalNum >= totalNum) {
-        setError("Nominal DP harus lebih kecil dari total tagihan. Pilih LUNAS jika dibayar penuh.");
-        return;
-      }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Ukuran foto maksimal 5MB");
+      return;
     }
 
+    setProofPreview(URL.createObjectURL(file));
+    setProofUrl(null);
+    setUploading(true);
+
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("order_id", order.id);
+      const res = await fetch("/api/service/upload-payment-proof", {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || "Gagal upload bukti pembayaran");
+      setProofUrl(json.data.url);
+    } catch (e: any) {
+      setError(e.message || "Gagal upload bukti pembayaran");
+      setProofPreview(null);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveProof = () => {
+    setProofPreview(null);
+    setProofUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleConfirm = async () => {
+    if (!amountNum || amountNum <= 0) {
+      setError("Nominal dibayar wajib diisi dan harus lebih dari 0");
+      return;
+    }
+    if (!proofUrl) {
+      setError("Foto bukti pembayaran wajib diupload sebelum menyimpan");
+      return;
+    }
     setLoading(true);
+    setError("");
     try {
       await onConfirm({
-        payment_amount: nominalNum,
-        payment_status: statusBayar,
-        total_tagihan: statusBayar === "DP" ? totalNum : nominalNum,
-        payment_method: metode,
-        payment_note: catatan.trim() || undefined,
+        payment_amount: amountNum,
+        payment_status: status,
+        total_tagihan: status === "DP" ? amountNum : undefined,
+        payment_method: method,
+        payment_note: note.trim() || undefined,
+        payment_proof_url: proofUrl,
       });
+      resetForm();
     } catch (e: any) {
       setError(e.message || "Gagal menyimpan pembayaran");
     } finally {
@@ -85,59 +145,48 @@ export default function ServicePrepaymentModal({
     }
   };
 
-  const handleClose = () => {
-    if (loading) return;
-    onClose();
-  };
+  const canSubmit = !loading && !uploading && amountNum > 0 && !!proofUrl;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
 
       <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div className="min-w-0">
+        <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0 flex items-start justify-between">
+          <div>
             <h2 className="text-base font-bold text-[#1a1a2e]">Bayar di Muka</h2>
-            <p className="text-xs text-gray-400 mt-0.5 truncate">
-              {order.nama} · {order.type_laptop}
-            </p>
+            <p className="text-xs text-gray-400 mt-0.5">{order.nama} · {order.type_laptop}</p>
           </div>
           <button
             onClick={handleClose}
             disabled={loading}
-            className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition shrink-0"
+            className="p-2 rounded-xl text-gray-400 hover:bg-gray-50 transition"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          {/* Pilihan status bayar */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {/* Status Pembayaran */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-2">Status Pembayaran</label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setStatusBayar("LUNAS")}
-                className={`h-10 rounded-xl border-2 text-sm font-bold transition ${
-                  statusBayar === "LUNAS"
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                    : "border-gray-200 text-gray-400 hover:border-gray-300"
+                onClick={() => setStatus("LUNAS")}
+                className={`py-2.5 rounded-xl border-2 text-sm font-bold transition ${
+                  status === "LUNAS" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-gray-200 text-gray-500"
                 }`}
               >
                 Lunas
               </button>
               <button
                 type="button"
-                onClick={() => setStatusBayar("DP")}
-                className={`h-10 rounded-xl border-2 text-sm font-bold transition ${
-                  statusBayar === "DP"
-                    ? "border-amber-500 bg-amber-50 text-amber-700"
-                    : "border-gray-200 text-gray-400 hover:border-gray-300"
+                onClick={() => setStatus("DP")}
+                className={`py-2.5 rounded-xl border-2 text-sm font-bold transition ${
+                  status === "DP" ? "border-amber-500 bg-amber-50 text-amber-700" : "border-gray-200 text-gray-500"
                 }`}
               >
                 DP (Cicil)
@@ -145,104 +194,132 @@ export default function ServicePrepaymentModal({
             </div>
           </div>
 
-          {/* Total tagihan — hanya untuk DP */}
-          {statusBayar === "DP" && (
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">
-                Total Tagihan Disepakati <span className="text-red-500">*</span>
-              </label>
+          {/* Nominal */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              Nominal Dibayar<span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">Rp</span>
               <input
-                type="number"
-                min={0}
-                value={totalTagihan}
-                onChange={e => setTotalTagihan(e.target.value)}
-                placeholder="cth: 500000"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition placeholder:text-gray-300"
+                type="text"
+                value={amount}
+                onChange={e => handleAmountChange(e.target.value)}
+                placeholder="cth: 200000"
+                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition font-mono"
               />
             </div>
-          )}
-
-          {/* Nominal dibayar */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">
-              {statusBayar === "DP" ? "Nominal DP Dibayar Sekarang" : "Nominal Dibayar"} <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min={0}
-              value={nominal}
-              onChange={e => setNominal(e.target.value)}
-              placeholder="cth: 200000"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition placeholder:text-gray-300"
-            />
-            {statusBayar === "DP" && totalNum > 0 && nominalNum > 0 && nominalNum < totalNum && (
-              <p className="mt-1 text-[11px] font-medium text-amber-500">
-                Sisa yang belum dibayar: Rp {(totalNum - nominalNum).toLocaleString("id-ID")}
-              </p>
-            )}
           </div>
 
-          {/* Metode pembayaran */}
+          {/* Metode Pembayaran */}
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Metode Pembayaran</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-2">Metode Pembayaran</label>
             <div className="grid grid-cols-3 gap-2">
-              {(["CASH", "TRANSFER", "QRIS"] as Metode[]).map(m => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMetode(m)}
-                  className={`h-9 rounded-xl border text-xs font-bold transition ${
-                    metode === m
-                      ? "border-[#1a1a2e] bg-[#1a1a2e] text-white"
-                      : "border-gray-200 text-gray-500 hover:border-gray-300"
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
+              {METHOD_OPTIONS.map(m => {
+                const Icon = m.icon;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setMethod(m.value)}
+                    className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 text-xs font-semibold transition ${
+                      method === m.value ? "border-[#1a1a2e] bg-[#1a1a2e]/5 text-[#1a1a2e]" : "border-gray-200 text-gray-500 hover:border-gray-300"
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    {m.label}
+                  </button>
+                );
+              })}
             </div>
+          </div>
+
+          {/* Bukti Pembayaran — WAJIB */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              Foto Bukti Pembayaran<span className="text-red-500 ml-0.5">*</span>
+            </label>
+
+            {!proofPreview ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-[#1a1a2e]/30 hover:text-[#1a1a2e] transition"
+              >
+                <Upload className="w-5 h-5" />
+                <span className="text-xs font-semibold">Upload foto bukti transfer / pembayaran</span>
+                <span className="text-[10px] text-gray-300">JPG, PNG, atau WEBP · maks 5MB</span>
+              </button>
+            ) : (
+              <div className="relative w-full overflow-hidden rounded-xl border border-gray-200">
+                <img src={proofPreview} alt="Bukti pembayaran" className="w-full max-h-56 object-contain bg-gray-50" />
+                {uploading && (
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 bg-white/80 text-xs font-semibold text-gray-500">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Mengupload...
+                  </div>
+                )}
+                {!uploading && proofUrl && (
+                  <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-lg bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                    <Check className="w-3 h-3" /> Terupload
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleRemoveProof}
+                  disabled={uploading}
+                  className="absolute top-2 right-2 grid h-7 w-7 place-items-center rounded-lg bg-black/60 text-white hover:bg-black/80 transition"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={e => handleFileSelect(e.target.files?.[0] ?? null)}
+            />
           </div>
 
           {/* Catatan */}
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Catatan (opsional)</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              Catatan <span className="text-gray-400 font-normal">(opsional)</span>
+            </label>
             <textarea
-              value={catatan}
-              onChange={e => setCatatan(e.target.value)}
-              rows={2}
+              value={note}
+              onChange={e => setNote(e.target.value)}
               placeholder="cth: Bayar via transfer BCA a.n. ..."
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition placeholder:text-gray-300 resize-none"
+              rows={2}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] transition resize-none placeholder:text-gray-300"
             />
           </div>
 
           {error && (
-            <div className="px-3 py-2.5 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">
+            <div className="px-3 py-2 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600">
               {error}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
           <button
             onClick={handleClose}
             disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition"
+            className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-xl transition"
           >
             Batal
           </button>
           <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="px-5 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 transition disabled:opacity-60 flex items-center gap-2"
+            onClick={handleConfirm}
+            disabled={!canSubmit}
+            className="flex-[2] px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loading && (
-              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-              </svg>
-            )}
-            {loading ? "Menyimpan..." : "Simpan Pembayaran"}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Simpan Pembayaran
           </button>
         </div>
       </div>
