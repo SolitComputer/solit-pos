@@ -16,6 +16,8 @@ function getAdmin() {
 export const GET = withAuth(async (req, _ctx, user) => {
   const { searchParams } = new URL(req.url);
   const statuses = searchParams.getAll("status") as ServiceStatus[];
+  const from = searchParams.get("from"); // ISO string, inclusive
+  const to = searchParams.get("to");     // ISO string, exclusive
 
   const supabase = getAdmin();
 
@@ -32,6 +34,11 @@ export const GET = withAuth(async (req, _ctx, user) => {
   if (statuses.length > 0) {
     query = query.in("status", statuses);
   }
+  // BARU: filter periode berdasarkan tanggal_masuk — field ini selalu terisi
+  // untuk semua status (beda dengan tanggal_selesai/tanggal_diambil yang bisa
+  // null di order TIDAK_JADI), jadi aman jadi acuan filter tanggal riwayat.
+  if (from) query = query.gte("tanggal_masuk", from);
+  if (to) query = query.lt("tanggal_masuk", to);
 
   const { data, error } = await query;
 
