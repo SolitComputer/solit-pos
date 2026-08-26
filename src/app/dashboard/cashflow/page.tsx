@@ -980,8 +980,8 @@ return (
                 )}
             </div>
             <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                {entry.source_type === "MANUAL" && entry.direction === "OUT" && (
-                    <button onClick={() => { onClose(); onEdit(entry); }} className="inline-flex items-center gap-1.5 h-10 px-4 bg-white border border-amber-200 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-50 transition">
+                {entry.source_type === "MANUAL" && (
+                    <button onClick={() => { onClose(); onEdit(entry); }} className={`inline-flex items-center gap-1.5 h-10 px-4 bg-white border text-sm font-medium transition ${entry.direction === "OUT" ? "border-amber-200 text-amber-700 hover:bg-amber-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"} rounded-lg`}>
                         <IconEdit /> Edit
                     </button>
                 )}
@@ -1111,9 +1111,10 @@ return (
 );
 }
 
-// ── Edit Expense Modal ────────────────────────────────────────────────────────
-function EditExpenseModal({ entry, onClose, onSaved }: { entry: Entry; onClose: () => void; onSaved: () => void }) {
-const categories = Object.entries(EXPENSE_CATEGORIES);
+// ── Edit Entry Modal ──────────────────────────────────────────────────────────
+function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: () => void; onSaved: () => void }) {
+const isOut = entry.direction === "OUT";
+const categories = isOut ? Object.entries(EXPENSE_CATEGORIES) : Object.entries(INCOME_CATEGORIES).filter(([key]) => !(AUTO_INCOME_CATEGORIES as readonly string[]).includes(key));
 const [category, setCategory] = useState(entry.category);
 const [nominal, setNominal] = useState(String(entry.nominal ?? ""));
 const [keterangan, setKeterangan] = useState(entry.keterangan ?? "");
@@ -1138,16 +1139,20 @@ const submit = async () => {
     setSaving(true);
     setError("");
     try {
+        const body: any = {
+            category,
+            nominal: parsed,
+            keterangan: keterangan.trim() || null,
+            tanggal,
+        };
+        if (isOut) {
+            body.payment_method = paymentMethod;
+        }
+
         const res = await fetch(`/api/cashflow/${entry.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                category,
-                nominal: parsed,
-                keterangan: keterangan.trim() || null,
-                tanggal,
-                payment_method: paymentMethod,
-            }),
+            body: JSON.stringify(body),
         });
         const json = await res.json();
         if (!json.success) return setError(json.message || "Gagal menyimpan perubahan");
@@ -1160,25 +1165,50 @@ const submit = async () => {
     }
 };
 
-const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 transition";
+const theme = isOut ? {
+    ring: "focus:ring-amber-400/30",
+    borderFocus: "focus:border-amber-400",
+    bgIcon: "bg-amber-50",
+    textIcon: "text-amber-600",
+    bgAlert: "bg-amber-50",
+    borderAlert: "border-amber-200",
+    textAlert: "text-amber-700",
+    bgBtn: "bg-amber-600",
+    hoverBtn: "hover:bg-amber-700",
+    gradient: "from-amber-400 to-orange-500",
+} : {
+    ring: "focus:ring-emerald-400/30",
+    borderFocus: "focus:border-emerald-400",
+    bgIcon: "bg-emerald-50",
+    textIcon: "text-emerald-600",
+    bgAlert: "bg-emerald-50",
+    borderAlert: "border-emerald-200",
+    textAlert: "text-emerald-700",
+    bgBtn: "bg-emerald-600",
+    hoverBtn: "hover:bg-emerald-700",
+    gradient: "from-emerald-400 to-green-500",
+};
+
+const inputCls = `w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 ${theme.ring} ${theme.borderFocus} transition`;
 const showZeroHint = nominal.trim() !== "" && Number(nominal) === 0;
 
 return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
         <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={onClose} />
         <div className="relative bg-white w-full sm:max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
-            <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
+            <div className={`h-1 bg-gradient-to-r ${theme.gradient}`} />
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-base"><Pencil size={16} /></div>
+                    <div className={`w-8 h-8 rounded-lg ${theme.bgIcon} ${theme.textIcon} flex items-center justify-center text-base`}><Pencil size={16} /></div>
                     <div>
-                        <p className="text-sm font-bold text-gray-900">Edit Uang Keluar</p>
+                        <p className="text-sm font-bold text-gray-900">Edit Uang {isOut ? "Keluar" : "Masuk"}</p>
                         <p className="text-[11px] text-gray-400">{fmtTanggal(entry.tanggal)}</p>
                     </div>
                 </div>
                 <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
             </div>
             <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+                {isOut && (
                 <div>
                     <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
                     <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
@@ -1189,6 +1219,7 @@ return (
                         ))}
                     </div>
                 </div>
+                )}
                 <div>
                     <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
                     <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
@@ -1209,7 +1240,7 @@ return (
                     </div>
                 </div>
                 {showZeroHint && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[11px] text-amber-700">
+                    <div className={`${theme.bgAlert} border ${theme.borderAlert} rounded-lg px-3 py-2 text-[11px] ${theme.textAlert}`}>
                         Nominal 0 disimpan sebagai koreksi. Entry bernilai 0 <b>tidak bisa diaudit</b> sampai nominalnya diisi kembali.
                     </div>
                 )}
@@ -1227,7 +1258,7 @@ return (
             </div>
             <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
                 <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
-                <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition disabled:opacity-60">{saving ? "Menyimpan..." : "Simpan Perubahan"}</button>
+                <button onClick={submit} disabled={saving} className={`flex-1 h-10 ${theme.bgBtn} text-white rounded-lg text-sm font-medium ${theme.hoverBtn} transition disabled:opacity-60`}>{saving ? "Menyimpan..." : "Simpan Perubahan"}</button>
             </div>
         </div>
     </div>
@@ -1651,7 +1682,7 @@ return (
         {showModalAwal && <ModalAwalModal onClose={() => setShowModalAwal(false)} onSaved={() => fetchData(true)} />}
         {showIncomeModal && <IncomeModal onClose={() => setShowIncomeModal(false)} onSaved={() => fetchData(true)} />}
         {detailEntry && <DetailModal entry={detailEntry} onClose={() => setDetailEntry(null)} onDelete={deleteEntry} onEdit={(e) => setEditEntry(e)} />}
-        {editEntry && <EditExpenseModal entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => fetchData(true)} />}
+        {editEntry && <EditEntryModal entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => fetchData(true)} />}
         {showAuditAccessModal && <AuditAccessModal onClose={() => setShowAuditAccessModal(false)} />}
 
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-5">

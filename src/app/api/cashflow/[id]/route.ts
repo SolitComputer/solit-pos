@@ -197,35 +197,38 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
     if (fetchErr || !entry)
         return NextResponse.json({ success: false, message: "Entry tidak ditemukan" }, { status: 404 });
 
-    if (entry.direction !== "OUT")
-        return NextResponse.json({ success: false, message: "Hanya uang keluar yang bisa diedit" }, { status: 400 });
-
     if (entry.source_type !== "MANUAL")
         return NextResponse.json({ success: false, message: "Hanya entry manual yang bisa diedit" }, { status: 400 });
 
     if (entry.is_audited)
         return NextResponse.json({ success: false, message: "Entry yang sudah diaudit tidak bisa diedit" }, { status: 400 });
 
-    if (!isValidCategory("OUT", category))
+    if (!isValidCategory(entry.direction, category))
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
 
-    if (!payment_method || !["CASH", "SALDO"].includes(payment_method))
-        return NextResponse.json(
-            { success: false, message: "Metode pembayaran harus CASH atau SALDO" },
-            { status: 400 }
-        );
+    if (entry.direction === "OUT") {
+        if (!payment_method || !["CASH", "SALDO"].includes(payment_method))
+            return NextResponse.json(
+                { success: false, message: "Metode pembayaran harus CASH atau SALDO" },
+                { status: 400 }
+            );
+    }
 
     const jakartaToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
+    const updatePayload: any = {
+        category,
+        nominal: nom,
+        keterangan: keterangan?.trim() || null,
+        tanggal: tanggal || jakartaToday,
+    };
+    if (entry.direction === "OUT") {
+        updatePayload.payment_method = payment_method;
+    }
+
     const { data: updated, error: updateErr } = await supabase
         .from("cashflow_entries")
-        .update({
-            category,
-            nominal: nom,
-            keterangan: keterangan?.trim() || null,
-            tanggal: tanggal || jakartaToday,
-            payment_method,
-        })
+        .update(updatePayload)
         .eq("id", id)
         .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)
         .single();
