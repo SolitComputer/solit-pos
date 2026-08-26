@@ -22,12 +22,13 @@ function buildTodayWIBTimestamp(dateKey: string, time: { h: number; m: number })
   return new Date(`${dateKey}T${pad(time.h)}:${pad(time.m)}:00+07:00`).toISOString();
 }
 
-// Poin 1 lanjutan — koreksi jam pulang: bisa isi/ubah jam pulang, ATAU
-// mengosongkannya kembali (misal salah catat karena bug sensor/kamera).
-// Admin-only. Setelah koreksi, draft lemburan AFTER_OUT/HOLIDAY yang masih
-// PENDING otomatis disesuaikan/dihapus mengikuti kondisi baru. Draft yang
-// sudah di-ACC/diaudit TIDAK PERNAH disentuh otomatis — hanya diberi
-// peringatan lewat field `warning` di response.
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dateObj = new Date(Date.UTC(y, m - 1, d));
+  dateObj.setUTCDate(dateObj.getUTCDate() + days);
+  return dateObj.toISOString().slice(0, 10);
+}
+
 export async function PATCH(request: Request) {
   try {
     const admin = await getCurrentUser();
@@ -51,8 +52,8 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const dayStart = `${date}T00:00:00+07:00`;
-    const dayEnd = `${date}T23:59:59+07:00`;
+    const dayStart = `${date}T04:00:00+07:00`;
+    const dayEnd = `${addDaysToDateStr(date, 1)}T03:59:59+07:00`;
 
     const { data: targetUser } = await supabaseAdmin
       .from("users").select("role, roles").eq("id", user_id).maybeSingle();
@@ -61,13 +62,15 @@ export async function PATCH(request: Request) {
     }
     const userRole = (Array.isArray(targetUser.roles) && targetUser.roles[0]) || targetUser.role;
 
-    const [{ data: todayIn }, { data: existingOut }] = await Promise.all([
+    const [{ data: todayIn }, { data: existingOut }, { data: manualToday }] = await Promise.all([
       supabaseAdmin.from("face_verifications").select("id, created_at")
         .eq("user_id", user_id).eq("status", "SUCCESS").eq("direction", "IN")
         .gte("created_at", dayStart).lte("created_at", dayEnd).maybeSingle(),
       supabaseAdmin.from("face_verifications").select("id")
         .eq("user_id", user_id).eq("status", "SUCCESS").eq("direction", "OUT")
         .gte("created_at", dayStart).lte("created_at", dayEnd).maybeSingle(),
+      supabaseAdmin.from("attendance_manual").select("id, status, check_in_time")
+        .eq("user_id", user_id).eq("attendance_date", date).maybeSingle(),
     ]);
 
     // Dipakai baik jalur "clear" maupun jalur isi/koreksi jam di bawah.
@@ -166,15 +169,17 @@ export async function PATCH(request: Request) {
       ? { ...baseSchedule, ...overrideShape, checkout: overrideShape.checkout ?? baseSchedule.checkout }
       : baseSchedule;
 
+    const inTimestamp = todayIn?.created_at ?? (manualToday as any)?.check_in_time ?? null;
+
     let correctMinutes = 0;
     let correctDirection: OvertimeDirection = "AFTER_OUT";
     let correctActualStart = buildTodayWIBTimestamp(date, schedule.checkout);
     const correctActualEnd = newCheckoutISO;
 
-    if (isDayOff && todayIn) {
+    if (isDayOff && inTimestamp) {
       correctDirection = "HOLIDAY";
-      correctActualStart = todayIn.created_at;
-      correctMinutes = computeHolidayOvertimeMinutes(todayIn.created_at, newCheckoutISO);
+      correctActualStart = inTimestamp;
+      correctMinutes = computeHolidayOvertimeMinutes(inTimestamp, newCheckoutISO);
     } else if (!isDayOff) {
       correctMinutes = computeAfterOutOvertimeMinutes(newCheckoutISO, schedule);
     }
