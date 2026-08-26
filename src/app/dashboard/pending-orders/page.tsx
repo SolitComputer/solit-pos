@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasPermission, PERMISSIONS } from "@/lib/permissions";
-import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban, Wallet } from "lucide-react";
+import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban, Wallet, Receipt } from "lucide-react";
 import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface PendingTransaction {
@@ -619,7 +619,7 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
                             Lunas
                         </button>
                     )}
-                    {canCancel && (
+                                        {canCancel && (
                         <button onClick={() => onCancel(tx)}
                             title="Tidak Jadi — batalkan pesanan"
                             className="h-7 px-2.5 flex items-center gap-1 rounded-lg text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all">
@@ -627,12 +627,20 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
                             Tidak Jadi
                         </button>
                     )}
+                    <a
+                        href={`/invoice/${tx.invoice_number}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Lihat Invoice"
+                        className="h-7 px-2.5 flex items-center gap-1 rounded-lg text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-all">
+                        <Receipt size={12} />
+                        Invoice
+                    </a>
                 </div>
             </td>
         </tr>
     );
 }
-
 // ─── Table row for HISTORY ────────────────────────────────────────────────────
 function HistoryRow({ tx, onDetail, onWhatsApp, idx }: {
     tx: PendingTransaction;

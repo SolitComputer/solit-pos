@@ -1,3 +1,5 @@
+import { buildWhatsappReceiptBlock, type ReceiptLineItem } from "@/lib/receiptItems";
+
 export async function sendWhatsapp(
   target: string,
   message: string
@@ -64,7 +66,7 @@ export async function sendWhatsapp(
 
         // ── TAMBAHAN: device disconnect = tidak perlu retry ──
         if (result.reason?.toLowerCase?.().includes("disconnect") ||
-            result.reason?.toLowerCase?.().includes("not found")) {
+          result.reason?.toLowerCase?.().includes("not found")) {
           console.error("[Fonnte] Device tidak terhubung — hentikan retry");
           break;
         }
@@ -91,10 +93,7 @@ export async function sendWhatsapp(
   return false;
 }
 
-/**
- * Template pesan konfirmasi pembayaran
- * Dikirim otomatis setelah transaksi PAID
- */
+
 export function buildPaymentMessage(data: {
   customer_name: string;
   invoice_number: string;
@@ -108,6 +107,7 @@ export function buildPaymentMessage(data: {
   pickup_location?: string;
   software_request?: string;
   customer_type?: string;
+  items?: ReceiptLineItem[];
 }): string {
   const fmtDate = (d: string) =>
     new Date(d).toLocaleDateString("id-ID", {
@@ -128,23 +128,45 @@ export function buildPaymentMessage(data: {
       .join("\n")
     : "";
 
+  const items: ReceiptLineItem[] =
+    data.items && data.items.length > 0
+      ? data.items
+      : [
+        {
+          label: data.laptop_name,
+          meta: data.serial_number ? `SN: ${data.serial_number}` : undefined,
+          qty: 1,
+          unitPrice: data.amount,
+          amount: data.amount,
+          isBonus: false,
+        },
+      ];
+
+  const receiptBlock = buildWhatsappReceiptBlock({
+    storeName: "SOLIT 03",
+    invoiceNumber: data.invoice_number,
+    dateLabel: new Date().toLocaleString("id-ID", {
+      day: "2-digit", month: "long", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    }),
+    items,
+    total: data.amount,
+    paymentMethod: data.payment_method,
+    statusLabel: "LUNAS",
+  });
+
   return [
     `Halo *${data.customer_name}* 👋`,
     ``,
     `✅ Pembayaran laptop Anda telah *berhasil dikonfirmasi!*`,
     ``,
-    `━━━━━━━━━━━━━━━━━━`,
-    `📋 *Detail Transaksi*`,
-    `━━━━━━━━━━━━━━━━━━`,
-    `📄 Nota           : ${data.invoice_number}`,
-    `💻 Laptop        : ${data.laptop_name}`,
-    data.serial_number ? `🔢 Serial No    : ${data.serial_number}` : null,
-    data.software_request ? `💿 Software    : ${data.software_request}` : null,
-    `💰 Total           : Rp${data.amount.toLocaleString("id-ID")}`,
-    `💳 Pembayaran  : ${data.payment_method}`,
-    data.customer_type === "RESELLER" ? `🔄 Tipe             : Reseller` : null,
-    data.customer_type === "MITRA" ? `🤝 Tipe             : Mitra Bisnis` : null,
-    `🏷️ Status         : LUNAS ✓`,
+    "```",
+    receiptBlock,
+    "```",
+    ``,
+    data.customer_type === "RESELLER" ? `🔄 Tipe pelanggan : Reseller` : null,
+    data.customer_type === "MITRA" ? `🤝 Tipe pelanggan : Mitra Bisnis` : null,
+    data.software_request ? `💿 Software request : ${data.software_request}` : null,
     ``,
     `━━━━━━━━━━━━━━━━━━`,
     `📦 *Info Pengambilan*`,
