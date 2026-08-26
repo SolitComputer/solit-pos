@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toPng } from "html-to-image";
+import { buildWhatsappReceiptBlock, type ReceiptLineItem } from "@/lib/receiptItems";
 
 interface Props {
     customerPhone: string;
@@ -19,6 +20,7 @@ interface Props {
     warrantyDaysLeft?: number;
     customerType?: string;
     itemKind?: "laptop" | "accessory" | "mixed";
+    items?: ReceiptLineItem[];
 }
 export default function ReceiptActions({
     customerPhone,
@@ -36,6 +38,7 @@ export default function ReceiptActions({
     warrantyDaysLeft,
     customerType,
     itemKind,
+    items,
 }: Props) {
     const [downloading, setDownloading] = useState(false);
     const [waSent, setWaSent] = useState(false);
@@ -59,24 +62,47 @@ export default function ReceiptActions({
                 ? ` (${warrantyDaysLeft} hari lagi)`
                 : " (Kadaluarsa)"
             }`
-            : null;
+                     : null;
+
+        const receiptItems: ReceiptLineItem[] =
+            items && items.length > 0
+                ? items
+                : [
+                    {
+                        label: laptopName,
+                        meta: serialNumber ? `SN: ${serialNumber}` : undefined,
+                        qty: 1,
+                        unitPrice: amount,
+                        amount,
+                        isBonus: false,
+                    },
+                ];
+
+        const receiptBlock = buildWhatsappReceiptBlock({
+            storeName: "SOLIT 03",
+            invoiceNumber,
+            dateLabel: new Date().toLocaleString("id-ID", {
+                day: "2-digit", month: "long", year: "numeric",
+                hour: "2-digit", minute: "2-digit",
+            }),
+            items: receiptItems,
+            total: amount,
+            paymentMethod,
+            statusLabel: "LUNAS",
+        });
 
         const lines = [
             `Halo ${customerName} `,
             ``,
             ` *Pembayaran Berhasil!*`,
-            `Terima kasih sudah berbelanja di *Solit 03* `,
             ``,
-            `━━━━━━━━━━━━━━━━━━`,
-            ` *Detail Transaksi*`,
-            `━━━━━━━━━━━━━━━━━━`,
-            ` Nota           : ${invoiceNumber}`,
-            itemKind === "accessory" ? ` Barang         : ${laptopName}` : ` Laptop        : ${laptopName}`,
-            serialNumber ? ` Serial No    : ${serialNumber}` : null,
-            ` Total           : Rp${amount?.toLocaleString("id-ID")}`,
-            ` Pembayaran  : ${paymentMethod}`,
-            customerType === "RESELLER" ? ` Tipe             : Reseller` : null,
-            customerType === "MITRA" ? ` Tipe             : Mitra Bisnis` : null,
+            "```",
+            receiptBlock,
+            "```",
+            ``,
+            customerType === "RESELLER" ? ` Tipe pelanggan : Reseller` : null,
+            customerType === "MITRA" ? ` Tipe pelanggan : Mitra Bisnis` : null,
+            softwareRequest ? ` Software request : ${softwareRequest}` : null,
             ``,
             `━━━━━━━━━━━━━━━━━━`,
             ` *Info Pengambilan*`,
@@ -84,7 +110,6 @@ export default function ReceiptActions({
             ` Metode       : ${pickupMethod === "DATANG" ? "Datang ke Toko" : "Diantar"}`,
             fmtDateStr ? ` Tanggal     : ${fmtDateStr}` : null,
             pickupTime ? ` Jam             : ${pickupTime}` : null,
-            softwareRequest ? ` Software    : ${softwareRequest}` : null,
             ``,
             `━━━━━━━━━━━━━━━━━━`,
             ` *Garansi Laptop*`,
