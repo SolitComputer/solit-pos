@@ -19,7 +19,8 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
     .select("id, title, message, severity, status, target_user_id, target_role, created_at, read_at, resolved_at, whatsapp_sent, whatsapp_error")
     .or(orCondition)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(50)
+    .abortSignal(AbortSignal.timeout(8000));
 
   if (error) {
     return NextResponse.json(
