@@ -3907,6 +3907,7 @@ export default function AttendanceDashboardPage() {
         let openMin: number | null = null;
         let lateMin: number | null = null;
         let closeMin: number | null = null;
+        let checkoutMin: number | null = null; // ✅ NEW — jam pulang resmi, TERPISAH dari closeMin (batas absen ditutup)
 
         if (sched) {
             fromSchedule = true;
@@ -3919,6 +3920,9 @@ export default function AttendanceDashboardPage() {
             }
             if (sched.close_hour != null) {
                 closeMin = sched.close_hour * 60 + (sched.close_minute ?? 0);
+            }
+            if (sched.checkout_hour != null) { // ✅ NEW
+                checkoutMin = sched.checkout_hour * 60 + (sched.checkout_minute ?? 0);
             }
         }
 
@@ -3935,18 +3939,23 @@ export default function AttendanceDashboardPage() {
             if (closeMin == null && cfg.close_hour != null) {
                 closeMin = cfg.close_hour * 60 + (cfg.close_minute ?? 0);
             }
+            if (checkoutMin == null && cfg.checkout_hour != null) { // ✅ NEW
+                checkoutMin = cfg.checkout_hour * 60 + (cfg.checkout_minute ?? 0);
+            }
         }
 
         const base = SHIFT_DEFAULTS[shift] ?? SHIFT_DEFAULTS.PAGI;
         if (openMin == null) openMin = base.open_hour * 60 + base.open_minute;
         if (lateMin == null) lateMin = base.late_hour * 60 + base.late_minute;
         if (closeMin == null) closeMin = base.close_hour * 60 + base.close_minute;
+        if (checkoutMin == null) checkoutMin = base.checkout_hour * 60 + base.checkout_minute; // ✅ NEW
 
         const defOpenMin = base.open_hour * 60 + base.open_minute;
         const defLateMin = base.late_hour * 60 + base.late_minute;
         const defCloseMin = base.close_hour * 60 + base.close_minute;
+        const defCheckoutMin = base.checkout_hour * 60 + base.checkout_minute; // ✅ NEW
 
-        const isCustom = openMin !== defOpenMin || lateMin !== defLateMin || closeMin !== defCloseMin;
+        const isCustom = openMin !== defOpenMin || lateMin !== defLateMin || closeMin !== defCloseMin || checkoutMin !== defCheckoutMin;
 
         return {
             shift,
@@ -3955,6 +3964,7 @@ export default function AttendanceDashboardPage() {
             open: openMin,
             late: lateMin,
             close: closeMin,
+            checkout: checkoutMin, // ✅ NEW — pakai INI buat hitung lembur akhir, JANGAN pakai `close`
         };
     }, [schedulesByUser, configsByUser, allUsers]);
 
@@ -3987,7 +3997,7 @@ export default function AttendanceDashboardPage() {
             const eff = effectiveShiftFor(currentUser.id, dk);
             const schedule = {
                 lateFrom: { h: Math.floor(eff.late / 60), m: eff.late % 60 },
-                checkout: { h: Math.floor(eff.close / 60), m: eff.close % 60 },
+                checkout: { h: Math.floor(eff.checkout / 60), m: eff.checkout % 60 }, // ✅ FIX — sebelumnya salah pakai eff.close (batas absen ditutup)
             };
 
             let beforeInMinutes = 0, afterOutMinutes = 0, holidayMinutes = 0;
@@ -5640,7 +5650,7 @@ export default function AttendanceDashboardPage() {
                                                                             ? "bg-amber-50 text-amber-700 border-amber-200"
                                                                             : "bg-indigo-50 text-indigo-700 border-indigo-200"
                                                                             }`}>
-                                                                            {eff.shift === "PAGI" ? <Sun className="w-3.5 h-3.5 inline mr-1 text-amber-500" /> : <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />} {minToHHMM(eff.open)}–{minToHHMM(eff.close)}
+                                                                            {eff.shift === "PAGI" ? <Sun className="w-3.5 h-3.5 inline mr-1 text-amber-500" /> : <Moon className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />} {minToHHMM(eff.open)}–{minToHHMM(eff.checkout)}
                                                                         </span>
                                                                         {eff.fromSchedule && !eff.isCustom && (
                                                                             <span className="text-[8px] font-bold text-violet-500">dari jadwal</span>
