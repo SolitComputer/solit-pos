@@ -16,7 +16,7 @@ const withPWA = withPWAInit({
     clientsClaim: true,
     runtimeCaching: [
       {
-        // ✅ RSC responses + navigasi → JANGAN pernah cache
+        // ✅ RSC responses + navigasi → JANGAN pernah cachee
         urlPattern: ({ request, url }: { request: Request; url: URL }) =>
           request.mode === "navigate" ||
           request.headers.get("RSC") === "1" ||
