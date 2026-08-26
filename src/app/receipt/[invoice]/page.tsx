@@ -29,7 +29,7 @@ export default async function Page(props: Props) {
       .eq("invoice_number", params.invoice),
   ]);
 
-    const laptopItems = (txItems ?? []).filter((it: any) => it.item_type !== "accessory");
+  const laptopItems = (txItems ?? []).filter((it: any) => it.item_type !== "accessory");
   const accessoryItems = (txItems ?? []).filter((it: any) => it.item_type === "accessory");
   const itemKind: "laptop" | "accessory" | "mixed" =
     laptopItems.length > 0 && accessoryItems.length > 0
@@ -149,7 +149,7 @@ export default async function Page(props: Props) {
 
             <Separator />
 
-                        {/* Detail Pembelian — gaya struk Indomaret: keterangan kiri, nominal kanan */}
+            {/* Detail Pembelian — gaya struk Indomaret: keterangan kiri, nominal kanan */}
             <Section
               title={itemKind === "accessory" ? "Detail Aksesoris" : itemKind === "mixed" ? "Detail Pembelian" : "Detail Laptop"}
               icon={<Package className="w-4 h-4" />}
@@ -298,6 +298,7 @@ export default async function Page(props: Props) {
               warrantyDaysLeft={warrantyDaysLeft ?? undefined}
               customerType={data.customer_type || "UMUM"}
               itemKind={itemKind}
+              items={lineItems}
             />
           </div>
         </div>
