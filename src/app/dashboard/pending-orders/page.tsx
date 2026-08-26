@@ -168,6 +168,15 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
     const [cicilanAmount, setCicilanAmount] = useState("");
     const [confirmSN, setConfirmSN] = useState(tx.serial_number || "");
+    // REVISI: nominal pembayaran mode Lunas — default = sisa tagihan, tapi
+    // tetap bisa diedit. Wajib diisi manual kalau harga deal-nya Rp0
+    // (transaksi E-Commerce Pending yang dibuat tanpa harga).
+    const [lunasAmount, setLunasAmount] = useState<string>(() => {
+        const dt = Number(tx.deal_price || tx.amount || 0);
+        const paid = Number(tx.dp_amount || 0);
+        const rem = Math.max(0, dt - paid);
+        return rem > 0 ? String(rem) : "";
+    });
 
     const dealTotal = Number(tx.deal_price || tx.amount || 0);
     const paidSoFar = Number(tx.dp_amount || 0);
@@ -224,6 +233,11 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
             return;
         }
 
+        // ── REVISI: nominal pembayaran wajib diisi di mode Lunas juga —
+        // dibutuhkan terutama saat harga deal Rp0 (E-Commerce Pending) ──
+        const lunasAmt = Number(lunasAmount);
+        if (!lunasAmt || lunasAmt <= 0) { setError("Nominal pembayaran wajib diisi"); return; }
+
         // ── REVISI: SN wajib diisi kalau statusnya RESERVED dan belum ada SN ──
         if (showSNForm && !confirmSN.trim()) { setError("Serial number wajib diisi"); return; }
 
@@ -236,6 +250,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                     invoice_number: tx.invoice_number,
                     serial_number: confirmSN.trim() || tx.serial_number || undefined,
                     payment_photo: paymentPhoto,
+                    amount: lunasAmt,
                 }),
             });
             const r = await res.json();
@@ -274,8 +289,11 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
                     {/* Info rows */}
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100 overflow-hidden">
-                        {[
-                            { label: "Status", value: <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${tx.status === "RESERVED" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-orange-50 text-orange-700 border-orange-200"}`}>{tx.status === "RESERVED" ? <><CreditCard size={12} /> DP</> : <><Package size={12} /> Ambil Dulu</>}</span> },
+                                             {[
+                            // FIX: sebelumnya cuma ada 2 kondisi (RESERVED vs selain-itu),
+                            // jadi PACKING & PENDING ikut ketampil "Ambil Dulu". Sekarang
+                            // pakai StatusBadge yang sama dengan tabel biar konsisten.
+                            { label: "Status", value: <StatusBadge status={tx.status as "RESERVED" | "HELD" | "PENDING" | "PACKING"} /> },
                             { label: "Customer", value: <span className="text-xs font-semibold text-gray-800">{tx.customer_name}</span> },
                             { label: "Laptop", value: <span className="text-xs font-semibold text-gray-800 truncate max-w-[180px] block">{tx.laptop_name}</span> },
                             { label: "Harga Deal", value: <span className="text-sm font-bold text-gray-800">{fmt(dealTotal)}</span> },
@@ -322,6 +340,25 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                                 autoFocus
                             />
                             <p className="text-[11px] text-gray-400">Sisa setelah cicilan ini: {fmt(Math.max(0, remaining - (Number(cicilanAmount) || 0)))}</p>
+                        </div>
+                    )}
+
+                    {/* ── REVISI: Nominal Pembayaran untuk mode Lunas — default sisa
+                        tagihan, wajib diisi manual kalau harga deal Rp0 ── */}
+                    {!showCicilanForm && (
+                        <div className="space-y-1.5">
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                                Nominal Pembayaran <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="number" value={lunasAmount}
+                                onChange={(e) => { setLunasAmount(e.target.value); setError(""); }}
+                                placeholder={remaining > 0 ? `Default: ${fmt(remaining)}` : "Masukkan nominal pembayaran"}
+                                className="w-full h-11 border border-gray-300 rounded-xl px-3 text-sm font-mono bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0f0c29]/15 focus:border-[#0f0c29]/40 focus:bg-white transition"
+                            />
+                            {dealTotal === 0 && (
+                                <p className="text-[11px] text-amber-600">Harga deal belum diisi saat transaksi dibuat — isi nominal final di sini.</p>
+                            )}
                         </div>
                     )}
 
@@ -385,7 +422,8 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
 
                 <div className="px-5 py-3 border-t border-gray-100 flex gap-2.5 shrink-0">
                     <button onClick={onClose} disabled={loading} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
-                   <button onClick={handleConfirm} disabled={loading || uploadingPhoto || !paymentPhoto}
+                   <button onClick={handleConfirm}
+                        disabled={loading || uploadingPhoto || !paymentPhoto || (showCicilanForm ? !cicilanAmount : !lunasAmount)}
                         className="flex-1 h-10 bg-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:bg-[#1a1545] transition-colors disabled:opacity-40 disabled:hover:bg-[#0f0c29] flex items-center justify-center gap-2 shadow-sm">
                         {loading
                             ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Memproses...</>
