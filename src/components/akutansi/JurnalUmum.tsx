@@ -112,6 +112,32 @@ const SOURCE_GROUP_RANK: Record<string, number> = {
 
 const key = (d: { source_type: string; source_id: string }) => `${d.source_type}:${d.source_id}`;
 
+// Bandingkan lines "sebelum" vs "sesudah" dari snapshot journal_audit_logs (action SYNC),
+// dikelompokkan per account_code+side, buat nunjukin akun mana yang nominalnya berubah.
+type SyncSnapshotLine = { account_code: string; account_name?: string; side: string; nominal: number | string };
+
+function computeLineDiff(beforeLines: SyncSnapshotLine[], afterLines: SyncSnapshotLine[]) {
+    const map = new Map<string, { account_code: string; account_name: string; side: string; before: number; after: number }>();
+
+    for (const l of beforeLines ?? []) {
+        const k = `${l.account_code}-${l.side}`;
+        const row = map.get(k) ?? { account_code: l.account_code, account_name: l.account_name ?? "", side: l.side, before: 0, after: 0 };
+        row.before += Number(l.nominal || 0);
+        map.set(k, row);
+    }
+    for (const l of afterLines ?? []) {
+        const k = `${l.account_code}-${l.side}`;
+        const row = map.get(k) ?? { account_code: l.account_code, account_name: l.account_name ?? "", side: l.side, before: 0, after: 0 };
+        row.after += Number(l.nominal || 0);
+        if (!row.account_name) row.account_name = l.account_name ?? "";
+        map.set(k, row);
+    }
+
+    return Array.from(map.values())
+        .map((r) => ({ ...r, changed: r.before !== r.after }))
+        .sort((a, b) => (a.side === b.side ? a.account_code.localeCompare(b.account_code) : a.side === "DEBIT" ? -1 : 1));
+}
+
 function getCompanyBadge(company?: string | null): { label: string; color: string } | null {
     if (!company) return null;
     const cn = company.toLowerCase();
@@ -277,22 +303,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                 return next;
             });
             await load(false);
-        } finally {
-            setBusy(false);
-        }
-    };
-
-    const handleSyncNominal = async (entry: JournalEntry) => {
-        if (!confirm(`Sinkronkan nominal jurnal "${entry.keterangan}" sesuai data sumber terbaru (Transaksi/Cashflow/Service)?`)) return;
-        setBusy(true);
-        try {
-            const res = await fetch(`/api/akutansi/jurnal/${entry.id}/sync`, { method: "POST" });
-            const json = await res.json();
-            if (!json.success) { setToast(json.message ?? "Gagal sinkronisasi"); return; }
-            setToast("Nominal jurnal disinkronkan");
-            await load(false);
-        } catch {
-            setToast("Koneksi bermasalah saat sinkronisasi");
         } finally {
             setBusy(false);
         }
@@ -1445,7 +1455,6 @@ export default function JurnalUmum({ period }: { period: string }) {
                                                 onEdit={setEditEntry}
                                                 onLog={setLogEntry}
                                                 onDelete={handleDelete}
-                                                onSync={handleSyncNominal}
                                                 onToggleChecked={toggleEntryChecked}
                                                 onUpdated={handleUpdated}
                                                 onToggleWarningState={handleToggleWarningState}
@@ -1750,6 +1759,175 @@ function WarningToggle({
                         >
                             Simpan
                         </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Sync history toggle — badge + popover riwayat sinkronisasi nominal (kolom Aksi) ───
+function SyncHistoryToggle({
+    entry,
+    onUpdated,
+    setToast,
+}: {
+    entry: JournalEntry;
+    onUpdated: () => void;
+    setToast: (msg: string) => void;
+}) {
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const btnRef = useRef<HTMLButtonElement>(null);
+    const [popPos, setPopPos] = useState<{ top: number; left: number } | null>(null);
+    const [showPopover, setShowPopover] = useState(false);
+    const [logs, setLogs] = useState<any[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
+    const [confirming, setConfirming] = useState(false);
+    const [busy, setBusy] = useState(false);
+
+    const computePos = () => {
+        const btn = btnRef.current;
+        if (!btn) return;
+        const rect = btn.getBoundingClientRect();
+        const POPOVER_HEIGHT = 380;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const top =
+            spaceBelow < POPOVER_HEIGHT
+                ? Math.max(8, rect.top - POPOVER_HEIGHT - 6)
+                : rect.bottom + 6;
+        setPopPos({ top, left: Math.max(8, rect.right - 288) });
+    };
+
+    useEffect(() => {
+        if (!showPopover) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+                setShowPopover(false);
+                setConfirming(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [showPopover]);
+
+    const loadLogs = useCallback(async () => {
+        setLoadingLogs(true);
+        try {
+            const res = await fetch(`/api/akutansi/jurnal/${entry.id}/logs`);
+            const json = await res.json();
+            const all = json.success ? json.data ?? [] : [];
+            setLogs(all.filter((l: any) => l.action === "SYNC"));
+        } catch {
+            setLogs([]);
+        } finally {
+            setLoadingLogs(false);
+        }
+    }, [entry.id]);
+
+    const openPopover = () => {
+        computePos();
+        const next = !showPopover;
+        setShowPopover(next);
+        if (next) loadLogs();
+    };
+
+    const doSync = async () => {
+        if (busy) return;
+        setBusy(true);
+        try {
+            const res = await fetch(`/api/akutansi/jurnal/${entry.id}/sync`, { method: "POST" });
+            const json = await res.json();
+            if (!json.success) {
+                setToast(json.message ?? "Gagal sinkronisasi");
+                return;
+            }
+            setToast("Nominal jurnal disinkronkan");
+            setShowPopover(false);
+            setConfirming(false);
+            onUpdated();
+        } catch {
+            setToast("Koneksi bermasalah saat sinkronisasi");
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    if (!entry.sync_available) return null;
+
+    return (
+        <div ref={wrapperRef} className="inline-block">
+            <button
+                ref={btnRef}
+                onClick={openPopover}
+                title="Nominal berubah di sumber — klik untuk lihat & sinkronkan"
+                className={`p-1.5 rounded-lg border active:scale-90 transition-all duration-150 ${showPopover ? "bg-blue-100 text-blue-700 border-blue-300" : "text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100"
+                    }`}
+            >
+                <RefreshCw className="w-4 h-4 text-blue-600" />
+            </button>
+            {showPopover && popPos && (
+                <div
+                    className="fixed z-[95] w-72 max-h-[80vh] overflow-y-auto bg-white border border-blue-200 rounded-xl shadow-xl p-3 text-left"
+                    style={{ top: popPos.top, left: popPos.left }}
+                >
+                    <p className="text-[10.5px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1 mb-2 pb-1.5 border-b border-gray-100">
+                        <RefreshCw className="w-3.5 h-3.5" /> Nominal Berubah
+                    </p>
+
+                    <p className="text-[11px] text-gray-500 mb-2">
+                        Nominal jurnal ini belum sama dengan data sumber (Transaksi/Cashflow/Service) terbaru.
+                    </p>
+
+                    {!confirming ? (
+                        <button
+                            onClick={() => setConfirming(true)}
+                            className="w-full py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold shadow-2xs mb-3"
+                        >
+                            Sinkronkan Sekarang
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-1.5 mb-3">
+                            <button
+                                onClick={doSync}
+                                disabled={busy}
+                                className="flex-1 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold disabled:opacity-40"
+                            >
+                                {busy ? "Menyinkronkan..." : "Ya, Sinkronkan"}
+                            </button>
+                            <button
+                                onClick={() => setConfirming(false)}
+                                disabled={busy}
+                                className="h-8 px-3 text-[11px] font-semibold text-slate-400 hover:text-slate-600"
+                            >
+                                Batal
+                            </button>
+                        </div>
+                    )}
+
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Riwayat Sinkronisasi</p>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {loadingLogs ? (
+                            <p className="text-[11px] text-gray-400">Memuat...</p>
+                        ) : logs.length === 0 ? (
+                            <p className="text-[11px] text-gray-400">Belum pernah disinkronkan sebelumnya.</p>
+                        ) : (
+                            logs.map((l) => {
+                                const diff = computeLineDiff(l.before_data?.lines ?? [], l.after_data?.lines ?? []).filter((d) => d.changed);
+                                return (
+                                    <div key={l.id} className="text-[11px] border-b border-gray-50 pb-1.5 last:border-0 last:pb-0">
+                                        <p className="font-bold text-blue-700">
+                                            Disinkronkan · {l.changed_by_user?.name ?? "—"}
+                                        </p>
+                                        <p className="text-[9px] text-gray-300 mb-1">{fmtWaktu(l.changed_at)}</p>
+                                        {diff.map((d) => (
+                                            <p key={`${d.account_code}-${d.side}`} className="text-gray-500 font-mono text-[10px]">
+                                                {d.account_code} · {d.account_name}: {rp(d.before)} → <span className="text-emerald-600 font-bold">{rp(d.after)}</span>
+                                            </p>
+                                        ))}
+                                    </div>
+                                );
+                            })
+                        )}
                     </div>
                 </div>
             )}
@@ -2313,6 +2491,23 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
                                         </div>
                                     </div>
                                 )}
+                                {l.action === "SYNC" && l.before_data && (
+                                    <div className="mt-2 space-y-1">
+                                        <p className="text-[10px] font-bold text-blue-600 mb-1">Perubahan Nominal:</p>
+                                        {computeLineDiff(l.before_data.lines ?? [], l.after_data?.lines ?? [])
+                                            .filter((d) => d.changed)
+                                            .map((d) => (
+                                                <div key={`${d.account_code}-${d.side}`} className="flex items-center justify-between text-[10px] bg-white border border-blue-100 rounded-lg px-2 py-1">
+                                                    <span className="text-gray-600">{d.account_code} · {d.account_name}</span>
+                                                    <span className="font-mono">
+                                                        <span className="text-red-500 line-through">{rp(d.before)}</span>
+                                                        {" → "}
+                                                        <span className="text-emerald-600 font-bold">{rp(d.after)}</span>
+                                                    </span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                )}
                                 {l.action === "ACTIVATE" && l.reason && (
                                     <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2 text-[10px]">
                                         <p className="text-red-700 font-bold mb-0.5">Alasan:</p>
@@ -2551,7 +2746,6 @@ interface JournalEntryRowProps {
     onEdit: (entry: JournalEntry) => void;
     onLog: (entry: JournalEntry) => void;
     onDelete: (entry: JournalEntry) => void;
-    onSync: (entry: JournalEntry) => void;
     onToggleChecked: (entry: JournalEntry, checked: boolean) => void;
     onUpdated: (showLoader?: boolean) => void;
     onToggleWarningState: (entryId: string, hasWarn: boolean) => void;
@@ -2568,7 +2762,6 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
     onEdit,
     onLog,
     onDelete,
-    onSync,
     onToggleChecked,
     onUpdated,
     onToggleWarningState,
@@ -2698,6 +2891,11 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                         <AlertTriangle className="w-2.5 h-2.5 text-red-600" /> Penanda
                                                     </span>
                                                 )}
+                                                {entry.sync_available && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 inline-flex items-center gap-1 shrink-0" title="Nominal berbeda dari data sumber terbaru">
+                                                        <RefreshCw className="w-2.5 h-2.5 text-blue-600" /> Nominal Berubah
+                                                    </span>
+                                                )}
                                                 {modalMissing && (
                                                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1 shrink-0" title="Harga modal belum diinput di transaksi ini">
                                                         <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Modal Rp0
@@ -2762,15 +2960,11 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                             >
                                                 <Pencil className="w-4 h-4" />
                                             </button>
-                                            {entry.sync_available && (
-                                                <button
-                                                    onClick={() => onSync(entry)}
-                                                    className="p-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-300 active:scale-90 transition-all duration-150"
-                                                    title="Nominal berubah di sumber (Transaksi/Cashflow/Service) — klik untuk sinkronkan"
-                                                >
-                                                    <RefreshCw className="w-4 h-4" />
-                                                </button>
-                                            )}
+                                            <SyncHistoryToggle
+                                                entry={entry}
+                                                onUpdated={() => onUpdated(false)}
+                                                setToast={setToast}
+                                            />
                                             <button
                                                 onClick={() => onLog(entry)}
                                                 className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 active:scale-90 transition-all duration-150"

@@ -71,7 +71,7 @@ async function getHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
       query = query.limit(100);
     }
 
-    const { data, error, count } = await query;
+    const { data, error, count } = await query.abortSignal(AbortSignal.timeout(8000));
     if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
 
     // ── Resolve laptop_id untuk item yang TIDAK punya laptop_id ──

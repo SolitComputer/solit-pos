@@ -682,7 +682,7 @@ export async function PATCH(request: Request) {
       if (overtime.status !== "PENDING") {
         return NextResponse.json({ success: false, message: "Detail lembur hanya bisa diisi selama masih berstatus PENDING (belum di-ACC kepala divisi)." }, { status: 400 });
       }
-      const { category: cat, work_description: desc, proof_photo_url: proofUrl } = body;
+      const { category: cat, work_description: desc } = body;
       if (!cat || !isValidOvertimeCategory(cat)) {
         return NextResponse.json({
           success: false,
@@ -692,17 +692,8 @@ export async function PATCH(request: Request) {
       if (!desc?.trim()) {
         return NextResponse.json({ success: false, message: "Keterangan lembur wajib diisi." }, { status: 400 });
       }
-      // ✅ NEW — foto bukti sekarang wajib diupload DI SINI (bareng kategori
-      // + keterangan), sebelum kepala divisi meng-ACC.
-      const finalProofUrl = proofUrl !== undefined ? proofUrl : overtime.proof_photo_url;
-      if (!finalProofUrl) {
-        return NextResponse.json({ success: false, message: "Foto bukti lembur wajib diupload sebelum bisa dikirim ke atasan." }, { status: 400 });
-      }
       const { data, error } = await supabase.from("overtime_requests").update({
-        category: cat,
-        work_description: desc.trim(),
-        proof_photo_url: finalProofUrl,
-        updated_at: new Date().toISOString(),
+        category: cat, work_description: desc.trim(), updated_at: new Date().toISOString(),
       }).eq("id", id).select().single();
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
       return NextResponse.json({ success: true, data });
@@ -721,22 +712,9 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: false, message: `Lembur ini berstatus ${overtime.status}, hanya lembur berstatus PENDING yang bisa di-ACC.` }, { status: 400 });
       }
 
-      const { category: bodyCategory, work_description: bodyDesc, proof_photo_url: bodyProof } = body;
-
-      // ✅ NEW — foto bukti wajib sudah ada SEBELUM di-ACC (diupload karyawan
-      // bareng kategori+keterangan lewat SUBMIT_DETAIL). Atasan nggak bisa
-      // lagi ACC dulu baru minta foto belakangan.
-      const finalProof = bodyProof !== undefined ? bodyProof : overtime.proof_photo_url;
-      if (!finalProof) {
-        return NextResponse.json({ success: false, message: "Karyawan belum upload foto bukti lembur — tidak bisa di-ACC dulu." }, { status: 400 });
-      }
-
+      const { category: bodyCategory, work_description: bodyDesc } = body;
       const updatePayload: Record<string, any> = {
-        // ✅ CHANGED — foto sudah ada duluan, jadi begitu di-ACC langsung
-        // COMPLETED (skip NEED_PROOF, karena bukti sudah lengkap dari awal).
-        status: "COMPLETED",
-        proof_photo_url: finalProof,
-        completed_at: new Date().toISOString(),
+        status: "NEED_PROOF", // langsung minta bukti foto — sesuai poin 6
         approved_by: user.id,
         approved_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
