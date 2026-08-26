@@ -688,26 +688,47 @@ function fmtMinShort(min: number | null): string {
   return m > 0 ? `${h}j ${m}m` : `${h} jam`;
 }
 
+// ── Persist filter periode/status/search biar tidak reset saat balik dari halaman detail ──
+interface StoredPrepFilters {
+  statusFilter: string;
+  search: string;
+  fromDate: string;
+  toDate: string;
+  allTime: boolean;
+  activePreset: string;
+  page: number;
+}
+const PREP_FILTERS_KEY = "prep-list-filters";
+function loadStoredPrepFilters(): StoredPrepFilters | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(PREP_FILTERS_KEY);
+    return raw ? (JSON.parse(raw) as StoredPrepFilters) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function PreparationPage() {
   // ── View & data ──
   const [orders, setOrders] = useState<PrepOrder[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => loadStoredPrepFilters()?.page ?? 1);
   const PAGE_SIZE = 20;
   const [isLoading, setIsLoading] = useState(true);
 
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState(() => loadStoredPrepFilters()?.statusFilter ?? "ALL");
+  const [search, setSearch] = useState(() => loadStoredPrepFilters()?.search ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(() => loadStoredPrepFilters()?.search ?? "");
 
   // ── Periode / kalender ──
   const now0 = new Date();
   const [fromDate, setFromDate] = useState(() =>
-    ymd(new Date(now0.getFullYear(), now0.getMonth(), 1))
+    loadStoredPrepFilters()?.fromDate ?? ymd(new Date(now0.getFullYear(), now0.getMonth(), 1))
   );
-  const [toDate, setToDate] = useState(() => ymd(now0));
-  const [allTime, setAllTime] = useState(false);
-  const [activePreset, setActivePreset] = useState<string>("month");
+  const [toDate, setToDate] = useState(() => loadStoredPrepFilters()?.toDate ?? ymd(now0));
+  const [allTime, setAllTime] = useState(() => loadStoredPrepFilters()?.allTime ?? false);
+  const [activePreset, setActivePreset] = useState<string>(() => loadStoredPrepFilters()?.activePreset ?? "month");
 
   // ── Leaderboard / stats ──
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -779,10 +800,24 @@ export default function PreparationPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // filter berubah → balik ke halaman 1
+  // filter berubah → balik ke halaman 1 (skip di render pertama biar `page` dari sessionStorage tidak ke-reset)
+  const filtersMountedRef = useRef(false);
   useEffect(() => {
+    if (!filtersMountedRef.current) {
+      filtersMountedRef.current = true;
+      return;
+    }
     setPage(1);
   }, [statusFilter, debouncedSearch, fromDate, toDate, allTime]);
+
+  // Simpan filter aktif ke sessionStorage supaya tetap kebawa saat kembali dari halaman detail
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const data: StoredPrepFilters = {
+      statusFilter, search: debouncedSearch, fromDate, toDate, allTime, activePreset, page,
+    };
+    sessionStorage.setItem(PREP_FILTERS_KEY, JSON.stringify(data));
+  }, [statusFilter, debouncedSearch, fromDate, toDate, allTime, activePreset, page]);
 
   const periodParams = useCallback(
     (qs: URLSearchParams) => {
