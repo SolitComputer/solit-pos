@@ -150,7 +150,13 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
     }
 
     // ── Jalur LUNAS (melunasi sisa, sekaligus proses SOLD & warranty) ────
-    const finalPayment = remaining;
+    // REVISI: nominal pembayaran sekarang bisa dikirim manual dari modal
+    // (field "Nominal Pembayaran"). Kalau valid, itu jadi acuan finalPayment —
+    // dipakai terutama untuk transaksi E-Commerce Pending yang harga deal-nya
+    // Rp0 saat dibuat. Kalau tidak dikirim, fallback ke perhitungan lama.
+    const requestedAmount = Number(amount);
+    const finalPayment = Number.isFinite(requestedAmount) && requestedAmount > 0 ? requestedAmount : remaining;
+    const newDealTotal = paidSoFar + finalPayment;
     const now = new Date().toISOString();
     const warrantyDuration = 30;
     const warrantyEnd = new Date();
@@ -190,7 +196,9 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
         .from("transactions")
         .update({
           status: "PAID",
-          dp_amount: dealTotal,
+          deal_price: newDealTotal,
+          amount: newDealTotal,
+          dp_amount: newDealTotal,
           paid_at: now,
           payment_photo: payment_photo || transaction.payment_photo,
           last_edited_by: user.name,
@@ -341,7 +349,9 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
           status: "PAID",
           serial_number: finalSN,
           unit_id: unit.id,
-          dp_amount: dealTotal,
+          deal_price: newDealTotal,
+          amount: newDealTotal,
+          dp_amount: newDealTotal,
           paid_at: now,
           payment_photo: payment_photo || transaction.payment_photo,
           last_edited_by: user.name,

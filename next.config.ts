@@ -16,7 +16,7 @@ const withPWA = withPWAInit({
     clientsClaim: true,
     runtimeCaching: [
       {
-        // ✅ RSC responses + navigasi → JANGAN pernah cache
+        // ✅ RSC responses + navigasi → JANGAN pernah cachee
         urlPattern: ({ request, url }: { request: Request; url: URL }) =>
           request.mode === "navigate" ||
           request.headers.get("RSC") === "1" ||
@@ -36,7 +36,6 @@ const withPWA = withPWAInit({
         options: {
           cacheName: "next-static",
           expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
-          cacheableResponse: { statuses: [0, 200] },
         },
       },
       {
@@ -46,7 +45,6 @@ const withPWA = withPWAInit({
         options: {
           cacheName: "assets",
           expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 },
-          cacheableResponse: { statuses: [0, 200] },
         },
       },
     ],
