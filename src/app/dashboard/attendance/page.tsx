@@ -175,7 +175,7 @@ const OFFICE_LNG = 106.787233;
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 const DAY_NAMES = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
-const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"] as const;
+const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
 const FULL_ALLOWANCE_USER_IDS: string[] = [
     "236c08b5-0dd2-4f2f-95d6-286c5b6dd75e",
 ];
@@ -183,7 +183,7 @@ function isAdminRole(role?: string): boolean {
     return !!role && (FULL_ACCESS_ROLES as readonly string[]).includes(role);
 }
 
-const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER", "ACCOUNTING"] as const;
+const SALARY_ACCESS_ROLES = ["ADMIN", "ASISTEN_CEO", "PROGRAMMER"] as const;
 function canViewSalary(role?: string): boolean {
     return !!role && (SALARY_ACCESS_ROLES as readonly string[]).includes(role);
 }
@@ -4709,7 +4709,7 @@ export default function AttendanceDashboardPage() {
 
     const userRoles: string[] = getUserRoles(currentUser);
     const isAdmin = userIsAdmin(currentUser);
-    const canManage = isAdmin || isFullAccessMulti(userRoles) || getEffectiveSubordinates(userRoles).length > 0;
+    const canManage = isAdmin || getEffectiveSubordinates(userRoles).length > 0;
     const canSalary = userCanViewSalary(currentUser);
 
     if (!selectedMonth) return (
@@ -7054,7 +7054,7 @@ export default function AttendanceDashboardPage() {
             {showMonthlyOffModal && canManage && (
                 <MonthlyOffModal
                     users={
-                        (isAdmin || isFullAccessMulti(userRoles))
+                        isAdmin
                             ? allUsers
                             : allUsers.filter(u => (getEffectiveSubordinates(userRoles) as string[]).includes(u.role))
                     }
@@ -7086,7 +7086,7 @@ export default function AttendanceDashboardPage() {
             {showShiftScheduleModal && canManage && (
                 <ShiftScheduleModal
                     users={
-                        (isAdmin || isFullAccessMulti(userRoles))
+                        isAdmin
                             ? allUsers
                             : allUsers.filter(u => (getEffectiveSubordinates(userRoles) as string[]).includes(u.role))
                     }
