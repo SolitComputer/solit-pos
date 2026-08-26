@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import type { ReactNode, CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import * as faceapi from "face-api.js";
 import { startAuthentication, browserSupportsWebAuthn, platformAuthenticatorIsAvailable } from "@simplewebauthn/browser";
+
 type Stage =
   | "loading" | "checking" | "location" | "enroll" | "verify"
   | "enrolling" | "verifying" | "success" | "error"
@@ -68,6 +70,352 @@ function isAttendanceTimeClient(shift: ShiftType): AttendanceTimeResult {
 type LogType = "info" | "ok" | "warn" | "err";
 interface LogEntry { time: string; msg: string; type: LogType }
 interface GpsCoords { latitude: number; longitude: number; accuracy: number }
+
+/* ============================================================================
+ * UI PRIMITIVES
+ * Komponen kecil & reusable di bawah ini menggantikan JSX yang tadinya
+ * di-copy-paste di banyak "stage" (day-off, gps-denied, gps-weak, no-camera,
+ * dst). Tidak ada satupun logic/hook di komponen utama yang berubah — ini
+ * murni penataan ulang tampilan supaya konsisten & gampang dirawat.
+ * ==========================================================================*/
+
+function Spinner({ size = 14 }: { size?: number }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        border: "1.5px solid rgba(255,255,255,0.2)",
+        borderTop: "1.5px solid var(--accent)",
+        borderRadius: "50%",
+        animation: "spin 0.7s linear infinite",
+      }}
+    />
+  );
+}
+
+function LoadingLabel({ text }: { text: string }) {
+  return (
+    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+      <Spinner />
+      {text}
+    </span>
+  );
+}
+
+function PrimaryButton({
+  onClick, disabled, loading, loadingText, children, style,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  loadingText?: string;
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
+  return (
+    <button className="btn-main" onClick={onClick} disabled={disabled} style={style}>
+      {loading ? <LoadingLabel text={loadingText ?? "Memproses..."} /> : children}
+    </button>
+  );
+}
+
+function GhostButton({
+  onClick, disabled, children, style,
+}: {
+  onClick?: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
+  return (
+    <button className="btn-ghost" onClick={onClick} disabled={disabled} style={style}>
+      {children}
+    </button>
+  );
+}
+
+type Tone = "amber" | "red" | "orange";
+
+const TONE: Record<Tone, { fg: string; iconBg: string; iconBorder: string; cardBg: string; cardBorder: string }> = {
+  amber: {
+    fg: "#fbbf24",
+    iconBg: "rgba(251,191,36,0.1)", iconBorder: "rgba(251,191,36,0.3)",
+    cardBg: "rgba(251,191,36,0.06)", cardBorder: "rgba(251,191,36,0.25)",
+  },
+  red: {
+    fg: "var(--err)",
+    iconBg: "rgba(248,113,113,0.1)", iconBorder: "rgba(248,113,113,0.3)",
+    cardBg: "rgba(248,113,113,0.06)", cardBorder: "rgba(248,113,113,0.25)",
+  },
+  orange: {
+    fg: "#fb923c",
+    iconBg: "rgba(251,146,60,0.1)", iconBorder: "rgba(251,146,60,0.3)",
+    cardBg: "rgba(251,146,60,0.06)", cardBorder: "rgba(251,146,60,0.25)",
+  },
+};
+
+function IconBadge({ tone, children }: { tone: Tone; children: ReactNode }) {
+  const t = TONE[tone];
+  return (
+    <div className="state-icon" style={{ background: t.iconBg, border: `0.5px solid ${t.iconBorder}` }}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Kartu status generik: icon bulat + judul + body text, dipakai di semua
+ * "state screen" (day-off, no-camera, gps-denied, gps-weak, out-of-time,
+ * early-checkout-request). `children` (kalau ada) dirender SETELAH body,
+ * masih di dalam kartu yang sama (mis. schedule-pill atau kotak instruksi),
+ * dan otomatis memberi jarak (marginBottom) di bawah body — sama seperti
+ * versi asli, tapi sekarang konsisten di semua tempat.
+ */
+function StatusPanel({
+  tone, icon, title, body, children, variant = "card",
+}: {
+  tone: Tone;
+  icon: ReactNode;
+  title: string;
+  body?: ReactNode;
+  children?: ReactNode;
+  variant?: "card" | "time-gate";
+}) {
+  const t = TONE[tone];
+  const className = variant === "time-gate" ? "time-gate-card" : "state-card";
+  const cardStyle: CSSProperties | undefined =
+    variant === "card" ? { background: t.cardBg, border: `0.5px solid ${t.cardBorder}` } : undefined;
+
+  return (
+    <div className={className} style={cardStyle}>
+      <IconBadge tone={tone}>{icon}</IconBadge>
+      <div className="state-title">{title}</div>
+      {body !== undefined && (
+        <div className="state-body" style={children ? { marginBottom: 16 } : undefined}>{body}</div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+function SchedulePill({
+  label, shift, openAt, closeAt,
+}: { label: string; shift: string; openAt: string; closeAt: string }) {
+  return (
+    <div className="schedule-pill">
+      <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+        {label} {shift}:{" "}
+        <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{openAt}</span>
+        <span className="clock-colon"> – </span>
+        <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{closeAt} WIB</span>
+      </div>
+    </div>
+  );
+}
+
+function GpsPing() {
+  return (
+    <div className="gps-ping">
+      <div className="gps-ping-dot" />
+      <div className="gps-ping-ring" />
+    </div>
+  );
+}
+
+/* ------------------------------- Icons ------------------------------- */
+
+function IconCalendarCheck() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth={1.5}>
+      <rect x="3" y="5" width="18" height="16" rx="3" strokeLinejoin="round" />
+      <path strokeLinecap="round" d="M3 10h18M8 3v4M16 3v4" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 15.5l2 2 4-4.5" />
+    </svg>
+  );
+}
+
+function IconClock() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function IconNoCamera() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round"
+        d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+      <line x1="3" y1="3" x2="21" y2="21" stroke="#fbbf24" strokeWidth={1.5} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconLocationPin({
+  size = 26, stroke = "currentColor", strokeWidth = 1.5, slashed = false, style,
+}: { size?: number; stroke?: string; strokeWidth?: number; slashed?: boolean; style?: CSSProperties }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={strokeWidth} style={style}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+      {slashed && <line x1="4" y1="4" x2="20" y2="20" stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" />}
+    </svg>
+  );
+}
+
+function IconAlertCircle({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="var(--err)" strokeWidth={1.5}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+function IconArrowRight({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+    </svg>
+  );
+}
+
+function IconExternalLink({ size = 11 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+    </svg>
+  );
+}
+
+/* --------------------------- Composite blocks --------------------------- */
+
+// ✅ Direvisi lagi — sekarang full flexbox (bukan position:absolute) supaya
+// tombol "Ganti akun" otomatis turun ke baris baru kalau ruang sempit
+// (flexWrap), bukan menimpa nama/badge. Props & perilaku onClick tetap
+// identik dengan versi sebelumnya.
+function UserIdentityCard({
+  name, role, shift, onLogout,
+}: { name: string; role: string; shift: string; onLogout: () => void }) {
+  return (
+    <div style={{
+      background: "linear-gradient(135deg, rgba(30, 58, 138, 0.35) 0%, rgba(15, 23, 42, 0.65) 100%)",
+      border: "1px solid rgba(96, 165, 250, 0.35)",
+      borderRadius: 14,
+      padding: "14px 16px",
+      marginBottom: 16,
+      boxShadow: "0 8px 24px -6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)",
+    }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: "1 1 190px" }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+            background: "rgba(96,165,250,0.15)", border: "1px solid rgba(96,165,250,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+            </svg>
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(147,197,253,0.85)", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 2 }}>
+              Anda akan absen sebagai
+            </div>
+            <div className="identity-name" style={{
+              fontWeight: 700, color: "#ffffff", letterSpacing: 0.1,
+              lineHeight: 1.25, marginBottom: 6,
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}>
+              {name}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, flexWrap: "wrap", rowGap: 6 }}>
+              <span style={{ background: "rgba(255,255,255,0.08)", border: "0.5px solid rgba(255,255,255,0.12)", padding: "2px 8px", borderRadius: 6, fontWeight: 500, color: "rgba(255,255,255,0.75)" }}>
+                {role}
+              </span>
+              <span style={{ background: "rgba(45,212,191,0.1)", border: "0.5px solid rgba(45,212,191,0.3)", padding: "2px 8px", borderRadius: 6, fontWeight: 500, color: "var(--accent)" }}>
+                Shift {shift}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onLogout}
+          style={{
+            flexShrink: 0,
+            marginLeft: "auto",
+            display: "flex", alignItems: "center", gap: 4,
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 7, padding: "4px 8px",
+            color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 500,
+            cursor: "pointer", transition: "all 0.15s ease",
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15l-3-3m0 0l3-3m-3 3h12M15 5h4a2 2 0 012 2v10a2 2 0 01-2 2h-4" />
+          </svg>
+          Ganti akun
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BiometricButton({
+  eligible, supported, busy, enrolled, error, onClick,
+}: {
+  eligible: boolean;
+  supported: boolean | null;
+  busy: boolean;
+  enrolled: boolean;
+  error: string | null;
+  onClick: () => void;
+}) {
+  if (!eligible) return null;
+  const isSupported = supported === true;
+
+  return (
+    <div style={{ marginTop: 14, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
+        <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--text-faint)", letterSpacing: 1 }}>ATAU</span>
+        <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
+      </div>
+      <PrimaryButton
+        disabled={!isSupported || busy}
+        onClick={onClick}
+        loading={busy}
+        loadingText="Memproses sidik jari..."
+        style={!isSupported ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+      >
+        {isSupported ? (enrolled ? "Absen dengan Sidik Jari" : "Daftarkan Sidik Jari Dulu →") : "Sidik Jari (device tidak mendukung)"}
+      </PrimaryButton>
+      {error && <div style={{ fontSize: 11, color: "var(--err)", textAlign: "center", marginTop: 8 }}>{error}</div>}
+    </div>
+  );
+}
+
+/* ============================================================================
+ * MAIN COMPONENT
+ * Semua state, refs, useEffect, dan useCallback di bawah ini SAMA PERSIS
+ * dengan versi sebelumnya — tidak ada perubahan logic. Yang berubah hanya
+ * bagian JSX (return) di paling bawah, yang sekarang pakai komponen-komponen
+ * di atas supaya tidak ada lagi markup yang di-copy-paste.
+ * ==========================================================================*/
 
 export default function FaceVerifyPage() {
   const searchParams = useSearchParams();
@@ -764,38 +1112,6 @@ export default function FaceVerifyPage() {
     }
   }, [biometricEnrolled, gpsCoords, scheduleInfo, redirectTo]);
 
-  const renderBiometricOption = () => {
-    if (!biometricEligible) return null;
-    const supported = biometricDeviceSupported === true;
-    return (
-      <div style={{ marginTop: 14, marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
-          <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--text-faint)", letterSpacing: 1 }}>ATAU</span>
-          <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
-        </div>
-        <button
-          className="btn-main"
-          disabled={!supported || bioBusy}
-          onClick={handleBiometricAttendance}
-          style={!supported ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
-        >
-          {bioBusy ? (
-            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid var(--accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-              Memproses sidik jari...
-            </span>
-          ) : supported ? (
-            biometricEnrolled ? "Absen dengan Sidik Jari" : "Daftarkan Sidik Jari Dulu →"
-          ) : (
-            "Sidik Jari (device tidak mendukung)"
-          )}
-        </button>
-        {bioError && <div style={{ fontSize: 11, color: "var(--err)", textAlign: "center", marginTop: 8 }}>{bioError}</div>}
-      </div>
-    );
-  };
-
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
@@ -819,7 +1135,7 @@ export default function FaceVerifyPage() {
   const closeAtStr = scheduleInfo?.closeAt ?? fallbackClose;
 
   return (
-    <main style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", padding: "12px", fontFamily: "'Inter', -apple-system, sans-serif" }}>
+    <main className="fv-shell" style={{ background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", padding: "12px", fontFamily: "'Inter', -apple-system, sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
@@ -853,6 +1169,14 @@ export default function FaceVerifyPage() {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes gps-ping { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2.5); opacity: 0; } }
         @keyframes clock-tick { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.4; } }
+
+        /* ✅ NEW — pakai dvh kalau browser support (fix viewport goyang di
+           mobile Safari/Chrome saat address bar collapse/expand), fallback
+           ke vh untuk browser lama. */
+        .fv-shell { min-height: 100vh; }
+        @supports (height: 100dvh) {
+          .fv-shell { min-height: 100dvh; }
+        }
 
         .fv-card { width: 100%; max-width: 400px; background: var(--panel); border: 0.5px solid var(--line); border-radius: 18px; padding: 24px; position: relative; overflow: hidden; box-shadow: 0 24px 60px -24px rgba(0,0,0,0.65); }
         .fv-card::after { content: ''; position: absolute; top: -0.5px; left: 15%; right: 15%; height: 0.5px; background: rgba(255,255,255,0.12); }
@@ -925,6 +1249,33 @@ export default function FaceVerifyPage() {
         .fv-textarea:focus { outline: none; border-color: var(--accent-dim); box-shadow: 0 0 0 3px var(--accent-glow); }
         .schedule-pill { background: rgba(255,255,255,0.04); border: 0.5px solid var(--line); border-radius: 10px; padding: 10px 16px; display: inline-flex; align-items: center; gap: 10px; }
 
+        /* ✅ NEW — kelas responsif (font-size/visibility yang menyesuaikan
+           layar sempit; tidak bisa lewat inline style karena media query
+           butuh CSS class). Semua ukuran dasar sama seperti sebelumnya. */
+        .fv-title { font-size: 17px; }
+        .identity-name { font-size: 17px; }
+        .range-number { font-size: 32px; }
+        .sys-label, .footer-tag { display: inline; }
+
+        @media (max-width: 380px) {
+          .fv-card { padding: 18px; }
+          .state-card, .time-gate-card { padding: 16px 14px; }
+          .state-icon { width: 48px; height: 48px; margin-bottom: 12px; }
+          .schedule-pill { padding: 8px 12px; }
+          .fv-title { font-size: 16px; }
+        }
+        @media (max-width: 360px) {
+          .range-number { font-size: 26px; }
+        }
+        @media (max-width: 340px) {
+          .fv-card { padding: 14px; }
+          .identity-name { font-size: 15px; }
+          .sys-label { display: none; }
+        }
+        @media (max-width: 360px) {
+          .footer-tag { display: none; }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           *, *::before, *::after {
             animation-duration: 0.01ms !important;
@@ -946,13 +1297,13 @@ export default function FaceVerifyPage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--accent)", boxShadow: "0 0 6px var(--accent-glow)", animation: "pulse-accent 2s ease infinite" }} />
-            <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--text-faint)", letterSpacing: 0.5 }}>sys online</span>
+            <span className="sys-label" style={{ fontFamily: "var(--mono)", fontSize: 9.5, color: "var(--text-faint)", letterSpacing: 0.5 }}>sys online</span>
           </div>
         </div>
 
         {/* Title */}
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <div style={{ fontSize: 17, fontWeight: 600, color: "var(--text)", letterSpacing: 0.1, marginBottom: 4 }}>
+          <div className="fv-title" style={{ fontWeight: 600, color: "var(--text)", letterSpacing: 0.1, marginBottom: 4 }}>
             {stage === "enroll" || stage === "enrolling"
               ? "Daftarkan Wajah"
               : attendanceDirection === "OUT" ? "Absen Pulang" : "Absen Masuk"}
@@ -963,95 +1314,9 @@ export default function FaceVerifyPage() {
           </div>
         </div>
 
-        {/* User Identity Confirmation Card (Besar & Jelas) */}
+        {/* User Identity Confirmation Card */}
         {userName && !["loading", "checking", "success", "out-of-time", "day-off", "early-checkout-request"].includes(stage) && (
-          <div style={{
-            background: "linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.7) 100%)",
-            border: "1.5px solid rgba(96, 165, 250, 0.45)",
-            borderRadius: "14px",
-            padding: "14px 16px",
-            marginBottom: "16px",
-            textAlign: "center",
-            boxShadow: "0 8px 24px -6px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12)",
-            position: "relative",
-          }}>
-            <div style={{
-              fontSize: "11px",
-              fontWeight: 600,
-              color: "rgba(147, 197, 253, 0.95)",
-              letterSpacing: "0.5px",
-              textTransform: "uppercase",
-              marginBottom: "5px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px"
-            }}>
-              <span>👤</span> Anda akan absen sebagai:
-            </div>
-            
-            <div style={{
-              fontSize: "20px",
-              fontWeight: 800,
-              color: "#ffffff",
-              letterSpacing: "0.2px",
-              lineHeight: 1.25,
-              marginBottom: "6px",
-              textShadow: "0 2px 12px rgba(0,0,0,0.6)"
-            }}>
-              {userName}
-            </div>
-
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              fontSize: "11px",
-              color: "rgba(255, 255, 255, 0.65)",
-              marginBottom: "10px"
-            }}>
-              <span style={{
-                background: "rgba(255, 255, 255, 0.1)",
-                padding: "2px 8px",
-                borderRadius: "6px",
-                fontWeight: 500
-              }}>
-                {userRole}
-              </span>
-              <span>•</span>
-              <span style={{
-                background: "rgba(255, 255, 255, 0.1)",
-                padding: "2px 8px",
-                borderRadius: "6px",
-                fontWeight: 500
-              }}>
-                Shift {userShift}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              style={{
-                background: "rgba(239, 68, 68, 0.16)",
-                border: "1px solid rgba(239, 68, 68, 0.45)",
-                borderRadius: "8px",
-                padding: "6px 14px",
-                color: "#fca5a5",
-                fontSize: "11px",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px"
-              }}
-            >
-              <span>⚠️ Bukan akun Anda?</span>
-              <span style={{ textDecoration: "underline", color: "#ffffff" }}>Ganti Akun / Logout</span>
-            </button>
-          </div>
+          <UserIdentityCard name={userName} role={userRole} shift={userShift} onLogout={handleLogout} />
         )}
 
         {/* Loading / Checking */}
@@ -1067,90 +1332,64 @@ export default function FaceVerifyPage() {
         {/* Day Off */}
         {stage === "day-off" && (
           <div style={{ padding: "8px 0 0" }}>
-            <div className="state-card" style={{ background: "rgba(251,146,60,0.06)", border: "0.5px solid rgba(251,146,60,0.25)" }}>
-              <div className="state-icon" style={{ background: "rgba(251,146,60,0.1)", border: "0.5px solid rgba(251,146,60,0.3)" }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth={1.5}>
-                  <rect x="3" y="5" width="18" height="16" rx="3" strokeLinejoin="round" />
-                  <path strokeLinecap="round" d="M3 10h18M8 3v4M16 3v4" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 15.5l2 2 4-4.5" />
-                </svg>
-              </div>
-              <div className="state-title">Hari Ini Kamu Libur</div>
-              <div className="state-body">
-                Absen tidak wajib di hari libur.<br />
-                {/* ✅ FIX (poin 12): kalau tetap absen, sekarang dihitung lembur penuh */}
-                Tapi kalau tetap masuk, jam kerjamu <span style={{ color: "rgba(251,146,60,0.85)", fontWeight: 600 }}>akan dihitung lembur penuh</span>.
-              </div>
-            </div>
-            <button className="btn-main" onClick={() => { setStage("location"); setMessage("Cek lokasi untuk absen lembur hari libur"); }}>
+            <StatusPanel
+              tone="orange"
+              icon={<IconCalendarCheck />}
+              title="Hari Ini Kamu Libur"
+              body={
+                <>
+                  Absen tidak wajib di hari libur.<br />
+                  {/* ✅ FIX (poin 12): kalau tetap absen, sekarang dihitung lembur penuh */}
+                  Tapi kalau tetap masuk, jam kerjamu{" "}
+                  <span style={{ color: "rgba(251,146,60,0.85)", fontWeight: 600 }}>akan dihitung lembur penuh</span>.
+                </>
+              }
+            />
+            <PrimaryButton onClick={() => { setStage("location"); setMessage("Cek lokasi untuk absen lembur hari libur"); }}>
               Tetap Absen (Lembur) →
-            </button>
-            <button className="btn-ghost" style={{ marginTop: 10, width: "100%", textAlign: "center" }} disabled={skipping} onClick={handleSkipToRedirect}>
+            </PrimaryButton>
+            <GhostButton style={{ marginTop: 10, width: "100%", textAlign: "center" }} disabled={skipping} onClick={handleSkipToRedirect}>
               {skipping ? "Mengalihkan..." : "Lewati, tidak usah absen →"}
-            </button>
+            </GhostButton>
           </div>
         )}
 
         {/* Out of time */}
         {stage === "out-of-time" && (
           <div style={{ padding: "8px 0 0" }}>
-            <div className="time-gate-card">
-              <div className="state-icon" style={{ background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)" }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="state-title">
-                {timeInfo?.reason === "TOO_EARLY" ? "Absen Belum Dibuka" : "Waktu Absen Berakhir"}
-              </div>
-              <div className="state-body" style={{ marginBottom: 16 }}>
-                {timeInfo?.reason === "TOO_EARLY"
+            <StatusPanel
+              tone="amber"
+              variant="time-gate"
+              icon={<IconClock />}
+              title={timeInfo?.reason === "TOO_EARLY" ? "Absen Belum Dibuka" : "Waktu Absen Berakhir"}
+              body={
+                timeInfo?.reason === "TOO_EARLY"
                   ? <span>Absen dibuka pukul <span style={{ color: "#fbbf24", fontWeight: 600 }}>{openAtStr} WIB</span></span>
                   : <span>Batas absen pukul <span style={{ color: "#fbbf24", fontWeight: 600 }}>{closeAtStr} WIB</span></span>
-                }
-              </div>
-              <div className="schedule-pill">
-                <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                  Jam absen shift {userShift}:{" "}
-                  <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{openAtStr}</span>
-                  <span className="clock-colon"> – </span>
-                  <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{closeAtStr} WIB</span>
-                </div>
-              </div>
+              }
+            >
+              <SchedulePill label="Jam absen shift" shift={userShift} openAt={openAtStr} closeAt={closeAtStr} />
               <div style={{ marginTop: 10, fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)" }}>
                 Waktu sekarang: <span>{clockStr} WIB</span>
               </div>
-            </div>
-            <button className="btn-main" style={{ marginTop: 16 }} disabled={skipping} onClick={handleSkipToRedirect}>
-              {skipping ? (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid var(--accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-                  Mengalihkan...
-                </span>
-              ) : "Lanjut ke Dashboard →"}
-            </button>
+            </StatusPanel>
+            <PrimaryButton style={{ marginTop: 16 }} disabled={skipping} loading={skipping} loadingText="Mengalihkan..." onClick={handleSkipToRedirect}>
+              Lanjut ke Dashboard →
+            </PrimaryButton>
           </div>
         )}
 
         {/* Early checkout — belum waktunya pulang, minta izin admin */}
         {stage === "early-checkout-request" && (
           <div style={{ padding: "8px 0 0" }}>
-            <div className="time-gate-card">
-              <div className="state-icon" style={{ background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)" }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="state-title">Belum Waktunya Pulang</div>
-              <div className="state-body">{earlyCheckoutMsg}</div>
-            </div>
+            <StatusPanel tone="amber" variant="time-gate" icon={<IconClock />} title="Belum Waktunya Pulang" body={earlyCheckoutMsg} />
 
             {earlyCheckoutSubmitted ? (
               <div style={{ marginTop: 16, textAlign: "center" }}>
                 <div style={{ fontSize: 13, color: "rgba(74,222,128,0.85)", marginBottom: 12 }}>
                   Pengajuan izin terkirim. Tunggu persetujuan admin/atasan, lalu coba absen pulang lagi.
                 </div>
-                <button className="btn-main" onClick={() => window.location.reload()}>Coba Absen Lagi</button>
+                <PrimaryButton onClick={() => window.location.reload()}>Coba Absen Lagi</PrimaryButton>
               </div>
             ) : (
               <div style={{ marginTop: 16 }}>
@@ -1167,30 +1406,26 @@ export default function FaceVerifyPage() {
                 {earlyCheckoutError && (
                   <div style={{ fontSize: 11, color: "var(--err)", marginBottom: 10 }}>{earlyCheckoutError}</div>
                 )}
-                <button className="btn-main" disabled={earlyCheckoutSubmitting} onClick={submitEarlyCheckoutRequest}>
+                <PrimaryButton disabled={earlyCheckoutSubmitting} onClick={submitEarlyCheckoutRequest}>
                   {earlyCheckoutSubmitting ? "Mengirim..." : "Ajukan Izin Pulang Cepat"}
-                </button>
+                </PrimaryButton>
               </div>
             )}
 
-            <button className="btn-ghost" style={{ marginTop: 12, width: "100%", textAlign: "center" }} disabled={skipping} onClick={handleSkipToRedirect}>
+            <GhostButton style={{ marginTop: 12, width: "100%", textAlign: "center" }} disabled={skipping} onClick={handleSkipToRedirect}>
               {skipping ? "Mengalihkan..." : "Kembali ke Dashboard →"}
-            </button>
+            </GhostButton>
           </div>
         )}
 
         {/* Success */}
         {stage === "success" && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "32px 0" }}>
-            <div className="success-circle">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
+            <div className="success-circle"><IconCheck /></div>
             <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", textAlign: "center" }}>{message}</div>
             {gpsCoords && currentDistance !== null && (
               <div style={{ fontSize: 11, color: "rgba(74,222,128,0.75)", display: "flex", alignItems: "center", gap: 5 }}>
-                <div className="gps-ping"><div className="gps-ping-dot" /><div className="gps-ping-ring" /></div>
+                <GpsPing />
                 {currentDistance}m dari kantor · ±{Math.round(gpsCoords.accuracy)}m
               </div>
             )}
@@ -1201,48 +1436,33 @@ export default function FaceVerifyPage() {
         {/* Error */}
         {stage === "error" && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "30px 0" }}>
-            <div className="state-icon" style={{ background: "rgba(248,113,113,0.06)", border: "0.5px solid rgba(248,113,113,0.25)" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--err)" strokeWidth={1.5}>
-                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            </div>
+            <IconBadge tone="red"><IconAlertCircle /></IconBadge>
             <div style={{ fontSize: 13, color: "var(--err)", textAlign: "center" }}>{message}</div>
-            <button className="btn-main" onClick={() => window.location.reload()} style={{ maxWidth: 180 }}>Refresh halaman</button>
-            {renderBiometricOption()}
+            <PrimaryButton onClick={() => window.location.reload()} style={{ maxWidth: 180 }}>Refresh halaman</PrimaryButton>
+            <BiometricButton
+              eligible={biometricEligible} supported={biometricDeviceSupported}
+              busy={bioBusy} enrolled={biometricEnrolled} error={bioError}
+              onClick={handleBiometricAttendance}
+            />
           </div>
         )}
 
         {/* No Camera */}
         {stage === "no-camera" && (
           <div style={{ padding: "8px 0 0" }}>
-            <div className="state-card" style={{ background: "rgba(251,191,36,0.06)", border: "0.5px solid rgba(251,191,36,0.25)" }}>
-              <div className="state-icon" style={{ background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)" }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round"
-                    d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-                  <line x1="3" y1="3" x2="21" y2="21" stroke="#fbbf24" strokeWidth={1.5} strokeLinecap="round" />
-                </svg>
-              </div>
+            <StatusPanel
+              tone="amber"
+              icon={<IconNoCamera />}
+              title="Kamera Tidak Tersedia"
+              body={<>Perangkat ini tidak memiliki kamera.<br />Absensi wajah tidak dapat dilakukan.</>}
+            >
+              <SchedulePill label="Shift" shift={userShift} openAt={openAtStr} closeAt={closeAtStr} />
+            </StatusPanel>
 
-              <div className="state-title">Kamera Tidak Tersedia</div>
-              <div className="state-body" style={{ marginBottom: 16 }}>
-                Perangkat ini tidak memiliki kamera.<br />
-                Absensi wajah tidak dapat dilakukan.
-              </div>
-
-              <div className="schedule-pill">
-                <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                  Shift {userShift}:{" "}
-                  <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{openAtStr}</span>
-                  <span className="clock-colon"> – </span>
-                  <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{closeAtStr} WIB</span>
-                </div>
-              </div>
-            </div>
-
-            <button
-              className="btn-main"
+            <PrimaryButton
               disabled={skipping}
+              loading={skipping}
+              loadingText="Mengalihkan..."
               onClick={async () => {
                 setSkipping(true);
                 try {
@@ -1259,22 +1479,17 @@ export default function FaceVerifyPage() {
                 window.location.href = redirectTo;
               }}
             >
-              {skipping ? (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid var(--accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-                  Mengalihkan...
-                </span>
-              ) : (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                  </svg>
-                  Lanjut ke Dashboard Tanpa Absen
-                </span>
-              )}
-            </button>
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <IconArrowRight />
+                Lanjut ke Dashboard Tanpa Absen
+              </span>
+            </PrimaryButton>
 
-            {renderBiometricOption()}
+            <BiometricButton
+              eligible={biometricEligible} supported={biometricDeviceSupported}
+              busy={bioBusy} enrolled={biometricEnrolled} error={bioError}
+              onClick={handleBiometricAttendance}
+            />
             <div style={{ marginTop: 10, textAlign: "center", fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)" }}>
               Kehadiran akan tercatat sebagai <span style={{ color: "rgba(251,191,36,0.65)" }}>SKIPPED</span>
             </div>
@@ -1284,21 +1499,12 @@ export default function FaceVerifyPage() {
         {/* GPS Permission Denied */}
         {stage === "gps-denied" && (
           <div style={{ padding: "8px 0 0" }}>
-            <div className="state-card" style={{ background: "rgba(248,113,113,0.06)", border: "0.5px solid rgba(248,113,113,0.25)" }}>
-              <div className="state-icon" style={{ background: "rgba(248,113,113,0.1)", border: "0.5px solid rgba(248,113,113,0.3)" }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--err)" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <line x1="4" y1="4" x2="20" y2="20" stroke="var(--err)" strokeWidth={1.5} strokeLinecap="round" />
-                </svg>
-              </div>
-
-              <div className="state-title">Izin Lokasi Diblokir</div>
-              <div className="state-body" style={{ marginBottom: 16 }}>
-                Browser atau HP kamu menolak akses lokasi.<br />
-                Ikuti salah satu langkah di bawah ini:
-              </div>
-
+            <StatusPanel
+              tone="red"
+              icon={<IconLocationPin slashed stroke="var(--err)" />}
+              title="Izin Lokasi Diblokir"
+              body={<>Browser atau HP kamu menolak akses lokasi.<br />Ikuti salah satu langkah di bawah ini:</>}
+            >
               <div style={{ textAlign: "left", background: "rgba(255,255,255,0.03)", border: "0.5px solid var(--line)", borderRadius: 11, padding: "14px 16px" }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", marginBottom: 6 }}>
                   1. Cek Location Services HP
@@ -1313,41 +1519,33 @@ export default function FaceVerifyPage() {
                   Tap ikon di sebelah kiri alamat website (address bar) → <b>Site settings/Permissions</b> → <b>Location</b> → ubah ke <b>Allow/Izinkan</b>.
                 </div>
               </div>
-            </div>
+            </StatusPanel>
 
-            <button className="btn-main" onClick={checkLocation} disabled={gpsLoading}>
-              {gpsLoading ? (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid var(--accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-                  Mengecek ulang...
-                </span>
-              ) : "Sudah Diaktifkan — Coba Lagi"}
-            </button>
-            <button className="btn-ghost" style={{ marginTop: 10, color: "rgba(248,113,113,0.55)" }}
-              onClick={handleRejectAttendance} disabled={skipping}>
+            <PrimaryButton onClick={checkLocation} disabled={gpsLoading} loading={gpsLoading} loadingText="Mengecek ulang...">
+              Sudah Diaktifkan — Coba Lagi
+            </PrimaryButton>
+            <GhostButton style={{ marginTop: 10, color: "rgba(248,113,113,0.55)" }} onClick={handleRejectAttendance} disabled={skipping}>
               {skipping ? "Mengalihkan..." : "Lewati absen →"}
-            </button>
+            </GhostButton>
           </div>
         )}
 
-        {/* ✅ NEW — GPS akurasi terlalu buruk (device kemungkinan pakai lokasi jaringan, bukan GPS chip) */}
+        {/* GPS akurasi terlalu buruk (device kemungkinan pakai lokasi jaringan, bukan GPS chip) */}
         {stage === "gps-weak" && (
           <div style={{ padding: "8px 0 0" }}>
-            <div className="state-card" style={{ background: "rgba(251,191,36,0.06)", border: "0.5px solid rgba(251,191,36,0.25)" }}>
-              <div className="state-icon" style={{ background: "rgba(251,191,36,0.1)", border: "0.5px solid rgba(251,191,36,0.3)" }}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <div className="state-title">Akurasi GPS Terlalu Rendah</div>
-              <div className="state-body" style={{ marginBottom: 16 }}>
-                {weakGpsAccuracy != null && (
-                  <>Akurasi saat ini <span style={{ color: "#fbbf24", fontWeight: 600 }}>±{weakGpsAccuracy}m</span> — jauh di atas batas wajar.<br /></>
-                )}
-                Ini biasanya berarti HP memakai lokasi jaringan (WiFi/seluler), bukan chip GPS asli.
-              </div>
-
+            <StatusPanel
+              tone="amber"
+              icon={<IconLocationPin stroke="#fbbf24" />}
+              title="Akurasi GPS Terlalu Rendah"
+              body={
+                <>
+                  {weakGpsAccuracy != null && (
+                    <>Akurasi saat ini <span style={{ color: "#fbbf24", fontWeight: 600 }}>±{weakGpsAccuracy}m</span> — jauh di atas batas wajar.<br /></>
+                  )}
+                  Ini biasanya berarti HP memakai lokasi jaringan (WiFi/seluler), bukan chip GPS asli.
+                </>
+              }
+            >
               <div style={{ textAlign: "left", background: "rgba(255,255,255,0.03)", border: "0.5px solid var(--line)", borderRadius: 11, padding: "14px 16px" }}>
                 {detectOS() === "android" ? (
                   <>
@@ -1373,23 +1571,21 @@ export default function FaceVerifyPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </StatusPanel>
 
-            <button className="btn-main" onClick={checkLocation} disabled={gpsLoading}>
-              {gpsLoading ? (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <div style={{ width: 14, height: 14, border: "1.5px solid rgba(255,255,255,0.2)", borderTop: "1.5px solid var(--accent)", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-                  Mengecek ulang...
-                </span>
-              ) : "Sudah Diaktifkan — Coba Lagi"}
-            </button>
+            <PrimaryButton onClick={checkLocation} disabled={gpsLoading} loading={gpsLoading} loadingText="Mengecek ulang...">
+              Sudah Diaktifkan — Coba Lagi
+            </PrimaryButton>
 
-            {renderBiometricOption()}
+            <BiometricButton
+              eligible={biometricEligible} supported={biometricDeviceSupported}
+              busy={bioBusy} enrolled={biometricEnrolled} error={bioError}
+              onClick={handleBiometricAttendance}
+            />
 
-            <button className="btn-ghost" style={{ marginTop: 10, color: "rgba(248,113,113,0.55)" }}
-              onClick={handleRejectAttendance} disabled={skipping}>
+            <GhostButton style={{ marginTop: 10, color: "rgba(248,113,113,0.55)" }} onClick={handleRejectAttendance} disabled={skipping}>
               {skipping ? "Mengalihkan..." : "Lewati absen →"}
-            </button>
+            </GhostButton>
           </div>
         )}
 
@@ -1399,10 +1595,7 @@ export default function FaceVerifyPage() {
             <div style={{ position: "relative", width: 64, height: 64, marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <div style={{ position: "absolute", width: 64, height: 64, borderRadius: "50%", background: "rgba(74,222,128,0.08)", border: "0.5px solid rgba(74,222,128,0.2)" }} />
               <div style={{ position: "absolute", width: 48, height: 48, borderRadius: "50%", background: "rgba(74,222,128,0.06)", animation: "gps-ping 2s ease-out infinite" }} />
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth={1.5} style={{ position: "relative", zIndex: 1 }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              <IconLocationPin size={28} stroke="var(--ok)" style={{ position: "relative", zIndex: 1 }} />
             </div>
             <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>
               {needEnrollState ? "Cek Lokasi Sebelum Daftar" : "Cek Lokasi Absen"}
@@ -1413,19 +1606,15 @@ export default function FaceVerifyPage() {
                 : <span>Pastikan berada dalam radius <span style={{ color: "rgba(255,255,255,0.68)", fontWeight: 600 }}>{MAX_DISTANCE_METERS}m</span> dari kantor</span>
               }
             </div>
-            <button className="btn-main" style={{ maxWidth: 220 }} onClick={checkLocation}>
+            <PrimaryButton style={{ maxWidth: 220 }} onClick={checkLocation}>
               <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
+                <IconLocationPin size={14} stroke="currentColor" strokeWidth={2} />
                 Cek Lokasi Saya
               </span>
-            </button>
-            <button className="btn-ghost" style={{ marginTop: 12, color: "rgba(248,113,113,0.55)" }}
-              onClick={handleRejectAttendance} disabled={skipping}>
+            </PrimaryButton>
+            <GhostButton style={{ marginTop: 12, color: "rgba(248,113,113,0.55)" }} onClick={handleRejectAttendance} disabled={skipping}>
               {skipping ? "Mengalihkan..." : "Lewati absen →"}
-            </button>
+            </GhostButton>
           </div>
         )}
 
@@ -1436,11 +1625,11 @@ export default function FaceVerifyPage() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
                 <div>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)", letterSpacing: 0.5, marginBottom: 4 }}>JARAK KAMU</div>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: "var(--err)", lineHeight: 1 }}>{currentDistance}<span style={{ fontSize: 14, color: "rgba(248,113,113,0.6)", marginLeft: 4 }}>m</span></div>
+                  <div className="range-number" style={{ fontWeight: 700, color: "var(--err)", lineHeight: 1 }}>{currentDistance}<span style={{ fontSize: 14, color: "rgba(248,113,113,0.6)", marginLeft: 4 }}>m</span></div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)", letterSpacing: 0.5, marginBottom: 4 }}>BATAS MAKS</div>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: "rgba(255,255,255,0.3)", lineHeight: 1 }}>{MAX_DISTANCE_METERS}<span style={{ fontSize: 14, color: "rgba(255,255,255,0.2)", marginLeft: 4 }}>m</span></div>
+                  <div className="range-number" style={{ fontWeight: 700, color: "rgba(255,255,255,0.3)", lineHeight: 1 }}>{MAX_DISTANCE_METERS}<span style={{ fontSize: 14, color: "rgba(255,255,255,0.2)", marginLeft: 4 }}>m</span></div>
                 </div>
               </div>
               <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
@@ -1453,16 +1642,15 @@ export default function FaceVerifyPage() {
             {gpsCoords && (
               <a href={`https://maps.google.com/?q=${gpsCoords.latitude},${gpsCoords.longitude}`} target="_blank" rel="noopener noreferrer"
                 style={{ fontSize: 11, color: "rgba(96,165,250,0.75)", marginBottom: 20, display: "flex", alignItems: "center", gap: 5, textDecoration: "none" }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                <IconExternalLink />
                 {gpsCoords.latitude.toFixed(5)}, {gpsCoords.longitude.toFixed(5)}
                 <span style={{ color: "var(--text-faint)" }}>±{Math.round(gpsCoords.accuracy)}m</span>
               </a>
             )}
-            <button className="btn-ghost" style={{ marginTop: 4 }} onClick={checkLocation}>Coba cek ulang →</button>
-            <button className="btn-ghost" style={{ marginTop: 6, color: "rgba(248,113,113,0.55)" }}
-              onClick={handleRejectAttendance} disabled={skipping}>
+            <GhostButton style={{ marginTop: 4 }} onClick={checkLocation}>Coba cek ulang →</GhostButton>
+            <GhostButton style={{ marginTop: 6, color: "rgba(248,113,113,0.55)" }} onClick={handleRejectAttendance} disabled={skipping}>
               {skipping ? "Mengalihkan..." : "Lewati absen →"}
-            </button>
+            </GhostButton>
           </div>
         )}
 
@@ -1472,7 +1660,7 @@ export default function FaceVerifyPage() {
             {gpsCoords && currentDistance !== null && (
               <div className="gps-info-box">
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div className="gps-ping"><div className="gps-ping-dot" /><div className="gps-ping-ring" /></div>
+                  <GpsPing />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: "rgba(74,222,128,0.9)", fontWeight: 500 }}>{currentDistance}m dari kantor · ±{Math.round(gpsCoords.accuracy)}m</div>
                     <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-faint)", marginTop: 1 }}>{gpsCoords.latitude.toFixed(5)}, {gpsCoords.longitude.toFixed(5)}</div>
@@ -1490,7 +1678,13 @@ export default function FaceVerifyPage() {
               </div>
             )}
 
-            {!isProcessing && renderBiometricOption()}
+            {!isProcessing && (
+              <BiometricButton
+                eligible={biometricEligible} supported={biometricDeviceSupported}
+                busy={bioBusy} enrolled={biometricEnrolled} error={bioError}
+                onClick={handleBiometricAttendance}
+              />
+            )}
 
             {attempts > 0 && !isProcessing && (
               <div className="fail-badge">
@@ -1546,7 +1740,7 @@ export default function FaceVerifyPage() {
             )}
 
             {attempts >= 3 && !isProcessing && (
-              <button className="btn-ghost"
+              <GhostButton
                 style={{ width: "100%", textAlign: "center", color: "rgba(248,113,113,0.55)", fontSize: 10 }}
                 onClick={async () => {
                   addLog("re-enrollment requested", "warn");
@@ -1555,9 +1749,10 @@ export default function FaceVerifyPage() {
                   attemptsRef.current = 0;
                   setStage("enroll");
                   setMessage("Daftarkan wajah Anda");
-                }}>
+                }}
+              >
                 Wajah tidak dikenali? Daftar ulang →
-              </button>
+              </GhostButton>
             )}
           </>
         )}
@@ -1581,8 +1776,8 @@ export default function FaceVerifyPage() {
         {/* Footer */}
         {!["loading", "checking", "success", "out-of-time", "early-checkout-request"].includes(stage) && (
           <div style={{ borderTop: "0.5px solid var(--line-soft)", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <button className="btn-ghost" onClick={handleLogout}>Bukan Anda? Ganti akun</button>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "rgba(255,255,255,0.16)", letterSpacing: 0.4 }}>biometric only · wib</div>
+            <GhostButton onClick={handleLogout}>Bukan Anda? Ganti akun</GhostButton>
+            <div className="footer-tag" style={{ fontFamily: "var(--mono)", fontSize: 9, color: "rgba(255,255,255,0.16)", letterSpacing: 0.4 }}>biometric only · wib</div>
           </div>
         )}
       </div>
