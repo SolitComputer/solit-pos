@@ -641,6 +641,7 @@ function OpeningBalanceModal({
                             min={0}
                             value={nominalInput}
                             onChange={(e) => setNominalInput(e.target.value)}
+                            onWheel={(e) => e.currentTarget.blur()}
                             placeholder="0"
                             className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
                         />

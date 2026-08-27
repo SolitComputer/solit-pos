@@ -29,11 +29,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validasi ukuran file (max 5MB)
-    const MAX_SIZE = 5 * 1024 * 1024;
+    // Validasi ukuran file (max 10MB)
+    const MAX_SIZE = 10 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { success: false, message: "Ukuran file terlalu besar (max 5MB)" },
+        { success: false, message: "Ukuran file terlalu besar (max 10MB)" },
         { status: 400 }
       );
     }
