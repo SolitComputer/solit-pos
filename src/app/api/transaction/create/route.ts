@@ -491,6 +491,33 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
 
         // 12. WhatsApp (non-blocking) — tetap
         if (body.customer_phone) {
+            // Array TERPISAH khusus buat struk WA — bukan reuse laptopItems/
+            // accessoryItems, karena field official_price ini tidak ada di
+            // skema tabel transaction_items dan tidak boleh ikut ke payload
+            // insert di langkah 6 sebelumnya.
+            const receiptItemsForWA = [
+                ...laptopItems.map((li) => ({
+                    item_type: li.item_type,
+                    item_name: li.item_name,
+                    serial_number: li.serial_number,
+                    quantity: li.quantity,
+                    deal_price: li.deal_price,
+                    is_bonus: li.is_bonus,
+                    official_price:
+                        (laptopUnits.find((u) => u.unit_id === li.unit_id)?.selling_price ?? 0) * li.quantity,
+                })),
+                ...accessoryItems.map((ai) => ({
+                    item_type: ai.item_type,
+                    item_name: ai.item_name,
+                    serial_number: ai.serial_number,
+                    quantity: ai.quantity,
+                    deal_price: ai.deal_price,
+                    is_bonus: ai.is_bonus,
+                    official_price:
+                        (accMap.get(ai.accessory_id)?.sell_price ?? 0) * ai.quantity,
+                })),
+            ];
+
             const message = buildPaymentMessage({
                 customer_name: body.customer_name, invoice_number,
                 laptop_name: displayLaptopName, serial_number: displaySN,
@@ -498,7 +525,7 @@ async function handler(req: NextRequest, ctx: { params: any }, user: AuthUser) {
                 pickup_method: body.pickup_method, pickup_date: body.pickup_date,
                 pickup_time: body.pickup_time, pickup_location: body.pickup_location,
                 software_request: body.software_request, customer_type: body.customer_type,
-                items: buildLineItemsFromTxItems([...laptopItems, ...accessoryItems]),
+                items: buildLineItemsFromTxItems(receiptItemsForWA),
             });
             const waTimeout = new Promise<boolean>((r) => setTimeout(() => r(false), 15_000));
             try { await Promise.race([sendWhatsapp(body.customer_phone, message), waTimeout]); }
