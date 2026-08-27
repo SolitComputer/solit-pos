@@ -1,6 +1,6 @@
 import { supabase } from "@/services/supabase";
 import Link from "next/link";
-import { buildLineItemsFromTxItems, sumLineItems } from "@/lib/receiptItems";
+import { buildLineItemsFromTxItems, sumLineItems, buildFallbackLineItems } from "@/lib/receiptItems";
 
 interface Props {
   params: Promise<{ invoice: string }>;
@@ -66,7 +66,11 @@ export default async function InvoicePage(props: Props) {
     );
   }
 
-  const lineItems = buildLineItemsFromTxItems(txItems ?? []);
+  const rawLineItems = buildLineItemsFromTxItems(txItems ?? []);
+  // Fallback: kalau transaction_items kosong, susun dari kolom transactions langsung
+  // (lihat penjelasan root cause di atas) — supaya tabel rincian tidak pernah kosong
+  // selama datanya ada di `data`.
+  const lineItems = rawLineItems.length > 0 ? rawLineItems : buildFallbackLineItems(data);
   const subtotal = sumLineItems(lineItems) || Number(data.deal_price ?? data.amount ?? 0);
   const dpPaid = Number(data.dp_amount ?? 0);
   const remaining = Math.max(0, subtotal - dpPaid);
@@ -179,12 +183,12 @@ export default async function InvoicePage(props: Props) {
               </tr>
               {dpPaid > 0 && (
                 <tr>
-                  <td className="pr-6 py-1 text-gray-500 text-right">DP</td>
+                  <td className="pr-6 py-1 text-gray-500 text-right">Sudah Dibayar (DP)</td>
                   <td className="py-1 text-right font-mono">- Rp{dpPaid.toLocaleString("id-ID")}</td>
                 </tr>
               )}
               <tr className="border-t-2 border-gray-800">
-                <td className="pr-6 pt-2 font-bold text-gray-800 text-right">Payment</td>
+                <td className="pr-6 pt-2 font-bold text-gray-800 text-right">Sisa Pembayaran</td>
                 <td className="pt-2 text-right font-mono font-bold text-base">Rp{remaining.toLocaleString("id-ID")}</td>
               </tr>
             </tbody>
@@ -197,6 +201,13 @@ export default async function InvoicePage(props: Props) {
             <p className="text-sm text-gray-600">{data.notes}</p>
           </div>
         )}
+
+        <div className="mt-6 pt-4 border-t border-gray-200">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1.5">Pembayaran Transfer</p>
+          <p className="text-sm text-gray-700">
+            No. Rekening: <span className="font-mono font-semibold">7005165318</span> a.n. Reinaldy Olyvierd Sendouw
+          </p>
+        </div>
 
         <div className="mt-10 pt-6 border-t border-gray-200 text-center">
           <p className="text-sm text-gray-600 italic">Terima kasih atas kerja sama Anda!</p>
