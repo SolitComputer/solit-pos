@@ -39,15 +39,15 @@ export async function GET() {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    // ── Hitung rentang "hari ini" versi WIB, dikonversi ke UTC ─────────────
-    // WIB 00:00 hari ini = UTC 17:00 hari sebelumnya (WIB = UTC+7)
-    const nowWIB = new Date(Date.now() + 7 * 60 * 60 * 1000);
-    const todayWIBStr = nowWIB.toISOString().slice(0, 10);
+    // ── Hitung rentang "hari ini" dengan cutoff 04:00 WIB ─────────────
+    // Gunakan WIB (+7) - 4 jam cutoff = +3 jam
+    const wibDateStr = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const startUTC = new Date(`${todayWIBStr}T00:00:00.000Z`);
-    startUTC.setUTCHours(startUTC.getUTCHours() - 7);
-    const endUTC = new Date(`${todayWIBStr}T23:59:59.999Z`);
-    endUTC.setUTCHours(endUTC.getUTCHours() - 7);
+    // startUTC = jam 04:00:00 WIB hari ini = jam 21:00:00 UTC kemarin
+    const startUTC = new Date(`${wibDateStr}T04:00:00+07:00`);
+    
+    // endUTC = 24 jam setelah startUTC minus 1 milidetik
+    const endUTC = new Date(startUTC.getTime() + 24 * 60 * 60 * 1000 - 1);
 
     // ── Ambil absen SUCCESS hari ini saja (bukan semua histori) ────────────
     const { data, error } = await supabase
@@ -56,6 +56,7 @@ export async function GET() {
         user_id,
         created_at,
         status,
+        direction,
         users!inner ( id, name, role )
       `)
       .eq("status", "SUCCESS")
@@ -72,6 +73,9 @@ export async function GET() {
     const seen = new Set<string>();
     const merged: AttendanceEntry[] = [];
     (data || []).forEach((item: any) => {
+      // ✅ FIX: abaikan absen pulang, kita cuma cari jam masuk (IN)
+      if (item.direction === "OUT") return;
+
       if (seen.has(item.user_id)) return;
       seen.add(item.user_id);
       merged.push({
