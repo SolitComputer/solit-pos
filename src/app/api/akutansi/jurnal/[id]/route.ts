@@ -82,6 +82,24 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
   if (!before)
     return NextResponse.json({ success: false, message: "Jurnal tidak ditemukan" }, { status: 404 });
 
+  // Simpan status "Sudah Dicek" SEBELUM baris lama dihapus. Baris baru nanti
+  // dapat id baru (bukan hasil update baris lama), jadi checklist lama tidak
+  // otomatis nyambung ke id baru itu kalau tidak kita pulihkan manual.
+  const { data: oldLines } = await supabase
+    .from("journal_lines")
+    .select("id")
+    .eq("entry_id", id);
+  const oldLineIds = (oldLines ?? []).map((l: any) => l.id);
+
+  let wasFullyChecked = false;
+  if (oldLineIds.length > 0) {
+    const { data: oldChecks } = await supabase
+      .from("journal_umum_line_checks")
+      .select("line_id")
+      .in("line_id", oldLineIds);
+    wasFullyChecked = (oldChecks?.length ?? 0) === oldLineIds.length;
+  }
+
   const { error: updErr } = await supabase
     .from("journal_entries")
     .update({
@@ -102,14 +120,30 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
   }
 
   // Replace lines (paling simpel & konsisten dibanding diff per baris)
+  if (oldLineIds.length > 0) {
+    await supabase.from("journal_umum_line_checks").delete().in("line_id", oldLineIds);
+  }
   await supabase.from("journal_lines").delete().eq("entry_id", id);
-  const { error: lineErr } = await supabase.from("journal_lines").insert(draftToLineRows(id, merged));
+  const { data: insertedLines, error: lineErr } = await supabase
+    .from("journal_lines")
+    .insert(draftToLineRows(id, merged))
+    .select("id");
 
   if (lineErr) {
     // Rollback: kembalikan baris lama
     await supabase.from("journal_lines").insert(draftToLineRows(id, (before as any).lines ?? []));
     console.error("[akuntansi PUT lines]", lineErr);
     return NextResponse.json({ success: false, message: lineErr.message }, { status: 500 });
+  }
+
+  // Kalau SEMUA baris lama sudah dicek sebelum edit ini dilakukan, pertahankan
+  // status itu di baris-baris baru (id baru) — supaya proses Edit tidak
+  // mereset ceklis "Sudah Dicek" yang sudah ada sebelumnya.
+  if (wasFullyChecked && insertedLines && insertedLines.length > 0) {
+    const checkedAt = new Date().toISOString();
+    await supabase.from("journal_umum_line_checks").insert(
+      insertedLines.map((l: any) => ({ line_id: l.id, checked_at: checkedAt }))
+    );
   }
 
   const after = await snapshot(supabase, id);
