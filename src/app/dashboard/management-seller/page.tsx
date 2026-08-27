@@ -604,6 +604,33 @@ function TandaiFuButton({
   );
 }
 
+// ── Kompresi gambar sebelum upload (kurangi resiko limit ukuran & upload lambat di HP) ──
+async function compressImage(file: File, maxDim = 1600, quality = 0.75): Promise<File> {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return file;
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", quality)
+    );
+    if (!blob || blob.size >= file.size) return file; // kalau hasil malah lebih besar, pakai aslinya
+
+    return new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" });
+  } catch {
+    return file; // gagal kompres → tetap pakai file asli, jangan blokir upload
+  }
+}
+
 // ── Upload Bukti FU ───────────────────────────────────────────────────────────
 function BuktiFuUploader({
   value,
@@ -625,7 +652,7 @@ function BuktiFuUploader({
     return () => URL.revokeObjectURL(url);
   }, [value]);
 
-  const handleFile = (file: File | undefined) => {
+  const handleFile = async (file: File | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       alert("Hanya file gambar (JPG, PNG, WEBP) yang diperbolehkan.");
@@ -635,7 +662,10 @@ function BuktiFuUploader({
       alert("Ukuran file maksimal 5 MB.");
       return;
     }
-    onChange(file);
+    //  NEW — kompres dulu supaya upload lebih ringan & tidak kena limit ukuran
+    // request di server/hosting (foto kamera HP asli bisa 3-8MB)
+    const compressed = await compressImage(file);
+    onChange(compressed);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -1811,13 +1841,36 @@ const userRoles = useMemo<UserRole[]>(() => authUser?.roles ?? [], [authUser]);
         });
       }
 
-      const result = await res.json();
+      //  FIX — baca sebagai text dulu, baru coba JSON.parse manual. Kalau server/
+      // proxy balikin HTML (413/502/504) bukan JSON, kita masih tahu status code
+      // & cuplikan body-nya, bukan cuma pesan generik yang menutupi akar masalah.
+      const raw = await res.text();
+      let result: { success: boolean; message?: string };
+      try {
+        result = JSON.parse(raw);
+      } catch {
+        console.error("[runAction] Response bukan JSON", {
+          status: res.status,
+          statusText: res.statusText,
+          bodyPreview: raw.slice(0, 300),
+        });
+        if (res.status === 413) {
+          alert("Foto terlalu besar untuk server. Coba pakai foto dengan ukuran lebih kecil.");
+        } else if (res.status === 502 || res.status === 504) {
+          alert("Server tidak merespon (timeout). Coba lagi dengan koneksi yang lebih stabil.");
+        } else {
+          alert(`Gagal memproses (status ${res.status}). Buka console untuk detail teknis.`);
+        }
+        return;
+      }
+
       if (!result.success) {
         alert(result.message || "Gagal memproses");
         return;
       }
       await loadData(true);
-    } catch {
+    } catch (err) {
+      console.error("[runAction] Fetch gagal total", err);
       alert("Terjadi kesalahan koneksi");
     } finally {
       setProcessingId(null);
