@@ -119,9 +119,11 @@ export const POST = withAuth(async (_req, ctx, user: any) => {
     );
   }
 
-  if (linesEqual((before.lines ?? []) as any, draft.lines)) {
+  const keteranganChanged = before.keterangan !== draft.keterangan;
+
+  if (linesEqual((before.lines ?? []) as any, draft.lines) && !keteranganChanged) {
     return NextResponse.json(
-      { success: false, message: "Nominal jurnal sudah sama dengan data sumber terbaru" },
+      { success: false, message: "Nominal & keterangan jurnal sudah sama dengan data sumber terbaru" },
       { status: 400 }
     );
   }
@@ -140,6 +142,7 @@ export const POST = withAuth(async (_req, ctx, user: any) => {
   const { error: updErr } = await supabase
     .from("journal_entries")
     .update({
+      keterangan: draft.keterangan,
       total: draft.total,
       is_edited: true,
       updated_by: user.id,

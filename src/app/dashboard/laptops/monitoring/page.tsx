@@ -112,14 +112,14 @@ function MetricCard({
   icon: typeof Package; label: string; value: string | number; sub?: string; color: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-5 flex items-start gap-2.5 sm:gap-4 hover:shadow-md transition-shadow">
-      <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
-        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2.5 sm:p-5 flex items-start gap-2 sm:gap-4 hover:shadow-md transition-shadow min-w-0">
+      <div className={`w-8 h-8 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+        <Icon className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
       </div>
-      <div className="min-w-0">
-        <p className="text-[10px] sm:text-[11px] font-medium text-gray-400 uppercase tracking-wider truncate">{label}</p>
-        <p className="text-lg sm:text-xl font-bold text-gray-800 mt-0.5">{value}</p>
-        {sub && <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5 truncate">{sub}</p>}
+      <div className="min-w-0 flex-1">
+        <p className="text-[9px] sm:text-[11px] font-medium text-gray-400 uppercase tracking-wider truncate">{label}</p>
+        <p className="text-sm sm:text-xl font-bold text-gray-800 mt-0.5 break-words leading-tight">{value}</p>
+        {sub && <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 line-clamp-2 leading-snug">{sub}</p>}
       </div>
     </div>
   );
@@ -307,11 +307,11 @@ export default function MonitoringPage() {
   }, [data, search]);
 
   // ── Tab Config ─────────────────────────────────────────────────────────────
-  const tabs: { key: TabKey; label: string; count: number; icon: typeof Package }[] = [
-    { key: "siapJual", label: "Siap Jual", count: data?.metrics.siapJual ?? 0, icon: PackageCheck },
-    { key: "sold", label: "Terjual", count: data?.metrics.sold ?? 0, icon: PackageX },
-    { key: "transit", label: "Transit / Pending", count: data?.metrics.inTransit ?? 0, icon: Truck },
-    { key: "anomali", label: "Anomali", count: data?.anomalyCount ?? 0, icon: ShieldAlert },
+  const tabs: { key: TabKey; label: string; mobileLabel: string; count: number; icon: typeof Package }[] = [
+    { key: "siapJual", label: "Siap Jual", mobileLabel: "Siap Jual", count: data?.metrics.siapJual ?? 0, icon: PackageCheck },
+    { key: "sold", label: "Terjual", mobileLabel: "Terjual", count: data?.metrics.sold ?? 0, icon: PackageX },
+    { key: "transit", label: "Transit / Pending", mobileLabel: "Transit", count: data?.metrics.inTransit ?? 0, icon: Truck },
+    { key: "anomali", label: "Anomali", mobileLabel: "Anomali", count: data?.anomalyCount ?? 0, icon: ShieldAlert },
   ];
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -431,7 +431,8 @@ export default function MonitoringPage() {
                 Tutup
               </button>
             </div>
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50/80 border-b border-gray-100">
@@ -459,6 +460,31 @@ export default function MonitoringPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile Cards */}
+            <div className="sm:hidden space-y-2">
+              {reconcileResult.map((r) => (
+                <div key={r.laptop_id} className="border border-gray-100 rounded-xl p-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-700 truncate">{r.laptop_name}</p>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Qty</span>
+                    <span>
+                      <span className="text-red-500 font-semibold">{r.old_qty}</span>
+                      <span className="text-gray-300 mx-1">&rarr;</span>
+                      <span className="text-emerald-600 font-semibold">{r.new_qty}</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Status</span>
+                    <span className="flex items-center gap-1.5">
+                      <StatusBadge status={r.old_status} />
+                      <span className="text-gray-300">&rarr;</span>
+                      <StatusBadge status={r.new_status} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -467,20 +493,21 @@ export default function MonitoringPage() {
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               {/* Tabs */}
-              <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto flex-1">
+              <div className="grid grid-cols-4 sm:flex gap-1 bg-gray-100 rounded-xl p-1 sm:overflow-x-auto flex-1">
                 {tabs.map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                    className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold transition-all sm:whitespace-nowrap ${
                       activeTab === tab.key
                         ? "bg-white text-gray-800 shadow-sm"
                         : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
                     <tab.icon className="w-3.5 h-3.5" />
-                    {tab.label}
-                    <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    <span className="sm:hidden truncate max-w-full">{tab.mobileLabel}</span>
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className={`sm:ml-1 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold ${
                       activeTab === tab.key
                         ? tab.key === "anomali" && tab.count > 0
                           ? "bg-red-100 text-red-600"
@@ -507,15 +534,6 @@ export default function MonitoringPage() {
                 />
               </div>
             </div>
-
-            {/* ── Toast ───────────────────────────────────────────────────────── */}
-            {toast && (
-              <Toast
-                message={toast.message}
-                type={toast.type}
-                onDone={() => setToast(null)}
-              />
-            )}
 
             {/* ── 2-Step Verification Modal ────────────────────────────────────── */}
             {reconcileStep > 0 && (
@@ -782,7 +800,7 @@ function UnitTable({
                     </div>
                   </>
                 )}
-                <div>
+                <div className="col-span-2">
                   <p className="text-[10px] text-gray-400">Tgl Masuk</p>
                   <p className="text-xs font-semibold text-gray-700">{fmtDateShort(u.created_at)}</p>
                 </div>
