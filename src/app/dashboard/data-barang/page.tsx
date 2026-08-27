@@ -6,11 +6,12 @@ import { UserRole, hasAnyRole, ITEM_OUTFLOW_ROLES, DATA_BARANG_LAPTOP_ROLES } fr
 import { LaptopsContent } from "../laptops/LaptopsContent";
 import AccessoriesContent from "../accessories/AccessoriesContent";
 import OutflowsContent from "./OutflowsContent";
+import CategoriesContent from "./CategoriesContent";
 import PriceListPedagangTab from "@/components/inventory/price-list-pedagang/page";
 import { PRICELIST_PEDAGANG_ROLES } from "@/lib/pricelistPedagang";
 
 
-type TabKey = "laptops" | "accessories" | "outflows" | "pedagang";
+type TabKey = "laptops" | "accessories" | "outflows" | "pedagang" | "kategori";
 
 interface TabDef {
   key: TabKey;
@@ -43,6 +44,12 @@ const TABS: TabDef[] = [
     label: "Price List Pedagang",
     roles: PRICELIST_PEDAGANG_ROLES,
     icon: "ti-tag",
+  },
+  {
+    key: "kategori",
+    label: "Kategori",
+    roles: DATA_BARANG_LAPTOP_ROLES,
+    icon: "ti-category",
   },
 ];
 
@@ -77,6 +84,15 @@ function getTabIcon(icon: string, className: string) {
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.17L4 3a1 1 0 0 0-1 1l.17 5.59a2 2 0 0 0 .66 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83Z" />
           <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "ti-category":
+      return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
         </svg>
       );
     default:
@@ -239,7 +255,7 @@ export default function DataBarangPage() {
             {activeTab === "accessories" && visibleTabs.some((t) => t.key === "accessories") && <AccessoriesContent />}
             {activeTab === "outflows" && visibleTabs.some((t) => t.key === "outflows") && <OutflowsContent />}
             {activeTab === "pedagang" && visibleTabs.some((t) => t.key === "pedagang") && <PriceListPedagangTab />}
-          </>
+            {activeTab === "kategori" && visibleTabs.some((t) => t.key === "kategori") && <CategoriesContent />}          </>
         )}
       </div>
 
