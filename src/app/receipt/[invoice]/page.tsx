@@ -3,8 +3,7 @@ import Link from "next/link";
 import ReceiptActions from "./ReceiptActions";
 import { User, Package, Shield, FileText } from "lucide-react";
 import ItemsTable from "@/components/receipt/ItemsTable";
-import { buildLineItemsFromTxItems, sumLineItems } from "@/lib/receiptItems";
-
+import { buildLineItemsFromTxItems, sumLineItems, sumSavings } from "@/lib/receiptItems";
 interface Props {
   params: Promise<{ invoice: string }>;
 }
@@ -23,22 +22,50 @@ export default async function Page(props: Props) {
       .select("warranty_start, warranty_end, warranty_duration, status, notes")
       .eq("invoice_number", params.invoice)
       .single(),
-    supabase
+       supabase
       .from("transaction_items")
-      .select("item_type, item_name, serial_number, quantity, deal_price, is_bonus")
+      .select("item_type, item_name, serial_number, quantity, deal_price, is_bonus, unit_id, accessory_id")
       .eq("invoice_number", params.invoice),
   ]);
 
-  const laptopItems = (txItems ?? []).filter((it: any) => it.item_type !== "accessory");
-  const accessoryItems = (txItems ?? []).filter((it: any) => it.item_type === "accessory");
+  const rawTxItems = txItems ?? [];
+  const laptopItems = rawTxItems.filter((it: any) => it.item_type !== "accessory");
+  const accessoryItems = rawTxItems.filter((it: any) => it.item_type === "accessory");
   const itemKind: "laptop" | "accessory" | "mixed" =
     laptopItems.length > 0 && accessoryItems.length > 0
       ? "mixed"
       : accessoryItems.length > 0
         ? "accessory"
         : "laptop";
-  const lineItems = buildLineItemsFromTxItems(txItems ?? []);
+
+  // ── Ambil harga JUAL RESMI (official) per unit/aksesori — dipakai buat
+  // bandingin sama deal_price supaya bisa munculin coretan + badge diskon.
+  const unitIds = [...new Set(laptopItems.filter((it: any) => it.unit_id).map((it: any) => it.unit_id))];
+  const accessoryIds = [...new Set(accessoryItems.filter((it: any) => it.accessory_id).map((it: any) => it.accessory_id))];
+
+  const [{ data: unitPricesData }, { data: accPricesData }] = await Promise.all([
+    unitIds.length > 0
+      ? supabase.from("laptop_units").select("id, selling_price").in("id", unitIds)
+      : Promise.resolve({ data: [] as any[] }),
+    accessoryIds.length > 0
+      ? supabase.from("accessories").select("id, sell_price").in("id", accessoryIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+
+  const unitOfficialMap = new Map((unitPricesData ?? []).map((u: any) => [u.id, Number(u.selling_price) || 0]));
+  const accOfficialMap = new Map((accPricesData ?? []).map((a: any) => [a.id, Number(a.sell_price) || 0]));
+
+  const enrichedTxItems = rawTxItems.map((it: any) => {
+    const qty = Number(it.quantity) || 1;
+    const officialUnit = it.item_type === "accessory"
+      ? (accOfficialMap.get(it.accessory_id) ?? 0)
+      : (unitOfficialMap.get(it.unit_id) ?? 0);
+    return { ...it, official_price: officialUnit * qty };
+  });
+
+  const lineItems = buildLineItemsFromTxItems(enrichedTxItems);
   const itemsSubtotal = sumLineItems(lineItems) || Number(data?.amount ?? 0);
+  const itemsSavings = sumSavings(lineItems);
 
   if (!data || data.status !== "PAID") {
     return (
@@ -159,6 +186,12 @@ export default async function Page(props: Props) {
                 <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Subtotal</span>
                 <span className="text-sm font-bold text-gray-800 font-mono">Rp{itemsSubtotal.toLocaleString("id-ID")}</span>
               </div>
+              {itemsSavings > 0 && (
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-xs font-bold text-emerald-600 uppercase tracking-wide">Lebih Hemat</span>
+                  <span className="text-sm font-bold text-emerald-600 font-mono">Rp{itemsSavings.toLocaleString("id-ID")}</span>
+                </div>
+              )}
             </Section>
 
             <Separator />
