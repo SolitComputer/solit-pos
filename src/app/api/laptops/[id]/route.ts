@@ -22,7 +22,7 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const { data, error } = await supabase
       .from("laptops")
-      .select("*")
+      .select("*, laptop_categories ( id, name )")
       .eq("id", id)
       .single();
 
@@ -32,6 +32,9 @@ async function getHandler(req: NextRequest, props: Props, user: AuthUser) {
         { status: 400 }
       );
     }
+
+    // Ratakan nama kategori — konsisten dengan GET /api/laptops (list).
+    (data as Record<string, any>).category_name = (data as Record<string, any>).laptop_categories?.name ?? null;
 
     // ✅ SECURITY FIX: dulu select("*") dikembalikan mentah tanpa masking —
     // beda dari GET /api/laptops (list) yang sudah benar menyaring
@@ -75,6 +78,12 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
     ] as const;
     for (const f of FIELDS) {
       if (body[f] !== undefined) updatePayload[f] = body[f];
+    }
+    // category_id ditangani terpisah dari FIELDS supaya string kosong dari
+    // opsi "Tanpa Kategori" di dropdown dikonversi ke null, bukan tersimpan
+    // sebagai string kosong "" (kolom ini FK ke laptop_categories.id).
+    if (body.category_id !== undefined) {
+      updatePayload.category_id = body.category_id || null;
     }
     if (body.selling_price !== undefined && body.selling_price !== null) {
       const price = Math.round(Number(body.selling_price));
