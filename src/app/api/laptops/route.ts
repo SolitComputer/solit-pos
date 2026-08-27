@@ -11,6 +11,7 @@ async function handler(req: NextRequest, ctx: any, user: AuthUser) {
       .from("laptops")
       .select(`
         *,
+        laptop_categories ( id, name ),
 laptop_units (
           id,
           serial_number,
@@ -41,6 +42,7 @@ laptop_units (
     //  status kelengkapan harga tanpa perlu tahu angka aslinya.
     const withReadyFlag = (data ?? []).map((l: Record<string, any>) => ({
       ...l,
+      category_name: l.laptop_categories?.name ?? null,
       laptop_units: (l.laptop_units ?? []).map((u: Record<string, any>) => ({
         ...u,
         is_price_complete: Number(u.purchase_price) > 0 && Number(u.selling_price) > 0,

@@ -14,6 +14,7 @@ import React, { useState } from "react";
 export interface InventoryRow {
     id: string;
     laptop_name: string;
+    category_name?: string | null;
     cpu: string;
     ram: string;
     storage: string;
@@ -116,7 +117,7 @@ const Note = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[11px] text-gray-300 italic">{children}</span>
 );
 
-type SortKey = "NAMA" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "TOTAL_MODAL" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "SO" | "AKSI";
+type SortKey = "NAMA" | "CATEGORY" | "CPU" | "RAM" | "STORAGE" | "MODAL" | "SPAREPART" | "TOTAL_MODAL" | "PRICE" | "OFFICIAL" | "GROSS_PROFIT" | "TOTAL_JUAL" | "SUMBER" | "TANGGAL" | "SN" | "STOK" | "SIAP" | "MINUS" | "AUDIT" | "SO" | "AKSI";
 //  Badge "NEW" — dipakai di kolom Nama Laptop saat row.is_new === true.
 //  Nilai is_new sudah dihitung di pemanggil (LaptopsContent.tsx / ready/page.tsx),
 //  jadi komponen ini murni presentasional, tidak menghitung TTL sendiri.
@@ -160,6 +161,7 @@ export default function InventoryTable({
 
             switch (localSort.col) {
                 case "NAMA": valA = a.laptop_name || ""; valB = b.laptop_name || ""; break;
+                case "CATEGORY": valA = a.category_name || ""; valB = b.category_name || ""; break;
                 case "CPU": valA = a.cpu || ""; valB = b.cpu || ""; break;
                 case "RAM": valA = a.ram || ""; valB = b.ram || ""; break;
                 case "STORAGE": valA = a.storage || ""; valB = b.storage || ""; break;
@@ -204,6 +206,7 @@ export default function InventoryTable({
                     <tr className="bg-gray-50 border-b border-gray-100">
                         <Th center>No</Th>
                         <Th sortKey="NAMA" activeSort={sortBy} onSort={onSort}>Nama Laptop</Th>
+                        <Th sortKey="CATEGORY" activeSort={sortBy} onSort={onSort}>Kategori</Th>
                         <Th sortKey="CPU" activeSort={sortBy} onSort={onSort}>CPU</Th>
                         <Th sortKey="RAM" activeSort={sortBy} onSort={onSort}>RAM</Th>
                         <Th sortKey="STORAGE" activeSort={sortBy} onSort={onSort}>Storage</Th>
@@ -249,6 +252,17 @@ export default function InventoryTable({
                                 </div>
                             </td>
 
+                            <td className="px-3 py-3.5 max-w-[130px]">
+                                {row.category_name ? (
+                                    <span
+                                        className="inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100 truncate max-w-full"
+                                        title={row.category_name}
+                                    >
+                                        {row.category_name}
+                                    </span>
+                                ) : <Dash />}
+                            </td>
+
                             <td className="px-3.5 py-3.5 max-w-[150px]">
                                 <span className="block text-xs text-gray-600 truncate" title={row.cpu}>
                                     {row.cpu || <Dash />}
@@ -273,7 +287,7 @@ export default function InventoryTable({
                                 </td>
                             )}
 
-                          {canSeePrivate && showSparepart && (
+                            {canSeePrivate && showSparepart && (
                                 <td className="px-3 py-3.5 text-right whitespace-nowrap">
                                     {row.sparepart_modal != null ? (
                                         <span className="text-xs font-semibold text-gray-600 tabular-nums">{fmt(row.sparepart_modal)}</span>
