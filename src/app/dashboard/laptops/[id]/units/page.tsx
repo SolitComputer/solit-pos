@@ -63,17 +63,21 @@ const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }
 
 const GRADE_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 };
 
-//  Harus sama dengan AUDIT_TTL_MS / SO_TTL_MS di /api/units/[id]/audit & /so
+//  Audit: tetap rolling TTL (2 hari) — TIDAK diubah, di luar scope perbaikan ini.
 const AUDIT_TTL_DAYS = 2;
 const AUDIT_TTL_MS = AUDIT_TTL_DAYS * 24 * 60 * 60 * 1000;
-const SO_TTL_DAYS = 1;
-const SO_TTL_MS = SO_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+//  SO: reset otomatis begitu GANTI TANGGAL KALENDER WIB (00:00), BUKAN rolling
+//  24 jam dari waktu SO dibuat — harus sama persis dgn logika di
+//  /api/laptops/[id]/so/route.ts (level model) supaya konsisten di semua halaman.
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7, Indonesia tidak pakai DST
+const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 
 function isUnitAuditActive(u: LaptopUnit): boolean {
     return !!u.audited_at && Date.now() - new Date(u.audited_at).getTime() < AUDIT_TTL_MS;
 }
 function isUnitSOActive(u: LaptopUnit): boolean {
-    return !!u.so_at && Date.now() - new Date(u.so_at).getTime() < SO_TTL_MS;
+    return !!u.so_at && toWibDateStr(new Date(u.so_at)) === toWibDateStr(new Date());
 }
 
 function sortUnits(units: LaptopUnit[]): LaptopUnit[] {
@@ -1558,7 +1562,7 @@ function SoButton({ active, loading, soBy, soAt, onClick }: {
     const title = active
         ? `SO oleh ${soBy ?? "—"}${soAt ? " · " + new Date(soAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}\nKlik untuk batalkan SO`
         : expiredButOnceSo
-            ? `Terakhir SO oleh ${soBy ?? "—"} · ${new Date(soAt as string).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} (sudah lewat ${SO_TTL_DAYS} hari)\nKlik untuk SO lagi`
+            ? `Terakhir SO oleh ${soBy ?? "—"} · ${new Date(soAt as string).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} (sudah ganti hari, reset otomatis)\nKlik untuk SO lagi`
             : "Klik untuk tandai sudah SO";
 
     return (
