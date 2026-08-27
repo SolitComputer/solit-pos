@@ -435,6 +435,12 @@ function OvertimeProofUploadForm({ row, onClose, onSaved }: { row: OvertimeTable
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawFile = e.target.files?.[0];
     if (!rawFile) return;
+
+    if (rawFile.size > 10 * 1024 * 1024) {
+      setError("Ukuran foto terlalu besar (maksimal 10 MB). Silakan pilih foto yang lebih kecil.");
+      return;
+    }
+
     setError("");
     setProcessing(true);
     try {

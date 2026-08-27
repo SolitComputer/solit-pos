@@ -2350,6 +2350,7 @@ function EntryFormModal({
                                                                 min={0}
                                                                 value={l.nominal || ""}
                                                                 onChange={(e) => patch(i, { nominal: Math.max(0, Number(e.target.value)) })}
+                                                                onWheel={(e) => e.currentTarget.blur()}
                                                                 placeholder="0"
                                                                 className="h-9 w-28 sm:w-36 shrink-0 border border-gray-200 rounded-lg px-2 text-xs font-mono text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                             />
