@@ -31,9 +31,17 @@ interface LaptopUnit {
     is_pedagang_listed?: boolean;
 }
 
+interface Category {
+    id: string;
+    name: string;
+    description?: string | null;
+}
+
 interface Laptop {
     id: string;
     laptop_name: string;
+    category_id?: string | null;
+    category_name?: string | null;
     brand: string;
     cpu: string;
     ram: string;
@@ -63,6 +71,7 @@ type ModalMode = "detail" | "create" | "edit" | null;
 
 const EMPTY_FORM = {
     laptop_name: "",
+    category_id: "",
     brand: "",
     cpu: "",
     ram: "",
@@ -383,6 +392,10 @@ export function LaptopsContent() {
     //  Dipakai khusus untuk cek SO_LIMITED_USER_IDS (akun dengan SO terbatas)
     const [userId, setUserId] = useState<string | null>(null);
 
+    //  Daftar kategori — dipakai dropdown Tambah/Edit Laptop & filter kategori.
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [filterCategory, setFilterCategory] = useState<string>("ALL");
+
     //  Semua permission check sekarang pakai hasAnyRole(userRoles, ...)
     // Additive: aksi muncul kalau role sudah diizinkan lewat array hardcode
     // ATAU matrix "Role & Hak Akses" (halaman laptops) sudah mengizinkannya.
@@ -520,6 +533,17 @@ export function LaptopsContent() {
 
     useEffect(() => { fetchLaptops(); }, []);
 
+    //  Ambil daftar kategori untuk dropdown create/edit & filter kategori.
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/categories");
+                const json = await res.json();
+                if (res.ok && json.success) setCategories(json.data as Category[]);
+            } catch { /* dropdown kategori kosong kalau gagal, tidak fatal */ }
+        })();
+    }, []);
+
     //  Multi-role: ambil array roles dari /api/auth/me, fallback ke role tunggal
     useEffect(() => {
         getAuthUser().then(u => ({ success: true, user: u }))
@@ -616,6 +640,7 @@ export function LaptopsContent() {
             list = list.filter(x => (x.stok_minus ?? 0) > 0);
         }
         if (filterBrand !== "ALL") list = list.filter(x => x.brand === filterBrand);
+        if (filterCategory !== "ALL") list = list.filter(x => x.category_id === filterCategory);
         if (filterProcessor !== "ALL") {
             list = list.filter(x => x.cpu?.toLowerCase().includes(filterProcessor.toLowerCase()));
         }
@@ -699,7 +724,7 @@ export function LaptopsContent() {
             case "SN": list.sort((a, b) => a.id.localeCompare(b.id)); break;
         }
         return list;
-    }, [laptops, search, filterSN, filterStatus, filterBrand, filterProcessor, filterRam, filterPriceRange, filterStock, filterAudit, sortBy]);
+    }, [laptops, search, filterSN, filterStatus, filterBrand, filterCategory, filterProcessor, filterRam, filterPriceRange, filterStock, filterAudit, sortBy]);
 
     const uniqueRams = useMemo(() => {
         const r = new Set(laptops.map(x => x.ram).filter(Boolean));
@@ -755,10 +780,11 @@ export function LaptopsContent() {
         }
     };
 
-    const openEdit = (laptop: Laptop) => {
+     const openEdit = (laptop: Laptop) => {
         setSelectedLaptop(laptop);
         setFormData({
             laptop_name: laptop.laptop_name || "",
+            category_id: laptop.category_id || "",
             brand: laptop.brand || "",
             cpu: laptop.cpu || "",
             ram: laptop.ram || "",
@@ -909,6 +935,7 @@ export function LaptopsContent() {
         const base = {
             id: l.id,
             laptop_name: l.laptop_name,
+            category_name: l.category_name ?? null,
             cpu: l.cpu,
             ram: l.ram,
             storage: l.storage,
@@ -1118,7 +1145,7 @@ export function LaptopsContent() {
                                 {uniqueBrands.map(b => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
                             </FilterSelect>
                             <button
-                                onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setFilterStock("TERSEDIA"); setFilterAudit(""); setSortBy("DEFAULT"); }}
+                                onClick={() => { setSearch(""); setFilterSN(""); setFilterStatus("ALL"); setFilterBrand("ALL"); setFilterCategory("ALL"); setFilterProcessor("ALL"); setFilterRam("ALL"); setFilterPriceRange("ALL"); setFilterStock("TERSEDIA"); setFilterAudit(""); setSortBy("DEFAULT"); }}
                                 className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all duration-150 flex items-center justify-center gap-1.5"
                             >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1129,6 +1156,10 @@ export function LaptopsContent() {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                            <FilterSelect value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+                                <option value="ALL">Semua Kategori</option>
+                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </FilterSelect>
                             <FilterSelect value={filterRam} onChange={e => setFilterRam(e.target.value)}>
                                 {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
                             </FilterSelect>
@@ -1174,8 +1205,9 @@ export function LaptopsContent() {
                             )}
                         </div>
 
-                        {(filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || filterStock !== "TERSEDIA" || filterAudit !== "" || sortBy !== "DEFAULT") && (
+                        {(filterCategory !== "ALL" || filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || filterStock !== "TERSEDIA" || filterAudit !== "" || sortBy !== "DEFAULT") && (
                             <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                {filterCategory !== "ALL" && <FilterChip label={categories.find(c => c.id === filterCategory)?.name ?? "Kategori"} onRemove={() => setFilterCategory("ALL")} />}
                                 {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
                                 {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
                                 {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
@@ -1402,6 +1434,12 @@ export function LaptopsContent() {
                         <FormField label="Nama Laptop" required>
                             <input name="laptop_name" placeholder="Contoh: MacBook Air M2 2023" value={formData.laptop_name} onChange={handleFormChange} required className={inputCls} />
                         </FormField>
+                        <FormField label="Kategori">
+                            <select name="category_id" value={formData.category_id} onChange={handleFormChange} className={inputCls}>
+                                <option value="">Tanpa Kategori</option>
+                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </FormField>
                         <FormField label="Brand">
                             <input name="brand" placeholder="Apple, Lenovo, Dell, ASUS..." value={formData.brand} onChange={handleFormChange} className={inputCls} />
                         </FormField>
@@ -1440,6 +1478,12 @@ export function LaptopsContent() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField label="Nama Laptop" required>
                             <input name="laptop_name" value={formData.laptop_name} onChange={handleFormChange} required className={inputCls} />
+                        </FormField>
+                        <FormField label="Kategori">
+                            <select name="category_id" value={formData.category_id} onChange={handleFormChange} className={inputCls}>
+                                <option value="">Tanpa Kategori</option>
+                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
                         </FormField>
                         <FormField label="Brand">
                             <input name="brand" value={formData.brand} onChange={handleFormChange} className={inputCls} />
@@ -1512,6 +1556,7 @@ export function LaptopsContent() {
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Spesifikasi Teknis</p>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                                 {[
+                                    { label: "Kategori", value: selectedLaptop.category_name },
                                     { label: "CPU", value: selectedLaptop.cpu },
                                     { label: "RAM", value: selectedLaptop.ram },
                                     { label: "Storage", value: selectedLaptop.storage },
@@ -2331,7 +2376,7 @@ function SkeletonTable() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b-2 border-gray-100">
-                            {["No", "Nama Laptop", "CPU", "RAM", "Storage", "Modal Laptop", "Modal Sparepart", "Harga Jual", "Total Jual", "Sumber", "Tanggal Masuk", "SN", "ST", "SJ", "M", "SO", "Audit", "Aksi"].map(h => (
+                            {["No", "Nama Laptop", "Kategori", "CPU", "RAM", "Storage", "Modal Laptop", "Modal Sparepart", "Harga Jual", "Total Jual", "Sumber", "Tanggal Masuk", "SN", "ST", "SJ", "M", "SO", "Audit", "Aksi"].map(h => (
                                 <th key={h} className="px-3 py-3"><Shimmer h={10} /></th>
                             ))}
                         </tr>
