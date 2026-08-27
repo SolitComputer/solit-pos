@@ -149,6 +149,7 @@ export interface TransactionSyncDraft {
   total: number;
   modal: number;
   modalMissing: boolean;
+  keterangan: string;
 }
 
 /**
@@ -177,7 +178,7 @@ export async function getTransactionSyncDraftsByInvoices(
     const { data, error } = await supabase
       .from("transactions")
       .select(
-        "invoice_number, status, deal_price, amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, item_kind"
+        "invoice_number, status, deal_price, amount, payment_method, payment_method_2, amount_method_1, amount_method_2, unit_id, unit_ids, item_kind, customer_name, laptop_name, serial_number"
       )
       .in("invoice_number", batch);
     if (error) {
@@ -195,14 +196,16 @@ export async function getTransactionSyncDraftsByInvoices(
   }
 
   const purchasePriceMap = new Map<string, number>();
+  const serialNumberMap = new Map<string, string>();
   if (unitIds.size > 0) {
     for (const batch of chunkArray(Array.from(unitIds), 150)) {
       const { data: units } = await supabase
         .from("laptop_units")
-        .select("id, purchase_price")
+        .select("id, purchase_price, serial_number")
         .in("id", batch);
       for (const u of units ?? []) {
         purchasePriceMap.set(u.id as string, Math.round(Number(u.purchase_price ?? 0)));
+        if (u.serial_number) serialNumberMap.set(u.id as string, u.serial_number as string);
       }
     }
   }
@@ -237,7 +240,14 @@ export async function getTransactionSyncDraftsByInvoices(
       Array.isArray(t.unit_ids) && t.unit_ids.length > 0 ? t.unit_ids : t.unit_id ? [t.unit_id] : [];
 
     let modal = 0;
-    for (const id of ids) modal += purchasePriceMap.get(id) ?? 0;
+    const sns: string[] = [];
+    for (const id of ids) {
+      modal += purchasePriceMap.get(id) ?? 0;
+      const sn = serialNumberMap.get(id);
+      if (sn) sns.push(sn);
+    }
+    const snText = sns.length > 0 ? sns.join(", ") : (t.serial_number as string) || "—";
+    const keterangan = `${t.laptop_name ?? "Laptop"} - ${snText} - ${t.customer_name ?? "—"}`;
 
     const effectiveItemKind: "laptop" | "accessory" | "mixed" =
       t.item_kind === "mixed" || t.item_kind === "accessory" || t.item_kind === "laptop"
@@ -285,6 +295,7 @@ export async function getTransactionSyncDraftsByInvoices(
       total: totalOf(merged),
       modal,
       modalMissing: modal === 0,
+      keterangan,
     });
   }
 
@@ -294,6 +305,7 @@ export async function getTransactionSyncDraftsByInvoices(
 export interface JournalSyncDraft {
   lines: DraftLine[];
   total: number;
+  keterangan: string;
 }
 
 /**
@@ -315,7 +327,7 @@ export async function getCashflowSyncDraftsByIds(
   for (const batch of chunkArray(ids, 150)) {
     const { data, error } = await supabase
       .from("cashflow_entries")
-      .select("id, direction, category, nominal, payment_method, source_type")
+      .select("id, direction, category, nominal, payment_method, source_type, nama, keterangan")
       .eq("source_type", "MANUAL")
       .in("id", batch);
     if (error) {
@@ -342,7 +354,7 @@ export async function getCashflowSyncDraftsByIds(
         ];
 
     const merged = mergeLines(lines);
-    result.set(String(e.id), { lines: merged, total: totalOf(merged) });
+    result.set(String(e.id), { lines: merged, total: totalOf(merged), keterangan: cashflowKeterangan(e) });
   }
 
   return result;
@@ -399,7 +411,7 @@ export async function getServiceSyncDraftsByIds(
   for (const batch of chunkArray(eligibleIds, 150)) {
     const { data, error } = await supabase
       .from("service_orders")
-      .select("id, payment_amount, payment_method")
+      .select("id, payment_amount, payment_method, nama, type_laptop")
       .in("id", batch);
     if (error) {
       console.error("[akuntansi] fetch service_orders (sync):", error.message);
@@ -428,7 +440,8 @@ export async function getServiceSyncDraftsByIds(
     ];
 
     const merged = mergeLines(lines);
-    result.set(String(s.id), { lines: merged, total: totalOf(merged) });
+    const keterangan = `Service · ${s.type_laptop ?? "—"} - ${s.nama ?? "—"}`;
+    result.set(String(s.id), { lines: merged, total: totalOf(merged), keterangan });
   }
 
   return result;
