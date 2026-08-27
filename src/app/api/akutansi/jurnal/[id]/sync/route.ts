@@ -128,15 +128,41 @@ export const POST = withAuth(async (_req, ctx, user: any) => {
     );
   }
 
+  // Simpan status "Sudah Dicek" sebelum baris lama dihapus
+  const oldLineIds = ((before.lines ?? []) as any).map((l: any) => l.id);
+  let wasFullyChecked = false;
+  if (oldLineIds.length > 0) {
+    const { data: oldChecks } = await supabase
+      .from("journal_umum_line_checks")
+      .select("line_id")
+      .in("line_id", oldLineIds);
+    // Jika ada salah satu baris (atau semua) yang pernah dicek, anggap entry ini checked
+    wasFullyChecked = (oldChecks?.length ?? 0) > 0;
+  }
+
   // Replace baris lama dengan draft baru
+  if (oldLineIds.length > 0) {
+    await supabase.from("journal_umum_line_checks").delete().in("line_id", oldLineIds);
+  }
   await supabase.from("journal_lines").delete().eq("entry_id", id);
-  const { error: lineErr } = await supabase.from("journal_lines").insert(draftToLineRows(id, draft.lines));
+  const { data: insertedLines, error: lineErr } = await supabase
+    .from("journal_lines")
+    .insert(draftToLineRows(id, draft.lines))
+    .select("id");
 
   if (lineErr) {
     // Rollback: kembalikan baris lama supaya jurnal tidak tiba-tiba kosong
     await supabase.from("journal_lines").insert(draftToLineRows(id, (before as any).lines ?? []));
     console.error("[akuntansi POST sync lines]", lineErr);
     return NextResponse.json({ success: false, message: lineErr.message }, { status: 500 });
+  }
+
+  // Pulihkan status "Sudah Dicek" ke baris-baris yang baru di-insert
+  if (wasFullyChecked && insertedLines && insertedLines.length > 0) {
+    const checkedAt = new Date().toISOString();
+    await supabase.from("journal_umum_line_checks").insert(
+      insertedLines.map((l: any) => ({ line_id: l.id, checked_at: checkedAt }))
+    );
   }
 
   const { error: updErr } = await supabase
