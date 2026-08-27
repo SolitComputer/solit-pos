@@ -678,13 +678,16 @@ export default function JurnalUmum({ period }: { period: string }) {
 
         try {
             await Promise.all(
-                validLines.map((l) =>
-                    fetch("/api/akutansi/jurnal/check", {
+                validLines.map(async (l) => {
+                    const res = await fetch("/api/akutansi/jurnal/check", {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ line_id: l.id, checked: next }),
-                    })
-                )
+                    });
+                    if (!res.ok) throw new Error("Failed to check");
+                    const json = await res.json();
+                    if (!json.success) throw new Error(json.message);
+                })
             );
         } catch {
             load(false);
