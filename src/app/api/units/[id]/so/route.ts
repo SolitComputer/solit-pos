@@ -8,8 +8,12 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-//  Harus sama dengan SO_TTL_MS di src/app/dashboard/laptops/[id]/units/page.tsx (1 hari).
-const SO_TTL_MS = 1 * 24 * 60 * 60 * 1000;
+//  SO unit direset otomatis begitu ganti TANGGAL KALENDER WIB (00:00), BUKAN
+//  rolling 24 jam — harus konsisten dengan toWibDateStr() di
+//  /api/laptops/[id]/so/route.ts dan isUnitSOActive() di
+//  src/app/dashboard/laptops/[id]/units/page.tsx.
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7, Indonesia tidak pakai DST
+const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 
 // Sama polanya dgn canSoLaptop() di /api/laptops/[id]/so — bedanya di sini
 // cek status unit itu SENDIRI (bukan agregat), karena 1 unit = 1 baris.
@@ -46,7 +50,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const isActive =
       current.so_at != null &&
-      Date.now() - new Date(current.so_at).getTime() < SO_TTL_MS;
+      toWibDateStr(new Date(current.so_at)) === toWibDateStr(new Date());
 
     const payload = isActive
       ? { so_at: null, so_by: null }
