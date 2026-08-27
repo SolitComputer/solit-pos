@@ -202,7 +202,7 @@ export function expenseAccountForCashflow(category: string): string {
 export const CASHFLOW_IN_ACCOUNT: Record<string, string> = {
   PIUTANG: AKUN.PIUTANG,
   AKSESORIS: AKUN.PENJUALAN_AKSESORIS,
-  BIAYA_LAIN: AKUN.PEMASUKAN_LAIN,
+  BIAYA_LAIN: AKUN.BIAYA_LAIN,
 };
 
 export function incomeAccountForCashflow(category: string): string {
