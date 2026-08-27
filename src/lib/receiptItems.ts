@@ -48,6 +48,54 @@ export function sumLineItems(items: ReceiptLineItem[]): number {
   return items.reduce((s, it) => s + (it.isBonus ? 0 : it.amount), 0);
 }
 
+// Data minimal dari tabel `transactions` yang dibutuhkan untuk fallback di bawah.
+export interface TxFallbackData {
+  laptop_name?: string | null;
+  serial_number?: string | null;
+  serial_numbers?: string[] | null;
+  deal_price?: number | null;
+  amount?: number | null;
+}
+
+/**
+ * Fallback kalau `transaction_items` KOSONG (mis. transaksi RESERVED/HELD
+ * yang belum pernah direkonsiliasi lewat PUT /api/transaction/[invoice]).
+ * Bikin baris item langsung dari kolom `transactions`, supaya Nota/Invoice
+ * tidak menampilkan "Belum ada rincian barang" padahal transaksinya valid.
+ */
+export function buildFallbackLineItems(tx: TxFallbackData): ReceiptLineItem[] {
+  const amount = Number(tx.deal_price ?? tx.amount ?? 0);
+  const serials = Array.isArray(tx.serial_numbers) && tx.serial_numbers.length > 0
+    ? tx.serial_numbers.filter(Boolean)
+    : tx.serial_number
+      ? [tx.serial_number]
+      : [];
+  const label = tx.laptop_name || "Laptop";
+
+  if (serials.length > 1) {
+    const unitPrice = Math.round(amount / serials.length);
+    return serials.map((sn) => ({
+      label,
+      meta: `SN: ${sn}`,
+      qty: 1,
+      unitPrice,
+      amount: unitPrice,
+      isBonus: false,
+    }));
+  }
+
+  return [
+    {
+      label,
+      meta: serials[0] ? `SN: ${serials[0]}` : undefined,
+      qty: 1,
+      unitPrice: amount,
+      amount,
+      isBonus: false,
+    },
+  ];
+}
+
 const fmtNum = (n: number) => (n || 0).toLocaleString("id-ID");
 
 function padLine(left: string, right: string, width: number): string {
