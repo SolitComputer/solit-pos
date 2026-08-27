@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   ArrowLeft, Trophy, Medal, Award, Users, TrendingUp, Clock, CheckCircle2,
-  Inbox, AlertCircle, ChevronDown, ChevronUp, type LucideIcon,
+  Inbox, AlertCircle, ChevronDown, ChevronUp, BarChart3, Percent, Activity,
+  type LucideIcon,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -325,14 +326,15 @@ function PodiumCard({ entry, rank }: { entry: RankingEntry; rank: number }) {
   const Icon = style.icon;
   const bg = avBg(entry.name);
   const disiplinPct = (entry.disiplin * 100).toFixed(1);
+  const isFirst = rank === 0;
   return (
     <div className={`flex-1 min-w-0 ${style.order} ${style.height}`}>
-      <div className={`bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm p-2.5 sm:p-5 text-center ring-2 ${style.ring} relative`}>
+      <div className={`bg-white rounded-xl sm:rounded-2xl border ${isFirst ? "border-amber-200" : "border-gray-100"} shadow-sm ${isFirst ? "shadow-md" : ""} p-2.5 sm:p-5 text-center ring-2 ${style.ring} relative`}>
         <div className={`absolute -top-2.5 sm:-top-3 left-1/2 -translate-x-1/2 w-6 h-6 sm:w-7 sm:h-7 rounded-full ${style.badge} flex items-center justify-center text-white text-[9px] sm:text-[10px] font-black shadow-sm`}>
           {rank + 1}
         </div>
         <Icon className={`w-4 h-4 sm:w-5 sm:h-5 mx-auto mt-1 sm:mt-2 mb-1 sm:mb-1.5 ${style.iconColor}`} />
-        <div className={`w-9 h-9 sm:w-12 sm:h-12 mx-auto rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold mb-1.5 sm:mb-2 ${bg}`}>{initials(entry.name)}</div>
+        <div className={`w-9 h-9 sm:w-12 sm:h-12 mx-auto rounded-lg sm:rounded-xl flex items-center justify-center text-xs sm:text-sm font-bold mb-1.5 sm:mb-2 ${bg} ${isFirst ? "ring-2 ring-amber-300 ring-offset-1" : ""}`}>{initials(entry.name)}</div>
         <p className="font-bold text-gray-900 text-[11px] sm:text-xs leading-tight truncate">{entry.name}</p>
         <p className="text-[8px] sm:text-[9px] text-gray-400 mt-0.5 mb-1.5 sm:mb-2 truncate">{entry.role.replace(/_/g, " ")}</p>
         <p className="text-sm sm:text-lg font-black text-violet-600 leading-none">
@@ -349,13 +351,22 @@ function PodiumCard({ entry, rank }: { entry: RankingEntry; rank: number }) {
 }
 
 // ─── RANKING ROW ────────────────────────────────────────────────────────
+const RANK_BADGE: Record<number, string> = {
+  0: "bg-gradient-to-br from-amber-300 to-amber-500 text-white",
+  1: "bg-gradient-to-br from-gray-300 to-gray-400 text-white",
+  2: "bg-gradient-to-br from-orange-300 to-orange-500 text-white",
+};
+
 function RankingRow({ entry, idx }: { entry: RankingEntry; idx: number }) {
   const bg = avBg(entry.name);
   const disiplinPct = (entry.disiplin * 100).toFixed(1);
   const kehadiranPct = (entry.kehadiran * 100).toFixed(0);
+  const rankBadgeClass = RANK_BADGE[idx] ?? "bg-gray-50 text-gray-400";
   return (
     <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center gap-2.5 sm:gap-3.5 hover:bg-gray-50/60 transition-colors">
-      <span className={`w-5 sm:w-6 text-center text-xs font-black flex-shrink-0 ${idx < 3 ? "text-violet-600" : "text-gray-300"}`}>{idx + 1}</span>
+      <span className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 ${rankBadgeClass}`}>
+        {idx + 1}
+      </span>
       <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center text-[10px] sm:text-[11px] font-bold flex-shrink-0 ${bg}`}>{initials(entry.name)}</div>
       <div className="flex-1 min-w-0">
         <p className="font-bold text-gray-900 text-xs sm:text-sm leading-tight truncate">{entry.name}</p>
@@ -363,6 +374,9 @@ function RankingRow({ entry, idx }: { entry: RankingEntry; idx: number }) {
           {entry.role.replace(/_/g, " ")} · {entry.hadir} hadir · {entry.tepat} tepat · {entry.telat} telat
           {entry.leave > 0 ? ` · ${entry.leave} cuti` : ""}
         </p>
+        <div className="h-1 bg-gray-100 rounded-full overflow-hidden mt-1.5 max-w-[140px] sm:max-w-[180px]">
+          <div className="h-full bg-violet-500 rounded-full" style={{ width: `${Math.min(entry.disiplin * 100, 100)}%` }} />
+        </div>
       </div>
       <div className="text-right flex-shrink-0">
         <p className="text-xs sm:text-sm font-black text-violet-700">{entry.bayesianScore.toFixed(1)} <span className="text-[9px] sm:text-[10px] font-semibold text-gray-400">poin</span></p>
@@ -378,10 +392,10 @@ function RankingRow({ entry, idx }: { entry: RankingEntry; idx: number }) {
 function RankingTable({ title, ranking, loading }: { title: string; ranking: RankingEntry[]; loading: boolean }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-3.5 sm:px-5 py-3 sm:py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="px-3.5 sm:px-5 py-3 sm:py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50/60 to-transparent">
         <p className="font-bold text-gray-900 text-xs sm:text-sm">{title}</p>
         {!loading && ranking.length > 0 && (
-          <span className="text-[10px] font-bold text-gray-400">{ranking.length} orang</span>
+          <span className="text-[10px] font-bold text-violet-600 bg-violet-50 border border-violet-100 rounded-full px-2 py-0.5">{ranking.length} orang</span>
         )}
       </div>
       {loading ? (
@@ -418,7 +432,7 @@ function BarTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="bg-gray-900 text-white text-[10px] rounded-lg px-3 py-2 shadow-lg">
+    <div className="bg-gray-900 text-white text-[10px] rounded-xl px-3 py-2 shadow-lg">
       <p className="font-bold mb-0.5">{d.fullName}</p>
       <p className="text-gray-300">{d.bayesianScore.toFixed(1)} poin · {d.tepat} tepat · {d.telat} telat</p>
     </div>
@@ -427,7 +441,7 @@ function BarTooltip({ active, payload }: any) {
 function TrendTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-gray-900 text-white text-[10px] rounded-lg px-3 py-2 shadow-lg">
+    <div className="bg-gray-900 text-white text-[10px] rounded-xl px-3 py-2 shadow-lg">
       <p className="font-bold mb-0.5">{label}</p>
       <p className="text-gray-300">{payload[0].value} absen</p>
     </div>
@@ -531,17 +545,17 @@ export default function AttendanceLeaderboardPage() {
 
           {/* ── Header ── */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-            <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3.5">
               <button onClick={() => router.push("/dashboard/attendance")}
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all flex-shrink-0 active:scale-95 bg-white">
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-800 hover:border-gray-300 hover:shadow-sm transition-all flex-shrink-0 active:scale-95 bg-white">
                 <ArrowLeft className="w-4 h-4" />
               </button>
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#1a1545] to-[#0f0c29] flex items-center justify-center flex-shrink-0 shadow-sm shadow-[#1a1545]/20">
+                <Trophy className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-amber-300" />
+              </div>
               <div>
-                <div className="flex items-center gap-2 sm:gap-2.5 mb-0.5 sm:mb-1">
-                  <div className="w-1 h-5 sm:h-6 rounded-full bg-violet-600 flex-shrink-0" />
-                  <h1 className="text-lg sm:text-2xl font-black text-gray-900 tracking-tight">Leaderboard Absensi</h1>
-                </div>
-                <p className="text-[11px] sm:text-xs text-gray-400 pl-3 sm:pl-4">{headerSubtitle}</p>
+                <h1 className="text-lg sm:text-2xl font-black text-gray-900 tracking-tight leading-none">Leaderboard Absensi</h1>
+                <p className="text-[11px] sm:text-xs text-gray-400 mt-1 sm:mt-1.5">{headerSubtitle}</p>
               </div>
             </div>
 
@@ -550,7 +564,7 @@ export default function AttendanceLeaderboardPage() {
               <div className="flex gap-1 p-1 bg-white rounded-xl border border-gray-100 shadow-sm flex-shrink-0">
                 {SCOPE_OPTIONS.map(opt => (
                   <button key={opt.value} onClick={() => setScope(opt.value)}
-                    className={`h-7 sm:h-8 px-2.5 sm:px-3 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap ${scope === opt.value ? "bg-[#1a1a2e] text-white shadow-sm" : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"}`}>
+                    className={`h-7 sm:h-8 px-2.5 sm:px-3 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap ${scope === opt.value ? "bg-gradient-to-br from-[#1a1545] to-[#0f0c29] text-white shadow-sm" : "text-gray-500 hover:text-gray-800 hover:bg-gray-50"}`}>
                     {opt.label}
                   </button>
                 ))}
@@ -584,45 +598,71 @@ export default function AttendanceLeaderboardPage() {
 
           {/* ── Info banners ── */}
           {scope === "all" && (
-            <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 text-blue-700 text-[10px] sm:text-[11px] px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl">
-              Mode Semua Waktu hanya menghitung absen otomatis (wajah) — absen manual & cuti tidak disertakan.
+            <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-100 text-blue-700 text-[10px] sm:text-[11px] px-3 sm:px-3.5 py-2.5 sm:py-3 rounded-xl">
+              <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-3.5 h-3.5" />
+              </div>
+              <span>Mode Semua Waktu hanya menghitung absen otomatis (wajah) — absen manual & cuti tidak disertakan.</span>
             </div>
           )}
           {!loading && scope !== "day" && (
-            <div className="flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 text-[10px] sm:text-[11px] px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl">
-              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>Skor menggunakan <strong className="mx-0.5">Bayesian smoothing</strong>. Prior global = {data.globalOnTimeRate}% · Min sesi = {MIN_SESI} hari.</span>
+            <div className="flex items-center gap-2.5 bg-violet-50 border border-violet-100 text-violet-700 text-[10px] sm:text-[11px] px-3 sm:px-3.5 py-2.5 sm:py-3 rounded-xl">
+              <div className="w-6 h-6 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-3.5 h-3.5" />
+              </div>
+              <span>Skor menggunakan <strong className="mx-0.5 font-bold">Bayesian smoothing</strong>. Prior global = <strong className="font-bold">{data.globalOnTimeRate}%</strong> · Min sesi = <strong className="font-bold">{MIN_SESI} hari</strong>.</span>
             </div>
           )}
           {error && (
-            <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-3 rounded-xl">{error}</div>
+            <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-700 text-xs px-3.5 py-3 rounded-xl">
+              <div className="w-6 h-6 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-3.5 h-3.5" />
+              </div>
+              <span>{error}</span>
+            </div>
           )}
 
           {/* ── Summary Cards ── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
             {[
-              { label: "Tepat Waktu", value: loading ? null : `${data.summary.totalPresent}`, icon: <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />, accent: "from-emerald-50 to-emerald-100/30" },
-              { label: "Terlambat", value: loading ? null : `${data.summary.totalLate}`, icon: <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />, accent: "from-amber-50 to-amber-100/30" },
-              { label: "Karyawan Aktif", value: loading ? null : `${data.summary.activeEmployees}`, icon: <Users className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />, accent: "from-blue-50 to-blue-100/30" },
-              { label: "Rata² Ketepatan", value: loading ? null : `${data.summary.avgOnTimeRate}%`, icon: <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-violet-500" />, accent: "from-violet-50 to-violet-100/30" },
-            ].map(c => (
-              <div key={c.label} className={`bg-gradient-to-br ${c.accent} rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3`}>
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-white/80 border border-white shadow-sm flex items-center justify-center flex-shrink-0">{c.icon}</div>
-                <div className="min-w-0">
-                  <p className="text-[8px] sm:text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1 sm:mb-1.5 truncate">{c.label}</p>
-                  <p className="text-sm sm:text-base font-black leading-none text-gray-800 truncate">
-                    {c.value === null ? <span className="inline-block w-10 sm:w-14 h-4 bg-white/60 rounded-lg animate-pulse" /> : c.value}
-                  </p>
+              { label: "Tepat Waktu", value: loading ? null : `${data.summary.totalPresent}`, icon: CheckCircle2, color: "emerald" as const },
+              { label: "Terlambat", value: loading ? null : `${data.summary.totalLate}`, icon: Clock, color: "amber" as const },
+              { label: "Karyawan Aktif", value: loading ? null : `${data.summary.activeEmployees}`, icon: Users, color: "blue" as const },
+              { label: "Rata² Ketepatan", value: loading ? null : `${data.summary.avgOnTimeRate}%`, icon: TrendingUp, color: "violet" as const },
+            ].map(c => {
+              const Icon = c.icon;
+              const CARD_STYLE: Record<string, { border: string; iconBg: string; iconText: string }> = {
+                emerald: { border: "border-t-emerald-400", iconBg: "bg-emerald-50", iconText: "text-emerald-500" },
+                amber: { border: "border-t-amber-400", iconBg: "bg-amber-50", iconText: "text-amber-500" },
+                blue: { border: "border-t-blue-400", iconBg: "bg-blue-50", iconText: "text-blue-500" },
+                violet: { border: "border-t-violet-400", iconBg: "bg-violet-50", iconText: "text-violet-500" },
+              };
+              const s = CARD_STYLE[c.color];
+              return (
+                <div key={c.label} className={`bg-white rounded-xl sm:rounded-2xl border border-gray-100 border-t-2 ${s.border} shadow-sm p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3 hover:shadow-md transition-shadow`}>
+                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl ${s.iconBg} flex items-center justify-center flex-shrink-0`}>
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${s.iconText}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[8px] sm:text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1 sm:mb-1.5 truncate">{c.label}</p>
+                    <p className="text-sm sm:text-base font-black leading-none text-gray-800 truncate">
+                      {c.value === null ? <span className="inline-block w-10 sm:w-14 h-4 bg-gray-100 rounded-lg animate-pulse" /> : c.value}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* ── Podium Karyawan ── */}
           {!loading && top3.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-6">
-              <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">Top Performer{hasBothSections ? " · Karyawan" : ""}</p>
-              <div className="flex items-end gap-1.5 sm:gap-3">
+            <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 sm:p-6 overflow-hidden">
+              <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-56 h-56 rounded-full bg-gradient-to-br from-amber-200/40 via-violet-200/30 to-transparent blur-3xl pointer-events-none" />
+              <div className="relative flex items-center gap-1.5 mb-3 sm:mb-4">
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest">Top Performer{hasBothSections ? " · Karyawan" : ""}</p>
+              </div>
+              <div className="relative flex items-end gap-1.5 sm:gap-3">
                 {podiumOrder.map(({ entry, rank }) => (
                   <PodiumCard key={entry.userId} entry={entry} rank={rank} />
                 ))}
@@ -635,7 +675,12 @@ export default function AttendanceLeaderboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
               {/* Bar ranking */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
-                <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">Skor Bayesian Top 10</p>
+                <div className="flex items-center gap-1.5 mb-3 sm:mb-4">
+                  <div className="w-5 h-5 rounded-md bg-violet-50 flex items-center justify-center flex-shrink-0">
+                    <BarChart3 className="w-3 h-3 text-violet-600" />
+                  </div>
+                  <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest">Skor Bayesian Top 10</p>
+                </div>
                 <ResponsiveContainer width="100%" height={Math.max(200, barData.length * 32)}>
                   <BarChart data={barData} layout="vertical" margin={{ left: -10, right: 10, top: 4, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f1f3" />
@@ -649,7 +694,12 @@ export default function AttendanceLeaderboardPage() {
 
               {/* Status distribution */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
-                <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">Distribusi Status</p>
+                <div className="flex items-center gap-1.5 mb-3 sm:mb-4">
+                  <div className="w-5 h-5 rounded-md bg-cyan-50 flex items-center justify-center flex-shrink-0">
+                    <Percent className="w-3 h-3 text-cyan-600" />
+                  </div>
+                  <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest">Distribusi Status</p>
+                </div>
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
                     <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={70} paddingAngle={2}>
@@ -663,9 +713,14 @@ export default function AttendanceLeaderboardPage() {
 
               {/* Trend */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 lg:col-span-2">
-                <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">
-                  Tren Kehadiran {trendLabel}
-                </p>
+                <div className="flex items-center gap-1.5 mb-3 sm:mb-4">
+                  <div className="w-5 h-5 rounded-md bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                    <Activity className="w-3 h-3 text-emerald-600" />
+                  </div>
+                  <p className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                    Tren Kehadiran {trendLabel}
+                  </p>
+                </div>
                 <ResponsiveContainer width="100%" height={200}>
                   <AreaChart data={data.trend} margin={{ left: -20, right: 10, top: 4, bottom: 4 }}>
                     <defs>
@@ -702,11 +757,13 @@ export default function AttendanceLeaderboardPage() {
           {!loading && data.insufficientEntries.length > 0 && (
             <div className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden">
               <button
-                className="w-full px-3.5 sm:px-5 py-3 sm:py-4 border-b border-amber-100 flex items-center justify-between text-left"
+                className="w-full px-3.5 sm:px-5 py-3 sm:py-4 border-b border-amber-100 flex items-center justify-between text-left hover:bg-amber-50/40 transition-colors"
                 onClick={() => setShowInsufficient(v => !v)}
               >
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                <div className="flex items-center gap-2 sm:gap-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                  </div>
                   <p className="font-bold text-gray-700 text-xs sm:text-sm">Data Belum Cukup</p>
                   <span className="text-[9px] sm:text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
                     {data.insufficientEntries.length} orang
@@ -722,7 +779,7 @@ export default function AttendanceLeaderboardPage() {
                   {data.insufficientEntries.map(e => {
                     const bg = avBg(e.name);
                     return (
-                      <div key={e.userId} className="px-3.5 sm:px-5 py-2.5 sm:py-3 flex items-center gap-2.5 sm:gap-3">
+                      <div key={e.userId} className="px-3.5 sm:px-5 py-2.5 sm:py-3 flex items-center gap-2.5 sm:gap-3 hover:bg-amber-50/30 transition-colors">
                         <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center text-[9px] sm:text-[10px] font-bold flex-shrink-0 ${bg}`}>{initials(e.name)}</div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-800 text-xs truncate">{e.name}</p>
