@@ -18,10 +18,11 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
 
     const body = await req.json();
 
-    const { data: laptop, error } = await supabase
+     const { data: laptop, error } = await supabase
       .from("laptops")
       .insert({
         laptop_name: body.laptop_name,
+        category_id: body.category_id || null,
         brand: body.brand,
         cpu: body.cpu,
         ram: body.ram,
