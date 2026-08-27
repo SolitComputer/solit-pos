@@ -525,7 +525,7 @@ function UnitCard({
 
                         <div className="flex items-center justify-between gap-3">
                             <span className="text-[11px] text-gray-400 flex-shrink-0">Harga Sparepart</span>
-                            {canEditUnit && !isSold ? (
+                            {canEditUnit ? (
                                 <EditableSparepartCell unitId={unit.id} value={unit.sparepart_cost || 0} onSaved={onSparepartSaved} />
                             ) : (
                                 <span className="text-xs text-blue-600 font-medium tabular-nums">{fmt(unit.sparepart_cost || 0)}</span>
@@ -1314,7 +1314,7 @@ export default function AllUnitsPage() {
                                                                 </td>
                                                                 {/* Harga Sparepart — editable */}
                                                                 <td className="px-4 py-3.5 whitespace-nowrap">
-                                                                    {canEditUnit && !isSold ? (
+                                                                    {canEditUnit ? (
                                                                         <EditableSparepartCell
                                                                             unitId={unit.id}
                                                                             value={unit.sparepart_cost || 0}
