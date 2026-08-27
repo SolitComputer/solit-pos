@@ -44,7 +44,16 @@ export const POST = withAuth(async (req, _ctx, user) => {
 
   if (uploadErr) {
     console.error("[upload-payment-proof]", uploadErr);
-    return NextResponse.json({ success: false, message: uploadErr.message }, { status: 500 });
+    const isMissingBucket = uploadErr.message?.toLowerCase().includes("bucket not found");
+    return NextResponse.json(
+      {
+        success: false,
+        message: isMissingBucket
+          ? `Storage bucket "${BUCKET}" belum dibuat di Supabase. Hubungi admin untuk setup bucket.`
+          : uploadErr.message,
+      },
+      { status: 500 }
+    );
   }
 
   const { data: publicUrlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
