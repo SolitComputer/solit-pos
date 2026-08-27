@@ -10,6 +10,7 @@ export type LogAction = "CREATE" | "EDIT" | "DELETE" | "RESTORE" | "AUDIT" | "UN
 
 export type LogEntity =
   | "laptop"
+  | "laptop_category" // ✅ ADD: log CRUD kategori laptop (laptop_categories) di tab Kategori — Data Barang
   | "unit"
   | "transaction"
   | "warranty"
