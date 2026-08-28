@@ -894,7 +894,7 @@ export async function PATCH(request: Request) {
         total_pay: nominal,
         updated_at: new Date().toISOString(),
       };
-      if (!salaryRow) {
+      if (!salaryRow)  {
         auditUpdatePayload.rate_per_hour = finalRatePerHour;
       }
 
