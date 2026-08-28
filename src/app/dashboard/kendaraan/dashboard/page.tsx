@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Car, CarFront, Inbox, Wrench, Clock, Trophy, Loader2, CheckCircle2, History } from "lucide-react";
+import { Car, CarFront, Inbox, Wrench, Clock, Trophy, Loader2, CheckCircle2, History, Fuel } from "lucide-react";
 import { ErrorBanner, EmptyState, formatTime, formatDateTime, formatDuration, liveDurationMinutes } from "@/components/kendaraan/ui";
 import { ApproveRequestModal, RejectRequestModal, type ApprovalRequest } from "@/components/kendaraan/ApprovalModals";
 import VehicleSopGate from "@/components/kendaraan/VehicleSopGate";
@@ -27,6 +27,7 @@ type HistoryReq = {
   actual_end: string | null;
   duration_minutes: number | null;
   return_condition: "BAIK" | "LECET" | "RUSAK" | null;
+  return_fuel_level: string | null;
   vehicle?: { name: string } | null;
   borrower?: UserLite | null;
 };
@@ -249,6 +250,10 @@ export default function KendaraanDashboardPage() {
                         <p className="text-xs font-bold text-gray-900 truncate">{h.vehicle?.name ?? "—"}</p>
                         <p className="text-[10px] text-gray-500 truncate">
                           {h.borrower?.name ?? "—"} · {formatDateTime(h.actual_end)}
+                        </p>
+                        <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                          <Fuel size={11} className="text-emerald-500 shrink-0" />
+                          Sisa bensin: <span className="font-semibold text-gray-700">{h.return_fuel_level || "—"}</span>
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">

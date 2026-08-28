@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   // 1) Semua kendaraan buat metric card
   const { data: vehicles, error: vErr } = await supabaseVehicles
     .from("vehicles")
-    .select("id, name, type, status, battery_level");
+    .select("id, name, type, status, battery_level, fuel_level");
   if (vErr) return NextResponse.json({ success: false, message: vErr.message }, { status: 500 });
 
   const totalVehicles = vehicles?.length ?? 0;
