@@ -63,10 +63,11 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { id } = await props.params;
     const body = await req.json();
 
-    const {
+        const {
       serial_number,
       grade,
       condition_note,
+      source,
       purchase_price,
       selling_price,
       sparepart_cost,
@@ -94,11 +95,12 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const { data, error } = await supabase
       .from("laptop_units")
-      .insert({
+           .insert({
         laptop_id: id,
         serial_number,
         grade,
         condition_note,
+        source: source || null,
         purchase_price: purchase_price != null ? Math.round(Number(purchase_price)) : 0,
         selling_price: selling_price != null ? Math.round(Number(selling_price)) : 0,
         sparepart_cost: sparepart_cost != null ? Math.round(Number(sparepart_cost)) : 0,

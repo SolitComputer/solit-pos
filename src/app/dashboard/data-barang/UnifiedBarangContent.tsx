@@ -5,12 +5,14 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Laptop as LaptopIcon, Wrench, History as HistoryIcon } from "lucide-react";
 import BarcodeModal from "@/components/ui/BarcodeModal";
+import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
+import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { usePagePermission } from "@/hooks/usePagePermission";
 import {
     UserRole, hasAnyRole, PERMISSIONS,
     LAPTOP_DELETE_ROLES, ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES,
-    BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop,
+    BARANG_PRIVATE_VIEW_ROLES, BARANG_FULL_ACCESS_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop,
 } from "@/lib/permissions";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -288,6 +290,15 @@ export default function UnifiedBarangContent() {
     const [historyLoading, setHistoryLoading] = useState(false);
 
     const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string } | null>(null);
+    //  Tambah unit pertama untuk laptop stok 0 — dibuka dari tombol "Tambah Unit"
+    //  di kolom Aksi (mobile & desktop) ATAU dari klik baris/kartu itu sendiri
+    //  (lihat handleRowClick di bawah), saat row.unit_count === 0.
+    const [addUnitTarget, setAddUnitTarget] = useState<UnifiedRow | null>(null);
+    //  Edit SN + tambah unit untuk laptop stok 1 — dibuka dari klik baris/kartu
+    //  (lihat handleRowClick). Unit LENGKAP diambil dulu lewat fetch, karena
+    //  data di tabel gabungan ini tidak menyertakan condition_note/notes.
+    const [unitDetailTarget, setUnitDetailTarget] = useState<{ unit: UnitDetailData; row: UnifiedRow } | null>(null);
+    const [unitDetailLoading, setUnitDetailLoading] = useState(false);
 
     // Set berisi key row ("TIPE-id") yang kartunya sedang dibuka detailnya — khusus mode mobile.
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -307,6 +318,12 @@ export default function UnifiedBarangContent() {
     const canDeleteLaptop = hasAnyRole(userRoles, LAPTOP_DELETE_ROLES) || matrixCanLaptop.delete;
     const canViewUnits = hasAnyRole(userRoles, PERMISSIONS.VIEW_UNITS);
     const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
+    //  Klik baris/kartu untuk buka pop-up "Tambah Unit" (stok 0) ATAU pop-up
+    //  "Detail Unit" untuk edit SN + tambah unit (stok 1) — lihat handleRowClick.
+    const canAddUnit = hasAnyRole(userRoles, PERMISSIONS.CREATE_UNITS);
+    //  Dipakai sebagai prop canEdit UnitDetailModal — menggerbangi tombol
+    //  "+ Tambah Unit" & "Edit Data" di dalam pop-up detail unit (stok 1).
+    const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
     const canCreateAcc = hasAnyRole(userRoles, ACCESSORY_CREATE_ROLES) || matrixCanBarang.create;
     const canEditAcc = hasAnyRole(userRoles, ACCESSORY_EDIT_ROLES) || matrixCanBarang.edit;
@@ -478,6 +495,46 @@ export default function UnifiedBarangContent() {
             toast.error(e instanceof Error ? e.message : "Gagal update status pedagang");
         } finally {
             setPedagangSavingId(null);
+        }
+    };
+
+    //  Ambil detail unit LENGKAP (condition_note, notes, dst) untuk laptop
+    //  stok 1 — data di tabel gabungan ini cuma versi ringkas, jadi harus
+    //  fetch ulang lewat endpoint units, sama seperti LaptopsContent.tsx.
+    const openUnitDetail = async (row: UnifiedRow) => {
+        setUnitDetailLoading(true);
+        try {
+            const res = await fetch(`/api/laptops/${row.id}/units`);
+            const json = await res.json();
+            if (!res.ok || json.success === false) throw new Error(json.message || "Gagal memuat detail unit");
+            const units = (json.data ?? []) as UnitDetailData[];
+            const active = units.find(u => u.status !== "SOLD") ?? units[0];
+            if (!active) {
+                toast.error("Unit tidak ditemukan untuk laptop ini");
+                return;
+            }
+            setUnitDetailTarget({ unit: active, row });
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal memuat detail unit");
+        } finally {
+            setUnitDetailLoading(false);
+        }
+    };
+
+    // ── Klik baris (desktop) / tap kartu (mobile) ───────────────────────────
+    // Stok 0  → buka pop-up "Tambah Unit" (unit pertama belum ada).
+    // Stok 1  → buka pop-up "Detail Unit" untuk edit SN yang sudah ada ATAU
+    //           tambah unit baru (tombol "+ Tambah Unit" di dalam pop-up itu).
+    // Stok >1 → TIDAK diberi aksi klik — edit SN dilakukan di halaman Units
+    //           lewat tombol "Kelola Unit" yang sudah ada.
+    const handleRowClick = (row: UnifiedRow) => {
+        if (row.tipe !== "LAPTOP") return;
+        if (row.unit_count === 0 && canAddUnit) {
+            setAddUnitTarget(row);
+            return;
+        }
+        if (row.unit_count === 1 && canViewUnits) {
+            openUnitDetail(row);
         }
     };
 
@@ -665,8 +722,16 @@ export default function UnifiedBarangContent() {
                                     const expanded = expandedIds.has(rowKey);
                                     const canEditThis = row.tipe === "LAPTOP" ? canEditLaptop : canEditAcc;
                                     const canDeleteThis = row.tipe === "LAPTOP" ? canDeleteLaptop : canDeleteAcc;
+                                    const isRowClickable = row.tipe === "LAPTOP" && (
+                                        (row.unit_count === 0 && canAddUnit) ||
+                                        (row.unit_count === 1 && canViewUnits)
+                                    );
                                     return (
-                                        <div key={rowKey} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+                                        <div
+                                            key={rowKey}
+                                            onClick={() => handleRowClick(row)}
+                                            className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3 ${isRowClickable ? "cursor-pointer" : ""}`}
+                                        >
                                             {/* Header: tipe + nama + harga jual */}
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0 flex-1">
@@ -700,7 +765,7 @@ export default function UnifiedBarangContent() {
 
                                             {/* Toggle detail — CPU/RAM/Spek/Sumber/SN/dll disembunyikan di sini,
                                                 BUKAN dihapus, supaya kartu tetap ringkas di layar kecil. */}
-                                            <button type="button" onClick={() => toggleExpand(rowKey)}
+                                            <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(rowKey); }}
                                                 className="text-[11px] font-semibold text-indigo-600 flex items-center gap-1">
                                                 {expanded ? "Sembunyikan detail" : "Lihat detail lengkap"}
                                                 <svg className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
@@ -724,8 +789,10 @@ export default function UnifiedBarangContent() {
                                                 </div>
                                             )}
 
-                                            {/* Aksi — persis fungsi yang sama dengan kolom Aksi di tabel desktop */}
-                                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-100">
+                                            {/* Aksi — persis fungsi yang sama dengan kolom Aksi di tabel desktop.
+                                                stopPropagation supaya tap tombol di sini tidak ikut memicu
+                                                handleRowClick pada wrapper kartu di atas. */}
+                                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
                                                 <button onClick={() => toggleAudit(row)} disabled={!canToggleAudit(row) || auditingId === row.id}
                                                     title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
                                                     className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
@@ -744,6 +811,12 @@ export default function UnifiedBarangContent() {
                                                 {row.tipe === "LAPTOP" && row.unit_id && (
                                                     <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
                                                         className="h-7 px-2 text-[11px] font-semibold text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition">Pedagang</button>
+                                                )}
+                                                {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
+                                                    <button onClick={() => setAddUnitTarget(row)}
+                                                        className="h-7 px-2 text-[11px] font-semibold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">
+                                                        Tambah Unit
+                                                    </button>
                                                 )}
                                                 {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
                                                     <Link href={`/dashboard/laptops/${row.id}/units`}
@@ -792,8 +865,16 @@ export default function UnifiedBarangContent() {
                                                 const soActive = isSoActive(row.so_at);
                                                 const zebra = idx % 2 === 1;
                                                 const rowBg = zebra ? "bg-gray-50" : "bg-white";
+                                                const isRowClickable = row.tipe === "LAPTOP" && (
+                                                    (row.unit_count === 0 && canAddUnit) ||
+                                                    (row.unit_count === 1 && canViewUnits)
+                                                );
                                                 return (
-                                                    <tr key={`${row.tipe}-${row.id}`} className={`group border-b border-gray-50 hover:bg-indigo-50 transition-colors ${rowBg}`}>
+                                                    <tr
+                                                        key={`${row.tipe}-${row.id}`}
+                                                        onClick={() => handleRowClick(row)}
+                                                        className={`group border-b border-gray-50 hover:bg-indigo-50 transition-colors ${rowBg} ${isRowClickable ? "cursor-pointer" : ""}`}
+                                                    >
                                                         <td className="px-3 py-3 text-xs text-gray-400 tabular-nums">{idx + 1}</td>
                                                         <td className="px-3 py-3">
                                                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-indigo-50 text-indigo-700" : "bg-violet-50 text-violet-700"}`}>
@@ -832,7 +913,7 @@ export default function UnifiedBarangContent() {
                                                         <td className="px-3 py-3 text-xs text-center tabular-nums">
                                                             <span className={(row.stok ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok ?? <Dash />}</span>
                                                         </td>
-                                                        <td className="px-3 py-3 text-center">
+                                                        <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                             {row.tipe === "LAPTOP" && canManageSo && canSoLaptop(userRoles, userId, row.siap_jual ?? 0) ? (
                                                                 <button onClick={() => toggleSo(row)} disabled={soingId === row.id}
                                                                     className={`h-7 px-2 rounded-lg text-[11px] font-semibold border ${soActive ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
@@ -840,7 +921,7 @@ export default function UnifiedBarangContent() {
                                                                 </button>
                                                             ) : <Dash />}
                                                         </td>
-                                                        <td className="px-3 py-3 text-center">
+                                                        <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                             <div className="flex items-center justify-center gap-1">
                                                                 <button onClick={() => toggleAudit(row)} disabled={!canToggleAudit(row) || auditingId === row.id}
                                                                     title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
@@ -852,11 +933,17 @@ export default function UnifiedBarangContent() {
                                                                 </button>
                                                             </div>
                                                         </td>
-                                                        <td className="px-3 py-3">
+                                                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                                                             <div className="flex items-center gap-1 flex-nowrap min-w-max">
                                                                 {row.tipe === "LAPTOP" && row.unit_id && (
                                                                     <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
                                                                         className="h-7 px-2 text-[11px] font-semibold text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition">Pedagang</button>
+                                                                )}
+                                                                {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
+                                                                    <button onClick={() => setAddUnitTarget(row)}
+                                                                        className="h-7 px-2 text-[11px] font-semibold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">
+                                                                        Tambah Unit
+                                                                    </button>
                                                                 )}
                                                                 {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
                                                                     <Link href={`/dashboard/laptops/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
@@ -981,6 +1068,55 @@ export default function UnifiedBarangContent() {
 
             {barcodeTarget && (
                 <BarcodeModal laptopId={barcodeTarget.id} laptopName={barcodeTarget.name} onClose={() => setBarcodeTarget(null)} />
+            )}
+
+            {addUnitTarget && (
+                <AddUnitModal
+                    laptopId={addUnitTarget.id}
+                    laptopName={addUnitTarget.nama}
+                    defaultSellingPrice={addUnitTarget.harga_jual}
+                    onClose={() => setAddUnitTarget(null)}
+                    onCreated={(unit: CreatedUnit) => {
+                        setAddUnitTarget(null);
+                        fetchAll();
+                        toast.success(`Unit dengan SN "${unit.serial_number}" berhasil ditambahkan`);
+                    }}
+                />
+            )}
+
+            {/*  Loader singkat saat menarik detail unit lengkap (stok = 1) */}
+            {unitDetailLoading && (
+                <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
+                    <div className="w-8 h-8 border-2 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+                </div>
+            )}
+
+            {unitDetailTarget && (
+                <UnitDetailModal
+                    unit={unitDetailTarget.unit}
+                    laptopName={unitDetailTarget.row.nama}
+                    laptopMeta={[unitDetailTarget.row.brand, unitDetailTarget.row.cpu, unitDetailTarget.row.ram, unitDetailTarget.row.storage].filter(Boolean).join(" · ")}
+                    laptopSpecs={[
+                        { label: "Brand", value: unitDetailTarget.row.brand },
+                        { label: "CPU", value: unitDetailTarget.row.cpu },
+                        { label: "RAM", value: unitDetailTarget.row.ram },
+                        { label: "Storage", value: unitDetailTarget.row.storage },
+                    ]}
+                    canEdit={canFullAccessBarang}
+                    canSeePrivate={canSeePrivate}
+                    defaultSellingPrice={unitDetailTarget.row.harga_jual}
+                    onClose={() => setUnitDetailTarget(null)}
+                    onSaved={() => {
+                        setUnitDetailTarget(null);
+                        fetchAll();
+                        toast.success("Data unit berhasil diperbarui");
+                    }}
+                    onCreated={(created: UnitDetailData) => {
+                        setUnitDetailTarget(null);
+                        fetchAll();
+                        toast.success(`Unit dengan SN "${created.serial_number}" berhasil ditambahkan`);
+                    }}
+                />
             )}
         </>
     );
