@@ -11,6 +11,7 @@ import {
   OVERTIME_CATEGORIES,
   type OvertimeCategory,
 } from "@/lib/overtimeEngine";
+import { isPKLRole } from "@/lib/permissions";
 
 export interface OvertimeTableRow {
   id: string;
@@ -270,10 +271,11 @@ export function OvertimeTable({
                       {canUploadProof && <button onClick={() => setDetailModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100">Upload Bukti</button>}
                       {canAuditThis && (
                         <button disabled={isBusy} onClick={() => {
+                          const isTargetPkl = isPKLRole(o.users?.role);
                           if (o.is_holiday) {
                             const isLate = o.is_late === true || (o.is_late == null && detectLateFromTimeStr(o.requested_start ?? o.actual_start));
-                            const holidayPay = isLate ? 50000 : 100000;
-                            if (confirm(`Audit lemburan hari libur ${o.users?.name}?\n\nStatus: ${isLate ? "Terlambat" : "Tepat Waktu"} — nominal terkunci ${holidayPay === 50000 ? "Rp50.000" : "Rp100.000"} (aturan tetap).`)) {
+                            const holidayPay = isTargetPkl ? (isLate ? 25000 : 50000) : (isLate ? 50000 : 100000);
+                            if (confirm(`Audit lemburan hari libur ${o.users?.name}?\n\nStatus: ${isLate ? "Terlambat" : "Tepat Waktu"} — nominal terkunci ${formatRupiah(holidayPay)} (aturan tetap ${isTargetPkl ? "PKL" : "karyawan"}).`)) {
                               runAction(o.id, { action: "AUDIT", decision: "APPROVE", total_pay: holidayPay, rate_per_hour: null });
                             }
                             return;

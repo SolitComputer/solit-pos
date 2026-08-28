@@ -14,11 +14,44 @@ export async function GET(request: NextRequest) {
 
   const { data: vehicles, error: vErr } = await supabaseVehicles
     .from("vehicles")
-    .select("id, name, type, status, battery_level")
+    .select("id, name, type, status, battery_level, fuel_level")
     .order("type", { ascending: true })
     .order("name", { ascending: true });
 
   if (vErr) return NextResponse.json({ success: false, message: vErr.message }, { status: 500 });
+
+  // Pemakaian terakhir per kendaraan (buat "dipinjam siapa" + status pemakaian terakhir)
+  const vehicleIds = (vehicles ?? []).map((v) => v.id);
+  const lastUsageMap: Record<
+    string,
+    { borrower_name: string; status: string; fuel: string | null; condition: string | null; at: string | null }
+  > = {};
+  if (vehicleIds.length) {
+    const { data: usageRows } = await supabaseVehicles
+      .from("vehicle_borrow_requests")
+      .select("vehicle_id, user_id, status, return_fuel_level, return_condition, actual_start, actual_end, requested_at")
+      .in("vehicle_id", vehicleIds)
+      .in("status", ["APPROVED", "COMPLETED"])
+      .order("requested_at", { ascending: false });
+
+    const uids = [...new Set((usageRows ?? []).map((r) => r.user_id).filter(Boolean))];
+    const nameMap: Record<string, string> = {};
+    if (uids.length) {
+      const { data: us } = await supabaseVehicles.from("users").select("id, name").in("id", uids);
+      (us ?? []).forEach((u: any) => (nameMap[u.id] = u.name));
+    }
+    for (const r of usageRows ?? []) {
+      if (lastUsageMap[r.vehicle_id]) continue; // sudah ambil yang terbaru (order desc)
+      lastUsageMap[r.vehicle_id] = {
+        borrower_name: nameMap[r.user_id] ?? "—",
+        status: r.status,
+        fuel: r.return_fuel_level ?? null,
+        condition: r.return_condition ?? null,
+        at: r.actual_end ?? r.actual_start ?? r.requested_at ?? null,
+      };
+    }
+  }
+  const vehiclesOut = (vehicles ?? []).map((v) => ({ ...v, lastUsage: lastUsageMap[v.id] ?? null }));
 
   // Pengajuan milik user: aktif (PENDING/APPROVED) + yang baru ditolak (7 hari terakhir),
   // supaya peminjam dapat notifikasi kalau pengajuannya ditolak.
@@ -46,7 +79,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    vehicles: vehicles ?? [],
+    vehicles: vehiclesOut,
     myRequests,
     isAdmin: me.isAdmin,
   });
@@ -65,7 +98,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const name = (body?.name ?? "").trim();
   const type = body?.type;
-  const battery_level = body?.battery_level?.trim() || null;
+  const fuel_level = body?.fuel_level?.trim() || null;
 
   if (!name) return NextResponse.json({ success: false, message: "Nama kendaraan wajib diisi." }, { status: 400 });
   if (type !== "MOTOR" && type !== "MOBIL")
@@ -77,10 +110,10 @@ export async function POST(request: NextRequest) {
       name,
       type,
       status: "TERSEDIA",
-      // battery_level cuma disimpan buat motor
-      battery_level: type === "MOTOR" ? battery_level : null,
+      // fuel_level = level bensin/baterai awal (mobil & motor)
+      fuel_level,
     })
-    .select("id, name, type, status, battery_level")
+    .select("id, name, type, status, battery_level, fuel_level")
     .single();
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });

@@ -150,10 +150,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ success: false, message: "Pengajuan sudah di-checkout." }, { status: 409 });
 
     // RUSAK -> kunci MAINTENANCE sampai admin kembalikan manual. Selain itu -> TERSEDIA.
+    // fuel_level kendaraan di-update ke level bensin/baterai hasil checkout terakhir.
     const nextVehicleStatus = condition === "RUSAK" ? "MAINTENANCE" : "TERSEDIA";
     await supabaseVehicles
       .from("vehicles")
-      .update({ status: nextVehicleStatus, updated_at: nowIso })
+      .update({ status: nextVehicleStatus, fuel_level: fuel, updated_at: nowIso })
       .eq("id", req.vehicle_id);
 
     return NextResponse.json({ success: true, data, vehicleStatus: nextVehicleStatus });
