@@ -205,12 +205,16 @@ async function syncServiceEntries(
 
         const cur = existingMap.get(String(s.id));
 
-        if (!cur) {
+               if (!cur) {
             toInsert.push({ ...desired, is_audited: false });
             continue;
         }
-        if (cur.is_audited) continue;
 
+        // ⬅️ FIX: entry SERVICE tetap direkonsiliasi walau SUDAH diaudit — beda dari
+        // TRANSACTION yang sengaja dikunci pas diaudit (badge "Kini Rp..."). Kalau
+        // payment_amount diedit lewat Riwayat Servis > Edit Payment, nominal di
+        // Cashflow harus LANGSUNG berubah ke angka baru, bukan cuma ditandai stale.
+        // is_audited & audited_at/audited_by TIDAK ikut ter-reset — status audit tetap.
         const patch = diffPayload(cur, desired);
         if (Object.keys(patch).length > 0) updates.push({ id: cur.id, patch });
     }
@@ -483,7 +487,7 @@ export const GET = withAuth(async () => {
         )
     );
 
-    // Entry pembayaran (source_id = id baris transaction_payments) perlu di-lookup dulu
+       // Entry pembayaran (source_id = id baris transaction_payments) perlu di-lookup dulu
     // ke invoice_number-nya sebelum bisa cek status transaksi induk.
     const paymentInvoiceMap = new Map<string, string>();
     if (paymentSourceIds.length > 0) {
@@ -522,7 +526,7 @@ export const GET = withAuth(async () => {
         }
     }
 
-    const all = rawAll.map((e: any) => {
+       const all = rawAll.map((e: any) => {
         if (e.source_type === "TRANSACTION" && e.source_id) {
             const tx = txMap.get(e.source_id as string);
             const isVoided = !!tx && tx.status !== "PAID";
@@ -548,15 +552,15 @@ export const GET = withAuth(async () => {
             return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null, tx_payment_method: tx?.paymentMethod ?? null, invoice_number: e.source_id as string };
         }
 
-        return { ...e, is_voided: false, is_stale: false };
+                return { ...e, is_voided: false, is_stale: false };
     });
 
     const masuk = all.filter((e: any) => e.direction === "IN");
     const keluar = all.filter((e: any) => e.direction === "OUT");
 
-    // ✅ FIX: entry yang is_stale (sudah diaudit, tapi harga di transaksi sumbernya
+    // ✅ FIX: entry yang is_stale (sudah diaudit, tapi harga di transaksi/service sumbernya
     // berubah belakangan — badge "Kini Rp2.850.000" di tabel) dihitung pakai
-    // source_nominal (harga TERKINI di tabel transactions), bukan nominal yang
+    // source_nominal (harga TERKINI di tabel transactions / service_orders), bukan nominal yang
     // ter-lock saat audit. Supaya Saldo Cashflow selalu mencerminkan uang yang
     // benar-benar diterima sekarang, bukan angka lama yang sudah usang.
     const effectiveNominal = (e: any) =>
