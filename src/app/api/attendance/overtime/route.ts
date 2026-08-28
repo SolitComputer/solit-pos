@@ -885,15 +885,23 @@ export async function PATCH(request: Request) {
         }
       }
 
-      const { data, error } = await supabase.from("overtime_requests").update({
+      // ✅ FIX — rate_per_hour hanya ditulis untuk jalur PKL-manual
+      // (salaryRow kosong). Untuk karyawan biasa (salaryRow ada), kolom ini
+      // TIDAK disentuh sama sekali, persis seperti perilaku sebelum
+      // perubahan ini — supaya tidak menimpa data lama secara tidak sengaja.
+      const auditUpdatePayload: Record<string, any> = {
         audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
         base_salary_snapshot: salaryRow?.base_salary ?? null,
         effective_workdays_snapshot: effectiveWorkdays,
         per_minute_rate: perMinuteRate,
-        rate_per_hour: finalRatePerHour,
         total_pay: nominal,
         updated_at: new Date().toISOString(),
-      }).eq("id", id).select().single();
+      };
+      if (!salaryRow) {
+        auditUpdatePayload.rate_per_hour = finalRatePerHour;
+      }
+
+      const { data, error } = await supabase.from("overtime_requests").update(auditUpdatePayload).eq("id", id).select().single();
 
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 
@@ -961,7 +969,6 @@ export async function PATCH(request: Request) {
             updatePayload.actual_end = lockedEnd;
             updatePayload.completed_at = lockedEnd;
             updatePayload.duration_minutes = durationMins;
-            // ✅ FIX: proporsional per menit, bukan dibulatkan ke bawah per jam.
             updatePayload.total_pay = Math.round((durationMins / 60) * ratePerHour);
           }
         }
