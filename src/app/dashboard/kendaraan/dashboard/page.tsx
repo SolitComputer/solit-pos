@@ -251,14 +251,12 @@ export default function KendaraanDashboardPage() {
                         <p className="text-[10px] text-gray-500 truncate">
                           {h.borrower?.name ?? "—"} · {formatDateTime(h.actual_end)}
                         </p>
+                        <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                          <Fuel size={11} className="text-emerald-500 shrink-0" />
+                          Sisa bensin: <span className="font-semibold text-gray-700">{h.return_fuel_level || "—"}</span>
+                        </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {h.return_fuel_level && (
-                          <span className="hidden sm:flex text-[10px] text-gray-500 items-center gap-1">
-                            <Fuel size={11} className="text-emerald-500" />
-                            {h.return_fuel_level}
-                          </span>
-                        )}
                         {h.return_condition && <ConditionBadge condition={h.return_condition} />}
                         <span className="text-[11px] font-black tabular-nums text-gray-700">{formatDuration(h.duration_minutes)}</span>
                       </div>
