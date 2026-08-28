@@ -1,0 +1,1034 @@
+"use client";
+
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { toast } from "sonner";
+import Link from "next/link";
+import { Laptop as LaptopIcon, Wrench, History as HistoryIcon } from "lucide-react";
+import BarcodeModal from "@/components/ui/BarcodeModal";
+import { getAuthUser } from "@/hooks/useAuthUser";
+import { usePagePermission } from "@/hooks/usePagePermission";
+import {
+    UserRole, hasAnyRole, PERMISSIONS,
+    LAPTOP_DELETE_ROLES, ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES,
+    BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop,
+} from "@/lib/permissions";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════════════════
+type ItemType = "LAPTOP" | "AKSESORIS";
+
+interface LaptopUnitLite {
+    id: string; serial_number: string; status: string;
+    purchase_price?: number; sparepart_cost?: number;
+    source?: string | null; created_at?: string;
+}
+interface LaptopRaw {
+    id: string; laptop_name: string; category_id?: string | null; category_name?: string | null;
+    brand: string; cpu: string; ram: string; storage: string; gpu: string; display: string;
+    condition_note: string; selling_price: number; notes: string; created_at: string;
+    audited_at?: string | null; audited_by?: string | null;
+    so_at?: string | null; so_by?: string | null;
+    laptop_units?: LaptopUnitLite[];
+}
+interface AccessoryRaw {
+    id: string; name: string; category: string; brand: string | null; spec: string | null;
+    buy_price?: number; sell_price: number; stock: number; notes: string | null; created_at: string;
+    audited_at?: string | null; audited_by?: string | null;
+}
+
+interface UnifiedRow {
+    id: string; tipe: ItemType; nama: string;
+    kategori: string | null; kategori_id?: string | null;
+    brand: string | null; cpu: string | null; ram: string | null; storage: string | null; spek: string | null;
+    harga_modal: number | null; harga_modal_note?: string; modal_sparepart: number | null;
+    harga_jual: number; total_jual: number | null; gross_profit: number | null;
+    sumber: string | null; tanggal_masuk: string | null;
+    sn: string | null; sn_note?: string;
+    stok_tersedia: number | null; siap_jual: number | null; minus: number | null; // laptop (ST/SJ/M)
+    stok: number | null; // aksesoris
+    so_at: string | null; so_by: string | null;
+    audited_at: string | null; audited_by: string | null;
+    unit_id?: string; unit_count: number;
+    raw: LaptopRaw | AccessoryRaw;
+}
+
+interface HistoryEntry { id: string; action: string; by: string; at: string; notes?: string | null }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KONSTANTA & HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
+const Dash = () => <span className="text-gray-300">-</span>;
+
+// TTL audit BEDA antara laptop (2 hari) & aksesoris (3 hari) — ini business
+// rule yang SUDAH ADA masing-masing di komponen asli, disatukan di sini biar
+// tabel gabungan tetap konsisten dengan behavior lama, bukan diseragamkan.
+const LAPTOP_AUDIT_TTL_MS = 2 * 24 * 60 * 60 * 1000;
+const ACCESSORY_AUDIT_TTL_MS = 3 * 24 * 60 * 60 * 1000;
+function isAuditActive(row: Pick<UnifiedRow, "tipe" | "audited_at">): boolean {
+    if (!row.audited_at) return false;
+    const ttl = row.tipe === "LAPTOP" ? LAPTOP_AUDIT_TTL_MS : ACCESSORY_AUDIT_TTL_MS;
+    return Date.now() - new Date(row.audited_at).getTime() < ttl;
+}
+
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
+
+const ACCESSORY_CATEGORIES = [
+    "HDD", "SSD", "RAM", "CHARGER", "BATERAI", "KEYBOARD", "LCD", "CASING",
+    "MOTHERBOARD", "PROCESSOR", "VGA", "FAN", "THERMAL PASTE", "KABEL", "LAINNYA",
+];
+
+function normalizeLaptop(l: LaptopRaw): UnifiedRow {
+    const units = l.laptop_units ?? [];
+    const aktif = units.filter(u => u.status !== "SOLD");
+    const siapJual = aktif.filter(u => u.status === "SIAP_JUAL").length;
+    const stokMinus = aktif.filter(u => u.status === "SERVICE" || u.status === "BELUM_SIAP").length;
+    const dalamPenyiapan = aktif.filter(u => u.status === "DALAM_PENYIAPAN").length;
+    const stokTersedia = siapJual + stokMinus + dalamPenyiapan;
+    const one = aktif.length === 1 ? aktif[0] : null;
+    const modals = aktif.map(u => u.purchase_price).filter((n): n is number => n != null && n > 0);
+    const min = modals.length ? Math.min(...modals) : 0;
+    const max = modals.length ? Math.max(...modals) : 0;
+    const jt = (n: number) => (n / 1_000_000).toFixed(1).replace(".", ",");
+
+    return {
+        id: l.id, tipe: "LAPTOP", nama: l.laptop_name,
+        kategori: l.category_name ?? null, kategori_id: l.category_id ?? null,
+        brand: l.brand || null, cpu: l.cpu || null, ram: l.ram || null, storage: l.storage || null, spek: null,
+        harga_modal: one ? (one.purchase_price ?? 0) : null,
+        harga_modal_note: one ? undefined : (modals.length ? (min === max ? `Rp ${jt(min)} jt` : `Rp ${jt(min)}–${jt(max)} jt`) : undefined),
+        modal_sparepart: one ? (one.sparepart_cost ?? 0) : null,
+        harga_jual: l.selling_price || 0,
+        total_jual: (l.selling_price || 0) * stokTersedia,
+        gross_profit: null, // tabel Data Laptop asli tidak menampilkan kolom ini per-baris
+        sumber: one ? (one.source ?? null) : null,
+        tanggal_masuk: one ? (one.created_at ?? null) : null,
+        sn: one ? one.serial_number : null,
+        sn_note: one ? undefined : (aktif.length > 1 ? `${aktif.length} SN` : undefined),
+        stok_tersedia: stokTersedia, siap_jual: siapJual, minus: stokMinus, stok: null,
+        so_at: l.so_at ?? null, so_by: l.so_by ?? null,
+        audited_at: l.audited_at ?? null, audited_by: l.audited_by ?? null,
+        unit_id: one ? one.id : undefined, unit_count: aktif.length,
+        raw: l,
+    };
+}
+
+function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
+    const margin = (a.sell_price || 0) - (a.buy_price || 0);
+    return {
+        id: a.id, tipe: "AKSESORIS", nama: a.name, kategori: a.category,
+        brand: a.brand || null, cpu: null, ram: null, storage: null, spek: a.spec || null,
+        harga_modal: a.buy_price ?? null, modal_sparepart: null,
+        harga_jual: a.sell_price || 0, total_jual: null,
+        gross_profit: a.buy_price != null && a.buy_price > 0 ? margin : null,
+        sumber: null, tanggal_masuk: null, sn: null,
+        stok_tersedia: null, siap_jual: null, minus: null, stok: a.stock ?? 0,
+        so_at: null, so_by: null,
+        audited_at: a.audited_at ?? null, audited_by: a.audited_by ?? null,
+        unit_count: 0, raw: a,
+    };
+}
+
+// Form default value
+const EMPTY_LAPTOP_FORM = {
+    laptop_name: "", category_id: "", brand: "", cpu: "", ram: "", storage: "",
+    gpu: "", display: "", selling_price: "", condition_note: "", notes: "",
+};
+const EMPTY_ACC_FORM = {
+    name: "", category: "", brand: "", spec: "", buy_price: "", sell_price: "", stock: "", notes: "",
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODAL: Riwayat (Audit / SO) — generik, dipakai untuk kedua tipe
+// ═══════════════════════════════════════════════════════════════════════════
+function HistoryModal({ title, subtitle, entries, loading, onClose }: {
+    title: string; subtitle: string; entries: HistoryEntry[]; loading: boolean; onClose: () => void;
+}) {
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[80vh] flex flex-col animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-indigo-400 via-indigo-600 to-indigo-800 flex-shrink-0" />
+                <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{title}</p>
+                    <h3 className="text-sm font-bold text-gray-900 truncate">{subtitle}</h3>
+                </div>
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    {loading ? (
+                        <p className="text-sm text-gray-400 text-center py-6">Memuat...</p>
+                    ) : entries.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-6">Belum ada riwayat</p>
+                    ) : (
+                        <ul className="space-y-2">
+                            {entries.map(h => (
+                                <li key={h.id} className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
+                                    <p className="text-xs font-semibold text-gray-700">{h.action}</p>
+                                    {h.notes && <p className="text-[11px] text-gray-600 italic mt-1">"{h.notes}"</p>}
+                                    <p className="text-[11px] text-gray-400 mt-0.5">
+                                        {h.by} · {new Date(h.at).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                    </p>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Tutup</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODAL: Konfirmasi Hapus (generik)
+// ═══════════════════════════════════════════════════════════════════════════
+function DeleteConfirm({ row, onClose, onConfirm, loading }: {
+    row: UnifiedRow | null; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+    if (!row) return null;
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                <div className="h-1 w-full bg-gradient-to-r from-rose-400 via-rose-600 to-rose-800" />
+                <div className="bg-gradient-to-r from-rose-600 to-rose-700 px-6 py-5">
+                    <p className="font-bold text-white text-sm">Hapus {row.tipe === "LAPTOP" ? "Laptop" : "Aksesori"}</p>
+                    <p className="text-xs text-white/60 mt-0.5">Tindakan ini tidak dapat dibatalkan</p>
+                </div>
+                <div className="p-6">
+                    <p className="text-sm text-gray-600 text-center mb-2">Yakin hapus <span className="font-bold text-gray-800">{row.nama}</span>?</p>
+                    {row.tipe === "LAPTOP" && row.unit_count > 1 && (
+                        <p className="text-xs text-amber-600 text-center mb-4 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            Model ini punya {row.unit_count} unit terdaftar — semua unit & garansi terkait ikut terhapus.
+                        </p>
+                    )}
+                    <div className="flex gap-3 mt-4">
+                        <button onClick={onClose} disabled={loading} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
+                        <button onClick={onConfirm} disabled={loading} className="flex-1 h-11 bg-rose-600 text-white rounded-xl text-sm font-semibold hover:bg-rose-700 transition disabled:opacity-50">
+                            {loading ? "Menghapus..." : "Hapus"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CACHE (sessionStorage) — supaya buka tab "Data Barang" berikutnya langsung
+// muncul instan dari data terakhir, tanpa nunggu network. Data lalu di-refresh
+// diam-diam (silent) di belakang layar supaya tetap akurat.
+// ═══════════════════════════════════════════════════════════════════════════
+const BARANG_CACHE_KEY = "unified-barang-cache-v1";
+const BARANG_CACHE_TTL_MS = 5 * 60 * 1000; // cache dianggap basi setelah 5 menit
+
+interface BarangCachePayload {
+    rows: UnifiedRow[];
+    savedAt: number;
+}
+
+function readBarangCache(): BarangCachePayload | null {
+    if (typeof window === "undefined") return null; // guard render di server
+    try {
+        const raw = sessionStorage.getItem(BARANG_CACHE_KEY);
+        if (!raw) return null;
+        const parsed: BarangCachePayload = JSON.parse(raw);
+        if (Date.now() - parsed.savedAt > BARANG_CACHE_TTL_MS) return null; // basi, abaikan
+        return parsed;
+    } catch {
+        return null; // JSON korup / storage diblokir browser — anggap tidak ada cache
+    }
+}
+
+function writeBarangCache(rows: UnifiedRow[]) {
+    if (typeof window === "undefined") return;
+    try {
+        sessionStorage.setItem(BARANG_CACHE_KEY, JSON.stringify({ rows, savedAt: Date.now() }));
+    } catch {
+        // storage penuh/disabled — tidak fatal, cuma berarti load berikutnya tidak instan
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════════════════════════════════
+export default function UnifiedBarangContent() {
+    // Lazy initializer: cache dibaca SEKALI saat komponen pertama kali dibuat.
+    // Kalau ada cache yang masih segar, rows langsung terisi & loading langsung
+    // false — artinya tabel/kartu langsung tampil di render PERTAMA, tanpa
+    // "kedip" loading sama sekali.
+    const [rows, setRows] = useState<UnifiedRow[]>(() => readBarangCache()?.rows ?? []);
+    const [loading, setLoading] = useState(() => readBarangCache() === null);
+    const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+    const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    const [userId, setUserId] = useState<string | null>(null);
+
+    const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>("ALL");
+    const [kategoriFilter, setKategoriFilter] = useState("");
+    const [search, setSearch] = useState("");
+
+    const [formModal, setFormModal] = useState<{ mode: "create" | "edit"; tipe: ItemType; row?: UnifiedRow } | null>(null);
+    const [laptopForm, setLaptopForm] = useState(EMPTY_LAPTOP_FORM);
+    const [accForm, setAccForm] = useState(EMPTY_ACC_FORM);
+    const [saving, setSaving] = useState(false);
+
+    const [deleteRow, setDeleteRow] = useState<UnifiedRow | null>(null);
+    const [deleting, setDeleting] = useState(false);
+
+    const [auditingId, setAuditingId] = useState<string | null>(null);
+    const [soingId, setSoingId] = useState<string | null>(null);
+    const [pedagangSavingId, setPedagangSavingId] = useState<string | null>(null);
+
+    const [historyTarget, setHistoryTarget] = useState<{ row: UnifiedRow; kind: "audit" | "so" } | null>(null);
+    const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+
+    const [barcodeTarget, setBarcodeTarget] = useState<{ id: string; name: string } | null>(null);
+
+    // Set berisi key row ("TIPE-id") yang kartunya sedang dibuka detailnya — khusus mode mobile.
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+    const toggleExpand = (key: string) => setExpandedIds(prev => {
+        const next = new Set(prev);
+        next.has(key) ? next.delete(key) : next.add(key);
+        return next;
+    });
+
+    const { can: matrixCanBarang } = usePagePermission("data-barang");
+    const { can: matrixCanLaptop } = usePagePermission("laptops");
+
+    const isAdmin = userRoles.includes("ADMIN" as UserRole);
+    const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
+    const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP) || matrixCanLaptop.create;
+    const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP) || matrixCanLaptop.edit;
+    const canDeleteLaptop = hasAnyRole(userRoles, LAPTOP_DELETE_ROLES) || matrixCanLaptop.delete;
+    const canViewUnits = hasAnyRole(userRoles, PERMISSIONS.VIEW_UNITS);
+    const canViewBarcode = hasAnyRole(userRoles, PERMISSIONS.VIEW_BARCODE);
+    const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
+    const canCreateAcc = hasAnyRole(userRoles, ACCESSORY_CREATE_ROLES) || matrixCanBarang.create;
+    const canEditAcc = hasAnyRole(userRoles, ACCESSORY_EDIT_ROLES) || matrixCanBarang.edit;
+    const canDeleteAcc = hasAnyRole(userRoles, ACCESSORY_EDIT_ROLES) || matrixCanBarang.delete;
+
+    // ── Aturan toggle audit: LAPTOP butuh canSeePrivate, AKSESORIS butuh ADMIN.
+    // Ini persis aturan yang sudah ada masing-masing di komponen asli — sengaja
+    // TIDAK diseragamkan biar tidak mengubah behavior lama.
+    const canToggleAudit = (row: UnifiedRow) => row.tipe === "LAPTOP" ? canSeePrivate : isAdmin;
+
+    // opts.silent = true → refresh di belakang layar: TIDAK menyalakan spinner
+    // "Memuat data..." dan TIDAK menampilkan toast kalau gagal (karena data lama
+    // dari cache masih tampil di layar, gangguan toast hanya bikin bingung).
+    const fetchAll = useCallback(async (opts?: { silent?: boolean }) => {
+        if (!opts?.silent) setLoading(true);
+        try {
+            const [lapRes, accRes] = await Promise.all([
+                fetch("/api/laptops"),
+                fetch("/api/accessories?page=1&limit=9999"),
+            ]);
+            const lapJson = await lapRes.json();
+            const accJson = await accRes.json();
+            const laptopRows = (lapJson.success ? lapJson.data : []).map(normalizeLaptop);
+            const accessoryRows = (accJson.success ? accJson.data : []).map(normalizeAccessory);
+            const merged = [...laptopRows, ...accessoryRows];
+            setRows(merged);
+            writeBarangCache(merged);
+        } catch {
+            if (!opts?.silent) toast.error("Gagal memuat data barang");
+        } finally {
+            if (!opts?.silent) setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        // Ada cache segar? → rows sudah terisi dari lazy initializer di atas,
+        // di sini cuma refresh DIAM-DIAM di belakang layar biar tetap akurat.
+        // Tidak ada cache? → fetch normal dengan spinner "Memuat data...".
+        if (readBarangCache()) {
+            fetchAll({ silent: true });
+        } else {
+            fetchAll();
+        }
+    }, [fetchAll]);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/categories");
+                const json = await res.json();
+                if (json.success) setCategories(json.data);
+            } catch { /* dropdown kosong kalau gagal, tidak fatal */ }
+        })();
+    }, []);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const u = await getAuthUser();
+                const roles: string[] = Array.isArray((u as any)?.roles) && (u as any).roles.length > 0
+                    ? (u as any).roles : u?.role ? [u.role] : [];
+                setUserRoles(roles as UserRole[]);
+                setUserId((u as any)?.id ?? null);
+            } catch { setUserRoles([]); }
+        })();
+    }, []);
+
+    // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe)
+    useEffect(() => { setKategoriFilter(""); }, [tipeFilter]);
+
+    const filteredRows = useMemo(() => {
+        let list = rows;
+        if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
+        if (kategoriFilter) {
+            list = list.filter(r => tipeFilter === "LAPTOP" ? r.kategori_id === kategoriFilter : r.kategori === kategoriFilter);
+        }
+        if (search.trim()) {
+            const t = search.toLowerCase();
+            list = list.filter(r => {
+                const matchString = (
+                    r.nama?.toLowerCase().includes(t) ||
+                    r.brand?.toLowerCase().includes(t) ||
+                    r.cpu?.toLowerCase().includes(t) ||
+                    r.ram?.toLowerCase().includes(t) ||
+                    r.storage?.toLowerCase().includes(t) ||
+                    r.spek?.toLowerCase().includes(t) ||
+                    r.sn?.toLowerCase().includes(t)
+                );
+
+                if (matchString) return true;
+
+                // Also check inside laptop_units array if there are multiple units
+                if (r.tipe === "LAPTOP" && r.raw && "laptop_units" in r.raw) {
+                    const units = (r.raw as LaptopRaw).laptop_units;
+                    if (units && units.some(u => u.serial_number?.toLowerCase().includes(t))) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+        }
+        return list;
+    }, [rows, tipeFilter, kategoriFilter, search]);
+
+    const counts = useMemo(() => ({
+        total: rows.length,
+        laptop: rows.filter(r => r.tipe === "LAPTOP").length,
+        aksesoris: rows.filter(r => r.tipe === "AKSESORIS").length,
+    }), [rows]);
+
+    // ── Audit toggle ───────────────────────────────────────────────────────
+    const toggleAudit = async (row: UnifiedRow) => {
+        if (!canToggleAudit(row)) return;
+        setAuditingId(row.id);
+        try {
+            const url = row.tipe === "LAPTOP" ? `/api/laptops/${row.id}/audit` : `/api/accessories/${row.id}/audit`;
+            const res = await fetch(url, { method: "PATCH" });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal update audit");
+            setRows(prev => {
+                const next = prev.map(r => r.id === row.id ? { ...r, audited_at: json.data.audited_at, audited_by: json.data.audited_by } : r);
+                writeBarangCache(next); // cache ikut update, biar load berikutnya tidak "kedip balik" ke status lama
+                return next;
+            });
+            toast.success("Status audit diperbarui");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal update audit");
+        } finally {
+            setAuditingId(null);
+        }
+    };
+
+    // ── SO toggle (laptop only) ─────────────────────────────────────────────
+    const toggleSo = async (row: UnifiedRow) => {
+        const note = window.prompt("Catatan SO (opsional):", "") ?? "";
+        setSoingId(row.id);
+        try {
+            const res = await fetch(`/api/laptops/${row.id}/so`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal update SO");
+            setRows(prev => {
+                const next = prev.map(r => r.id === row.id ? { ...r, so_at: json.data.so_at, so_by: json.data.so_by } : r);
+                writeBarangCache(next);
+                return next;
+            });
+            toast.success("Status SO diperbarui");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal update SO");
+        } finally {
+            setSoingId(null);
+        }
+    };
+
+    // ── Pedagang toggle (laptop, stok = 1 saja) ────────────────────────────
+    const togglePedagang = async (row: UnifiedRow, current: boolean) => {
+        if (!row.unit_id) return;
+        setPedagangSavingId(row.unit_id);
+        try {
+            const res = await fetch(`/api/units/${row.unit_id}/pedagang`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_pedagang_listed: !current }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal update status pedagang");
+            toast.success("Status pedagang diperbarui");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal update status pedagang");
+        } finally {
+            setPedagangSavingId(null);
+        }
+    };
+
+    // ── Riwayat ──────────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!historyTarget) return;
+        setHistoryLoading(true);
+        (async () => {
+            try {
+                const { row, kind } = historyTarget;
+                const url = kind === "so" ? `/api/laptops/${row.id}/so` : row.tipe === "LAPTOP" ? `/api/laptops/${row.id}/audit` : `/api/accessories/${row.id}/audit`;
+                const res = await fetch(url);
+                const json = await res.json();
+                const raw = json.data?.history ?? [];
+                const mapped: HistoryEntry[] = raw.map((h: any) => ({
+                    id: h.id,
+                    action: kind === "so" ? (h.action === "SO" ? "Ditandai sudah SO" : "SO dibatalkan") : (h.action === "AUDIT" ? "Ditandai sudah diaudit" : "Audit dibatalkan"),
+                    by: kind === "so" ? h.so_by : h.audited_by,
+                    at: kind === "so" ? h.so_at : h.audited_at,
+                    notes: h.notes ?? null,
+                }));
+                setHistoryEntries(mapped);
+            } catch {
+                setHistoryEntries([]);
+            } finally {
+                setHistoryLoading(false);
+            }
+        })();
+    }, [historyTarget]);
+
+    // ── Create / Edit form ───────────────────────────────────────────────────
+    const openCreate = (tipe: ItemType) => {
+        setLaptopForm(EMPTY_LAPTOP_FORM);
+        setAccForm(EMPTY_ACC_FORM);
+        setFormModal({ mode: "create", tipe });
+    };
+    const openEdit = (row: UnifiedRow) => {
+        if (row.tipe === "LAPTOP") {
+            const l = row.raw as LaptopRaw;
+            setLaptopForm({
+                laptop_name: l.laptop_name || "", category_id: l.category_id || "", brand: l.brand || "",
+                cpu: l.cpu || "", ram: l.ram || "", storage: l.storage || "", gpu: l.gpu || "", display: l.display || "",
+                selling_price: String(l.selling_price || ""), condition_note: l.condition_note || "", notes: l.notes || "",
+            });
+        } else {
+            const a = row.raw as AccessoryRaw;
+            setAccForm({
+                name: a.name || "", category: a.category || "", brand: a.brand || "", spec: a.spec || "",
+                buy_price: String(a.buy_price ?? ""), sell_price: String(a.sell_price ?? ""), stock: String(a.stock ?? ""), notes: a.notes || "",
+            });
+        }
+        setFormModal({ mode: "edit", tipe: row.tipe, row });
+    };
+    const closeForm = () => setFormModal(null);
+
+    const submitForm = async () => {
+        if (!formModal) return;
+        setSaving(true);
+        try {
+            if (formModal.tipe === "LAPTOP") {
+                if (!laptopForm.laptop_name.trim()) { toast.error("Nama laptop wajib diisi"); return; }
+                const body = { ...laptopForm, selling_price: Number(laptopForm.selling_price) || 0 };
+                const url = formModal.mode === "edit" ? `/api/laptops/${formModal.row!.id}` : "/api/laptops/create";
+                const res = await fetch(url, {
+                    method: formModal.mode === "edit" ? "PUT" : "POST",
+                    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+                });
+                const json = await res.json();
+                if (!json.success) throw new Error(json.message || "Gagal menyimpan laptop");
+            } else {
+                if (!accForm.name.trim()) { toast.error("Nama aksesori wajib diisi"); return; }
+                if (!accForm.category) { toast.error("Kategori wajib dipilih"); return; }
+                const body = {
+                    ...accForm,
+                    buy_price: Number(accForm.buy_price) || 0,
+                    sell_price: Number(accForm.sell_price) || 0,
+                    stock: Number(accForm.stock) || 0,
+                };
+                const url = formModal.mode === "edit" ? `/api/accessories/${formModal.row!.id}` : "/api/accessories";
+                const res = await fetch(url, {
+                    method: formModal.mode === "edit" ? "PATCH" : "POST",
+                    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+                });
+                const json = await res.json();
+                if (!json.success) throw new Error(json.error || "Gagal menyimpan aksesori");
+            }
+            toast.success(formModal.mode === "edit" ? "Berhasil diperbarui" : "Berhasil ditambahkan");
+            closeForm();
+            fetchAll();
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Terjadi kesalahan");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // ── Delete ────────────────────────────────────────────────────────────
+    const confirmDelete = async () => {
+        if (!deleteRow) return;
+        setDeleting(true);
+        try {
+            const url = deleteRow.tipe === "LAPTOP" ? `/api/laptops/${deleteRow.id}` : `/api/accessories/${deleteRow.id}`;
+            const res = await fetch(url, { method: "DELETE" });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || json.error || "Gagal menghapus");
+            toast.success("Berhasil dihapus");
+            setDeleteRow(null);
+            fetchAll();
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal menghapus");
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const hasFilter = tipeFilter !== "ALL" || !!kategoriFilter || !!search;
+    const resetFilter = () => { setTipeFilter("ALL"); setKategoriFilter(""); setSearch(""); };
+
+    return (
+        <>
+            <style>{`
+                @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+                @keyframes popIn  { from{opacity:0;transform:scale(0.94) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
+                .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+                .animate-popIn  { animation: popIn 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+                               .table-scroll { scrollbar-width: thin; scrollbar-color: #d1d5db #f9fafb; }
+                .table-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+                .table-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
+                .table-scroll::-webkit-scrollbar-track { background: #f9fafb; border-radius: 99px; }
+            `}</style>
+
+            <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
+                <div className="max-w-full mx-auto space-y-5">
+
+                    {/* ── FILTER TIPE BARANG ─────────────────────────────── */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-center gap-2">
+                        {([["ALL", `Semua (${counts.total})`], ["LAPTOP", `Laptop (${counts.laptop})`], ["AKSESORIS", `Aksesoris (${counts.aksesoris})`]] as const).map(([key, label]) => (
+                            <button key={key} onClick={() => setTipeFilter(key)}
+                                className={`h-9 px-4 rounded-xl text-sm font-semibold transition-all ${tipeFilter === key ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                                {label}
+                            </button>
+                        ))}
+                        <div className="flex-1" />
+                        {canCreateLaptop && <button onClick={() => openCreate("LAPTOP")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 transition">+ Laptop</button>}
+                        {canCreateAcc && <button onClick={() => openCreate("AKSESORIS")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 transition">+ Aksesori</button>}
+                    </div>
+
+                    {/* ── FILTER LANJUTAN ─────────────────────────────────── */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            <input className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 col-span-2"
+                                placeholder="Cari nama, brand, spek, SN..." value={search} onChange={e => setSearch(e.target.value)} />
+                            {tipeFilter === "LAPTOP" && (
+                                <select className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
+                                    <option value="">Semua Kategori</option>
+                                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            )}
+                            {tipeFilter === "AKSESORIS" && (
+                                <select className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
+                                    <option value="">Semua Kategori</option>
+                                    {ACCESSORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            )}
+                            <button onClick={resetFilter} disabled={!hasFilter} className="h-9 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 disabled:opacity-40 transition">Reset</button>
+                        </div>
+                    </div>
+
+                    {/* ── TABEL / DAFTAR BARANG ────────────────────────────── */}
+                    {loading ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center text-sm text-gray-400">Memuat data...</div>
+                    ) : filteredRows.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center">
+                            <p className="text-gray-700 font-bold text-base">Tidak ada barang ditemukan</p>
+                            <p className="text-gray-400 text-sm mt-1">Coba ubah filter atau tambah barang baru</p>
+                        </div>
+                    ) : (
+                        <>
+                            {/* ══ MODE HP/TABLET (< lg) — kartu per barang ══════════ */}
+                            <div className="lg:hidden space-y-3">
+                                {filteredRows.map((row) => {
+                                    const rowKey = `${row.tipe}-${row.id}`;
+                                    const auditActive = isAuditActive(row);
+                                    const soActive = isSoActive(row.so_at);
+                                    const expanded = expandedIds.has(rowKey);
+                                    const canEditThis = row.tipe === "LAPTOP" ? canEditLaptop : canEditAcc;
+                                    const canDeleteThis = row.tipe === "LAPTOP" ? canDeleteLaptop : canDeleteAcc;
+                                    return (
+                                        <div key={rowKey} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+                                            {/* Header: tipe + nama + harga jual */}
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-indigo-50 text-indigo-700" : "bg-violet-50 text-violet-700"}`}>
+                                                        {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
+                                                        {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
+                                                    </span>
+                                                    <h3 className="font-bold text-gray-900 text-[13.5px] leading-snug mt-1.5 truncate" title={row.nama}>{row.nama}</h3>
+                                                    <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                                                        {row.kategori || "Tanpa kategori"}{row.brand ? ` · ${row.brand}` : ""}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right flex-shrink-0">
+                                                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">Harga Jual</p>
+                                                    <p className="text-sm font-black text-gray-900 tabular-nums">{fmt(row.harga_jual)}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Chip status stok — beda field antara laptop (ST/SJ/M) dan aksesoris (Stok) */}
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {row.tipe === "LAPTOP" ? (
+                                                    <>
+                                                        <StatChip label="ST" value={row.stok_tersedia} tone={(row.stok_tersedia ?? 0) === 0 ? "red" : "gray"} />
+                                                        <StatChip label="SJ" value={row.siap_jual} tone="green" />
+                                                        <StatChip label="M" value={row.minus} tone={(row.minus ?? 0) > 0 ? "red" : "gray"} />
+                                                    </>
+                                                ) : (
+                                                    <StatChip label="Stok" value={row.stok} tone={(row.stok ?? 0) === 0 ? "red" : "emerald"} />
+                                                )}
+                                            </div>
+
+                                            {/* Toggle detail — CPU/RAM/Spek/Sumber/SN/dll disembunyikan di sini,
+                                                BUKAN dihapus, supaya kartu tetap ringkas di layar kecil. */}
+                                            <button type="button" onClick={() => toggleExpand(rowKey)}
+                                                className="text-[11px] font-semibold text-indigo-600 flex items-center gap-1">
+                                                {expanded ? "Sembunyikan detail" : "Lihat detail lengkap"}
+                                                <svg className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+
+                                            {expanded && (
+                                                <div className="grid grid-cols-2 gap-2 pt-1">
+                                                    <DetailItem label="CPU" value={row.cpu} />
+                                                    <DetailItem label="RAM" value={row.ram} />
+                                                    <DetailItem label="Storage" value={row.storage} />
+                                                    <DetailItem label="Spek" value={row.spek} />
+                                                    <DetailItem label="Harga Modal" value={row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note} />
+                                                    <DetailItem label="Modal Sparepart" value={row.modal_sparepart != null ? fmt(row.modal_sparepart) : null} />
+                                                    <DetailItem label="Total Jual" value={row.total_jual != null ? fmt(row.total_jual) : null} />
+                                                    <DetailItem label="Gross Profit" value={row.gross_profit != null ? `${row.gross_profit >= 0 ? "+" : ""}${fmt(row.gross_profit)}` : null} />
+                                                    <DetailItem label="Sumber" value={row.sumber} />
+                                                    <DetailItem label="Tgl Masuk" value={row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : null} />
+                                                    <DetailItem label="SN" value={row.sn || row.sn_note} />
+                                                </div>
+                                            )}
+
+                                            {/* Aksi — persis fungsi yang sama dengan kolom Aksi di tabel desktop */}
+                                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-100">
+                                                <button onClick={() => toggleAudit(row)} disabled={!canToggleAudit(row) || auditingId === row.id}
+                                                    title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
+                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                                                    {auditActive ? "Teraudit" : "Audit"}
+                                                </button>
+                                                <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit"
+                                                    className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
+                                                    <HistoryIcon size={13} />
+                                                </button>
+                                                {row.tipe === "LAPTOP" && canManageSo && canSoLaptop(userRoles, userId, row.siap_jual ?? 0) && (
+                                                    <button onClick={() => toggleSo(row)} disabled={soingId === row.id}
+                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border ${soActive ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                                                        {soActive ? "SO" : "Tandai SO"}
+                                                    </button>
+                                                )}
+                                                {row.tipe === "LAPTOP" && row.unit_id && (
+                                                    <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
+                                                        className="h-7 px-2 text-[11px] font-semibold text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition">Pedagang</button>
+                                                )}
+                                                {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
+                                                    <Link href={`/dashboard/laptops/${row.id}/units`}
+                                                        className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
+                                                        Kelola Unit ({row.unit_count})
+                                                    </Link>
+                                                )}
+                                                {row.tipe === "LAPTOP" && canViewBarcode && (
+                                                    <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama })}
+                                                        className="h-7 px-2 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Barcode</button>
+                                                )}
+                                                {canEditThis && (
+                                                    <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>
+                                                )}
+                                                {canDeleteThis && (
+                                                    <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                <p className="text-center text-xs text-gray-400 pt-1">
+                                    <span className="text-gray-700 font-bold">{filteredRows.length}</span> barang ditampilkan
+                                </p>
+                            </div>
+
+                            {/* ══ MODE LAPTOP (≥ lg) — tabel penuh, sticky header + kolom nama ══ */}
+                            <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                <div className="overflow-auto table-scroll max-h-[70vh]">
+                                    <table className="w-full text-sm border-collapse">
+                                        <thead>
+                                            <tr className="whitespace-nowrap">
+                                                {["No", "Tipe", "Nama Barang", "Kategori", "Merk", "CPU", "RAM", "Storage", "Spek",
+                                                    "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
+                                                    "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "M", "Stok", "SO", "Audit", "Aksi"].map((h, hi) => (
+                                                        <th key={h}
+                                                            className={`px-3 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left bg-gray-50 border-b-2 border-gray-100 sticky top-0 ${hi === 2 ? "left-0 z-20 min-w-[180px]" : "z-10"}`}>
+                                                            {h}
+                                                        </th>
+                                                    ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredRows.map((row, idx) => {
+                                                const auditActive = isAuditActive(row);
+                                                const soActive = isSoActive(row.so_at);
+                                                const zebra = idx % 2 === 1;
+                                                const rowBg = zebra ? "bg-gray-50" : "bg-white";
+                                                return (
+                                                    <tr key={`${row.tipe}-${row.id}`} className={`group border-b border-gray-50 hover:bg-indigo-50 transition-colors ${rowBg}`}>
+                                                        <td className="px-3 py-3 text-xs text-gray-400 tabular-nums">{idx + 1}</td>
+                                                        <td className="px-3 py-3">
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-indigo-50 text-indigo-700" : "bg-violet-50 text-violet-700"}`}>
+                                                                {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
+                                                                {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
+                                                            </span>
+                                                        </td>
+                                                        <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-gray-800 max-w-[200px] truncate border-r border-gray-100 group-hover:bg-indigo-50 ${rowBg}`} title={row.nama}>{row.nama}</td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.kategori || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.brand || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.cpu || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.ram || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.storage || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500 max-w-[140px] truncate">{row.spek || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">
+                                                            {row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note ? <span className="text-gray-400">{row.harga_modal_note}</span> : <Dash />}
+                                                        </td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{row.modal_sparepart != null ? fmt(row.modal_sparepart) : <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs font-bold text-gray-800 whitespace-nowrap">{fmt(row.harga_jual)}</td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{row.total_jual != null ? fmt(row.total_jual) : <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs whitespace-nowrap">
+                                                            {row.gross_profit != null ? <span className={row.gross_profit >= 0 ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}>{row.gross_profit >= 0 ? "+" : ""}{fmt(row.gross_profit)}</span> : <Dash />}
+                                                        </td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.sumber || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.sn || (row.sn_note ? <span className="text-gray-400">{row.sn_note}</span> : <Dash />)}</td>
+                                                        <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                            <span className={(row.stok_tersedia ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok_tersedia ?? <Dash />}</span>
+                                                        </td>
+                                                        <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                            <span className={(row.siap_jual ?? 0) > 0 ? "text-emerald-600 font-bold" : ""}>{row.siap_jual ?? <Dash />}</span>
+                                                        </td>
+                                                        <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                            <span className={(row.minus ?? 0) > 0 ? "text-red-500 font-bold" : ""}>{row.minus ?? <Dash />}</span>
+                                                        </td>
+                                                        <td className="px-3 py-3 text-xs text-center tabular-nums">
+                                                            <span className={(row.stok ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok ?? <Dash />}</span>
+                                                        </td>
+                                                        <td className="px-3 py-3 text-center">
+                                                            {row.tipe === "LAPTOP" && canManageSo && canSoLaptop(userRoles, userId, row.siap_jual ?? 0) ? (
+                                                                <button onClick={() => toggleSo(row)} disabled={soingId === row.id}
+                                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border ${soActive ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                                                                    {soActive ? "SO" : "-"}
+                                                                </button>
+                                                            ) : <Dash />}
+                                                        </td>
+                                                        <td className="px-3 py-3 text-center">
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                <button onClick={() => toggleAudit(row)} disabled={!canToggleAudit(row) || auditingId === row.id}
+                                                                    title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
+                                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                                                                    {auditActive ? "Teraudit" : "Audit"}
+                                                                </button>
+                                                                <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit" className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
+                                                                    <HistoryIcon size={13} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-3">
+                                                            <div className="flex items-center gap-1 flex-nowrap min-w-max">
+                                                                {row.tipe === "LAPTOP" && row.unit_id && (
+                                                                    <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
+                                                                        className="h-7 px-2 text-[11px] font-semibold text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition">Pedagang</button>
+                                                                )}
+                                                                {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
+                                                                    <Link href={`/dashboard/laptops/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
+                                                                        Kelola Unit ({row.unit_count})
+                                                                    </Link>
+                                                                )}
+                                                                {row.tipe === "LAPTOP" && canViewBarcode && (
+                                                                    <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama })} className="h-7 px-2 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Barcode</button>
+                                                                )}
+                                                                {((row.tipe === "LAPTOP" && canEditLaptop) || (row.tipe === "AKSESORIS" && canEditAcc)) && (
+                                                                    <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>
+                                                                )}
+                                                                {((row.tipe === "LAPTOP" && canDeleteLaptop) || (row.tipe === "AKSESORIS" && canDeleteAcc)) && (
+                                                                    <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/60 text-xs text-gray-400">
+                                    <span className="text-gray-700 font-bold">{filteredRows.length}</span> barang ditampilkan
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </main>
+
+            {/* ── MODAL CREATE / EDIT ─────────────────────────────────── */}
+            {formModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={closeForm} />
+                    <div className="relative bg-white w-full max-w-lg shadow-2xl rounded-2xl overflow-hidden animate-popIn max-h-[90vh] flex flex-col">
+                        <div className="h-0.5 w-full bg-gradient-to-r from-indigo-300 via-indigo-600 to-indigo-900" />
+                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                            <h2 className="font-bold text-gray-900 text-[15px]">
+                                {formModal.mode === "edit" ? "Edit" : "Tambah"} {formModal.tipe === "LAPTOP" ? "Laptop" : "Aksesori"}
+                            </h2>
+                            <button onClick={closeForm} className="text-gray-400 hover:text-gray-700">✕</button>
+                        </div>
+
+                        {formModal.mode === "create" && (
+                            <div className="px-6 pt-4 flex gap-2">
+                                <button onClick={() => setFormModal({ mode: "create", tipe: "LAPTOP" })}
+                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "LAPTOP" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-500"}`}>Laptop</button>
+                                <button onClick={() => setFormModal({ mode: "create", tipe: "AKSESORIS" })}
+                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "AKSESORIS" ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-500"}`}>Aksesoris</button>
+                            </div>
+                        )}
+
+                        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-3">
+                            {formModal.tipe === "LAPTOP" ? (
+                                <>
+                                    <Field label="Nama Laptop" required>
+                                        <input className={inputCls} value={laptopForm.laptop_name} onChange={e => setLaptopForm(p => ({ ...p, laptop_name: e.target.value }))} />
+                                    </Field>
+                                    <Field label="Kategori">
+                                        <select className={inputCls} value={laptopForm.category_id} onChange={e => setLaptopForm(p => ({ ...p, category_id: e.target.value }))}>
+                                            <option value="">Tanpa Kategori</option>
+                                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
+                                    </Field>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Field label="Brand"><input className={inputCls} value={laptopForm.brand} onChange={e => setLaptopForm(p => ({ ...p, brand: e.target.value }))} /></Field>
+                                        <Field label="CPU"><input className={inputCls} value={laptopForm.cpu} onChange={e => setLaptopForm(p => ({ ...p, cpu: e.target.value }))} /></Field>
+                                        <Field label="RAM"><input className={inputCls} value={laptopForm.ram} onChange={e => setLaptopForm(p => ({ ...p, ram: e.target.value }))} /></Field>
+                                        <Field label="Storage"><input className={inputCls} value={laptopForm.storage} onChange={e => setLaptopForm(p => ({ ...p, storage: e.target.value }))} /></Field>
+                                        <Field label="GPU"><input className={inputCls} value={laptopForm.gpu} onChange={e => setLaptopForm(p => ({ ...p, gpu: e.target.value }))} /></Field>
+                                        <Field label="Display"><input className={inputCls} value={laptopForm.display} onChange={e => setLaptopForm(p => ({ ...p, display: e.target.value }))} /></Field>
+                                    </div>
+                                    <Field label="Harga Store" required><input type="number" className={inputCls} value={laptopForm.selling_price} onChange={e => setLaptopForm(p => ({ ...p, selling_price: e.target.value }))} /></Field>
+                                    <Field label="Kondisi Umum"><input className={inputCls} value={laptopForm.condition_note} onChange={e => setLaptopForm(p => ({ ...p, condition_note: e.target.value }))} /></Field>
+                                    <Field label="Catatan"><textarea rows={2} className={inputCls} value={laptopForm.notes} onChange={e => setLaptopForm(p => ({ ...p, notes: e.target.value }))} /></Field>
+                                </>
+                            ) : (
+                                <>
+                                    <Field label="Nama Aksesori" required><input className={inputCls} value={accForm.name} onChange={e => setAccForm(p => ({ ...p, name: e.target.value }))} /></Field>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Field label="Kategori" required>
+                                            <select className={inputCls} value={accForm.category} onChange={e => setAccForm(p => ({ ...p, category: e.target.value }))}>
+                                                <option value="">-- Pilih --</option>
+                                                {ACCESSORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </Field>
+                                        <Field label="Merk"><input className={inputCls} value={accForm.brand} onChange={e => setAccForm(p => ({ ...p, brand: e.target.value }))} /></Field>
+                                    </div>
+                                    <Field label="Spesifikasi"><input className={inputCls} value={accForm.spec} onChange={e => setAccForm(p => ({ ...p, spec: e.target.value }))} /></Field>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Field label="Harga Modal"><input type="number" className={inputCls} value={accForm.buy_price} onChange={e => setAccForm(p => ({ ...p, buy_price: e.target.value }))} /></Field>
+                                        <Field label="Harga Jual" required><input type="number" className={inputCls} value={accForm.sell_price} onChange={e => setAccForm(p => ({ ...p, sell_price: e.target.value }))} /></Field>
+                                    </div>
+                                    <Field label="Stok" required><input type="number" className={inputCls} value={accForm.stock} onChange={e => setAccForm(p => ({ ...p, stock: e.target.value }))} /></Field>
+                                    <Field label="Keterangan"><textarea rows={2} className={inputCls} value={accForm.notes} onChange={e => setAccForm(p => ({ ...p, notes: e.target.value }))} /></Field>
+                                </>
+                            )}
+                        </div>
+                        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+                            <button onClick={closeForm} disabled={saving} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Batal</button>
+                            <button onClick={submitForm} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-sm font-semibold hover:from-indigo-700 hover:to-indigo-800 transition disabled:opacity-50">
+                                {saving ? "Menyimpan..." : "Simpan"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <DeleteConfirm row={deleteRow} onClose={() => setDeleteRow(null)} onConfirm={confirmDelete} loading={deleting} />
+
+            {historyTarget && (
+                <HistoryModal
+                    title={historyTarget.kind === "so" ? "Riwayat SO" : "Riwayat Audit"}
+                    subtitle={historyTarget.row.nama}
+                    entries={historyEntries}
+                    loading={historyLoading}
+                    onClose={() => setHistoryTarget(null)}
+                />
+            )}
+
+            {barcodeTarget && (
+                <BarcodeModal laptopId={barcodeTarget.id} laptopName={barcodeTarget.name} onClose={() => setBarcodeTarget(null)} />
+            )}
+        </>
+    );
+}
+
+const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400";
+
+function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
+    return (
+        <div>
+            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">
+                {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+            </label>
+            {children}
+        </div>
+    );
+}
+
+// ── Dipakai di kartu mobile ──────────────────────────────────────────────
+// StatChip: null (bukan 0) berarti field ini memang tidak berlaku untuk tipe
+// barang ini (mis. "Stok" untuk laptop, atau "ST/SJ/M" untuk aksesoris) →
+// chip tidak dirender sama sekali, bukan ditampilkan sebagai "0".
+function StatChip({ label, value, tone = "gray" }: { label: string; value: number | null; tone?: "gray" | "green" | "red" | "emerald" }) {
+    if (value == null) return null;
+    const toneCls: Record<string, string> = {
+        gray: "bg-gray-50 text-gray-500 border-gray-200",
+        green: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        red: "bg-red-50 text-red-600 border-red-200",
+        emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    };
+    return (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border tabular-nums ${toneCls[tone]}`}>
+            {label} <span className="font-black">{value}</span>
+        </span>
+    );
+}
+
+// DetailItem: dipakai di panel "Lihat detail lengkap" pada kartu mobile.
+// Cek eksplisit undefined/null/"" (bukan pakai `||`) supaya nilai 0 yang
+// valid (mis. Gross Profit = 0) tetap tampil, bukan ikut dianggap kosong.
+function DetailItem({ label, value }: { label: string; value?: string | number | null }) {
+    const hasValue = value !== undefined && value !== null && value !== "";
+    return (
+        <div className="bg-gray-50 rounded-lg px-2.5 py-1.5 border border-gray-100">
+            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
+            <p className="text-[11px] font-semibold text-gray-700 truncate">
+                {hasValue ? value : <span className="text-gray-300 font-normal">-</span>}
+            </p>
+        </div>
+    );
+}

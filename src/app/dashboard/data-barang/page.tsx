@@ -3,15 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasAnyRole, ITEM_OUTFLOW_ROLES, DATA_BARANG_LAPTOP_ROLES } from "@/lib/permissions";
-import { LaptopsContent } from "../laptops/LaptopsContent";
-import AccessoriesContent from "../accessories/AccessoriesContent";
+import UnifiedBarangContent from "./UnifiedBarangContent";
 import OutflowsContent from "./OutflowsContent";
 import CategoriesContent from "./CategoriesContent";
 import PriceListPedagangTab from "@/components/inventory/price-list-pedagang/page";
 import { PRICELIST_PEDAGANG_ROLES } from "@/lib/pricelistPedagang";
 
 
-type TabKey = "laptops" | "accessories" | "outflows" | "pedagang" | "kategori";
+type TabKey = "barang" | "outflows" | "pedagang" | "kategori";
 
 interface TabDef {
   key: TabKey;
@@ -22,16 +21,10 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   {
-    key: "laptops",
-    label: "Data Laptop",
+    key: "barang",
+    label: "Data Barang",
     roles: DATA_BARANG_LAPTOP_ROLES,
     icon: "ti-device-laptop",
-  },
-  {
-    key: "accessories",
-    label: "Aksesoris",
-    roles: DATA_BARANG_LAPTOP_ROLES,
-    icon: "ti-devices",
   },
   {
     key: "outflows",
@@ -103,7 +96,7 @@ function getTabIcon(icon: string, className: string) {
 export default function DataBarangPage() {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [rolesLoaded, setRolesLoaded] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>("laptops");
+  const [activeTab, setActiveTab] = useState<TabKey>("barang");
   const topRef = useRef<HTMLDivElement>(null);
   // ── Load roles
   useEffect(() => {
@@ -251,8 +244,7 @@ export default function DataBarangPage() {
           </div>
         ) : (
           <>
-            {activeTab === "laptops" && visibleTabs.some((t) => t.key === "laptops") && <LaptopsContent />}
-            {activeTab === "accessories" && visibleTabs.some((t) => t.key === "accessories") && <AccessoriesContent />}
+            {activeTab === "barang" && visibleTabs.some((t) => t.key === "barang") && <UnifiedBarangContent />}
             {activeTab === "outflows" && visibleTabs.some((t) => t.key === "outflows") && <OutflowsContent />}
             {activeTab === "pedagang" && visibleTabs.some((t) => t.key === "pedagang") && <PriceListPedagangTab />}
             {activeTab === "kategori" && visibleTabs.some((t) => t.key === "kategori") && <CategoriesContent />}          </>

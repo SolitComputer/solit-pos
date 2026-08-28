@@ -682,7 +682,7 @@ export async function PATCH(request: Request) {
       if (overtime.status !== "PENDING") {
         return NextResponse.json({ success: false, message: "Detail lembur hanya bisa diisi selama masih berstatus PENDING (belum di-ACC kepala divisi)." }, { status: 400 });
       }
-      const { category: cat, work_description: desc } = body;
+      const { category: cat, work_description: desc, proof_photo_url } = body;
       if (!cat || !isValidOvertimeCategory(cat)) {
         return NextResponse.json({
           success: false,
@@ -692,8 +692,14 @@ export async function PATCH(request: Request) {
       if (!desc?.trim()) {
         return NextResponse.json({ success: false, message: "Keterangan lembur wajib diisi." }, { status: 400 });
       }
+      if (!isFullAccessUser && !proof_photo_url) {
+        return NextResponse.json({ success: false, message: "Bukti foto lembur wajib diunggah." }, { status: 400 });
+      }
       const { data, error } = await supabase.from("overtime_requests").update({
-        category: cat, work_description: desc.trim(), updated_at: new Date().toISOString(),
+        category: cat, 
+        work_description: desc.trim(), 
+        proof_photo_url,
+        updated_at: new Date().toISOString(),
       }).eq("id", id).select().single();
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
       return NextResponse.json({ success: true, data });
@@ -714,11 +720,15 @@ export async function PATCH(request: Request) {
 
       const { category: bodyCategory, work_description: bodyDesc } = body;
       const updatePayload: Record<string, any> = {
-        status: "NEED_PROOF", // langsung minta bukti foto — sesuai poin 6
+        status: overtime.proof_photo_url ? "COMPLETED" : "NEED_PROOF",
         approved_by: user.id,
         approved_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+      
+      if (overtime.proof_photo_url) {
+        updatePayload.completed_at = new Date().toISOString();
+      }
 
       const finalCategory = bodyCategory ?? overtime.category;
       if (!finalCategory || !isValidOvertimeCategory(finalCategory)) {
