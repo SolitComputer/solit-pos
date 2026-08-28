@@ -51,6 +51,7 @@ export type VehicleRow = {
   type: "MOTOR" | "MOBIL";
   status: "TERSEDIA" | "DIPAKAI" | "MAINTENANCE";
   battery_level: string | null;
+  fuel_level: string | null;
 };
 
 export type UserLite = { id: string; name: string; role: string };
@@ -97,7 +98,7 @@ export async function enrichRequests(rows: BorrowRequestRow[]): Promise<BorrowRe
     vehicleIds.length
       ? supabaseVehicles
           .from("vehicles")
-          .select("id, name, type, status, battery_level")
+          .select("id, name, type, status, battery_level, fuel_level")
           .in("id", vehicleIds)
       : Promise.resolve({ data: [] as VehicleRow[] }),
   ]);
