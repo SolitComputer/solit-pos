@@ -18,6 +18,7 @@ interface LedgerLine {
     saldo_kredit: number;
     checked: boolean;
     checked_at: string | null;
+    checked_by_name: string | null;
     is_synthetic: boolean;
     trx_meta: {
         company_name: string | null;
@@ -44,6 +45,16 @@ interface LedgerData {
 const rp = (n: number) => `Rp${Math.round(Number(n || 0)).toLocaleString("id-ID")}`;
 const fmtTgl = (d: string) =>
     new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" });
+// (baru) — format tanggal + jam (WIB) khusus buat tooltip "Cek", beda dari fmtTgl yang cuma tanggal
+const fmtTglJam = (iso: string) =>
+    new Date(iso).toLocaleString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Jakarta",
+    });
 
 // Badge nama toko — replikasi persis logic getCompanyBadge() di JurnalUmum.tsx,
 // supaya label & warnanya konsisten antar tab Akuntansi.
@@ -125,7 +136,7 @@ export default function BukuBesar({ period }: { period: string }) {
                     ...prev,
                     lines: prev.lines.map((l) =>
                         l.id === lineId
-                            ? { ...l, checked: next, checked_at: next ? new Date().toISOString() : null }
+                            ? { ...l, checked: next, checked_at: next ? new Date().toISOString() : null, checked_by_name: next ? l.checked_by_name : null }
                             : l
                     ),
                 }
@@ -139,6 +150,20 @@ export default function BukuBesar({ period }: { period: string }) {
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.message);
+            // (baru) sinkronkan nama pencentang dari respons server — server yang tau siapa
+            // user yg login (bukan tebakan client), jadi tooltip langsung akurat tanpa reload.
+            if (next) {
+                setData((prev) =>
+                    prev
+                        ? {
+                            ...prev,
+                            lines: prev.lines.map((l) =>
+                                l.id === lineId ? { ...l, checked_by_name: json.data?.checked_by_name ?? null } : l
+                            ),
+                        }
+                        : prev
+                );
+            }
         } catch {
             setData((prev) =>
                 prev
@@ -460,7 +485,7 @@ export default function BukuBesar({ period }: { period: string }) {
                                                                 onClick={() => toggleChecked(l.id, !l.checked)}
                                                                 title={
                                                                     l.checked
-                                                                        ? `Sudah dicek${l.checked_at ? " · " + fmtTgl(l.checked_at.slice(0, 10)) : ""}`
+                                                                        ? `Sudah dicek${l.checked_at ? " · " + fmtTglJam(l.checked_at) : ""} · ${l.checked_by_name ? "oleh " + l.checked_by_name : "pencentang tidak tercatat (data sebelum fitur ini aktif)"}`
                                                                         : "Tandai sudah dicek"
                                                                 }
                                                                 className={`w-6 h-6 rounded-md border flex items-center justify-center text-[11px] font-black active:scale-90 transition-all duration-150 ${l.checked
