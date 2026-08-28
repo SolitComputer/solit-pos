@@ -4,6 +4,7 @@
 import { useState, useRef } from "react";
 import { Banknote, Landmark, QrCode, Check, Upload, X, Loader2 } from "lucide-react";
 import type { ServiceOrder } from "@/types/service";
+import { compressImage } from "@/lib/imageCompression";
 
 interface Props {
   open: boolean;
@@ -75,7 +76,7 @@ export default function ServicePrepaymentModal({ open, order, onClose, onConfirm
     setAmount(digits ? fmtRupiah(parseInt(digits)) : "");
   };
 
-  const handleFileSelect = async (file: File | null) => {
+   const handleFileSelect = async (file: File | null) => {
     if (!file) return;
     setError("");
 
@@ -83,18 +84,22 @@ export default function ServicePrepaymentModal({ open, order, onClose, onConfirm
       setError("Format foto harus JPG, PNG, atau WEBP");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Ukuran foto maksimal 5MB");
+
+    setUploading(true);
+    const compressedFile = await compressImage(file, { maxSizeMB: 1, maxWidthOrHeight: 1920 });
+
+    if (compressedFile.size > 5 * 1024 * 1024) {
+      setError("Ukuran foto masih terlalu besar setelah dikompres, coba foto lain");
+      setUploading(false);
       return;
     }
 
-    setProofPreview(URL.createObjectURL(file));
+    setProofPreview(URL.createObjectURL(compressedFile));
     setProofUrl(null);
-    setUploading(true);
 
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", compressedFile);
       fd.append("order_id", order.id);
       const res = await fetch("/api/service/upload-payment-proof", {
         method: "POST",
