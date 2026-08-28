@@ -17,7 +17,7 @@ export const POST = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthU
             return NextResponse.json({ success: false, message: "Terlalu banyak percobaan, coba lagi sebentar lagi" }, { status: 429 });
         }
 
-        const { phone, imageUrl, invoice } = await req.json();
+        const { phone, imageUrl, invoice, message, filename } = await req.json();
 
         if (!phone || !imageUrl) {
             return NextResponse.json({ success: false, message: "Missing phone or imageUrl" });
@@ -27,13 +27,17 @@ export const POST = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthU
         if (normalized.startsWith("0")) normalized = "62" + normalized.slice(1);
         else if (!normalized.startsWith("62")) normalized = "62" + normalized;
 
-        const caption = `🧾 Struk pembayaran invoice *${invoice}*\nTerima kasih sudah berbelanja di *Solit 03* 🙏`;
+        // REVISI: caption & filename sekarang bisa di-override caller (mis. reminder
+        // DP/Ambil Dulu di pending-orders yang kirim gambar Invoice, bukan struk).
+        // Kalau tidak dikirim, fallback ke caption/filename lama — jadi pemanggil
+        // existing (nota yang sudah lunas) perilakunya tidak berubah sama sekali.
+        const caption = message || `🧾 Struk pembayaran invoice *${invoice}*\nTerima kasih sudah berbelanja di *Solit 03* 🙏`;
 
         const formData = new FormData();
         formData.append("target", normalized);
         formData.append("message", caption);
         formData.append("url", imageUrl);
-        formData.append("filename", `struk-${invoice}.jpg`);
+        formData.append("filename", filename || `struk-${invoice}.jpg`);
 
         const FONNTE_TOKEN = process.env.WHATSAPP_API_KEY;
         if (!FONNTE_TOKEN) {
