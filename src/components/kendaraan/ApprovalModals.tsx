@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Bike, Ban } from "lucide-react";
 import {
   inp, lbl, primaryBtn, secondaryBtn, dangerBtn, ErrorBanner, Spinner,
   ModalWrapper, ModalHead, ModalFoot, formatDateTime,
@@ -64,7 +64,7 @@ export function ApproveRequestModal({
   if (confirmStep) {
     return (
       <ModalWrapper onClose={onClose} preventClose={busy}>
-        <ModalHead icon="✅" title="Konfirmasi ACC" sub="Langkah terakhir — pastikan datanya benar" onClose={onClose} noClose={busy} />
+        <ModalHead icon={<CheckCircle2 size={18} />} title="Konfirmasi ACC" sub="Langkah terakhir — pastikan datanya benar" onClose={onClose} noClose={busy} />
         <div className="px-5 py-4 space-y-2.5">
           {err && <ErrorBanner msg={err} />}
           <Row k="Kendaraan" v={request.vehicle?.name ?? "—"} />
@@ -83,7 +83,7 @@ export function ApproveRequestModal({
 
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="🛵" title="Setujui Peminjaman" sub={request.vehicle?.name} onClose={onClose} />
+      <ModalHead icon={<Bike size={18} />} title="Setujui Peminjaman" sub={request.vehicle?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-2.5">
         {err && <ErrorBanner msg={err} />}
         <Row k="Kendaraan" v={request.vehicle?.name ?? "—"} />
@@ -143,7 +143,7 @@ export function RejectRequestModal({
   if (confirmStep) {
     return (
       <ModalWrapper onClose={onClose} preventClose={busy}>
-        <ModalHead icon="🚫" title="Konfirmasi Tolak" sub="Pengajuan akan ditolak" onClose={onClose} noClose={busy} />
+        <ModalHead icon={<Ban size={18} />} title="Konfirmasi Tolak" sub="Pengajuan akan ditolak" onClose={onClose} noClose={busy} />
         <div className="px-5 py-4 space-y-2.5">
           {err && <ErrorBanner msg={err} />}
           <Row k="Kendaraan" v={request.vehicle?.name ?? "—"} />
@@ -163,7 +163,7 @@ export function RejectRequestModal({
   const canNext = note.trim().length > 0;
   return (
     <ModalWrapper onClose={onClose}>
-      <ModalHead icon="🚫" title="Tolak Peminjaman" sub={request.vehicle?.name} onClose={onClose} />
+      <ModalHead icon={<Ban size={18} />} title="Tolak Peminjaman" sub={request.vehicle?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3">
         {err && <ErrorBanner msg={err} />}
         <div>

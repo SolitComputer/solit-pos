@@ -66,7 +66,7 @@ export function ModalHead({
   onClose,
   noClose,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   sub?: string;
   onClose: () => void;
@@ -74,7 +74,7 @@ export function ModalHead({
 }) {
   return (
     <div className="px-5 pt-3 pb-4 border-b border-gray-100 flex items-start gap-3">
-      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-100 flex items-center justify-center text-base flex-shrink-0 shadow-sm">
+      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-100 flex items-center justify-center text-gray-600 flex-shrink-0 shadow-sm">
         {icon}
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
