@@ -82,11 +82,12 @@ export default function KendaraanDashboardPage() {
     <DashboardLayout>
       <div className="min-h-screen bg-[#F7F7F8]">
         {/* Hero */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0f0c29] via-[#150f38] to-[#1a1545] px-5 py-5 sm:px-7 sm:py-6 shadow-lg shadow-violet-950/10 mb-5">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-800 to-black px-5 py-5 sm:px-7 sm:py-6 shadow-lg shadow-black/20 mb-5">
+          <div className="pointer-events-none absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/5 blur-3xl" />
           <div className="relative flex items-center justify-between gap-3">
             <div>
               <h1 className="text-lg sm:text-2xl font-black text-white leading-tight">Dashboard Kendaraan</h1>
-              <p className="text-[11px] sm:text-xs text-violet-200/80 mt-1">Monitoring pemakaian kendaraan operasional</p>
+              <p className="text-[11px] sm:text-xs text-zinc-400 mt-1">Monitoring pemakaian kendaraan operasional</p>
             </div>
             <span className="flex items-center gap-1.5 h-8 px-3 rounded-full bg-white/10 border border-white/15 text-[11px] font-bold text-emerald-300">
               <span className="relative flex h-2 w-2">
@@ -113,9 +114,9 @@ export default function KendaraanDashboardPage() {
         ) : (
           <div className="space-y-6">
             {/* Metric cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard label="Total Kendaraan" value={m!.totalVehicles} icon={<Car size={18} />} tone="gray" />
-              <StatCard label="Sedang Dipakai" value={m!.inUse} icon={<CarFront size={18} />} tone="violet" />
+              <StatCard label="Sedang Dipakai" value={m!.inUse} icon={<CarFront size={18} />} tone="zinc" />
               <StatCard label="Menunggu ACC" value={m!.pending} icon={<Inbox size={18} />} tone="amber" />
               <StatCard label="Maintenance" value={m!.maintenance} icon={<Wrench size={18} />} tone="emerald" />
             </div>
@@ -124,7 +125,7 @@ export default function KendaraanDashboardPage() {
               {/* Sedang berjalan */}
               <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="w-8 h-8 rounded-xl bg-violet-50 border border-violet-200 text-violet-600 flex items-center justify-center">
+                  <span className="w-8 h-8 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 flex items-center justify-center">
                     <Clock size={16} />
                   </span>
                   <h2 className="text-sm font-black text-gray-900">Sedang Berjalan ({data.running.length})</h2>
@@ -134,14 +135,14 @@ export default function KendaraanDashboardPage() {
                 ) : (
                   <div className="space-y-2.5">
                     {data.running.map((r) => (
-                      <div key={r.id} className="border border-gray-100 rounded-xl p-3.5 flex items-center justify-between gap-3 bg-gray-50/40">
+                      <div key={r.id} className="border border-gray-100 hover:border-gray-200 rounded-xl p-3.5 flex items-center justify-between gap-3 bg-gray-50/40 transition-colors">
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-gray-900 truncate">{r.vehicle?.name ?? "—"}</p>
                           <p className="text-[10px] text-gray-500 truncate">
                             {r.borrower?.name ?? "—"} · sejak {formatTime(r.actual_start)}
                           </p>
                         </div>
-                        <span className="text-[11px] font-black tabular-nums text-violet-600 whitespace-nowrap">
+                        <span className="text-[11px] font-black tabular-nums text-zinc-800 whitespace-nowrap">
                           {formatDuration(liveDurationMinutes(r.actual_start, nowMs))}
                         </span>
                       </div>
@@ -163,7 +164,7 @@ export default function KendaraanDashboardPage() {
                 ) : (
                   <div className="space-y-2.5">
                     {data.pending.map((r) => (
-                      <div key={r.id} className="border border-gray-100 rounded-xl p-3.5 bg-gray-50/40">
+                      <div key={r.id} className="border border-gray-100 hover:border-gray-200 rounded-xl p-3.5 bg-gray-50/40 transition-colors">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0">
                             <p className="text-xs font-bold text-gray-900 truncate">{r.vehicle?.name ?? "—"}</p>
@@ -174,7 +175,7 @@ export default function KendaraanDashboardPage() {
                           <div className="flex gap-2">
                             <button
                               onClick={() => setApproveTarget(r)}
-                              className="flex-1 h-9 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition active:scale-95"
+                              className="flex-1 h-9 bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-zinc-700 hover:to-zinc-800 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition active:scale-95 shadow-sm shadow-zinc-900/20 ring-1 ring-inset ring-white/10"
                             >
                               <CheckCircle2 size={13} /> Setujui
                             </button>
@@ -245,7 +246,7 @@ export default function KendaraanDashboardPage() {
               ) : (
                 <div className="space-y-2">
                   {history.map((h) => (
-                    <div key={h.id} className="border border-gray-100 rounded-xl p-3.5 flex items-center justify-between gap-3">
+                    <div key={h.id} className="border border-gray-100 hover:border-gray-200 hover:bg-gray-50/60 rounded-xl p-3.5 flex items-center justify-between gap-3 transition-colors">
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-gray-900 truncate">{h.vehicle?.name ?? "—"}</p>
                         <p className="text-[10px] text-gray-500 truncate">
@@ -290,9 +291,9 @@ function ConditionBadge({ condition }: { condition: "BAIK" | "LECET" | "RUSAK" }
 }
 
 // ─── STAT CARD (pola dari monitoring Lembur) ─────────────────────────────────
-const STAT_TONES: Record<"gray" | "violet" | "emerald" | "amber", { bg: string; text: string; border: string }> = {
+const STAT_TONES: Record<"gray" | "zinc" | "emerald" | "amber", { bg: string; text: string; border: string }> = {
   gray: { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200" },
-  violet: { bg: "bg-violet-50", text: "text-violet-600", border: "border-violet-200" },
+  zinc: { bg: "bg-zinc-100", text: "text-zinc-700", border: "border-zinc-200" },
   emerald: { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200" },
   amber: { bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-200" },
 };

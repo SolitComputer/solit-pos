@@ -95,18 +95,19 @@ export default function KendaraanPage() {
     <DashboardLayout>
       <div className="min-h-screen bg-[#F7F7F8]">
         {/* Hero */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0f0c29] via-[#150f38] to-[#1a1545] px-5 py-5 sm:px-7 sm:py-6 shadow-lg shadow-violet-950/10 mb-5">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-800 to-black px-5 py-5 sm:px-7 sm:py-6 shadow-lg shadow-black/20 mb-5">
+          <div className="pointer-events-none absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/5 blur-3xl" />
           <div className="relative flex items-center justify-between gap-3">
             <div>
               <h1 className="text-lg sm:text-2xl font-black text-white leading-tight">Manajemen Kendaraan</h1>
-              <p className="text-[11px] sm:text-xs text-violet-200/80 mt-1">
+              <p className="text-[11px] sm:text-xs text-zinc-400 mt-1">
                 Pinjam kendaraan operasional & pantau pemakaian
               </p>
             </div>
             {isAdmin && (
               <button
                 onClick={() => setAddOpen(true)}
-                className="h-10 px-4 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm shadow-violet-950/30"
+                className="h-10 px-4 bg-white hover:bg-zinc-100 text-zinc-900 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm shadow-black/30"
               >
                 <Plus size={15} /> Tambah Kendaraan
               </button>
@@ -137,9 +138,9 @@ export default function KendaraanPage() {
                   </span>
                   <h2 className="text-sm font-black text-gray-900">Menunggu ACC ({queue.length})</h2>
                 </div>
-                <div className="grid gap-2.5 sm:grid-cols-2">
+                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                   {queue.map((r) => (
-                    <div key={r.id} className="border border-gray-100 rounded-xl p-3.5 bg-gray-50/50">
+                    <div key={r.id} className="border border-gray-100 hover:border-gray-200 rounded-xl p-3.5 bg-gray-50/50 transition-colors">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-gray-900 truncate">{r.vehicle?.name ?? "—"}</p>
@@ -223,7 +224,7 @@ function VehicleSection({
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <span className="w-8 h-8 rounded-xl bg-violet-50 border border-violet-200 text-violet-600 flex items-center justify-center">
+        <span className="w-8 h-8 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 flex items-center justify-center">
           {icon}
         </span>
         <h2 className="text-sm font-black text-gray-900">
@@ -235,7 +236,7 @@ function VehicleSection({
           <EmptyState icon={icon} text={`Belum ada ${title.toLowerCase()} terdaftar.`} />
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {vehicles.map((v) => (
             <VehicleCard
               key={v.id}
@@ -304,71 +305,87 @@ function VehicleCard({
   const iAmUsing = myActive?.status === "APPROVED" && v.status === "DIPAKAI";
   const iAmPending = myActive?.status === "PENDING";
 
+  // Icon jenis kendaraan + warna aksen tipis di atas kartu sesuai status
+  const TypeIcon = v.type === "MOTOR" ? Bike : Car;
+  const accent: Record<string, string> = {
+    TERSEDIA: "bg-emerald-400",
+    DIPAKAI: "bg-zinc-400",
+    MAINTENANCE: "bg-amber-400",
+  };
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-3 transition hover:shadow-md">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-black text-gray-900 truncate">{v.name}</p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
-            <span className="text-[10px] text-gray-500 flex items-center gap-1">
-              <Fuel size={12} className="text-emerald-500" /> {v.fuel_level || "—"}
+    <div className="group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-gray-200 transition-all duration-200 overflow-hidden flex flex-col">
+      <div className={`h-1 w-full ${accent[v.status] ?? "bg-gray-200"}`} />
+      <div className="p-4 flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <span className="w-10 h-10 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-400 flex items-center justify-center shrink-0">
+              <TypeIcon size={18} />
             </span>
-            {v.lastUsage && (
-              <span className="text-[10px] text-gray-500 flex items-center gap-1 truncate max-w-[140px]">
-                <User size={12} className="text-gray-400" />
-                {v.status === "DIPAKAI" && v.lastUsage.status === "APPROVED"
-                  ? v.lastUsage.borrower_name
-                  : `Terakhir: ${v.lastUsage.borrower_name}`}
-              </span>
-            )}
+            <div className="min-w-0 pt-0.5">
+              <p className="text-sm font-black text-gray-900 truncate">{v.name}</p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+                <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                  <Fuel size={12} className="text-emerald-500" /> {v.fuel_level || "—"}
+                </span>
+                {v.lastUsage && (
+                  <span className="text-[10px] text-gray-500 flex items-center gap-1 truncate max-w-[140px]">
+                    <User size={12} className="text-gray-400" />
+                    {v.status === "DIPAKAI" && v.lastUsage.status === "APPROVED"
+                      ? v.lastUsage.borrower_name
+                      : `Terakhir: ${v.lastUsage.borrower_name}`}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
+          <VehicleStatusBadge status={v.status} />
         </div>
-        <VehicleStatusBadge status={v.status} />
-      </div>
 
-      {/* Aksi peminjam */}
-      {v.status === "TERSEDIA" && !iAmPending && (
-        <button onClick={onBorrow} className={primaryBtn}>
-          <Plus size={14} /> Ajukan Pinjam
-        </button>
-      )}
-      {iAmPending && (
-        <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 font-semibold">
-          Pengajuanmu menunggu ACC admin…
-        </div>
-      )}
-      {iAmUsing && (
-        <button onClick={() => myActive && onCheckout(myActive)} className={primaryBtn}>
-          <LogOut size={14} /> Check-out (Selesai Pakai)
-        </button>
-      )}
-      {v.status === "DIPAKAI" && !iAmUsing && (
-        <div className="text-[10px] text-violet-700 bg-violet-50 border border-violet-200 rounded-xl px-3 py-2 font-semibold">
-          Sedang dipakai karyawan lain
-        </div>
-      )}
-      {v.status === "MAINTENANCE" && (
-        <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 font-semibold flex items-center gap-1.5">
-          <Wrench size={12} /> Dalam perbaikan
-        </div>
-      )}
-
-      {/* Aksi admin */}
-      {isAdmin && (
-        <div className="flex items-center gap-2 pt-1 border-t border-gray-50">
-          <button onClick={onEdit} className="flex-1 h-8 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition">
-            <Pencil size={12} /> Edit
+        {/* Aksi peminjam */}
+        {v.status === "TERSEDIA" && !iAmPending && (
+          <button onClick={onBorrow} className={primaryBtn}>
+            <Plus size={14} /> Ajukan Pinjam
           </button>
-          {v.status === "MAINTENANCE" && (
-            <button onClick={restore} disabled={busy} className="flex-1 h-8 text-[11px] font-semibold text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
-              {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Set Tersedia
+        )}
+        {iAmPending && (
+          <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 font-semibold">
+            Pengajuanmu menunggu ACC admin…
+          </div>
+        )}
+        {iAmUsing && (
+          <button onClick={() => myActive && onCheckout(myActive)} className={primaryBtn}>
+            <LogOut size={14} /> Check-out (Selesai Pakai)
+          </button>
+        )}
+        {v.status === "DIPAKAI" && !iAmUsing && (
+          <div className="text-[10px] text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-xl px-3 py-2 font-semibold">
+            Sedang dipakai karyawan lain
+          </div>
+        )}
+        {v.status === "MAINTENANCE" && (
+          <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 font-semibold flex items-center gap-1.5">
+            <Wrench size={12} /> Dalam perbaikan
+          </div>
+        )}
+
+        {/* Aksi admin */}
+        {isAdmin && (
+          <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+            <button onClick={onEdit} className="flex-1 h-8 text-[11px] font-semibold text-gray-600 border border-gray-100 hover:bg-gray-50 hover:border-gray-200 rounded-lg flex items-center justify-center gap-1 transition">
+              <Pencil size={12} /> Edit
             </button>
-          )}
-          <button onClick={del} disabled={deleting} className="flex-1 h-8 text-[11px] font-semibold text-red-500 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
-            {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Hapus
-          </button>
-        </div>
-      )}
+            {v.status === "MAINTENANCE" && (
+              <button onClick={restore} disabled={busy} className="flex-1 h-8 text-[11px] font-semibold text-emerald-600 border border-emerald-100 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
+                {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Set Tersedia
+              </button>
+            )}
+            <button onClick={del} disabled={deleting} className="flex-1 h-8 text-[11px] font-semibold text-red-500 border border-red-100 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
+              {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Hapus
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
