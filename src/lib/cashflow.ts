@@ -84,7 +84,8 @@ export interface CashflowFilter {
   source: SourceFilter;
   paymentMethod: PaymentMethodFilter;
   status: StatusFilter;
-  incomeMethod: IncomeMethodFilter; // ⬅️ BARU: khusus tab Uang Masuk
+    incomeMethod: IncomeMethodFilter; // ⬅️ BARU: khusus tab Uang Masuk
+  nama: string; // ⬅️ BARU: filter berdasarkan Nama/Teknisi/Customer/Pengisi
   search: string;
 }
 
@@ -97,7 +98,8 @@ export function defaultCashflowFilter(): CashflowFilter {
     source: "ALL",
     paymentMethod: "ALL", // ⬅️ BARU
     status: "ALL", // ⬅️ BARU: filter Batal
-    incomeMethod: "ALL", // ⬅️ BARU
+        incomeMethod: "ALL", // ⬅️ BARU
+    nama: "ALL", // ⬅️ BARU
     search: "",
   };
 }
@@ -112,7 +114,8 @@ export function isFilterActive(f: CashflowFilter): boolean {
     f.source !== d.source ||
     f.paymentMethod !== d.paymentMethod || // ⬅️ BARU
     f.status !== d.status || // ⬅️ BARU
-    f.incomeMethod !== d.incomeMethod || // ⬅️ BARU
+       f.incomeMethod !== d.incomeMethod || // ⬅️ BARU
+    f.nama !== d.nama || // ⬅️ BARU
     f.search !== d.search
   );
 }
@@ -125,9 +128,24 @@ export function activeFilterCount(f: CashflowFilter): number {
   if (f.source !== "ALL") c++;
   if (f.paymentMethod !== "ALL") c++; // ⬅️ BARU
   if (f.status !== "ALL") c++; // ⬅️ BARU
-  if (f.incomeMethod !== "ALL") c++; // ⬅️ BARU
-  if (f.search.trim()) c++;
+   if (f.incomeMethod !== "ALL") c++; // ⬅️ BARU
+  if (f.nama !== "ALL") c++; // ⬅️ BARU
+   if (f.search.trim()) c++;
   return c;
+}
+
+/** Nama yang ditampilkan di tabel & dipakai untuk filter Nama — MANUAL/MODAL_AWAL
+ *  pakai nama pengisi (created_by_user), selain itu pakai field `nama` apa adanya
+ *  (teknisi utk SERVICE, sales/nama transaksi utk TRANSACTION, dst). */
+export function getEntryDisplayNama(e: {
+  source_type?: string;
+  nama?: string;
+  created_by_user?: { name: string } | null;
+}): string {
+  if ((e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL") && e.created_by_user?.name) {
+    return e.created_by_user.name;
+  }
+  return (e.nama || "").trim();
 }
 
 export function applyFilters<T extends {
@@ -137,9 +155,10 @@ export function applyFilters<T extends {
   source_type?: string;
   payment_method?: string | null; // ⬅️ BARU
   is_voided?: boolean; // ⬅️ BARU
-  tx_payment_method?: string | null; // ⬅️ BARU: buat filter Tunai/Transfer
+   tx_payment_method?: string | null; // ⬅️ BARU: buat filter Tunai/Transfer
   nama?: string;
   keterangan?: string | null;
+  created_by_user?: { name: string } | null; // ⬅️ BARU: buat filter Nama
 }>(entries: T[], filter: CashflowFilter): T[] {
   const q = filter.search.trim().toLowerCase();
 
@@ -158,8 +177,9 @@ export function applyFilters<T extends {
       const m = (e.tx_payment_method || "").trim();
       if (filter.incomeMethod === "TUNAI" && m !== "Tunai") return false;
       if (filter.incomeMethod === "TRANSFER" && m !== "Transfer") return false;
-      if (filter.incomeMethod === "TUNAI_TRANSFER" && m !== "Tunai+Transfer") return false;
+           if (filter.incomeMethod === "TUNAI_TRANSFER" && m !== "Tunai+Transfer") return false;
     }
+    if (filter.nama !== "ALL" && getEntryDisplayNama(e) !== filter.nama) return false; // ⬅️ BARU
    if (q) {
       const haystack = `${e.nama || ""} ${e.keterangan || ""}`.toLowerCase();
       if (!haystack.includes(q)) return false;
