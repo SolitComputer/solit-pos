@@ -886,7 +886,7 @@ export async function PATCH(request: Request) {
         salaryType: salaryTypeToCompute,
       });
 
-      const { data, error } = await supabase.from("overtime_requests").update({
+      const auditUpdatePayload: Record<string, any> = {
         audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
         base_salary_snapshot: baseSalary,
         effective_workdays_snapshot: effectiveWorkdays,
@@ -894,9 +894,6 @@ export async function PATCH(request: Request) {
         total_pay: nominal,
         updated_at: new Date().toISOString(),
       };
-      if (!salaryRow)  {
-        auditUpdatePayload.rate_per_hour = finalRatePerHour;
-      }
 
       const { data, error } = await supabase.from("overtime_requests").update(auditUpdatePayload).eq("id", id).select().single();
 
