@@ -5,7 +5,7 @@ import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Car, Bike, Plus, Pencil, Trash2, Inbox, BarChart3, LogOut, CheckCircle2,
-  Loader2, BatteryMedium, Wrench, RefreshCw,
+  Loader2, BatteryMedium, Wrench, RefreshCw, Send, AlertTriangle,
 } from "lucide-react";
 import {
   inp, lbl, primaryBtn, secondaryBtn, ErrorBanner, Spinner,
@@ -414,7 +414,7 @@ function BorrowModal({ vehicle, onClose, onSaved }: { vehicle: Vehicle; onClose:
   };
   return (
     <ModalWrapper onClose={onClose} preventClose={busy}>
-      <ModalHead icon="🛵" title="Ajukan Peminjaman" sub={vehicle.name} onClose={onClose} />
+      <ModalHead icon={<Send size={18} />} title="Ajukan Peminjaman" sub={vehicle.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3">
         {err && <ErrorBanner msg={err} />}
         <p className="text-xs text-gray-600 leading-relaxed">
@@ -464,7 +464,7 @@ function CheckoutModal({ request, onClose, onSaved }: { request: BorrowRequest; 
 
   return (
     <ModalWrapper onClose={onClose} preventClose={busy}>
-      <ModalHead icon="✅" title="Check-out Kendaraan" sub={request.vehicle?.name} onClose={onClose} />
+      <ModalHead icon={<LogOut size={18} />} title="Check-out Kendaraan" sub={request.vehicle?.name} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5">
         {err && <ErrorBanner msg={err} />}
         <div className="bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-2.5 text-[11px] text-gray-600">
@@ -488,8 +488,9 @@ function CheckoutModal({ request, onClose, onSaved }: { request: BorrowRequest; 
             <option value="RUSAK">Rusak</option>
           </select>
           {condition === "RUSAK" && (
-            <p className="text-[10px] text-amber-600 mt-1.5 font-medium">
-              ⚠ Kendaraan akan otomatis dikunci status Maintenance sampai admin mengembalikannya.
+            <p className="text-[10px] text-amber-600 mt-1.5 font-medium flex items-start gap-1">
+              <AlertTriangle size={12} className="shrink-0 mt-px" />
+              Kendaraan akan otomatis dikunci status Maintenance sampai admin mengembalikannya.
             </p>
           )}
         </div>
@@ -543,7 +544,7 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
 
   return (
     <ModalWrapper onClose={onClose} preventClose={busy}>
-      <ModalHead icon="🚗" title={isEdit ? "Edit Kendaraan" : "Tambah Kendaraan"} onClose={onClose} />
+      <ModalHead icon={<Car size={18} />} title={isEdit ? "Edit Kendaraan" : "Tambah Kendaraan"} onClose={onClose} />
       <div className="px-5 py-4 space-y-3.5">
         {err && <ErrorBanner msg={err} />}
         <div>
