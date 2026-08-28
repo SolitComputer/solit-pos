@@ -74,17 +74,28 @@ const PAY_VIEW_ROLES = [
   "KEPALA_PENGELOLA_BARANG",
 ];
 
-function isHolidayOvertimeLate(overtime: { is_late?: boolean | null; requested_start?: string | null }): boolean {
+function isHolidayOvertimeLate(overtime: {
+  is_late?: boolean | null;
+  requested_start?: string | null;
+  actual_start?: string | null;
+  scheduled_start?: string | null;
+}): boolean {
   if (overtime.is_late === true) return true;
   if (overtime.is_late === false) return false;
-  const requestedStart = overtime.requested_start;
-  if (!requestedStart) return false;
-  const [h, m] = String(requestedStart).split(":").map(Number);
+  const timeStr = overtime.requested_start ?? overtime.actual_start ?? overtime.scheduled_start;
+  if (!timeStr) return false;
+  if (timeStr.includes("T")) {
+    const w = new Date(new Date(timeStr).getTime() + 7 * 60 * 60 * 1000);
+    const totalMin = w.getUTCHours() * 60 + w.getUTCMinutes();
+    return totalMin >= 8 * 60;
+  }
+  const [h, m] = String(timeStr).split(":").map(Number);
   if (Number.isNaN(h)) return false;
   return h * 60 + (m || 0) >= 8 * 60;
 }
 
 const HOLIDAY_OVERTIME_PAY = { LATE: 50000, ON_TIME: 100000 } as const;
+const PKL_HOLIDAY_OVERTIME_PAY = { LATE: 25000, ON_TIME: 50000 } as const;
 
 // ─── HELPER: apakah approver (single role) bisa approve target ─────────────
 function canApprove(
@@ -807,9 +818,13 @@ export async function PATCH(request: Request) {
         }, { status: 400 });
       }
 
+      const isPKL = isPKLRole(targetUser?.role);
+
       if (overtime.is_holiday === true) {
         const late = isHolidayOvertimeLate(overtime);
-        const holidayPay = late ? HOLIDAY_OVERTIME_PAY.LATE : HOLIDAY_OVERTIME_PAY.ON_TIME;
+        const holidayPay = isPKL
+          ? (late ? PKL_HOLIDAY_OVERTIME_PAY.LATE : PKL_HOLIDAY_OVERTIME_PAY.ON_TIME)
+          : (late ? HOLIDAY_OVERTIME_PAY.LATE : HOLIDAY_OVERTIME_PAY.ON_TIME);
 
         const { data, error } = await supabase.from("overtime_requests").update({
           audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
@@ -840,7 +855,7 @@ export async function PATCH(request: Request) {
         supabase.from("user_date_work").select("work_date").eq("user_id", overtime.user_id).gte("work_date", firstDay).lte("work_date", lastDay),
       ]);
 
-      if (!salaryRow) {
+      if (!salaryRow && !isPKL) {
         return NextResponse.json({
           success: false,
           message: "Karyawan ini belum punya data gaji (menu Rekap Gaji) — atur gaji dulu sebelum audit lembur.",
@@ -855,16 +870,25 @@ export async function PATCH(request: Request) {
       const workOverrideDates = new Set<string>((dateWorks ?? []).map((r: any) => r.work_date));
       const effectiveWorkdays = countEffectiveWorkdaysInMonth(year, month0, weeklyOffDows, offDates, workOverrideDates);
 
+      // Base salary: jika PKL belum diset gaji khusus, fallback ke rate harian PKL (10rb * hari kerja efektif)
+      let baseSalary = salaryRow?.base_salary ?? 0;
+      if (isPKL && baseSalary <= 0) {
+        baseSalary = effectiveWorkdays * 10000;
+      }
+
+      // Formula lembur PKL dihitung sama dengan karyawan reguler
+      const salaryTypeToCompute = isPKL ? "PERCENTAGE" : (salaryRow?.salary_type ?? "PERCENTAGE");
+
       const { nominal, perMinuteRate, eligible } = computeOvertimeNominal({
-        baseSalary: salaryRow.base_salary,
+        baseSalary,
         effectiveWorkdays,
         overtimeMinutes: overtime.duration_minutes ?? 0,
-        salaryType: salaryRow.salary_type,
+        salaryType: salaryTypeToCompute,
       });
 
       const { data, error } = await supabase.from("overtime_requests").update({
         audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
-        base_salary_snapshot: salaryRow.base_salary,
+        base_salary_snapshot: baseSalary,
         effective_workdays_snapshot: effectiveWorkdays,
         per_minute_rate: perMinuteRate,
         total_pay: nominal,
@@ -875,7 +899,7 @@ export async function PATCH(request: Request) {
 
       return NextResponse.json({
         success: true, data,
-        warning: !eligible ? "Karyawan ini bergaji FLAT (Tetap) — sesuai kebijakan, nominal lemburan otomatis Rp0." : undefined,
+        warning: (!eligible && !isPKL) ? "Karyawan ini bergaji FLAT (Tetap) — sesuai kebijakan, nominal lemburan otomatis Rp0." : undefined,
       });
     }
 
