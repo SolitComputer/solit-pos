@@ -53,6 +53,12 @@ function isItemActive(href: string, pathname: string): boolean {
   if (href === "/dashboard/fixed-assets/aset-matot") {
     return pathname === "/dashboard/fixed-assets/aset-matot";
   }
+  if (href === "/dashboard/kendaraan") {
+    return pathname === "/dashboard/kendaraan";
+  }
+  if (href === "/dashboard/kendaraan/dashboard") {
+    return pathname === "/dashboard/kendaraan/dashboard";
+  }
 
   if (href === "/dashboard/preparation") {
     return (
@@ -193,7 +199,8 @@ const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile"
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
-const ITEM_KENDARAAN: MenuItem = { name: "Kendaraan", href: "/dashboard/kendaraan", icon: Icons.kendaraan };
+const ITEM_KENDARAAN: MenuItem = { name: "Management Kendaraan", href: "/dashboard/kendaraan", icon: Icons.kendaraan };
+const ITEM_KENDARAAN_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard/kendaraan/dashboard", icon: Icons.reports };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
@@ -877,15 +884,24 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   }
 });
 
-// Kendaraan: bisa diakses SEMUA role (termasuk PKL). Taruh di grup "Utama".
+// Kendaraan: grup sendiri yang bisa di-collapse, berisi sub-menu Dashboard +
+// Management Kendaraan. Diakses SEMUA role (termasuk PKL). Ditaruh tepat setelah
+// grup "Utama".
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
-  const utama = ROLE_MENUS[role].find((g) => g.label === "Utama");
-  if (utama) {
-    if (!utama.items.some((it) => it.href === ITEM_KENDARAAN.href)) {
-      utama.items.push(ITEM_KENDARAAN);
-    }
+  const kendaraanGroup: MenuGroup = {
+    label: "Kendaraan",
+    items: [ITEM_KENDARAAN_DASHBOARD, ITEM_KENDARAAN],
+  };
+  const existingIdx = ROLE_MENUS[role].findIndex((g) => g.label === "Kendaraan");
+  if (existingIdx >= 0) {
+    ROLE_MENUS[role][existingIdx] = kendaraanGroup;
+    return;
+  }
+  const utamaIdx = ROLE_MENUS[role].findIndex((g) => g.label === "Utama");
+  if (utamaIdx >= 0) {
+    ROLE_MENUS[role].splice(utamaIdx + 1, 0, kendaraanGroup);
   } else {
-    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_KENDARAAN] }, ...ROLE_MENUS[role]];
+    ROLE_MENUS[role].unshift(kendaraanGroup);
   }
 });
 
