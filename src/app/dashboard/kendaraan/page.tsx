@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
-  Car, Bike, Plus, Pencil, Trash2, Inbox, BarChart3, LogOut, CheckCircle2,
+  Car, Bike, Plus, Pencil, Trash2, Inbox, LogOut, CheckCircle2,
   Loader2, BatteryMedium, Wrench, RefreshCw, Send, AlertTriangle,
 } from "lucide-react";
 import {
-  inp, lbl, primaryBtn, secondaryBtn, ErrorBanner, Spinner,
+  inp, lbl, primaryBtn, secondaryBtn, ErrorBanner, Spinner, EmptyState,
   ModalWrapper, ModalHead, ModalFoot, VehicleStatusBadge,
   formatTime, formatDateTime,
 } from "@/components/kendaraan/ui";
 import { ApproveRequestModal, RejectRequestModal } from "@/components/kendaraan/ApprovalModals";
+import VehicleSopGate from "@/components/kendaraan/VehicleSopGate";
 
 type Vehicle = {
   id: string;
@@ -94,24 +94,18 @@ export default function KendaraanPage() {
                 Pinjam kendaraan operasional & pantau pemakaian
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/dashboard/kendaraan/dashboard"
-                className="h-10 px-3.5 bg-white/10 hover:bg-white/20 border border-white/15 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95"
+            {isAdmin && (
+              <button
+                onClick={() => setAddOpen(true)}
+                className="h-10 px-4 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm shadow-violet-950/30"
               >
-                <BarChart3 size={15} /> <span className="hidden sm:inline">Dashboard</span>
-              </Link>
-              {isAdmin && (
-                <button
-                  onClick={() => setAddOpen(true)}
-                  className="h-10 px-3.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
-                >
-                  <Plus size={15} /> <span className="hidden sm:inline">Tambah</span>
-                </button>
-              )}
-            </div>
+                <Plus size={15} /> Tambah Kendaraan
+              </button>
+            )}
           </div>
         </div>
+
+        <VehicleSopGate />
 
         {error && (
           <div className="mb-4">
@@ -228,7 +222,9 @@ function VehicleSection({
         </h2>
       </div>
       {vehicles.length === 0 ? (
-        <p className="text-xs text-gray-400 pl-1 pb-2">Belum ada {title.toLowerCase()}.</p>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <EmptyState icon={icon} text={`Belum ada ${title.toLowerCase()} terdaftar.`} />
+        </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {vehicles.map((v) => (

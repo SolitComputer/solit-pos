@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
+import { useVehiclePendingBadge } from "@/hooks/useVehiclePendingBadge";
 import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
@@ -1378,6 +1379,8 @@ export default function Sidebar() {
 
   const prep = usePrepNotify(effectiveRoles, user?.id);
   const overtimeNotify = useOvertimeNotify(effectiveRoles, user?.id);
+  // Badge senyap (tanpa bunyi) untuk admin: pengajuan pinjam kendaraan yang PENDING
+  const vehiclePending = useVehiclePendingBadge(userRoles, user?.id);
   const leadsChat = useLeadsChatNotify(effectiveRoles, user?.id);
   const { sound_key: notifSoundKey, custom_sound_url: notifCustomUrl } = useNotificationSettings(user?.id ?? null);
 
@@ -1390,6 +1393,7 @@ export default function Sidebar() {
   const onAntrian = pathname.startsWith("/dashboard/preparation/antrian");
   const onSiapKirim = pathname.startsWith("/dashboard/preparation/siap-kirim");
   const onOvertimePage = pathname.startsWith("/dashboard/attendance/overtime");
+  const onKendaraanPage = pathname.startsWith("/dashboard/kendaraan");
 
   const isSilentAdmin = isPrepSilent(null, effectiveRoles);
 
@@ -1407,6 +1411,7 @@ export default function Sidebar() {
     "/dashboard/preparation/antrian": prep.menungguUnacked.length,
     "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
     "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count,
+    "/dashboard/kendaraan": onKendaraanPage ? 0 : vehiclePending.count,
     "/dashboard/tanya-ceo": onTanyaCeoPage ? 0 : reminderUnread,
     "/dashboard/ai-ceo": aiCeoEscalationCount,
 
