@@ -53,6 +53,12 @@ function isItemActive(href: string, pathname: string): boolean {
   if (href === "/dashboard/fixed-assets/aset-matot") {
     return pathname === "/dashboard/fixed-assets/aset-matot";
   }
+  if (href === "/dashboard/kendaraan") {
+    return pathname === "/dashboard/kendaraan";
+  }
+  if (href === "/dashboard/kendaraan/dashboard") {
+    return pathname === "/dashboard/kendaraan/dashboard";
+  }
 
   if (href === "/dashboard/preparation") {
     return (
@@ -168,6 +174,7 @@ const Icons = {
   auditOutflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12l2 2 4-4" /></svg>),
   fixedAsset: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01" /></svg>),
   assetMatot: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v8" /><path d="M18.36 6.64a9 9 0 11-12.73 0" /></svg>),
+  kendaraan: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 11l1.5-4.5A2 2 0 018.4 5h7.2a2 2 0 011.9 1.5L19 11" /><path d="M3 11h18v5a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H6v1a1 1 0 01-1 1H4a1 1 0 01-1-1z" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -192,6 +199,8 @@ const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile"
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
+const ITEM_KENDARAAN: MenuItem = { name: "Management Kendaraan", href: "/dashboard/kendaraan", icon: Icons.kendaraan };
+const ITEM_KENDARAAN_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard/kendaraan/dashboard", icon: Icons.reports };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
@@ -872,6 +881,27 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
     }
   } else {
     ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE] }, ...ROLE_MENUS[role]];
+  }
+});
+
+// Kendaraan: grup sendiri yang bisa di-collapse, berisi sub-menu Dashboard +
+// Management Kendaraan. Diakses SEMUA role (termasuk PKL). Ditaruh tepat setelah
+// grup "Utama".
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  const kendaraanGroup: MenuGroup = {
+    label: "Kendaraan",
+    items: [ITEM_KENDARAAN_DASHBOARD, ITEM_KENDARAAN],
+  };
+  const existingIdx = ROLE_MENUS[role].findIndex((g) => g.label === "Kendaraan");
+  if (existingIdx >= 0) {
+    ROLE_MENUS[role][existingIdx] = kendaraanGroup;
+    return;
+  }
+  const utamaIdx = ROLE_MENUS[role].findIndex((g) => g.label === "Utama");
+  if (utamaIdx >= 0) {
+    ROLE_MENUS[role].splice(utamaIdx + 1, 0, kendaraanGroup);
+  } else {
+    ROLE_MENUS[role].unshift(kendaraanGroup);
   }
 });
 

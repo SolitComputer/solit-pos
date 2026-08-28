@@ -1,4 +1,3 @@
-// lib/imageCompression.ts
 "use client";
 
 import imageCompression from "browser-image-compression";
