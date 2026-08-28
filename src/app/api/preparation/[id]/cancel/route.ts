@@ -3,6 +3,8 @@ import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { PREPARATION_CANCEL_ROLES } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
+import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { recalcLaptopParentQty } from "@/lib/laptopStock";
 interface Props { params: Promise<{ id: string }>; }
 async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
     try {
@@ -22,11 +24,27 @@ async function postHandler(req: NextRequest, props: Props, user: AuthUser) {
             return NextResponse.json({ success: false, message }, { status: 400 });
         }
 
-        // ── TIDAK ADA lagi restore ke laptop_units di sini ──
-        // Dulu blok ini mengembalikan status unit DALAM_PENYIAPAN → SIAP_JUAL
-        // saat order dibatalkan. Sekarang Penyiapan sama sekali tidak pernah
-        // mengubah laptop_units.status (lihat api/preparation/route.ts), jadi
-        // tidak ada lagi apa pun yang perlu "dikembalikan" di sini.
+        // ── RESTORE UNIT YANG NYANGKUT DI DALAM_PENYIAPAN ──
+        // Order baru memang sudah tidak pernah bikin unit jadi DALAM_PENYIAPAN,
+        // tapi order LAMA yang terlanjur dibuat dengan sistem lama unitnya 
+        // masih nyangkut di DALAM_PENYIAPAN. Saat dibatalkan, kita harus 
+        // kembalikan unit-unit lama ini ke SIAP_JUAL biar nggak hilang selamanya.
+        const { data: items } = await supabaseAdmin.from("preparation_items").select("unit_id").eq("preparation_id", id);
+        const unitIds = items?.map((it: any) => it.unit_id).filter(Boolean) || [];
+        
+        if (unitIds.length > 0) {
+            const { data: updatedUnits } = await supabaseAdmin
+                .from("laptop_units")
+                .update({ status: "SIAP_JUAL" })
+                .in("id", unitIds)
+                .eq("status", "DALAM_PENYIAPAN")
+                .select("laptop_id");
+
+            if (updatedUnits && updatedUnits.length > 0) {
+                const affectedLaptopIds = [...new Set(updatedUnits.map((u: any) => u.laptop_id).filter(Boolean))] as string[];
+                await Promise.allSettled(affectedLaptopIds.map(lid => recalcLaptopParentQty(supabaseAdmin, lid)));
+            }
+        }
         const now = new Date().toISOString();
         const { data, error } = await supabase
             .from("preparation_orders")

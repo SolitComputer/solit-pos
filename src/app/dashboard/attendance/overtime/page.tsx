@@ -12,6 +12,7 @@ import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { OvertimePendingPopup } from "@/components/attendance/OvertimePendingPopup";
 import { OvertimeRecapTable } from "@/components/attendance/OvertimeRecapTable"; // ✅ NEW — rekap bulanan
 import { addTimestampWatermark } from "@/lib/watermark";
+import { compressImage } from "@/lib/imageCompression";
 import { isPKLRole } from "@/lib/permissions";
 
 type OvertimeRequest = {
@@ -389,8 +390,9 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
     setProcessing(true);
     try {
       const res = await addTimestampWatermark(c, { tag: "SOLIT POS • BUKTI LEMBUR" });
+      const compressedFile = await compressImage(res.file, { maxSizeMB: 1, maxWidthOrHeight: 1600 });
       streamRef.current?.getTracks().forEach(t => t.stop());
-      onCapture(res.file, res.dataUrl);
+      onCapture(compressedFile, res.dataUrl);
     } catch (err: any) {
       console.error("[WatermarkError]", err);
       setError("Gagal memproses watermark pada foto");
@@ -398,15 +400,15 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
       setProcessing(false);
     }
   };
-
   const handleGalleryFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setProcessing(true);
+       setProcessing(true);
     try {
       const res = await addTimestampWatermark(file, { tag: "SOLIT POS • BUKTI LEMBUR" });
+      const compressedFile = await compressImage(res.file, { maxSizeMB: 1, maxWidthOrHeight: 1600 });
       streamRef.current?.getTracks().forEach(t => t.stop());
-      onCapture(res.file, res.dataUrl);
+      onCapture(compressedFile, res.dataUrl);
     } catch (err: any) {
       console.error("[WatermarkError]", err);
       setError("Gagal memproses watermark pada gambar galeri");
@@ -414,7 +416,6 @@ function CameraCapture({ onCapture, onCancel }: CCProps) {
       setProcessing(false);
     }
   };
-
   return (
     <div className="space-y-3">
       {error ? (
