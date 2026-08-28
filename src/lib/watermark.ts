@@ -111,8 +111,23 @@ export async function addTimestampWatermark(
     try {
       const img = await loadImage(srcUrl);
       canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth || img.width || 1280;
-      canvas.height = img.naturalHeight || img.height || 720;
+      
+      let width = img.naturalWidth || img.width || 1280;
+      let height = img.naturalHeight || img.height || 720;
+      const MAX_DIMENSION = 1280;
+
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        if (width > height) {
+          height = Math.round((height * MAX_DIMENSION) / width);
+          width = MAX_DIMENSION;
+        } else {
+          width = Math.round((width * MAX_DIMENSION) / height);
+          height = MAX_DIMENSION;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
       ctx = canvas.getContext("2d")!;
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     } finally {
