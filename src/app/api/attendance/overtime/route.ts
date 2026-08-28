@@ -840,7 +840,14 @@ export async function PATCH(request: Request) {
         supabase.from("user_date_work").select("work_date").eq("user_id", overtime.user_id).gte("work_date", firstDay).lte("work_date", lastDay),
       ]);
 
-      if (!salaryRow) {
+      const isPKL = isPKLRole(targetUser?.role ?? "");
+
+      // ✅ FIX — PKL tidak wajib punya data gaji bulanan (menu Rekap Gaji).
+      // Kalau salaryRow tidak ada TAPI user ini PKL, izinkan audit jalan
+      // pakai nominal manual (rate_per_hour / total_pay) yang memang sudah
+      // dikirim dari modal "Atur Bayaran" — sebelumnya dua field ini selalu
+      // diabaikan di sini untuk kasus non-holiday.
+      if (!salaryRow && !isPKL) {
         return NextResponse.json({
           success: false,
           message: "Karyawan ini belum punya data gaji (menu Rekap Gaji) — atur gaji dulu sebelum audit lembur.",
@@ -855,21 +862,56 @@ export async function PATCH(request: Request) {
       const workOverrideDates = new Set<string>((dateWorks ?? []).map((r: any) => r.work_date));
       const effectiveWorkdays = countEffectiveWorkdaysInMonth(year, month0, weeklyOffDows, offDates, workOverrideDates);
 
-      const { nominal, perMinuteRate, eligible } = computeOvertimeNominal({
-        baseSalary: salaryRow.base_salary,
-        effectiveWorkdays,
-        overtimeMinutes: overtime.duration_minutes ?? 0,
-        salaryType: salaryRow.salary_type,
-      });
+      let nominal: number;
+      let perMinuteRate: number | null;
+      let eligible = true;
+      let finalRatePerHour: number | null = null;
 
-      const { data, error } = await supabase.from("overtime_requests").update({
+      if (salaryRow) {
+        const computed = computeOvertimeNominal({
+          baseSalary: salaryRow.base_salary,
+          effectiveWorkdays,
+          overtimeMinutes: overtime.duration_minutes ?? 0,
+          salaryType: salaryRow.salary_type,
+        });
+        nominal = computed.nominal;
+        perMinuteRate = computed.perMinuteRate;
+        eligible = computed.eligible;
+      } else {
+        // PKL tanpa salaryRow — nominal murni dari input manual admin.
+        const durationMinutes = overtime.duration_minutes ?? 0;
+        if (typeof rate_per_hour === "number" && rate_per_hour >= 0) {
+          finalRatePerHour = rate_per_hour;
+          perMinuteRate = rate_per_hour / 60;
+          nominal = Math.round((durationMinutes / 60) * rate_per_hour);
+        } else if (typeof total_pay === "number" && total_pay >= 0) {
+          perMinuteRate = null;
+          nominal = Math.round(total_pay);
+        } else {
+          return NextResponse.json({
+            success: false,
+            message: "PKL belum punya data gaji bulanan — isi Tarif per Jam atau Nominal Tetap dulu di 'Atur Bayaran' sebelum audit.",
+          }, { status: 400 });
+        }
+      }
+
+      // ✅ FIX — rate_per_hour hanya ditulis untuk jalur PKL-manual
+      // (salaryRow kosong). Untuk karyawan biasa (salaryRow ada), kolom ini
+      // TIDAK disentuh sama sekali, persis seperti perilaku sebelum
+      // perubahan ini — supaya tidak menimpa data lama secara tidak sengaja.
+      const auditUpdatePayload: Record<string, any> = {
         audit_status: "AUDITED", audited_by: user.id, audited_at: new Date().toISOString(),
-        base_salary_snapshot: salaryRow.base_salary,
+        base_salary_snapshot: salaryRow?.base_salary ?? null,
         effective_workdays_snapshot: effectiveWorkdays,
         per_minute_rate: perMinuteRate,
         total_pay: nominal,
         updated_at: new Date().toISOString(),
-      }).eq("id", id).select().single();
+      };
+      if (!salaryRow) {
+        auditUpdatePayload.rate_per_hour = finalRatePerHour;
+      }
+
+      const { data, error } = await supabase.from("overtime_requests").update(auditUpdatePayload).eq("id", id).select().single();
 
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
 
@@ -937,7 +979,6 @@ export async function PATCH(request: Request) {
             updatePayload.actual_end = lockedEnd;
             updatePayload.completed_at = lockedEnd;
             updatePayload.duration_minutes = durationMins;
-            // ✅ FIX: proporsional per menit, bukan dibulatkan ke bawah per jam.
             updatePayload.total_pay = Math.round((durationMins / 60) * ratePerHour);
           }
         }
