@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasPermission, PERMISSIONS } from "@/lib/permissions";
-import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban, Wallet, Receipt } from "lucide-react";
+import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban, Wallet, Receipt, Download } from "lucide-react";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import html2canvas from "html2canvas";
 
 interface PendingTransaction {
     id: string;
@@ -54,6 +55,51 @@ function daysSince(iso: string) {
     if (days === 0) return "Hari ini";
     if (days === 1) return "1 hari";
     return `${days} hari`;
+}
+
+// ── Auto-crop canvas hasil screenshot: buang area yang warnanya sama
+// dengan background (dideteksi dari pixel pojok kiri-atas), sisakan cuma
+// bounding box konten aslinya (card invoice) + sedikit padding. ──
+function trimCanvas(canvas: HTMLCanvasElement, padding = 24): HTMLCanvasElement {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return canvas;
+    const { width, height } = canvas;
+    const { data } = ctx.getImageData(0, 0, width, height);
+
+    const bgR = data[0], bgG = data[1], bgB = data[2];
+    const threshold = 12;
+    const isBg = (i: number) =>
+        Math.abs(data[i] - bgR) <= threshold &&
+        Math.abs(data[i + 1] - bgG) <= threshold &&
+        Math.abs(data[i + 2] - bgB) <= threshold;
+
+    const rowIsBg = (y: number) => {
+        for (let x = 0; x < width; x++) { if (!isBg((y * width + x) * 4)) return false; }
+        return true;
+    };
+    const colIsBg = (x: number) => {
+        for (let y = 0; y < height; y++) { if (!isBg((y * width + x) * 4)) return false; }
+        return true;
+    };
+
+    let top = 0, bottom = height - 1, left = 0, right = width - 1;
+    while (top < bottom && rowIsBg(top)) top++;
+    while (bottom > top && rowIsBg(bottom)) bottom--;
+    while (left < right && colIsBg(left)) left++;
+    while (right > left && colIsBg(right)) right--;
+
+    const cropX = Math.max(0, left - padding);
+    const cropY = Math.max(0, top - padding);
+    const cropW = Math.min(width - cropX, right - left + 1 + padding * 2);
+    const cropH = Math.min(height - cropY, bottom - top + 1 + padding * 2);
+
+    if (cropW <= 0 || cropH <= 0) return canvas; // fallback aman kalau deteksi gagal
+
+    const trimmed = document.createElement("canvas");
+    trimmed.width = cropW;
+    trimmed.height = cropH;
+    trimmed.getContext("2d")?.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+    return trimmed;
 }
 
 function getOriginalStatus(tx: PendingTransaction): "RESERVED" | "HELD" | null {
@@ -289,7 +335,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                 <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
                     {/* Info rows */}
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100 overflow-hidden">
-                                             {[
+                        {[
                             // FIX: sebelumnya cuma ada 2 kondisi (RESERVED vs selain-itu),
                             // jadi PACKING & PENDING ikut ketampil "Ambil Dulu". Sekarang
                             // pakai StatusBadge yang sama dengan tabel biar konsisten.
@@ -329,7 +375,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                         </button>
                     </div>
 
-                   {showCicilanForm && (
+                    {showCicilanForm && (
                         <div className="space-y-1.5">
                             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">Nominal Cicilan</label>
                             <input
@@ -422,7 +468,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
 
                 <div className="px-5 py-3 border-t border-gray-100 flex gap-2.5 shrink-0">
                     <button onClick={onClose} disabled={loading} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
-                   <button onClick={handleConfirm}
+                    <button onClick={handleConfirm}
                         disabled={loading || uploadingPhoto || !paymentPhoto || (showCicilanForm ? !cicilanAmount : !lunasAmount)}
                         className="flex-1 h-10 bg-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:bg-[#1a1545] transition-colors disabled:opacity-40 disabled:hover:bg-[#0f0c29] flex items-center justify-center gap-2 shadow-sm">
                         {loading
@@ -551,7 +597,7 @@ function StatusBadge({ status }: { status: "RESERVED" | "HELD" | "PENDING" | "PA
 }
 
 // ─── Table row for PENDING ────────────────────────────────────────────────────
-function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, onWhatsApp, idx }: {
+function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, onWhatsApp, onDownload, downloadingInvoice, idx }: {
     tx: PendingTransaction;
     canConfirm: boolean;
     canCancel: boolean;
@@ -559,6 +605,8 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
     onCancel: (tx: PendingTransaction) => void;
     onDetail: (tx: PendingTransaction) => void;
     onWhatsApp: (tx: PendingTransaction) => void;
+    onDownload: (tx: PendingTransaction) => void;
+    downloadingInvoice: string | null;
     idx: number;
 }) {
     const isOld = Date.now() - new Date(tx.created_at).getTime() > 3 * 86_400_000;
@@ -642,7 +690,7 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
                             Lunas
                         </button>
                     )}
-                                        {canCancel && (
+                    {canCancel && (
                         <button onClick={() => onCancel(tx)}
                             title="Tidak Jadi — batalkan pesanan"
                             className="h-7 px-2.5 flex items-center gap-1 rounded-lg text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all">
@@ -651,6 +699,7 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
                         </button>
                     )}
                     <a
+
                         href={`/invoice/${tx.invoice_number}`}
                         target="_blank"
                         rel="noreferrer"
@@ -659,6 +708,16 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
                         <Receipt size={12} />
                         Invoice
                     </a>
+                    <button
+                        onClick={() => onDownload(tx)}
+                        disabled={downloadingInvoice === tx.invoice_number}
+                        title="Download Invoice (PNG)"
+                        className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all disabled:opacity-50">
+                        {downloadingInvoice === tx.invoice_number
+                            ? <div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-emerald-600 rounded-full animate-spin" />
+                            : <Download size={14} />
+                        }
+                    </button>
                 </div>
             </td>
         </tr>
@@ -847,8 +906,9 @@ export default function PendingOrdersPage() {
     const [cancelTx, setCancelTx] = useState<PendingTransaction | null>(null);
     const [cancelling, setCancelling] = useState(false);
 
-    const [userId, setUserId] = useState<string | null>(null);
+     const [userId, setUserId] = useState<string | null>(null);
     const canCancel = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
+    const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
 
     const CONFIRM_PAYMENT_ROLES = [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -956,6 +1016,88 @@ export default function PendingOrdersPage() {
             `— *Solit*`,
         ].join("\n");
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+    };
+
+    // ── Download Invoice sebagai PNG: render halaman /invoice/[invoice] di
+    // iframe tersembunyi (tetap ke-render, cuma diposisikan di luar layar),
+    // lalu di-screenshot pakai html2canvas dan didownload sebagai file .png ──
+    const handleDownloadInvoice = (tx: PendingTransaction) => {
+        setDownloadingInvoice(tx.invoice_number);
+
+        const iframe = document.createElement("iframe");
+        iframe.style.position = "fixed";
+        iframe.style.top = "-10000px";
+        iframe.style.left = "0";
+        iframe.style.width = "800px";
+        iframe.style.height = "1200px";
+        iframe.style.border = "none";
+        iframe.style.pointerEvents = "none";
+        iframe.src = `/invoice/${tx.invoice_number}`;
+
+        const cleanup = () => {
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+            setDownloadingInvoice(null);
+        };
+
+        iframe.onerror = () => {
+            setAlertModal("Gagal memuat halaman invoice.");
+            cleanup();
+        };
+
+        iframe.onload = () => {
+            // Jeda agar data invoice (fetch client-side di halaman /invoice)
+            // sempat selesai di-render sebelum di-screenshot.
+            setTimeout(async () => {
+                try {
+                    const doc = iframe.contentDocument;
+                    if (!doc || !doc.body) throw new Error("Konten invoice tidak ditemukan");
+
+                    // Sembunyikan tombol/link "Kembali ke Riwayat Pending" (atau
+                    // navigasi apapun yang teksnya mengandung "kembali") biar gak
+                    // ikut ke-screenshot
+                    doc.querySelectorAll("a, button").forEach((el) => {
+                        if (el.textContent?.toLowerCase().includes("kembali")) {
+                            (el as HTMLElement).style.display = "none";
+                        }
+                    });
+
+                    // Samakan tinggi iframe dengan tinggi konten asli biar tidak kepotong
+                    iframe.style.height = `${doc.body.scrollHeight}px`;
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                    const fullCanvas = await html2canvas(doc.body, {
+                        backgroundColor: "#ffffff",
+                        scale: 2,
+                        useCORS: true,
+                    });
+                    // Buang area kosong di sekeliling card invoice, sisakan
+                    // cuma bounding box invoice-nya + sedikit padding
+                    const canvas = trimCanvas(fullCanvas);
+
+                    canvas.toBlob((blob) => {
+                        if (!blob) {
+                            setAlertModal("Gagal membuat gambar invoice.");
+                            cleanup();
+                            return;
+                        }
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `invoice-${tx.invoice_number}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                        cleanup();
+                    }, "image/png");
+                } catch {
+                    setAlertModal("Gagal mengunduh invoice sebagai gambar.");
+                    cleanup();
+                }
+            }, 900);
+        };
+
+        document.body.appendChild(iframe);
     };
 
     const filtered = transactions.filter(tx => {
@@ -1173,7 +1315,9 @@ export default function PendingOrdersPage() {
                                                     onConfirm={setConfirmPaymentTx}
                                                     onCancel={setCancelTx}
                                                     onDetail={setDetailTx}
-                                                    onWhatsApp={handleWhatsApp} />
+                                                    onWhatsApp={handleWhatsApp}
+                                                    onDownload={handleDownloadInvoice}
+                                                    downloadingInvoice={downloadingInvoice} />
                                             ))
                                         )}
                                     </tbody>
