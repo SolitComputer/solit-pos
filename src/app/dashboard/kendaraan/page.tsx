@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Car, Bike, Plus, Pencil, Trash2, Inbox, LogOut, CheckCircle2,
-  Loader2, BatteryMedium, Wrench, RefreshCw, Send, AlertTriangle,
+  Loader2, Fuel, User, Wrench, RefreshCw, Send, AlertTriangle,
 } from "lucide-react";
 import {
   inp, lbl, primaryBtn, secondaryBtn, ErrorBanner, Spinner, EmptyState,
@@ -14,12 +14,21 @@ import {
 import { ApproveRequestModal, RejectRequestModal } from "@/components/kendaraan/ApprovalModals";
 import VehicleSopGate from "@/components/kendaraan/VehicleSopGate";
 
+type LastUsage = {
+  borrower_name: string;
+  status: string;
+  fuel: string | null;
+  condition: string | null;
+  at: string | null;
+};
 type Vehicle = {
   id: string;
   name: string;
   type: "MOTOR" | "MOBIL";
   status: "TERSEDIA" | "DIPAKAI" | "MAINTENANCE";
   battery_level: string | null;
+  fuel_level: string | null;
+  lastUsage?: LastUsage | null;
 };
 type UserLite = { id: string; name: string; role: string };
 type BorrowRequest = {
@@ -300,11 +309,19 @@ function VehicleCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-black text-gray-900 truncate">{v.name}</p>
-          {v.type === "MOTOR" && v.battery_level && (
-            <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
-              <BatteryMedium size={12} className="text-emerald-500" /> {v.battery_level}
-            </p>
-          )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+            <span className="text-[10px] text-gray-500 flex items-center gap-1">
+              <Fuel size={12} className="text-emerald-500" /> {v.fuel_level || "—"}
+            </span>
+            {v.lastUsage && (
+              <span className="text-[10px] text-gray-500 flex items-center gap-1 truncate max-w-[140px]">
+                <User size={12} className="text-gray-400" />
+                {v.status === "DIPAKAI" && v.lastUsage.status === "APPROVED"
+                  ? v.lastUsage.borrower_name
+                  : `Terakhir: ${v.lastUsage.borrower_name}`}
+              </span>
+            )}
+          </div>
         </div>
         <VehicleStatusBadge status={v.status} />
       </div>
@@ -506,7 +523,7 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
   const isEdit = !!vehicle;
   const [name, setName] = useState(vehicle?.name ?? "");
   const [type, setType] = useState<"MOTOR" | "MOBIL">(vehicle?.type ?? "MOTOR");
-  const [battery, setBattery] = useState(vehicle?.battery_level ?? "");
+  const [fuel, setFuel] = useState(vehicle?.fuel_level ?? "");
   const [status, setStatus] = useState(vehicle?.status ?? "TERSEDIA");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -520,7 +537,7 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
     try {
       const url = isEdit ? `/api/vehicles/${vehicle!.id}` : "/api/vehicles";
       const method = isEdit ? "PUT" : "POST";
-      const payload: any = { name: name.trim(), type, battery_level: type === "MOTOR" ? battery.trim() : "" };
+      const payload: any = { name: name.trim(), type, fuel_level: fuel.trim() };
       if (isEdit) payload.status = status;
       const res = await fetch(url, {
         method,
@@ -554,12 +571,18 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
             <option value="MOBIL">Mobil</option>
           </select>
         </div>
-        {type === "MOTOR" && (
-          <div>
-            <label className={lbl}>Indikator Baterai (opsional)</label>
-            <input value={battery} onChange={(e) => setBattery(e.target.value)} placeholder="mis. 100%, 2 bar (kosongkan kalau non-listrik)" className={inp} />
-          </div>
-        )}
+        <div>
+          <label className={lbl}>{type === "MOBIL" ? "Level Bensin (awal)" : "Level Bensin / Baterai (awal)"}</label>
+          <input
+            value={fuel}
+            onChange={(e) => setFuel(e.target.value)}
+            placeholder="mis. Full, 1/2, 80%, 3 bar"
+            className={inp}
+          />
+          <p className="text-[10px] text-gray-400 mt-1.5">
+            Otomatis ter-update ke level checkout terakhir tiap kendaraan selesai dipakai.
+          </p>
+        </div>
         {isEdit && (
           <div>
             <label className={lbl}>Status</label>
