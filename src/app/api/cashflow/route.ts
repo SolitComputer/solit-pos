@@ -60,7 +60,7 @@ function buildTxPayload(t: any) {
 }
 
 function buildSvcPayload(s: any, techName: string) {
-   const refDate = (s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
+    const refDate = (s.tanggal_diambil || s.tanggal_selesai || s.tanggal_masuk) as string;
     return {
         direction: "IN",
         category: "SERVICE",
@@ -201,20 +201,29 @@ async function syncServiceEntries(
         }
 
         const desired = buildSvcPayload(s, techName);
-        if (desired.nominal <= 0 || desired.tanggal < CASHFLOW_START_DATE) continue;
+
+        // ⬅️ FIX: dulu baris ini nge-skip TOTAL (insert & update) kalau nominal <= 0 —
+        // jadi waktu payment_amount di Riwayat Servis diedit JADI 0 setelah entry-nya
+        // sudah ada di Cashflow, reconcile ikut ke-skip & nominal lama tetap "nyangkut".
+        // Sekarang tanggal tetap wajib valid, tapi nominal 0 tetap lanjut diproses —
+        // aturan insert-vs-update-nya dipisah di bawah.
+        if (desired.tanggal < CASHFLOW_START_DATE) continue;
 
         const cur = existingMap.get(String(s.id));
 
-               if (!cur) {
+        if (!cur) {
+            // Entry BARU (belum pernah tercatat di Cashflow) hanya dibuat kalau nominal > 0.
+            // Servis yang dari AWAL memang gratis (payment_amount 0, tidak pernah diedit)
+            // tidak perlu bikin entry Rp0 baru — biar Cashflow tidak penuh entry kosong.
+            if (desired.nominal <= 0) continue;
             toInsert.push({ ...desired, is_audited: false });
             continue;
         }
 
-        // ⬅️ FIX: entry SERVICE tetap direkonsiliasi walau SUDAH diaudit — beda dari
-        // TRANSACTION yang sengaja dikunci pas diaudit (badge "Kini Rp..."). Kalau
-        // payment_amount diedit lewat Riwayat Servis > Edit Payment, nominal di
-        // Cashflow harus LANGSUNG berubah ke angka baru, bukan cuma ditandai stale.
-        // is_audited & audited_at/audited_by TIDAK ikut ter-reset — status audit tetap.
+        // Entry SUDAH ADA di Cashflow — direkonsiliasi APA ADANYA mengikuti payment_amount
+        // TERKINI di service_orders, TERMASUK kalau turun jadi 0. Berlaku juga walau
+        // entry-nya sudah diaudit (beda dari TRANSACTION yang sengaja dikunci pas diaudit).
+        // is_audited, audited_at, audited_by TIDAK ikut berubah — status audit tetap sama.
         const patch = diffPayload(cur, desired);
         if (Object.keys(patch).length > 0) updates.push({ id: cur.id, patch });
     }
@@ -392,43 +401,62 @@ async function syncDerivedEntries(supabase: SupabaseClient) {
     await syncTransactionEntries(supabase);
     await syncTransactionPaymentEntries(supabase);
 
-    const { data: services, error: svcError } = await supabase
-        .from("service_orders")
-        .select(`
-            id,
-            nama,
-            payment_amount,
-            payment_method,
-            tanggal_selesai,
-            tanggal_diambil,
-            tanggal_masuk,
-            status,
-            dikerjakan_by,
-            dikerjakan_by_user:users!service_orders_dikerjakan_by_fkey(id, name)
-        `)
-        .in("status", ["SUDAH_DIAMBIL"])
-        .not("payment_amount", "is", null)
-        .gt("payment_amount", 0);
+    // ⬅️ FIX: dulu pakai .select() biasa tanpa pagination → PostgREST default
+    // limit 1000 baris/query, jadi kalau service SUDAH_DIAMBIL + payment_amount>0
+    // sudah lebih dari 1000, sisanya kepotong diam-diam & TIDAK PERNAH direkonsiliasi.
+    // Ditambah tidak ada .order() eksplisit, jadi baris mana yg "kepilih" masuk 1000
+    // pertama itu tidak konsisten antar-request — makanya kelihatan "acak" mana yang
+    // ke-update mana yang enggak. fetchAllRows menangani pagination-nya otomatis,
+    // sama seperti fix yang sudah dipakai buat fetch cashflow_entries di atas.
+    let services: any[] = [];
+    try {
+        services = await fetchAllRows<any>((from, to) =>
+            supabase
+                .from("service_orders")
+                .select(`
+                    id,
+                    nama,
+                    payment_amount,
+                    payment_method,
+                    tanggal_selesai,
+                    tanggal_diambil,
+                    tanggal_masuk,
+                    status,
+                    dikerjakan_by,
+                    dikerjakan_by_user:users!service_orders_dikerjakan_by_fkey(id, name)
+                `)
+                .in("status", ["SUDAH_DIAMBIL"])
+                .not("payment_amount", "is", null)
+                .gte("payment_amount", 0)   // ⬅️ FIX: dulu .gt(0) — service yang payment_amount-nya
+                // diedit JADI 0 tidak pernah ke-fetch sama sekali, jadi
+                // tidak pernah sampai direkonsiliasi ke Cashflow.
+                .order("id", { ascending: true })
+                .range(from, to)
+        );
+    } catch (svcError: any) {
+        console.error("[cashflow sync] fetch service error:", svcError?.message ?? svcError);
 
-    if (svcError) {
-        console.error("[cashflow sync] fetch service error:", svcError.message);
-
-        const { data: servicesFallback, error: svcFbError } = await supabase
-            .from("service_orders")
-            .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, tanggal_masuk, status, dikerjakan_by")
-            .in("status", ["SUDAH_DIAMBIL"])
-            .not("payment_amount", "is", null)
-            .gt("payment_amount", 0);
-
-        if (svcFbError) {
-            console.error("[cashflow sync] fetch service fallback error:", svcFbError.message);
-        } else if (servicesFallback && servicesFallback.length > 0) {
-            await syncServiceEntries(supabase, servicesFallback, new Map());
+        try {
+            const servicesFallback = await fetchAllRows<any>((from, to) =>
+                supabase
+                    .from("service_orders")
+                    .select("id, nama, payment_amount, payment_method, tanggal_selesai, tanggal_diambil, tanggal_masuk, status, dikerjakan_by")
+                    .in("status", ["SUDAH_DIAMBIL"])
+                    .not("payment_amount", "is", null)
+                    .gte("payment_amount", 0)   // ⬅️ FIX: sama seperti query utama di atas
+                    .order("id", { ascending: true })
+                    .range(from, to)
+            );
+            if (servicesFallback.length > 0) {
+                await syncServiceEntries(supabase, servicesFallback, new Map());
+            }
+        } catch (svcFbError: any) {
+            console.error("[cashflow sync] fetch service fallback error:", svcFbError?.message ?? svcFbError);
         }
         return;
     }
 
-    if (services && services.length > 0) {
+    if (services.length > 0) {
         const technicianNameMap = new Map<string, string>();
         for (const svc of services as any[]) {
             const techName = getJoinedName(svc.dikerjakan_by_user);
@@ -487,7 +515,7 @@ export const GET = withAuth(async () => {
         )
     );
 
-       // Entry pembayaran (source_id = id baris transaction_payments) perlu di-lookup dulu
+    // Entry pembayaran (source_id = id baris transaction_payments) perlu di-lookup dulu
     // ke invoice_number-nya sebelum bisa cek status transaksi induk.
     const paymentInvoiceMap = new Map<string, string>();
     if (paymentSourceIds.length > 0) {
@@ -526,7 +554,7 @@ export const GET = withAuth(async () => {
         }
     }
 
-       const all = rawAll.map((e: any) => {
+    const all = rawAll.map((e: any) => {
         if (e.source_type === "TRANSACTION" && e.source_id) {
             const tx = txMap.get(e.source_id as string);
             const isVoided = !!tx && tx.status !== "PAID";
@@ -552,7 +580,7 @@ export const GET = withAuth(async () => {
             return { ...e, is_voided: isVoided, is_stale: false, source_nominal: null, tx_payment_method: tx?.paymentMethod ?? null, invoice_number: e.source_id as string };
         }
 
-                return { ...e, is_voided: false, is_stale: false };
+        return { ...e, is_voided: false, is_stale: false };
     });
 
     const masuk = all.filter((e: any) => e.direction === "IN");
