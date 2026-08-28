@@ -686,5 +686,6 @@ export const config = {
     "/api/achievements/:path*",
     "/api/leads-chat/:path*",
     "/api/webhooks/:path*",
+    "/api/vehicles/:path*",
   ],
 };
