@@ -31,6 +31,8 @@ interface Props {
     canSeePrivate: boolean;
     /** Klik baris unit → buka Pop-up Detail unit */
     onSelectUnit?: (unit: PreviewUnit) => void;
+    /** Tombol "Tambah Unit" saat daftar unit masih kosong (stok = 0) */
+    onAddUnit?: () => void;
 }
 
 const STATUS_STYLE: Record<string, { badge: string; dot: string; label: string }> = {
@@ -53,7 +55,7 @@ const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 const fmtDate = (iso?: string) =>
     iso ? new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
-export default function LaptopUnitsPreview({ laptopId, canSeePrivate, onSelectUnit }: Props) {
+export default function LaptopUnitsPreview({ laptopId, canSeePrivate, onSelectUnit, onAddUnit }: Props) {
     const [units, setUnits] = useState<PreviewUnit[] | null>(null);
     const [error, setError] = useState("");
     const [showSold, setShowSold] = useState(false);
@@ -99,7 +101,19 @@ export default function LaptopUnitsPreview({ laptopId, canSeePrivate, onSelectUn
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Daftar Unit</p>
                 <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-4 py-6 text-center">
                     <p className="text-sm text-gray-500 font-medium">Belum ada unit terdaftar</p>
-                    <p className="text-xs text-gray-400 mt-1">Tambahkan SN lewat halaman Units.</p>
+                    <p className="text-xs text-gray-400 mt-1">Tambahkan unit pertama (SN) untuk laptop ini.</p>
+                    {onAddUnit && (
+                        <button
+                            type="button"
+                            onClick={onAddUnit}
+                            className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition"
+                        >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Tambah Unit
+                        </button>
+                    )}
                 </div>
             </div>
         );

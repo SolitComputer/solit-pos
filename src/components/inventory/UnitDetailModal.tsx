@@ -34,8 +34,12 @@ interface Props {
     laptopMeta?: string;
     /** Spesifikasi model untuk ditampilkan di dalam modal (CPU, RAM, GPU, dst) */
     laptopSpecs?: { label: string; value?: string | null }[];
-    /** Full Access → boleh toggle mode Edit */
+       /** Full Access → boleh toggle mode Edit (dipakai untuk tombol "Info Laptop") */
     canEdit: boolean;
+    /** Boleh tambah unit baru & edit data unit (SN, harga, dst). Default ke
+     *  `canEdit` kalau tidak diisi, supaya pemanggil lama (halaman Units, dll)
+     *  yang belum kirim prop ini tetap berperilaku persis sama seperti sebelumnya. */
+    canManageUnit?: boolean;
     /** Boleh lihat Sumber, Harga Modal, Margin, Tanggal Masuk */
     canSeePrivate: boolean;
     onClose: () => void;
@@ -92,10 +96,14 @@ const inputCls =
 const OFFICIAL_PRICE_MARKUP = 300_000;
 
 export default function UnitDetailModal({
-    unit, laptopName, laptopMeta, laptopSpecs, canEdit, canSeePrivate, onClose, onSaved, onEditLaptop,
+    unit, laptopName, laptopMeta, laptopSpecs, canEdit, canManageUnit, canSeePrivate, onClose, onSaved, onEditLaptop,
     defaultSellingPrice, onCreated, onBack,
 }: Props) {
     useRegisterOverlay();
+    //  canManage khusus untuk aksi "+ Tambah Unit" & "Edit Data" (butuh CREATE_UNITS/
+    //  EDIT_UNITS di backend) — beda dari canEdit yang khusus tombol "Info Laptop"
+    //  (butuh EDIT_LAPTOP). Fallback ke canEdit kalau pemanggil belum kirim prop ini.
+    const canManage = canManageUnit ?? canEdit;
     const [isEditing, setIsEditing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -582,16 +590,16 @@ export default function UnitDetailModal({
                                     Info Laptop
                                 </button>
                             )}
-                            {/*  Tambah unit baru TETAP DI DALAM pop-up ini (bukan navigasi ke
+                                                        {/*  Tambah unit baru TETAP DI DALAM pop-up ini (bukan navigasi ke
                                 halaman Units) — supaya saat stok = 1, popup ini jadi satu-satunya
                                 tempat yang dibutuhkan untuk lihat, edit, maupun tambah unit. */}
-                            {canEdit && (
+                            {canManage && (
                                 <button onClick={() => setIsAdding(true)}
                                     className="h-11 px-4 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition flex items-center justify-center whitespace-nowrap">
                                     + Tambah Unit
                                 </button>
                             )}
-                            {canEdit && (
+                            {canManage && (
                                 <button onClick={() => setIsEditing(true)}
                                     className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition shadow-lg shadow-gray-800/20">
                                     Edit Data
