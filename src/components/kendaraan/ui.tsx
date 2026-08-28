@@ -5,10 +5,10 @@ import { AlertTriangle } from "lucide-react";
 
 // ─── SHARED STYLE TOKENS (samain dengan fitur Lembur) ───────────────────────
 export const inp =
-  "w-full h-10 border border-gray-200 rounded-xl px-3.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all placeholder:text-gray-300";
+  "w-full h-10 border border-gray-200 rounded-xl px-3.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-400 transition-all placeholder:text-gray-300";
 export const lbl = "text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5";
 export const primaryBtn =
-  "flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-violet-200";
+  "flex-1 h-10 bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-zinc-700 hover:to-zinc-800 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-zinc-900/20 ring-1 ring-inset ring-white/10";
 export const secondaryBtn =
   "flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all active:scale-[0.98] flex items-center justify-center";
 export const dangerBtn =
@@ -147,7 +147,7 @@ export function formatDateTime(iso: string | null | undefined): string {
 export function VehicleStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     TERSEDIA: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    DIPAKAI: "bg-violet-50 text-violet-700 border-violet-200",
+    DIPAKAI: "bg-zinc-100 text-zinc-700 border-zinc-200",
     MAINTENANCE: "bg-amber-50 text-amber-700 border-amber-200",
   };
   const label: Record<string, string> = { TERSEDIA: "Tersedia", DIPAKAI: "Dipakai", MAINTENANCE: "Maintenance" };
@@ -162,7 +162,7 @@ export function VehicleStatusBadge({ status }: { status: string }) {
 export function RequestStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     PENDING: "bg-amber-50 text-amber-700 border-amber-200",
-    APPROVED: "bg-violet-50 text-violet-700 border-violet-200",
+    APPROVED: "bg-zinc-100 text-zinc-700 border-zinc-200",
     REJECTED: "bg-red-50 text-red-600 border-red-200",
     COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   };

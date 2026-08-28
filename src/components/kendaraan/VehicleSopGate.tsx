@@ -92,7 +92,7 @@ export default function VehicleSopGate() {
     <>
       <div className="mb-5 flex items-center justify-between gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-200 text-violet-600 flex items-center justify-center shrink-0">
+            <span className="w-9 h-9 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 flex items-center justify-center shrink-0">
             <FileText size={16} />
           </span>
           <div className="min-w-0">
@@ -109,7 +109,7 @@ export default function VehicleSopGate() {
                 setForceRead(false);
                 setViewOpen(true);
               }}
-              className="h-9 px-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[11px] font-semibold flex items-center gap-1.5 transition active:scale-95"
+               className="h-9 px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-[11px] font-semibold flex items-center gap-1.5 transition active:scale-95"
             >
               <Eye size={14} /> Lihat SOP
             </button>
