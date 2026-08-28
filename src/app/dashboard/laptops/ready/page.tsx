@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
-import { Laptop, CheckCircle2, Lock, Trophy, ThumbsUp, AlertTriangle, Camera } from "lucide-react";
+import { Laptop, CheckCircle2, Lock, Trophy, ThumbsUp, AlertTriangle, Camera, Wrench } from "lucide-react";
 import { getAuthUser } from "@/hooks/useAuthUser";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -22,6 +22,8 @@ interface LaptopUnit {
     created_at: string;
     reserved_by?: string;
     reserved_invoice?: string;
+    being_prepared?: boolean;
+    preparing_order_number?: string | null;
     laptop?: {
         id: string;
         laptop_name: string;
@@ -110,6 +112,13 @@ function UnitInfoModal({ unit, onClose }: { unit: LaptopUnit; onClose: () => voi
                 </span>
             )
         },
+        ...(unit.being_prepared ? [{
+            label: "Status Penyiapan", value: (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border bg-orange-50 text-orange-700 border-orange-200">
+                    <Wrench size={12} /> Sedang Disiapkan{unit.preparing_order_number ? ` (${unit.preparing_order_number})` : ""}
+                </span>
+            )
+        }] : []),
         { label: "Harga Jual", value: <span className="font-bold text-gray-800">{fmt(unit.selling_price)}</span> },
         { label: "Kondisi", value: unit.condition_note || "—" },
         { label: "Catatan", value: unit.notes || "—" },
@@ -401,6 +410,7 @@ function ReadyContent() {
     const [filterBrand, setFilterBrand] = useState("ALL");
     const [filterRam, setFilterRam] = useState("ALL");
     const [filterPriceRange, setFilterPriceRange] = useState("ALL");
+    const [filterPrepared, setFilterPrepared] = useState("ALL"); // ALL | YES | NO
     const [sortBy, setSortBy] = useState("DEFAULT");
 
     const [alertMsg, setAlertMsg] = useState<string | null>(null);
@@ -493,6 +503,11 @@ function ReadyContent() {
             const [min, max] = ranges[filterPriceRange] ?? [0, Infinity];
             list = list.filter(u => u.selling_price >= min && u.selling_price < max);
         }
+        if (filterPrepared === "YES") {
+            list = list.filter(u => u.being_prepared);
+        } else if (filterPrepared === "NO") {
+            list = list.filter(u => !u.being_prepared);
+        }
 
         switch (sortBy) {
             case "AZ":
@@ -550,8 +565,7 @@ function ReadyContent() {
             }
         }
         return list;
-    }, [units, search, filterSN, filterStatus, filterBrand, filterRam, filterPriceRange, sortBy]);
-
+    }, [units, search, filterSN, filterStatus, filterBrand, filterRam, filterPriceRange, filterPrepared, sortBy]);
     const counts = {
         all: units.length,
         siap: units.filter(u => u.status === "SIAP_JUAL").length,
@@ -571,7 +585,7 @@ function ReadyContent() {
                 { header: "Brand", width: 14, align: "left" },
                 { header: "CPU", width: 22, align: "left" },
                 { header: "Display", width: 20, align: "left" },
-               { header: "Serial Number", width: 24, align: "center" },
+                { header: "Serial Number", width: 24, align: "center" },
                 { header: "Grade", width: 12, align: "center" },
                 { header: "Harga Setor", width: 18, align: "right", numFmt: '"Rp "#,##0' },
                 { header: "Status", width: 16, align: "center" },
@@ -614,7 +628,7 @@ function ReadyContent() {
         if (filtered.length === 0) return;
         setExportingType("setor");
         try {
-           const groups = groupUnitsByLaptop(filtered, u => u.selling_price ?? 0);
+            const groups = groupUnitsByLaptop(filtered, u => u.selling_price ?? 0);
             const colDefs: ExportColDef[] = [
                 { header: "No", width: 6, align: "center" },
                 { header: "Nama Laptop", width: 36, align: "left" },
@@ -652,7 +666,7 @@ function ReadyContent() {
         if (filtered.length === 0) return;
         setExportingType("official");
         try {
-           // Harga Official dihitung dari Harga Setor unit + markup tetap,
+            // Harga Official dihitung dari Harga Setor unit + markup tetap,
             // BUKAN dari kolom official_price mentah — biar konsisten dgn tabel web.
             const groups = groupUnitsByLaptop(filtered, u => (u.selling_price ?? 0) + OFFICIAL_PRICE_MARKUP);
             const colDefs: ExportColDef[] = [
@@ -694,6 +708,7 @@ function ReadyContent() {
         filterBrand !== "ALL" ||
         filterRam !== "ALL" ||
         filterPriceRange !== "ALL" ||
+        filterPrepared !== "ALL" ||
         sortBy !== "DEFAULT";
 
     const resetFilters = () => {
@@ -703,6 +718,7 @@ function ReadyContent() {
         setFilterBrand("ALL");
         setFilterRam("ALL");
         setFilterPriceRange("ALL");
+        setFilterPrepared("ALL");
         setSortBy("DEFAULT");
     };
 
@@ -840,19 +856,18 @@ function ReadyContent() {
 
                     {/* ── Filter — disamakan dengan Data Barang ───────────── */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2.5">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                            <div className="relative">
-                                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                                <input
-                                    type="text"
-                                    placeholder="Cari nama, brand, CPU, RAM, storage..."
-                                    value={search}
-                                    onChange={e => setSearch(e.target.value)}
-                                    className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 focus:border-violet-400 focus:bg-white transition"
-                                />
-                            </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">                            <div className="relative">
+                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Cari nama, brand, CPU, RAM, storage..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                className="w-full h-9 border border-gray-200 rounded-xl pl-8 pr-3 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400/20 focus:border-violet-400 focus:bg-white transition"
+                            />
+                        </div>
                             {/* Search SN — full width di mobile (col-span-2) */}
                             <div className="relative col-span-2 sm:col-span-1">
                                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -878,6 +893,11 @@ function ReadyContent() {
                                 <option value="2-3">Rp 2 jt – 3 jt</option>
                                 <option value="3-4">Rp 3 jt – 4 jt</option>
                                 <option value="4+">Rp 4 jt ke atas</option>
+                            </select>
+                            <select value={filterPrepared} onChange={e => setFilterPrepared(e.target.value)} className={selectCls}>
+                                <option value="ALL">Semua Status Penyiapan</option>
+                                <option value="YES">🔧 Sedang Disiapkan</option>
+                                <option value="NO">Belum/Tidak Disiapkan</option>
                             </select>
                         </div>
                         <div className="flex flex-wrap items-center gap-2.5">
@@ -909,6 +929,7 @@ function ReadyContent() {
                                 {filterBrand !== "ALL" && <FilterChip label={`Brand: ${filterBrand}`} onRemove={() => setFilterBrand("ALL")} />}
                                 {filterRam !== "ALL" && <FilterChip label={`RAM: ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
                                 {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
+                                {filterPrepared !== "ALL" && <FilterChip label={filterPrepared === "YES" ? "Sedang Disiapkan" : "Belum Disiapkan"} onRemove={() => setFilterPrepared("ALL")} />}
                                 {sortBy !== "DEFAULT" && <FilterChip label={`Sort: ${SORT_LABELS[sortBy] ?? sortBy}`} onRemove={() => setSortBy("DEFAULT")} />}
                             </div>
                         )}
@@ -963,6 +984,15 @@ function ReadyContent() {
                                                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap ${st.badge}`}>
                                                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${st.dot}`} />
                                                         {st.label}
+                                                    </span>
+                                                )}
+                                                {u.being_prepared && (
+                                                    <span
+                                                        title={u.preparing_order_number ? `Sedang di penyiapan ${u.preparing_order_number}` : undefined}
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border whitespace-nowrap bg-orange-50 text-orange-700 border-orange-200"
+                                                    >
+                                                        <Wrench size={10} className="flex-shrink-0" />
+                                                        Sedang Disiapkan
                                                     </span>
                                                 )}
                                                 {isPending && canConfirmTx && !confirmedUnitIds.has(u.id) && (
