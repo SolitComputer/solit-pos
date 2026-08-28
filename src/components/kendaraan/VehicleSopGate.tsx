@@ -4,9 +4,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { FileText, Eye, Pencil, Loader2 } from "lucide-react";
 import { getCurrentUserClient } from "@/lib/auth-client";
 import {
-  inp, lbl, primaryBtn, secondaryBtn, ErrorBanner, Spinner,
+  lbl, primaryBtn, secondaryBtn, ErrorBanner, Spinner,
   ModalWrapper, ModalHead, ModalFoot,
 } from "@/components/kendaraan/ui";
+import SopMarkdown from "@/components/kendaraan/SopMarkdown";
+import MarkdownEditor from "@/components/kendaraan/MarkdownEditor";
 
 type Sop = { content: string; updated_at: string; updated_by_name: string | null };
 
@@ -176,12 +178,8 @@ function SopViewModal({ sop, forceRead, onClose }: { sop: Sop; forceRead: boolea
         onClose={onClose}
         noClose={!canClose}
       />
-      <div
-        ref={scrollRef}
-        onScroll={checkEnd}
-        className="px-5 py-4 max-h-[55vh] overflow-y-auto text-xs text-gray-700 leading-relaxed whitespace-pre-wrap"
-      >
-        {sop.content}
+      <div ref={scrollRef} onScroll={checkEnd} className="px-5 py-4 max-h-[55vh] overflow-y-auto">
+        <SopMarkdown content={sop.content} />
       </div>
       <ModalFoot>
         {forceRead && !reachedEnd && (
@@ -236,14 +234,14 @@ function SopEditModal({
         {err && <ErrorBanner msg={err} />}
         <div>
           <label className={lbl}>Isi SOP</label>
-          <textarea
+          <MarkdownEditor
             value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={12}
-            placeholder={"Contoh:\n1. Pastikan kendaraan tersedia sebelum mengajukan.\n2. Kembalikan kendaraan dalam kondisi bersih.\n3. Isi bensin/baterai minimal seperti saat dipinjam.\n4. Laporkan kerusakan sejujurnya saat check-out."}
-            className={`${inp} h-auto py-2.5 resize-y leading-relaxed`}
+            onChange={setContent}
+            placeholder={"Contoh:\n\n## Aturan Peminjaman\n\n1. Pastikan kendaraan **tersedia** sebelum mengajukan.\n2. Kembalikan kendaraan dalam kondisi *bersih*.\n\n| Kondisi | Tindakan |\n| --- | --- |\n| Baik | Kembali normal |\n| Rusak | Lapor admin |"}
           />
-          <p className="text-[10px] text-gray-400 mt-1.5">Baris baru akan tampil apa adanya ke semua karyawan.</p>
+          <p className="text-[10px] text-gray-400 mt-1.5">
+            Blok teks lalu klik tombol format (tebal, miring, tabel, dll). Buka tab <b>Preview</b> untuk melihat hasilnya.
+          </p>
         </div>
       </div>
       <ModalFoot>
