@@ -385,14 +385,29 @@ export default function UnifiedBarangContent() {
         }
         if (search.trim()) {
             const t = search.toLowerCase();
-            list = list.filter(r =>
-                r.nama?.toLowerCase().includes(t) ||
-                r.brand?.toLowerCase().includes(t) ||
-                r.cpu?.toLowerCase().includes(t) ||
-                r.ram?.toLowerCase().includes(t) ||
-                r.storage?.toLowerCase().includes(t) ||
-                r.spek?.toLowerCase().includes(t)
-            );
+            list = list.filter(r => {
+                const matchString = (
+                    r.nama?.toLowerCase().includes(t) ||
+                    r.brand?.toLowerCase().includes(t) ||
+                    r.cpu?.toLowerCase().includes(t) ||
+                    r.ram?.toLowerCase().includes(t) ||
+                    r.storage?.toLowerCase().includes(t) ||
+                    r.spek?.toLowerCase().includes(t) ||
+                    r.sn?.toLowerCase().includes(t)
+                );
+
+                if (matchString) return true;
+
+                // Also check inside laptop_units array if there are multiple units
+                if (r.tipe === "LAPTOP" && r.raw && "laptop_units" in r.raw) {
+                    const units = (r.raw as LaptopRaw).laptop_units;
+                    if (units && units.some(u => u.serial_number?.toLowerCase().includes(t))) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
         }
         return list;
     }, [rows, tipeFilter, kategoriFilter, search]);
@@ -614,7 +629,7 @@ export default function UnifiedBarangContent() {
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                             <input className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 col-span-2"
-                                placeholder="Cari nama, brand, spek..." value={search} onChange={e => setSearch(e.target.value)} />
+                                placeholder="Cari nama, brand, spek, SN..." value={search} onChange={e => setSearch(e.target.value)} />
                             {tipeFilter === "LAPTOP" && (
                                 <select className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
                                     <option value="">Semua Kategori</option>
@@ -776,9 +791,9 @@ export default function UnifiedBarangContent() {
                                                 const auditActive = isAuditActive(row);
                                                 const soActive = isSoActive(row.so_at);
                                                 const zebra = idx % 2 === 1;
-                                                const rowBg = zebra ? "bg-gray-50/50" : "bg-white";
+                                                const rowBg = zebra ? "bg-gray-50" : "bg-white";
                                                 return (
-                                                    <tr key={`${row.tipe}-${row.id}`} className={`group border-b border-gray-50 hover:bg-indigo-50/40 transition-colors ${rowBg}`}>
+                                                    <tr key={`${row.tipe}-${row.id}`} className={`group border-b border-gray-50 hover:bg-indigo-50 transition-colors ${rowBg}`}>
                                                         <td className="px-3 py-3 text-xs text-gray-400 tabular-nums">{idx + 1}</td>
                                                         <td className="px-3 py-3">
                                                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-indigo-50 text-indigo-700" : "bg-violet-50 text-violet-700"}`}>
@@ -786,7 +801,7 @@ export default function UnifiedBarangContent() {
                                                                 {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
                                                             </span>
                                                         </td>
-                                                        <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-gray-800 max-w-[200px] truncate border-r border-gray-100 group-hover:bg-indigo-50/40 ${rowBg}`} title={row.nama}>{row.nama}</td>
+                                                        <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-gray-800 max-w-[200px] truncate border-r border-gray-100 group-hover:bg-indigo-50 ${rowBg}`} title={row.nama}>{row.nama}</td>
                                                         <td className="px-3 py-3 text-xs text-gray-500">{row.kategori || <Dash />}</td>
                                                         <td className="px-3 py-3 text-xs text-gray-500">{row.brand || <Dash />}</td>
                                                         <td className="px-3 py-3 text-xs text-gray-500">{row.cpu || <Dash />}</td>
@@ -838,7 +853,7 @@ export default function UnifiedBarangContent() {
                                                             </div>
                                                         </td>
                                                         <td className="px-3 py-3">
-                                                            <div className="flex items-center gap-1 flex-wrap">
+                                                            <div className="flex items-center gap-1 flex-nowrap min-w-max">
                                                                 {row.tipe === "LAPTOP" && row.unit_id && (
                                                                     <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
                                                                         className="h-7 px-2 text-[11px] font-semibold text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition">Pedagang</button>
