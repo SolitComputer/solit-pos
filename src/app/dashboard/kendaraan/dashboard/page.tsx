@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Car, CarFront, Inbox, Wrench, Clock, Trophy, Loader2, CheckCircle2, History } from "lucide-react";
+import { Car, CarFront, Inbox, Wrench, Clock, Trophy, Loader2, CheckCircle2, History, Fuel } from "lucide-react";
 import { ErrorBanner, EmptyState, formatTime, formatDateTime, formatDuration, liveDurationMinutes } from "@/components/kendaraan/ui";
 import { ApproveRequestModal, RejectRequestModal, type ApprovalRequest } from "@/components/kendaraan/ApprovalModals";
 import VehicleSopGate from "@/components/kendaraan/VehicleSopGate";
@@ -27,6 +27,7 @@ type HistoryReq = {
   actual_end: string | null;
   duration_minutes: number | null;
   return_condition: "BAIK" | "LECET" | "RUSAK" | null;
+  return_fuel_level: string | null;
   vehicle?: { name: string } | null;
   borrower?: UserLite | null;
 };
@@ -252,6 +253,12 @@ export default function KendaraanDashboardPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        {h.return_fuel_level && (
+                          <span className="hidden sm:flex text-[10px] text-gray-500 items-center gap-1">
+                            <Fuel size={11} className="text-emerald-500" />
+                            {h.return_fuel_level}
+                          </span>
+                        )}
                         {h.return_condition && <ConditionBadge condition={h.return_condition} />}
                         <span className="text-[11px] font-black tabular-nums text-gray-700">{formatDuration(h.duration_minutes)}</span>
                       </div>
