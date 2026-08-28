@@ -9,6 +9,7 @@ import { Laptop } from "lucide-react";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
 import LaptopUnitsPreview, { PreviewUnit } from "@/components/inventory/LaptopUnitsPreview";
+import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import { exportInventoryExcel } from "@/lib/inventoryExport";
 import { usePagePermission } from "@/hooks/usePagePermission";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -405,7 +406,11 @@ export function LaptopsContent() {
     const { can: matrixCan } = usePagePermission("laptops");
     const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP) || matrixCan.edit;
     const canDeleteLaptop = hasAnyRole(userRoles, LAPTOP_DELETE_ROLES) || matrixCan.delete;
-    const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP) || matrixCan.create;
+        const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP) || matrixCan.create;
+    //  Tambah Unit (SN) untuk laptop stok 0 — dipakai tombol "Tambah Unit" di
+    //  LaptopUnitsPreview (Pop-up Detail Laptop) & kolom Aksi tabel. Beda dari
+    //  canCreateLaptop yang untuk bikin MODEL laptop baru.
+    const canAddUnit = hasAnyRole(userRoles, PERMISSIONS.CREATE_UNITS);
     const canExport = hasAnyRole(userRoles, [
         "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES", "ACCOUNTING", "PENGELOLA_BARANG",
         "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "KEPALA_SOTECH",
@@ -451,7 +456,11 @@ export function LaptopsContent() {
     const [soHistoryTarget, setSoHistoryTarget] = useState<{ id: string; name: string } | null>(null);
 
     //  Isi Massal Harga Modal — laptop yang sedang dibuka modal isi massalnya
-    const [bulkPriceTarget, setBulkPriceTarget] = useState<{ id: string; name: string } | null>(null);
+       const [bulkPriceTarget, setBulkPriceTarget] = useState<{ id: string; name: string } | null>(null);
+    //  Tambah unit pertama untuk laptop stok 0 — dibuka dari tombol "Tambah Unit"
+    //  di LaptopUnitsPreview (Pop-up Detail Laptop) saat daftar unit masih kosong,
+    //  atau dari kolom Aksi tabel langsung (tanpa buka Detail dulu).
+    const [addUnitTarget, setAddUnitTarget] = useState<Laptop | null>(null);
 
     const showAlert = (msg: string) => setAlertModal(msg);
 
@@ -1374,10 +1383,23 @@ export function LaptopsContent() {
                                                     <span className="text-[10px] font-bold text-gray-400 tabular-nums">{row.stok_tersisa}</span>
                                                 </Link>
                                             )}
-                                            {row.stok_tersisa === 1 && (
+                                                                                       {row.stok_tersisa === 1 && (
                                                 <span className="h-7 px-2.5 text-[11px] font-semibold text-gray-400 bg-gray-50 border border-gray-100 rounded-lg flex items-center">
                                                     Detail
                                                 </span>
+                                            )}
+                                            {canAddUnit && row.stok_tersisa === 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setAddUnitTarget(l); }}
+                                                    className="h-7 px-2.5 text-[11px] font-semibold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-all duration-150 flex items-center gap-1"
+                                                    title="Tambah unit/SN pertama untuk laptop ini"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                                    </svg>
+                                                    Tambah Unit
+                                                </button>
                                             )}
                                             {canDeleteLaptop && (
                                                 <button
@@ -1575,9 +1597,13 @@ export function LaptopsContent() {
 
                         {/*  Daftar unit langsung di dalam pop-up — sebelumnya modal ini
                             hanya menampilkan spesifikasi model, jadi terlihat kosong. */}
-                        <LaptopUnitsPreview
+                                               <LaptopUnitsPreview
                             laptopId={selectedLaptop.id}
                             canSeePrivate={canSeePrivateBarang}
+                            onAddUnit={canAddUnit ? () => {
+                                closeModal();
+                                setTimeout(() => setAddUnitTarget(selectedLaptop), 60);
+                            } : undefined}
                             onSelectUnit={(u: PreviewUnit) => {
                                 const l = selectedLaptop;
                                 setModalMode(null); //  sembunyikan modal Detail tanpa reset selectedLaptop, biar tombol "Kembali" bisa buka lagi
@@ -1653,7 +1679,8 @@ export function LaptopsContent() {
                         { label: "Storage", value: unitDetail.laptop.storage },
                         { label: "GPU", value: unitDetail.laptop.gpu },
                         { label: "Display", value: unitDetail.laptop.display },
-                    ]} canEdit={canFullAccessBarang}
+                                       ]} canEdit={canFullAccessBarang}
+                    canManageUnit={canAddUnit}
                     canSeePrivate={canSeePrivateBarang}
                     defaultSellingPrice={unitDetail.laptop.selling_price}
                     onClose={() => { setUnitDetail(null); setUnitDetailFromLaptopDetail(false); }}
@@ -1699,7 +1726,7 @@ export function LaptopsContent() {
                     loading={soingId === soPromptLaptop.id}
                 />
             )}
-            {bulkPriceTarget && (
+                       {bulkPriceTarget && (
                 <BulkPriceModal
                     laptopId={bulkPriceTarget.id}
                     laptopName={bulkPriceTarget.name}
@@ -1709,6 +1736,19 @@ export function LaptopsContent() {
                         setBulkPriceTarget(null);
                         fetchLaptops();
                         showAlert(`Harga modal berhasil diperbarui untuk ${count} unit`);
+                    }}
+                />
+            )}
+            {addUnitTarget && (
+                <AddUnitModal
+                    laptopId={addUnitTarget.id}
+                    laptopName={addUnitTarget.laptop_name}
+                    defaultSellingPrice={addUnitTarget.selling_price}
+                    onClose={() => setAddUnitTarget(null)}
+                    onCreated={(unit: CreatedUnit) => {
+                        setAddUnitTarget(null);
+                        fetchLaptops();
+                        showAlert(`Unit dengan SN "${unit.serial_number}" berhasil ditambahkan`);
                     }}
                 />
             )}
