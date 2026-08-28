@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
+import { useVehiclePendingBadge } from "@/hooks/useVehiclePendingBadge";
 import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
@@ -884,26 +885,21 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   }
 });
 
-// Kendaraan: grup sendiri yang bisa di-collapse, berisi sub-menu Dashboard +
-// Management Kendaraan. Diakses SEMUA role (termasuk PKL). Ditaruh tepat setelah
-// grup "Utama".
-(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
-  const kendaraanGroup: MenuGroup = {
-    label: "Kendaraan",
-    items: [ITEM_KENDARAAN_DASHBOARD, ITEM_KENDARAAN],
-  };
-  const existingIdx = ROLE_MENUS[role].findIndex((g) => g.label === "Kendaraan");
-  if (existingIdx >= 0) {
-    ROLE_MENUS[role][existingIdx] = kendaraanGroup;
-    return;
-  }
-  const utamaIdx = ROLE_MENUS[role].findIndex((g) => g.label === "Utama");
-  if (utamaIdx >= 0) {
-    ROLE_MENUS[role].splice(utamaIdx + 1, 0, kendaraanGroup);
-  } else {
-    ROLE_MENUS[role].unshift(kendaraanGroup);
-  }
-});
+// Kendaraan: grup sendiri (collapsible) berisi Dashboard + Management Kendaraan.
+// Disuntik di level groups final (BUKAN per-role static), supaya muncul untuk SEMUA
+// user — termasuk yang pakai role dinamis (menu dari DB) yang tidak lewat ROLE_MENUS.
+const KENDARAAN_GROUP: MenuGroup = {
+  label: "Kendaraan",
+  items: [ITEM_KENDARAAN_DASHBOARD, ITEM_KENDARAAN],
+};
+
+// Pastikan grup "Kendaraan" ada tepat sekali, diposisikan setelah grup "Utama".
+function withKendaraanGroup(groups: MenuGroup[]): MenuGroup[] {
+  const rest = groups.filter((g) => g.label !== "Kendaraan");
+  const utamaIdx = rest.findIndex((g) => g.label === "Utama");
+  const at = utamaIdx >= 0 ? utamaIdx + 1 : 0;
+  return [...rest.slice(0, at), KENDARAAN_GROUP, ...rest.slice(at)];
+}
 
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   ADMIN: { label: "Admin / CEO", className: "bg-violet-50 text-violet-700" },
@@ -1301,15 +1297,17 @@ export default function Sidebar() {
       ? dedupeGroups(mergeMenuGroups(ROLE_MENUS as Record<string, MenuGroup[]>, effectiveRoles))
       : [];
 
-  const groups: MenuGroup[] = dedupeGroups([
-    ...(contractStatus && contractStatus !== "APPROVED" ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT] }] : []),
-    ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
-    ...staticGroups,
-    ...dynamicGroups.map((g) => ({
-      label: g.label,
-      items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
-    })),
-  ]);
+  const groups: MenuGroup[] = withKendaraanGroup(
+    dedupeGroups([
+      ...(contractStatus && contractStatus !== "APPROVED" ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT] }] : []),
+      ...(needsBiometricEnroll ? [{ label: "Keamanan Akun", items: [ITEM_BIOMETRIC_ENROLL] }] : []),
+      ...staticGroups,
+      ...dynamicGroups.map((g) => ({
+        label: g.label,
+        items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
+      })),
+    ])
+  );
 
   const groupsSig = groups.map((g) => g.label).join("|");
 
@@ -1378,6 +1376,8 @@ export default function Sidebar() {
 
   const prep = usePrepNotify(effectiveRoles, user?.id);
   const overtimeNotify = useOvertimeNotify(effectiveRoles, user?.id);
+  // Badge senyap (tanpa bunyi) untuk admin: pengajuan pinjam kendaraan yang PENDING
+  const vehiclePending = useVehiclePendingBadge(userRoles, user?.id);
   const leadsChat = useLeadsChatNotify(effectiveRoles, user?.id);
   const { sound_key: notifSoundKey, custom_sound_url: notifCustomUrl } = useNotificationSettings(user?.id ?? null);
 
@@ -1390,6 +1390,7 @@ export default function Sidebar() {
   const onAntrian = pathname.startsWith("/dashboard/preparation/antrian");
   const onSiapKirim = pathname.startsWith("/dashboard/preparation/siap-kirim");
   const onOvertimePage = pathname.startsWith("/dashboard/attendance/overtime");
+  const onKendaraanPage = pathname.startsWith("/dashboard/kendaraan");
 
   const isSilentAdmin = isPrepSilent(null, effectiveRoles);
 
@@ -1407,6 +1408,7 @@ export default function Sidebar() {
     "/dashboard/preparation/antrian": prep.menungguUnacked.length,
     "/dashboard/preparation/siap-kirim": prep.siapKirimUnacked.length,
     "/dashboard/attendance/overtime": onOvertimePage ? 0 : overtimeNotify.count,
+    "/dashboard/kendaraan": onKendaraanPage ? 0 : vehiclePending.count,
     "/dashboard/tanya-ceo": onTanyaCeoPage ? 0 : reminderUnread,
     "/dashboard/ai-ceo": aiCeoEscalationCount,
 

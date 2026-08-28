@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { Car, CarFront, Inbox, Wrench, Clock, Trophy, Loader2, ArrowLeft, CheckCircle2, History } from "lucide-react";
-import { ErrorBanner, formatTime, formatDateTime, formatDuration, liveDurationMinutes } from "@/components/kendaraan/ui";
+import { Car, CarFront, Inbox, Wrench, Clock, Trophy, Loader2, CheckCircle2, History, Fuel } from "lucide-react";
+import { ErrorBanner, EmptyState, formatTime, formatDateTime, formatDuration, liveDurationMinutes } from "@/components/kendaraan/ui";
 import { ApproveRequestModal, RejectRequestModal, type ApprovalRequest } from "@/components/kendaraan/ApprovalModals";
+import VehicleSopGate from "@/components/kendaraan/VehicleSopGate";
 
 type UserLite = { id: string; name: string; role: string };
 type Req = {
@@ -27,6 +27,7 @@ type HistoryReq = {
   actual_end: string | null;
   duration_minutes: number | null;
   return_condition: "BAIK" | "LECET" | "RUSAK" | null;
+  return_fuel_level: string | null;
   vehicle?: { name: string } | null;
   borrower?: UserLite | null;
 };
@@ -64,12 +65,16 @@ export default function KendaraanDashboardPage() {
     reload();
   }, [reload]);
 
-  // Tick durasi live tiap 30 detik (di-set setelah mount -> tidak ada hydration mismatch)
+  // Tick durasi live + auto-refresh data tiap 30 detik (di-set setelah mount -> tidak ada
+  // hydration mismatch). Auto-refresh bikin metric & antrian selalu up to date.
   useEffect(() => {
     setNowMs(Date.now());
-    const t = setInterval(() => setNowMs(Date.now()), 30000);
+    const t = setInterval(() => {
+      setNowMs(Date.now());
+      reload();
+    }, 30000);
     return () => clearInterval(t);
-  }, []);
+  }, [reload]);
 
   const m = data?.metrics;
 
@@ -83,14 +88,17 @@ export default function KendaraanDashboardPage() {
               <h1 className="text-lg sm:text-2xl font-black text-white leading-tight">Dashboard Kendaraan</h1>
               <p className="text-[11px] sm:text-xs text-violet-200/80 mt-1">Monitoring pemakaian kendaraan operasional</p>
             </div>
-            <Link
-              href="/dashboard/kendaraan"
-              className="h-10 px-3.5 bg-white/10 hover:bg-white/20 border border-white/15 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95"
-            >
-              <ArrowLeft size={15} /> <span className="hidden sm:inline">Kembali</span>
-            </Link>
+            <span className="flex items-center gap-1.5 h-8 px-3 rounded-full bg-white/10 border border-white/15 text-[11px] font-bold text-emerald-300">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+              Live
+            </span>
           </div>
         </div>
+
+        <VehicleSopGate />
 
         {error && (
           <div className="mb-4">
@@ -122,7 +130,7 @@ export default function KendaraanDashboardPage() {
                   <h2 className="text-sm font-black text-gray-900">Sedang Berjalan ({data.running.length})</h2>
                 </div>
                 {data.running.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-4 text-center">Tidak ada kendaraan yang sedang dipakai.</p>
+                  <EmptyState icon={<Clock size={20} />} text="Belum ada kendaraan yang sedang dipakai." />
                 ) : (
                   <div className="space-y-2.5">
                     {data.running.map((r) => (
@@ -151,7 +159,7 @@ export default function KendaraanDashboardPage() {
                   <h2 className="text-sm font-black text-gray-900">Menunggu ACC ({data.pending.length})</h2>
                 </div>
                 {data.pending.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-4 text-center">Tidak ada pengajuan menunggu.</p>
+                  <EmptyState icon={<Inbox size={20} />} text="Tidak ada pengajuan yang menunggu persetujuan." />
                 ) : (
                   <div className="space-y-2.5">
                     {data.pending.map((r) => (
@@ -196,7 +204,7 @@ export default function KendaraanDashboardPage() {
                 <h2 className="text-sm font-black text-gray-900">Leaderboard Pemakaian</h2>
               </div>
               {data.leaderboard.length === 0 ? (
-                <p className="text-xs text-gray-400 py-4 text-center">Belum ada data pemakaian selesai.</p>
+                <EmptyState icon={<Trophy size={20} />} text="Belum ada data pemakaian selesai." />
               ) : (
                 <div className="space-y-1.5">
                   {data.leaderboard.map((u, i) => (
@@ -233,7 +241,7 @@ export default function KendaraanDashboardPage() {
                 <h2 className="text-sm font-black text-gray-900">Riwayat Pemakaian ({history.length})</h2>
               </div>
               {history.length === 0 ? (
-                <p className="text-xs text-gray-400 py-4 text-center">Belum ada riwayat pemakaian.</p>
+                <EmptyState icon={<History size={20} />} text="Belum ada riwayat pemakaian." />
               ) : (
                 <div className="space-y-2">
                   {history.map((h) => (
@@ -242,6 +250,10 @@ export default function KendaraanDashboardPage() {
                         <p className="text-xs font-bold text-gray-900 truncate">{h.vehicle?.name ?? "—"}</p>
                         <p className="text-[10px] text-gray-500 truncate">
                           {h.borrower?.name ?? "—"} · {formatDateTime(h.actual_end)}
+                        </p>
+                        <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
+                          <Fuel size={11} className="text-emerald-500 shrink-0" />
+                          Sisa bensin: <span className="font-semibold text-gray-700">{h.return_fuel_level || "—"}</span>
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -295,16 +307,14 @@ function StatCard({
 }) {
   const t = STAT_TONES[tone];
   return (
-    <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 overflow-hidden transition hover:shadow-md hover:-translate-y-0.5">
-      <div className="relative flex items-start justify-between gap-2 mb-2">
-        <span className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${t.bg} border ${t.border} ${t.text} flex items-center justify-center shrink-0 shadow-sm`}>
+    <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm p-4 transition hover:shadow-md hover:-translate-y-0.5">
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 leading-tight pt-0.5 max-w-[68%]">{label}</span>
+        <span className={`w-10 h-10 rounded-xl ${t.bg} border ${t.border} ${t.text} flex items-center justify-center shrink-0`}>
           {icon}
         </span>
       </div>
-      <div className="relative">
-        <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1 truncate">{label}</div>
-        <div className="text-xl sm:text-2xl lg:text-3xl font-black tabular-nums text-gray-900 leading-none truncate">{value}</div>
-      </div>
+      <div className="text-3xl sm:text-4xl font-black tabular-nums text-gray-900 leading-none">{value}</div>
     </div>
   );
 }

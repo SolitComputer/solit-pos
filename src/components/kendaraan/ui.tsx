@@ -100,6 +100,18 @@ export function ModalFoot({ children }: { children: React.ReactNode }) {
   return <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/60 flex gap-2.5">{children}</div>;
 }
 
+// Empty state konsisten: ikon lembut + teks
+export function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2.5 py-9 text-center">
+      <span className="w-11 h-11 rounded-2xl bg-gray-50 border border-gray-100 text-gray-300 flex items-center justify-center">
+        {icon}
+      </span>
+      <p className="text-[11px] text-gray-400 max-w-[220px] leading-relaxed">{text}</p>
+    </div>
+  );
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 export function formatDuration(minutes: number | null | undefined): string {
   if (minutes == null || minutes < 0) return "—";
