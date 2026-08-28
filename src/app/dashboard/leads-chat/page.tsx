@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { MessageCircle, Plus, Trash2, Send, X, RefreshCw, Paperclip, MoreVertical, Copy, PencilLine } from "lucide-react";
-
+import { compressImage } from "@/lib/imageCompression";
 function FacebookIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -426,11 +426,12 @@ export default function LeadsChatPage() {
     fetchConversations();
   };
 
-  const handlePickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+   const handlePickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    const compressed = await compressImage(file, { maxSizeMB: 1, maxWidthOrHeight: 1600 });
+    setImageFile(compressed);
+    setImagePreview(URL.createObjectURL(compressed));
   };
 
   const sendReply = async () => {
