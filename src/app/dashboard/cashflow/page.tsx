@@ -21,6 +21,7 @@ defaultCashflowFilter,
 isFilterActive,
 activeFilterCount,
 applyFilters,
+getEntryDisplayNama, // ⬅️ BARU
 CASHFLOW_START_DATE,
 } from "@/lib/cashflow";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -729,8 +730,8 @@ return (
 }
 
 // ── Filter Panel ──────────────────────────────────────────────────────────────
-function FilterPanel({ filter, onChange, onReset, direction }: {
-filter: CashflowFilter; onChange: (f: CashflowFilter) => void; onReset: () => void; direction: "IN" | "OUT";
+function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
+filter: CashflowFilter; onChange: (f: CashflowFilter) => void; onReset: () => void; direction: "IN" | "OUT"; nameOptions: string[]; // ⬅️ BARU
 }) {
 const categories = direction === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 const catEntries = Object.entries(categories) as [string, string][];
@@ -774,12 +775,19 @@ return (
                     <option value="NOT_AUDITED">Belum Audit</option>
                 </select>
             </div>
-            <div>
+                       <div>
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sumber</label>
                 <select value={filter.source} onChange={(e) => onChange({ ...filter, source: e.target.value as SourceFilter })} className={`${selectCls} w-full`}>
                     <option value="ALL">Semua Sumber</option>
                     <option value="MANUAL">Manual</option>
                     <option value="AUTO">Otomatis</option>
+                </select>
+            </div>
+            <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Nama</label>
+                <select value={filter.nama} onChange={(e) => onChange({ ...filter, nama: e.target.value })} className={`${selectCls} w-full`}>
+                    <option value="ALL">Semua Nama</option>
+                    {nameOptions.map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
             </div>
             {direction === "IN" && (
@@ -1595,6 +1603,7 @@ if (allowed === false) return (
 
 const currentFilter = tab === "IN" ? filterIn : filterOut;
 const allRows = tab === "IN" ? masuk : keluar;
+const nameOptions = Array.from(new Set(allRows.map((e) => getEntryDisplayNama(e)).filter(Boolean))).sort((a, b) => a.localeCompare(b)); // ⬅️ FIX: hitung opsi dropdown Nama dari data tab aktif
 const baseRows = applyFilters(allRows, currentFilter);
 const rows = staleOnly ? baseRows.filter((e) => e.is_stale) : baseRows; // ⬅️ BARU
 const filterCount = activeFilterCount(currentFilter);
@@ -1809,7 +1818,7 @@ return (
                 )}
             </div>
 
-            {showFilter && <FilterPanel filter={currentFilter} onChange={handleFilterChange} onReset={handleFilterReset} direction={tab} />}
+            {showFilter && <FilterPanel filter={currentFilter} onChange={handleFilterChange} onReset={handleFilterReset} direction={tab} nameOptions={nameOptions} />}
 
             {!loading && voidedCount > 0 && (
                 <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[12px] text-gray-600">
