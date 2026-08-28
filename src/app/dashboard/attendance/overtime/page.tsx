@@ -12,6 +12,7 @@ import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
 import { OvertimePendingPopup } from "@/components/attendance/OvertimePendingPopup";
 import { OvertimeRecapTable } from "@/components/attendance/OvertimeRecapTable"; // ✅ NEW — rekap bulanan
 import { addTimestampWatermark } from "@/lib/watermark";
+import { isPKLRole } from "@/lib/permissions";
 
 type OvertimeRequest = {
   id: string; user_id: string; request_date: string;
@@ -883,12 +884,14 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
   const durationMinutes = (!start || !end) ? 0 : Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
   const hours = Math.floor(durationMinutes / 60);
 
-  // ✅ NEW — aturan KETAT lembur hari libur: Tepat waktu = Rp100.000,
-  // Terlambat = Rp50.000 (setengah). Nominal ini TIDAK bisa diedit manual
-  // sama sekali kalau overtime ini ditandai is_holiday.
+  // ✅ NEW — aturan KETAT lembur hari libur:
+  // Karyawan: Tepat waktu = Rp100.000, Terlambat = Rp50.000 (setengah).
+  // PKL: Tepat waktu = Rp50.000, Terlambat = Rp25.000 (setengah).
+  // Nominal ini TIDAK bisa diedit manual sama sekali kalau overtime ini ditandai is_holiday.
+  const isTargetPkl = isPKLRole(o.users?.role);
   const isHoliday = o.is_holiday === true;
   const holidayLate = isHoliday && (o.is_late === true || (o.is_late == null && detectLateFromTime(o.requested_start ?? o.actual_start ?? o.scheduled_start)));
-  const holidayAutoPay = isHoliday ? (holidayLate ? 50000 : 100000) : null;
+  const holidayAutoPay = isHoliday ? (isTargetPkl ? (holidayLate ? 25000 : 50000) : (holidayLate ? 50000 : 100000)) : null;
 
   const isFlatPay = o.is_holiday === true || (!o.rate_per_hour && (o.total_pay ?? 0) > 0);
   const [payMode, setPayMode] = useState<"PER_JAM" | "TETAP">(isFlatPay ? "TETAP" : "PER_JAM");
@@ -933,10 +936,10 @@ function SetPayModal({ overtime: o, onClose, onSaved }: { overtime: OvertimeRequ
         {isHoliday ? (
           <div className={`rounded-xl p-3.5 border ${holidayLate ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-100"}`}>
             <p className={`text-xs font-bold ${holidayLate ? "text-amber-800" : "text-emerald-800"}`}>
-              Lembur Hari Libur — {holidayLate ? "Terlambat" : "Tepat Waktu"}
+              Lembur Hari Libur — {holidayLate ? "Terlambat" : "Tepat Waktu"} {isTargetPkl ? "(PKL)" : ""}
             </p>
             <p className="text-[10px] text-gray-500 mt-1">
-              Aturan tetap sistem: Tepat waktu = {formatRupiah(100000)} · Terlambat = {formatRupiah(50000)}.
+              Aturan tetap sistem ({isTargetPkl ? "PKL" : "Karyawan"}): Tepat waktu = {formatRupiah(isTargetPkl ? 50000 : 100000)} · Terlambat = {formatRupiah(isTargetPkl ? 25000 : 50000)}.
               Nominal ini terkunci dan tidak bisa diubah manual.
             </p>
           </div>
@@ -1122,14 +1125,17 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
     return d > 0 ? Math.floor(d) : null;
   }, [startTime, endTime, isOvernight]);
 
+  const selectedUser = useMemo(() => allUsers.find(u => u.id === targetUserId), [allUsers, targetUserId]);
+  const isTargetPkl = isPKLRole(selectedUser?.role);
+
   const holidayIsLate = useMemo(
     () => isHolidayOvertime && detectLateFromTime(startTime),
     [isHolidayOvertime, startTime]
   );
 
   const holidayAutoPay = useMemo(
-    () => (isHolidayOvertime ? (holidayIsLate ? 50000 : 100000) : null),
-    [isHolidayOvertime, holidayIsLate]
+    () => (isHolidayOvertime ? (isTargetPkl ? (holidayIsLate ? 25000 : 50000) : (holidayIsLate ? 50000 : 100000)) : null),
+    [isHolidayOvertime, holidayIsLate, isTargetPkl]
   );
 
   useEffect(() => {
@@ -1214,7 +1220,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           </span>
           <div className="flex-1">
             <p className={`text-[11px] font-semibold leading-tight ${isHolidayOvertime ? "text-white" : "text-gray-800"}`}> Lembur hari libur</p>
-            <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran otomatis: Tepat 100rb / Telat 50rb</p>
+            <p className={`text-[9px] mt-0.5 ${isHolidayOvertime ? "text-purple-200" : "text-gray-400"}`}>Batas masuk 08:00 · bayaran otomatis: Tepat {isTargetPkl ? "50rb" : "100rb"} / Telat {isTargetPkl ? "25rb" : "50rb"}</p>
           </div>
         </button>
         {/*  Mode normal: grid tanggal/jam selalu tampil seperti sebelumnya */}
@@ -1239,13 +1245,13 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
               <span className="text-sm">{holidayIsLate ? "" : ""}</span>
               <div className="text-xs">
                 <p className={`font-semibold ${holidayIsLate ? "text-amber-700" : "text-emerald-700"}`}>
-                  Jam masuk {startTime} WIB {holidayIsLate ? "· Terlambat" : "· Tepat waktu"}
+                  Jam masuk {startTime} WIB {holidayIsLate ? "· Terlambat" : "· Tepat waktu"} {isTargetPkl ? "(PKL)" : ""}
                 </p>
                 <p className="text-[10px] text-gray-400 mt-0.5">
                   {holidayIsLate ? "Mulai 08:00 ke atas dihitung terlambat di hari libur." : "Masuk sebelum 08:00 dihitung tepat waktu di hari libur."}
                 </p>
                 <p className={`text-[11px] font-bold mt-1.5 pt-1.5 border-t ${holidayIsLate ? "text-amber-700 border-amber-200" : "text-emerald-700 border-emerald-200"}`}>
-                  Bayaran lembur: {holidayIsLate ? formatRupiah(50000) : formatRupiah(100000)}
+                  Bayaran lembur: {formatRupiah(holidayAutoPay ?? (isTargetPkl ? (holidayIsLate ? 25000 : 50000) : (holidayIsLate ? 50000 : 100000)))}
                 </p>
               </div>
             </div>
@@ -1279,7 +1285,7 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
           </div>
           <p className="text-[9px] text-gray-400 mt-1">
             {isHolidayOvertime
-              ? `Aturan tetap: Tepat waktu = ${formatRupiah(100000)} · Terlambat = ${formatRupiah(50000)}. Nominal ini terkunci mengikuti status jam masuk, tidak bisa diedit manual.`
+              ? `Aturan tetap (${isTargetPkl ? "PKL" : "Karyawan"}): Tepat waktu = ${formatRupiah(isTargetPkl ? 50000 : 100000)} · Terlambat = ${formatRupiah(isTargetPkl ? 25000 : 50000)}. Nominal ini terkunci mengikuti status jam masuk, tidak bisa diedit manual.`
               : "Kosong → dihitung dari tarif per jam × durasi. Diisi → pakai nominal ini (tetap), tidak dikali jam."}
           </p>
         </div>
