@@ -440,8 +440,11 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
 
 // ─── CancelModal (Tidak Jadi) ─────────────────────────────────────────────────
 function CancelModal({ tx, cancelling, onConfirm, onClose }: {
-    tx: PendingTransaction; cancelling: boolean; onConfirm: () => void; onClose: () => void;
+    tx: PendingTransaction; cancelling: boolean; onConfirm: (reason: string) => void; onClose: () => void;
 }) {
+    const [reason, setReason] = useState("");
+    const [reasonError, setReasonError] = useState("");
+
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
         window.addEventListener("keydown", h);
@@ -486,10 +489,30 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
                             <p className="text-amber-700 font-semibold pt-1"> DP yang sudah dibayar diurus manual (tidak otomatis dikembalikan sistem)</p>
                         )}
                     </div>
+
+                    <div className="space-y-1.5">
+                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                            Alasan Pembatalan <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                            value={reason}
+                            onChange={(e) => { setReason(e.target.value); setReasonError(""); }}
+                            placeholder="Contoh: Customer batal beli, ganti unit lain, dll..."
+                            rows={3}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500/15 focus:border-red-400 focus:bg-white transition resize-none"
+                        />
+                        {reasonError && <p className="text-[11px] text-red-600">{reasonError}</p>}
+                    </div>
                 </div>
                 <div className="px-5 py-3 border-t border-gray-100 flex gap-2.5 shrink-0">
                     <button onClick={onClose} disabled={cancelling} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
-                    <button onClick={onConfirm} disabled={cancelling} className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60">
+                    <button
+                        onClick={() => {
+                            if (!reason.trim()) { setReasonError("Alasan wajib diisi"); return; }
+                            onConfirm(reason.trim());
+                        }}
+                        disabled={cancelling}
+                        className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60">
                         {cancelling ? "Memproses..." : "Ya, Tidak Jadi"}
                     </button>
                 </div>
@@ -890,12 +913,16 @@ export default function PendingOrdersPage() {
         }
     }, [activeTab]);
 
-    const handleCancelConfirm = async () => {
+    const handleCancelConfirm = async (reason: string) => {
         if (!cancelTx) return;
         setCancelling(true);
         try {
             // Endpoint sama persis dengan tombol "Restore/Batal" di halaman Riwayat Transaksi
-            const res = await fetch(`/api/transaction/${cancelTx.invoice_number}/restore`, { method: "POST" });
+            const res = await fetch(`/api/transaction/${cancelTx.invoice_number}/restore`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason }), // ⚠️ ganti key "reason" kalau backend pakai nama field lain
+            });
             const result = await res.json();
             if (!result.success) {
                 setAlertModal("Gagal membatalkan: " + (result.message || "Terjadi kesalahan"));
