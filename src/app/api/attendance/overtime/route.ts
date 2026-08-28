@@ -854,9 +854,6 @@ export async function PATCH(request: Request) {
         supabase.from("user_date_off").select("off_date").eq("user_id", overtime.user_id).gte("off_date", firstDay).lte("off_date", lastDay),
         supabase.from("user_date_work").select("work_date").eq("user_id", overtime.user_id).gte("work_date", firstDay).lte("work_date", lastDay),
       ]);
-
-      const isPKL = isPKLRole(targetUser?.role ?? "");
-
       if (!salaryRow && !isPKL) {
         return NextResponse.json({
           success: false,
