@@ -11,7 +11,7 @@ function getAdmin(): SupabaseClient {
   );
 }
 
-export const PATCH = withAuth(async (req) => {
+export const PATCH = withAuth(async (req, _props, user) => {
   let body: { line_id?: string; checked?: boolean };
   try {
     body = await req.json();
@@ -29,10 +29,13 @@ export const PATCH = withAuth(async (req) => {
 
   const supabase = getAdmin();
 
-  // ⚠️ ASUMSI: withAuth menempelkan info user ke req.user setelah verifikasi.
-  // Sesuaikan `user?.id` / `user?.name` dengan bentuk object user di lib/auth.ts Anda
-  // (misal bisa jadi req.user.username, req.user.full_name, dll).
-  const user = (req as any).user as { id?: string; name?: string } | undefined;
+  // (fix) Root cause sebenarnya: withAuth TIDAK PERNAH menempel user ke `req.user`.
+  // Lihat src/lib/auth.ts — handler dipanggil `handler(req, ctx, user)`, jadi `user`
+  // dikirim sebagai ARGUMEN KE-3, bukan properti di object req. Makanya
+  // `(req as any).user` di atas selalu undefined → checked_by DAN checked_by_name
+  // selalu null (cocok persis sama hasil query SQL kamu). AuthUser.name dijamin
+  // selalu ada, jadi gak perlu fallback ke field lain lagi.
+  const checkedByName = user.name ?? null;
 
   try {
     if (checked) {
@@ -41,8 +44,8 @@ export const PATCH = withAuth(async (req) => {
         .upsert(
           {
             line_id,
-            checked_by: user?.id ?? null,
-            checked_by_name: user?.name ?? null,
+            checked_by: user.id,
+            checked_by_name: checkedByName,
             checked_at: new Date().toISOString(),
           },
           { onConflict: "line_id" }

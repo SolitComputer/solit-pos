@@ -105,7 +105,7 @@ export const GET = withAuth(async (req) => {
           .select("id, tanggal, keterangan, ref, source_type, source_id, created_at")
           .eq("period", period)
           .order("tanggal", { ascending: true })
-          .order("id", { ascending: true }) 
+          .order("id", { ascending: true })
           .range(from, from + PAGE_SIZE - 1);
 
         if (entryErr) throw entryErr;
@@ -187,20 +187,20 @@ export const GET = withAuth(async (req) => {
 
     const ownLineIds = ownLines.filter((l) => !syntheticIds.has(l.id)).map((l) => l.id);
 
-    const checkedMap = new Map<string, string>(); // line_id -> checked_at
+    const checkedMap = new Map<string, { checked_at: string; checked_by_name: string | null }>(); // line_id -> info cek (jam + siapa yang centang)
     if (ownLineIds.length > 0) {
       const CHUNK_SIZE = 150;
       for (let i = 0; i < ownLineIds.length; i += CHUNK_SIZE) {
         const chunk = ownLineIds.slice(i, i + CHUNK_SIZE);
         const { data: checksData, error: checksErr } = await supabase
           .from("journal_line_checks")
-          .select("line_id, checked_at")
+          .select("line_id, checked_at, checked_by_name")
           .in("line_id", chunk);
 
         if (checksErr) throw checksErr;
 
-        for (const c of (checksData ?? []) as { line_id: string; checked_at: string }[]) {
-          checkedMap.set(c.line_id, c.checked_at);
+        for (const c of (checksData ?? []) as { line_id: string; checked_at: string; checked_by_name: string | null }[]) {
+          checkedMap.set(c.line_id, { checked_at: c.checked_at, checked_by_name: c.checked_by_name ?? null });
         }
       }
     }
@@ -212,7 +212,7 @@ export const GET = withAuth(async (req) => {
       const kredit = l.side === "KREDIT" ? Number(l.nominal) : 0;
       running += debit - kredit;
       const ref = (counterMap.get(l.entry_id) ?? []).join(", ");
-      const checkedAt = checkedMap.get(l.id) ?? null; // (baru)
+      const checkInfo = checkedMap.get(l.id) ?? null; // (baru) — berisi jam & nama yang mencentang
       const baseInvoice = entry.source_id ? entry.source_id.split("__")[0] : "";
       const trxMeta =
         entry.source_type === "TRANSACTION" && entry.source_id
@@ -228,8 +228,9 @@ export const GET = withAuth(async (req) => {
         kredit,
         saldo_debit: running >= 0 ? running : 0,
         saldo_kredit: running < 0 ? Math.abs(running) : 0,
-        checked: !!checkedAt,
-        checked_at: checkedAt,
+        checked: !!checkInfo,
+        checked_at: checkInfo?.checked_at ?? null,
+        checked_by_name: checkInfo?.checked_by_name ?? null, // (baru) — dipakai tooltip di frontend
         trx_meta: trxMeta,
         is_synthetic: syntheticIds.has(l.id),
       };
