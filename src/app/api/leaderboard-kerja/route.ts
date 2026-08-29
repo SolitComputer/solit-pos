@@ -73,13 +73,10 @@ export const GET = withAuth(async (req, _ctx, user) => {
         .gte("created_at", startIso)
         .lte("created_at", endIso),
 
-      // Teknisi: service
       supabaseAdmin
         .from("service_orders")
-        .select("id, status, dikerjakan_by")
-        .gte("created_at", startIso)
-        .lte("created_at", endIso)
-        .in("status", ["SELESAI", "BISA_DIAMBIL", "SUDAH_DIAMBIL"]),
+        .select("id, status, dikerjakan_by, tanggal_selesai, tanggal_diambil")
+        .in("status", ["DONE", "SUDAH_DIAMBIL"]),
 
       // Konten: cc_reports
       supabaseAdmin
@@ -88,10 +85,9 @@ export const GET = withAuth(async (req, _ctx, user) => {
         .gte("created_at", startIso)
         .lte("created_at", endIso),
 
-      // Accounting: cashflow
       supabaseAdmin
         .from("cashflow_entries")
-        .select("id, created_by")
+        .select("id, created_by, source_type")
         .gte("created_at", startIso)
         .lte("created_at", endIso),
 
@@ -121,73 +117,92 @@ export const GET = withAuth(async (req, _ctx, user) => {
       const userRoles = u.roles || [u.role];
       const hasRole = (roleMatch: string) => userRoles.some((r: string) => r && r.includes(roleMatch));
 
-      // TRANSACTIONS (Sales) - Payment & Formats
-      const uTransactions = (transactions ?? []).filter((t) => t.created_by === uid);
-      const uFormats = (preparations ?? []).filter((p) => p.created_by === uid);
-      
-      if (uTransactions.length > 0 || uFormats.length > 0 || hasRole("SALES")) {
-        score += uTransactions.length * 20; // 20 points per transaction
-        score += uFormats.length * 5; // 5 points per format
-        metrics.push({ label: "Total Payment", value: uTransactions.length, unit: "trx" });
-        metrics.push({ label: "Buat Format", value: uFormats.length, unit: "order" });
-      }
+      // TRANSACTIONS (Sales) — DINONAKTIFKAN SEMENTARA, cuma Purchasing dulu yang aktif.
+      // Uncomment blok ini kapan aja buat aktifin lagi scoring Sales.
+      // const uTransactions = (transactions ?? []).filter((t) => t.created_by === uid);
+      // const uFormats = (preparations ?? []).filter((p) => p.created_by === uid);
+      // if (uTransactions.length > 0 || uFormats.length > 0 || hasRole("SALES")) {
+      //   score += uTransactions.length * 20; // 20 points per transaction
+      //   score += uFormats.length * 5; // 5 points per format
+      //   metrics.push({ label: "Total Payment", value: uTransactions.length, unit: "trx" });
+      //   metrics.push({ label: "Buat Format", value: uFormats.length, unit: "order" });
+      // }
 
-      // PREPARATIONS (Penyedia Barang / Pengantaran)
-      const uPreparations = (preparations ?? []).filter((p) => p.done_by === uid);
-      if (uPreparations.length > 0 || hasRole("PENYEDIA") || hasRole("PENGANTARAN") || hasRole("SOTECH") || hasRole("ONPOINT")) {
-        score += uPreparations.length * 15;
-        
-        let totalSpeedMs = 0;
-        let speedCount = 0;
-        uPreparations.forEach((p) => {
-          if (p.created_at && p.done_at) {
-            const ms = new Date(p.done_at).getTime() - new Date(p.created_at).getTime();
-            if (ms > 0) {
-              totalSpeedMs += ms;
-              speedCount++;
-            }
-          }
-        });
+      // PREPARATIONS (Penyedia Barang / Pengantaran) — DINONAKTIFKAN SEMENTARA.
+      // const uPreparations = (preparations ?? []).filter((p) => p.done_by === uid);
+      // if (uPreparations.length > 0 || hasRole("PENYEDIA") || hasRole("PENGANTARAN") || hasRole("SOTECH") || hasRole("ONPOINT")) {
+      //   score += uPreparations.length * 15;
+      //
+      //   let totalSpeedMs = 0;
+      //   let speedCount = 0;
+      //   uPreparations.forEach((p) => {
+      //     if (p.created_at && p.done_at) {
+      //       const ms = new Date(p.done_at).getTime() - new Date(p.created_at).getTime();
+      //       if (ms > 0) {
+      //         totalSpeedMs += ms;
+      //         speedCount++;
+      //       }
+      //     }
+      //   });
+      //
+      //   const avgSpeedMinutes = speedCount > 0 ? Math.round((totalSpeedMs / speedCount) / 60000) : 0;
+      //   metrics.push({ label: "Barang Disiapkan", value: uPreparations.length, unit: "unit" });
+      //   metrics.push({ label: "Kecepatan Rata-rata", value: avgSpeedMinutes, unit: "menit" });
+      // }
 
-        const avgSpeedMinutes = speedCount > 0 ? Math.round((totalSpeedMs / speedCount) / 60000) : 0;
-        metrics.push({ label: "Barang Disiapkan", value: uPreparations.length, unit: "unit" });
-        metrics.push({ label: "Kecepatan Rata-rata", value: avgSpeedMinutes, unit: "menit" });
-      }
-
-      // SERVICE (Teknisi)
-      const uServices = (serviceOrders ?? []).filter((s) => s.dikerjakan_by === uid);
+      // SERVICE (Teknisi) — 5 poin per laptop solved DI PERIODE TERPILIH. Basis tanggal ikut
+      // status: DONE pakai tanggal_selesai, SUDAH_DIAMBIL pakai tanggal_diambil — bukan created_at
+      // order, supaya laptop yang masuk antrian bulan lalu tapi baru solved bulan ini tetap
+      // kehitung di periode dia SOLVED, bukan periode dia masuk antrian. "TEKNISI" match via
+      // substring, otomatis ikut PKL_TEKNISI & KEPALA_TEKNISI juga.
+      const uServices = (serviceOrders ?? []).filter((s) => {
+        if (s.dikerjakan_by !== uid) return false;
+        const doneIso = s.status === "SUDAH_DIAMBIL" ? s.tanggal_diambil : s.tanggal_selesai;
+        if (!doneIso) return false;
+        const doneMs = new Date(doneIso).getTime();
+        return doneMs >= startDate.getTime() && doneMs <= endDate.getTime();
+      });
       if (uServices.length > 0 || hasRole("TEKNISI")) {
-        score += uServices.length * 30;
-        metrics.push({ label: "Servis Selesai", value: uServices.length, unit: "unit" });
+        score += uServices.length * 5;
+        metrics.push({ label: "Laptop Solved", value: uServices.length, unit: "unit" });
       }
 
-      // KONTEN (cc_reports)
-      const uReports = (ccReports ?? []).filter((c) => c.created_by_id === uid);
-      if (uReports.length > 0 || hasRole("KONTEN")) {
-        score += uReports.length * 15;
-        metrics.push({ label: "Konten Dibuat", value: uReports.length, unit: "doc" });
-      }
+      // KONTEN (cc_reports) — DINONAKTIFKAN SEMENTARA.
+      // const uReports = (ccReports ?? []).filter((c) => c.created_by_id === uid);
+      // if (uReports.length > 0 || hasRole("KONTEN")) {
+      //   score += uReports.length * 15;
+      //   metrics.push({ label: "Konten Dibuat", value: uReports.length, unit: "doc" });
+      // }
 
-      // ACCOUNTING (cashflow)
-      const uCashflows = (cashflows ?? []).filter((c) => c.created_by === uid);
-      if (uCashflows.length > 0 || hasRole("ACCOUNTING")) {
-        score += uCashflows.length * 10;
-        metrics.push({ label: "Input Cashflow", value: uCashflows.length, unit: "trx" });
+      if (hasRole("PURCHASING")) {
+        const uManualCashflows = (cashflows ?? []).filter(
+          (c) => c.created_by === uid && c.source_type === "MANUAL"
+        );
+        score += uManualCashflows.length * 1;
+        metrics.push({ label: "Input Cashflow", value: uManualCashflows.length, unit: "data" });
       }
+      // else {
+      //   // ACCOUNTING (cashflow) — DINONAKTIFKAN SEMENTARA, logic lama tetap disimpan di sini.
+      //   const uCashflows = (cashflows ?? []).filter((c) => c.created_by === uid);
+      //   if (uCashflows.length > 0 || hasRole("ACCOUNTING")) {
+      //     score += uCashflows.length * 10;
+      //     metrics.push({ label: "Input Cashflow", value: uCashflows.length, unit: "trx" });
+      //   }
+      // }
 
-      // PENGELOLA BARANG & SOTECH (activity logs)
-      const uActivities = (activities ?? []).filter((a) => a.user_id === uid);
-      if (uActivities.length > 0 || hasRole("PENGELOLA") || hasRole("SOTECH") || hasRole("ONPOINT")) {
-        score += uActivities.length * 5;
-        metrics.push({ label: "Data Barang Diinput", value: uActivities.length, unit: "unit" });
-      }
+      // PENGELOLA BARANG & SOTECH (activity logs) — DINONAKTIFKAN SEMENTARA.
+      // const uActivities = (activities ?? []).filter((a) => a.user_id === uid);
+      // if (uActivities.length > 0 || hasRole("PENGELOLA") || hasRole("SOTECH") || hasRole("ONPOINT")) {
+      //   score += uActivities.length * 5;
+      //   metrics.push({ label: "Data Barang Diinput", value: uActivities.length, unit: "unit" });
+      // }
 
-      // MISSIONS
-      const uMissions = (missions ?? []).filter((m) => m.assigned_to === uid);
-      if (uMissions.length > 0) {
-        score += uMissions.length * 20;
-        metrics.push({ label: "Misi Diselesaikan", value: uMissions.length, unit: "misi" });
-      }
+      // MISSIONS — DINONAKTIFKAN SEMENTARA (biar leaderboard "Pekerjaan" fokus Purchasing dulu).
+      // const uMissions = (missions ?? []).filter((m) => m.assigned_to === uid);
+      // if (uMissions.length > 0) {
+      //   score += uMissions.length * 20;
+      //   metrics.push({ label: "Misi Diselesaikan", value: uMissions.length, unit: "misi" });
+      // }
 
       return {
         id: u.id,

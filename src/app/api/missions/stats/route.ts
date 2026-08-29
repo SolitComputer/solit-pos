@@ -1,7 +1,7 @@
-// src/app/api/missions/stats/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
+import { fetchAllRows } from "@/lib/supabaseFetch";
 
 async function handler(_req: NextRequest, _ctx: any, _user: AuthUser) {
   // 1. All missions with timestamps + user info
@@ -91,10 +91,39 @@ async function handler(_req: NextRequest, _ctx: any, _user: AuthUser) {
     m => m.status !== "APPROVED" && m.status !== "REJECTED" && m.due_date && new Date(m.due_date as string).getTime() < now
   ).length;
 
-  // 7. Completion rate overall
   const totalMissions = rows.length;
   const completedMissions = statusCounts.APPROVED;
   const completionRate = totalMissions > 0 ? Math.round((completedMissions / totalMissions) * 100) : 0;
+
+  let purchasingLeaderboard: { id: string; name: string; role: string; points: number }[] = [];
+  try {
+    const cashflowEntries = await fetchAllRows<any>((from, to) =>
+      supabaseAdmin
+        .from("cashflow_entries")
+        .select(`
+          id, created_by,
+          created_by_user:users!cashflow_entries_created_by_fkey(id, name, role, roles)
+        `)
+        .eq("source_type", "MANUAL")
+        .not("created_by", "is", null)
+        .range(from, to)
+    );
+
+    const purchasingCounts: Record<string, { name: string; role: string; points: number }> = {};
+    for (const e of cashflowEntries) {
+      const u = e.created_by_user;
+      const roles: string[] = u?.roles?.length ? u.roles : u?.role ? [u.role] : [];
+      if (!roles.includes("PURCHASING")) continue;
+      const uid = e.created_by as string;
+      if (!purchasingCounts[uid]) purchasingCounts[uid] = { name: u?.name ?? "—", role: "PURCHASING", points: 0 };
+      purchasingCounts[uid].points++;
+    }
+    purchasingLeaderboard = Object.entries(purchasingCounts)
+      .map(([id, v]) => ({ id, ...v }))
+      .sort((a, b) => b.points - a.points);
+  } catch (cfError: any) {
+    console.error("[missions/stats] purchasing leaderboard error:", cfError?.message ?? cfError);
+  }
 
   return NextResponse.json({
     success: true,
@@ -106,6 +135,7 @@ async function handler(_req: NextRequest, _ctx: any, _user: AuthUser) {
       completionRate,
       leaderboard: leaderboard.slice(0, 10),
       topAssigners,
+      purchasingLeaderboard,
     },
   });
 }

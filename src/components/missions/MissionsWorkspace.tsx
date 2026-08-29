@@ -308,7 +308,7 @@ function HeadlineBlock({ mission }: { mission: Mission }) {
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                         style={overdue ? { background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }
                             : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
-                         Tenggat {fmtDateShort(mission.due_date)}{overdue ? " • Lewat" : ""}
+                        Tenggat {fmtDateShort(mission.due_date)}{overdue ? " • Lewat" : ""}
                     </span>
                 )}
             </div>
@@ -448,14 +448,14 @@ function MissionCard({
                 <div className="flex items-center gap-2 flex-wrap mt-2.5 pt-2.5" style={{ borderTop: "1px dashed #eef2f7" }}>
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
                         style={{ background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                         Dibuat {fmtDateShort(m.created_at)}
+                        Dibuat {fmtDateShort(m.created_at)}
                     </span>
                     <span className="text-[9.5px] text-slate-400">{timeAgo(m.created_at)}</span>
                     {m.due_date && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ml-auto"
                             style={overdue ? { background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }
                                 : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
-                             {fmtDateShort(m.due_date)}{overdue ? " • Lewat" : ""}
+                            {fmtDateShort(m.due_date)}{overdue ? " • Lewat" : ""}
                         </span>
                     )}
                 </div>
@@ -577,7 +577,7 @@ function MissionCalendar({
                     <button onClick={() => onSelectDate(null)}
                         className="ml-auto text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition whitespace-nowrap"
                         style={{ background: "#fff1f2", color: "#e11d48", border: "1px solid #fecdd3" }}>
-                        Semua Tanggal 
+                        Semua Tanggal
                     </button>
                 )}
             </div>
@@ -800,7 +800,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
 
                     {assignedTo.length > 1 && (
                         <p className="text-[10px] mt-1.5" style={{ color: "#7c3aed" }}>
-                             Misi yang sama akan dibuat untuk <b>{assignedTo.length} orang</b> — masing-masing punya progress sendiri.
+                            Misi yang sama akan dibuat untuk <b>{assignedTo.length} orang</b> — masing-masing punya progress sendiri.
                         </p>
                     )}
                 </Field>
@@ -906,7 +906,7 @@ function ConfirmDeleteModal({
 
                 <div className="rounded-xl p-3 text-xs"
                     style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e" }}>
-                     Misi & semua sub-tugas akan dihapus permanen dari sistem.
+                    Misi & semua sub-tugas akan dihapus permanen dari sistem.
                     {mission.status === "IN_PROGRESS" && (
                         <p className="mt-1 font-semibold">Catatan: misi ini sedang dikerjakan penerima.</p>
                     )}
@@ -1169,8 +1169,6 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
     );
 }
 
-// ── Stat kecil + skeleton ─────────────────────────────────────────────────────
-// ── Mission Stats Panel ───────────────────────────────────────────────────────
 interface MissionStatsData {
     total: number;
     statusCounts: Record<string, number>;
@@ -1179,6 +1177,7 @@ interface MissionStatsData {
     completionRate: number;
     leaderboard: { id: string; name: string; role: string; completed: number; total: number; avgMs: number; fastestMs: number; rate: number }[];
     topAssigners: { id: string; name: string; role: string; count: number }[];
+    purchasingLeaderboard: { id: string; name: string; role: string; points: number }[];
 }
 
 function fmtDuration(ms: number): string {
@@ -1250,7 +1249,7 @@ function MissionStatsPanel() {
                         <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-0.5 tabular-nums">{data.total}</p>
                         <div className="flex items-center gap-1.5 mt-1.5">
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: "#ecfdf5", color: "#059669" }}>
-                                 {data.statusCounts.APPROVED ?? 0} selesai
+                                {data.statusCounts.APPROVED ?? 0} selesai
                             </span>
                         </div>
                     </div>
@@ -1314,7 +1313,7 @@ function MissionStatsPanel() {
                         <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
                                 style={{ background: "linear-gradient(135deg,#fbbf24,#f59e0b)", boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>
-                                
+
                             </div>
                             <div>
                                 <p className="text-sm font-black text-slate-800">Leaderboard Tercepat</p>
@@ -1381,7 +1380,7 @@ function MissionStatsPanel() {
                                     {/* Stats */}
                                     <div className="text-right flex-shrink-0">
                                         <p className="text-xs font-black tabular-nums" style={{ color: i === 0 ? "#d97706" : "#334155" }}>
-                                             {fmtDuration(u.avgMs)}
+                                            {fmtDuration(u.avgMs)}
                                         </p>
                                         <p className="text-[9px] font-semibold text-slate-400 mt-0.5 tabular-nums">
                                             {u.completed}/{u.total} ({u.rate}%)
@@ -1399,7 +1398,7 @@ function MissionStatsPanel() {
                         <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
                                 style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }}>
-                                
+
                             </div>
                             <div>
                                 <p className="text-sm font-black text-slate-800">Top Pemberi Misi</p>
@@ -1451,6 +1450,61 @@ function MissionStatsPanel() {
                     </div>
                 </div>
             </div>
+
+            {/* Leaderboard Purchasing — 1 poin per data cashflow yang diinput (edit tidak dihitung) */}
+            {data.purchasingLeaderboard.length > 0 && (
+                <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "linear-gradient(135deg,#fafbff,#ecfdf5)" }}>
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
+                                style={{ background: "linear-gradient(135deg,#34d399,#059669)", boxShadow: "0 2px 8px rgba(5,150,105,0.3)" }}>
+                                🛒
+                            </div>
+                            <div>
+                                <p className="text-sm font-black text-slate-800">Leaderboard Purchasing</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">1 poin setiap 1 data cashflow diinput (edit tidak dihitung)</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                        {data.purchasingLeaderboard.map((u, i) => {
+                            const maxPoints = data.purchasingLeaderboard[0]?.points ?? 1;
+                            const pct = Math.max(8, Math.round((u.points / maxPoints) * 100));
+                            return (
+                                <div key={u.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 hover:bg-slate-50/50 transition-colors">
+                                    <div className="w-7 text-center flex-shrink-0">
+                                        {i < 3 ? (
+                                            <span className="text-lg">{MEDAL[i]}</span>
+                                        ) : (
+                                            <span className="text-[10px] font-black text-slate-400 bg-slate-100 w-5 h-5 rounded-full inline-flex items-center justify-center">{i + 1}</span>
+                                        )}
+                                    </div>
+                                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                                        style={{
+                                            background: i === 0 ? "linear-gradient(135deg,#34d399,#059669)" : "linear-gradient(135deg,#cbd5e1,#94a3b8)",
+                                            boxShadow: i < 3 ? "0 2px 6px rgba(0,0,0,0.12)" : "none",
+                                        }}>
+                                        {u.name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                            <p className="text-xs font-bold text-slate-800 truncate">{u.name}</p>
+                                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0"
+                                                style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                                {u.role.replace(/_/g, " ")}
+                                            </span>
+                                        </div>
+                                        <div className="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: "linear-gradient(90deg,#34d399,#059669)" }} />
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-black tabular-nums text-slate-700 flex-shrink-0">{u.points} poin</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Status Breakdown Bar */}
             <div className="bg-white rounded-2xl p-4 sm:p-5" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
