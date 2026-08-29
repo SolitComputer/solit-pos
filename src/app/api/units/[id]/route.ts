@@ -3,7 +3,7 @@ import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser, PERMISSIONS } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLogger";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
-import { BARANG_FULL_ACCESS_ROLES, hasAnyRole, expandRolesWithParents } from "@/lib/permissions";
+import { BARANG_FULL_ACCESS_ROLES, LAPTOP_DELETE_ROLES, hasAnyRole, expandRolesWithParents } from "@/lib/permissions";
 import { checkDynamicPageAccess } from "@/lib/dynamicPermissions";
 
 interface Props {
@@ -329,7 +329,7 @@ async function patchHandler(req: NextRequest, props: Props, user: AuthUser) {
 // ── DELETE: Hapus unit ────────────────────────────────────────────────────────
 async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
   try {
-    if (!(await hasUnitAccess(user, PERMISSIONS.EDIT_UNITS as string[], "delete"))) {
+    if (!(await hasUnitAccess(user, LAPTOP_DELETE_ROLES as string[], "delete"))) {
       return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
     }
 
