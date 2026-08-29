@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Car, Bike, Plus, Pencil, Trash2, Inbox, LogOut, CheckCircle2,
-  Loader2, Fuel, User, Wrench, RefreshCw, Send, AlertTriangle,
+  Loader2, Fuel, User, Wrench, RefreshCw, Send, AlertTriangle, Lock,
 } from "lucide-react";
 import {
   inp, lbl, primaryBtn, secondaryBtn, ErrorBanner, Spinner, EmptyState,
@@ -54,6 +54,8 @@ export default function KendaraanPage() {
     const [isAdmin, setIsAdmin] = useState(false);
   const [canApprove, setCanApprove] = useState(false);
   const [queue, setQueue] = useState<BorrowRequest[]>([]);
+  // Terkunci by default (aman) sampai VehicleSopGate memastikan status SOP.
+  const [sopBlocked, setSopBlocked] = useState(true);
 
   const [borrowTarget, setBorrowTarget] = useState<Vehicle | null>(null);
   const [checkoutTarget, setCheckoutTarget] = useState<BorrowRequest | null>(null);
@@ -126,7 +128,7 @@ export default function KendaraanPage() {
           </div>
         </div>
 
-        <VehicleSopGate />
+       <VehicleSopGate onStatusChange={setSopBlocked} />
 
         {error && (
           <div className="mb-4">
@@ -179,22 +181,24 @@ export default function KendaraanPage() {
             )}
 
             {/* Daftar kendaraan */}
-            <VehicleSection
+                        <VehicleSection
               title="Motor"
               icon={<Bike size={16} />}
               vehicles={motors}
               isAdmin={isAdmin}
+              sopBlocked={sopBlocked}
               myActiveFor={myActiveFor}
               onBorrow={setBorrowTarget}
               onCheckout={setCheckoutTarget}
               onEdit={setEditTarget}
               onReload={reload}
             />
-            <VehicleSection
+                        <VehicleSection
               title="Mobil"
               icon={<Car size={16} />}
               vehicles={mobils}
               isAdmin={isAdmin}
+              sopBlocked={sopBlocked}
               myActiveFor={myActiveFor}
               onBorrow={setBorrowTarget}
               onCheckout={setCheckoutTarget}
@@ -220,12 +224,13 @@ export default function KendaraanPage() {
 
 // ─── SECTION ─────────────────────────────────────────────────────────────────
 function VehicleSection({
-  title, icon, vehicles, isAdmin, myActiveFor, onBorrow, onCheckout, onEdit, onReload,
+  title, icon, vehicles, isAdmin, sopBlocked, myActiveFor, onBorrow, onCheckout, onEdit, onReload,
 }: {
   title: string;
   icon: React.ReactNode;
   vehicles: Vehicle[];
   isAdmin: boolean;
+  sopBlocked: boolean;
   myActiveFor: (id: string) => BorrowRequest | undefined;
   onBorrow: (v: Vehicle) => void;
   onCheckout: (r: BorrowRequest) => void;
@@ -253,6 +258,7 @@ function VehicleSection({
               key={v.id}
               vehicle={v}
               isAdmin={isAdmin}
+              sopBlocked={sopBlocked}
               myActive={myActiveFor(v.id)}
               onBorrow={() => onBorrow(v)}
               onCheckout={onCheckout}
@@ -268,10 +274,11 @@ function VehicleSection({
 
 // ─── CARD ────────────────────────────────────────────────────────────────────
 function VehicleCard({
-  vehicle: v, isAdmin, myActive, onBorrow, onCheckout, onEdit, onReload,
+  vehicle: v, isAdmin, sopBlocked, myActive, onBorrow, onCheckout, onEdit, onReload,
 }: {
   vehicle: Vehicle;
   isAdmin: boolean;
+  sopBlocked: boolean;
   myActive?: BorrowRequest;
   onBorrow: () => void;
   onCheckout: (r: BorrowRequest) => void;
@@ -359,10 +366,16 @@ function VehicleCard({
           <VehicleStatusBadge status={v.status} />
         </div>
 
-        {/* Aksi peminjam */}
+               {/* Aksi peminjam */}
         {v.status === "TERSEDIA" && !iAmPending && (
-          <button onClick={onBorrow} className={primaryBtn}>
-            <Plus size={14} /> Ajukan Pinjam
+          <button
+            onClick={onBorrow}
+            disabled={sopBlocked}
+            title={sopBlocked ? "Baca & setujui SOP Peminjaman Kendaraan di atas dulu" : undefined}
+            className={primaryBtn}
+          >
+            {sopBlocked ? <Lock size={14} /> : <Plus size={14} />}
+            {sopBlocked ? "Baca SOP Terlebih Dahulu" : "Ajukan Pinjam"}
           </button>
         )}
         {iAmPending && (
