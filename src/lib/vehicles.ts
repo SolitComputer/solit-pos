@@ -29,8 +29,8 @@ export async function getRequester(request: NextRequest): Promise<Requester | nu
   let roles = rolesHeader
     ? rolesHeader.split(",").filter(Boolean)
     : singleRole
-    ? [singleRole]
-    : [];
+      ? [singleRole]
+      : [];
   let id = request.headers.get("x-user-id") || "";
   let name = decodeURIComponent(request.headers.get("x-user-name") || "");
 
@@ -43,8 +43,8 @@ export async function getRequester(request: NextRequest): Promise<Requester | nu
   }
   if (!id) return null;
 
- const isAdmin = roles.some((r) => VEHICLE_ADMIN_ROLES.includes(r));
-  const canApprove = roles.some((r) => VEHICLE_APPROVAL_ROLES.includes(r));
+  const isAdmin = roles.some((r) => VEHICLE_ADMIN_ROLES.includes(r));
+  const canApprove = roles.some((r) => (VEHICLE_APPROVAL_ROLES as readonly string[]).includes(r));
   return { id, name, roles, isAdmin, canApprove };
 }
 
@@ -100,9 +100,9 @@ export async function enrichRequests(rows: BorrowRequestRow[]): Promise<BorrowRe
       : Promise.resolve({ data: [] as UserLite[] }),
     vehicleIds.length
       ? supabaseVehicles
-          .from("vehicles")
-          .select("id, name, type, status, battery_level, fuel_level")
-          .in("id", vehicleIds)
+        .from("vehicles")
+        .select("id, name, type, status, battery_level, fuel_level")
+        .in("id", vehicleIds)
       : Promise.resolve({ data: [] as VehicleRow[] }),
   ]);
 
