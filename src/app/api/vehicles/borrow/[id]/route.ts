@@ -29,9 +29,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!me.canApprove)
       return NextResponse.json({ success: false, message: "Kamu tidak punya akses untuk meng-ACC pengajuan ini." }, { status: 403 });
     // Validasi anti self-approve: admin TIDAK boleh ACC pengajuannya sendiri
-    if (me.id === req.user_id)
+     // Anti self-approve — berlaku untuk semua role approval KECUALI Admin.
+    // Admin boleh ACC pengajuannya sendiri; Kepala Sales (dan role approval
+    // lain di masa depan) tetap wajib minta orang lain.
+    if (me.id === req.user_id && !me.isAdmin)
       return NextResponse.json(
-        { success: false, message: "Kamu tidak boleh meng-ACC pengajuanmu sendiri. Minta Admin lain." },
+        { success: false, message: "Kamu tidak boleh meng-ACC pengajuanmu sendiri. Minta Admin/Kepala Sales lain." },
         { status: 403 }
       );
     if (req.status !== "PENDING")
