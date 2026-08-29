@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import {
   inp, lbl, primaryBtn, secondaryBtn, ErrorBanner, Spinner, EmptyState,
-  ModalWrapper, ModalHead, ModalFoot, VehicleStatusBadge,
+  ModalWrapper, ModalHead, ModalFoot, VehicleStatusBadge, ApprovedByNote, StatPill,
   formatTime, formatDateTime,
 } from "@/components/kendaraan/ui";
 import { ApproveRequestModal, RejectRequestModal } from "@/components/kendaraan/ApprovalModals";
@@ -20,6 +20,7 @@ type LastUsage = {
   fuel: string | null;
   condition: string | null;
   at: string | null;
+  approver_name?: string | null; // nama admin yang meng-ACC
 };
 type Vehicle = {
   id: string;
@@ -50,7 +51,8 @@ export default function KendaraanPage() {
   const [error, setError] = useState("");
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [myRequests, setMyRequests] = useState<BorrowRequest[]>([]);
-  const [isAdmin, setIsAdmin] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+  const [canApprove, setCanApprove] = useState(false);
   const [queue, setQueue] = useState<BorrowRequest[]>([]);
 
   const [borrowTarget, setBorrowTarget] = useState<Vehicle | null>(null);
@@ -66,10 +68,11 @@ export default function KendaraanPage() {
       const res = await fetch("/api/vehicles", { cache: "no-store" });
       const d = await res.json();
       if (!res.ok || !d.success) throw new Error(d.message || `Error ${res.status}`);
-      setVehicles(d.vehicles);
+           setVehicles(d.vehicles);
       setMyRequests(d.myRequests);
       setIsAdmin(d.isAdmin);
-      if (d.isAdmin) {
+      setCanApprove(d.canApprove);
+      if (d.canApprove) {
         const qr = await fetch("/api/vehicles/borrow?queue=1", { cache: "no-store" });
         const qd = await qr.json();
         if (qr.ok && qd.success) setQueue(qd.requests);
@@ -88,28 +91,36 @@ export default function KendaraanPage() {
   const myActiveFor = (vehicleId: string) =>
     myRequests.find((r) => r.vehicle_id === vehicleId && (r.status === "PENDING" || r.status === "APPROVED"));
 
-  const motors = vehicles.filter((v) => v.type === "MOTOR");
+ const motors = vehicles.filter((v) => v.type === "MOTOR");
   const mobils = vehicles.filter((v) => v.type === "MOBIL");
+  const availableCount = vehicles.filter((v) => v.status === "TERSEDIA").length;
+  const inUseCount = vehicles.filter((v) => v.status === "DIPAKAI").length;
+  const maintenanceCount = vehicles.filter((v) => v.status === "MAINTENANCE").length;
 
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-[#F7F7F8]">
         {/* Hero */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-800 to-black px-5 py-5 sm:px-7 sm:py-6 shadow-lg shadow-black/20 mb-5">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-800 to-black px-5 py-5 sm:px-7 sm:py-6 lg:px-9 lg:py-7 shadow-lg shadow-black/20 mb-5">
           <div className="pointer-events-none absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/5 blur-3xl" />
-          <div className="relative flex items-center justify-between gap-3">
-            <div>
-              <h1 className="text-lg sm:text-2xl font-black text-white leading-tight">Manajemen Kendaraan</h1>
-              <p className="text-[11px] sm:text-xs text-zinc-400 mt-1">
+          <div className="relative flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-white leading-tight">Manajemen Kendaraan</h1>
+              <p className="text-[11px] sm:text-xs lg:text-sm text-zinc-400 mt-1">
                 Pinjam kendaraan operasional & pantau pemakaian
               </p>
+              <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                <StatPill label="Tersedia" count={availableCount} tone="emerald" />
+                <StatPill label="Dipakai" count={inUseCount} tone="zinc" />
+                <StatPill label="Maintenance" count={maintenanceCount} tone="amber" />
+              </div>
             </div>
             {isAdmin && (
               <button
                 onClick={() => setAddOpen(true)}
-                className="h-10 px-4 bg-white hover:bg-zinc-100 text-zinc-900 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm shadow-black/30"
+                className="h-10 px-3 sm:px-4 bg-white hover:bg-zinc-100 text-zinc-900 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm shadow-black/30 shrink-0"
               >
-                <Plus size={15} /> Tambah Kendaraan
+                <Plus size={15} /> <span className="hidden sm:inline">Tambah Kendaraan</span>
               </button>
             )}
           </div>
@@ -130,15 +141,15 @@ export default function KendaraanPage() {
         ) : (
           <div className="space-y-6">
             {/* Antrian ACC (Admin) */}
-            {isAdmin && queue.length > 0 && (
+            {canApprove && queue.length > 0 && (
               <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center">
                     <Inbox size={16} />
                   </span>
-                  <h2 className="text-sm font-black text-gray-900">Menunggu ACC ({queue.length})</h2>
+                  <h2 className="text-sm sm:text-base font-black text-gray-900">Menunggu ACC ({queue.length})</h2>
                 </div>
-                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+               <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {queue.map((r) => (
                     <div key={r.id} className="border border-gray-100 hover:border-gray-200 rounded-xl p-3.5 bg-gray-50/50 transition-colors">
                       <div className="flex items-start justify-between gap-2 mb-2">
@@ -227,7 +238,7 @@ function VehicleSection({
         <span className="w-8 h-8 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 flex items-center justify-center">
           {icon}
         </span>
-        <h2 className="text-sm font-black text-gray-900">
+         <h2 className="text-sm sm:text-base font-black text-gray-900">
           {title} <span className="text-gray-400 font-bold">({vehicles.length})</span>
         </h2>
       </div>
@@ -236,7 +247,7 @@ function VehicleSection({
           <EmptyState icon={icon} text={`Belum ada ${title.toLowerCase()} terdaftar.`} />
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {vehicles.map((v) => (
             <VehicleCard
               key={v.id}
@@ -315,8 +326,8 @@ function VehicleCard({
 
   return (
     <div className="group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-gray-200 transition-all duration-200 overflow-hidden flex flex-col">
-      <div className={`h-1 w-full ${accent[v.status] ?? "bg-gray-200"}`} />
-      <div className="p-4 flex flex-col gap-3">
+    <div className={`h-1 w-full ${accent[v.status] ?? "bg-gray-200"}`} />
+      <div className="p-4 sm:p-5 flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2.5 min-w-0">
             <span className="w-10 h-10 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-400 flex items-center justify-center shrink-0">
@@ -329,11 +340,17 @@ function VehicleCard({
                   <Fuel size={12} className="text-emerald-500" /> {v.fuel_level || "—"}
                 </span>
                 {v.lastUsage && (
-                  <span className="text-[10px] text-gray-500 flex items-center gap-1 truncate max-w-[140px]">
-                    <User size={12} className="text-gray-400" />
+                  <span className="text-[10px] text-gray-500 flex items-center gap-1 truncate max-w-[180px] sm:max-w-[200px]">
+                    <User size={12} className="text-gray-400 shrink-0" />
                     {v.status === "DIPAKAI" && v.lastUsage.status === "APPROVED"
                       ? v.lastUsage.borrower_name
                       : `Terakhir: ${v.lastUsage.borrower_name}`}
+                  </span>
+                )}
+                {v.status === "DIPAKAI" && v.lastUsage?.approver_name && (
+                  <span className="text-[10px] text-gray-400 flex items-center gap-1 truncate max-w-[180px] sm:max-w-[200px]">
+                    <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
+                    ACC: {v.lastUsage.approver_name}
                   </span>
                 )}
               </div>
@@ -354,9 +371,12 @@ function VehicleCard({
           </div>
         )}
         {iAmUsing && (
-          <button onClick={() => myActive && onCheckout(myActive)} className={primaryBtn}>
-            <LogOut size={14} /> Check-out (Selesai Pakai)
-          </button>
+          <>
+            <ApprovedByNote name={myActive?.approver?.name} />
+            <button onClick={() => myActive && onCheckout(myActive)} className={primaryBtn}>
+              <LogOut size={14} /> Check-out (Selesai Pakai)
+            </button>
+          </>
         )}
         {v.status === "DIPAKAI" && !iAmUsing && (
           <div className="text-[10px] text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-xl px-3 py-2 font-semibold">
@@ -370,17 +390,17 @@ function VehicleCard({
         )}
 
         {/* Aksi admin */}
-        {isAdmin && (
-          <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
-            <button onClick={onEdit} className="flex-1 h-8 text-[11px] font-semibold text-gray-600 border border-gray-100 hover:bg-gray-50 hover:border-gray-200 rounded-lg flex items-center justify-center gap-1 transition">
+       {isAdmin && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+            <button onClick={onEdit} className="flex-1 min-w-[84px] h-9 text-[11px] font-semibold text-gray-600 border border-gray-100 hover:bg-gray-50 hover:border-gray-200 rounded-lg flex items-center justify-center gap-1 transition">
               <Pencil size={12} /> Edit
             </button>
             {v.status === "MAINTENANCE" && (
-              <button onClick={restore} disabled={busy} className="flex-1 h-8 text-[11px] font-semibold text-emerald-600 border border-emerald-100 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
+              <button onClick={restore} disabled={busy} className="flex-1 min-w-[110px] h-9 text-[11px] font-semibold text-emerald-600 border border-emerald-100 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
                 {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Set Tersedia
               </button>
             )}
-            <button onClick={del} disabled={deleting} className="flex-1 h-8 text-[11px] font-semibold text-red-500 border border-red-100 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
+            <button onClick={del} disabled={deleting} className="flex-1 min-w-[84px] h-9 text-[11px] font-semibold text-red-500 border border-red-100 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
               {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Hapus
             </button>
           </div>
