@@ -25,9 +25,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const nowIso = new Date().toISOString();
 
   // ─── APPROVE ───────────────────────────────────────────────────────────────
-  if (action === "APPROVE") {
-    if (!me.isAdmin)
-      return NextResponse.json({ success: false, message: "Hanya Admin yang bisa meng-ACC pengajuan." }, { status: 403 });
+ if (action === "APPROVE") {
+    if (!me.canApprove)
+      return NextResponse.json({ success: false, message: "Kamu tidak punya akses untuk meng-ACC pengajuan ini." }, { status: 403 });
     // Validasi anti self-approve: admin TIDAK boleh ACC pengajuannya sendiri
     if (me.id === req.user_id)
       return NextResponse.json(
@@ -75,9 +75,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   // ─── REJECT ──────────────────────────────────────────────────────────────
-  if (action === "REJECT") {
-    if (!me.isAdmin)
-      return NextResponse.json({ success: false, message: "Hanya Admin yang bisa menolak pengajuan." }, { status: 403 });
+ if (action === "REJECT") {
+    if (!me.canApprove)
+      return NextResponse.json({ success: false, message: "Kamu tidak punya akses untuk menolak pengajuan ini." }, { status: 403 });
     if (me.id === req.user_id)
       return NextResponse.json(
         { success: false, message: "Kamu tidak boleh menolak pengajuanmu sendiri." },
