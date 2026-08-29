@@ -2476,6 +2476,58 @@ function LeaveDetailModal({ name, dates, monthLabel, onClose }: {
     );
 }
 
+// ✅ NEW — detail tanggal "Lembur Libur" (klik badge ungu di tab Ringkasan)
+function HolidayWorkDetailModal({ name, dates, monthLabel, onClose }: {
+    name: string; dates: string[]; monthLabel: string; onClose: () => void;
+}) {
+    const fmt = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
+    const sorted = [...dates].sort();
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-purple-600 to-violet-700 px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">Detail Lembur Libur</p>
+                        <p className="text-xs text-white/70 mt-1">{name} · {monthLabel}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="px-6 pt-4 flex-shrink-0">
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 text-[11px] text-purple-700 leading-relaxed">
+                        Tanggal-tanggal di bawah adalah hari libur {name}, tapi tetap masuk kerja. Sudah dihitung sebagai <strong>lemburan</strong> di halaman Lembur — bukan kehadiran biasa, jadi tidak menambah skor atau persentase kehadiran.
+                    </div>
+                </div>
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-3">
+                        Tanggal masuk di hari libur ({sorted.length})
+                    </p>
+                    {sorted.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Tidak ada data</p>
+                    ) : (
+                        sorted.map(d => (
+                            <div key={d} className="flex items-center justify-between gap-3 bg-purple-50/60 border border-purple-100 rounded-xl px-3.5 py-3">
+                                <p className="text-sm font-bold text-gray-800">{fmt(d)}</p>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-purple-100 text-purple-700 border-purple-200 flex-shrink-0">
+                                    Lembur Libur
+                                </span>
+                            </div>
+                        ))
+                    )}
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 type SalarySlip = {
     id: string;
     user_id: string;
@@ -3339,6 +3391,7 @@ export default function AttendanceDashboardPage() {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [attendanceSummaryDetail, setAttendanceSummaryDetail] = useState<AttendanceSummaryDetail | null>(null);
     const [leaveDetail, setLeaveDetail] = useState<{ name: string; dates: string[] } | null>(null);
+    const [holidayWorkDetail, setHolidayWorkDetail] = useState<{ name: string; dates: string[] } | null>(null);
     const [absentPopupMode, setAbsentPopupMode] = useState<"karyawan" | "pkl" | null>(null);
     const [pklFilterMode, setPklFilterMode] = useState(false);
     const [calendarPklFilter, setCalendarPklFilter] = useState<"all" | "karyawan" | "pkl">("karyawan");
@@ -5619,12 +5672,13 @@ export default function AttendanceDashboardPage() {
                                                     </td>
                                                     <td className="px-4 py-4 text-center">
                                                         {u.holidayWorkDates.length > 0 ? (
-                                                            <span
-                                                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-purple-100 text-purple-700 text-sm font-black border border-purple-200"
-                                                                title={`Masuk di hari libur (dihitung lembur, bukan kehadiran): ${u.holidayWorkDates.map(d => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })).join(", ")}`}
+                                                            <button
+                                                                onClick={() => setHolidayWorkDetail({ name: u.name, dates: u.holidayWorkDates })}
+                                                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-purple-100 text-purple-700 text-sm font-black border border-purple-200 hover:bg-purple-200 hover:scale-105 transition-all cursor-pointer"
+                                                                title={`Lihat detail lembur libur ${u.name}`}
                                                             >
                                                                 {u.holidayWorkDates.length}
-                                                            </span>
+                                                            </button>
                                                         ) : (
                                                             <span className="text-gray-200 text-sm font-black">—</span>
                                                         )}
@@ -5745,7 +5799,7 @@ export default function AttendanceDashboardPage() {
                         )}
 
                         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
-                                                       {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"], ["bg-purple-400", "Lembur Libur = 0 poin (dibayar lembur, bukan kehadiran)"]].map(([c, l]) => (
+                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"], ["bg-purple-400", "Lembur Libur = 0 poin (dibayar lembur, bukan kehadiran)"]].map(([c, l]) => (
                                 <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
                             ))}
                             <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
@@ -7310,6 +7364,15 @@ export default function AttendanceDashboardPage() {
                     dates={leaveDetail.dates}
                     monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
                     onClose={() => setLeaveDetail(null)}
+                />
+            )}
+
+            {holidayWorkDetail && (
+                <HolidayWorkDetailModal
+                    name={holidayWorkDetail.name}
+                    dates={holidayWorkDetail.dates}
+                    monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
+                    onClose={() => setHolidayWorkDetail(null)}
                 />
             )}
 
