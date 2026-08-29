@@ -42,7 +42,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     if (error) throw error;
 
-        // ── Rekonsiliasi unit "SOLD" yang stale ──────────────────────────────────
+    // ── Rekonsiliasi unit "SOLD" yang stale ──────────────────────────────────
     // Kasus nyata (mis. INV-20260726-001): transaksi multi-laptop kadang cuma
     // nge-link SEBAGIAN unit ke transactions.unit_ids, jadi unit yang
     // "ketinggalan" gak pernah di-flip ke status SOLD di laptop_units — padahal
@@ -188,7 +188,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       }
     }
 
-    const enriched = (data ?? []).map((u: any) => ({
+    const enriched = allUnitRows.map((u: any) => ({
       ...u,
       sold_at: saleMap.get(u.id)?.sold_at ?? null,
       sold_price: saleMap.get(u.id)?.sold_price ?? null,
