@@ -49,21 +49,21 @@ const fmtShort = (n: number): string => {
 };
 
 const PLATFORM_COLOR: Record<string, { bg: string; color: string; border: string }> = {
-  shopee: { bg: "#FFF7ED", color: "#C2410C", border: "#FED7AA" },
-  tokopedia: { bg: "#ECFDF5", color: "#065F46", border: "#A7F3D0" },
-  facebook: { bg: "#EEF2FF", color: "#3730A3", border: "#C7D2FE" },
-  olx: { bg: "#F5F3FF", color: "#5B21B6", border: "#DDD6FE" },
-  carousell: { bg: "#FEF2F2", color: "#991B1B", border: "#FECACA" },
-  cod: { bg: "#FFFBEB", color: "#92400E", border: "#FDE68A" },
+  shopee: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
+  tokopedia: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
+  facebook: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
+  olx: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
+  carousell: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
+  cod: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
 };
 
 type TabKey = "daily" | "monthly" | "yearly";
 
 // ── Mini bar ──────────────────────────────────────────────────────────────────
-function MiniBar({ value, max, color = "linear-gradient(90deg,#6366F1,#818CF8)" }: { value: number; max: number; color?: string }) {
+function MiniBar({ value, max, color = "linear-gradient(90deg,#18181B,#3F3F46)" }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.max(4, (value / max) * 100) : 4;
   return (
-    <div className="w-full h-1.5 rounded-full mt-2 overflow-hidden" style={{ background: "#F1F5F9" }}>
+    <div className="w-full h-1.5 rounded-full mt-2 overflow-hidden" style={{ background: "#F4F4F5" }}>
       <div
         className="h-full rounded-full transition-all duration-700 ease-out"
         style={{ width: `${pct}%`, background: color }}
@@ -89,34 +89,34 @@ function LaptopRow({
 
   const rankStyle =
     rank === 1
-      ? { bg: "#FFFBEB", color: "#B45309", border: "#FDE68A", bar: "linear-gradient(90deg,#F59E0B,#FCD34D)" }
+      ? { bg: "#F4F4F5", color: "#18181B", border: "#E4E4E7", bar: "linear-gradient(90deg,#18181B,#3F3F46)" }
       : rank === 2
-        ? { bg: "#F8FAFC", color: "#475569", border: "#E2E8F0", bar: "linear-gradient(90deg,#94A3B8,#CBD5E1)" }
+        ? { bg: "#F4F4F5", color: "#52525B", border: "#E4E4E7", bar: "linear-gradient(90deg,#71717A,#A1A1AA)" }
         : rank === 3
-          ? { bg: "#FFF7ED", color: "#C2410C", border: "#FED7AA", bar: "linear-gradient(90deg,#F97316,#FDBA74)" }
-          : { bg: "#EEF2FF", color: "#4338CA", border: "#C7D2FE", bar: "linear-gradient(90deg,#6366F1,#818CF8)" };
+          ? { bg: "#F4F4F5", color: "#71717A", border: "#E4E4E7", bar: "linear-gradient(90deg,#A1A1AA,#D4D4D8)" }
+          : { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7", bar: "linear-gradient(90deg,#52525B,#71717A)" };
 
   return (
     <div
       className="rounded-xl overflow-hidden transition-all duration-200"
       style={{
         background: "#FFFFFF",
-        border: `1px solid ${expanded ? "#C7D2FE" : "#E2E8F0"}`,
+        border: `1px solid ${expanded ? "#A1A1AA" : "#E4E4E7"}`,
         boxShadow: expanded
-          ? "0 4px 16px rgba(99,102,241,0.1)"
-          : "0 1px 3px rgba(15,23,42,0.05)",
+          ? "0 4px 16px rgba(0,0,0,0.10)"
+          : "0 1px 3px rgba(0,0,0,0.05)",
       }}
     >
       {/* Header */}
       <button
         onClick={() => setExpanded((p) => !p)}
         className="w-full flex items-center gap-3 px-3.5 py-3 text-left transition-all duration-200"
-        style={{ background: expanded ? "#FAFBFF" : "#FFFFFF" }}
+        style={{ background: expanded ? "#FAFAFA" : "#FFFFFF" }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "#F8FAFF";
+          (e.currentTarget as HTMLButtonElement).style.background = "#FAFAFA";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = expanded ? "#FAFBFF" : "#FFFFFF";
+          (e.currentTarget as HTMLButtonElement).style.background = expanded ? "#FAFAFA" : "#FFFFFF";
         }}
       >
         {/* Rank badge */}
@@ -130,9 +130,9 @@ function LaptopRow({
         {/* Laptop icon */}
         <div
           className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: "#EEF2FF" }}
+          style={{ background: "#F4F4F5" }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="1.75">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#18181B" strokeWidth="1.75">
             <rect x="2" y="3" width="20" height="14" rx="2" />
             <line x1="8" y1="21" x2="16" y2="21" />
             <line x1="12" y1="17" x2="12" y2="21" />
@@ -141,17 +141,17 @@ function LaptopRow({
 
         {/* Name + bar */}
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-semibold truncate leading-tight" style={{ color: "#0F172A" }}>
+          <p className="text-[13px] font-semibold truncate leading-tight" style={{ color: "#18181B" }}>
             {entry.laptop_name}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
-            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#F1F5F9" }}>
+            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#F4F4F5" }}>
               <div
                 className="h-full rounded-full transition-all duration-700"
                 style={{ width: `${pct}%`, background: rankStyle.bar }}
               />
             </div>
-            <span className="text-[10px] flex-shrink-0 font-medium" style={{ color: "#94A3B8" }}>
+            <span className="text-[10px] flex-shrink-0 font-medium" style={{ color: "#A1A1AA" }}>
               {pct}%
             </span>
           </div>
@@ -161,12 +161,12 @@ function LaptopRow({
         <div className="text-right flex-shrink-0 space-y-0.5">
           <span
             className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full"
-            style={{ background: "#EEF2FF", color: "#4338CA" }}
+            style={{ background: "#18181B", color: "#FFFFFF" }}
           >
             {entry.count}x
           </span>
           {canSeeFinancials && (
-            <p className="text-[11px] font-semibold" style={{ color: "#059669" }}>
+            <p className="text-[11px] font-semibold" style={{ color: "#18181B" }}>
               {fmtShort(entry.revenue)}
             </p>
           )}
@@ -175,7 +175,7 @@ function LaptopRow({
         {/* Chevron */}
         <svg
           width="13" height="13" viewBox="0 0 24 24" fill="none"
-          stroke="#94A3B8" strokeWidth="2.5"
+          stroke="#A1A1AA" strokeWidth="2.5"
           className={`flex-shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
         >
           <polyline points="6 9 12 15 18 9" />
@@ -184,9 +184,9 @@ function LaptopRow({
 
       {/* Expanded transactions */}
       {expanded && (
-        <div style={{ borderTop: "1px solid #E2E8F0" }}>
+        <div style={{ borderTop: "1px solid #E4E4E7" }}>
           {entry.transactions.length === 0 ? (
-            <p className="text-xs text-center py-5" style={{ color: "#94A3B8" }}>
+            <p className="text-xs text-center py-5" style={{ color: "#A1A1AA" }}>
               Tidak ada detail transaksi
             </p>
           ) : (
@@ -196,35 +196,35 @@ function LaptopRow({
               const dateStr = txDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
               const timeStr = txDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
               const plat = tx.source_platform?.toLowerCase() ?? "";
-              const platStyle = PLATFORM_COLOR[plat] ?? { bg: "#F8FAFC", color: "#475569", border: "#E2E8F0" };
+              const platStyle = PLATFORM_COLOR[plat] ?? { bg: "#FAFAFA", color: "#52525B", border: "#E4E4E7" };
 
               return (
                 <div
                   key={tx.id}
                   className="px-3.5 py-2.5 flex items-start justify-between gap-3 transition-colors duration-150"
                   style={{
-                    borderBottom: "1px solid #F1F5F9",
-                    background: "#FAFBFF",
+                    borderBottom: "1px solid #F4F4F5",
+                    background: "#FAFAFA",
                   }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.background = "#F0F4FF";
+                    (e.currentTarget as HTMLDivElement).style.background = "#F4F4F5";
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.background = "#FAFBFF";
+                    (e.currentTarget as HTMLDivElement).style.background = "#FAFAFA";
                   }}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-semibold truncate" style={{ color: "#0F172A" }}>
+                    <p className="text-[12px] font-semibold truncate" style={{ color: "#18181B" }}>
                       {tx.customer_name}
                     </p>
-                    <p className="text-[10px] font-mono tracking-wide mt-0.5" style={{ color: "#94A3B8" }}>
+                    <p className="text-[10px] font-mono tracking-wide mt-0.5" style={{ color: "#A1A1AA" }}>
                       {tx.invoice_number}
                     </p>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                       {tx.sales_name && (
                         <span
                           className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md"
-                          style={{ background: "#F1F5F9", color: "#475569", border: "1px solid #E2E8F0" }}
+                          style={{ background: "#F4F4F5", color: "#52525B", border: "1px solid #E4E4E7" }}
                         >
                           <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
@@ -247,13 +247,13 @@ function LaptopRow({
                       )}
                     </div>
                     {tx.items && tx.items.length > 0 && (
-                      <p className="text-[10px] mt-1 leading-relaxed" style={{ color: "#64748B" }}>
+                      <p className="text-[10px] mt-1 leading-relaxed" style={{ color: "#71717A" }}>
                         {tx.items.map((it, idx) => (
                           <span key={idx}>
-                            {idx > 0 && <span style={{ color: "#CBD5E1" }}> · </span>}
+                            {idx > 0 && <span style={{ color: "#D4D4D8" }}> · </span>}
                             {it.name}
                             {it.quantity > 1 ? ` x${it.quantity}` : ""}
-                            {it.is_bonus && <span style={{ color: "#F59E0B" }}> (bonus)</span>}
+                            {it.is_bonus && <span style={{ color: "#A1A1AA" }}> (bonus)</span>}
                           </span>
                         ))}
                       </p>
@@ -261,12 +261,12 @@ function LaptopRow({
                   </div>
                   <div className="text-right flex-shrink-0">
                     {canSeeFinancials && (
-                      <p className="text-[12px] font-bold" style={{ color: "#0F172A" }}>
+                      <p className="text-[12px] font-bold" style={{ color: "#18181B" }}>
                         {fmtRupiah(rev)}
                       </p>
                     )}
-                    <p className="text-[10px] mt-0.5 font-medium" style={{ color: "#64748B" }}>{dateStr}</p>
-                    <p className="text-[10px] font-medium" style={{ color: "#94A3B8" }}>{timeStr}</p>
+                    <p className="text-[10px] mt-0.5 font-medium" style={{ color: "#71717A" }}>{dateStr}</p>
+                    <p className="text-[10px] font-medium" style={{ color: "#A1A1AA" }}>{timeStr}</p>
                   </div>
                 </div>
               );
@@ -292,30 +292,30 @@ function PeriodSection({
   return (
     <div
       className="rounded-xl overflow-hidden"
-      style={{ border: "1px solid #E2E8F0", boxShadow: "0 1px 3px rgba(15,23,42,0.05)" }}
+      style={{ border: "1px solid #E4E4E7", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}
     >
       {/* Period header */}
       <button
         onClick={() => setCollapsed((p) => !p)}
         className="w-full flex items-center justify-between px-4 py-3 text-left transition-all duration-150"
-        style={{ background: "linear-gradient(135deg,#F8FAFC 0%,#F0F4FF 100%)" }}
+        style={{ background: "linear-gradient(135deg,#FAFAFA 0%,#F4F4F5 100%)" }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLButtonElement).style.background =
-            "linear-gradient(135deg,#F0F4FF 0%,#E8EFFE 100%)";
+            "linear-gradient(135deg,#F4F4F5 0%,#E4E4E7 100%)";
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLButtonElement).style.background =
-            "linear-gradient(135deg,#F8FAFC 0%,#F0F4FF 100%)";
+            "linear-gradient(135deg,#FAFAFA 0%,#F4F4F5 100%)";
         }}
       >
         <div className="flex items-center gap-3">
-          <div className="w-1 h-7 rounded-full" style={{ background: "linear-gradient(180deg,#6366F1,#818CF8)" }} />
+          <div className="w-1 h-7 rounded-full" style={{ background: "linear-gradient(180deg,#18181B,#3F3F46)" }} />
           <div>
-            <p className="text-[13px] font-bold" style={{ color: "#0F172A" }}>{period.label}</p>
-            <p className="text-[11px] mt-0.5" style={{ color: "#64748B" }}>
+            <p className="text-[13px] font-bold" style={{ color: "#18181B" }}>{period.label}</p>
+            <p className="text-[11px] mt-0.5" style={{ color: "#71717A" }}>
               {period.count} transaksi
               {canSeeFinancials && (
-                <span style={{ color: "#059669" }}> · {fmtShort(period.revenue)}</span>
+                <span style={{ color: "#18181B" }}> · {fmtShort(period.revenue)}</span>
               )}
             </p>
           </div>
@@ -326,9 +326,8 @@ function PeriodSection({
             <span
               className="text-[10px] font-bold px-2 py-1 rounded-full"
               style={{
-                background: "#ECFDF5",
-                border: "1px solid #A7F3D0",
-                color: "#059669",
+                background: "#18181B",
+                color: "#FFFFFF",
               }}
             >
               +{fmtShort(period.profit)}
@@ -336,7 +335,7 @@ function PeriodSection({
           )}
           <svg
             width="13" height="13" viewBox="0 0 24 24" fill="none"
-            stroke="#94A3B8" strokeWidth="2.5"
+            stroke="#A1A1AA" strokeWidth="2.5"
             className={`transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`}
           >
             <polyline points="6 9 12 15 18 9" />
@@ -346,20 +345,20 @@ function PeriodSection({
 
       {/* Laptop list */}
       {!collapsed && (
-        <div className="p-3 space-y-2" style={{ background: "#F8FAFC" }}>
+        <div className="p-3 space-y-2" style={{ background: "#FAFAFA" }}>
           {period.laptops.length === 0 ? (
             <div className="text-center py-8">
               <div
                 className="w-10 h-10 rounded-2xl flex items-center justify-center mx-auto mb-2"
-                style={{ background: "#F1F5F9" }}
+                style={{ background: "#F4F4F5" }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.8">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4D4D8" strokeWidth="1.8">
                   <rect x="2" y="3" width="20" height="14" rx="2" />
                   <line x1="8" y1="21" x2="16" y2="21" />
                   <line x1="12" y1="17" x2="12" y2="21" />
                 </svg>
               </div>
-              <p className="text-xs font-medium" style={{ color: "#94A3B8" }}>
+              <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>
                 Tidak ada laptop terjual di periode ini
               </p>
             </div>
@@ -464,52 +463,52 @@ export function TransactionDetailModal({
 
         .tdm-shell {
           background: #FFFFFF;
-          border: 1px solid #E2E8F0;
-          box-shadow: 0 32px 80px rgba(15,23,42,0.14), 0 8px 24px rgba(15,23,42,0.08);
+          border: 1px solid #E4E4E7;
+          box-shadow: 0 32px 80px rgba(0,0,0,0.16), 0 8px 24px rgba(0,0,0,0.08);
         }
 
         .tdm-header {
-          background: linear-gradient(135deg, #F8FAFF 0%, #F0F4FF 100%);
-          border-bottom: 1px solid #E8EFFE;
+          background: linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%);
+          border-bottom: 1px solid #E4E4E7;
         }
 
         .tdm-stat {
           background: #FFFFFF;
-          border: 1px solid #E2E8F0;
-          box-shadow: 0 1px 4px rgba(15,23,42,0.06), 0 4px 16px rgba(15,23,42,0.04);
+          border: 1px solid #E4E4E7;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04);
           transition: box-shadow 0.2s, transform 0.2s;
         }
         .tdm-stat:hover {
-          box-shadow: 0 4px 20px rgba(15,23,42,0.1);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.10);
           transform: translateY(-2px);
         }
 
         .tdm-tabs-wrap {
-          background: #F1F5F9;
+          background: #F4F4F5;
           border-radius: 14px;
           padding: 4px;
         }
         .tdm-tab-active {
-          background: #FFFFFF;
-          color: #6366F1;
+          background: #18181B;
+          color: #FFFFFF;
           font-weight: 700;
-          box-shadow: 0 2px 8px rgba(99,102,241,0.18), 0 1px 3px rgba(15,23,42,0.08);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.08);
         }
         .tdm-tab-inactive {
-          color: #94A3B8;
+          color: #A1A1AA;
           font-weight: 500;
         }
         .tdm-tab-inactive:hover {
-          color: #475569;
-          background: rgba(255,255,255,0.6);
+          color: #52525B;
+          background: rgba(0,0,0,0.03);
         }
 
         .tdm-scroll::-webkit-scrollbar { width: 4px; }
         .tdm-scroll::-webkit-scrollbar-track { background: transparent; }
-        .tdm-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+        .tdm-scroll::-webkit-scrollbar-thumb { background: #D4D4D8; border-radius: 4px; }
 
         .tdm-shimmer {
-          background: linear-gradient(90deg, #F8FAFC 25%, #EEF2FF 50%, #F8FAFC 75%);
+          background: linear-gradient(90deg, #FAFAFA 25%, #F4F4F5 50%, #FAFAFA 75%);
           background-size: 200% 100%;
           animation: tdm-shimmer 1.5s infinite;
         }
@@ -526,24 +525,24 @@ export function TransactionDetailModal({
         }
 
         .tdm-close {
-          background: #F1F5F9;
-          color: #94A3B8;
+          background: #F4F4F5;
+          color: #A1A1AA;
           transition: background 0.2s, color 0.2s;
         }
-        .tdm-close:hover { background: #FEE2E2; color: #EF4444; }
+        .tdm-close:hover { background: #18181B; color: #FFFFFF; }
 
-        .tdm-handle { background: #CBD5E1; }
+        .tdm-handle { background: #D4D4D8; }
 
         .tdm-tabs-section {
           background: #FFFFFF;
-          border-bottom: 1px solid #E2E8F0;
+          border-bottom: 1px solid #E4E4E7;
         }
       `}</style>
 
       {/* ── Overlay ── */}
       <div
         className="tdm-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-        style={{ background: "rgba(15,23,42,0.45)", backdropFilter: "blur(6px)" }}
+        style={{ background: "rgba(9,9,11,0.50)", backdropFilter: "blur(6px)" }}
         onClick={onClose}
       >
         {/* ── Modal shell ── */}
@@ -563,8 +562,8 @@ export function TransactionDetailModal({
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{
-                    background: "linear-gradient(135deg,#6366F1 0%,#4F46E5 100%)",
-                    boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
+                    background: "linear-gradient(135deg,#18181B 0%,#3F3F46 100%)",
+                    boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
                   }}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -574,8 +573,8 @@ export function TransactionDetailModal({
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold" style={{ color: "#0F172A" }}>Detail Transaksi</h2>
-                  <p className="text-xs font-medium" style={{ color: "#94A3B8" }}>Laptop terjual per hari, bulan &amp; tahun</p>
+                  <h2 className="text-base sm:text-lg font-bold" style={{ color: "#18181B" }}>Detail Transaksi</h2>
+                  <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Laptop terjual per hari, bulan &amp; tahun</p>
                 </div>
               </div>
               <button onClick={onClose} className="tdm-close w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -591,49 +590,49 @@ export function TransactionDetailModal({
 
                 {/* Transaksi Hari Ini */}
                 <div className="tdm-stat rounded-2xl overflow-hidden">
-                  <div className="h-1" style={{ background: "linear-gradient(90deg,#6366F1,#818CF8)" }} />
+                  <div className="h-1" style={{ background: "linear-gradient(90deg,#18181B,#3F3F46)" }} />
                   <div className="px-3 py-2.5">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#EEF2FF" }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#18181B" strokeWidth="2.5" strokeLinecap="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" />
                         <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                       </svg>
                     </div>
-                    <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Hari Ini</p>
-                    <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#0F172A" }}>{data.today.count}</p>
-                    <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#6366F1" }}>transaksi</p>
+                    <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Hari Ini</p>
+                    <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#18181B" }}>{data.today.count}</p>
+                    <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#3F3F46" }}>transaksi</p>
                   </div>
                 </div>
 
                 {canSeeFinancials ? (
                   /* Omzet */
                   <div className="tdm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg,#10B981,#34D399)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg,#52525B,#71717A)" }} />
                     <div className="px-3 py-2.5">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#ECFDF5" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round">
                           <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
                         </svg>
                       </div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Omzet</p>
-                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "#0F172A" }}>{fmtShort(data.today.revenue)}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#10B981" }}>hari ini</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Omzet</p>
+                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "#18181B" }}>{fmtShort(data.today.revenue)}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#52525B" }}>hari ini</p>
                     </div>
                   </div>
                 ) : (
                   /* Bulan Ini (non-financial) */
                   <div className="tdm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg,#6366F1,#818CF8)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg,#52525B,#71717A)" }} />
                     <div className="px-3 py-2.5">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#EEF2FF" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round">
                           <rect x="3" y="4" width="18" height="18" rx="2" />
                           <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                         </svg>
                       </div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Bulan Ini</p>
-                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#0F172A" }}>{data.monthly[0]?.count ?? 0}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#6366F1" }}>transaksi</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Bulan Ini</p>
+                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#18181B" }}>{data.monthly[0]?.count ?? 0}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#52525B" }}>transaksi</p>
                     </div>
                   </div>
                 )}
@@ -641,32 +640,32 @@ export function TransactionDetailModal({
                 {canSeeFinancials ? (
                   /* Profit */
                   <div className="tdm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg,#8B5CF6,#C084FC)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg,#A1A1AA,#D4D4D8)" }} />
                     <div className="px-3 py-2.5">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F5F3FF" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2.5" strokeLinecap="round">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#71717A" strokeWidth="2.5" strokeLinecap="round">
                           <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                         </svg>
                       </div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Profit</p>
-                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "#0F172A" }}>{fmtShort(data.today.profit)}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#8B5CF6" }}>hari ini</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Profit</p>
+                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "#18181B" }}>{fmtShort(data.today.profit)}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#71717A" }}>hari ini</p>
                     </div>
                   </div>
                 ) : (
                   /* Tahun Ini (non-financial) */
                   <div className="tdm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg,#F59E0B,#FCD34D)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg,#A1A1AA,#D4D4D8)" }} />
                     <div className="px-3 py-2.5">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#FFFBEB" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#71717A" strokeWidth="2.5" strokeLinecap="round">
                           <rect x="3" y="4" width="18" height="18" rx="2" />
                           <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                         </svg>
                       </div>
-                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#94A3B8" }}>Tahun Ini</p>
-                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#0F172A" }}>{data.yearly[0]?.count ?? 0}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#F59E0B" }}>transaksi</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Tahun Ini</p>
+                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#18181B" }}>{data.yearly[0]?.count ?? 0}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#71717A" }}>transaksi</p>
                     </div>
                   </div>
                 )}
@@ -691,7 +690,7 @@ export function TransactionDetailModal({
           </div>
 
           {/* ── Content ── */}
-          <div className="tdm-scroll flex-1 overflow-y-auto" style={{ background: "#F8FAFC" }}>
+          <div className="tdm-scroll flex-1 overflow-y-auto" style={{ background: "#FAFAFA" }}>
             {isLoading ? (
               <Skeleton />
             ) : data ? (
@@ -700,15 +699,15 @@ export function TransactionDetailModal({
                   <div className="flex flex-col items-center justify-center py-16 gap-3">
                     <div
                       className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                      style={{ background: "#F1F5F9" }}
+                      style={{ background: "#F4F4F5" }}
                     >
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.8">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4D4D8" strokeWidth="1.8">
                         <rect x="3" y="4" width="18" height="18" rx="2" />
                         <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                       </svg>
                     </div>
-                    <p className="text-sm font-semibold" style={{ color: "#94A3B8" }}>Belum ada data transaksi</p>
-                    <p className="text-xs font-medium" style={{ color: "#CBD5E1" }}>Data akan muncul setelah ada transaksi</p>
+                    <p className="text-sm font-semibold" style={{ color: "#A1A1AA" }}>Belum ada data transaksi</p>
+                    <p className="text-xs font-medium" style={{ color: "#D4D4D8" }}>Data akan muncul setelah ada transaksi</p>
                   </div>
                 ) : (
                   activeData.map((period) => (
@@ -722,13 +721,13 @@ export function TransactionDetailModal({
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "#FEF2F2" }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: "#F4F4F5" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2">
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
-                <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
-                <p className="text-xs font-medium" style={{ color: "#94A3B8" }}>Coba tutup dan buka kembali</p>
+                <p className="text-sm font-semibold" style={{ color: "#52525B" }}>Gagal memuat data</p>
+                <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Coba tutup dan buka kembali</p>
               </div>
             )}
           </div>
