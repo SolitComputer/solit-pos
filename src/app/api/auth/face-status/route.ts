@@ -12,7 +12,6 @@ const supabase = createClient(
 
 const ATTENDANCE_EXEMPT_ROLES = ["PROGRAMMER"] as const;
 
-// ✅ NEW — pergantian "hari absensi" jam 04:00 WIB (bukan 00:00 WIB).
 function toAttendanceDateKey(iso: string): string {
   return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
@@ -22,10 +21,7 @@ function addDaysToDateStr(dateStr: string, days: number): string {
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
 }
-// Cookie "hari ini sudah beres" (absen/skip/libur) harus bertahan sampai
-// hari absensi berakhir (jam 04:00 WIB besok), bukan jam 00:00 WIB — kalau
-// tetap pakai jam 00:00, jam 00:00–03:59 jadi "linglung": secara data masih
-// hari kemarin, tapi cookie-nya udah expired duluan.
+
 function getAttendanceDayExpiry(attendanceDateKey: string): Date {
   return new Date(`${addDaysToDateStr(attendanceDateKey, 1)}T04:00:00+07:00`);
 }
