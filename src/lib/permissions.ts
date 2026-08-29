@@ -155,6 +155,12 @@ export const DEAD_ASSET_ROLES: UserRole[] = [
 ];
 export const OFFICIAL_PRICE_EDIT_ROLES: UserRole[] = ["ADMIN"];
 
+// ─── Manajemen Kendaraan (Vehicle Management) ─────────────────────────────────
+// Role yang boleh menyetujui/menolak (ACC) pengajuan peminjaman kendaraan.
+// Tambah/Edit/Hapus data kendaraan tetap ADMIN-only (diatur terpisah di
+// VEHICLE_ADMIN_ROLES pada src/lib/vehicles.ts).
+export const VEHICLE_APPROVAL_ROLES: UserRole[] = ["ADMIN", "KEPALA_SALES"];
+
 export function humanizeRoleKey(role: string): string {
   return role
     .split("_")
