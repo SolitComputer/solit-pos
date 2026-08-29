@@ -3837,23 +3837,32 @@ export default function AttendanceDashboardPage() {
     // Merged auto + manual
     const mergedAttendances = useMemo((): Attendance[] => {
         const auto = attendances.map(a => ({ ...a, source: "AUTO" as const }));
+        const todayWIB = getWIBToday();
         const manualExtra: Attendance[] = manualRecords
             .filter(mr => {
                 const inAuto = auto.some(a => (a.user_id ?? "") === mr.user_id && toWIBDateKey(a.check_in_time || a.created_at) === mr.attendance_date);
                 return !inAuto;
             })
-            .map(mr => ({
-                id: mr.id, user_id: mr.user_id,
-                user_name: mr.users?.name || (mr.user_id === currentUser?.id ? currentUser?.name : null) || "Unknown",
-                user_role: mr.users?.role || (mr.user_id === currentUser?.id ? currentUser?.role : "") || "",
-                user_shift: (mr.users?.shift as "PAGI" | "SORE") || "PAGI",
-                date: mr.check_in_time, check_in_time: mr.check_in_time, status: mr.status, method: "MANUAL",
-                latitude: null, longitude: null, accuracy: null, device: "Manual entry", ip_address: "", face_distance: null, created_at: mr.check_in_time,
-                displayStatus: (mr.status === "PRESENT" ? "PRESENT" : mr.status === "LATE" ? "LATE" : "SKIP") as "PRESENT" | "LATE" | "SKIP",
-                source: "MANUAL" as const,
-            }));
+            .map(mr => {
+                const isPresentOrLate = mr.status === "PRESENT" || mr.status === "LATE";
+                const hasCheckout = !!checkoutTimes[`${mr.user_id}_${mr.attendance_date}`];
+                const noCheckoutPenalty = isPresentOrLate
+                    && mr.attendance_date >= CHECKOUT_REQUIRED_FROM
+                    && mr.attendance_date < todayWIB
+                    && !hasCheckout;
+                return {
+                    id: mr.id, user_id: mr.user_id,
+                    user_name: mr.users?.name || (mr.user_id === currentUser?.id ? currentUser?.name : null) || "Unknown",
+                    user_role: mr.users?.role || (mr.user_id === currentUser?.id ? currentUser?.role : "") || "",
+                    user_shift: (mr.users?.shift as "PAGI" | "SORE") || "PAGI",
+                    date: mr.check_in_time, check_in_time: mr.check_in_time, status: mr.status, method: "MANUAL",
+                    latitude: null, longitude: null, accuracy: null, device: "Manual entry", ip_address: "", face_distance: null, created_at: mr.check_in_time,
+                    displayStatus: (noCheckoutPenalty ? "SKIP" : mr.status === "PRESENT" ? "PRESENT" : mr.status === "LATE" ? "LATE" : "SKIP") as "PRESENT" | "LATE" | "SKIP",
+                    source: "MANUAL" as const,
+                };
+            });
         return [...auto, ...manualExtra];
-    }, [attendances, manualRecords, currentUser]);
+    }, [attendances, manualRecords, currentUser, checkoutTimes]);
 
     const thisMonthKey = `${calYear}-${pad2(calMonth + 1)}`;
     const thisMonthAtt = mergedAttendances.filter(a => toWIBDateKey(a.check_in_time || a.created_at).startsWith(thisMonthKey));
@@ -4064,8 +4073,22 @@ export default function AttendanceDashboardPage() {
             if (!name || !mr.attendance_date.startsWith(thisMonthKey)) return;
             if (!manualByName[name]) manualByName[name] = {};
             manualByName[name][mr.attendance_date] = mr;
+
+            const isPresentOrLate = mr.status === "PRESENT" || mr.status === "LATE";
+            const hasCheckout = !!checkoutTimes[`${mr.user_id}_${mr.attendance_date}`];
+            const noCheckoutPenalty = isPresentOrLate
+                && mr.attendance_date >= CHECKOUT_REQUIRED_FROM
+                && mr.attendance_date < todayWIB
+                && !hasCheckout;
+
+            if (noCheckoutPenalty) {
+                if (!noCheckoutByName[name]) noCheckoutByName[name] = new Set();
+                noCheckoutByName[name].add(mr.attendance_date);
+            }
+
             setEff(name, mr.attendance_date,
-                mr.status === "PRESENT" ? "PRESENT" : mr.status === "LATE" ? "LATE" : "ABSENT");
+                noCheckoutPenalty ? "ABSENT"
+                    : mr.status === "PRESENT" ? "PRESENT" : mr.status === "LATE" ? "LATE" : "ABSENT");
         });
 
         const names = new Set<string>();
@@ -4171,13 +4194,10 @@ export default function AttendanceDashboardPage() {
                 else if (eff === "LATE") { late++; score += 0.5; }
                 else {
                     const mr = manualByName[name]?.[dk];
-                    // ✅ FIX: kalau absennya karena "tidak absen pulang" (bukan karena
-                    // benar-benar gak masuk & gak ada absen manual), reason-nya
-                    // "NO_CHECKOUT" — beda dari ALPHA (Tanpa Keterangan).
-                    const isNoCheckout = !mr && (noCheckoutByName[name]?.has(dk) ?? false);
+                    const isNoCheckout = noCheckoutByName[name]?.has(dk) ?? false;
                     absences.push({
                         date: dk,
-                        reason: (mr?.status as AbsenceReason) ?? (isNoCheckout ? "NO_CHECKOUT" : "ALPHA"),
+                        reason: isNoCheckout ? "NO_CHECKOUT" : ((mr?.status as AbsenceReason) ?? "ALPHA"),
                         note: mr?.notes ?? null,
                     });
                 }
@@ -4653,8 +4673,12 @@ export default function AttendanceDashboardPage() {
             let manualCreatedBy: string | null = null;
 
             if (manualRec) {
-                if (manualRec.status === "PRESENT") dayStatus = "PRESENT";
-                else if (manualRec.status === "LATE") dayStatus = "LATE";
+                const hasCheckout = !!checkoutTimes[`${userId}_${dk}`];
+                const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && dk < todayWIB && !hasCheckout;
+                if (!noCheckoutPenalty) {
+                    if (manualRec.status === "PRESENT") dayStatus = "PRESENT";
+                    else if (manualRec.status === "LATE") dayStatus = "LATE";
+                }
                 method = "MANUAL";
                 checkInTime = toWIBTime(manualRec.check_in_time);
                 manualCreatedBy = manualRec.created_by_name ?? null;
