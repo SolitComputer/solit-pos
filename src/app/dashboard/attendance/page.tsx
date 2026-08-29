@@ -4029,10 +4029,11 @@ export default function AttendanceDashboardPage() {
     const userSummary = useMemo(() => {
         type UserStat = {
             name: string; present: number; late: number; score: number;
-            leave: number; leaveDates: string[];          // tambah ini
+            leave: number; leaveDates: string[];
             pastWorkdays: number; totalWorkdays: number; pct: number;
             remainingDays: number; userId: string;
             absences: AbsenceItem[]; offDates: string[];
+            holidayWorkDates: string[];
         };
 
         const todayWIB = getWIBToday();
@@ -4135,17 +4136,17 @@ export default function AttendanceDashboardPage() {
                 else userLeaveSet.delete(date);
             });
 
-            let present = 0, late = 0, score = 0, leave = 0;   // + leave
+            let present = 0, late = 0, score = 0, leave = 0;
             const absences: AbsenceItem[] = [];
             const offDates: string[] = [];
             const leaveDates: string[] = [];
+            const holidayWorkDates: string[] = [];
             let totalWorkdays = 0;
             let pastWorkdays = 0;
 
             for (let d = 1; d <= dim; d++) {
                 const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(d)}`;
 
-                // Lewati tanggal sebelum user bergabung (kecuali ada absen manual di tanggal itu)
                 const beforeStart = dk < userStartDate;
                 const hasManual = !!manualByName[name]?.[dk];
                 if (beforeStart && !hasManual) continue;
@@ -4175,10 +4176,7 @@ export default function AttendanceDashboardPage() {
                 if (isScheduledOff) {
                     const effOnOff = effByName[name]?.[dk];
                     if (isPastOrToday && (effOnOff === "PRESENT" || effOnOff === "LATE")) {
-                        totalWorkdays++;
-                        pastWorkdays++;
-                        if (effOnOff === "PRESENT") { present++; score += 1; }
-                        else { late++; score += 0.5; }
+                        holidayWorkDates.push(dk);
                         continue;
                     }
                     if (isPastOrToday) offDates.push(dk);
@@ -4216,21 +4214,26 @@ export default function AttendanceDashboardPage() {
                 remainingDays: totalWorkdays - pastWorkdays,
                 userId: resolvedUserId,
                 absences, offDates,
+                holidayWorkDates,
             });
         });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
     }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, monthlyOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser, allDateWorks, leaveData, checkoutTimes]);
 
-    const thisMonthPresent = thisMonthAtt.filter(a => a.displayStatus === "PRESENT").length;
-    const thisMonthLate = thisMonthAtt.filter(a => a.displayStatus === "LATE").length;
-    const thisMonthDays = new Set(thisMonthAtt.map(a => toWIBDateKey(a.check_in_time || a.created_at))).size;
+    const thisMonthPresent = thisMonthAtt.filter(a => a.displayStatus === "PRESENT" && !isDayOffForUser(a.user_name, toWIBDateKey(a.check_in_time || a.created_at))).length;
+    const thisMonthLate = thisMonthAtt.filter(a => a.displayStatus === "LATE" && !isDayOffForUser(a.user_name, toWIBDateKey(a.check_in_time || a.created_at))).length;
+    const thisMonthDays = new Set(thisMonthAtt.filter(a => !isDayOffForUser(a.user_name, toWIBDateKey(a.check_in_time || a.created_at))).map(a => toWIBDateKey(a.check_in_time || a.created_at))).size;
 
     const selectedAttendances = selectedDate
         ? [...(byDate[selectedDate] || [])].sort((a, b) =>
             a.user_name.localeCompare(b.user_name, "id-ID", { sensitivity: "base" })
         )
         : [];
+
+    const selectedPresentCount = selectedAttendances.filter(a => a.displayStatus === "PRESENT" && !isDayOffForUser(a.user_name, selectedDate ?? "")).length;
+    const selectedLateCount = selectedAttendances.filter(a => a.displayStatus === "LATE" && !isDayOffForUser(a.user_name, selectedDate ?? "")).length;
+    const selectedHolidayWorkCount = selectedAttendances.filter(a => isDayOffForUser(a.user_name, selectedDate ?? "")).length;
 
     const selectedOffDetail = selectedDate ? getOffDetailForDate(selectedDate) : [];
 
@@ -4696,8 +4699,7 @@ export default function AttendanceDashboardPage() {
                 method = "FACE";
             }
 
-            const hadirDiHariLibur = dayStatus === "PRESENT" || dayStatus === "LATE";
-            if (!hadirDiHariLibur && isDayOffForUser(userName, dk)) continue;
+            if (isDayOffForUser(userName, dk)) continue;
 
             if (dayStatus === targetStatus) {
                 items.push({ date: dk, type: dayStatus, checkInTime, method, manualCreatedBy });
@@ -4992,7 +4994,7 @@ export default function AttendanceDashboardPage() {
                                     {calYear === new Date().getFullYear() && calMonth === new Date().getMonth() && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full">Bulan ini</span>}
                                 </div>
                                 <div className="hidden sm:flex items-center gap-4 flex-wrap">
-                                    {[["bg-emerald-400", "Tepat"], ["bg-amber-400", "Terlambat"], ["bg-gray-400", "Skip"], ["bg-blue-400", "Manual"], ["bg-red-300", "Libur"], ["bg-violet-400", "Sudah Pulang"], ["bg-orange-400", "Belum Pulang"]].map(([c, l]) => (
+                                    {[["bg-emerald-400", "Tepat"], ["bg-amber-400", "Terlambat"], ["bg-gray-400", "Skip"], ["bg-blue-400", "Manual"], ["bg-red-300", "Libur"], ["bg-purple-400", "Lembur Libur"], ["bg-violet-400", "Sudah Pulang"], ["bg-orange-400", "Belum Pulang"]].map(([c, l]) => (
                                         <div key={l} className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</div>
                                     ))}
                                 </div>
@@ -5011,11 +5013,12 @@ export default function AttendanceDashboardPage() {
                                             if (day === null) return <div key={`e-${idx}`} />;
                                             const dk = `${calYear}-${pad2(calMonth + 1)}-${pad2(day)}`;
                                             const dd = byDate[dk] || [];
-                                            const pc = dd.filter(a => a.displayStatus === "PRESENT").length;
-                                            const lc = dd.filter(a => a.displayStatus === "LATE").length;
-                                            const sc = dd.filter(a => a.displayStatus === "SKIP").length;
-                                            const mc = dd.filter(a => a.source === "MANUAL").length;
-                                            const tot = dd.length;
+                                            const hwc = dd.filter(a => isDayOffForUser(a.user_name, dk)).length;
+                                            const pc = dd.filter(a => a.displayStatus === "PRESENT" && !isDayOffForUser(a.user_name, dk)).length;
+                                            const lc = dd.filter(a => a.displayStatus === "LATE" && !isDayOffForUser(a.user_name, dk)).length;
+                                            const sc = dd.filter(a => a.displayStatus === "SKIP" && !isDayOffForUser(a.user_name, dk)).length;
+                                            const mc = dd.filter(a => a.source === "MANUAL" && !isDayOffForUser(a.user_name, dk)).length;
+                                            const tot = pc + lc + sc;
                                             const isTod = dk === todayKey, isSel = dk === selectedDate;
                                             const effectiveFilterUser = !canManage && currentUser?.name ? currentUser.name : filterUser;
                                             const filteredUserInfo = allUsers.find(u => u.name === effectiveFilterUser);
@@ -5030,12 +5033,10 @@ export default function AttendanceDashboardPage() {
                                                     return dk >= startDate;
                                                 }).length > 0
                                                 : false;
-                                            // AFTER
                                             const hasManual = mc > 0;
                                             const showLiburLine = !tot && (isUserDayOff || hasAnyDayOff);
-                                            // ✅ NEW — hitung status jam pulang (checkout) untuk tanggal ini
                                             const coCount = dd.filter(a => a.user_id && checkoutTimes[`${a.user_id}_${dk}`]).length;
-                                            const noCoCount = tot - coCount;
+                                            const noCoCount = dd.length - coCount;
                                             return (
                                                 <button key={day} onClick={() => {
                                                     setAbsentPopupMode(null);
@@ -5056,8 +5057,8 @@ export default function AttendanceDashboardPage() {
                                                             </div>
                                                             {/* ✅ NEW — Garis progress: proporsi absen pulang (jam pulang) hari ini */}
                                                             <div className={`w-full h-1 sm:h-1.5 rounded-full overflow-hidden flex ${isSel ? "bg-white/20" : "bg-gray-200/70"}`} title={`${coCount} sudah absen pulang, ${noCoCount} belum`}>
-                                                                {coCount > 0 && <div className="h-full bg-violet-400" style={{ width: `${(coCount / tot) * 100}%` }} />}
-                                                                {noCoCount > 0 && <div className="h-full bg-orange-400" style={{ width: `${(noCoCount / tot) * 100}%` }} />}
+                                                                {coCount > 0 && <div className="h-full bg-violet-400" style={{ width: `${(coCount / dd.length) * 100}%` }} />}
+                                                                {noCoCount > 0 && <div className="h-full bg-orange-400" style={{ width: `${(noCoCount / dd.length) * 100}%` }} />}
                                                             </div>
                                                             <div className="flex items-center gap-1">
                                                                 <div className={`flex items-center justify-center w-3 h-3 sm:w-4 sm:h-4 rounded-full ${isSel ? "bg-white/20" : "bg-[#1a1a2e]/10"} ${hasManual ? "ring-1 ring-blue-400" : ""}`}>
@@ -5070,14 +5071,29 @@ export default function AttendanceDashboardPage() {
                                                                     <span className="sm:hidden">{tot}{mc > 0 ? " (m)" : ""}</span>
                                                                 </span>
                                                             </div>
+                                                            {/* ✅ NEW — badge terpisah kalau ada yang masuk di hari libur (dihitung lembur) di tanggal yang sama */}
+                                                            {hwc > 0 && (
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0" />
+                                                                    <span className={`text-[8px] sm:text-[9px] font-bold leading-tight ${isSel ? "text-white/60" : "text-purple-500"}`}>
+                                                                        <span className="hidden sm:inline">{hwc} lembur libur</span>
+                                                                        <span className="sm:hidden">+{hwc}L</span>
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : hwc > 0 ? (
+                                                        <div className="mt-auto pt-1 w-full space-y-1">
+                                                            <div className="w-full h-1 sm:h-1.5 rounded-full bg-purple-300" />
+                                                            <span className={`text-[8px] sm:text-[9px] font-bold leading-tight block text-center ${isSel ? "text-white/70" : "text-purple-500"}`}>
+                                                                {hwc} lembur libur
+                                                            </span>
                                                         </div>
                                                     ) : showLiburLine ? (
-                                                        /* Garis Libur: merah penuh kalau nggak ada absensi & hari ini hari libur */
                                                         <div className="mt-auto pt-1 w-full">
                                                             <div className="w-full h-1 sm:h-1.5 rounded-full bg-red-300" />
                                                         </div>
                                                     ) : (
-                                                        /* Placeholder garis halus untuk tanggal biasa yang belum terisi */
                                                         <div className="mt-auto pt-1 w-full">
                                                             <div className={`w-full h-1 sm:h-1.5 rounded-full ${isSel ? "bg-white/20" : "bg-gray-200/50"}`} />
                                                         </div>
@@ -5099,8 +5115,9 @@ export default function AttendanceDashboardPage() {
                                             {new Date(selectedDate + "T12:00:00+07:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                                         </p>
                                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                            {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg> {selectedAttendances.filter(a => a.displayStatus === "PRESENT").length} tepat</span>}
-                                            {selectedAttendances.filter(a => a.displayStatus === "LATE").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> {selectedAttendances.filter(a => a.displayStatus === "LATE").length} terlambat</span>}
+                                            {selectedPresentCount > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg> {selectedPresentCount} tepat</span>}
+                                            {selectedLateCount > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> {selectedLateCount} terlambat</span>}
+                                            {selectedHolidayWorkCount > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-purple-700 bg-purple-100 border border-purple-200 px-3 py-1 rounded-full"><Umbrella className="w-3 h-3" /> {selectedHolidayWorkCount} lembur libur</span>}
                                             {selectedAttendances.filter(a => a.source === "MANUAL").length > 0 && <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg> {selectedAttendances.filter(a => a.source === "MANUAL").length} manual</span>}
                                             {selectedOffDetail.length > 0 && <span title={selectedOffDetail.map(o => o.name).join(", ")} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-red-700 bg-red-100 border border-red-200 px-3 py-1 rounded-full"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg> {selectedOffDetail.length} libur</span>}
                                             {selectedAbsentKaryawan.length > 0 && calendarPklFilter !== "pkl" && (
@@ -5221,6 +5238,7 @@ export default function AttendanceDashboardPage() {
                                                     const userId = a.user_id ?? "";
                                                     const dateKey = toWIBDateKey(a.check_in_time || a.created_at);
                                                     const manualRec = manualMap[`${userId}_${dateKey}`];
+                                                    const isHolidayWork = isDayOffForUser(a.user_name, dateKey);
                                                     const rowStatusKey: string | undefined = manualRec?.status ?? a.displayStatus;
                                                     const ACCENT_COLOR_MAP: Record<string, string> = {
                                                         PRESENT: "border-l-emerald-400",
@@ -5231,7 +5249,7 @@ export default function AttendanceDashboardPage() {
                                                         ABSENT: "border-l-red-400",
                                                         LEAVE: "border-l-cyan-400",
                                                     };
-                                                    const accentColor = (rowStatusKey && ACCENT_COLOR_MAP[rowStatusKey]) || "border-l-transparent";
+                                                    const accentColor = isHolidayWork ? "border-l-purple-400" : (rowStatusKey && ACCENT_COLOR_MAP[rowStatusKey]) || "border-l-transparent";
                                                     return (
                                                         <tr key={a.id} className={`border-l-4 ${accentColor} hover:bg-gray-50/60 transition-colors duration-200 ${a.source === "MANUAL" ? "bg-blue-50/40" : idx % 2 === 1 ? "bg-gray-50/30" : ""}`}>
                                                             <td className="px-6 py-4">
@@ -5292,7 +5310,11 @@ export default function AttendanceDashboardPage() {
                                                                 })()}
                                                             </td>
                                                             <td className="px-4 py-4">
-                                                                {manualRec ? (
+                                                                {isHolidayWork ? (
+                                                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border shadow-sm bg-purple-100 text-purple-700 border-purple-200">
+                                                                        <Umbrella className="w-3 h-3 text-purple-600" /> Libur → Lembur
+                                                                    </span>
+                                                                ) : manualRec ? (
                                                                     <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border shadow-sm ${MANUAL_STATUS_LABELS[manualRec.status]?.bg} ${MANUAL_STATUS_LABELS[manualRec.status]?.color} ${MANUAL_STATUS_LABELS[manualRec.status]?.border}`}>
                                                                         {renderStatusEmoji(MANUAL_STATUS_LABELS[manualRec.status]?.emoji)} {MANUAL_STATUS_LABELS[manualRec.status]?.label}
                                                                     </span>
@@ -5317,6 +5339,11 @@ export default function AttendanceDashboardPage() {
                                                             </td>
                                                             <td className="px-4 py-4 hidden lg:table-cell">
                                                                 <div className="space-y-0.5">
+                                                                    {isHolidayWork && (
+                                                                        <p className="text-[11px] text-purple-600 font-semibold leading-snug max-w-[180px]">
+                                                                            Masuk di hari libur — jadi terhitung lembur, bukan kehadiran
+                                                                        </p>
+                                                                    )}
                                                                     {manualRec?.notes && (
                                                                         <p className="text-[11px] text-blue-600 font-medium max-w-[180px] truncate">Notes: {manualRec.notes}</p>
                                                                     )}
@@ -5325,7 +5352,7 @@ export default function AttendanceDashboardPage() {
                                                                             oleh {manualRec.created_by_name}
                                                                         </p>
                                                                     )}
-                                                                    {!manualRec && (
+                                                                    {!manualRec && !isHolidayWork && (
                                                                         <p className="text-[10px] text-gray-400 truncate max-w-[180px] font-mono">{a.device || "—"}</p>
                                                                     )}
                                                                 </div>
@@ -5489,6 +5516,7 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Cuti</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Lembur Libur</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Hari Efektif</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Sisa Hari</th>                                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[180px]">Persentase</th>
@@ -5585,6 +5613,18 @@ export default function AttendanceDashboardPage() {
                                                             >
                                                                 {u.leave}
                                                             </button>
+                                                        ) : (
+                                                            <span className="text-gray-200 text-sm font-black">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        {u.holidayWorkDates.length > 0 ? (
+                                                            <span
+                                                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-purple-100 text-purple-700 text-sm font-black border border-purple-200"
+                                                                title={`Masuk di hari libur (dihitung lembur, bukan kehadiran): ${u.holidayWorkDates.map(d => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" })).join(", ")}`}
+                                                            >
+                                                                {u.holidayWorkDates.length}
+                                                            </span>
                                                         ) : (
                                                             <span className="text-gray-200 text-sm font-black">—</span>
                                                         )}
@@ -5705,7 +5745,7 @@ export default function AttendanceDashboardPage() {
                         )}
 
                         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
-                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"]].map(([c, l]) => (
+                                                       {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"], ["bg-purple-400", "Lembur Libur = 0 poin (dibayar lembur, bukan kehadiran)"]].map(([c, l]) => (
                                 <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
                             ))}
                             <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
