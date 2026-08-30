@@ -102,6 +102,11 @@ type Summary = {
     modal_awal_entry: Entry | null;
 };
 
+// ── Brand tokens (Solit POS navy-violet identity) ──────────────────────────────
+const BRAND_GRADIENT = "bg-gradient-to-r from-[#1a1545] to-[#0f0c29]";
+const BRAND_GRADIENT_HOVER = "hover:from-[#241c5e] hover:to-[#171040]";
+const BRAND_FOCUS = "focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300";
+
 // ── Icons ────────────────────────────────────────────────────────────────────
 const IconRefresh = () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -543,7 +548,7 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
     if (entry) return (
         <div className="border-t border-violet-100 bg-gradient-to-r from-violet-50 to-purple-50 overflow-hidden">
             <div className="h-0.5 bg-gradient-to-r from-violet-400 to-purple-500" />
-            <div className="px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+            <div className="px-4 sm:px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-violet-100 border border-violet-200 flex items-center justify-center shrink-0 text-xl"><Wallet size={20} className="text-violet-600" /></div>
                     <div>
@@ -560,7 +565,7 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
         </div>
     );
     if (!isWindowActive) return (
-        <div className="border-t border-amber-200 bg-amber-50 px-5 py-3 flex items-start gap-2.5">
+        <div className="border-t border-amber-200 bg-amber-50 px-4 sm:px-5 py-3 flex items-start gap-2.5">
             <IconInfo />
             <p className="text-xs text-amber-700"><span className="font-bold">Modal awal belum diatur.</span> Periode input sudah berakhir. Saldo tidak termasuk modal awal.</p>
         </div>
@@ -568,7 +573,7 @@ function ModalAwalBanner({ entry, onSet, isWindowActive }: { entry: Entry | null
     return (
         <div className="border-t border-gray-100">
             <div className="h-0.5 bg-gradient-to-r from-violet-400 to-violet-600" />
-            <div className="px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+            <div className="px-4 sm:px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-start gap-3">
                     <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center shrink-0 text-xl mt-0.5"><Wallet size={20} className="text-violet-600" /></div>
                     <div>
@@ -651,16 +656,16 @@ function AuditAccessModal({ onClose }: { onClose: () => void }) {
         finally { setSaving(false); }
     };
 
-    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
+    const inputCls = `w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none ${BRAND_FOCUS} transition`;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
             <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
-                <div className="h-1 bg-gradient-to-r from-gray-700 to-gray-900" />
+                <div className={`h-1 ${BRAND_GRADIENT}`} />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-base"><Shield size={16} className="text-gray-700" /></div>
+                        <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center text-base"><Shield size={16} className="text-violet-700" /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Manajemen Akses Audit Uang Keluar</p>
                             <p className="text-[11px] text-gray-400">Pilih akun yang diizinkan mengaudit entry Uang Keluar</p>
@@ -707,7 +712,7 @@ function AuditAccessModal({ onClose }: { onClose: () => void }) {
                                                 type="checkbox"
                                                 checked={checked}
                                                 onChange={() => toggle(row.user_id, checked)}
-                                                className="w-4 h-4 accent-gray-900"
+                                                className="w-4 h-4 accent-violet-600"
                                             />
                                         </div>
                                     </label>
@@ -720,7 +725,7 @@ function AuditAccessModal({ onClose }: { onClose: () => void }) {
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
                     <button onClick={onClose} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition">Tutup</button>
-                    <button onClick={submit} disabled={saving || !hasChanges} className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-60">
+                    <button onClick={submit} disabled={saving || !hasChanges} className={`flex-1 h-10 ${BRAND_GRADIENT} ${BRAND_GRADIENT_HOVER} text-white rounded-lg text-sm font-medium transition disabled:opacity-60`}>
                         {saving ? "Menyimpan..." : "Simpan Perubahan"}
                     </button>
                 </div>
@@ -736,30 +741,22 @@ function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
     const categories = direction === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
     const catEntries = Object.entries(categories) as [string, string][];
     const count = activeFilterCount(filter);
-    const selectCls = "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
-    const dateCls = "h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
+    const selectCls = `h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
+    const dateCls = `h-9 border border-gray-200 rounded-lg px-2.5 text-sm bg-white hover:border-gray-300 focus:outline-none ${BRAND_FOCUS} transition-all`;
 
     return (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <IconFilter />
                     <span className="text-sm font-bold text-gray-800">Filter</span>
-                    {count > 0 && <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] font-bold">{count}</span>}
+                    {count > 0 && <span className={`ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full ${BRAND_GRADIENT} text-white text-[10px] font-bold`}>{count}</span>}
                 </div>
                 {isFilterActive(filter) && (
                     <button onClick={onReset} className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-red-500 transition"><IconX /> Reset</button>
                 )}
             </div>
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                <div className="sm:col-span-2 lg:col-span-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Cari</label>
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400"><IconSearch /></div>
-                        <input type="text" value={filter.search} onChange={(e) => onChange({ ...filter, search: e.target.value })} placeholder="Nama / keterangan…" className={`${dateCls} w-full pl-8`} />
-                        {filter.search && <button onClick={() => onChange({ ...filter, search: "" })} className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-300 hover:text-gray-500"><IconX /></button>}
-                    </div>
-                </div>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Kategori</label>
                     <select value={filter.category} onChange={(e) => onChange({ ...filter, category: e.target.value })} className={`${selectCls} w-full`}>
@@ -835,24 +832,27 @@ function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
                 )}
             </div>
 
-            <div className="px-4 pb-4 -mt-1 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-                <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Dari Tanggal</label>
-                    <input type="date" value={filter.dateFrom} onChange={(e) => onChange({ ...filter, dateFrom: e.target.value })} className={`${dateCls} w-full`} />
-                </div>
-                <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sampai Tanggal</label>
-                    <input type="date" value={filter.dateTo} onChange={(e) => onChange({ ...filter, dateTo: e.target.value })} className={`${dateCls} w-full`} />
-                </div>
-                <div className="col-span-2 sm:col-span-2 lg:col-span-3 flex items-end gap-1.5 flex-wrap pb-0.5">
-                    {([
-                        ["Hari Ini", () => { const t = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); onChange({ ...filter, dateFrom: t, dateTo: t }); }],
-                        ["Minggu Ini", () => { const now = new Date(); const d = now.getDay(); const s = new Date(now); s.setDate(now.getDate() - (d === 0 ? 6 : d - 1)); onChange({ ...filter, dateFrom: s.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }), dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }) }); }],
-                        ["Bulan Ini", () => { const now = new Date(); const y = now.getFullYear(); const m = String(now.getMonth() + 1).padStart(2, "0"); onChange({ ...filter, dateFrom: `${y}-${m}-01`, dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }) }); }],
-                        ["Semua", () => { onChange({ ...filter, dateFrom: "", dateTo: "" }); }],
-                    ] as [string, () => void][]).map(([label, fn]) => (
-                        <button key={label} onClick={fn} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 hover:border-gray-300 transition">{label}</button>
-                    ))}
+            <div className="px-4 pb-4 pt-3 -mt-1 border-t border-gray-50">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Rentang Tanggal</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Dari Tanggal</label>
+                        <input type="date" value={filter.dateFrom} onChange={(e) => onChange({ ...filter, dateFrom: e.target.value })} className={`${dateCls} w-full`} />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Sampai Tanggal</label>
+                        <input type="date" value={filter.dateTo} onChange={(e) => onChange({ ...filter, dateTo: e.target.value })} className={`${dateCls} w-full`} />
+                    </div>
+                    <div className="col-span-2 sm:col-span-2 lg:col-span-3 flex items-end gap-1.5 flex-wrap pb-0.5">
+                        {([
+                            ["Hari Ini", () => { const t = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); onChange({ ...filter, dateFrom: t, dateTo: t }); }],
+                            ["Minggu Ini", () => { const now = new Date(); const d = now.getDay(); const s = new Date(now); s.setDate(now.getDate() - (d === 0 ? 6 : d - 1)); onChange({ ...filter, dateFrom: s.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }), dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }) }); }],
+                            ["Bulan Ini", () => { const now = new Date(); const y = now.getFullYear(); const m = String(now.getMonth() + 1).padStart(2, "0"); onChange({ ...filter, dateFrom: `${y}-${m}-01`, dateTo: now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }) }); }],
+                            ["Semua", () => { onChange({ ...filter, dateFrom: "", dateTo: "" }); }],
+                        ] as [string, () => void][]).map(([label, fn]) => (
+                            <button key={label} onClick={fn} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all">{label}</button>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>
@@ -998,7 +998,7 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                             <IconTrash /> Hapus
                         </button>
                     )}
-                    <button onClick={onClose} className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition">Tutup</button>
+                    <button onClick={onClose} className={`flex-1 h-10 ${BRAND_GRADIENT} ${BRAND_GRADIENT_HOVER} text-white rounded-lg text-sm font-medium transition`}>Tutup</button>
                 </div>
             </div>
             {zoom && entry.photo_url && (
@@ -1057,7 +1057,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         finally { setSaving(false); setUploadProgress("idle"); }
     };
 
-    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 transition";
+    const inputCls = "w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-400/30 focus:border-red-400 transition";
     const savingLabel = uploadProgress === "uploading" ? "Mengupload foto..." : saving ? "Menyimpan..." : "Simpan Pengeluaran";
 
     return (
@@ -1112,7 +1112,7 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
                     <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
-                    <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-60">{savingLabel}</button>
+                    <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition disabled:opacity-60">{savingLabel}</button>
                 </div>
             </div>
         </div>
@@ -1386,7 +1386,7 @@ function SummaryCard({ label, value, sublabel, color, icon, loading }: {
     };
     const c = colorMap[color];
     return (
-        <div className="relative bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="relative bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
             <div className={`absolute top-0 left-0 h-full w-1 ${c.bar}`} />
             <div className="pl-5 pr-4 py-4 flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${c.icon}`}>{icon}</div>
@@ -1434,11 +1434,11 @@ function InlineDateRange({ from, to, onChange }: { from: string, to: string, onC
     return (
         <div className="bg-white border border-gray-200 rounded-xl p-2 shadow-sm inline-block w-full max-w-[170px]">
             <div className="flex items-center justify-between mb-1.5">
-                <button onClick={prevMonth} className="p-0.5 hover:bg-gray-100 rounded-md text-gray-600 transition"><IconChevronLeft /></button>
+                <button onClick={prevMonth} className="p-0.5 hover:bg-violet-50 rounded-md text-gray-600 hover:text-violet-700 transition"><IconChevronLeft /></button>
                 <div className="font-bold text-[10px] text-gray-800">
                     {monthName} {currYear}
                 </div>
-                <button onClick={nextMonth} className="p-0.5 hover:bg-gray-100 rounded-md text-gray-600 transition"><IconChevronRight /></button>
+                <button onClick={nextMonth} className="p-0.5 hover:bg-violet-50 rounded-md text-gray-600 hover:text-violet-700 transition"><IconChevronRight /></button>
             </div>
             <div className="grid grid-cols-7 gap-0 text-center text-[8px] font-bold text-gray-400 mb-1 uppercase tracking-wider">
                 {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((d) => <div key={d}>{d}</div>)}
@@ -1452,8 +1452,8 @@ function InlineDateRange({ from, to, onChange }: { from: string, to: string, onC
                     const inRange = from && to && dateStr > from && dateStr < to;
 
                     let cls = "h-5 w-5 mx-auto rounded flex items-center justify-center cursor-pointer transition text-[9px] font-semibold ";
-                    if (isSelected) cls += "bg-gray-900 text-white shadow-sm ring-1 ring-gray-900";
-                    else if (inRange) cls += "bg-gray-100 text-gray-900";
+                    if (isSelected) cls += "bg-gradient-to-br from-[#1a1545] to-[#0f0c29] text-white shadow-sm ring-1 ring-[#1a1545]";
+                    else if (inRange) cls += "bg-violet-50 text-violet-900";
                     else if (isToday) cls += "bg-gray-50 text-gray-900 font-bold border border-gray-200 hover:bg-gray-100";
                     else cls += "text-gray-600 hover:bg-gray-50 hover:text-gray-900";
 
@@ -1465,8 +1465,8 @@ function InlineDateRange({ from, to, onChange }: { from: string, to: string, onC
                 })}
             </div>
             <div className="mt-2 flex justify-between items-center border-t border-gray-100 pt-2">
-                <button onClick={() => onChange(todayStr, todayStr)} className="text-[9px] font-semibold text-gray-500 hover:text-gray-900 transition">Hari Ini</button>
-                <button onClick={() => onChange("", "")} className="text-[9px] font-semibold text-gray-500 hover:text-gray-900 transition">Semua</button>
+                <button onClick={() => onChange(todayStr, todayStr)} className="text-[9px] font-semibold text-gray-500 hover:text-violet-700 transition">Hari Ini</button>
+                <button onClick={() => onChange("", "")} className="text-[9px] font-semibold text-gray-500 hover:text-violet-700 transition">Semua</button>
             </div>
         </div>
     );
@@ -1729,18 +1729,18 @@ export default function CashflowPage() {
             {editEntry && <EditEntryModal entry={editEntry} onClose={() => setEditEntry(null)} onSaved={() => fetchData(true)} />}
             {showAuditAccessModal && <AuditAccessModal onClose={() => setShowAuditAccessModal(false)} />}
 
-            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-5">
+            <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
 
                 {/* Header */}
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-1.5 h-9 bg-gradient-to-b from-gray-700 to-gray-900 rounded-full" />
+                        <div className={`w-1.5 h-9 ${BRAND_GRADIENT} rounded-full`} />
                         <div>
                             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">Cashflow</h1>
-                            <p className="text-sm text-gray-400 mt-0.5">Arus kas masuk & keluar · sejak {startDateFormatted}</p>
+                            <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Arus kas masuk & keluar · sejak {startDateFormatted}</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-700">
                             <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -1759,8 +1759,8 @@ export default function CashflowPage() {
                             <IconDownload />
                             <span className="hidden sm:inline text-sm">{exporting ? "Mengekspor..." : "Export Excel"}</span>
                         </button>
-                        <button onClick={() => fetchData()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 active:scale-95 transition">
-                            <IconRefresh />
+                        <button onClick={() => fetchData()} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 hover:border-violet-200 hover:text-violet-700 active:scale-95 transition">
+                            <span className={loading ? "inline-flex animate-spin" : "inline-flex"}><IconRefresh /></span>
                             <span className="hidden sm:inline text-sm">Segarkan</span>
                         </button>
                     </div>
@@ -1768,15 +1768,15 @@ export default function CashflowPage() {
 
                 {/* Saldo Utama */}
                 <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                    <div className="h-1 bg-gradient-to-r from-gray-700 via-gray-800 to-gray-900" />
-                    <div className="p-5 sm:p-6">
+                    <div className={`h-1 ${BRAND_GRADIENT.replace("bg-gradient-to-r", "bg-gradient-to-r")} bg-gradient-to-r from-[#1a1545] via-[#150f3d] to-[#0f0c29]`} />
+                    <div className="p-4 sm:p-6">
                         <div className="flex items-start justify-between gap-4 flex-wrap">
                             <div>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center"><IconWallet /></div>
+                                    <div className="w-8 h-8 rounded-lg bg-violet-50 text-violet-700 flex items-center justify-center"><IconWallet /></div>
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{saldoLabel}</span>
                                 </div>
-                                {loading ? <div className="h-10 w-48 bg-gray-100 rounded-xl animate-pulse" /> : <p className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight tabular-nums">{fmtRupiah(dateFilteredSaldo)}</p>}
+                                {loading ? <div className="h-10 w-48 bg-gray-100 rounded-xl animate-pulse" /> : <p className="text-2xl sm:text-3xl md:text-4xl font-black text-gray-900 tracking-tight tabular-nums">{fmtRupiah(dateFilteredSaldo)}</p>}
                                 <p className="text-[11px] text-gray-400 mt-1.5">{saldoSubLabel}</p>
                                 {!loading && isRangeQuery && (
                                     <div className="mt-1.5 flex items-center gap-3 flex-wrap">
@@ -1814,7 +1814,7 @@ export default function CashflowPage() {
                                     </button>
                                 )}
                             </div>
-                            <div className="flex flex-col items-end gap-2 shrink-0">
+                            <div className="flex flex-col items-end gap-2 shrink-0 w-full sm:w-auto">
                                 <InlineDateRange
                                     from={customFrom}
                                     to={customTo}
@@ -1826,38 +1826,52 @@ export default function CashflowPage() {
                 </div>
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <SummaryCard label={`Masuk · ${periodLabel}`} value={fmtRupiah(incomeValue)} color="emerald" icon={<IconTrendUp />} loading={loading} />
                     <SummaryCard label={`Keluar · ${periodLabel}`} value={fmtRupiah(expenseValue)} color="red" icon={<IconTrendDown />} loading={loading} />
                 </div>
 
                 {/* Tab + Filter + CTA */}
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 gap-0.5">
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-3.5 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                        <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1 gap-0.5 shrink-0">
                             {(["IN", "OUT"] as const).map((t) => (
-                                <button key={t} onClick={() => { setTab(t); setStaleOnly(false); }} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm" : "bg-red-600 text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}>
+                                <button key={t} onClick={() => { setTab(t); setStaleOnly(false); }} className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${tab === t ? t === "IN" ? "bg-emerald-600 text-white shadow-sm" : "bg-red-600 text-white shadow-sm" : "text-gray-500 hover:bg-white hover:shadow-sm"}`}>
                                     {t === "IN" ? `↑ Masuk ${!loading ? `(${masuk.length})` : ""}` : `↓ Keluar ${!loading ? `(${keluar.length})` : ""}`}
                                 </button>
                             ))}
                         </div>
-                        <button onClick={() => setShowFilter(!showFilter)} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border transition ${showFilter ? "bg-gray-900 text-white border-gray-900" : filterCount > 0 ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}>
+                        <button onClick={() => setShowFilter(!showFilter)} className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold border transition-all shrink-0 ${showFilter ? `${BRAND_GRADIENT} text-white border-transparent shadow-sm` : filterCount > 0 ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300"}`}>
                             <IconFilter /> Filter
                             {filterCount > 0 && <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${showFilter ? "bg-white text-gray-900" : "bg-amber-600 text-white"}`}>{filterCount}</span>}
                         </button>
+                        {/* Search dipisah dari FilterPanel, selalu tampil tanpa perlu buka Filter */}
+                        <div className="relative flex-1 min-w-[160px] max-w-full sm:max-w-xs basis-full sm:basis-auto">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><IconSearch /></div>
+                            <input
+                                type="text"
+                                value={currentFilter.search}
+                                onChange={(e) => handleFilterChange({ ...currentFilter, search: e.target.value })}
+                                placeholder="Cari nama / keterangan…"
+                                className={`h-9 w-full border border-gray-200 rounded-lg pl-9 pr-8 text-sm bg-gray-50/60 focus:bg-white focus:outline-none ${BRAND_FOCUS} transition-all placeholder:text-gray-400`}
+                            />
+                            {currentFilter.search && (
+                                <button onClick={() => handleFilterChange({ ...currentFilter, search: "" })} className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-300 hover:text-gray-500 transition"><IconX /></button>
+                            )}
+                        </div>
                         {canManageAuditAccess && (
-                            <button onClick={() => setShowAuditAccessModal(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 transition">
+                            <button onClick={() => setShowAuditAccessModal(true)} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-semibold border border-gray-200 text-gray-600 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all shrink-0">
                                 <Shield size={14} /> Akses Audit
                             </button>
                         )}
                     </div>
                     {tab === "IN" && (
-                        <button onClick={() => setShowIncomeModal(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition shadow-sm">
+                        <button onClick={() => setShowIncomeModal(true)} className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm shrink-0 w-full sm:w-auto">
                             <IconPlus /> Tambah Uang Masuk
                         </button>
                     )}
                     {tab === "OUT" && (
-                        <button onClick={() => setShowModal(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gray-900 hover:bg-gray-800 active:scale-95 transition shadow-sm">
+                        <button onClick={() => setShowModal(true)} className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white ${BRAND_GRADIENT} ${BRAND_GRADIENT_HOVER} active:scale-95 transition-all shadow-sm shrink-0 w-full sm:w-auto`}>
                             <IconPlus /> Tambah Pengeluaran
                         </button>
                     )}
@@ -1866,14 +1880,14 @@ export default function CashflowPage() {
                 {showFilter && <FilterPanel filter={currentFilter} onChange={handleFilterChange} onReset={handleFilterReset} direction={tab} nameOptions={nameOptions} />}
 
                 {!loading && voidedCount > 0 && (
-                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-[12px] text-gray-600">
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 shadow-sm text-[12px] text-gray-600">
                         <IconInfo />
                         <span>Ada <b>{voidedCount} entry dibatalkan</b> di tab ini — ditandai abu-abu &amp; nominalnya dicoret. Entry ini <b>tidak dihitung</b> ke saldo maupun total periode, dan tidak bisa diaudit.</span>
                     </div>
                 )}
 
                 {!loading && belumAuditActive && (
-                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[12px] text-amber-700">
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 shadow-sm text-[12px] text-amber-700">
                         <IconAlertTriangle />
                         <span>Menampilkan hanya entry yang <b>belum diaudit</b> di kedua tab (Masuk & Keluar).</span>
                         <button
@@ -1886,7 +1900,7 @@ export default function CashflowPage() {
                 )}
 
                 {!loading && staleOnly && (
-                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-orange-50 border border-orange-200 text-[12px] text-orange-700">
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-orange-50 border border-orange-200 shadow-sm text-[12px] text-orange-700">
                         <IconAlertTriangle />
                         <span>Menampilkan hanya entry yang <b>sudah diaudit tapi harga transaksinya berubah</b>.</span>
                         <button onClick={() => setStaleOnly(false)} className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-orange-700 bg-orange-100 hover:bg-orange-200 transition">
@@ -1895,7 +1909,7 @@ export default function CashflowPage() {
                     </div>
                 )}
                 {tab === "IN" && (
-                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-50/80 border border-blue-100 text-[12px] text-blue-700">
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-blue-50/80 border border-blue-100 shadow-sm text-[12px] text-blue-700">
                         <IconInfo />
                         <span>Klik baris untuk membuka sumbernya di <b>Riwayat Transaksi</b> atau <b>Service</b>. Uang masuk otomatis sync dari transaksi PAID & service DONE sejak <b>{startDateFormatted}</b>.</span>
                     </div>
@@ -1903,10 +1917,84 @@ export default function CashflowPage() {
 
                 {/* Table */}
                 <div ref={tableRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
+
+                    {/* Mobile card list (< sm) — same data & handlers as the table below */}
+                    <div className="sm:hidden divide-y divide-gray-50">
+                        {loading ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <div key={i} className="p-4 animate-pulse space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <div className="h-3 w-20 bg-gray-100 rounded-full" />
+                                        <div className="h-3 w-14 bg-gray-100 rounded-full" />
+                                    </div>
+                                    <div className="h-4 w-32 bg-gray-100 rounded-full" />
+                                    <div className="h-5 w-24 bg-gray-100 rounded-full" />
+                                </div>
+                            ))
+                        ) : rows.length === 0 ? (
+                            <div className="px-4 py-14 text-center">
+                                <div className="text-4xl mb-2.5 opacity-25 flex justify-center">{filterCount > 0 ? <Search size={36} /> : <Inbox size={36} />}</div>
+                                <p className="text-sm text-gray-400 font-medium">
+                                    {filterCount > 0 ? `Tidak ada data yang cocok (${allRows.length} entry tersembunyi).` : `Belum ada data ${tab === "IN" ? "uang masuk" : "uang keluar"}.`}
+                                </p>
+                                {filterCount > 0 && (
+                                    <button onClick={handleFilterReset} className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                                        <IconX /> Reset Filter
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            paginatedRows.map((e) => {
+                                const isClickable = clickable(e);
+                                const displayName = e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" ? (e.created_by_user?.name ?? e.nama) : e.nama;
+                                return (
+                                    <div key={e.id} onClick={() => isClickable && handleRowClick(e)}
+                                        className={`p-4 space-y-2.5 transition-colors ${e.is_voided && e.is_audited ? "bg-red-50/70" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "active:bg-blue-50/60" : ""}`}>
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <SourceBadge sourceType={e.source_type} />
+                                                <span className="text-[10px] font-mono text-gray-400">{fmtTanggal(e.tanggal)}</span>
+                                            </div>
+                                            <span className="text-[10px] font-semibold text-gray-500 shrink-0">
+                                                {e.created_at ? new Date(e.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : ""}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-bold text-gray-900 truncate">{displayName}</p>
+                                                <span className="inline-flex mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                                                    {e.source_type === "MODAL_AWAL" ? "Modal Awal" : categoryLabel(e.direction, e.category)}
+                                                </span>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <p className={`font-mono font-black text-base tabular-nums ${e.is_voided ? "text-gray-400 line-through decoration-gray-400" : e.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
+                                                    {e.direction === "IN" ? "+" : "−"}{fmtRupiah(e.nominal)}
+                                                </p>
+                                                {e.is_stale && e.source_nominal != null && (
+                                                    <p className="text-[9px] font-bold text-amber-600 mt-0.5">Kini {fmtRupiah(e.source_nominal)}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {e.keterangan && <p className="text-[11px] text-gray-500 line-clamp-2">{e.keterangan}</p>}
+                                        <div className="flex items-center justify-between gap-2 pt-1" onClick={(ev) => ev.stopPropagation()}>
+                                            <AuditCell entry={e} busy={auditingId === e.id} onAudit={() => toggleAudit(e)} canAudit={e.direction === "OUT" ? canAuditOut : true} />
+                                            {e.photo_url && (
+                                                <button type="button" onClick={() => setDetailEntry(e)} className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600">
+                                                    <Camera size={12} /> Foto
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    {/* Desktop / tablet table (sm and up) */}
+                    <div className="hidden sm:block overflow-x-auto">
                         <table className="w-full text-sm" style={{ minWidth: 860 }}>
                             <thead>
-                                <tr className="bg-gray-50/80 border-b border-gray-100">
+                                <tr className="bg-gray-50 border-b-2 border-gray-100">
                                     {[
                                         { label: "Tanggal", align: "left" },
                                         { label: "Sumber", align: "left" },
@@ -1919,7 +2007,7 @@ export default function CashflowPage() {
                                         { label: "Diaudit oleh", align: "left" },
                                         { label: "Waktu Audit", align: "center" },
                                     ].map((h, i) => (
-                                        <th key={i} className={`px-3.5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap text-${h.align} first:pl-5 last:pr-5`}>{h.label}</th>
+                                        <th key={i} className={`px-3.5 py-3.5 text-[10px] font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap text-${h.align} first:pl-5 last:pr-5`}>{h.label}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -1951,7 +2039,7 @@ export default function CashflowPage() {
                                         const isClickable = clickable(e);
                                         return (
                                             <tr key={e.id} onClick={() => isClickable && handleRowClick(e)}
-                                                className={`transition-colors group ${e.is_voided && e.is_audited ? "bg-red-50/70 ring-1 ring-inset ring-red-200" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "cursor-pointer hover:bg-blue-50/60" : "hover:bg-gray-50/50"}`}>
+                                                className={`transition-colors group ${e.is_voided && e.is_audited ? "bg-red-50/70 ring-1 ring-inset ring-red-200" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "cursor-pointer hover:bg-violet-50/40" : "hover:bg-gray-50/50"}`}>
                                                 <td className="pl-5 pr-3 py-3 whitespace-nowrap">
                                                     <span className="text-[11px] font-semibold text-gray-600">
                                                         {e.created_at
@@ -2034,7 +2122,7 @@ export default function CashflowPage() {
 
                     {/* Pagination */}
                     {!loading && rows.length > 0 && (
-                        <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between flex-wrap gap-3">
+                        <div className="px-4 sm:px-5 py-3.5 border-t border-gray-100 bg-gray-50/40 flex items-center justify-between flex-wrap gap-3">
                             <p className="text-[11px] text-gray-400 font-medium">
                                 Menampilkan <span className="font-bold text-gray-600">{(safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, rows.length)}</span> dari <span className="font-bold text-gray-600">{rows.length}</span> entry
                                 {rows.length !== allRows.length && <span className="text-gray-300"> (total {allRows.length})</span>}
@@ -2042,8 +2130,8 @@ export default function CashflowPage() {
                             </p>
                             {totalPages > 1 && (
                                 <div className="flex items-center gap-1">
-                                    <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 transition"><IconChevronsLeft /></button>
-                                    <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 transition"><IconChevronLeft /></button>
+                                    <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronsLeft /></button>
+                                    <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronLeft /></button>
                                     {(() => {
                                         const pages: (number | "...")[] = [];
                                         if (totalPages <= 7) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
@@ -2058,11 +2146,11 @@ export default function CashflowPage() {
                                         }
                                         return pages.map((p, i) =>
                                             p === "..." ? <span key={`d-${i}`} className="w-7 h-7 flex items-center justify-center text-[11px] text-gray-400">…</span>
-                                                : <button key={p} onClick={() => setCurrentPage(p as number)} className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-semibold transition ${p === safePage ? "bg-gray-900 text-white shadow-sm" : "border border-gray-200 text-gray-600 bg-white hover:bg-gray-50"}`}>{p}</button>
+                                                : <button key={p} onClick={() => setCurrentPage(p as number)} className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-semibold transition-all ${p === safePage ? `${BRAND_GRADIENT} text-white shadow-sm` : "border border-gray-200 text-gray-600 bg-white hover:bg-gray-100 hover:border-gray-300"}`}>{p}</button>
                                         );
                                     })()}
-                                    <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 transition"><IconChevronRight /></button>
-                                    <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-30 transition"><IconChevronsRight /></button>
+                                    <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronRight /></button>
+                                    <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 bg-white hover:bg-gray-100 hover:border-gray-300 disabled:opacity-30 transition-all"><IconChevronsRight /></button>
                                 </div>
                             )}
                         </div>
