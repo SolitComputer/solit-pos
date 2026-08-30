@@ -41,19 +41,24 @@ const EMPTY_ACC_FORM: AccessoryForm = {
     buy_price: 0, sell_price: 0, stock: 0, notes: "",
 };
 
-const CATEGORIES = [
-    "HDD", "SSD", "RAM", "CHARGER", "BATERAI",
-    "KEYBOARD", "LCD", "CASING", "MOTHERBOARD",
-    "PROCESSOR", "VGA", "FAN", "THERMAL PASTE",
-    "KABEL", "LAINNYA",
-];
-
-const CATEGORY_ICON: Record<string, LucideIcon> = {
-    HDD: HardDrive, SSD: HardDrive, RAM: MemoryStick, CHARGER: Plug, BATERAI: BatteryFull,
-    KEYBOARD: Keyboard, LCD: Monitor, CASING: Package, MOTHERBOARD: CircuitBoard,
-    PROCESSOR: Cpu, VGA: Gamepad2, FAN: Fan, "THERMAL PASTE": Droplet,
-    KABEL: Cable, LAINNYA: Wrench,
-};
+function getCategoryIcon(cat: string): LucideIcon {
+    const c = (cat || "").toUpperCase();
+    if (c.includes("HDD")) return HardDrive;
+    if (c.includes("SSD")) return HardDrive;
+    if (c.includes("RAM") || c.includes("MEMORY")) return MemoryStick;
+    if (c.includes("CHARGER") || c.includes("ADAPTER") || c.includes("ADAPTOR")) return Plug;
+    if (c.includes("BATERAI") || c.includes("BATTERY")) return BatteryFull;
+    if (c.includes("KEYBOARD")) return Keyboard;
+    if (c.includes("LCD") || c.includes("MONITOR") || c.includes("LAYAR")) return Monitor;
+    if (c.includes("CASING") || c.includes("CASE")) return Package;
+    if (c.includes("MOTHERBOARD") || c.includes("MAINBOARD")) return CircuitBoard;
+    if (c.includes("PROCESSOR") || c.includes("CPU")) return Cpu;
+    if (c.includes("VGA") || c.includes("GPU")) return Gamepad2;
+    if (c.includes("FAN") || c.includes("KIPAS")) return Fan;
+    if (c.includes("PASTE") || c.includes("PASTA")) return Droplet;
+    if (c.includes("KABEL") || c.includes("CABLE")) return Cable;
+    return Wrench;
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function parseRupiah(val: string): number {
@@ -122,7 +127,7 @@ function PriceInput({ value, onChange, placeholder }: { value: string; onChange:
 // ═══════════════════════════════════════════════════════════════════════════
 // MODAL: Aksesori (create/edit)
 // ═══════════════════════════════════════════════════════════════════════════
-function AccessoryModal({ open, onClose, onSave, initial, loading }: { open: boolean; onClose: () => void; onSave: (data: AccessoryForm) => Promise<void>; initial?: Accessory | null; loading: boolean; }) {
+function AccessoryModal({ open, onClose, onSave, initial, loading, categories = [] }: { open: boolean; onClose: () => void; onSave: (data: AccessoryForm) => Promise<void>; initial?: Accessory | null; loading: boolean; categories?: string[]; }) {
     const [form, setForm] = useState<AccessoryForm>(EMPTY_ACC_FORM);
     const [sellInput, setSellInput] = useState(""); const [buyInput, setBuyInput] = useState(""); const [stockInput, setStockInput] = useState("");
 
@@ -148,7 +153,16 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: { open: boo
                 <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
                     <div><label className={labelCls}>Nama Aksesori <span className="text-red-400">*</span></label><input className={inputCls} placeholder="cth. Samsung 870 EVO" value={form.name} onChange={e => set("name", e.target.value)} /></div>
                     <div className="grid grid-cols-2 gap-3">
-                        <div><label className={labelCls}>Kategori <span className="text-red-400">*</span></label><select className={`${inputCls} filter-select cursor-pointer`} value={form.category} onChange={e => set("category", e.target.value)}><option value="">-- Pilih --</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                        <div>
+                            <label className={labelCls}>Kategori <span className="text-red-400">*</span></label>
+                            <select className={`${inputCls} filter-select cursor-pointer`} value={form.category} onChange={e => set("category", e.target.value)}>
+                                <option value="">-- Pilih --</option>
+                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                {form.category && !categories.includes(form.category) && (
+                                    <option value={form.category}>{form.category}</option>
+                                )}
+                            </select>
+                        </div>
                         <div><label className={labelCls}>Merk</label><input className={inputCls} placeholder="Samsung, Kingston..." value={form.brand} onChange={e => set("brand", e.target.value)} /></div>
                     </div>
                     <div><label className={labelCls}>Spesifikasi</label><input className={inputCls} placeholder="500GB, DDR4 8GB, 65W..." value={form.spec} onChange={e => set("spec", e.target.value)} /></div>
@@ -175,7 +189,7 @@ function AccessoryModal({ open, onClose, onSave, initial, loading }: { open: boo
 function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete, canEdit, canDelete }: { accessory: Accessory | null; onClose: () => void; onEdit: () => void; onDelete: () => void; canEdit: boolean; canDelete: boolean; }) {
     useEffect(() => { if (!accessory) return; const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [accessory, onClose]);
     if (!accessory) return null;
-    const stock = accessory.stock ?? 0; const margin = (accessory.sell_price || 0) - (accessory.buy_price || 0); const CatIcon = CATEGORY_ICON[accessory.category] ?? Wrench;
+    const stock = accessory.stock ?? 0; const margin = (accessory.sell_price || 0) - (accessory.buy_price || 0); const CatIcon = getCategoryIcon(accessory.category);
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
@@ -300,6 +314,7 @@ function AccessoriesContent() {
     //  tidak pernah berkurang) — dipakai supaya dropdown filter tetap lengkap
     //  walau item.category ada yang di luar daftar CATEGORIES hardcoded (data lama).
     const [seenCategories, setSeenCategories] = useState<Set<string>>(new Set());
+    const [dbCategories, setDbCategories] = useState<string[]>([]);
     const [fetching, setFetching] = useState(true); const [isExporting, setIsExporting] = useState(false);
     const [accModalOpen, setAccModalOpen] = useState(false); const [editAcc, setEditAcc] = useState<Accessory | null>(null);
     const [deleteAcc, setDeleteAcc] = useState<Accessory | null>(null); const [savingAcc, setSavingAcc] = useState(false);
@@ -325,6 +340,18 @@ function AccessoriesContent() {
     const LIMIT = 9999;
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    const fetchCategories = useCallback(async () => {
+        try {
+            const res = await fetch("/api/categories");
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data)) {
+                setDbCategories(json.data.map((c: { name: string }) => c.name));
+            }
+        } catch {
+            // ignore
+        }
+    }, []);
+
     const fetchItems = useCallback(async (p = 1, q = search, cat = filterCategory) => {
         setFetching(true);
         try {
@@ -344,7 +371,10 @@ function AccessoriesContent() {
         } finally { setFetching(false); }
     }, [search, filterCategory]);
 
-    useEffect(() => { fetchItems(1); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        fetchItems(1);
+        fetchCategories();
+    }, [fetchItems, fetchCategories]);
 
     const handleSearch = (val: string) => { setSearch(val); if (searchTimeout.current) clearTimeout(searchTimeout.current); searchTimeout.current = setTimeout(() => fetchItems(1, val, filterCategory), 400); };
 
@@ -366,10 +396,12 @@ function AccessoriesContent() {
         };
     }, [items, total]);
 
-    const availableCategories = useMemo(
-        () => Array.from(new Set([...CATEGORIES, ...Array.from(seenCategories)])).sort((a, b) => a.localeCompare(b, "id")),
-        [seenCategories]
-    );
+    const availableCategories = useMemo(() => {
+        const set = new Set<string>();
+        dbCategories.forEach(c => c && set.add(c));
+        seenCategories.forEach(c => c && set.add(c));
+        return Array.from(set).sort((a, b) => a.localeCompare(b, "id"));
+    }, [dbCategories, seenCategories]);
 
     const handleSaveAcc = async (data: AccessoryForm) => { setSavingAcc(true); try { const isEdit = !!editAcc; const url = isEdit ? `/api/accessories/${editAcc!.id}` : "/api/accessories"; const res = await fetch(url, { method: isEdit ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); const json = await res.json(); if (!json.success) throw new Error(json.error ?? "Gagal menyimpan"); toast.success(isEdit ? "Aksesori diperbarui" : "Aksesori ditambahkan"); setAccModalOpen(false); setEditAcc(null); fetchItems(page); } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Terjadi kesalahan"); } finally { setSavingAcc(false); } };
 
@@ -536,7 +568,7 @@ function AccessoriesContent() {
                 </div>
             </main>
 
-            <AccessoryModal open={accModalOpen} onClose={() => { setAccModalOpen(false); setEditAcc(null); }} onSave={handleSaveAcc} initial={editAcc} loading={savingAcc} />
+            <AccessoryModal open={accModalOpen} onClose={() => { setAccModalOpen(false); setEditAcc(null); }} onSave={handleSaveAcc} initial={editAcc} loading={savingAcc} categories={availableCategories} />
             {view === "detail" && (<AccessoryDetailModal accessory={selectedAcc} onClose={() => { setView(null); setSelectedAcc(null); }} onEdit={() => { setEditAcc(selectedAcc); setView(null); setAccModalOpen(true); }} onDelete={() => setDeleteAcc(selectedAcc)} canEdit={canEditAcc} canDelete={canDeleteAcc} />)}
             <DeleteConfirm open={!!deleteAcc} title="Hapus Aksesori" name={deleteAcc?.name ?? ""} onClose={() => setDeleteAcc(null)} onConfirm={handleDeleteAcc} loading={deletingAcc} />
             <AuditHistoryModal accessory={historyAcc} onClose={() => setHistoryAcc(null)} />

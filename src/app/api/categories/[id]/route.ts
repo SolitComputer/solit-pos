@@ -75,17 +75,30 @@ async function deleteHandler(req: NextRequest, props: Props, user: AuthUser) {
       .eq("id", id)
       .single();
 
-    // Cek dulu apakah masih ada laptop yang pakai kategori ini
-    const { count } = await supabase
+    // Cek dulu apakah masih ada laptop atau aksesori yang pakai kategori ini
+    const { count: laptopCount } = await supabase
       .from("laptops")
       .select("id", { count: "exact", head: true })
       .eq("category_id", id);
 
-    if (count && count > 0) {
+    let accCount = 0;
+    if (category?.name) {
+      const { count } = await supabase
+        .from("accessories")
+        .select("id", { count: "exact", head: true })
+        .ilike("category", category.name);
+      accCount = count ?? 0;
+    }
+
+    const totalInUse = (laptopCount ?? 0) + accCount;
+    if (totalInUse > 0) {
+      const parts: string[] = [];
+      if (laptopCount && laptopCount > 0) parts.push(`${laptopCount} laptop`);
+      if (accCount > 0) parts.push(`${accCount} aksesori`);
       return NextResponse.json(
         {
           success: false,
-          message: `Tidak bisa menghapus: masih ada ${count} laptop yang memakai kategori ini. Pindahkan dulu laptop-laptop tersebut ke kategori lain.`,
+          message: `Tidak bisa menghapus: masih ada ${parts.join(" dan ")} yang memakai kategori ini. Pindahkan dulu barang tersebut ke kategori lain.`,
         },
         { status: 409 }
       );

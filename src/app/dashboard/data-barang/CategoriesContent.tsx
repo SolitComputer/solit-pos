@@ -92,8 +92,8 @@ export default function CategoriesContent() {
                         </svg>
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900 leading-tight">Kategori Laptop</h2>
-                        <p className="text-[12px] text-gray-400">Kelola kategori untuk mengelompokkan laptop</p>
+                        <h2 className="text-lg font-bold text-gray-900 leading-tight">Kategori Barang</h2>
+                        <p className="text-[12px] text-gray-400">Kelola kategori untuk mengelompokkan laptop dan aksesoris</p>
                     </div>
                 </div>
                 {canManage && (

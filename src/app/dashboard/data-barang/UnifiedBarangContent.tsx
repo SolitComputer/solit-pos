@@ -78,10 +78,6 @@ const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
 
-const ACCESSORY_CATEGORIES = [
-    "HDD", "SSD", "RAM", "CHARGER", "BATERAI", "KEYBOARD", "LCD", "CASING",
-    "MOTHERBOARD", "PROCESSOR", "VGA", "FAN", "THERMAL PASTE", "KABEL", "LAINNYA",
-];
 
 function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const units = l.laptop_units ?? [];
@@ -398,7 +394,13 @@ export default function UnifiedBarangContent() {
         let list = rows;
         if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
         if (kategoriFilter) {
-            list = list.filter(r => tipeFilter === "LAPTOP" ? r.kategori_id === kategoriFilter : r.kategori === kategoriFilter);
+            list = list.filter(r => {
+                if (tipeFilter === "LAPTOP") return r.kategori_id === kategoriFilter;
+                if (tipeFilter === "AKSESORIS") {
+                    return (r.kategori || "").toUpperCase() === kategoriFilter.toUpperCase() || r.kategori_id === kategoriFilter;
+                }
+                return r.kategori_id === kategoriFilter || (r.kategori || "").toUpperCase() === kategoriFilter.toUpperCase();
+            });
         }
         if (search.trim()) {
             const t = search.toLowerCase();
@@ -687,18 +689,10 @@ export default function UnifiedBarangContent() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                             <input className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 col-span-2"
                                 placeholder="Cari nama, brand, spek, SN..." value={search} onChange={e => setSearch(e.target.value)} />
-                            {tipeFilter === "LAPTOP" && (
-                                <select className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
-                                    <option value="">Semua Kategori</option>
-                                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
-                            )}
-                            {tipeFilter === "AKSESORIS" && (
-                                <select className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
-                                    <option value="">Semua Kategori</option>
-                                    {ACCESSORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            )}
+                            <select className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
+                                <option value="">Semua Kategori</option>
+                                {categories.map(c => <option key={c.id} value={tipeFilter === "AKSESORIS" ? c.name : c.id}>{c.name}</option>)}
+                            </select>
                             <button onClick={resetFilter} disabled={!hasFilter} className="h-9 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 disabled:opacity-40 transition">Reset</button>
                         </div>
                     </div>
@@ -1029,7 +1023,10 @@ export default function UnifiedBarangContent() {
                                         <Field label="Kategori" required>
                                             <select className={inputCls} value={accForm.category} onChange={e => setAccForm(p => ({ ...p, category: e.target.value }))}>
                                                 <option value="">-- Pilih --</option>
-                                                {ACCESSORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                                {accForm.category && !categories.some(c => c.name.toUpperCase() === accForm.category.toUpperCase()) && (
+                                                    <option value={accForm.category}>{accForm.category}</option>
+                                                )}
                                             </select>
                                         </Field>
                                         <Field label="Merk"><input className={inputCls} value={accForm.brand} onChange={e => setAccForm(p => ({ ...p, brand: e.target.value }))} /></Field>
