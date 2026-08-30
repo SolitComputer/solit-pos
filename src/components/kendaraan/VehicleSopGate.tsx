@@ -12,9 +12,13 @@ import MarkdownEditor from "@/components/kendaraan/MarkdownEditor";
 
 type Sop = { content: string; updated_at: string; updated_by_name: string | null };
 
-const ackKey = (userId: string) => `solit_vehicle_sop_ack_${userId}`;
+type VehicleSopGateProps = {
+  // Dipanggil tiap kali status "wajib baca SOP" berubah — dipakai halaman
+  // utama buat mengunci tombol "Ajukan Pinjam" sampai SOP diakui dibaca.
+  onStatusChange?: (blocked: boolean) => void;
+};
 
-export default function VehicleSopGate() {
+export default function VehicleSopGate({ onStatusChange }: VehicleSopGateProps) {
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [ready, setReady] = useState(false);
@@ -53,36 +57,38 @@ export default function VehicleSopGate() {
     };
   }, [loadSop]);
 
-  // Auto-popup wajib baca: kalau ada SOP & user belum acc versi ini
+  // Auto-popup wajib baca + lapor status ke parent (buat kunci tombol Ajukan
+  // Pinjam). Kalau belum ada SOP sama sekali, otomatis dianggap tidak terkunci.
+  // SENGAJA tidak diingat lintas kunjungan: setiap kali halaman ini dibuka
+  // (termasuk keluar lalu masuk lagi), popup SOP wajib muncul ulang dan
+  // tombol Ajukan Pinjam terkunci sampai user klik "Saya Sudah Membaca" pada
+  // kunjungan itu.
   useEffect(() => {
-    if (!ready || !userId || !sop || !sop.content.trim()) return;
-    let acked: string | null = null;
-    try {
-      acked = localStorage.getItem(ackKey(userId));
-    } catch {
-      /* ignore */
+    if (!ready) return; // masih loading — parent tetap pakai default terkunci (aman)
+    if (!sop || !sop.content.trim()) {
+      onStatusChange?.(false);
+      return;
     }
-    if (acked !== sop.updated_at) {
-      setForceRead(true);
-      setViewOpen(true);
-    }
-  }, [ready, userId, sop]);
+    onStatusChange?.(true);
+    setForceRead(true);
+    setViewOpen(true);
+  }, [ready, sop, onStatusChange]);
 
-  const ack = useCallback(() => {
-    if (userId && sop) {
-      try {
-        localStorage.setItem(ackKey(userId), sop.updated_at);
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [userId, sop]);
-
-  const closeView = useCallback(() => {
-    ack();
+  // Klik "Saya Sudah Membaca" -> buka kunci tombol Ajukan Pinjam untuk
+  // kunjungan ini saja (tidak disimpan permanen — lihat catatan di atas
+  // effect auto-popup).
+  const acknowledge = useCallback(() => {
+    onStatusChange?.(false);
     setViewOpen(false);
     setForceRead(false);
-  }, [ack]);
+  }, [onStatusChange]);
+
+  // Klik X / klik di luar modal -> cuma tutup popup, TIDAK dihitung sudah
+  // membaca. Tombol Ajukan Pinjam tetap terkunci sampai klik tombol acknowledge.
+  const dismiss = useCallback(() => {
+    setViewOpen(false);
+    setForceRead(false);
+  }, []);
 
   // Jangan render apa-apa kalau belum siap, atau (non-admin & belum ada SOP)
   if (!ready) return null;
@@ -92,7 +98,7 @@ export default function VehicleSopGate() {
     <>
       <div className="mb-5 flex items-center justify-between gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <span className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-200 text-violet-600 flex items-center justify-center shrink-0">
+          <span className="w-9 h-9 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 flex items-center justify-center shrink-0">
             <FileText size={16} />
           </span>
           <div className="min-w-0">
@@ -109,7 +115,7 @@ export default function VehicleSopGate() {
                 setForceRead(false);
                 setViewOpen(true);
               }}
-              className="h-9 px-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[11px] font-semibold flex items-center gap-1.5 transition active:scale-95"
+              className="h-9 px-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-[11px] font-semibold flex items-center gap-1.5 transition active:scale-95"
             >
               <Eye size={14} /> Lihat SOP
             </button>
@@ -126,7 +132,7 @@ export default function VehicleSopGate() {
       </div>
 
       {viewOpen && sop && (
-        <SopViewModal sop={sop} forceRead={forceRead} onClose={closeView} />
+        <SopViewModal sop={sop} forceRead={forceRead} onAcknowledge={acknowledge} onDismiss={dismiss} />
       )}
       {editOpen && (
         <SopEditModal
@@ -134,14 +140,10 @@ export default function VehicleSopGate() {
           onClose={() => setEditOpen(false)}
           onSaved={async (newSop) => {
             setSop(newSop);
-            // admin dianggap sudah baca versi yang baru dia tulis
-            if (userId) {
-              try {
-                localStorage.setItem(ackKey(userId), newSop.updated_at);
-              } catch {
-                /* ignore */
-              }
-            }
+            // Admin dianggap sudah baca versi yang baru saja dia tulis —
+            // buka kunci untuk kunjungan ini (tetap muncul lagi kalau admin
+            // keluar-masuk halaman, sama seperti user lain).
+            onStatusChange?.(false);
             setEditOpen(false);
           }}
         />
@@ -151,7 +153,18 @@ export default function VehicleSopGate() {
 }
 
 // ─── VIEW (wajib gulir ke bawah kalau forceRead) ─────────────────────────────
-function SopViewModal({ sop, forceRead, onClose }: { sop: Sop; forceRead: boolean; onClose: () => void }) {
+// X (dan klik di luar modal) SENGAJA selalu aktif — menutup lewat situ cuma
+// dismiss (onDismiss), TIDAK dihitung sebagai "sudah membaca". Tombol
+// "Saya Sudah Membaca" tetap butuh scroll sampai bawah dulu kalau forceRead,
+// dan hanya tombol itu yang membuka kunci Ajukan Pinjam.
+function SopViewModal({
+  sop, forceRead, onAcknowledge, onDismiss,
+}: {
+  sop: Sop;
+  forceRead: boolean;
+  onAcknowledge: () => void;
+  onDismiss: () => void;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [reachedEnd, setReachedEnd] = useState(!forceRead);
 
@@ -167,16 +180,15 @@ function SopViewModal({ sop, forceRead, onClose }: { sop: Sop; forceRead: boolea
     return () => clearTimeout(t);
   }, [checkEnd]);
 
-  const canClose = !forceRead || reachedEnd;
+  const canAcknowledge = !forceRead || reachedEnd;
 
   return (
-    <ModalWrapper onClose={canClose ? onClose : () => {}} preventClose={!canClose} wide>
+    <ModalWrapper onClose={onDismiss} wide>
       <ModalHead
         icon={<FileText size={18} />}
         title="SOP Peminjaman Kendaraan"
         sub={sop.updated_by_name ? `Diperbarui oleh ${sop.updated_by_name}` : undefined}
-        onClose={onClose}
-        noClose={!canClose}
+        onClose={onDismiss}
       />
       <div ref={scrollRef} onScroll={checkEnd} className="px-5 py-4 max-h-[55vh] overflow-y-auto">
         <SopMarkdown content={sop.content} />
@@ -185,8 +197,8 @@ function SopViewModal({ sop, forceRead, onClose }: { sop: Sop; forceRead: boolea
         {forceRead && !reachedEnd && (
           <p className="flex-1 text-[10px] text-gray-400 self-center">Gulir sampai bawah untuk melanjutkan…</p>
         )}
-        <button onClick={onClose} disabled={!canClose} className={primaryBtn}>
-          {canClose ? "Saya Sudah Membaca" : "Baca Dulu"}
+        <button onClick={onAcknowledge} disabled={!canAcknowledge} className={primaryBtn}>
+          {canAcknowledge ? "Saya Sudah Membaca" : "Baca Dulu"}
         </button>
       </ModalFoot>
     </ModalWrapper>

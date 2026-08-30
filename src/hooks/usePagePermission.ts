@@ -20,10 +20,10 @@ interface PermSet {
   delete: boolean;
 }
 
-const FALLBACK_ALL: PermSet = { view: true, create: true, edit: true, delete: true };
+const FALLBACK_NONE: PermSet = { view: false, create: false, edit: false, delete: false };
 
 export function usePagePermission(pageKey: string) {
-  const [can, setCan] = useState<PermSet>(FALLBACK_ALL);
+    const [can, setCan] = useState<PermSet>(FALLBACK_NONE);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,12 +35,13 @@ export function usePagePermission(pageKey: string) {
         if (!alive) return;
         if (data.success && data.permissions[pageKey]) {
           setCan(data.permissions[pageKey]);
-        } else {
-          // Tidak ada entri dinamis untuk halaman ini -> anggap role lama, jangan batasi.
-          setCan(FALLBACK_ALL);
+               } else {
+          // Tidak ada entri dinamis untuk halaman ini -> jangan MENAMBAH izin apa pun.
+          // Static role check (hasAnyRole(...) di komponen) yang tetap menentukan sendiri.
+          setCan(FALLBACK_NONE);
         }
-      } catch {
-        if (alive) setCan(FALLBACK_ALL);
+           } catch {
+        if (alive) setCan(FALLBACK_NONE);
       } finally {
         if (alive) setLoading(false);
       }

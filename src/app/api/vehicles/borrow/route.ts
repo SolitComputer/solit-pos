@@ -16,8 +16,8 @@ export async function GET(request: NextRequest) {
   const isQueue = new URL(request.url).searchParams.get("queue") === "1";
 
   if (isQueue) {
-    if (!me.isAdmin)
-      return NextResponse.json({ success: false, message: "Hanya Admin yang bisa melihat antrian ACC." }, { status: 403 });
+    if (!me.canApprove)
+      return NextResponse.json({ success: false, message: "Kamu tidak punya akses untuk melihat antrian ACC." }, { status: 403 });
 
     const { data, error } = await supabaseVehicles
       .from("vehicle_borrow_requests")

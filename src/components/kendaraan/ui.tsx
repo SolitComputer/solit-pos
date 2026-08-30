@@ -1,18 +1,18 @@
 "use client";
 
 import React from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 // ─── SHARED STYLE TOKENS (samain dengan fitur Lembur) ───────────────────────
 export const inp =
-  "w-full h-10 border border-gray-200 rounded-xl px-3.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all placeholder:text-gray-300";
+  "w-full h-10 border border-gray-200 rounded-xl px-3.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-400 transition-all placeholder:text-gray-300";
 export const lbl = "text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5";
 export const primaryBtn =
-  "flex-1 h-10 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-violet-200";
+  "flex-1 h-10 bg-gradient-to-b from-zinc-800 to-zinc-900 hover:from-zinc-700 hover:to-zinc-800 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-zinc-900/20 ring-1 ring-inset ring-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2";
 export const secondaryBtn =
-  "flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all active:scale-[0.98] flex items-center justify-center";
+  "flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all active:scale-[0.98] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2";
 export const dangerBtn =
-  "flex-1 h-10 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-red-200";
+  "flex-1 h-10 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2";
 
 export function ErrorBanner({ msg }: { msg: string }) {
   return (
@@ -25,6 +25,39 @@ export function ErrorBanner({ msg }: { msg: string }) {
 
 export function Spinner() {
   return <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />;
+}
+
+// Pill statistik kecil untuk hero (jumlah kendaraan per status)
+export function StatPill({
+  label,
+  count,
+  tone,
+}: {
+  label: string;
+  count: number;
+  tone: "emerald" | "zinc" | "amber";
+}) {
+  const dot: Record<string, string> = {
+    emerald: "bg-emerald-400",
+    zinc: "bg-zinc-400",
+    amber: "bg-amber-400",
+  };
+  return (
+    <span className="inline-flex items-center gap-1.5 bg-white/10 border border-white/10 rounded-full pl-2 pr-2.5 py-1 text-[10px] font-semibold text-zinc-200">
+      <span className={`w-1.5 h-1.5 rounded-full ${dot[tone]}`} />
+      {count} {label}
+    </span>
+  );
+}
+
+// Info kecil "disetujui oleh admin X" — dipakai di kartu kendaraan
+export function ApprovedByNote({ name }: { name?: string | null }) {
+  if (!name) return null;
+  return (
+    <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 font-semibold flex items-center gap-1.5">
+      <CheckCircle2 size={12} /> Disetujui oleh: {name}
+    </div>
+  );
 }
 
 // ─── MODAL SHELL ─────────────────────────────────────────────────────────────
@@ -45,8 +78,8 @@ export function ModalWrapper({
       style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)" }}
       onClick={preventClose ? undefined : onClose}
     >
-      <div
-        className={`w-full ${wide ? "sm:max-w-lg" : "sm:max-w-md"} bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden border border-gray-100/80`}
+       <div
+        className={`w-full ${wide ? "sm:max-w-lg" : "sm:max-w-md"} max-h-[92vh] sm:max-h-[85vh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-gray-100/80`}
         style={{ animation: "modalUp 0.28s cubic-bezier(0.22,1,0.36,1)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -97,7 +130,14 @@ export function ModalHead({
 }
 
 export function ModalFoot({ children }: { children: React.ReactNode }) {
-  return <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/60 flex gap-2.5">{children}</div>;
+  return (
+    <div
+      className="px-5 py-4 border-t border-gray-100 bg-gray-50/60 flex gap-2.5"
+      style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+    >
+      {children}
+    </div>
+  );
 }
 
 // Empty state konsisten: ikon lembut + teks
@@ -147,7 +187,7 @@ export function formatDateTime(iso: string | null | undefined): string {
 export function VehicleStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     TERSEDIA: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    DIPAKAI: "bg-violet-50 text-violet-700 border-violet-200",
+    DIPAKAI: "bg-zinc-100 text-zinc-700 border-zinc-200",
     MAINTENANCE: "bg-amber-50 text-amber-700 border-amber-200",
   };
   const label: Record<string, string> = { TERSEDIA: "Tersedia", DIPAKAI: "Dipakai", MAINTENANCE: "Maintenance" };
@@ -162,7 +202,7 @@ export function VehicleStatusBadge({ status }: { status: string }) {
 export function RequestStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     PENDING: "bg-amber-50 text-amber-700 border-amber-200",
-    APPROVED: "bg-violet-50 text-violet-700 border-violet-200",
+    APPROVED: "bg-zinc-100 text-zinc-700 border-zinc-200",
     REJECTED: "bg-red-50 text-red-600 border-red-200",
     COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   };

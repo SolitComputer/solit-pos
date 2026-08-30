@@ -296,6 +296,10 @@ function AuditHistoryModal({ accessory, onClose }: { accessory: Accessory | null
 function AccessoriesContent() {
     const [items, setItems] = useState<Accessory[]>([]); const [total, setTotal] = useState(0); const [page, setPage] = useState(1);
     const [search, setSearch] = useState(""); const [filterCategory, setFilterCategory] = useState("");
+    //  FIX: kumpulan kategori yang PERNAH terlihat dari respons API (akumulatif,
+    //  tidak pernah berkurang) — dipakai supaya dropdown filter tetap lengkap
+    //  walau item.category ada yang di luar daftar CATEGORIES hardcoded (data lama).
+    const [seenCategories, setSeenCategories] = useState<Set<string>>(new Set());
     const [fetching, setFetching] = useState(true); const [isExporting, setIsExporting] = useState(false);
     const [accModalOpen, setAccModalOpen] = useState(false); const [editAcc, setEditAcc] = useState<Accessory | null>(null);
     const [deleteAcc, setDeleteAcc] = useState<Accessory | null>(null); const [savingAcc, setSavingAcc] = useState(false);
@@ -323,7 +327,21 @@ function AccessoriesContent() {
 
     const fetchItems = useCallback(async (p = 1, q = search, cat = filterCategory) => {
         setFetching(true);
-        try { const params = new URLSearchParams({ page: String(p), limit: String(LIMIT), ...(q && { search: q }), ...(cat && { category: cat }) }); const res = await fetch(`/api/accessories?${params}`); const json = await res.json(); if (json.success) { setItems(json.data); setTotal(json.total); setPage(p); } } finally { setFetching(false); }
+        try {
+            const params = new URLSearchParams({ page: String(p), limit: String(LIMIT), ...(q && { search: q }), ...(cat && { category: cat }) });
+            const res = await fetch(`/api/accessories?${params}`);
+            const json = await res.json();
+            if (json.success) {
+                setItems(json.data);
+                setTotal(json.total);
+                setPage(p);
+                setSeenCategories(prev => {
+                    const next = new Set(prev);
+                    (json.data as Accessory[]).forEach(i => { if (i.category) next.add(i.category); });
+                    return next;
+                });
+            }
+        } finally { setFetching(false); }
     }, [search, filterCategory]);
 
     useEffect(() => { fetchItems(1); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -336,8 +354,6 @@ function AccessoriesContent() {
         const nilai = items.reduce((s, i) => s + (i.sell_price ?? 0) * (i.stock ?? 0), 0);      // nilai jual stok
         const nilaiModal = items.reduce((s, i) => s + (i.buy_price ?? 0) * (i.stock ?? 0), 0);   // modal tertanam
         const labaKotor = nilai - nilaiModal;                                                    // gross profit (Rp)
-        // GP% = laba kotor / nilai jual (gross margin, basis harga jual).
-        // Guard bagi-0: kalau belum ada stok/harga jual, nilai = 0 → JANGAN dibagi (NaN/Infinity).
         const gpPersen = nilai > 0 ? (labaKotor / nilai) * 100 : 0;
         return {
             jenis: total,
@@ -349,6 +365,11 @@ function AccessoriesContent() {
             gpPersen,
         };
     }, [items, total]);
+
+    const availableCategories = useMemo(
+        () => Array.from(new Set([...CATEGORIES, ...Array.from(seenCategories)])).sort((a, b) => a.localeCompare(b, "id")),
+        [seenCategories]
+    );
 
     const handleSaveAcc = async (data: AccessoryForm) => { setSavingAcc(true); try { const isEdit = !!editAcc; const url = isEdit ? `/api/accessories/${editAcc!.id}` : "/api/accessories"; const res = await fetch(url, { method: isEdit ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); const json = await res.json(); if (!json.success) throw new Error(json.error ?? "Gagal menyimpan"); toast.success(isEdit ? "Aksesori diperbarui" : "Aksesori ditambahkan"); setAccModalOpen(false); setEditAcc(null); fetchItems(page); } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Terjadi kesalahan"); } finally { setSavingAcc(false); } };
 
@@ -459,7 +480,7 @@ function AccessoriesContent() {
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                             <div className="relative group lg:col-span-2"><div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg></div><input className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all font-medium placeholder:text-gray-400 placeholder:font-normal" placeholder="Cari nama, merk, spesifikasi..." value={search} onChange={e => handleSearch(e.target.value)} /></div>
-                            <FilterSelect value={filterCategory} onChange={e => { setFilterCategory(e.target.value); fetchItems(1, search, e.target.value); }}><option value="">Semua Kategori</option>{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</FilterSelect>
+                            <FilterSelect value={filterCategory} onChange={e => { setFilterCategory(e.target.value); fetchItems(1, search, e.target.value); }}><option value="">Semua Kategori</option>{availableCategories.map(c => <option key={c} value={c}>{c}</option>)}</FilterSelect>
                             <button onClick={() => { setSearch(""); setFilterCategory(""); fetchItems(1, "", ""); }} disabled={!hasFilter} className="h-9 bg-gray-100 text-gray-600 rounded-xl px-3 text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Reset</button>
                         </div>
                     </div>

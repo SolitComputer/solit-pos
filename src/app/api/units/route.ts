@@ -42,20 +42,68 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     if (error) throw error;
 
-    // ── Enrich unit SOLD dengan tanggal & harga dari Riwayat Transaksi ───────
-    // "Tgl Keluar" & "Harga Terjual" harus ngikutin transaksi asli, bukan
-    // created_at/selling_price milik unit itu sendiri.
-    const soldUnits = (data ?? []).filter((u: any) => u.status === "SOLD");
+    // ── Rekonsiliasi unit "SOLD" yang stale ──────────────────────────────────
+    // Kasus nyata (mis. INV-20260726-001): transaksi multi-laptop kadang cuma
+    // nge-link SEBAGIAN unit ke transactions.unit_ids, jadi unit yang
+    // "ketinggalan" gak pernah di-flip ke status SOLD di laptop_units — padahal
+    // SN-nya beneran tercatat lunas di transactions.serial_numbers /
+    // transaction_items. Riwayat Transaksi tetap nemuin (full-text search),
+    // tapi halaman ini query laptop_units WHERE status='SOLD' doang, jadi unit
+    // begini "hilang" dari Barang Terjual walau datanya ada di inventory.
+    //
+    // Kalau request ini minta status=SOLD, tarik juga unit yang SN-nya muncul
+    // di transaksi PAID (non-cancelled) tapi kolom status-nya belum SOLD, lalu
+    // paksa status jadi SOLD di RESPONSE (bukan di DB) supaya konsisten sama
+    // Riwayat Transaksi.
+    let allUnitRows: any[] = data ?? [];
+
+    if (statusFilter === "SOLD") {
+      const knownSerials = new Set(
+        allUnitRows.map((u: any) => u.serial_number).filter(Boolean)
+      );
+
+      const { data: paidTx, error: paidTxErr } = await supabase
+        .from("transactions")
+        .select("serial_number, serial_numbers, status")
+        .eq("status", "PAID");
+      if (paidTxErr) console.error("[GET /api/units] paidTx error:", paidTxErr.message);
+
+      const missingSerials = new Set<string>();
+      for (const tx of paidTx ?? []) {
+        for (const sn of [...splitSerials(tx.serial_numbers), ...splitSerials(tx.serial_number)]) {
+          if (sn && sn !== "-" && !knownSerials.has(sn)) missingSerials.add(sn);
+        }
+      }
+
+      if (missingSerials.size > 0) {
+        const { data: strayUnits, error: strayErr } = await supabase
+          .from("laptop_units")
+          .select(`
+            *,
+            laptops (
+              laptop_name,
+              brand,
+              cpu,
+              ram,
+              storage
+            )
+          `)
+          .in("serial_number", Array.from(missingSerials));
+        if (strayErr) console.error("[GET /api/units] strayUnits error:", strayErr.message);
+
+        for (const u of strayUnits ?? []) {
+          if (allUnitRows.some((r: any) => r.id === u.id)) continue;
+          allUnitRows = [...allUnitRows, { ...u, status: "SOLD" }];
+        }
+      }
+    }
+
+    const soldUnits = allUnitRows.filter((u: any) => u.status === "SOLD");
     const soldUnitIds = soldUnits.map((u: any) => u.id);
     const soldUnitIdSet = new Set(soldUnitIds);
-
     const saleMap = new Map<string, { sold_at: string; sold_price: number }>();
 
     if (soldUnitIds.length > 0) {
-      // ── Ambil transactions & transaction_items SEKALIGUS (paralel) ────────
-      // Dua query ini gak saling bergantung, jadi dijalankan bareng lewat
-      // Promise.all — total waktu tunggu jadi = query paling lama, bukan
-      // jumlah keduanya (sebelumnya di-await satu-satu / sequential).
       const [
         { data: allTx, error: allTxErr },
         { data: txItems, error: txItemsErr },
@@ -140,7 +188,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
       }
     }
 
-    const enriched = (data ?? []).map((u: any) => ({
+    const enriched = allUnitRows.map((u: any) => ({
       ...u,
       sold_at: saleMap.get(u.id)?.sold_at ?? null,
       sold_price: saleMap.get(u.id)?.sold_price ?? null,

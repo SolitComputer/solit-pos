@@ -182,17 +182,17 @@ function AlertModal({ message, onClose }: { message: string; onClose: () => void
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
-                <div className="h-1 w-full bg-gradient-to-r from-indigo-400 via-indigo-600 to-indigo-800" />
+                <div className="h-1 w-full bg-gray-800" />
                 <div className="p-7 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-5 shadow-inner ring-1 ring-indigo-100">
-                        <svg className="w-7 h-7 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-5 shadow-inner ring-1 ring-gray-200">
+                        <svg className="w-7 h-7 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
                     <p className="text-gray-700 text-sm font-medium mb-6 leading-relaxed">{message}</p>
                     <button onClick={onClose}
-                        className="w-full h-11 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-sm font-semibold hover:from-indigo-700 hover:to-indigo-800 active:scale-[0.98] transition-all duration-150 shadow-lg shadow-indigo-600/25">
+                        className="w-full h-11 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 active:scale-[0.98] transition-all duration-150 shadow-sm">
                         OK
                     </button>
                 </div>
@@ -240,7 +240,7 @@ function ConfirmModal({
                             Batal
                         </button>
                         <button onClick={onConfirm}
-                            className={`flex-1 h-11 rounded-xl text-sm font-semibold text-white active:scale-[0.98] transition-all duration-150 shadow-lg ${danger ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/25" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/25"}`}>
+                            className={`flex-1 h-11 rounded-xl text-sm font-semibold text-white active:scale-[0.98] transition-all duration-150 shadow-lg ${danger ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/25" : "bg-gray-800 hover:bg-gray-900 shadow-none"}`}>
                             {confirmLabel}
                         </button>
                     </div>
@@ -406,7 +406,7 @@ export function LaptopsContent() {
     const { can: matrixCan } = usePagePermission("laptops");
     const canEditLaptop = hasAnyRole(userRoles, PERMISSIONS.EDIT_LAPTOP) || matrixCan.edit;
     const canDeleteLaptop = hasAnyRole(userRoles, LAPTOP_DELETE_ROLES) || matrixCan.delete;
-        const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP) || matrixCan.create;
+    const canCreateLaptop = hasAnyRole(userRoles, PERMISSIONS.CREATE_LAPTOP) || matrixCan.create;
     //  Tambah Unit (SN) untuk laptop stok 0 — dipakai tombol "Tambah Unit" di
     //  LaptopUnitsPreview (Pop-up Detail Laptop) & kolom Aksi tabel. Beda dari
     //  canCreateLaptop yang untuk bikin MODEL laptop baru.
@@ -456,7 +456,7 @@ export function LaptopsContent() {
     const [soHistoryTarget, setSoHistoryTarget] = useState<{ id: string; name: string } | null>(null);
 
     //  Isi Massal Harga Modal — laptop yang sedang dibuka modal isi massalnya
-       const [bulkPriceTarget, setBulkPriceTarget] = useState<{ id: string; name: string } | null>(null);
+    const [bulkPriceTarget, setBulkPriceTarget] = useState<{ id: string; name: string } | null>(null);
     //  Tambah unit pertama untuk laptop stok 0 — dibuka dari tombol "Tambah Unit"
     //  di LaptopUnitsPreview (Pop-up Detail Laptop) saat daftar unit masih kosong,
     //  atau dari kolom Aksi tabel langsung (tanpa buka Detail dulu).
@@ -649,7 +649,13 @@ export function LaptopsContent() {
             list = list.filter(x => (x.stok_minus ?? 0) > 0);
         }
         if (filterBrand !== "ALL") list = list.filter(x => x.brand === filterBrand);
-        if (filterCategory !== "ALL") list = list.filter(x => x.category_id === filterCategory);
+        if (filterCategory !== "ALL") {
+            list = list.filter(x => {
+                if (x.category_id === filterCategory) return true;
+                const target = filterCategoryOptions.find(c => c.id === filterCategory);
+                return !!target && x.category_name === target.name;
+            });
+        }
         if (filterProcessor !== "ALL") {
             list = list.filter(x => x.cpu?.toLowerCase().includes(filterProcessor.toLowerCase()));
         }
@@ -745,6 +751,18 @@ export function LaptopsContent() {
         return ["ALL", ...Array.from(b)];
     }, [laptops]);
 
+    const filterCategoryOptions = useMemo(() => {
+        const known = new Map(categories.map(c => [c.id, c.name]));
+        laptops.forEach(l => {
+            if (l.category_id && !known.has(l.category_id)) {
+                known.set(l.category_id, l.category_name || "Tanpa Nama");
+            }
+        });
+        return Array.from(known.entries())
+            .map(([id, name]) => ({ id, name }))
+            .sort((a, b) => a.name.localeCompare(b.name, "id"));
+    }, [categories, laptops]);
+
     const openCreate = () => { setFormData({ ...EMPTY_FORM }); setModalMode("create"); };
 
     const openDetail = async (laptop: Laptop) => {
@@ -789,7 +807,7 @@ export function LaptopsContent() {
         }
     };
 
-     const openEdit = (laptop: Laptop) => {
+    const openEdit = (laptop: Laptop) => {
         setSelectedLaptop(laptop);
         setFormData({
             laptop_name: laptop.laptop_name || "",
@@ -1071,7 +1089,7 @@ export function LaptopsContent() {
                 .table-scroll::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
                 .data-row { transition: background-color 0.15s ease; }
                 .data-row:hover { background-color: #f8fafc; }
-                .data-row:hover td:first-child { border-left: 3px solid #4f46e5; }
+                .data-row:hover td:first-child { border-left: 3px solid #6b7280; }
                 .filter-select {
                     appearance: none;
                     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
@@ -1082,13 +1100,13 @@ export function LaptopsContent() {
                 }
     `}</style>
 
-            <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
+            <main className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
                 <div className="max-w-full mx-auto space-y-5">
 
                     {/* ── HEADER ───────────────────────────────────────── */}
                     <div className="flex flex-wrap items-center justify-between gap-4 animate-slideDown">
                         <div className="flex items-center gap-3.5">
-                            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-900/25 flex-shrink-0">
+                            <div className="w-10 h-10 bg-gray-900 rounded-2xl flex items-center justify-center shadow-sm flex-shrink-0">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                                     <rect x="2" y="3" width="20" height="14" rx="2" />
                                     <line x1="8" y1="21" x2="16" y2="21" />
@@ -1096,8 +1114,8 @@ export function LaptopsContent() {
                                 </svg>
                             </div>
                             <div>
-                                <h1 className="text-xl font-black text-gray-900 tracking-tight leading-none">Data Laptop</h1>
-                                <p className="text-xs text-gray-400 mt-0.5 font-medium">Kelola inventaris laptop Solit 03</p>
+                                <h1 className="text-base font-bold text-gray-800 tracking-tight leading-none">Data Laptop</h1>
+                                <p className="text-xs text-gray-400 mt-0.5 font-normal">Kelola inventaris laptop Solit 03</p>
                             </div>
                         </div>
 
@@ -1113,7 +1131,7 @@ export function LaptopsContent() {
                             )}
                             {canCreateLaptop && (
                                 <button onClick={openCreate}
-                                    className="inline-flex items-center gap-2 h-9 px-4 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-xl text-sm font-semibold text-white hover:from-indigo-700 hover:to-indigo-800 active:scale-[0.97] transition-all duration-150 shadow-lg shadow-indigo-600/25">
+                                    className="inline-flex items-center gap-2 h-9 px-4 bg-gray-900 rounded-xl text-sm font-semibold text-white hover:bg-gray-800 active:scale-[0.97] transition-all duration-150 shadow-sm">
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                                     </svg>
@@ -1167,7 +1185,7 @@ export function LaptopsContent() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
                             <FilterSelect value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
                                 <option value="ALL">Semua Kategori</option>
-                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                {filterCategoryOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </FilterSelect>
                             <FilterSelect value={filterRam} onChange={e => setFilterRam(e.target.value)}>
                                 {uniqueRams.map(r => <option key={r} value={r}>{r === "ALL" ? "Semua RAM" : `RAM ${r}`}</option>)}
@@ -1216,7 +1234,7 @@ export function LaptopsContent() {
 
                         {(filterCategory !== "ALL" || filterProcessor !== "ALL" || filterRam !== "ALL" || filterPriceRange !== "ALL" || filterStock !== "TERSEDIA" || filterAudit !== "" || sortBy !== "DEFAULT") && (
                             <div className="flex flex-wrap gap-1.5 pt-0.5">
-                                {filterCategory !== "ALL" && <FilterChip label={categories.find(c => c.id === filterCategory)?.name ?? "Kategori"} onRemove={() => setFilterCategory("ALL")} />}
+                                {filterCategory !== "ALL" && <FilterChip label={filterCategoryOptions.find(c => c.id === filterCategory)?.name ?? "Kategori"} onRemove={() => setFilterCategory("ALL")} />}
                                 {filterProcessor !== "ALL" && <FilterChip label={filterProcessor} onRemove={() => setFilterProcessor("ALL")} />}
                                 {filterRam !== "ALL" && <FilterChip label={`RAM ${filterRam}`} onRemove={() => setFilterRam("ALL")} />}
                                 {filterPriceRange !== "ALL" && <FilterChip label={filterPriceRange === "4+" ? "≥ Rp 4 jt" : `Rp ${filterPriceRange} jt`} onRemove={() => setFilterPriceRange("ALL")} />}
@@ -1383,7 +1401,7 @@ export function LaptopsContent() {
                                                     <span className="text-[10px] font-bold text-gray-400 tabular-nums">{row.stok_tersisa}</span>
                                                 </Link>
                                             )}
-                                                                                       {row.stok_tersisa === 1 && (
+                                            {row.stok_tersisa === 1 && (
                                                 <span className="h-7 px-2.5 text-[11px] font-semibold text-gray-400 bg-gray-50 border border-gray-100 rounded-lg flex items-center">
                                                     Detail
                                                 </span>
@@ -1597,7 +1615,7 @@ export function LaptopsContent() {
 
                         {/*  Daftar unit langsung di dalam pop-up — sebelumnya modal ini
                             hanya menampilkan spesifikasi model, jadi terlihat kosong. */}
-                                               <LaptopUnitsPreview
+                        <LaptopUnitsPreview
                             laptopId={selectedLaptop.id}
                             canSeePrivate={canSeePrivateBarang}
                             onAddUnit={canAddUnit ? () => {
@@ -1679,7 +1697,7 @@ export function LaptopsContent() {
                         { label: "Storage", value: unitDetail.laptop.storage },
                         { label: "GPU", value: unitDetail.laptop.gpu },
                         { label: "Display", value: unitDetail.laptop.display },
-                                       ]} canEdit={canFullAccessBarang}
+                    ]} canEdit={canFullAccessBarang}
                     canManageUnit={canAddUnit}
                     canSeePrivate={canSeePrivateBarang}
                     defaultSellingPrice={unitDetail.laptop.selling_price}
@@ -1726,7 +1744,7 @@ export function LaptopsContent() {
                     loading={soingId === soPromptLaptop.id}
                 />
             )}
-                       {bulkPriceTarget && (
+            {bulkPriceTarget && (
                 <BulkPriceModal
                     laptopId={bulkPriceTarget.id}
                     laptopName={bulkPriceTarget.name}
@@ -1782,8 +1800,8 @@ export function LaptopsContent() {
 // ═══════════════════════════════════════════════════════
 // SHARED STYLE CONSTANTS
 // ═══════════════════════════════════════════════════════
-const inputCls = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all duration-150";
-const textareaCls = "w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all duration-150 resize-none";
+const inputCls = "w-full h-11 border border-gray-200 rounded-xl px-3.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-500 focus:bg-white transition-all duration-150";
+const textareaCls = "w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-500 focus:bg-white transition-all duration-150 resize-none";
 
 // ═══════════════════════════════════════════════════════
 // HELPER COMPONENTS
@@ -1822,7 +1840,7 @@ function SearchInput({ placeholder, value, onChange, icon }: {
                 )}
             </div>
             <input type="text" placeholder={placeholder} value={value} onChange={onChange}
-                className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all duration-150 font-medium placeholder:text-gray-400 placeholder:font-normal" />
+                className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-500 focus:bg-white transition-all duration-150 font-medium placeholder:text-gray-400 placeholder:font-normal" />
         </div>
     );
 }
@@ -1832,7 +1850,7 @@ function FilterSelect({ value, onChange, children }: {
 }) {
     return (
         <select value={value} onChange={onChange}
-            className="filter-select h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all duration-150 cursor-pointer hover:bg-gray-100">
+            className="filter-select h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-gray-400/20 focus:border-gray-500 focus:bg-white transition-all duration-150 cursor-pointer hover:bg-gray-100">
             {children}
         </select>
     );
@@ -1840,7 +1858,7 @@ function FilterSelect({ value, onChange, children }: {
 
 function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
     return (
-        <span className="inline-flex items-center gap-1.5 h-6 px-2.5 bg-indigo-600 text-white text-[10px] font-semibold rounded-lg">
+        <span className="inline-flex items-center gap-1.5 h-6 px-2.5 bg-gray-700 text-white text-[10px] font-semibold rounded-lg">
             {label}
             <button onClick={onRemove} className="hover:text-gray-300 transition-colors ml-0.5">
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2497,7 +2515,7 @@ function Modal({ open, onClose, title, children, size = "md" }: {
             onClick={e => { if (e.target === overlayRef.current) onClose(); }}>
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" />
             <div className={`relative bg-white w-full shadow-2xl flex flex-col rounded-t-2xl sm:rounded-2xl overflow-hidden animate-popIn ${size === "lg" ? "sm:max-w-3xl" : "sm:max-w-lg"} max-h-[92dvh] sm:max-h-[88vh]`}>
-                <div className="h-0.5 w-full bg-gradient-to-r from-indigo-300 via-indigo-600 to-indigo-900 flex-shrink-0" />
+                <div className="h-0.5 w-full bg-gray-800 flex-shrink-0" />
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
                     <h2 className="font-bold text-gray-900 text-[15px] tracking-tight">{title}</h2>
                     <button onClick={onClose}
