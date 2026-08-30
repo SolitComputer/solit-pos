@@ -29,6 +29,19 @@ function addDaysToDateStr(dateStr: string, days: number): string {
   return dateObj.toISOString().slice(0, 10);
 }
 
+// ✅ FIX — hari absensi baru mulai jam 04:00 WIB, jadi jam 00:00–03:59 yang
+// diinput admin sebenarnya kalender HARI BERIKUTNYA dari `dateKey` (mis.
+// checkout 00:20 untuk hari absensi Senin = jam 00:20 dini hari Selasa secara
+// kalender). Helper ini memastikan hasil ISO-nya tetap jatuh di rentang
+// [04:00 dateKey, 03:59 dateKey+1] — sama seperti dayStart/dayEnd di bawah —
+// bukan malah jatuh SEBELUM cutoff di tanggal `dateKey` itu sendiri.
+function buildAttendanceTimestampISO(dateKey: string, timeStr: string): string {
+  const fmt = timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+  const hour = parseInt(fmt.split(":")[0], 10);
+  const calendarDate = hour < 4 ? addDaysToDateStr(dateKey, 1) : dateKey;
+  return new Date(`${calendarDate}T${fmt}+07:00`).toISOString();
+}
+
 export async function PATCH(request: Request) {
   try {
     const admin = await getCurrentUser();
@@ -110,8 +123,12 @@ export async function PATCH(request: Request) {
     }
 
     // ── Jalur isi/koreksi jam pulang ─────────────────────────────────────────
-    const fmtTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
-    const newCheckoutISO = new Date(`${date}T${fmtTime(checkout_time)}+07:00`).toISOString();
+    // ✅ FIX: pakai buildAttendanceTimestampISO (bukan tempel manual
+    // ${date}T${time}), supaya jam 00:00–03:59 dianggap dini hari KALENDER
+    // BERIKUTNYA — tetap masuk hari absensi `date` yang sama — bukan jatuh
+    // sebelum cutoff 04:00 di tanggal `date` sendiri (penyebab jam pulang
+    // 00:20 "hilang"/nyangkut ke hari absensi sebelumnya).
+    const newCheckoutISO = buildAttendanceTimestampISO(date, checkout_time);
     if (Number.isNaN(new Date(newCheckoutISO).getTime())) {
       return NextResponse.json({ success: false, message: "Format tanggal/jam tidak valid." }, { status: 400 });
     }

@@ -10,8 +10,20 @@ interface Category {
     id: string;
     name: string;
     description: string | null;
+    type?: string | null; // 'LAPTOP' | 'AKSESORIS' — bisa null kalau migrasi belum jalan
     created_by: string | null;
     created_at: string;
+}
+
+// Badge tipe kategori. Kategori tanpa type (migrasi belum jalan) tidak dikasih badge.
+function TypeBadge({ type }: { type?: string | null }) {
+    if (type !== "LAPTOP" && type !== "AKSESORIS") return null;
+    const isLaptop = type === "LAPTOP";
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${isLaptop ? "bg-indigo-50 text-indigo-700" : "bg-violet-50 text-violet-700"}`}>
+            {isLaptop ? "Laptop" : "Aksesoris"}
+        </span>
+    );
 }
 
 const formatDate = (iso: string) =>
@@ -153,6 +165,7 @@ export default function CategoriesContent() {
                                 <tr className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500 border-b border-gray-200">
                                     <th className="text-left font-semibold px-4 py-3">No</th>
                                     <th className="text-left font-semibold px-4 py-3">Nama Kategori</th>
+                                    <th className="text-left font-semibold px-4 py-3">Tipe</th>
                                     <th className="text-left font-semibold px-4 py-3">Deskripsi</th>
                                     <th className="text-left font-semibold px-4 py-3">Dibuat</th>
                                     {canManage && <th className="text-right font-semibold px-4 py-3">Aksi</th>}
@@ -163,6 +176,7 @@ export default function CategoriesContent() {
                                     <tr key={cat.id} className="hover:bg-gray-50/60 transition">
                                         <td className="px-4 py-3 text-gray-400 tabular-nums">{String(i + 1).padStart(2, "0")}</td>
                                         <td className="px-4 py-3 font-medium text-gray-800">{cat.name}</td>
+                                        <td className="px-4 py-3"><TypeBadge type={cat.type} /></td>
                                         <td className="px-4 py-3 text-gray-600 max-w-[280px] truncate" title={cat.description ?? ""}>
                                             {cat.description || <span className="text-gray-300">—</span>}
                                         </td>
@@ -258,6 +272,10 @@ function CategoryFormModal({
     const isEdit = !!category;
     const [name, setName] = useState(category?.name ?? "");
     const [description, setDescription] = useState(category?.description ?? "");
+    // Default AKSESORIS untuk kategori baru (mayoritas kategori adalah aksesoris).
+    const [type, setType] = useState<"LAPTOP" | "AKSESORIS">(
+        category?.type === "LAPTOP" ? "LAPTOP" : "AKSESORIS",
+    );
     const [submitting, setSubmitting] = useState(false);
 
     const handleSubmit = async () => {
@@ -270,7 +288,7 @@ function CategoryFormModal({
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: name.trim(), description: description.trim() || null }),
+                body: JSON.stringify({ name: name.trim(), description: description.trim() || null, type }),
             });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan kategori");
@@ -309,6 +327,24 @@ function CategoryFormModal({
                             className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                             autoFocus
                         />
+                    </div>
+                    <div>
+                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Tipe Kategori</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(["LAPTOP", "AKSESORIS"] as const).map(t => (
+                                <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => setType(t)}
+                                    className={`py-2.5 rounded-xl border text-sm font-semibold transition ${type === t
+                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                        : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+                                >
+                                    {t === "LAPTOP" ? "Laptop" : "Aksesoris"}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="mt-1.5 text-[11px] text-gray-400">Menentukan kategori ini muncul di dropdown Laptop atau Aksesoris.</p>
                     </div>
                     <div>
                         <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Deskripsi (Opsional)</label>
