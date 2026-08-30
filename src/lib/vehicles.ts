@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { VEHICLE_APPROVAL_ROLES } from "@/lib/permissions";
 
 // Service-role client (dipakai di API routes, bypass RLS) — dibuat sekali di module top
 export const supabaseVehicles: SupabaseClient = createClient(
@@ -17,6 +18,7 @@ export type Requester = {
   name: string;
   roles: string[];
   isAdmin: boolean;
+  canApprove: boolean; // boleh ACC/Tolak pengajuan peminjaman (ADMIN + Kepala Sales)
 };
 
 // Ambil identitas pemanggil. Prefer header x-user-* yang di-set middleware,
@@ -27,8 +29,8 @@ export async function getRequester(request: NextRequest): Promise<Requester | nu
   let roles = rolesHeader
     ? rolesHeader.split(",").filter(Boolean)
     : singleRole
-    ? [singleRole]
-    : [];
+      ? [singleRole]
+      : [];
   let id = request.headers.get("x-user-id") || "";
   let name = decodeURIComponent(request.headers.get("x-user-name") || "");
 
@@ -42,7 +44,8 @@ export async function getRequester(request: NextRequest): Promise<Requester | nu
   if (!id) return null;
 
   const isAdmin = roles.some((r) => VEHICLE_ADMIN_ROLES.includes(r));
-  return { id, name, roles, isAdmin };
+  const canApprove = roles.some((r) => (VEHICLE_APPROVAL_ROLES as readonly string[]).includes(r));
+  return { id, name, roles, isAdmin, canApprove };
 }
 
 export type VehicleRow = {
@@ -97,9 +100,9 @@ export async function enrichRequests(rows: BorrowRequestRow[]): Promise<BorrowRe
       : Promise.resolve({ data: [] as UserLite[] }),
     vehicleIds.length
       ? supabaseVehicles
-          .from("vehicles")
-          .select("id, name, type, status, battery_level, fuel_level")
-          .in("id", vehicleIds)
+        .from("vehicles")
+        .select("id, name, type, status, battery_level, fuel_level")
+        .in("id", vehicleIds)
       : Promise.resolve({ data: [] as VehicleRow[] }),
   ]);
 

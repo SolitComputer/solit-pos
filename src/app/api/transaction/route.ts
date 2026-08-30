@@ -507,9 +507,16 @@ async function handler(req: NextRequest, _ctx: unknown, user: AuthUser) {
         vga: trx.vga || laptopSpecs?.vga || undefined,
         gpu: trx.gpu || laptopSpecs?.vga || undefined,
         laptop_name: trx.laptop_name || laptopSpecs?.name || undefined,
-        serial_numbers: allSerialNumbers.length > 0
-          ? allSerialNumbers
-          : trx.serial_numbers ?? (trx.serial_number ? [trx.serial_number] : []),
+        serial_numbers: (() => {
+          const stored: string[] = Array.isArray(trx.serial_numbers) && trx.serial_numbers.length > 0
+            ? trx.serial_numbers.filter(Boolean)
+            : trx.serial_number ? [trx.serial_number] : [];
+          const merged = [...allSerialNumbers];
+          for (const sn of stored) {
+            if (sn && !merged.includes(sn)) merged.push(sn);
+          }
+          return merged;
+        })(),
         other: showFin ? totalMargin : 0,
         has_modal: hasModal,
         modal_missing: modalMissing,

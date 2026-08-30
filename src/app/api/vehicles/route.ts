@@ -20,21 +20,35 @@ export async function GET(request: NextRequest) {
 
   if (vErr) return NextResponse.json({ success: false, message: vErr.message }, { status: 500 });
 
-  // Pemakaian terakhir per kendaraan (buat "dipinjam siapa" + status pemakaian terakhir)
+  // Pemakaian terakhir per kendaraan (buat "dipinjam siapa" + status pemakaian terakhir + siapa yang ACC)
   const vehicleIds = (vehicles ?? []).map((v) => v.id);
   const lastUsageMap: Record<
     string,
-    { borrower_name: string; status: string; fuel: string | null; condition: string | null; at: string | null }
+    {
+      borrower_name: string;
+      status: string;
+      fuel: string | null;
+      condition: string | null;
+      at: string | null;
+      approver_name: string | null;
+    }
   > = {};
   if (vehicleIds.length) {
     const { data: usageRows } = await supabaseVehicles
       .from("vehicle_borrow_requests")
-      .select("vehicle_id, user_id, status, return_fuel_level, return_condition, actual_start, actual_end, requested_at")
+      .select("vehicle_id, user_id, status, return_fuel_level, return_condition, actual_start, actual_end, requested_at, approved_by")
       .in("vehicle_id", vehicleIds)
       .in("status", ["APPROVED", "COMPLETED"])
       .order("requested_at", { ascending: false });
 
-    const uids = [...new Set((usageRows ?? []).map((r) => r.user_id).filter(Boolean))];
+    // Kumpulkan id peminjam DAN id approver, sekali query ke tabel users
+    const uids = [
+      ...new Set(
+        (usageRows ?? [])
+          .flatMap((r) => [r.user_id, r.approved_by])
+          .filter(Boolean)
+      ),
+    ];
     const nameMap: Record<string, string> = {};
     if (uids.length) {
       const { data: us } = await supabaseVehicles.from("users").select("id, name").in("id", uids);
@@ -48,6 +62,7 @@ export async function GET(request: NextRequest) {
         fuel: r.return_fuel_level ?? null,
         condition: r.return_condition ?? null,
         at: r.actual_end ?? r.actual_start ?? r.requested_at ?? null,
+        approver_name: r.approved_by ? (nameMap[r.approved_by] ?? "—") : null,
       };
     }
   }
@@ -82,6 +97,7 @@ export async function GET(request: NextRequest) {
     vehicles: vehiclesOut,
     myRequests,
     isAdmin: me.isAdmin,
+    canApprove: me.canApprove,
   });
 }
 

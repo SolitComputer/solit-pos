@@ -155,6 +155,12 @@ export const DEAD_ASSET_ROLES: UserRole[] = [
 ];
 export const OFFICIAL_PRICE_EDIT_ROLES: UserRole[] = ["ADMIN"];
 
+// ─── Manajemen Kendaraan (Vehicle Management) ─────────────────────────────────
+// Role yang boleh menyetujui/menolak (ACC) pengajuan peminjaman kendaraan.
+// Tambah/Edit/Hapus data kendaraan tetap ADMIN-only (diatur terpisah di
+// VEHICLE_ADMIN_ROLES pada src/lib/vehicles.ts).
+export const VEHICLE_APPROVAL_ROLES: UserRole[] = ["ADMIN", "KEPALA_SALES"];
+
 export function humanizeRoleKey(role: string): string {
   return role
     .split("_")
@@ -779,7 +785,6 @@ export const LAPTOP_READY_VIEW_ROLES: UserRole[] = [
 
 export const LAPTOP_DELETE_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
   "KEPALA_TEKNISI",
 ];
 
@@ -1057,3 +1062,11 @@ export const ACCESSORY_VIEW_ROLES: UserRole[] = [
   "KEPALA_ZENITH",
 ];
 export const ACCESSORY_EDIT_ROLES: UserRole[] = [...ACCESSORY_CREATE_ROLES];
+
+// ── Data Barang: Aksesoris — DELETE dipisah dari EDIT/CREATE.
+// Pengelola Barang & Kepala Pengelola Barang tetap boleh create/edit aksesoris,
+// tapi TIDAK boleh hapus — konsisten dengan aturan delete laptop.
+export const ACCESSORY_DELETE_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "TEKNISI", "KEPALA_TEKNISI",
+];
