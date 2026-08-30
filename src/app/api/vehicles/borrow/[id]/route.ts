@@ -92,9 +92,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         { status: 400 }
       );
 
-    const note = (body?.rejection_note ?? "").trim();
-    if (!note)
-      return NextResponse.json({ success: false, message: "Alasan penolakan wajib diisi." }, { status: 400 });
+    const note = (body?.rejection_note ?? "").trim() || null;
 
     const { data, error } = await supabaseVehicles
       .from("vehicle_borrow_requests")

@@ -261,7 +261,7 @@ export default function UnifiedBarangContent() {
     // "kedip" loading sama sekali.
     const [rows, setRows] = useState<UnifiedRow[]>(() => readBarangCache()?.rows ?? []);
     const [loading, setLoading] = useState(() => readBarangCache() === null);
-    const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+    const [categories, setCategories] = useState<{ id: string; name: string; type?: string | null }[]>([]);
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
 
@@ -390,16 +390,37 @@ export default function UnifiedBarangContent() {
     // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe)
     useEffect(() => { setKategoriFilter(""); }, [tipeFilter]);
 
+    // Kategori dipisah per tipe supaya dropdown laptop tidak menampilkan kategori
+    // aksesoris & sebaliknya. Transition-safe: kategori tanpa `type` (mis. migrasi
+    // belum jalan) tetap ikut muncul di kedua tipe — persis perilaku lama.
+    const laptopCategories = useMemo(
+        () => categories.filter(c => !c.type || c.type === "LAPTOP"),
+        [categories],
+    );
+    const accessoryCategories = useMemo(
+        () => categories.filter(c => !c.type || c.type === "AKSESORIS"),
+        [categories],
+    );
+    // Opsi yang tampil di dropdown filter, mengikuti tipe yang sedang dipilih.
+    const filterCategories = tipeFilter === "LAPTOP" ? laptopCategories
+        : tipeFilter === "AKSESORIS" ? accessoryCategories
+        : categories;
+
     const filteredRows = useMemo(() => {
         let list = rows;
         if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
         if (kategoriFilter) {
+            // kategoriFilter selalu berupa ID kategori. Laptop menyimpan kategori
+            // sebagai kategori_id, tapi aksesoris hanya menyimpan NAMA (kolom
+            // `category`, tanpa category_id). Jadi resolusi id → nama dulu supaya
+            // aksesoris ikut cocok — termasuk saat tipe = "Semua".
+            const selectedName = (categories.find(c => c.id === kategoriFilter)?.name || "").toUpperCase();
+            const matchLaptop = (r: UnifiedRow) => r.kategori_id === kategoriFilter;
+            const matchAksesoris = (r: UnifiedRow) => (r.kategori || "").toUpperCase() === selectedName;
             list = list.filter(r => {
-                if (tipeFilter === "LAPTOP") return r.kategori_id === kategoriFilter;
-                if (tipeFilter === "AKSESORIS") {
-                    return (r.kategori || "").toUpperCase() === kategoriFilter.toUpperCase() || r.kategori_id === kategoriFilter;
-                }
-                return r.kategori_id === kategoriFilter || (r.kategori || "").toUpperCase() === kategoriFilter.toUpperCase();
+                if (tipeFilter === "LAPTOP") return matchLaptop(r);
+                if (tipeFilter === "AKSESORIS") return matchAksesoris(r);
+                return r.tipe === "LAPTOP" ? matchLaptop(r) : matchAksesoris(r);
             });
         }
         if (search.trim()) {
@@ -429,7 +450,7 @@ export default function UnifiedBarangContent() {
             });
         }
         return list;
-    }, [rows, tipeFilter, kategoriFilter, search]);
+    }, [rows, tipeFilter, kategoriFilter, search, categories]);
 
     const counts = useMemo(() => ({
         total: rows.length,
@@ -691,7 +712,7 @@ export default function UnifiedBarangContent() {
                                 placeholder="Cari nama, brand, spek, SN..." value={search} onChange={e => setSearch(e.target.value)} />
                             <select className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
                                 <option value="">Semua Kategori</option>
-                                {categories.map(c => <option key={c.id} value={tipeFilter === "AKSESORIS" ? c.name : c.id}>{c.name}</option>)}
+                                {filterCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                             <button onClick={resetFilter} disabled={!hasFilter} className="h-9 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 disabled:opacity-40 transition">Reset</button>
                         </div>
@@ -1001,7 +1022,7 @@ export default function UnifiedBarangContent() {
                                     <Field label="Kategori">
                                         <select className={inputCls} value={laptopForm.category_id} onChange={e => setLaptopForm(p => ({ ...p, category_id: e.target.value }))}>
                                             <option value="">Tanpa Kategori</option>
-                                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                            {laptopCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
                                     </Field>
                                     <div className="grid grid-cols-2 gap-3">
@@ -1023,8 +1044,8 @@ export default function UnifiedBarangContent() {
                                         <Field label="Kategori" required>
                                             <select className={inputCls} value={accForm.category} onChange={e => setAccForm(p => ({ ...p, category: e.target.value }))}>
                                                 <option value="">-- Pilih --</option>
-                                                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                                {accForm.category && !categories.some(c => c.name.toUpperCase() === accForm.category.toUpperCase()) && (
+                                                {accessoryCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                                {accForm.category && !accessoryCategories.some(c => c.name.toUpperCase() === accForm.category.toUpperCase()) && (
                                                     <option value={accForm.category}>{accForm.category}</option>
                                                 )}
                                             </select>
@@ -1100,6 +1121,12 @@ export default function UnifiedBarangContent() {
                         { label: "Storage", value: unitDetailTarget.row.storage },
                     ]}
                     canEdit={canFullAccessBarang}
+                    //  Tombol "+ Tambah Unit" & "Edit Data" di dalam pop-up ini digerbangi
+                    //  CREATE_UNITS/EDIT_UNITS (memuat KEPALA_TEKNISI dkk) — bukan full-access.
+                    //  Tanpa prop ini, canManage jatuh ke canEdit=full-access sehingga role
+                    //  yang backend-nya SUDAH izinkan (mis. KEPALA_TEKNISI) tidak bisa nambah/
+                    //  edit unit dari sini, padahal bisa lewat tombol "Tambah Unit" saat stok 0.
+                    canManageUnit={canAddUnit}
                     canSeePrivate={canSeePrivate}
                     defaultSellingPrice={unitDetailTarget.row.harga_jual}
                     onClose={() => setUnitDetailTarget(null)}
