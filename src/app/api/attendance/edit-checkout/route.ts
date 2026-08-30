@@ -149,87 +149,98 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true, mode });
     }
 
-    const nowWIB = new Date(new Date(newCheckoutISO).getTime() + 7 * 3600_000);
-    const todayDow = nowWIB.getUTCDay();
-
-    const [{ data: weeklyOff }, { data: specificOff }, { data: dateWork }, { data: monthlyOff }] = await Promise.all([
-      supabaseAdmin.from("user_day_off").select("id").eq("user_id", user_id).eq("day_of_week", todayDow).maybeSingle(),
-      supabaseAdmin.from("user_date_off").select("id").eq("user_id", user_id).eq("off_date", date).maybeSingle(),
-      supabaseAdmin.from("user_date_work").select("id").eq("user_id", user_id).eq("work_date", date).maybeSingle(),
-      supabaseAdmin.from("user_monthly_off").select("id").eq("user_id", user_id).eq("off_date", date).maybeSingle(),
-    ]);
-    const isDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !dateWork);
-
-    const [baseSchedule, scheduleOverride] = await Promise.all([
-      resolveShiftConfigFromDB(user_id, supabaseAdmin),
-      resolveScheduleOverride(supabaseAdmin, user_id, date),
-    ]);
-    const overrideShape = scheduleOverride ? toAuthScheduleShape(scheduleOverride) : null;
-    const schedule = overrideShape
-      ? { ...baseSchedule, ...overrideShape, checkout: overrideShape.checkout ?? baseSchedule.checkout }
-      : baseSchedule;
-
-    const inTimestamp = todayIn?.created_at ?? (manualToday as any)?.check_in_time ?? null;
-
-    let correctMinutes = 0;
-    let correctDirection: OvertimeDirection = "AFTER_OUT";
-    let correctActualStart = buildTodayWIBTimestamp(date, schedule.checkout);
-    const correctActualEnd = newCheckoutISO;
-
-    if (isDayOff && inTimestamp) {
-      correctDirection = "HOLIDAY";
-      correctActualStart = inTimestamp;
-      correctMinutes = computeHolidayOvertimeMinutes(inTimestamp, newCheckoutISO);
-    } else if (!isDayOff) {
-      correctMinutes = computeAfterOutOvertimeMinutes(newCheckoutISO, schedule);
-    }
-
-    const existingDraft = await findLinkedDraft(outRecordId);
+    // ✅ FIX: jam pulang di atas SUDAH tersimpan ke DB di titik ini. Blok
+    // rekalkulasi lembur di bawah cuma efek samping — kalau ada query yang
+    // gagal di sini, JANGAN sampai bikin API lapor success:false, karena itu
+    // bikin frontend batal refresh (refreshAll() tidak jalan) walau jam
+    // pulangnya sendiri sebenarnya sudah benar tersimpan. Makanya dibungkus
+    // try/catch terpisah dari penyimpanan jam pulang di atas.
     let overtimeWarning: string | undefined;
-    const draftIsLocked = existingDraft && (existingDraft.status !== "PENDING" || existingDraft.audit_status === "AUDITED");
+    try {
+      const nowWIB = new Date(new Date(newCheckoutISO).getTime() + 7 * 3600_000);
+      const todayDow = nowWIB.getUTCDay();
 
-    if (draftIsLocked) {
-      overtimeWarning = "Lemburan untuk tanggal ini sudah di-ACC/diaudit sebelumnya — nominalnya TIDAK ikut berubah otomatis. Cek dan sesuaikan manual lewat menu Lembur kalau perlu.";
-    } else if (correctMinutes > 0) {
-      if (existingDraft) {
-        await supabaseAdmin.from("overtime_requests").update({
-          direction: correctDirection,
-          duration_minutes: correctMinutes,
-          actual_start: correctActualStart,
-          actual_end: correctActualEnd,
-          is_holiday: correctDirection === "HOLIDAY",
-          updated_at: new Date().toISOString(),
-        }).eq("id", existingDraft.id);
-      } else {
-        const AUTO_REASON_BY_DIRECTION: Record<string, string> = {
-          BEFORE_IN: "Diajukan karyawan — lembur awal (sebelum jam masuk)",
-          AFTER_OUT: "Diajukan karyawan — lembur akhir (sesudah jam pulang)",
-          BOTH: "Diajukan karyawan — gabungan lembur awal & akhir",
-          HOLIDAY: "Diajukan karyawan — lembur di hari libur",
-          MANUAL: "Input manual admin",
-        };
-        const toWIBTimeString = (iso: string) => {
-          const pad = (n: number) => String(n).padStart(2, "0");
-          const wib = new Date(new Date(iso).getTime() + 7 * 3600_000);
-          return `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())}:${pad(wib.getUTCSeconds())}`;
-        };
+      const [{ data: weeklyOff }, { data: specificOff }, { data: dateWork }, { data: monthlyOff }] = await Promise.all([
+        supabaseAdmin.from("user_day_off").select("id").eq("user_id", user_id).eq("day_of_week", todayDow).maybeSingle(),
+        supabaseAdmin.from("user_date_off").select("id").eq("user_id", user_id).eq("off_date", date).maybeSingle(),
+        supabaseAdmin.from("user_date_work").select("id").eq("user_id", user_id).eq("work_date", date).maybeSingle(),
+        supabaseAdmin.from("user_monthly_off").select("id").eq("user_id", user_id).eq("off_date", date).maybeSingle(),
+      ]);
+      const isDayOff = Boolean(monthlyOff) || ((Boolean(weeklyOff) || Boolean(specificOff)) && !dateWork);
 
-        await supabaseAdmin.from("overtime_requests").insert({
-          user_id,
-          request_date: date,
-          direction: correctDirection,
-          reason: AUTO_REASON_BY_DIRECTION[correctDirection] ?? "Koreksi jam pulang admin",
-          requested_start: toWIBTimeString(correctActualStart),
-          status: "PENDING",
-          duration_minutes: correctMinutes,
-          actual_start: correctActualStart,
-          actual_end: correctActualEnd,
-          is_holiday: correctDirection === "HOLIDAY",
-          source_face_verification_id: outRecordId,
-        });
+      const [baseSchedule, scheduleOverride] = await Promise.all([
+        resolveShiftConfigFromDB(user_id, supabaseAdmin),
+        resolveScheduleOverride(supabaseAdmin, user_id, date),
+      ]);
+      const overrideShape = scheduleOverride ? toAuthScheduleShape(scheduleOverride) : null;
+      const schedule = overrideShape
+        ? { ...baseSchedule, ...overrideShape, checkout: overrideShape.checkout ?? baseSchedule.checkout }
+        : baseSchedule;
+
+      const inTimestamp = todayIn?.created_at ?? (manualToday as any)?.check_in_time ?? null;
+
+      let correctMinutes = 0;
+      let correctDirection: OvertimeDirection = "AFTER_OUT";
+      let correctActualStart = buildTodayWIBTimestamp(date, schedule.checkout);
+      const correctActualEnd = newCheckoutISO;
+
+      if (isDayOff && inTimestamp) {
+        correctDirection = "HOLIDAY";
+        correctActualStart = inTimestamp;
+        correctMinutes = computeHolidayOvertimeMinutes(inTimestamp, newCheckoutISO);
+      } else if (!isDayOff) {
+        correctMinutes = computeAfterOutOvertimeMinutes(newCheckoutISO, schedule);
       }
-    } else if (existingDraft) {
-      await supabaseAdmin.from("overtime_requests").delete().eq("id", existingDraft.id);
+
+      const existingDraft = await findLinkedDraft(outRecordId);
+      const draftIsLocked = existingDraft && (existingDraft.status !== "PENDING" || existingDraft.audit_status === "AUDITED");
+
+      if (draftIsLocked) {
+        overtimeWarning = "Lemburan untuk tanggal ini sudah di-ACC/diaudit sebelumnya — nominalnya TIDAK ikut berubah otomatis. Cek dan sesuaikan manual lewat menu Lembur kalau perlu.";
+      } else if (correctMinutes > 0) {
+        if (existingDraft) {
+          await supabaseAdmin.from("overtime_requests").update({
+            direction: correctDirection,
+            duration_minutes: correctMinutes,
+            actual_start: correctActualStart,
+            actual_end: correctActualEnd,
+            is_holiday: correctDirection === "HOLIDAY",
+            updated_at: new Date().toISOString(),
+          }).eq("id", existingDraft.id);
+        } else {
+          const AUTO_REASON_BY_DIRECTION: Record<string, string> = {
+            BEFORE_IN: "Diajukan karyawan — lembur awal (sebelum jam masuk)",
+            AFTER_OUT: "Diajukan karyawan — lembur akhir (sesudah jam pulang)",
+            BOTH: "Diajukan karyawan — gabungan lembur awal & akhir",
+            HOLIDAY: "Diajukan karyawan — lembur di hari libur",
+            MANUAL: "Input manual admin",
+          };
+          const toWIBTimeString = (iso: string) => {
+            const pad = (n: number) => String(n).padStart(2, "0");
+            const wib = new Date(new Date(iso).getTime() + 7 * 3600_000);
+            return `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())}:${pad(wib.getUTCSeconds())}`;
+          };
+
+          await supabaseAdmin.from("overtime_requests").insert({
+            user_id,
+            request_date: date,
+            direction: correctDirection,
+            reason: AUTO_REASON_BY_DIRECTION[correctDirection] ?? "Koreksi jam pulang admin",
+            requested_start: toWIBTimeString(correctActualStart),
+            status: "PENDING",
+            duration_minutes: correctMinutes,
+            actual_start: correctActualStart,
+            actual_end: correctActualEnd,
+            is_holiday: correctDirection === "HOLIDAY",
+            source_face_verification_id: outRecordId,
+          });
+        }
+      } else if (existingDraft) {
+        await supabaseAdmin.from("overtime_requests").delete().eq("id", existingDraft.id);
+      }
+    } catch (overtimeErr: any) {
+      console.error("[edit-checkout] gagal rekalkulasi lembur (jam pulang tetap tersimpan):", overtimeErr);
+      overtimeWarning = "Jam pulang berhasil disimpan, tapi rekalkulasi lembur otomatis gagal. Cek manual lewat menu Lembur kalau perlu.";
     }
 
     return NextResponse.json({ success: true, mode, warning: overtimeWarning });

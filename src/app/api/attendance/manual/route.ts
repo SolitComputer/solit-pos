@@ -10,6 +10,14 @@ const supabase = createClient(
 
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
+// ✅ NEW — dipakai untuk hitung batas akhir "hari absensi" (cutoff jam 04:00 WIB)
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -125,15 +133,25 @@ export async function POST(request: Request) {
       .select()
       .single();
 
+    if (error) {
+      console.error("[attendance/manual POST] upsert error:", error);
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
     if (status === "PRESENT" || status === "LATE") {
       try {
-        const dateStart = `${attendance_date}T00:00:00+07:00`;
-        const dateEnd = `${attendance_date}T23:59:59+07:00`;
+        // ✅ FIX: batas hari absensi jam 04:00 WIB (konsisten sama route lain),
+        // dan WAJIB filter direction "IN" — sebelumnya tanpa filter ini, jadi
+        // absen PULANG (OUT) yang sudah ada di hari yang sama ikut kehapus
+        // setiap kali admin edit/koreksi absen MASUK lewat modal manual.
+        const dateStart = `${attendance_date}T04:00:00+07:00`;
+        const dateEnd = `${addDaysToDateStr(attendance_date, 1)}T03:59:59+07:00`;
 
         const { data: deleted, error: deleteError } = await supabase
           .from("face_verifications")
           .delete()
           .eq("user_id", user_id)
+          .eq("direction", "IN")
           .gte("created_at", dateStart)
           .lte("created_at", dateEnd)
           .select();
@@ -146,11 +164,6 @@ export async function POST(request: Request) {
       } catch (deleteErr: any) {
         console.error("[attendance/manual POST] Exception:", deleteErr);
       }
-    }
-
-    if (error) {
-      console.error("[attendance/manual POST] upsert error:", error);
-      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
 
     if (status === "LEAVE") {
