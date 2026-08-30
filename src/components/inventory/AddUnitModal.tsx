@@ -68,9 +68,9 @@ export default function AddUnitModal({
                     notes: form.notes,
                 }),
             });
-            const result = await res.json();
-            if (!result.success) {
-                setError(result.message || "Gagal menambahkan unit");
+            const result = await res.json().catch(() => null);
+            if (!res.ok || !result?.success) {
+                setError(result?.message || "Gagal menambahkan unit");
                 return;
             }
             onCreated(result.data);

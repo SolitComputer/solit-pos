@@ -27,16 +27,31 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       .eq("id", id)
       .single();
 
-    const { data, error } = await supabase
+    // type opsional: 'LAPTOP' | 'AKSESORIS'. Kalau tidak valid, jangan diubah.
+    const typeInput = String(body.type ?? "").toUpperCase();
+    const type = typeInput === "LAPTOP" || typeInput === "AKSESORIS" ? typeInput : null;
+    const basePayload = {
+      name,
+      description: body.description?.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    let { data, error } = await supabase
       .from("laptop_categories")
-      .update({
-        name,
-        description: body.description?.trim() || null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(type ? { ...basePayload, type } : basePayload)
       .eq("id", id)
       .select()
       .single();
+
+    // Kolom `type` belum ada (migrasi belum dijalankan) → ulangi tanpa type.
+    if (error?.code === "42703") {
+      ({ data, error } = await supabase
+        .from("laptop_categories")
+        .update(basePayload)
+        .eq("id", id)
+        .select()
+        .single());
+    }
 
     if (error) {
       const message = error.code === "23505" ? `Kategori "${name}" sudah ada` : error.message;
