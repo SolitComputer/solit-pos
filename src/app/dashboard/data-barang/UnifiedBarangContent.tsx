@@ -61,7 +61,7 @@ interface HistoryEntry { id: string; action: string; by: string; at: string; not
 // KONSTANTA & HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
-const Dash = () => <span className="text-gray-300">-</span>;
+const Dash = () => <span className="text-zinc-300">-</span>;
 
 // TTL audit BEDA antara laptop (2 hari) & aksesoris (3 hari) — ini business
 // rule yang SUDAH ADA masing-masing di komponen asli, disatukan di sini biar
@@ -149,23 +149,23 @@ function HistoryModal({ title, subtitle, entries, loading, onClose }: {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[80vh] flex flex-col animate-popIn">
-                <div className="h-1 w-full bg-gradient-to-r from-indigo-400 via-indigo-600 to-indigo-800 flex-shrink-0" />
-                <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{title}</p>
-                    <h3 className="text-sm font-bold text-gray-900 truncate">{subtitle}</h3>
+                <div className="h-1 w-full bg-gradient-to-r from-zinc-400 via-zinc-700 to-black flex-shrink-0" />
+                <div className="px-5 py-4 border-b border-zinc-100 flex-shrink-0">
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{title}</p>
+                    <h3 className="text-sm font-bold text-zinc-900 truncate">{subtitle}</h3>
                 </div>
                 <div className="overflow-y-auto flex-1 px-5 py-4">
                     {loading ? (
-                        <p className="text-sm text-gray-400 text-center py-6">Memuat...</p>
+                        <p className="text-sm text-zinc-400 text-center py-6">Memuat...</p>
                     ) : entries.length === 0 ? (
-                        <p className="text-sm text-gray-400 text-center py-6">Belum ada riwayat</p>
+                        <p className="text-sm text-zinc-400 text-center py-6">Belum ada riwayat</p>
                     ) : (
                         <ul className="space-y-2">
                             {entries.map(h => (
-                                <li key={h.id} className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5">
-                                    <p className="text-xs font-semibold text-gray-700">{h.action}</p>
-                                    {h.notes && <p className="text-[11px] text-gray-600 italic mt-1">"{h.notes}"</p>}
-                                    <p className="text-[11px] text-gray-400 mt-0.5">
+                                <li key={h.id} className="bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2.5">
+                                    <p className="text-xs font-semibold text-zinc-700">{h.action}</p>
+                                    {h.notes && <p className="text-[11px] text-zinc-600 italic mt-1">"{h.notes}"</p>}
+                                    <p className="text-[11px] text-zinc-400 mt-0.5">
                                         {h.by} · {new Date(h.at).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                                     </p>
                                 </li>
@@ -173,8 +173,8 @@ function HistoryModal({ title, subtitle, entries, loading, onClose }: {
                         </ul>
                     )}
                 </div>
-                <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
-                    <button onClick={onClose} className="w-full h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Tutup</button>
+                <div className="px-5 py-4 border-t border-zinc-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-zinc-200 transition">Tutup</button>
                 </div>
             </div>
         </div>
@@ -198,14 +198,14 @@ function DeleteConfirm({ row, onClose, onConfirm, loading }: {
                     <p className="text-xs text-white/60 mt-0.5">Tindakan ini tidak dapat dibatalkan</p>
                 </div>
                 <div className="p-6">
-                    <p className="text-sm text-gray-600 text-center mb-2">Yakin hapus <span className="font-bold text-gray-800">{row.nama}</span>?</p>
+                    <p className="text-sm text-zinc-600 text-center mb-2">Yakin hapus <span className="font-bold text-zinc-800">{row.nama}</span>?</p>
                     {row.tipe === "LAPTOP" && row.unit_count > 1 && (
                         <p className="text-xs text-amber-600 text-center mb-4 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                             Model ini punya {row.unit_count} unit terdaftar — semua unit & garansi terkait ikut terhapus.
                         </p>
                     )}
                     <div className="flex gap-3 mt-4">
-                        <button onClick={onClose} disabled={loading} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
+                        <button onClick={onClose} disabled={loading} className="flex-1 h-11 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 transition disabled:opacity-50">Batal</button>
                         <button onClick={onConfirm} disabled={loading} className="flex-1 h-11 bg-rose-600 text-white rounded-xl text-sm font-semibold hover:bg-rose-700 transition disabled:opacity-50">
                             {loading ? "Menghapus..." : "Hapus"}
                         </button>
@@ -683,48 +683,48 @@ export default function UnifiedBarangContent() {
                 @keyframes popIn  { from{opacity:0;transform:scale(0.94) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
                 .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
                 .animate-popIn  { animation: popIn 0.25s cubic-bezier(0.34,1.56,0.64,1); }
-                               .table-scroll { scrollbar-width: thin; scrollbar-color: #d1d5db #f9fafb; }
+                               .table-scroll { scrollbar-width: thin; scrollbar-color: #d4d4d8 #fafafa; }
                 .table-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-                .table-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
-                .table-scroll::-webkit-scrollbar-track { background: #f9fafb; border-radius: 99px; }
+                .table-scroll::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 99px; }
+                .table-scroll::-webkit-scrollbar-track { background: #fafafa; border-radius: 99px; }
             `}</style>
 
-            <main className="min-h-screen bg-[#F7F7F8] p-4 sm:p-6 lg:p-8">
+            <main className="min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8">
                 <div className="max-w-full mx-auto space-y-5">
 
                     {/* ── FILTER TIPE BARANG ─────────────────────────────── */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-center gap-2">
+                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 flex flex-wrap items-center gap-2">
                         {([["ALL", `Semua (${counts.total})`], ["LAPTOP", `Laptop (${counts.laptop})`], ["AKSESORIS", `Aksesoris (${counts.aksesoris})`]] as const).map(([key, label]) => (
                             <button key={key} onClick={() => setTipeFilter(key)}
-                                className={`h-9 px-4 rounded-xl text-sm font-semibold transition-all ${tipeFilter === key ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                                className={`h-9 px-4 rounded-xl text-sm font-semibold transition-all ${tipeFilter === key ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
                                 {label}
                             </button>
                         ))}
                         <div className="flex-1" />
-                        {canCreateLaptop && <button onClick={() => openCreate("LAPTOP")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 transition">+ Laptop</button>}
-                        {canCreateAcc && <button onClick={() => openCreate("AKSESORIS")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 transition">+ Aksesori</button>}
+                        {canCreateLaptop && <button onClick={() => openCreate("LAPTOP")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black transition">+ Laptop</button>}
+                        {canCreateAcc && <button onClick={() => openCreate("AKSESORIS")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-600 to-zinc-700 hover:from-zinc-700 hover:to-zinc-800 transition">+ Aksesori</button>}
                     </div>
 
                     {/* ── FILTER LANJUTAN ─────────────────────────────────── */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-5">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <input className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 col-span-2"
+                            <input className="h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 col-span-2"
                                 placeholder="Cari nama, brand, spek, SN..." value={search} onChange={e => setSearch(e.target.value)} />
-                            <select className="h-9 px-3 border border-gray-200 rounded-xl text-xs bg-gray-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
+                            <select className="h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
                                 <option value="">Semua Kategori</option>
                                 {filterCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
-                            <button onClick={resetFilter} disabled={!hasFilter} className="h-9 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 disabled:opacity-40 transition">Reset</button>
+                            <button onClick={resetFilter} disabled={!hasFilter} className="h-9 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 disabled:opacity-40 transition">Reset</button>
                         </div>
                     </div>
 
                     {/* ── TABEL / DAFTAR BARANG ────────────────────────────── */}
                     {loading ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center text-sm text-gray-400">Memuat data...</div>
+                        <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm py-16 text-center text-sm text-zinc-400">Memuat data...</div>
                     ) : filteredRows.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center">
-                            <p className="text-gray-700 font-bold text-base">Tidak ada barang ditemukan</p>
-                            <p className="text-gray-400 text-sm mt-1">Coba ubah filter atau tambah barang baru</p>
+                        <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm py-16 text-center">
+                            <p className="text-zinc-700 font-bold text-base">Tidak ada barang ditemukan</p>
+                            <p className="text-zinc-400 text-sm mt-1">Coba ubah filter atau tambah barang baru</p>
                         </div>
                     ) : (
                         <>
@@ -745,23 +745,23 @@ export default function UnifiedBarangContent() {
                                         <div
                                             key={rowKey}
                                             onClick={() => handleRowClick(row)}
-                                            className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3 ${isRowClickable ? "cursor-pointer" : ""}`}
+                                            className={`bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 space-y-3 ${isRowClickable ? "cursor-pointer" : ""}`}
                                         >
                                             {/* Header: tipe + nama + harga jual */}
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0 flex-1">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-indigo-50 text-indigo-700" : "bg-violet-50 text-violet-700"}`}>
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
                                                         {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
                                                         {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
                                                     </span>
-                                                    <h3 className="font-bold text-gray-900 text-[13.5px] leading-snug mt-1.5 truncate" title={row.nama}>{row.nama}</h3>
-                                                    <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                                                    <h3 className="font-bold text-zinc-900 text-[13.5px] leading-snug mt-1.5 truncate" title={row.nama}>{row.nama}</h3>
+                                                    <p className="text-[11px] text-zinc-400 mt-0.5 truncate">
                                                         {row.kategori || "Tanpa kategori"}{row.brand ? ` · ${row.brand}` : ""}
                                                     </p>
                                                 </div>
                                                 <div className="text-right flex-shrink-0">
-                                                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-widest">Harga Jual</p>
-                                                    <p className="text-sm font-black text-gray-900 tabular-nums">{fmt(row.harga_jual)}</p>
+                                                    <p className="text-[9px] font-semibold text-zinc-400 uppercase tracking-widest">Harga Jual</p>
+                                                    <p className="text-sm font-black text-zinc-900 tabular-nums">{fmt(row.harga_jual)}</p>
                                                 </div>
                                             </div>
 
@@ -781,7 +781,7 @@ export default function UnifiedBarangContent() {
                                             {/* Toggle detail — CPU/RAM/Spek/Sumber/SN/dll disembunyikan di sini,
                                                 BUKAN dihapus, supaya kartu tetap ringkas di layar kecil. */}
                                             <button type="button" onClick={(e) => { e.stopPropagation(); toggleExpand(rowKey); }}
-                                                className="text-[11px] font-semibold text-indigo-600 flex items-center gap-1">
+                                                className="text-[11px] font-semibold text-zinc-700 hover:text-zinc-900 flex items-center gap-1">
                                                 {expanded ? "Sembunyikan detail" : "Lihat detail lengkap"}
                                                 <svg className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -807,44 +807,44 @@ export default function UnifiedBarangContent() {
                                             {/* Aksi — persis fungsi yang sama dengan kolom Aksi di tabel desktop.
                                                 stopPropagation supaya tap tombol di sini tidak ikut memicu
                                                 handleRowClick pada wrapper kartu di atas. */}
-                                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-zinc-100" onClick={(e) => e.stopPropagation()}>
                                                 <button onClick={() => toggleAudit(row)} disabled={!canToggleAudit(row) || auditingId === row.id}
                                                     title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
-                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
                                                     {auditActive ? "Teraudit" : "Audit"}
                                                 </button>
                                                 <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit"
-                                                    className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
+                                                    className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
                                                     <HistoryIcon size={13} />
                                                 </button>
                                                 {row.tipe === "LAPTOP" && canManageSo && canSoLaptop(userRoles, userId, row.siap_jual ?? 0) && (
                                                     <button onClick={() => toggleSo(row)} disabled={soingId === row.id}
-                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border ${soActive ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border ${soActive ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
                                                         {soActive ? "SO" : "Tandai SO"}
                                                     </button>
                                                 )}
                                                 {row.tipe === "LAPTOP" && row.unit_id && (
                                                     <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
-                                                        className="h-7 px-2 text-[11px] font-semibold text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition">Pedagang</button>
+                                                        className="h-7 px-2 text-[11px] font-semibold text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Pedagang</button>
                                                 )}
                                                 {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
                                                     <button onClick={() => setAddUnitTarget(row)}
-                                                        className="h-7 px-2 text-[11px] font-semibold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">
+                                                        className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
                                                         Tambah Unit
                                                     </button>
                                                 )}
                                                 {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
                                                     <Link href={`/dashboard/laptops/${row.id}/units`}
-                                                        className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
+                                                        className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
                                                         Kelola Unit ({row.unit_count})
                                                     </Link>
                                                 )}
                                                 {row.tipe === "LAPTOP" && canViewBarcode && (
                                                     <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama })}
-                                                        className="h-7 px-2 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Barcode</button>
+                                                        className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
                                                 )}
                                                 {canEditThis && (
-                                                    <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>
+                                                    <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
                                                 )}
                                                 {canDeleteThis && (
                                                     <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
@@ -853,13 +853,13 @@ export default function UnifiedBarangContent() {
                                         </div>
                                     );
                                 })}
-                                <p className="text-center text-xs text-gray-400 pt-1">
-                                    <span className="text-gray-700 font-bold">{filteredRows.length}</span> barang ditampilkan
+                                <p className="text-center text-xs text-zinc-400 pt-1">
+                                    <span className="text-zinc-700 font-bold">{filteredRows.length}</span> barang ditampilkan
                                 </p>
                             </div>
 
                             {/* ══ MODE LAPTOP (≥ lg) — tabel penuh, sticky header + kolom nama ══ */}
-                            <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="hidden lg:block bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
                                 <div className="overflow-auto table-scroll max-h-[70vh]">
                                     <table className="w-full text-sm border-collapse">
                                         <thead>
@@ -868,7 +868,7 @@ export default function UnifiedBarangContent() {
                                                     "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
                                                     "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "M", "Stok", "SO", "Audit", "Aksi"].map((h, hi) => (
                                                         <th key={h}
-                                                            className={`px-3 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left bg-gray-50 border-b-2 border-gray-100 sticky top-0 ${hi === 2 ? "left-0 z-20 min-w-[180px]" : "z-10"}`}>
+                                                            className={`px-3 py-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-left bg-zinc-50 border-b-2 border-zinc-100 sticky top-0 ${hi === 2 ? "left-0 z-20 min-w-[180px]" : "z-10"}`}>
                                                             {h}
                                                         </th>
                                                     ))}
@@ -879,7 +879,7 @@ export default function UnifiedBarangContent() {
                                                 const auditActive = isAuditActive(row);
                                                 const soActive = isSoActive(row.so_at);
                                                 const zebra = idx % 2 === 1;
-                                                const rowBg = zebra ? "bg-gray-50" : "bg-white";
+                                                const rowBg = zebra ? "bg-zinc-50" : "bg-white";
                                                 const isRowClickable = row.tipe === "LAPTOP" && (
                                                     (row.unit_count === 0 && canAddUnit) ||
                                                     (row.unit_count === 1 && canViewUnits)
@@ -888,34 +888,34 @@ export default function UnifiedBarangContent() {
                                                     <tr
                                                         key={`${row.tipe}-${row.id}`}
                                                         onClick={() => handleRowClick(row)}
-                                                        className={`group border-b border-gray-50 hover:bg-indigo-50 transition-colors ${rowBg} ${isRowClickable ? "cursor-pointer" : ""}`}
+                                                        className={`group border-b border-zinc-50 hover:bg-zinc-100 transition-colors ${rowBg} ${isRowClickable ? "cursor-pointer" : ""}`}
                                                     >
-                                                        <td className="px-3 py-3 text-xs text-gray-400 tabular-nums">{idx + 1}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-400 tabular-nums">{idx + 1}</td>
                                                         <td className="px-3 py-3">
-                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-indigo-50 text-indigo-700" : "bg-violet-50 text-violet-700"}`}>
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
                                                                 {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
                                                                 {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
                                                             </span>
                                                         </td>
-                                                        <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-gray-800 max-w-[200px] truncate border-r border-gray-100 group-hover:bg-indigo-50 ${rowBg}`} title={row.nama}>{row.nama}</td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.kategori || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.brand || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.cpu || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.ram || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.storage || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500 max-w-[140px] truncate">{row.spek || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">
-                                                            {row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note ? <span className="text-gray-400">{row.harga_modal_note}</span> : <Dash />}
+                                                        <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-zinc-800 max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 ${rowBg}`} title={row.nama}>{row.nama}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.kategori || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.brand || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.cpu || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.ram || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.storage || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500 max-w-[140px] truncate">{row.spek || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">
+                                                            {row.harga_modal != null ? fmt(row.harga_modal) : row.harga_modal_note ? <span className="text-zinc-400">{row.harga_modal_note}</span> : <Dash />}
                                                         </td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{row.modal_sparepart != null ? fmt(row.modal_sparepart) : <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs font-bold text-gray-800 whitespace-nowrap">{fmt(row.harga_jual)}</td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{row.total_jual != null ? fmt(row.total_jual) : <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.modal_sparepart != null ? fmt(row.modal_sparepart) : <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs font-bold text-zinc-800 whitespace-nowrap">{fmt(row.harga_jual)}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.total_jual != null ? fmt(row.total_jual) : <Dash />}</td>
                                                         <td className="px-3 py-3 text-xs whitespace-nowrap">
                                                             {row.gross_profit != null ? <span className={row.gross_profit >= 0 ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}>{row.gross_profit >= 0 ? "+" : ""}{fmt(row.gross_profit)}</span> : <Dash />}
                                                         </td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.sumber || <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500 whitespace-nowrap">{row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : <Dash />}</td>
-                                                        <td className="px-3 py-3 text-xs text-gray-500">{row.sn || (row.sn_note ? <span className="text-gray-400">{row.sn_note}</span> : <Dash />)}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.sumber || <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500 whitespace-nowrap">{row.tanggal_masuk ? new Date(row.tanggal_masuk).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : <Dash />}</td>
+                                                        <td className="px-3 py-3 text-xs text-zinc-500">{row.sn || (row.sn_note ? <span className="text-zinc-400">{row.sn_note}</span> : <Dash />)}</td>
                                                         <td className="px-3 py-3 text-xs text-center tabular-nums">
                                                             <span className={(row.stok_tersedia ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok_tersedia ?? <Dash />}</span>
                                                         </td>
@@ -931,7 +931,7 @@ export default function UnifiedBarangContent() {
                                                         <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                                                             {row.tipe === "LAPTOP" && canManageSo && canSoLaptop(userRoles, userId, row.siap_jual ?? 0) ? (
                                                                 <button onClick={() => toggleSo(row)} disabled={soingId === row.id}
-                                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border ${soActive ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border ${soActive ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
                                                                     {soActive ? "SO" : "-"}
                                                                 </button>
                                                             ) : <Dash />}
@@ -940,10 +940,10 @@ export default function UnifiedBarangContent() {
                                                             <div className="flex items-center justify-center gap-1">
                                                                 <button onClick={() => toggleAudit(row)} disabled={!canToggleAudit(row) || auditingId === row.id}
                                                                     title={!canToggleAudit(row) ? (row.tipe === "AKSESORIS" ? "Hanya Admin yang bisa mengubah status audit" : "Tidak punya akses") : ""}
-                                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border disabled:opacity-40 ${auditActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
                                                                     {auditActive ? "Teraudit" : "Audit"}
                                                                 </button>
-                                                                <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit" className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
+                                                                <button onClick={() => setHistoryTarget({ row, kind: "audit" })} title="Riwayat audit" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
                                                                     <HistoryIcon size={13} />
                                                                 </button>
                                                             </div>
@@ -952,24 +952,24 @@ export default function UnifiedBarangContent() {
                                                             <div className="flex items-center gap-1 flex-nowrap min-w-max">
                                                                 {row.tipe === "LAPTOP" && row.unit_id && (
                                                                     <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
-                                                                        className="h-7 px-2 text-[11px] font-semibold text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition">Pedagang</button>
+                                                                        className="h-7 px-2 text-[11px] font-semibold text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Pedagang</button>
                                                                 )}
                                                                 {row.tipe === "LAPTOP" && row.unit_count === 0 && canAddUnit && (
                                                                     <button onClick={() => setAddUnitTarget(row)}
-                                                                        className="h-7 px-2 text-[11px] font-semibold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">
+                                                                        className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
                                                                         Tambah Unit
                                                                     </button>
                                                                 )}
                                                                 {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
-                                                                    <Link href={`/dashboard/laptops/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
+                                                                    <Link href={`/dashboard/laptops/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
                                                                         Kelola Unit ({row.unit_count})
                                                                     </Link>
                                                                 )}
                                                                 {row.tipe === "LAPTOP" && canViewBarcode && (
-                                                                    <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama })} className="h-7 px-2 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Barcode</button>
+                                                                    <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama })} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
                                                                 )}
                                                                 {((row.tipe === "LAPTOP" && canEditLaptop) || (row.tipe === "AKSESORIS" && canEditAcc)) && (
-                                                                    <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>
+                                                                    <button onClick={() => openEdit(row)} className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Edit</button>
                                                                 )}
                                                                 {((row.tipe === "LAPTOP" && canDeleteLaptop) || (row.tipe === "AKSESORIS" && canDeleteAcc)) && (
                                                                     <button onClick={() => setDeleteRow(row)} className="h-7 px-2 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>
@@ -982,8 +982,8 @@ export default function UnifiedBarangContent() {
                                         </tbody>
                                     </table>
                                 </div>
-                                <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/60 text-xs text-gray-400">
-                                    <span className="text-gray-700 font-bold">{filteredRows.length}</span> barang ditampilkan
+                                <div className="px-5 py-3 border-t border-zinc-100 bg-zinc-50/60 text-xs text-zinc-400">
+                                    <span className="text-zinc-700 font-bold">{filteredRows.length}</span> barang ditampilkan
                                 </div>
                             </div>
                         </>
@@ -996,20 +996,20 @@ export default function UnifiedBarangContent() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={closeForm} />
                     <div className="relative bg-white w-full max-w-lg shadow-2xl rounded-2xl overflow-hidden animate-popIn max-h-[90vh] flex flex-col">
-                        <div className="h-0.5 w-full bg-gradient-to-r from-indigo-300 via-indigo-600 to-indigo-900" />
-                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                            <h2 className="font-bold text-gray-900 text-[15px]">
+                        <div className="h-0.5 w-full bg-gradient-to-r from-zinc-300 via-zinc-600 to-black" />
+                        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+                            <h2 className="font-bold text-zinc-900 text-[15px]">
                                 {formModal.mode === "edit" ? "Edit" : "Tambah"} {formModal.tipe === "LAPTOP" ? "Laptop" : "Aksesori"}
                             </h2>
-                            <button onClick={closeForm} className="text-gray-400 hover:text-gray-700">✕</button>
+                            <button onClick={closeForm} className="text-zinc-400 hover:text-zinc-700">✕</button>
                         </div>
 
                         {formModal.mode === "create" && (
                             <div className="px-6 pt-4 flex gap-2">
                                 <button onClick={() => setFormModal({ mode: "create", tipe: "LAPTOP" })}
-                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "LAPTOP" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-500"}`}>Laptop</button>
+                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500"}`}>Laptop</button>
                                 <button onClick={() => setFormModal({ mode: "create", tipe: "AKSESORIS" })}
-                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "AKSESORIS" ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-500"}`}>Aksesoris</button>
+                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "AKSESORIS" ? "bg-zinc-700 text-white" : "bg-zinc-100 text-zinc-500"}`}>Aksesoris</button>
                             </div>
                         )}
 
@@ -1062,9 +1062,9 @@ export default function UnifiedBarangContent() {
                                 </>
                             )}
                         </div>
-                        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
-                            <button onClick={closeForm} disabled={saving} className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">Batal</button>
-                            <button onClick={submitForm} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-sm font-semibold hover:from-indigo-700 hover:to-indigo-800 transition disabled:opacity-50">
+                        <div className="flex gap-3 px-6 py-4 border-t border-zinc-100">
+                            <button onClick={closeForm} disabled={saving} className="flex-1 h-11 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-zinc-200 transition">Batal</button>
+                            <button onClick={submitForm} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-zinc-800 to-zinc-900 text-white rounded-xl text-sm font-semibold hover:from-zinc-900 hover:to-black transition disabled:opacity-50">
                                 {saving ? "Menyimpan..." : "Simpan"}
                             </button>
                         </div>
@@ -1105,7 +1105,7 @@ export default function UnifiedBarangContent() {
             {/*  Loader singkat saat menarik detail unit lengkap (stok = 1) */}
             {unitDetailLoading && (
                 <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
-                    <div className="w-8 h-8 border-2 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+                    <div className="w-8 h-8 border-2 border-zinc-200 border-t-zinc-900 rounded-full animate-spin" />
                 </div>
             )}
 
@@ -1146,12 +1146,12 @@ export default function UnifiedBarangContent() {
     );
 }
 
-const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400";
+const inputCls = "w-full h-10 border border-zinc-200 rounded-xl px-3 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-400";
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
     return (
         <div>
-            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
                 {label}{required && <span className="text-red-400 ml-0.5">*</span>}
             </label>
             {children}
@@ -1166,7 +1166,7 @@ function Field({ label, children, required }: { label: string; children: React.R
 function StatChip({ label, value, tone = "gray" }: { label: string; value: number | null; tone?: "gray" | "green" | "red" | "emerald" }) {
     if (value == null) return null;
     const toneCls: Record<string, string> = {
-        gray: "bg-gray-50 text-gray-500 border-gray-200",
+        gray: "bg-zinc-50 text-zinc-500 border-zinc-200",
         green: "bg-emerald-50 text-emerald-700 border-emerald-200",
         red: "bg-red-50 text-red-600 border-red-200",
         emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -1184,10 +1184,10 @@ function StatChip({ label, value, tone = "gray" }: { label: string; value: numbe
 function DetailItem({ label, value }: { label: string; value?: string | number | null }) {
     const hasValue = value !== undefined && value !== null && value !== "";
     return (
-        <div className="bg-gray-50 rounded-lg px-2.5 py-1.5 border border-gray-100">
-            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
-            <p className="text-[11px] font-semibold text-gray-700 truncate">
-                {hasValue ? value : <span className="text-gray-300 font-normal">-</span>}
+        <div className="bg-zinc-50 rounded-lg px-2.5 py-1.5 border border-zinc-100">
+            <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{label}</p>
+            <p className="text-[11px] font-semibold text-zinc-700 truncate">
+                {hasValue ? value : <span className="text-zinc-300 font-normal">-</span>}
             </p>
         </div>
     );
