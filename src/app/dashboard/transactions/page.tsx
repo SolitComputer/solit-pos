@@ -1824,6 +1824,11 @@ export default function Page() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportLabel, setExportLabel] = useState("");
+  const [showMonthExport, setShowMonthExport] = useState(false);
+  const [exportMonth, setExportMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [photoModal, setPhotoModal] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -1991,8 +1996,23 @@ export default function Page() {
     setPaymentMethod("ALL"); setSourcePlatform("ALL"); setCompanyName("ALL"); setItemKind("ALL");
   };
 
+  // ─── Hitung rentang tanggal 1 bulan penuh dari <input type="month"> (format "YYYY-MM") ──
+  const getMonthRangeFromInput = (monthValue: string): { from: string; to: string; label: string } | null => {
+    if (!monthValue) return null;
+    const [yearStr, monthStr] = monthValue.split("-");
+    const year = Number(yearStr);
+    const month = Number(monthStr); // 1-12
+    if (!year || !month) return null;
+    const from = `${yearStr}-${monthStr}-01`;
+    const lastDay = new Date(year, month, 0).getDate(); // tanggal terakhir bulan itu
+    const to = `${yearStr}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const label = `${monthNames[month - 1]}-${year}`;
+    return { from, to, label };
+  };
+
   // ─── EXPORT EXCEL ──────────────────────────────────────────────────
-  const handleExportExcel = async () => {
+  const handleExportExcel = async (monthRange?: { from: string; to: string; label: string }) => {
     if (isExporting) return;
     setIsExporting(true);
     setExportProgress(0);
@@ -2000,6 +2020,9 @@ export default function Page() {
     try {
       const { default: ExcelJS } = await import("exceljs");
       setExportProgress(5);
+
+      const effectiveDateFrom = monthRange?.from ?? dateFrom;
+      const effectiveDateTo = monthRange?.to ?? dateTo;
 
       const exportParams = new URLSearchParams({ export: "1", status, sortOrder });
       if (!CLIENT_SIDE_SORT_KEYS.includes(sortBy)) {
@@ -2009,8 +2032,8 @@ export default function Page() {
       if (bulkSNList.length > 0) exportParams.set("snList", bulkSNList.join(","));
       else if (debouncedSearch.trim()) exportParams.set("search", debouncedSearch.trim());
       if (customerType !== "ALL") exportParams.set("customerType", customerType);
-      if (dateFrom) exportParams.set("dateFrom", dateFrom);
-      if (dateTo) exportParams.set("dateTo", dateTo);
+      if (effectiveDateFrom) exportParams.set("dateFrom", effectiveDateFrom);
+      if (effectiveDateTo) exportParams.set("dateTo", effectiveDateTo);
       if (paymentMethod !== "ALL") exportParams.set("paymentMethod", paymentMethod);
       if (sourcePlatform !== "ALL") exportParams.set("sourcePlatform", sourcePlatform);
       if (companyName !== "ALL") exportParams.set("companyName", companyName);
@@ -2140,7 +2163,7 @@ export default function Page() {
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      const dateStr = new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
+      const dateStr = monthRange?.label ?? new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-");
       link.download = `Transaksi_Solit_${dateStr}.xlsx`;
       document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(link.href);
       setExportProgress(100);
@@ -2154,6 +2177,13 @@ export default function Page() {
       setExportProgress(0);
       setExportLabel("");
     }
+  };
+
+  const handleExportMonth = () => {
+    const range = getMonthRangeFromInput(exportMonth);
+    if (!range) return;
+    setShowMonthExport(false);
+    handleExportExcel(range);
   };
 
   return (
@@ -2194,7 +2224,7 @@ export default function Page() {
               )}
               {!isLoading && totalCount > 0 && (
                 <button
-                  onClick={handleExportExcel} disabled={isExporting}
+                  onClick={() => handleExportExcel()} disabled={isExporting}
                   className="inline-flex items-center gap-1.5 px-3 h-9 bg-white border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isExporting ? (
@@ -2202,6 +2232,37 @@ export default function Page() {
                     <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><polyline points="8 13 12 17 16 13" /><line x1="12" y1="17" x2="12" y2="11" /></svg>Export Excel</>
                   )}
                 </button>
+              )}
+
+              {!isLoading && totalCount > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowMonthExport((v) => !v)}
+                    disabled={isExporting}
+                    className="inline-flex items-center gap-1.5 px-3 h-9 bg-white border border-blue-200 rounded-xl text-xs font-semibold text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    Export per Bulan
+                  </button>
+
+                  {showMonthExport && (
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl border border-gray-200 shadow-xl p-3.5 z-20">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Pilih Bulan</label>
+                      <input
+                        type="month"
+                        value={exportMonth}
+                        onChange={(e) => setExportMonth(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg h-9 px-2.5 text-sm text-[#1a1545] bg-white focus:outline-none focus:ring-2 focus:ring-[#0f0c29]/10 focus:border-gray-400 transition"
+                      />
+                      <div className="flex gap-2 mt-3">
+                        <button onClick={() => setShowMonthExport(false)} className="flex-1 h-8 rounded-lg border border-gray-200 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition">Batal</button>
+                        <button onClick={handleExportMonth} disabled={isExporting} className="flex-1 h-8 rounded-lg bg-[#0f0c29] text-white text-xs font-semibold hover:bg-[#1a1545] transition disabled:opacity-60">Export</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
