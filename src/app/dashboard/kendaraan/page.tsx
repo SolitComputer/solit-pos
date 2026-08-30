@@ -4,14 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import {
   Car, Bike, Plus, Pencil, Trash2, Inbox, LogOut, CheckCircle2,
-  Loader2, Fuel, User, Wrench, RefreshCw, Send, AlertTriangle, Lock,
+  Loader2, Fuel, User, Wrench, RefreshCw, Send, AlertTriangle, Lock, Ban,
 } from "lucide-react";
 import {
   inp, lbl, primaryBtn, secondaryBtn, ErrorBanner, Spinner, EmptyState,
-  ModalWrapper, ModalHead, ModalFoot, VehicleStatusBadge, ApprovedByNote, StatPill,
+  ModalWrapper, ModalHead, ModalFoot, ConfirmModal, VehicleStatusBadge, ApprovedByNote, StatPill,
   formatTime, formatDateTime,
 } from "@/components/kendaraan/ui";
-import { ApproveRequestModal, RejectRequestModal } from "@/components/kendaraan/ApprovalModals";
+import { ApproveRequestModal } from "@/components/kendaraan/ApprovalModals";
 import VehicleSopGate from "@/components/kendaraan/VehicleSopGate";
 
 type LastUsage = {
@@ -51,7 +51,7 @@ export default function KendaraanPage() {
   const [error, setError] = useState("");
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [myRequests, setMyRequests] = useState<BorrowRequest[]>([]);
-    const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [canApprove, setCanApprove] = useState(false);
   const [queue, setQueue] = useState<BorrowRequest[]>([]);
   // Terkunci by default (aman) sampai VehicleSopGate memastikan status SOP.
@@ -70,7 +70,7 @@ export default function KendaraanPage() {
       const res = await fetch("/api/vehicles", { cache: "no-store" });
       const d = await res.json();
       if (!res.ok || !d.success) throw new Error(d.message || `Error ${res.status}`);
-           setVehicles(d.vehicles);
+      setVehicles(d.vehicles);
       setMyRequests(d.myRequests);
       setIsAdmin(d.isAdmin);
       setCanApprove(d.canApprove);
@@ -93,7 +93,7 @@ export default function KendaraanPage() {
   const myActiveFor = (vehicleId: string) =>
     myRequests.find((r) => r.vehicle_id === vehicleId && (r.status === "PENDING" || r.status === "APPROVED"));
 
- const motors = vehicles.filter((v) => v.type === "MOTOR");
+  const motors = vehicles.filter((v) => v.type === "MOTOR");
   const mobils = vehicles.filter((v) => v.type === "MOBIL");
   const availableCount = vehicles.filter((v) => v.status === "TERSEDIA").length;
   const inUseCount = vehicles.filter((v) => v.status === "DIPAKAI").length;
@@ -103,15 +103,41 @@ export default function KendaraanPage() {
     <DashboardLayout>
       <div className="min-h-screen bg-[#F7F7F8]">
         {/* Hero */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-800 to-black px-5 py-5 sm:px-7 sm:py-6 lg:px-9 lg:py-7 shadow-lg shadow-black/20 mb-5">
-          <div className="pointer-events-none absolute -top-24 -right-24 w-64 h-64 rounded-full bg-white/5 blur-3xl" />
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-800 to-black px-5 py-6 sm:px-7 sm:py-7 lg:px-9 lg:py-8 shadow-lg shadow-black/20 mb-5">
+          {/* Tekstur blueprint grid — nuansa "papan teknis" armada */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, rgba(255,255,255,0.055) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.055) 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+              maskImage: "linear-gradient(to bottom, black, transparent 85%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black, transparent 85%)",
+            }}
+          />
+          {/* Siluet kendaraan raksasa transparan — signature visual, bukan sekadar dekorasi acak */}
+          <Car
+            size={230}
+            strokeWidth={1}
+            className="pointer-events-none absolute -right-8 -bottom-14 text-white opacity-[0.05] rotate-[-6deg] hidden sm:block"
+          />
+          <div className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full bg-white/[0.06] blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 -left-16 w-64 h-64 rounded-full bg-zinc-500/10 blur-3xl" />
+
           <div className="relative flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-white leading-tight">Manajemen Kendaraan</h1>
-              <p className="text-[11px] sm:text-xs lg:text-sm text-zinc-400 mt-1">
+              <div className="flex items-center gap-2.5 mb-2.5">
+                <span className="w-9 h-9 rounded-2xl bg-white/10 border border-white/10 text-white flex items-center justify-center shrink-0">
+                  <Car size={17} />
+                </span>
+                <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-white leading-tight tracking-tight">
+                  Manajemen Kendaraan
+                </h1>
+              </div>
+              <p className="text-[11px] sm:text-xs lg:text-sm text-zinc-400">
                 Pinjam kendaraan operasional & pantau pemakaian
               </p>
-              <div className="flex flex-wrap items-center gap-1.5 mt-3">
+              <div className="flex flex-wrap items-center gap-1.5 mt-3.5">
                 <StatPill label="Tersedia" count={availableCount} tone="emerald" />
                 <StatPill label="Dipakai" count={inUseCount} tone="zinc" />
                 <StatPill label="Maintenance" count={maintenanceCount} tone="amber" />
@@ -120,7 +146,7 @@ export default function KendaraanPage() {
             {isAdmin && (
               <button
                 onClick={() => setAddOpen(true)}
-                className="h-10 px-3 sm:px-4 bg-white hover:bg-zinc-100 text-zinc-900 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-sm shadow-black/30 shrink-0"
+                className="h-10 px-3 sm:px-4 bg-white hover:bg-zinc-100 text-zinc-900 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shadow-md shadow-black/30 shrink-0"
               >
                 <Plus size={15} /> <span className="hidden sm:inline">Tambah Kendaraan</span>
               </button>
@@ -128,7 +154,7 @@ export default function KendaraanPage() {
           </div>
         </div>
 
-       <VehicleSopGate onStatusChange={setSopBlocked} />
+        <VehicleSopGate onStatusChange={setSopBlocked} />
 
         {error && (
           <div className="mb-4">
@@ -145,23 +171,37 @@ export default function KendaraanPage() {
             {/* Antrian ACC (Admin) */}
             {canApprove && queue.length > 0 && (
               <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center">
+                <div className="flex items-center gap-2 mb-3.5">
+                  <span className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center">
                     <Inbox size={16} />
                   </span>
-                  <h2 className="text-sm sm:text-base font-black text-gray-900">Menunggu ACC ({queue.length})</h2>
+                  <h2 className="text-sm sm:text-base font-black text-gray-900 tracking-tight">
+                    Menunggu ACC <span className="text-amber-500">({queue.length})</span>
+                  </h2>
                 </div>
-               <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {queue.map((r) => (
-                    <div key={r.id} className="border border-gray-100 hover:border-gray-200 rounded-xl p-3.5 bg-gray-50/50 transition-colors">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-gray-900 truncate">{r.vehicle?.name ?? "—"}</p>
-                          <p className="text-[10px] text-gray-500 truncate">
-                            {r.borrower?.name ?? "—"} · {r.borrower?.role?.replace(/_/g, " ")}
-                          </p>
+                    <div
+                      key={r.id}
+                      className="border border-gray-100 hover:border-gray-200 rounded-2xl p-3.5 bg-gray-50/60 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black shrink-0 ${avatarTone(
+                              r.borrower?.name
+                            )}`}
+                          >
+                            {initials(r.borrower?.name)}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-gray-900 truncate">{r.vehicle?.name ?? "—"}</p>
+                            <p className="text-[10.5px] text-gray-500 truncate mt-0.5">
+                              {r.borrower?.name ?? "—"} · {r.borrower?.role?.replace(/_/g, " ")}
+                            </p>
+                          </div>
                         </div>
-                        <span className="text-[9px] text-gray-400 whitespace-nowrap">{formatDateTime(r.requested_at)}</span>
+                        <span className="text-[9px] text-gray-400 whitespace-nowrap shrink-0">{formatDateTime(r.requested_at)}</span>
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => setApproveTarget(r)} className={primaryBtn}>
@@ -169,7 +209,7 @@ export default function KendaraanPage() {
                         </button>
                         <button
                           onClick={() => setRejectTarget(r)}
-                          className="flex-1 h-10 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-semibold hover:bg-red-50 transition-all active:scale-[0.98]"
+                          className="flex-1 h-11 bg-white border border-red-100 text-red-600 rounded-xl text-[12.5px] font-semibold hover:bg-red-50 hover:border-red-200 transition-all active:scale-[0.97]"
                         >
                           Tolak
                         </button>
@@ -181,7 +221,7 @@ export default function KendaraanPage() {
             )}
 
             {/* Daftar kendaraan */}
-                        <VehicleSection
+            <VehicleSection
               title="Motor"
               icon={<Bike size={16} />}
               vehicles={motors}
@@ -193,7 +233,7 @@ export default function KendaraanPage() {
               onEdit={setEditTarget}
               onReload={reload}
             />
-                        <VehicleSection
+            <VehicleSection
               title="Mobil"
               icon={<Car size={16} />}
               vehicles={mobils}
@@ -215,7 +255,7 @@ export default function KendaraanPage() {
       {borrowTarget && <BorrowModal vehicle={borrowTarget} onClose={() => setBorrowTarget(null)} onSaved={reload} />}
       {checkoutTarget && <CheckoutModal request={checkoutTarget} onClose={() => setCheckoutTarget(null)} onSaved={reload} />}
       {approveTarget && <ApproveRequestModal request={approveTarget} onClose={() => setApproveTarget(null)} onSaved={reload} />}
-      {rejectTarget && <RejectRequestModal request={rejectTarget} onClose={() => setRejectTarget(null)} onSaved={reload} />}
+      {rejectTarget && <RejectConfirmModal request={rejectTarget} onClose={() => setRejectTarget(null)} onSaved={reload} />}
       {addOpen && <VehicleFormModal onClose={() => setAddOpen(false)} onSaved={reload} />}
       {editTarget && <VehicleFormModal vehicle={editTarget} onClose={() => setEditTarget(null)} onSaved={reload} />}
     </DashboardLayout>
@@ -243,7 +283,7 @@ function VehicleSection({
         <span className="w-8 h-8 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-700 flex items-center justify-center">
           {icon}
         </span>
-         <h2 className="text-sm sm:text-base font-black text-gray-900">
+        <h2 className="text-sm sm:text-base font-black text-gray-900 tracking-tight">
           {title} <span className="text-gray-400 font-bold">({vehicles.length})</span>
         </h2>
       </div>
@@ -252,7 +292,7 @@ function VehicleSection({
           <EmptyState icon={icon} text={`Belum ada ${title.toLowerCase()} terdaftar.`} />
         </div>
       ) : (
-        <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {vehicles.map((v) => (
             <VehicleCard
               key={v.id}
@@ -270,6 +310,83 @@ function VehicleSection({
       )}
     </section>
   );
+}
+
+// ─── FUEL / BATTERY GAUGE ─────────────────────────────────────────────────────
+// Parse level bensin/baterai dari teks bebas jadi persentase (best-effort).
+// Kalau polanya tidak dikenali, kembalikan null -> cincin tampil abu-abu putus,
+// teks aslinya tetap ditampilkan apa adanya di baris meta (tidak pernah ditebak).
+function fuelPercent(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const s = raw.trim().toLowerCase();
+  if (!s) return null;
+  if (/\bfull\b|\bpenuh\b/.test(s)) return 100;
+  if (/\bkosong\b|\bhabis\b/.test(s)) return 0;
+  if (/3\s*\/\s*4/.test(s)) return 75;
+  if (/1\s*\/\s*2|\bsetengah\b/.test(s)) return 50;
+  if (/1\s*\/\s*4/.test(s)) return 25;
+  const pct = s.match(/(\d{1,3})\s*%/);
+  if (pct) return Math.min(100, Math.max(0, parseInt(pct[1], 10)));
+  // Indikator strip/bar motor umumnya 5 segmen — pendekatan kasar, bukan nilai presisi.
+  const bar = s.match(/(\d)\s*bar/);
+  if (bar) return Math.min(100, Math.round((parseInt(bar[1], 10) / 5) * 100));
+  return null;
+}
+
+function FuelRing({ level, TypeIcon }: { level: string | null | undefined; TypeIcon: typeof Bike }) {
+  const pct = fuelPercent(level);
+  const size = 44;
+  const stroke = 3;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const tone = pct == null ? "#D4D4D8" : pct >= 60 ? "#10B981" : pct >= 25 ? "#F59E0B" : "#F43F5E";
+  const dashOffset = pct == null ? c * 0.25 : c - (pct / 100) * c;
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#F0F0F1" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={tone}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={dashOffset}
+          opacity={pct == null ? 0.4 : 1}
+          className="transition-all duration-500"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center text-zinc-500">
+        <TypeIcon size={17} />
+      </div>
+    </div>
+  );
+}
+
+// ─── AVATAR INISIAL (peminjam) ────────────────────────────────────────────────
+const avatarPalette = [
+  "bg-violet-100 text-violet-700",
+  "bg-blue-100 text-blue-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700",
+  "bg-cyan-100 text-cyan-700",
+];
+function initials(name?: string | null): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+function avatarTone(name?: string | null): string {
+  const s = name ?? "";
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+  return avatarPalette[hash % avatarPalette.length];
 }
 
 // ─── CARD ────────────────────────────────────────────────────────────────────
@@ -323,25 +440,32 @@ function VehicleCard({
   const iAmUsing = myActive?.status === "APPROVED" && v.status === "DIPAKAI";
   const iAmPending = myActive?.status === "PENDING";
 
-  // Icon jenis kendaraan + warna aksen tipis di atas kartu sesuai status
   const TypeIcon = v.type === "MOTOR" ? Bike : Car;
   const accent: Record<string, string> = {
-    TERSEDIA: "bg-emerald-400",
-    DIPAKAI: "bg-zinc-400",
-    MAINTENANCE: "bg-amber-400",
+    TERSEDIA: "bg-gradient-to-b from-emerald-400 to-emerald-500",
+    DIPAKAI: "bg-gradient-to-b from-zinc-300 to-zinc-400",
+    MAINTENANCE: "bg-gradient-to-b from-amber-400 to-amber-500",
+  };
+  // Shadow hover mengikuti warna status — biar "hidup" tapi tetap halus, bukan norak.
+  const hoverGlow: Record<string, string> = {
+    TERSEDIA: "hover:shadow-[0_18px_36px_-16px_rgba(16,185,129,0.35)]",
+    DIPAKAI: "hover:shadow-[0_18px_36px_-16px_rgba(63,63,70,0.22)]",
+    MAINTENANCE: "hover:shadow-[0_18px_36px_-16px_rgba(245,158,11,0.35)]",
   };
 
   return (
-    <div className="group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-gray-200 transition-all duration-200 overflow-hidden flex flex-col">
-    <div className={`h-1 w-full ${accent[v.status] ?? "bg-gray-200"}`} />
-      <div className="p-4 sm:p-5 flex flex-col gap-3">
+    <div
+      className={`group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:-translate-y-0.5 hover:border-gray-200 transition-all duration-200 overflow-hidden flex ${
+        hoverGlow[v.status] ?? "hover:shadow-lg"
+      }`}
+    >
+      <div className={`w-1 shrink-0 ${accent[v.status] ?? "bg-gray-200"}`} />
+      <div className="p-4 sm:p-5 flex flex-col gap-3 flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2.5 min-w-0">
-            <span className="w-10 h-10 rounded-xl bg-zinc-100 border border-zinc-200 text-zinc-400 flex items-center justify-center shrink-0">
-              <TypeIcon size={18} />
-            </span>
+            <FuelRing level={v.fuel_level} TypeIcon={TypeIcon} />
             <div className="min-w-0 pt-0.5">
-              <p className="text-sm font-black text-gray-900 truncate">{v.name}</p>
+              <p className="text-sm font-black text-gray-900 truncate tracking-tight">{v.name}</p>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
                 <span className="text-[10px] text-gray-500 flex items-center gap-1">
                   <Fuel size={12} className="text-emerald-500" /> {v.fuel_level || "—"}
@@ -363,61 +487,67 @@ function VehicleCard({
               </div>
             </div>
           </div>
-          <VehicleStatusBadge status={v.status} />
+          <div className="shrink-0">
+            <VehicleStatusBadge status={v.status} />
+          </div>
         </div>
 
-               {/* Aksi peminjam */}
-        {v.status === "TERSEDIA" && !iAmPending && (
-          <button
-            onClick={onBorrow}
-            disabled={sopBlocked}
-            title={sopBlocked ? "Baca & setujui SOP Peminjaman Kendaraan di atas dulu" : undefined}
-            className={primaryBtn}
-          >
-            {sopBlocked ? <Lock size={14} /> : <Plus size={14} />}
-            {sopBlocked ? "Baca SOP Terlebih Dahulu" : "Ajukan Pinjam"}
-          </button>
-        )}
-        {iAmPending && (
-          <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 font-semibold">
-            Pengajuanmu menunggu ACC admin…
-          </div>
-        )}
-        {iAmUsing && (
-          <>
-            <ApprovedByNote name={myActive?.approver?.name} />
-            <button onClick={() => myActive && onCheckout(myActive)} className={primaryBtn}>
-              <LogOut size={14} /> Check-out (Selesai Pakai)
+        {/* Blok aksi didorong ke bawah kartu (mt-auto) supaya sejajar rapi
+            walau tinggi kartu berbeda-beda dalam satu baris grid. */}
+        <div className="mt-auto flex flex-col gap-3">
+          {/* Aksi peminjam */}
+          {v.status === "TERSEDIA" && !iAmPending && (
+            <button
+              onClick={onBorrow}
+              disabled={sopBlocked}
+              title={sopBlocked ? "Baca & setujui SOP Peminjaman Kendaraan di atas dulu" : undefined}
+              className={`${primaryBtn} flex-none`}
+            >
+              {sopBlocked ? <Lock size={14} /> : <Plus size={14} />}
+              {sopBlocked ? "Baca SOP Terlebih Dahulu" : "Ajukan Pinjam"}
             </button>
-          </>
-        )}
-        {v.status === "DIPAKAI" && !iAmUsing && (
-          <div className="text-[10px] text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-xl px-3 py-2 font-semibold">
-            Sedang dipakai karyawan lain
-          </div>
-        )}
-        {v.status === "MAINTENANCE" && (
-          <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 font-semibold flex items-center gap-1.5">
-            <Wrench size={12} /> Dalam perbaikan
-          </div>
-        )}
-
-        {/* Aksi admin */}
-       {isAdmin && (
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
-            <button onClick={onEdit} className="flex-1 min-w-[84px] h-9 text-[11px] font-semibold text-gray-600 border border-gray-100 hover:bg-gray-50 hover:border-gray-200 rounded-lg flex items-center justify-center gap-1 transition">
-              <Pencil size={12} /> Edit
-            </button>
-            {v.status === "MAINTENANCE" && (
-              <button onClick={restore} disabled={busy} className="flex-1 min-w-[110px] h-9 text-[11px] font-semibold text-emerald-600 border border-emerald-100 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
-                {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Set Tersedia
+          )}
+          {iAmPending && (
+            <div className="text-[10.5px] text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 font-semibold">
+              Pengajuanmu menunggu ACC admin…
+            </div>
+          )}
+          {iAmUsing && (
+            <>
+              <ApprovedByNote name={myActive?.approver?.name} />
+              <button onClick={() => myActive && onCheckout(myActive)} className={`${primaryBtn} flex-none`}>
+                <LogOut size={14} /> Check-out (Selesai Pakai)
               </button>
-            )}
-            <button onClick={del} disabled={deleting} className="flex-1 min-w-[84px] h-9 text-[11px] font-semibold text-red-500 border border-red-100 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
-              {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Hapus
-            </button>
-          </div>
-        )}
+            </>
+          )}
+          {v.status === "DIPAKAI" && !iAmUsing && (
+            <div className="text-[10.5px] text-zinc-600 bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-2.5 font-semibold">
+              Sedang dipakai karyawan lain
+            </div>
+          )}
+          {v.status === "MAINTENANCE" && (
+            <div className="text-[10.5px] text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 font-semibold flex items-center gap-1.5">
+              <Wrench size={12} /> Dalam perbaikan
+            </div>
+          )}
+
+          {/* Aksi admin */}
+          {isAdmin && (
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+              <button onClick={onEdit} className="flex-1 min-w-[84px] h-9 text-[11px] font-semibold text-gray-600 border border-gray-100 hover:bg-gray-50 hover:border-gray-200 rounded-lg flex items-center justify-center gap-1 transition">
+                <Pencil size={12} /> Edit
+              </button>
+              {v.status === "MAINTENANCE" && (
+                <button onClick={restore} disabled={busy} className="flex-1 min-w-[110px] h-9 text-[11px] font-semibold text-emerald-600 border border-emerald-100 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
+                  {busy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Set Tersedia
+                </button>
+              )}
+              <button onClick={del} disabled={deleting} className="flex-1 min-w-[84px] h-9 text-[11px] font-semibold text-red-500 border border-red-100 hover:bg-red-50 rounded-lg flex items-center justify-center gap-1 transition disabled:opacity-40">
+                {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Hapus
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -431,7 +561,7 @@ function MyRejectedNotices({ requests }: { requests: BorrowRequest[] }) {
   return (
     <section className="space-y-2">
       {rejected.map((r) => (
-        <div key={r.id} className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-3 flex items-start justify-between gap-3">
+        <div key={r.id} className="bg-red-50 border border-red-100 rounded-2xl px-3.5 py-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-bold text-red-700">Pengajuan {r.vehicle?.name ?? "kendaraan"} ditolak</p>
             {r.rejection_note && <p className="text-[11px] text-red-600 mt-0.5">Alasan: {r.rejection_note}</p>}
@@ -494,6 +624,56 @@ function BorrowModal({ vehicle, onClose, onSaved }: { vehicle: Vehicle; onClose:
   );
 }
 
+// ─── REJECT — konfirmasi cepat Ya/Tidak, TANPA alasan wajib ─────────────────
+function RejectConfirmModal({ request, onClose, onSaved }: { request: BorrowRequest; onClose: () => void; onSaved: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submit = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch(`/api/vehicles/borrow/${request.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "REJECT", rejection_note: null }),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.success) throw new Error(d.message || `Error ${res.status}`);
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      setErr(e.message || "Gagal menolak pengajuan");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <ConfirmModal
+      icon={<Ban size={22} />}
+      tone="danger"
+      title="Tolak pengajuan ini?"
+      confirmLabel="Ya, Tolak"
+      cancelLabel="Tidak"
+      busy={busy}
+      onConfirm={submit}
+      onCancel={onClose}
+      message={
+        <>
+          Pengajuan peminjaman <b className="text-gray-900">{request.vehicle?.name ?? "kendaraan ini"}</b> dari{" "}
+          <b className="text-gray-900">{request.borrower?.name ?? "karyawan ini"}</b> akan ditolak. Karyawan akan melihat status ditolak di halaman mereka.
+          {err && (
+            <span className="block mt-3 text-left">
+              <ErrorBanner msg={err} />
+            </span>
+          )}
+        </>
+      }
+    />
+  );
+}
+
 // ─── CHECKOUT (wajib isi lengkap sebelum tombol aktif) ───────────────────────
 function CheckoutModal({ request, onClose, onSaved }: { request: BorrowRequest; onClose: () => void; onSaved: () => void }) {
   const [fuel, setFuel] = useState("");
@@ -501,7 +681,6 @@ function CheckoutModal({ request, onClose, onSaved }: { request: BorrowRequest; 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  // Semua field wajib terisi -> baru tombol aktif (pola mustUpload di fitur Lembur)
   const canSubmit = fuel.trim().length > 0 && condition !== "";
 
   const submit = async () => {
