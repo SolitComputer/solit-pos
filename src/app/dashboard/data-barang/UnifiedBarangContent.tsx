@@ -9,6 +9,7 @@ import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { usePagePermission } from "@/hooks/usePagePermission";
+import * as XLSX from "xlsx";
 import {
       UserRole, hasAnyRole, PERMISSIONS,
     LAPTOP_DELETE_ROLES, ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES, ACCESSORY_DELETE_ROLES,
@@ -452,11 +453,91 @@ export default function UnifiedBarangContent() {
         return list;
     }, [rows, tipeFilter, kategoriFilter, search, categories]);
 
-    const counts = useMemo(() => ({
+        const counts = useMemo(() => ({
         total: rows.length,
         laptop: rows.filter(r => r.tipe === "LAPTOP").length,
         aksesoris: rows.filter(r => r.tipe === "AKSESORIS").length,
     }), [rows]);
+
+    // ── Export Excel ─────────────────────────────────────────────────────
+    // Laptop: setiap unit/SN aktif (non-SOLD) jadi 1 baris sendiri, supaya
+    // modal, sumber, dan tanggal masuk per-SN kelihatan detail — bukan
+    // digabung per model seperti di tabel. Aksesoris tetap 1 baris per item
+    // (memang tidak punya SN individual). Yang di-export ikut filter/search
+    // yang sedang aktif (pakai filteredRows, bukan rows mentah).
+    const handleExportExcel = useCallback(() => {
+        try {
+            const exportRows: Record<string, string | number>[] = [];
+            let no = 1;
+
+            filteredRows.forEach((row) => {
+                const auditLabel = isAuditActive(row) ? "Teraudit" : "Belum";
+                const soLabel = row.tipe === "LAPTOP" ? (isSoActive(row.so_at) ? "Sudah SO" : "Belum SO") : "-";
+
+                if (row.tipe === "LAPTOP") {
+                    const units = ((row.raw as LaptopRaw).laptop_units ?? []).filter(u => u.status !== "SOLD");
+
+                    if (units.length === 0) {
+                        // Model belum punya unit sama sekali — tetap 1 baris, SN kosong
+                        exportRows.push({
+                            No: no++, Tipe: "Laptop", "Nama Barang": row.nama,
+                            Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                            CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
+                            SN: "-", "Status Unit": "-",
+                            "Harga Modal": 0, "Modal Sparepart": 0, "Harga Jual": row.harga_jual,
+                            Sumber: "-", "Tgl Masuk": "-", Stok: 0,
+                            "Status Audit": auditLabel, "Status SO": soLabel,
+                        });
+                        return;
+                    }
+
+                    units.forEach((u) => {
+                        exportRows.push({
+                            No: no++, Tipe: "Laptop", "Nama Barang": row.nama,
+                            Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                            CPU: row.cpu ?? "-", RAM: row.ram ?? "-", Storage: row.storage ?? "-", Spek: "-",
+                            SN: u.serial_number, "Status Unit": u.status,
+                            "Harga Modal": u.purchase_price ?? 0, "Modal Sparepart": u.sparepart_cost ?? 0,
+                            "Harga Jual": row.harga_jual,
+                            Sumber: u.source ?? "-",
+                            "Tgl Masuk": u.created_at ? new Date(u.created_at).toLocaleDateString("id-ID") : "-",
+                            Stok: 1,
+                            "Status Audit": auditLabel, "Status SO": soLabel,
+                        });
+                    });
+                } else {
+                    const acc = row.raw as AccessoryRaw;
+                    exportRows.push({
+                        No: no++, Tipe: "Aksesoris", "Nama Barang": row.nama,
+                        Kategori: row.kategori ?? "-", Merk: row.brand ?? "-",
+                        CPU: "-", RAM: "-", Storage: "-", Spek: row.spek ?? "-",
+                        SN: "-", "Status Unit": "-",
+                        "Harga Modal": acc.buy_price ?? 0, "Modal Sparepart": 0, "Harga Jual": row.harga_jual,
+                        Sumber: "-", "Tgl Masuk": "-", Stok: row.stok ?? 0,
+                        "Status Audit": auditLabel, "Status SO": soLabel,
+                    });
+                }
+            });
+
+            const ws = XLSX.utils.json_to_sheet(exportRows);
+            ws["!cols"] = [
+                { wch: 5 }, { wch: 10 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+                { wch: 18 }, { wch: 8 }, { wch: 10 }, { wch: 16 }, { wch: 16 },
+                { wch: 12 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 12 },
+                { wch: 12 }, { wch: 6 }, { wch: 11 }, { wch: 10 },
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Data Barang");
+
+            const stamp = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
+            XLSX.writeFile(wb, `Data-Barang-${stamp}.xlsx`);
+
+            toast.success(`Export berhasil — ${exportRows.length} baris`);
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal export Excel");
+        }
+    }, [filteredRows]);
 
     // ── Audit toggle ───────────────────────────────────────────────────────
     const toggleAudit = async (row: UnifiedRow) => {
@@ -700,7 +781,11 @@ export default function UnifiedBarangContent() {
                                 {label}
                             </button>
                         ))}
-                        <div className="flex-1" />
+                                                <div className="flex-1" />
+                        <button onClick={handleExportExcel} disabled={filteredRows.length === 0}
+                            className="h-9 px-4 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 transition">
+                            Export Excel
+                        </button>
                         {canCreateLaptop && <button onClick={() => openCreate("LAPTOP")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black transition">+ Laptop</button>}
                         {canCreateAcc && <button onClick={() => openCreate("AKSESORIS")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-600 to-zinc-700 hover:from-zinc-700 hover:to-zinc-800 transition">+ Aksesori</button>}
                     </div>
