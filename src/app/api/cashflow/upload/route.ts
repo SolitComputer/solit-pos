@@ -12,8 +12,26 @@ function getAdmin() {
     );
 }
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
-const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "heic", "heif"];
+const MAX_SIZE_BYTES = 8 * 1024 * 1024; // 8MB — foto kamera HP modern sering >5MB
+
+// ⬅️ FIX: foto dari kamera langsung (input capture="environment") sering dikirim
+// browser dengan file.type KOSONG ("") atau non-standar ("image/jpg"), beda
+// dengan file dari galeri yang metadata MIME-nya lengkap. Kalau cuma dicek
+// ALLOWED_TYPES.includes(file.type) seperti sebelumnya, foto kamera SELALU
+// ditolak walau filenya valid. Sekarang fallback ke ekstensi nama file kalau
+// MIME type tidak dikenali/kosong.
+function resolveContentType(fileType: string, ext: string): string | null {
+    const normalized = fileType === "image/jpg" ? "image/jpeg" : fileType;
+    if (ALLOWED_TYPES.includes(normalized)) return normalized;
+    if (!ALLOWED_EXTENSIONS.includes(ext)) return null;
+    const extToMime: Record<string, string> = {
+        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+        webp: "image/webp", heic: "image/heic", heif: "image/heif",
+    };
+    return extToMime[ext];
+}
 
 export async function POST(req: NextRequest) {
     // Auth
@@ -32,16 +50,18 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
-    if (!file) return NextResponse.json({ success: false, message: "File tidak ditemukan" }, { status: 400 });
-    if (!ALLOWED_TYPES.includes(file.type))
+        if (!file) return NextResponse.json({ success: false, message: "File tidak ditemukan" }, { status: 400 });
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const contentType = resolveContentType(file.type, ext);
+    if (!contentType)
         return NextResponse.json({ success: false, message: "Format file tidak didukung (JPG/PNG/WEBP)" }, { status: 400 });
     if (file.size > MAX_SIZE_BYTES)
-        return NextResponse.json({ success: false, message: "Ukuran file maksimal 5MB" }, { status: 400 });
+        return NextResponse.json({ success: false, message: "Ukuran file maksimal 8MB" }, { status: 400 });
 
     const supabase = getAdmin();
 
     // Generate unique filename
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const jakartaDate = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
     const filename = `${jakartaDate}/${user.id}_${Date.now()}.${ext}`;
 
@@ -52,7 +72,9 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase.storage
         .from("cashflow-photos")
         .upload(filename, buffer, {
-            contentType: file.type,
+            contentType, // ⬅️ FIX: dulu pakai file.type mentah — kalau kosong (kasus kamera),
+            // object di Supabase Storage tersimpan tanpa content-type yang benar,
+            // sehingga foto berisiko tidak ter-render sebagai gambar saat dibuka.
             upsert: false,
         });
 
