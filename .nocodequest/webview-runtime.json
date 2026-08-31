@@ -1,0 +1,243 @@
+{
+  "buildStamp": "H-2026-06-19-rt7",
+  "seq": 10,
+  "bootstrap": {
+    "state": {
+      "player": {
+        "name": "Aventurero",
+        "level": 1,
+        "exp": 0,
+        "gold": 50,
+        "equipped": {
+          "skin": "mono_fabrica",
+          "weapon": "martillo_refactor"
+        }
+      },
+      "inventory": {
+        "weapons": [
+          "martillo_refactor"
+        ],
+        "skins": [
+          "mono_fabrica"
+        ],
+        "scrolls": {
+          "pergamino_estabilidad": 1
+        },
+        "potions": {
+          "pocion_cafe": 0
+        }
+      },
+      "badges": [],
+      "lair": {
+        "decorations": [
+          "planta_buen_codigo"
+        ],
+        "technical_debt_level": 0,
+        "lastPotionAt": null
+      },
+      "acceptedQuests": [],
+      "adventureLog": [],
+      "stats": {
+        "bugsDefeated": 0,
+        "commitsTotal": 0,
+        "questsCompleted": 0,
+        "bossesDefeated": 0,
+        "linesAnalyzed": 0
+      }
+    },
+    "quests": [],
+    "cards": [],
+    "ideSummary": {
+      "generatedAt": "2026-08-31T02:38:18.022Z",
+      "workspaceName": "solit-pos",
+      "activeFile": {
+        "name": "page.tsx",
+        "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx",
+        "language": "typescriptreact",
+        "isDirty": false
+      },
+      "modifiedCount": 3,
+      "modifiedFiles": [
+        {
+          "name": "page.tsx",
+          "status": "modified",
+          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx"
+        },
+        {
+          "name": "ApprovalModals.tsx",
+          "status": "modified",
+          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\components\\kendaraan\\ApprovalModals.tsx"
+        },
+        {
+          "name": "webview-runtime.json",
+          "status": "untracked",
+          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\.nocodequest\\webview-runtime.json"
+        }
+      ],
+      "diagnostics": {
+        "errorCount": 0,
+        "warnCount": 0,
+        "topError": null
+      }
+    },
+    "sceneMood": {
+      "state": "stable",
+      "label": "Mazmorra estable",
+      "reason": "Cambios controlados: 3 archivo(s) modificado(s)",
+      "backdropKey": "bg_home",
+      "errorCount": 0,
+      "warnCount": 0,
+      "overlayAlpha": 0.08,
+      "overlayColor": 858660
+    },
+    "visualSkins": {
+      "weapon": "martillo_refactor",
+      "skin": "mono_fabrica"
+    },
+    "speechText": "Jasper afina su laud mientras el reino despierta..."
+  },
+  "events": [
+    {
+      "id": 1,
+      "command": "refreshQuestBoard",
+      "quests": [],
+      "ts": 1788143898009
+    },
+    {
+      "id": 2,
+      "command": "refreshQuestBoard",
+      "quests": [],
+      "ts": 1788143898016
+    },
+    {
+      "id": 3,
+      "command": "refreshQuestBoard",
+      "quests": [],
+      "ts": 1788143898023
+    },
+    {
+      "id": 4,
+      "command": "syncIdeSummary",
+      "summary": {
+        "generatedAt": "2026-08-31T02:38:18.015Z",
+        "workspaceName": "solit-pos",
+        "activeFile": {
+          "name": "page.tsx",
+          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx",
+          "language": "typescriptreact",
+          "isDirty": false
+        },
+        "modifiedCount": 3,
+        "modifiedFiles": [
+          {
+            "name": "page.tsx",
+            "status": "modified",
+            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx"
+          },
+          {
+            "name": "ApprovalModals.tsx",
+            "status": "modified",
+            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\components\\kendaraan\\ApprovalModals.tsx"
+          },
+          {
+            "name": "webview-runtime.json",
+            "status": "untracked",
+            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\.nocodequest\\webview-runtime.json"
+          }
+        ],
+        "diagnostics": {
+          "errorCount": 0,
+          "warnCount": 0,
+          "topError": null
+        }
+      },
+      "ts": 1788143898026
+    },
+    {
+      "id": 5,
+      "command": "updateSceneMood",
+      "mood": {
+        "state": "stable",
+        "label": "Mazmorra estable",
+        "reason": "Cambios controlados: 3 archivo(s) modificado(s)",
+        "backdropKey": "bg_home",
+        "errorCount": 0,
+        "warnCount": 0,
+        "overlayAlpha": 0.08,
+        "overlayColor": 858660
+      },
+      "ts": 1788143898029
+    },
+    {
+      "id": 6,
+      "command": "showAdventureCards",
+      "cards": [],
+      "ts": 1788143898032
+    },
+    {
+      "id": 7,
+      "command": "refreshQuestBoard",
+      "quests": [],
+      "ts": 1788143898035
+    },
+    {
+      "id": 8,
+      "command": "syncIdeSummary",
+      "summary": {
+        "generatedAt": "2026-08-31T02:38:18.022Z",
+        "workspaceName": "solit-pos",
+        "activeFile": {
+          "name": "page.tsx",
+          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx",
+          "language": "typescriptreact",
+          "isDirty": false
+        },
+        "modifiedCount": 3,
+        "modifiedFiles": [
+          {
+            "name": "page.tsx",
+            "status": "modified",
+            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx"
+          },
+          {
+            "name": "ApprovalModals.tsx",
+            "status": "modified",
+            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\components\\kendaraan\\ApprovalModals.tsx"
+          },
+          {
+            "name": "webview-runtime.json",
+            "status": "untracked",
+            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\.nocodequest\\webview-runtime.json"
+          }
+        ],
+        "diagnostics": {
+          "errorCount": 0,
+          "warnCount": 0,
+          "topError": null
+        }
+      },
+      "ts": 1788143898038
+    },
+    {
+      "id": 9,
+      "command": "updateSceneMood",
+      "mood": {
+        "state": "stable",
+        "label": "Mazmorra estable",
+        "reason": "Cambios controlados: 3 archivo(s) modificado(s)",
+        "backdropKey": "bg_home",
+        "errorCount": 0,
+        "warnCount": 0,
+        "overlayAlpha": 0.08,
+        "overlayColor": 858660
+      },
+      "ts": 1788143898041
+    },
+    {
+      "id": 10,
+      "command": "showAdventureCards",
+      "cards": [],
+      "ts": 1788143898045
+    }
+  ]
+}

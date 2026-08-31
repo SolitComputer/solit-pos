@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Laptop as LaptopIcon, Wrench, History as HistoryIcon } from "lucide-react";
+import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Search, RotateCcw, X, Plus, Layers, Filter } from "lucide-react";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
@@ -268,6 +269,13 @@ export default function UnifiedBarangContent() {
     const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>("ALL");
     const [kategoriFilter, setKategoriFilter] = useState("");
     const [search, setSearch] = useState("");
+    const [filterSN, setFilterSN] = useState("");
+    const [filterBrand, setFilterBrand] = useState("ALL");
+    const [filterStatus, setFilterStatus] = useState("ALL");
+    const [filterRam, setFilterRam] = useState("ALL");
+    const [filterPriceRange, setFilterPriceRange] = useState("ALL");
+    const [filterAudit, setFilterAudit] = useState("");
+    const [sortBy, setSortBy] = useState("DEFAULT");
 
     const [formModal, setFormModal] = useState<{ mode: "create" | "edit"; tipe: ItemType; row?: UnifiedRow } | null>(null);
     const [laptopForm, setLaptopForm] = useState(EMPTY_LAPTOP_FORM);
@@ -365,15 +373,19 @@ export default function UnifiedBarangContent() {
         }
     }, [fetchAll]);
 
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch("/api/categories");
-                const json = await res.json();
-                if (json.success) setCategories(json.data);
-            } catch { /* dropdown kosong kalau gagal, tidak fatal */ }
-        })();
+    const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+
+    const fetchCategories = useCallback(async () => {
+        try {
+            const res = await fetch("/api/categories");
+            const json = await res.json();
+            if (json.success) setCategories(json.data);
+        } catch { /* dropdown kosong kalau gagal, tidak fatal */ }
     }, []);
+
+    useEffect(() => {
+        fetchCategories();
+    }, [fetchCategories]);
 
     useEffect(() => {
         (async () => {
@@ -406,14 +418,36 @@ export default function UnifiedBarangContent() {
         : tipeFilter === "AKSESORIS" ? accessoryCategories
         : categories;
 
+    // List Brand unik dari data
+    const uniqueBrands = useMemo(() => {
+        const set = new Set<string>();
+        rows.forEach(r => {
+            if (r.brand && r.brand.trim()) set.add(r.brand.trim());
+        });
+        return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))];
+    }, [rows]);
+
+    // List RAM unik dari data
+    const uniqueRams = useMemo(() => {
+        const set = new Set<string>();
+        rows.forEach(r => {
+            if (r.ram && r.ram.trim()) set.add(r.ram.trim().toUpperCase());
+        });
+        return ["ALL", ...Array.from(set).sort((a, b) => {
+            const numA = parseInt(a) || 0;
+            const numB = parseInt(b) || 0;
+            return numA - numB;
+        })];
+    }, [rows]);
+
     const filteredRows = useMemo(() => {
         let list = rows;
+
+        // 1. Tipe
         if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
+
+        // 2. Kategori
         if (kategoriFilter) {
-            // kategoriFilter selalu berupa ID kategori. Laptop menyimpan kategori
-            // sebagai kategori_id, tapi aksesoris hanya menyimpan NAMA (kolom
-            // `category`, tanpa category_id). Jadi resolusi id → nama dulu supaya
-            // aksesoris ikut cocok — termasuk saat tipe = "Semua".
             const selectedName = (categories.find(c => c.id === kategoriFilter)?.name || "").toUpperCase();
             const matchLaptop = (r: UnifiedRow) => r.kategori_id === kategoriFilter;
             const matchAksesoris = (r: UnifiedRow) => (r.kategori || "").toUpperCase() === selectedName;
@@ -423,34 +457,111 @@ export default function UnifiedBarangContent() {
                 return r.tipe === "LAPTOP" ? matchLaptop(r) : matchAksesoris(r);
             });
         }
+
+        // 3. Search umum (Nama, Brand, CPU, Storage, Spek)
         if (search.trim()) {
             const t = search.toLowerCase();
+            list = list.filter(r => (
+                r.nama?.toLowerCase().includes(t) ||
+                r.brand?.toLowerCase().includes(t) ||
+                r.cpu?.toLowerCase().includes(t) ||
+                r.ram?.toLowerCase().includes(t) ||
+                r.storage?.toLowerCase().includes(t) ||
+                r.spek?.toLowerCase().includes(t) ||
+                r.sn?.toLowerCase().includes(t)
+            ));
+        }
+
+        // 4. Search Khusus Serial Number (SN)
+        if (filterSN.trim()) {
+            const snQ = filterSN.trim().toLowerCase();
             list = list.filter(r => {
-                const matchString = (
-                    r.nama?.toLowerCase().includes(t) ||
-                    r.brand?.toLowerCase().includes(t) ||
-                    r.cpu?.toLowerCase().includes(t) ||
-                    r.ram?.toLowerCase().includes(t) ||
-                    r.storage?.toLowerCase().includes(t) ||
-                    r.spek?.toLowerCase().includes(t) ||
-                    r.sn?.toLowerCase().includes(t)
-                );
-
-                if (matchString) return true;
-
-                // Also check inside laptop_units array if there are multiple units
+                if (r.sn && r.sn.toLowerCase().includes(snQ)) return true;
                 if (r.tipe === "LAPTOP" && r.raw && "laptop_units" in r.raw) {
                     const units = (r.raw as LaptopRaw).laptop_units;
-                    if (units && units.some(u => u.serial_number?.toLowerCase().includes(t))) {
-                        return true;
-                    }
+                    if (units && units.some(u => u.serial_number?.toLowerCase().includes(snQ))) return true;
                 }
-
                 return false;
             });
         }
+
+        // 5. Filter Brand
+        if (filterBrand !== "ALL") {
+            const bQ = filterBrand.toLowerCase();
+            list = list.filter(r => r.brand?.toLowerCase() === bQ);
+        }
+
+        // 6. Filter RAM
+        if (filterRam !== "ALL") {
+            const ramQ = filterRam.toUpperCase();
+            list = list.filter(r => r.ram?.toUpperCase().includes(ramQ));
+        }
+
+        // 7. Filter Rentang Harga
+        if (filterPriceRange !== "ALL") {
+            list = list.filter(r => {
+                const p = r.harga_jual || 0;
+                switch (filterPriceRange) {
+                    case "0-2": return p < 2000000;
+                    case "2-3": return p >= 2000000 && p <= 3000000;
+                    case "3-5": return p > 3000000 && p <= 5000000;
+                    case "5-8": return p > 5000000 && p <= 8000000;
+                    case "8+": return p > 8000000;
+                    default: return true;
+                }
+            });
+        }
+
+        // 8. Filter Status Unit & Stok
+        if (filterStatus !== "ALL") {
+            list = list.filter(r => {
+                if (filterStatus === "SIAP_JUAL") {
+                    return (r.siap_jual ?? 0) > 0 || (r.stok ?? 0) > 0;
+                }
+                if (filterStatus === "BELUM_SIAP" || filterStatus === "SERVICE" || filterStatus === "RESERVED" || filterStatus === "HELD" || filterStatus === "PACKING") {
+                    if (r.tipe === "LAPTOP" && r.raw && "laptop_units" in r.raw) {
+                        return (r.raw as LaptopRaw).laptop_units?.some(u => u.status === filterStatus);
+                    }
+                    return false;
+                }
+                if (filterStatus === "TERSEDIA") {
+                    return (r.stok_tersedia ?? r.stok ?? 0) > 0;
+                }
+                if (filterStatus === "HABIS") {
+                    return (r.stok_tersedia ?? r.stok ?? 0) <= 0;
+                }
+                return true;
+            });
+        }
+
+        // 9. Status Audit
+        if (filterAudit) {
+            const AUDIT_TTL = 2 * 24 * 60 * 60 * 1000;
+            const isAudited = (r: UnifiedRow) => r.audited_at ? (Date.now() - new Date(r.audited_at).getTime() < AUDIT_TTL) : false;
+            list = list.filter(r => filterAudit === "audited" ? isAudited(r) : !isAudited(r));
+        }
+
+        // 10. Sorting
+        if (sortBy !== "DEFAULT") {
+            list = [...list].sort((a, b) => {
+                switch (sortBy) {
+                    case "AZ": return a.nama.localeCompare(b.nama);
+                    case "ZA": return b.nama.localeCompare(a.nama);
+                    case "PRICE_ASC": return (a.harga_jual || 0) - (b.harga_jual || 0);
+                    case "PRICE_DESC": return (b.harga_jual || 0) - (a.harga_jual || 0);
+                    case "MODAL_ASC": return (a.harga_modal || 0) - (b.harga_modal || 0);
+                    case "MODAL_DESC": return (b.harga_modal || 0) - (a.harga_modal || 0);
+                    case "STOK_DESC": return (b.stok_tersedia ?? b.stok ?? 0) - (a.stok_tersedia ?? a.stok ?? 0);
+                    case "STOK_ASC": return (a.stok_tersedia ?? a.stok ?? 0) - (b.stok_tersedia ?? b.stok ?? 0);
+                    case "DATE_DESC": return (b.tanggal_masuk ? new Date(b.tanggal_masuk).getTime() : 0) - (a.tanggal_masuk ? new Date(a.tanggal_masuk).getTime() : 0);
+                    case "DATE_ASC": return (a.tanggal_masuk ? new Date(a.tanggal_masuk).getTime() : 0) - (b.tanggal_masuk ? new Date(b.tanggal_masuk).getTime() : 0);
+                    default: return 0;
+                }
+            });
+        }
+
         return list;
-    }, [rows, tipeFilter, kategoriFilter, search, categories]);
+    }, [rows, tipeFilter, kategoriFilter, search, filterSN, filterBrand, filterStatus, filterRam, filterPriceRange, filterAudit, sortBy, categories]);
 
     const counts = useMemo(() => ({
         total: rows.length,
@@ -673,8 +784,31 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    const hasFilter = tipeFilter !== "ALL" || !!kategoriFilter || !!search;
-    const resetFilter = () => { setTipeFilter("ALL"); setKategoriFilter(""); setSearch(""); };
+    const hasFilter = (
+        tipeFilter !== "ALL" ||
+        !!kategoriFilter ||
+        !!search.trim() ||
+        !!filterSN.trim() ||
+        filterBrand !== "ALL" ||
+        filterStatus !== "ALL" ||
+        filterRam !== "ALL" ||
+        filterPriceRange !== "ALL" ||
+        !!filterAudit ||
+        sortBy !== "DEFAULT"
+    );
+
+    const resetFilter = () => {
+        setTipeFilter("ALL");
+        setKategoriFilter("");
+        setSearch("");
+        setFilterSN("");
+        setFilterBrand("ALL");
+        setFilterStatus("ALL");
+        setFilterRam("ALL");
+        setFilterPriceRange("ALL");
+        setFilterAudit("");
+        setSortBy("DEFAULT");
+    };
 
     return (
         <>
@@ -683,7 +817,7 @@ export default function UnifiedBarangContent() {
                 @keyframes popIn  { from{opacity:0;transform:scale(0.94) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
                 .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
                 .animate-popIn  { animation: popIn 0.25s cubic-bezier(0.34,1.56,0.64,1); }
-                               .table-scroll { scrollbar-width: thin; scrollbar-color: #d4d4d8 #fafafa; }
+                .table-scroll { scrollbar-width: thin; scrollbar-color: #d4d4d8 #fafafa; }
                 .table-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
                 .table-scroll::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 99px; }
                 .table-scroll::-webkit-scrollbar-track { background: #fafafa; border-radius: 99px; }
@@ -692,30 +826,315 @@ export default function UnifiedBarangContent() {
             <main className="min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8">
                 <div className="max-w-full mx-auto space-y-5">
 
-                    {/* ── FILTER TIPE BARANG ─────────────────────────────── */}
-                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 flex flex-wrap items-center gap-2">
-                        {([["ALL", `Semua (${counts.total})`], ["LAPTOP", `Laptop (${counts.laptop})`], ["AKSESORIS", `Aksesoris (${counts.aksesoris})`]] as const).map(([key, label]) => (
-                            <button key={key} onClick={() => setTipeFilter(key)}
-                                className={`h-9 px-4 rounded-xl text-sm font-semibold transition-all ${tipeFilter === key ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
-                                {label}
-                            </button>
-                        ))}
-                        <div className="flex-1" />
-                        {canCreateLaptop && <button onClick={() => openCreate("LAPTOP")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black transition">+ Laptop</button>}
-                        {canCreateAcc && <button onClick={() => openCreate("AKSESORIS")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-600 to-zinc-700 hover:from-zinc-700 hover:to-zinc-800 transition">+ Aksesori</button>}
-                    </div>
+                    {/* ── CARD FILTER & AKSI ──────────────────────────────── */}
+                    <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-4 sm:p-5 space-y-3.5">
+                        {/* Baris Atas: Tab Tipe Barang & Tombol Tambah */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-100">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {([
+                                    ["ALL", `Semua (${counts.total})`, Layers],
+                                    ["LAPTOP", `Laptop (${counts.laptop})`, LaptopIcon],
+                                    ["AKSESORIS", `Aksesoris (${counts.aksesoris})`, Wrench],
+                                ] as const).map(([key, label, Icon]) => {
+                                    const isActive = tipeFilter === key;
+                                    return (
+                                        <button
+                                            key={key}
+                                            onClick={() => setTipeFilter(key)}
+                                            className={`inline-flex items-center gap-2 h-9 px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-[0.98] ${
+                                                isActive
+                                                    ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/20 ring-1 ring-zinc-900"
+                                                    : "bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 hover:border-zinc-300"
+                                            }`}
+                                        >
+                                            <Icon size={14} className={isActive ? "text-zinc-200" : "text-zinc-400"} />
+                                            {label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
 
-                    {/* ── FILTER LANJUTAN ─────────────────────────────────── */}
-                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-5">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <input className="h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 col-span-2"
-                                placeholder="Cari nama, brand, spek, SN..." value={search} onChange={e => setSearch(e.target.value)} />
-                            <select className="h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
-                                <option value="">Semua Kategori</option>
-                                {filterCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                            <button onClick={resetFilter} disabled={!hasFilter} className="h-9 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 disabled:opacity-40 transition">Reset</button>
+                            {/* Tombol Tambah */}
+                            <div className="flex items-center gap-2">
+                                {canCreateLaptop && (
+                                    <button
+                                        onClick={() => openCreate("LAPTOP")}
+                                        className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+                                    >
+                                        <Plus size={14} />
+                                        <span>Laptop</span>
+                                    </button>
+                                )}
+                                {canCreateAcc && (
+                                    <button
+                                        onClick={() => openCreate("AKSESORIS")}
+                                        className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+                                    >
+                                        <Plus size={14} />
+                                        <span>Aksesori</span>
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setCategoryModalOpen(true)}
+                                    className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/80 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+                                    title="Buat Kategori Baru"
+                                >
+                                    <Plus size={14} />
+                                    <span>Kategori</span>
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Baris Filter 1: Input Search, Search SN, Status, Brand, & Reset */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5">
+                            {/* Input Pencarian Nama/Spek */}
+                            <div className="relative lg:col-span-4">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    placeholder="Cari nama, brand, CPU, spek..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="w-full h-9 pl-8.5 pr-7 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 text-zinc-900 placeholder:text-zinc-400 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all"
+                                />
+                                {search && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearch("")}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-zinc-400 hover:text-zinc-600 rounded"
+                                    >
+                                        <X size={13} />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Input Pencarian SN */}
+                            <div className="relative lg:col-span-3">
+                                <input
+                                    type="text"
+                                    placeholder="Cari Serial Number (SN)..."
+                                    value={filterSN}
+                                    onChange={(e) => setFilterSN(e.target.value)}
+                                    className="w-full h-9 px-3 pr-7 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 text-zinc-900 placeholder:text-zinc-400 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all"
+                                />
+                                {filterSN && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setFilterSN("")}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-zinc-400 hover:text-zinc-600 rounded"
+                                    >
+                                        <X size={13} />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Filter Status */}
+                            <div className="lg:col-span-2">
+                                <select
+                                    value={filterStatus}
+                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
+                                >
+                                    <option value="ALL">Semua Status</option>
+                                    <option value="SIAP_JUAL">Siap Jual</option>
+                                    <option value="BELUM_SIAP">Belum Siap</option>
+                                    <option value="SERVICE">Service</option>
+                                    <option value="RESERVED">Dipesan (DP)</option>
+                                    <option value="HELD">Diambil Dulu</option>
+                                    <option value="PACKING">Packing</option>
+                                    <option value="TERSEDIA">Stok Ada (&gt;0)</option>
+                                    <option value="HABIS">Stok Habis (0)</option>
+                                </select>
+                            </div>
+
+                            {/* Filter Brand */}
+                            <div className="lg:col-span-2">
+                                <select
+                                    value={filterBrand}
+                                    onChange={(e) => setFilterBrand(e.target.value)}
+                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
+                                >
+                                    {uniqueBrands.map((b) => (
+                                        <option key={b} value={b}>
+                                            {b === "ALL" ? "Semua Brand" : b}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Tombol Reset */}
+                            <div className="lg:col-span-1 flex items-center">
+                                <button
+                                    onClick={resetFilter}
+                                    disabled={!hasFilter}
+                                    className={`w-full inline-flex items-center justify-center gap-1 h-9 px-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                                        hasFilter
+                                            ? "bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 hover:border-red-300 active:scale-95 shadow-xs cursor-pointer"
+                                            : "bg-zinc-100/70 border border-zinc-200/50 text-zinc-400 cursor-not-allowed opacity-60"
+                                    }`}
+                                    title={hasFilter ? "Reset semua filter" : "Tidak ada filter aktif"}
+                                >
+                                    <RotateCcw size={12} />
+                                    <span>Reset</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Baris Filter 2: Filter Kategori, RAM, Rentang Harga, Urutan, Audit */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                            {/* Filter Kategori */}
+                            <div className="relative">
+                                <select
+                                    value={kategoriFilter}
+                                    onChange={(e) => setKategoriFilter(e.target.value)}
+                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
+                                >
+                                    <option value="">Semua Kategori</option>
+                                    {filterCategories.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Filter RAM */}
+                            <div>
+                                <select
+                                    value={filterRam}
+                                    onChange={(e) => setFilterRam(e.target.value)}
+                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
+                                >
+                                    {uniqueRams.map((r) => (
+                                        <option key={r} value={r}>
+                                            {r === "ALL" ? "Semua RAM" : `RAM ${r}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Filter Rentang Harga */}
+                            <div>
+                                <select
+                                    value={filterPriceRange}
+                                    onChange={(e) => setFilterPriceRange(e.target.value)}
+                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
+                                >
+                                    <option value="ALL">Semua Harga</option>
+                                    <option value="0-2">&lt; Rp 2 jt</option>
+                                    <option value="2-3">Rp 2 jt – 3 jt</option>
+                                    <option value="3-5">Rp 3 jt – 5 jt</option>
+                                    <option value="5-8">Rp 5 jt – 8 jt</option>
+                                    <option value="8+">&ge; Rp 8 jt</option>
+                                </select>
+                            </div>
+
+                            {/* Urutan / Sort */}
+                            <div>
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value)}
+                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
+                                >
+                                    <option value="DEFAULT">Urutan Default</option>
+                                    <option value="AZ">Nama: A → Z</option>
+                                    <option value="ZA">Nama: Z → A</option>
+                                    <option value="PRICE_ASC">Harga Jual: Rendah → Tinggi</option>
+                                    <option value="PRICE_DESC">Harga Jual: Tinggi → Rendah</option>
+                                    {canSeePrivate && <option value="MODAL_ASC">Modal: Rendah → Tinggi</option>}
+                                    {canSeePrivate && <option value="MODAL_DESC">Modal: Tinggi → Rendah</option>}
+                                    <option value="STOK_DESC">Stok: Terbanyak</option>
+                                    <option value="STOK_ASC">Stok: Tersedikit</option>
+                                    <option value="DATE_DESC">Tanggal: Terbaru</option>
+                                    <option value="DATE_ASC">Tanggal: Terlama</option>
+                                </select>
+                            </div>
+
+                            {/* Filter Audit */}
+                            <div>
+                                <select
+                                    value={filterAudit}
+                                    onChange={(e) => setFilterAudit(e.target.value)}
+                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
+                                >
+                                    <option value="">Semua Audit</option>
+                                    <option value="audited">Sudah Diaudit</option>
+                                    <option value="unaudited">Belum Diaudit</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Indikator Filter Aktif & Total Hasil */}
+                        {hasFilter && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 text-[11px] text-zinc-500 border-t border-zinc-100">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-semibold text-zinc-700">Filter Aktif:</span>
+                                    {tipeFilter !== "ALL" && (
+                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
+                                            Tipe: {tipeFilter === "LAPTOP" ? "Laptop" : "Aksesoris"}
+                                            <button onClick={() => setTipeFilter("ALL")} className="hover:text-zinc-900"><X size={11} /></button>
+                                        </span>
+                                    )}
+                                    {search && (
+                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
+                                            Cari: &ldquo;{search}&rdquo;
+                                            <button onClick={() => setSearch("")} className="hover:text-zinc-900"><X size={11} /></button>
+                                        </span>
+                                    )}
+                                    {filterSN && (
+                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
+                                            SN: &ldquo;{filterSN}&rdquo;
+                                            <button onClick={() => setFilterSN("")} className="hover:text-zinc-900"><X size={11} /></button>
+                                        </span>
+                                    )}
+                                    {filterStatus !== "ALL" && (
+                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
+                                            Status: {filterStatus}
+                                            <button onClick={() => setFilterStatus("ALL")} className="hover:text-zinc-900"><X size={11} /></button>
+                                        </span>
+                                    )}
+                                    {filterBrand !== "ALL" && (
+                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
+                                            Brand: {filterBrand}
+                                            <button onClick={() => setFilterBrand("ALL")} className="hover:text-zinc-900"><X size={11} /></button>
+                                        </span>
+                                    )}
+                                    {kategoriFilter && (
+                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
+                                            Kategori: {categories.find(c => c.id === kategoriFilter)?.name || "Kategori"}
+                                            <button onClick={() => setKategoriFilter("")} className="hover:text-zinc-900"><X size={11} /></button>
+                                        </span>
+                                    )}
+                                    {filterRam !== "ALL" && (
+                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
+                                            RAM: {filterRam}
+                                            <button onClick={() => setFilterRam("ALL")} className="hover:text-zinc-900"><X size={11} /></button>
+                                        </span>
+                                    )}
+                                    {filterPriceRange !== "ALL" && (
+                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
+                                            Harga: {filterPriceRange}
+                                            <button onClick={() => setFilterPriceRange("ALL")} className="hover:text-zinc-900"><X size={11} /></button>
+                                        </span>
+                                    )}
+                                    {filterAudit && (
+                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
+                                            Audit: {filterAudit === "audited" ? "Sudah Diaudit" : "Belum Diaudit"}
+                                            <button onClick={() => setFilterAudit("")} className="hover:text-zinc-900"><X size={11} /></button>
+                                        </span>
+                                    )}
+                                    {sortBy !== "DEFAULT" && (
+                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
+                                            Sort: {sortBy}
+                                            <button onClick={() => setSortBy("DEFAULT")} className="hover:text-zinc-900"><X size={11} /></button>
+                                        </span>
+                                    )}
+                                </div>
+                                <span className="font-medium text-zinc-400 shrink-0">
+                                    Ditemukan <strong className="text-zinc-800">{filteredRows.length}</strong> barang
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* ── TABEL / DAFTAR BARANG ────────────────────────────── */}
@@ -1142,7 +1561,152 @@ export default function UnifiedBarangContent() {
                     }}
                 />
             )}
+
+            {/* ── Pop-up Buat Kategori Cepat ──────────────────────────── */}
+            <CategoryQuickModal
+                isOpen={categoryModalOpen}
+                onClose={() => setCategoryModalOpen(false)}
+                onSuccess={() => {
+                    fetchCategories();
+                }}
+            />
         </>
+    );
+}
+
+// ── Pop-up Form Tambah Kategori Cepat ───────────────────────────────────────
+function CategoryQuickModal({
+    isOpen,
+    onClose,
+    onSuccess,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}) {
+    const [name, setName] = useState("");
+    const [description, setDescription] = useState("");
+    const [type, setType] = useState<"LAPTOP" | "AKSESORIS">("AKSESORIS");
+    const [submitting, setSubmitting] = useState(false);
+
+    if (!isOpen) return null;
+
+    const handleSubmit = async () => {
+        if (!name.trim()) return toast.error("Nama kategori wajib diisi");
+
+        setSubmitting(true);
+        try {
+            const res = await fetch("/api/categories", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: name.trim(), description: description.trim() || null, type }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan kategori");
+            toast.success(`Kategori "${name.trim()}" berhasil dibuat!`);
+            setName("");
+            setDescription("");
+            onSuccess();
+            onClose();
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Terjadi kesalahan");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div
+            className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4 animate-fadeIn"
+            onClick={onClose}
+        >
+            <div
+                className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-popIn"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 bg-white">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center">
+                            <Layers size={16} />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-zinc-900">Tambah Kategori Baru</h3>
+                            <p className="text-[11px] text-zinc-400">Buat kategori produk langsung tanpa pindah tab</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition">
+                        <X size={16} />
+                    </button>
+                </div>
+
+                <div className="p-5 space-y-4">
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                            Nama Kategori <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            placeholder="Contoh: RAM PC4, SSD NVMe, Adapter Charger, dll..."
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                            autoFocus
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                            Tipe Kategori
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {(["LAPTOP", "AKSESORIS"] as const).map(t => (
+                                <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => setType(t)}
+                                    className={`py-2 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+                                        type === t
+                                            ? "border-zinc-900 bg-zinc-900 text-white shadow-sm"
+                                            : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                                    }`}
+                                >
+                                    {t === "LAPTOP" ? "Laptop / Unit" : "Aksesoris / Sparepart"}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="mt-1.5 text-[11px] text-zinc-400">
+                            Menentukan kategori ini muncul pada kelompok Laptop atau Aksesoris.
+                        </p>
+                    </div>
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                            Deskripsi (Opsional)
+                        </label>
+                        <textarea
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            rows={2}
+                            placeholder="Keterangan singkat tentang kategori ini…"
+                            className="w-full px-3.5 py-2 rounded-xl border border-zinc-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex gap-2 px-5 py-4 border-t border-zinc-100 bg-zinc-50/50">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 py-2.5 rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-600 hover:bg-zinc-100 transition cursor-pointer"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={submitting}
+                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black text-white text-sm font-semibold transition disabled:opacity-60 active:scale-[0.98] shadow-sm cursor-pointer"
+                    >
+                        {submitting ? "Menyimpan…" : "Simpan Kategori"}
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }
 
