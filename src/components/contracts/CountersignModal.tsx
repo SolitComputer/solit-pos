@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, FileSignature, Loader2 } from "lucide-react";
+import { X, FileSignature, Loader2, Clock } from "lucide-react";
 import SignaturePad from "./SignaturePad";
+import { CareerLevelBadge } from "./CareerLevelBadge";
 
 interface PendingContract {
   id: string;
@@ -61,16 +62,18 @@ export default function CountersignModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden">
+      <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
         <div className="px-6 py-5 flex items-start justify-between flex-shrink-0" style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-          <div className="flex items-center gap-2.5">
-            <FileSignature className="w-5 h-5 text-white" />
-            <div>
-              <p className="font-bold text-white text-sm">Tanda Tangani Kontrak</p>
-              <p className="text-xs text-white/60 mt-0.5">{contract.users?.name}</p>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.1)" }}>
+              <FileSignature className="w-4 h-4 text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-bold text-white text-sm truncate">Tanda Tangani Kontrak</p>
+              <p className="text-xs text-white/50 mt-0.5 truncate">{contract.users?.name}</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition">
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/15 transition flex-shrink-0">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -78,7 +81,16 @@ export default function CountersignModal({
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
           {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-4 py-3 rounded-xl">{error}</div>}
 
-          <p className="text-sm font-bold text-gray-800">{contract.title}</p>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm font-bold text-gray-800">{contract.title}</p>
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+              style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}
+            >
+              <Clock className="w-2.5 h-2.5" /> Menunggu TTD Kamu
+            </span>
+          </div>
+          {contract.career_level && <CareerLevelBadge level={contract.career_level} />}
           {(contract.valid_from || contract.valid_until) && (
             <p className="text-[11px] text-gray-400">Masa berlaku: {contract.valid_from ?? "—"} s/d {contract.valid_until ?? "tanpa batas"}</p>
           )}
@@ -90,7 +102,7 @@ export default function CountersignModal({
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">Tanda Tangan Karyawan</p>
             {contract.user_signature_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={contract.user_signature_url} alt="Tanda tangan karyawan" className="h-16 border border-gray-200 rounded-lg bg-white px-3" />
+              <img src={contract.user_signature_url} alt="Tanda tangan karyawan" className="h-16 border border-gray-200 rounded-xl bg-white px-3" />
             ) : (
               <p className="text-xs text-gray-300">—</p>
             )}

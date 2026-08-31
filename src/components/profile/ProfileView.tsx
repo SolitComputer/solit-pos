@@ -9,6 +9,7 @@ import SongPickerPanel from "@/components/social/song/SongPickerPanel";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { ContractBadge } from "@/components/contracts/ContractBadge";
 import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
+import ContractInfoModal from "@/components/contracts/ContractInfoModal";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
     Loader2, Pencil, Check, X, Music, Play, Pause,
@@ -72,6 +73,10 @@ function noteTimeLeft(expiresAtIso: string): string {
     const minutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
     return `${minutes} menit lagi`;
 }
+function daysUntilDate(dateStr: string): number {
+    const todayWIB = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    return Math.ceil((new Date(dateStr).getTime() - new Date(todayWIB).getTime()) / 86400000);
+}
 
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
     useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
@@ -119,7 +124,14 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [showSongPicker, setShowSongPicker] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
 
-    const [contractInfo, setContractInfo] = useState<{ status: string; valid_until: string | null; career_level: string | null } | null>(null);
+    const [contractInfo, setContractInfo] = useState<{
+        id: string; title: string; content: string; status: string;
+        valid_from: string | null; valid_until: string | null; career_level: string | null;
+        user_signature_url: string | null; user_signed_at: string | null;
+        admin_signature_url: string | null; admin_signed_at: string | null;
+        admin?: { name: string } | null;
+    } | null>(null);
+    const [showContractModal, setShowContractModal] = useState(false);
 
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
@@ -175,7 +187,16 @@ export default function ProfileView({ userId }: { userId: string }) {
                 .then((r) => r.json())
                 .then((d) => {
                     if (d.success && d.gate_enabled !== false) {
-                        setContractInfo({ status: d.contract_status ?? "NONE", valid_until: d.valid_until ?? null, career_level: d.career_level ?? null });
+                        setContractInfo(
+                            d.contract
+                                ? { ...d.contract, status: d.contract_status ?? d.contract.status }
+                                : {
+                                    id: "", title: "", content: "", status: d.contract_status ?? "NONE",
+                                    valid_from: null, valid_until: null, career_level: d.career_level ?? null,
+                                    user_signature_url: null, user_signed_at: null,
+                                    admin_signature_url: null, admin_signed_at: null, admin: null,
+                                }
+                        );
                     }
                 })
                 .catch(() => { });
@@ -185,7 +206,16 @@ export default function ProfileView({ userId }: { userId: string }) {
                 .then((d) => {
                     if (d.success) {
                         const latest = (d.data || [])[0];
-                        setContractInfo({ status: latest?.status ?? "NONE", valid_until: latest?.valid_until ?? null, career_level: latest?.career_level ?? null });
+                        setContractInfo(
+                            latest
+                                ? { ...latest }
+                                : {
+                                    id: "", title: "", content: "", status: "NONE",
+                                    valid_from: null, valid_until: null, career_level: null,
+                                    user_signature_url: null, user_signed_at: null,
+                                    admin_signature_url: null, admin_signed_at: null, admin: null,
+                                }
+                        );
                     }
                 })
                 .catch(() => { });
@@ -677,6 +707,14 @@ export default function ProfileView({ userId }: { userId: string }) {
                 />
             )}
 
+            {showContractModal && contractInfo && (
+                <ContractInfoModal
+                    contract={contractInfo}
+                    userName={profile.name}
+                    onClose={() => setShowContractModal(false)}
+                />
+            )}
+
             <div className="bg-white rounded-3xl overflow-hidden border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                 <div className="relative h-32 sm:h-44 lg:h-56 overflow-hidden"
                     style={{
@@ -888,17 +926,23 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <ContractBadge status={contractInfo.status} validUntil={contractInfo.valid_until} />
                                     {contractInfo.status === "APPROVED" && contractInfo.valid_until && (
-                                        <span className="text-xs text-slate-400">s/d {contractInfo.valid_until}</span>
+                                        <span className="text-xs text-slate-400">
+                                            s/d {contractInfo.valid_until}
+                                            {daysUntilDate(contractInfo.valid_until) >= 0 && ` · ${daysUntilDate(contractInfo.valid_until)} hari lagi`}
+                                        </span>
                                     )}
                                     {contractInfo.status === "APPROVED" && contractInfo.career_level && (
                                         <CareerLevelBadge level={contractInfo.career_level} />
                                     )}
                                 </div>
                             </div>
-                            {isSelf && (
-                                <a href="/contract" className="text-xs font-semibold text-violet-500 hover:text-violet-600">
+                            {contractInfo.id && (
+                                <button
+                                    onClick={() => setShowContractModal(true)}
+                                    className="text-xs font-semibold text-violet-500 hover:text-violet-600"
+                                >
                                     Lihat Detail
-                                </a>
+                                </button>
                             )}
                         </div>
                     )}
