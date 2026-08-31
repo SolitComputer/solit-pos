@@ -70,7 +70,7 @@ const PERIODS = [
 type PeriodKey = (typeof PERIODS)[number]["key"];
 
 // ─── Warna ──────────────────────────────────────────────────────────────────
-const ACCENT = "#4f46e5"; // indigo-600
+const ACCENT = "#52525b"; // zinc-600
 
 const STATUS_COLOR: Record<string, string> = {
   ANTRIAN: "#94a3b8",
@@ -304,10 +304,10 @@ export default function ServiceStatistikPage() {
     <DashboardLayout>
       <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5 p-3 sm:p-6 pb-16">
         {/* ─── HERO HEADER ─── */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-indigo-800 p-5 sm:p-7 shadow-xl shadow-indigo-900/20">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-800 to-black p-5 sm:p-7 shadow-xl shadow-black/20">
           {/* Decorative blobs */}
-          <div className="absolute -top-16 -right-16 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl" />
-          <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-violet-500/15 rounded-full blur-3xl" />
+          <div className="absolute -top-16 -right-16 w-48 h-48 bg-zinc-500/15 rounded-full blur-3xl" />
+          <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-zinc-400/10 rounded-full blur-3xl" />
 
           <div className="relative flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
@@ -349,7 +349,7 @@ export default function ServiceStatistikPage() {
                   onClick={() => setPeriod(p.key)}
                   className={`px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
                     period === p.key
-                      ? "bg-white text-indigo-700 shadow-md"
+                      ? "bg-white text-zinc-900 shadow-md"
                       : "text-white/70 hover:text-white hover:bg-white/10"
                   }`}
                 >
@@ -375,7 +375,7 @@ export default function ServiceStatistikPage() {
               value={totalServis.toString()}
               subtitle="Periode aktif"
               icon={<CheckCircle2 className="w-5 h-5" />}
-              tone="indigo"
+              tone="zinc"
             />
             <StatCard
               label="Teknisi Aktif"
@@ -396,7 +396,7 @@ export default function ServiceStatistikPage() {
               value={topTech ? firstName(topTech.name) : "—"}
               subtitle={topTech ? `${topTech.total} servis` : "Belum ada"}
               icon={<Trophy className="w-5 h-5" />}
-              tone="violet"
+              tone="slate"
             />
           </div>
         )}
@@ -421,7 +421,7 @@ export default function ServiceStatistikPage() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} tickLine={false} axisLine={false} interval={0} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} width={32} />
-                  <Tooltip cursor={{ fill: "#eef2ff" }} content={<CountTooltip unit="servis" />} />
+                  <Tooltip cursor={{ fill: "#f4f4f5" }} content={<CountTooltip unit="servis" />} />
                   <Bar dataKey="total" radius={[8, 8, 0, 0]} maxBarSize={46}>
                     {workloadData.map((_, i) => (
                       <Cell key={i} fill={ACCENT} fillOpacity={1 - i * 0.07} />
@@ -512,7 +512,7 @@ export default function ServiceStatistikPage() {
         ) : (
           <div className="overflow-hidden rounded-2xl border border-gray-200/60 bg-white shadow-sm">
             <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex items-center gap-2">
-              <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+              <span className="w-6 h-6 rounded-lg bg-zinc-100 text-zinc-700 flex items-center justify-center flex-shrink-0">
                 <Trophy className="w-3.5 h-3.5" />
               </span>
               <div className="flex-1 min-w-0">
@@ -542,17 +542,17 @@ export default function ServiceStatistikPage() {
                     <tr
                       key={r.id}
                       onClick={() => setSelected(r)}
-                      className="hover:bg-indigo-50/40 transition-colors cursor-pointer group"
+                      className="hover:bg-zinc-50 transition-colors cursor-pointer group"
                     >
                       <td className="px-4 py-3">
                         <RankBadge idx={idx} />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-white flex items-center justify-center font-black text-[11px] shrink-0 shadow-sm shadow-indigo-500/30">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-white flex items-center justify-center font-black text-[11px] shrink-0 shadow-sm shadow-zinc-900/30">
                             {getInitials(r.name)}
                           </div>
-                          <span className="font-bold text-gray-900 group-hover:text-indigo-700 transition">{r.name}</span>
+                          <span className="font-bold text-gray-900 group-hover:text-zinc-900 transition">{r.name}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center font-black text-gray-900 tabular-nums">
@@ -564,7 +564,7 @@ export default function ServiceStatistikPage() {
                       <td className="px-4 py-3 text-center">
                         <DurCell avg={r.penyelesaianAvgMs} total={r.penyelesaianTotalMs} />
                       </td>
-                      <td className="px-4 py-3 text-center font-black text-indigo-700 tabular-nums">
+                      <td className="px-4 py-3 text-center font-black text-zinc-900 tabular-nums">
                         {formatDuration(r.avgMs)}
                       </td>
                     </tr>
@@ -579,10 +579,10 @@ export default function ServiceStatistikPage() {
                 <button
                   key={r.id}
                   onClick={() => setSelected(r)}
-                  className="w-full text-left px-3 py-3 hover:bg-indigo-50/40 transition-colors flex items-center gap-3"
+                  className="w-full text-left px-3 py-3 hover:bg-zinc-50 transition-colors flex items-center gap-3"
                 >
                   <RankBadge idx={idx} />
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm shadow-indigo-500/30">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-sm shadow-zinc-900/30">
                     {getInitials(r.name)}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -594,7 +594,7 @@ export default function ServiceStatistikPage() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-base font-black text-indigo-600 tabular-nums leading-none">{r.total}</div>
+                    <div className="text-base font-black text-zinc-800 tabular-nums leading-none">{r.total}</div>
                     <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mt-0.5">servis</div>
                   </div>
                 </button>
@@ -614,17 +614,17 @@ export default function ServiceStatistikPage() {
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 const TONE: Record<string, { text: string; gradient: string; ring: string }> = {
-  indigo: { text: "text-indigo-600", gradient: "from-indigo-500 to-indigo-600", ring: "ring-indigo-500/20" },
+  zinc:   { text: "text-zinc-800",   gradient: "from-zinc-700 to-zinc-900",   ring: "ring-zinc-500/20" },
   sky:    { text: "text-sky-600",    gradient: "from-sky-500 to-sky-600",       ring: "ring-sky-500/20" },
   amber:  { text: "text-amber-600",  gradient: "from-amber-500 to-amber-600",   ring: "ring-amber-500/20" },
-  violet: { text: "text-violet-600", gradient: "from-violet-500 to-violet-600", ring: "ring-violet-500/20" },
+  slate:  { text: "text-slate-700",  gradient: "from-slate-500 to-slate-700", ring: "ring-slate-500/20" },
 };
 
 function StatCard({
   label,
   value,
   subtitle,
-  tone = "indigo",
+  tone = "zinc",
   icon,
 }: {
   label: string;
@@ -633,7 +633,7 @@ function StatCard({
   tone?: keyof typeof TONE;
   icon?: React.ReactNode;
 }) {
-  const t = TONE[tone] ?? TONE.indigo;
+  const t = TONE[tone] ?? TONE.zinc;
   return (
     <div className="relative bg-white rounded-2xl border border-gray-200/60 shadow-sm p-3 sm:p-4 overflow-hidden transition hover:shadow-md hover:-translate-y-0.5">
       <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${t.gradient} opacity-[0.07] rounded-full blur-2xl`} />
@@ -680,7 +680,7 @@ function ChartCard({
     <div className={`bg-white rounded-2xl border border-gray-200/60 shadow-sm p-4 ${className}`}>
       <div className="mb-3 flex items-start gap-2">
         {icon && (
-          <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <span className="w-6 h-6 rounded-lg bg-zinc-100 text-zinc-700 flex items-center justify-center flex-shrink-0 mt-0.5">
             {icon}
           </span>
         )}
@@ -761,8 +761,8 @@ function DetailModal({
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
         {/* Header — dengan gradient */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-indigo-700 px-4 sm:px-5 py-4 flex items-center gap-3">
-          <div className="absolute -top-8 -right-8 w-32 h-32 bg-indigo-500/30 rounded-full blur-2xl" />
+        <div className="relative overflow-hidden bg-gradient-to-br from-zinc-900 via-zinc-800 to-black px-4 sm:px-5 py-4 flex items-center gap-3">
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-zinc-500/20 rounded-full blur-2xl" />
           <div className="relative w-11 h-11 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 text-white flex items-center justify-center font-black text-sm shrink-0">
             {getInitials(tech.name)}
           </div>
@@ -807,7 +807,7 @@ function DetailModal({
             tech.orders.map((o) => (
               <div
                 key={o.id}
-                className="rounded-xl border border-gray-200/60 p-3 hover:border-indigo-200 hover:shadow-sm transition-all"
+                className="rounded-xl border border-gray-200/60 p-3 hover:border-zinc-300 hover:shadow-sm transition-all"
               >
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="min-w-0 flex-1">
@@ -833,7 +833,7 @@ function DetailModal({
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 pt-2 border-t border-gray-50 text-[11px]">
                   <span className="text-gray-500 inline-flex items-center gap-1">
-                    <Activity className="w-3 h-3 text-indigo-500" />
+                    <Activity className="w-3 h-3 text-zinc-700" />
                     Pengerjaan: <strong className="text-gray-800">{formatDuration(o.pengerjaanMs)}</strong>
                   </span>
                   <span className="text-gray-500 inline-flex items-center gap-1">

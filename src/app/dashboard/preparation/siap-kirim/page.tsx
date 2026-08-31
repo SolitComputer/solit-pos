@@ -138,8 +138,8 @@ export default function PreparationSiapKirimPage() {
             <main className="min-h-screen bg-gradient-to-b from-[#F7F7F8] to-white p-4 sm:p-6 lg:p-8">
                 {toast && (
                     <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-2 fade-in duration-300">
-                        <div className="bg-white border-2 border-orange-300 rounded-2xl shadow-2xl shadow-orange-900/20 px-5 py-4 flex items-center gap-4 max-w-sm backdrop-blur-sm bg-white/95">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0 animate-bounce shadow-lg shadow-orange-500/30">
+                        <div className="bg-white border-2 border-zinc-300 rounded-2xl shadow-2xl shadow-zinc-900/20 px-5 py-4 flex items-center gap-4 max-w-sm backdrop-blur-sm bg-white/95">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center flex-shrink-0 animate-bounce shadow-lg shadow-zinc-900/30">
                                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" />
                                 </svg>
@@ -159,7 +159,7 @@ export default function PreparationSiapKirimPage() {
 
                 {alarmCount > 0 && (
                     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[90] animate-in slide-in-from-top-2 duration-300">
-                        <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-3 rounded-full shadow-2xl shadow-orange-900/40 flex items-center gap-3">
+                        <div className="bg-gradient-to-r from-zinc-800 to-zinc-900 text-white px-6 py-3 rounded-full shadow-2xl shadow-zinc-900/40 flex items-center gap-3">
                             <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse flex-shrink-0" />
                             <p className="text-sm font-black">{alarmCount} barang siap — pilih metode pengiriman!</p>
                             <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse flex-shrink-0" />
@@ -171,7 +171,7 @@ export default function PreparationSiapKirimPage() {
                     {/* Header */}
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/30 flex-shrink-0">
+                            <div className="w-12 h-12 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-2xl flex items-center justify-center shadow-lg shadow-zinc-900/30 flex-shrink-0">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" />
                                 </svg>
@@ -181,8 +181,8 @@ export default function PreparationSiapKirimPage() {
                                     <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-none">
                                         Siap Dikirim
                                     </h1>
-                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-200">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-zinc-700 bg-zinc-100 px-2.5 py-1 rounded-full border border-zinc-200">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 animate-pulse" />
                                         LIVE
                                     </span>
                                 </div>
@@ -206,7 +206,7 @@ export default function PreparationSiapKirimPage() {
                                 title={soundOn ? "Suara notif aktif" : "Suara notif mati"}
                                 className={`w-10 h-10 flex items-center justify-center rounded-xl border transition ${
                                     soundOn 
-                                        ? "bg-orange-50 border-orange-200 text-orange-600 hover:bg-orange-100" 
+                                        ? "bg-zinc-100 border-zinc-300 text-zinc-800 hover:bg-zinc-200" 
                                         : "bg-gray-100 border-gray-200 text-gray-400 hover:bg-gray-200"
                                 }`}
                             >
@@ -225,24 +225,24 @@ export default function PreparationSiapKirimPage() {
 
                     {/* Summary cards with improved design */}
                     <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-gradient-to-br from-orange-50 to-orange-100/50 border border-orange-200 rounded-2xl p-4 transition hover:shadow-md hover:scale-[1.02] active:scale-95">
+                        <div className="bg-gradient-to-br from-zinc-100 to-zinc-200/50 border border-zinc-300 rounded-2xl p-4 transition hover:shadow-md hover:scale-[1.02] active:scale-95">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" /></svg>
-                                    <span className="text-xs font-bold text-orange-600 uppercase tracking-wide">Menunggu Dispatch</span>
+                                    <svg className="w-5 h-5 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" /></svg>
+                                    <span className="text-xs font-bold text-zinc-700 uppercase tracking-wide">Menunggu Dispatch</span>
                                 </div>
-                                <span className="text-3xl font-black tabular-nums text-orange-700">
+                                <span className="text-3xl font-black tabular-nums text-zinc-900">
                                     {isLoading ? "…" : orders.length}
                                 </span>
                             </div>
                         </div>
-                        <div className="bg-gradient-to-br from-violet-50 to-violet-100/50 border border-violet-200 rounded-2xl p-4 transition hover:shadow-md hover:scale-[1.02] active:scale-95">
+                        <div className="bg-gradient-to-br from-zinc-100 to-zinc-200/50 border border-zinc-300 rounded-2xl p-4 transition hover:shadow-md hover:scale-[1.02] active:scale-95">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                                    <span className="text-xs font-bold text-violet-600 uppercase tracking-wide">Total Unit</span>
+                                    <svg className="w-5 h-5 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                    <span className="text-xs font-bold text-zinc-700 uppercase tracking-wide">Total Unit</span>
                                 </div>
-                                <span className="text-3xl font-black tabular-nums text-violet-700">
+                                <span className="text-3xl font-black tabular-nums text-zinc-900">
                                     {isLoading ? "…" : totalUnits}
                                 </span>
                             </div>
@@ -251,19 +251,19 @@ export default function PreparationSiapKirimPage() {
 
                     {/* Alert banner with better design */}
                     {orders.length > 0 && (
-                        <div className="bg-gradient-to-r from-orange-50 to-orange-100/70 border border-orange-200 rounded-2xl px-5 py-4 flex items-center gap-4 shadow-sm">
-                            <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-orange-500/25">
+                        <div className="bg-gradient-to-r from-zinc-100 to-zinc-200/70 border border-zinc-300 rounded-2xl px-5 py-4 flex items-center gap-4 shadow-sm">
+                            <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-zinc-900/25">
                                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-orange-800">
+                                <p className="text-sm font-bold text-zinc-900">
                                     {orders.length} penyiapan butuh konfirmasi pengiriman
                                 </p>
-                                <p className="text-xs text-orange-600 mt-0.5">
+                                <p className="text-xs text-zinc-600 mt-0.5">
                                     Klik untuk pilih: Diambil langsung, Diantar, atau Kurir
                                 </p>
                             </div>
-                            <svg className="w-5 h-5 text-orange-500 animate-pulse flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            <svg className="w-5 h-5 text-zinc-600 animate-pulse flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         </div>
                     )}
 
@@ -279,7 +279,7 @@ export default function PreparationSiapKirimPage() {
                                 value={search} 
                                 onChange={e => setSearch(e.target.value)} 
                                 placeholder="Cari nomor, customer, WA, SN..."
-                                className="w-full h-11 border border-gray-200 rounded-xl pl-10 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:bg-white transition" 
+                                className="w-full h-11 border border-gray-200 rounded-xl pl-10 pr-4 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-500 focus:bg-white transition" 
                             />
                             {search && (
                                 <button 
@@ -320,7 +320,7 @@ export default function PreparationSiapKirimPage() {
                             {search && (
                                 <button 
                                     onClick={() => setSearch("")}
-                                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-orange-600 hover:text-orange-700 transition"
+                                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-zinc-700 hover:text-zinc-900 transition"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -338,8 +338,8 @@ export default function PreparationSiapKirimPage() {
                                     onClick={() => ackOrder(o.id)}
                                     className={`group block bg-white rounded-2xl border shadow-sm p-5 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${
                                         newIds.has(o.id) || alarmIds.has(o.id)
-                                            ? "border-orange-400 ring-2 ring-orange-200 ring-offset-2"
-                                            : "border-gray-100 hover:border-orange-200"
+                                            ? "border-zinc-500 ring-2 ring-zinc-300 ring-offset-2"
+                                            : "border-gray-100 hover:border-zinc-300"
                                     }`}
                                 >
                                     <div className="flex items-start justify-between gap-3 mb-3">
@@ -348,12 +348,12 @@ export default function PreparationSiapKirimPage() {
                                                 <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-lg">
                                                     {o.order_number}
                                                 </span>
-                                                <span className="inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full border bg-orange-50 text-orange-700 border-orange-200">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                                                <span className="inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full border bg-zinc-100 text-zinc-700 border-zinc-200">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 animate-pulse" />
                                                     Siap Kirim
                                                 </span>
                                                 {newIds.has(o.id) && (
-                                                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-500 text-white animate-pulse">
+                                                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-zinc-800 text-white animate-pulse">
                                                         BARU
                                                     </span>
                                                 )}
@@ -405,11 +405,11 @@ export default function PreparationSiapKirimPage() {
                                         </div>
                                     </div>
 
-                                    <div className="h-11 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center gap-2 text-sm font-bold text-white transition-all duration-200 hover:shadow-lg hover:shadow-orange-500/30 group-hover:scale-[1.02] active:scale-95">
+                                    <div className="h-11 bg-gradient-to-r from-zinc-800 to-zinc-900 rounded-xl flex items-center justify-center gap-2 text-sm font-bold text-white transition-all duration-200 hover:shadow-lg hover:shadow-zinc-900/30 group-hover:scale-[1.02] active:scale-95">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                                         Pilih Metode Pengiriman
                                         <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                         </svg>
                                     </div>
                                 </Link>

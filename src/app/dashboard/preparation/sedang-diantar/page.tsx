@@ -114,7 +114,7 @@ export default function PreparationSedangDiantarPage() {
                     {/* Header */}
                     <div className="space-y-3">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-violet-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/30 flex-shrink-0">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-2xl flex items-center justify-center shadow-lg shadow-zinc-900/30 flex-shrink-0">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="sm:w-5 sm:h-5">
                                     <circle cx="6" cy="19" r="2" />
                                     <circle cx="18" cy="5" r="2" />
@@ -126,8 +126,8 @@ export default function PreparationSedangDiantarPage() {
                                     <h1 className="text-lg sm:text-2xl font-black text-gray-900 tracking-tight leading-none truncate">
                                         Sedang Diantar
                                     </h1>
-                                    <span className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-violet-600 bg-violet-50 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-violet-200 flex-shrink-0">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+                                    <span className="inline-flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-zinc-700 bg-zinc-100 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-zinc-200 flex-shrink-0">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 animate-pulse" />
                                         LIVE
                                     </span>
                                 </div>
@@ -162,13 +162,13 @@ export default function PreparationSedangDiantarPage() {
 
                     {/* Summary Cards */}
                     <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                        <div className="bg-gradient-to-br from-violet-50 to-violet-100/50 border border-violet-200 rounded-2xl p-3 sm:p-4 transition hover:shadow-md hover:scale-[1.02] active:scale-95">
+                        <div className="bg-gradient-to-br from-zinc-100 to-zinc-200/50 border border-zinc-300 rounded-2xl p-3 sm:p-4 transition hover:shadow-md hover:scale-[1.02] active:scale-95">
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                                    <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg>
-                                    <span className="text-[10px] sm:text-xs font-bold text-violet-600 uppercase tracking-wide truncate">Sedang Berjalan</span>
+                                    <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg>
+                                    <span className="text-[10px] sm:text-xs font-bold text-zinc-700 uppercase tracking-wide truncate">Sedang Berjalan</span>
                                 </div>
-                                <span className="text-2xl sm:text-3xl font-black tabular-nums text-violet-700 flex-shrink-0">
+                                <span className="text-2xl sm:text-3xl font-black tabular-nums text-zinc-900 flex-shrink-0">
                                     {isLoading ? "…" : orders.length}
                                 </span>
                             </div>
@@ -226,7 +226,7 @@ export default function PreparationSedangDiantarPage() {
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 placeholder="Cari customer, pengantar, alamat, no order..."
-                                className="w-full h-10 sm:h-11 border border-gray-200 rounded-xl pl-9 sm:pl-10 pr-9 sm:pr-4 text-xs sm:text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 focus:bg-white transition"
+                                className="w-full h-10 sm:h-11 border border-gray-200 rounded-xl pl-9 sm:pl-10 pr-9 sm:pr-4 text-xs sm:text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-500 focus:bg-white transition"
                             />
                             {search && (
                                 <button
@@ -268,7 +268,7 @@ export default function PreparationSedangDiantarPage() {
                             {search && (
                                 <button
                                     onClick={() => setSearch("")}
-                                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-violet-600 hover:text-violet-700 transition"
+                                    className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-zinc-700 hover:text-zinc-900 transition"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -289,7 +289,7 @@ export default function PreparationSedangDiantarPage() {
                                         href={`/dashboard/preparation/${o.id}`}
                                         className={`group block bg-white rounded-2xl border shadow-sm p-4 sm:p-5 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${live.tone === "bad"
                                             ? "border-red-300 ring-2 ring-red-200 ring-offset-2"
-                                            : "border-gray-100 hover:border-violet-200"
+                                            : "border-gray-100 hover:border-zinc-300"
                                             }`}
                                     >
                                         <div className="flex items-start justify-between gap-3 mb-3">
@@ -298,7 +298,7 @@ export default function PreparationSedangDiantarPage() {
                                                     <span className="font-mono text-[11px] sm:text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-lg">
                                                         {o.order_number}
                                                     </span>
-                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full text-white animate-pulse ${isReturn ? "bg-orange-500" : "bg-violet-500"
+                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full text-white animate-pulse ${isReturn ? "bg-orange-500" : "bg-zinc-800"
                                                         }`}>
                                                         {isReturn ? "PULANG" : "DIANTAR"}
                                                     </span>

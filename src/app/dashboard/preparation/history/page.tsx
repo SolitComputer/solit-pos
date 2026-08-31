@@ -180,7 +180,7 @@ export default function PreparationHistoryPage() {
 
   const SUMMARY = [
     { label: "Total Trip", value: totals.trips, sub: `${totals.completed} selesai`, color: "from-blue-50 to-blue-100/50 border-blue-200 text-blue-700", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg> },
-    { label: "Total Jarak", value: fmtDistance(totals.distance), sub: "akumulasi", color: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> },
+    { label: "Total Jarak", value: fmtDistance(totals.distance), sub: "akumulasi", color: "from-zinc-100 to-zinc-200/50 border-zinc-300 text-zinc-800", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> },
     { label: "Total Waktu Antar", value: fmtDur(totals.antar), sub: "berangkat→sampai", color: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
     { label: "Total Berhenti", value: totals.stops, sub: "≥45 dtk", color: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> },
   ];
@@ -352,7 +352,7 @@ export default function PreparationHistoryPage() {
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
                       i === 0 
                         ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white" 
-                        : "bg-gradient-to-br from-violet-500 to-violet-600 text-white"
+                        : "bg-gradient-to-br from-zinc-700 to-zinc-900 text-white"
                     }`}>
                        {i === 0 ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-amber-400"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg> : i === 1 ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-slate-400"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg> : i === 2 ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-amber-600"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg> : d.name.charAt(0).toUpperCase()}
                     </div>
@@ -360,7 +360,7 @@ export default function PreparationHistoryPage() {
                       <p className="text-sm font-bold text-gray-800 truncate">{d.name}</p>
                       <div className="flex flex-wrap gap-1.5 mt-1 text-[10px] font-bold">
                         <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg">{d.trips} trip</span>
-                        <span className="bg-violet-50 text-violet-700 px-2 py-0.5 rounded-lg">{fmtDistance(d.distance)}</span>
+                        <span className="bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg">{fmtDistance(d.distance)}</span>
                         <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg">{fmtDur(d.antar)}</span>
                         <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-lg">{d.stops}× berhenti</span>
                       </div>
@@ -421,7 +421,7 @@ export default function PreparationHistoryPage() {
                             {t.order_number}
                           </span>
                           {inProgress ? (
-                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-violet-500 text-white animate-pulse">
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-zinc-800 text-white animate-pulse">
                               BERLANGSUNG
                             </span>
                           ) : (
@@ -469,9 +469,9 @@ export default function PreparationHistoryPage() {
                         <p className="text-[9px] text-blue-500 font-bold uppercase">Avg</p>
                         <p className="text-xs font-black text-blue-700">{t.avg_speed_kmh != null ? `${Math.round(t.avg_speed_kmh)}` : "—"}</p>
                       </div>
-                      <div className="bg-gradient-to-br from-violet-50 to-violet-100/50 rounded-xl py-2 px-2 text-center group-hover:shadow-sm transition">
-                        <p className="text-[9px] text-violet-500 font-bold uppercase">Max</p>
-                        <p className="text-xs font-black text-violet-700">{t.max_speed_kmh != null ? `${Math.round(t.max_speed_kmh)}` : "—"}</p>
+                      <div className="bg-gradient-to-br from-zinc-100 to-zinc-200/50 rounded-xl py-2 px-2 text-center group-hover:shadow-sm transition">
+                        <p className="text-[9px] text-zinc-600 font-bold uppercase">Max</p>
+                        <p className="text-xs font-black text-zinc-800">{t.max_speed_kmh != null ? `${Math.round(t.max_speed_kmh)}` : "—"}</p>
                       </div>
                       <div className={`rounded-xl py-2 px-2 text-center group-hover:shadow-sm transition ${
                         t.stops > 0 ? "bg-gradient-to-br from-amber-50 to-amber-100/50" : "bg-gray-50"
