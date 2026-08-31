@@ -68,6 +68,7 @@ export const GET = withAuth(async (req, _ctx, user) => {
       { data: journalLogs },
       { data: cashflowAudits },
       { data: todos },
+      { data: todoItems },
       { data: missions }
     ] = await Promise.all([
       // Sales: transactions
@@ -140,13 +141,22 @@ export const GET = withAuth(async (req, _ctx, user) => {
         .lte("audited_at", endIso),
 
       // Programmer: todos yang DISELESAIKAN (completed_by + completed_at,
-      // diisi PATCH /api/todos/[id] saat is_done false → true) — 3 poin/tugas.
+      // diisi PATCH /api/todos/[id] saat is_done false → true) — dipakai
+      // sebagai FALLBACK untuk tugas yang tidak punya sub-task sama sekali.
       supabaseAdmin
         .from("todos")
         .select("id, completed_by, completed_at")
         .not("completed_by", "is", null)
         .gte("completed_at", startIso)
         .lte("completed_at", endIso),
+
+      // Programmer: todo_items (sub-task) — sumber utama scoring. Diambil
+      // TANPA filter tanggal supaya kita tahu total sub-task tiap tugas
+      // (buat nentuin tugas itu "punya sub-task" atau tidak) — filter
+      // periode untuk completed_at dilakukan belakangan di JS.
+      supabaseAdmin
+        .from("todo_items")
+        .select("id, todo_id, completed_by, completed_at"),
 
       // Missions: (all)
       supabaseAdmin
@@ -156,6 +166,15 @@ export const GET = withAuth(async (req, _ctx, user) => {
         .lte("created_at", endIso)
         .eq("status", "DONE")
     ]);
+
+    // Programmer: peta jumlah sub-task per tugas — dipakai buat nentuin
+    // tugas mana yang "punya sub-task" (poinnya dihitung dari situ) vs
+    // yang "tidak punya sub-task" (fallback ke completed_by tugas itu
+    // sendiri). Dihitung SEKALI di luar loop per-user, bukan berulang.
+    const itemCountByTodoId = new Map<string, number>();
+    (todoItems ?? []).forEach((it: any) => {
+      itemCountByTodoId.set(it.todo_id, (itemCountByTodoId.get(it.todo_id) ?? 0) + 1);
+    });
 
     // Calculate score per user
     const leaderboard = usersData.map((u) => {
@@ -325,13 +344,29 @@ export const GET = withAuth(async (req, _ctx, user) => {
         metrics.push({ label: "Audit", value: uAuditTotal, unit: "aksi" });
       }
 
-      // PROGRAMMER — 3 poin per tugas To-Do yang DISELESAIKAN. Role sistem
-      // ke-4 akun ini ADMIN, makanya dicek lewat PROGRAMMER_USER_IDS
+      // PROGRAMMER — 3 poin per SUB-TASK yang diselesaikan (todo_items).
+      // Kalau sebuah tugas SAMA SEKALI tidak punya sub-task, dihitung dari
+      // penyelesaian TUGAS-nya langsung (todos.completed_by) sebagai
+      // fallback — supaya tugas simpel tanpa checklist tetap dapat poin.
+      // Tugas yang PUNYA sub-task TIDAK lagi dihitung dari completed_by di
+      // level tugas itu sendiri, biar tidak dobel-hitung. Role sistem ke-4
+      // akun Programmer ADMIN, makanya dicek lewat PROGRAMMER_USER_IDS
       // (array), bukan hasRole("PROGRAMMER").
-      const uTodos = (todos ?? []).filter((t: any) => t.completed_by === uid);
+      const uSubtaskCompletions = (todoItems ?? []).filter((it: any) => {
+        if (it.completed_by !== uid || !it.completed_at) return false;
+        const ms = new Date(it.completed_at).getTime();
+        return ms >= startDate.getTime() && ms <= endDate.getTime();
+      });
+      const uTodoFallbackCompletions = (todos ?? []).filter((t: any) => {
+        if (t.completed_by !== uid || !t.completed_at) return false;
+        if ((itemCountByTodoId.get(t.id) ?? 0) > 0) return false; // punya sub-task → sudah dihitung di atas
+        const ms = new Date(t.completed_at).getTime();
+        return ms >= startDate.getTime() && ms <= endDate.getTime();
+      });
+      const uTodoUnits = uSubtaskCompletions.length + uTodoFallbackCompletions.length;
       if (hasRole("PROGRAMMER") || PROGRAMMER_USER_IDS.includes(uid)) {
-        score += uTodos.length * 3;
-        metrics.push({ label: "Tugas Selesai", value: uTodos.length, unit: "tugas" });
+        score += uTodoUnits * 3;
+        metrics.push({ label: "Tugas Selesai", value: uTodoUnits, unit: "item" });
       }
 
       // MISSIONS — DINONAKTIFKAN SEMENTARA (biar leaderboard "Pekerjaan" fokus Purchasing dulu).
