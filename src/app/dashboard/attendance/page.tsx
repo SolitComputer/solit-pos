@@ -2528,6 +2528,58 @@ function HolidayWorkDetailModal({ name, dates, monthLabel, onClose }: {
     );
 }
 
+// ✅ NEW — detail tanggal "Pending Absensi" (klik badge oranye di tab Ringkasan)
+function PendingAttendanceDetailModal({ name, dates, monthLabel, onClose }: {
+    name: string; dates: string[]; monthLabel: string; onClose: () => void;
+}) {
+    const fmt = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" });
+    const sorted = [...dates].sort();
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden animate-scaleIn">
+                <div className="bg-gradient-to-r from-orange-500 to-amber-600 px-6 py-5 flex items-start justify-between flex-shrink-0">
+                    <div>
+                        <p className="font-bold text-white text-base">Detail Pending Absensi</p>
+                        <p className="text-xs text-white/70 mt-1">{name} · {monthLabel}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/60 hover:text-white hover:bg-white/20 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="px-6 pt-4 flex-shrink-0">
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-[11px] text-orange-700 leading-relaxed">
+                        Karyawan ini sudah absen masuk hari ini, tapi belum absen pulang. Belum dihitung <strong>tepat waktu</strong> dan belum masuk ke persentase kehadiran. Kalau sampai pukul <strong>04:00 WIB besok</strong> masih belum absen pulang, statusnya otomatis berubah jadi <strong>Tidak Hadir</strong> dengan alasan "Tidak Absen Pulang".
+                    </div>
+                </div>
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-2">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-3">
+                        Tanggal pending ({sorted.length})
+                    </p>
+                    {sorted.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Tidak ada data</p>
+                    ) : (
+                        sorted.map(d => (
+                            <div key={d} className="flex items-center justify-between gap-3 bg-orange-50/60 border border-orange-100 rounded-xl px-3.5 py-3">
+                                <p className="text-sm font-bold text-gray-800">{fmt(d)}</p>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border bg-orange-100 text-orange-700 border-orange-200 flex-shrink-0">
+                                    Pending
+                                </span>
+                            </div>
+                        ))
+                    )}
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button onClick={onClose} className="w-full h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 type SalarySlip = {
     id: string;
     user_id: string;
@@ -3392,6 +3444,7 @@ export default function AttendanceDashboardPage() {
     const [attendanceSummaryDetail, setAttendanceSummaryDetail] = useState<AttendanceSummaryDetail | null>(null);
     const [leaveDetail, setLeaveDetail] = useState<{ name: string; dates: string[] } | null>(null);
     const [holidayWorkDetail, setHolidayWorkDetail] = useState<{ name: string; dates: string[] } | null>(null);
+    const [pendingDetail, setPendingDetail] = useState<{ name: string; dates: string[] } | null>(null); // ✅ NEW
     const [absentPopupMode, setAbsentPopupMode] = useState<"karyawan" | "pkl" | null>(null);
     const [pklFilterMode, setPklFilterMode] = useState(false);
     const [calendarPklFilter, setCalendarPklFilter] = useState<"all" | "karyawan" | "pkl">("karyawan");
@@ -4092,14 +4145,15 @@ export default function AttendanceDashboardPage() {
             remainingDays: number; userId: string;
             absences: AbsenceItem[]; offDates: string[];
             holidayWorkDates: string[];
+            pending: number; pendingDates: string[]; // ✅ NEW — belum absen pulang (belum "tepat waktu", bukan "tidak hadir")
         };
 
         const todayWIB = getWIBToday();
         const isCurrentMonth = thisMonthKey === todayWIB.slice(0, 7);
         const dim = new Date(calYear, calMonth + 1, 0).getDate();
 
-        const effByName: Record<string, Record<string, "PRESENT" | "LATE" | "ABSENT">> = {};
-        const setEff = (name: string, date: string, status: "PRESENT" | "LATE" | "ABSENT") => {
+        const effByName: Record<string, Record<string, "PRESENT" | "LATE" | "ABSENT" | "PENDING">> = {};
+        const setEff = (name: string, date: string, status: "PRESENT" | "LATE" | "ABSENT" | "PENDING") => {
             if (!effByName[name]) effByName[name] = {};
             effByName[name][date] = status;
         };
@@ -4113,17 +4167,24 @@ export default function AttendanceDashboardPage() {
             if (a.source !== "AUTO") return;
             const dk = toWIBDateKey(a.check_in_time || a.created_at);
             const hasCheckout = !!checkoutTimes[`${a.user_id}_${dk}`];
-            // ✅ FIX: penalti "tidak absen pulang" cuma berlaku untuk tanggal yang SUDAH LEWAT
-            // (dk < todayWIB). Untuk HARI INI, jam kerja mungkin belum selesai — jadi jangan
-            // langsung dianggap ABSENT, biarkan status PRESENT/LATE dari absen masuk tetap dipakai.
+            // ✅ FIX: penalti "Tidak Hadir" karena tidak absen pulang cuma berlaku
+            // untuk tanggal yang SUDAH LEWAT (dk < todayWIB) — dihitung setelah
+            // cutoff jam 04:00 WIB hari berikutnya.
             const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && dk < todayWIB && !hasCheckout;
+            // ✅ NEW — HARI INI: sudah absen masuk (present/late) tapi belum absen
+            // pulang → "Pending Absensi". Belum final, jadi belum dihitung tepat
+            // waktu ataupun tidak hadir sampai jam kerja hari ini berakhir (cutoff
+            // 04:00 WIB besok).
+            const isPendingToday = dk >= CHECKOUT_REQUIRED_FROM && dk === todayWIB && !hasCheckout
+                && (a.displayStatus === "PRESENT" || a.displayStatus === "LATE");
             if (noCheckoutPenalty) {
                 if (!noCheckoutByName[a.user_name]) noCheckoutByName[a.user_name] = new Set();
                 noCheckoutByName[a.user_name].add(dk);
             }
             setEff(a.user_name, dk,
                 noCheckoutPenalty ? "ABSENT"
-                    : a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "ABSENT");
+                    : isPendingToday ? "PENDING"
+                        : a.displayStatus === "PRESENT" ? "PRESENT" : a.displayStatus === "LATE" ? "LATE" : "ABSENT");
         });
         const manualByName: Record<string, Record<string, ManualAttendance>> = {};
         manualRecords.forEach(mr => {
@@ -4139,6 +4200,11 @@ export default function AttendanceDashboardPage() {
                 && mr.attendance_date >= CHECKOUT_REQUIRED_FROM
                 && mr.attendance_date < todayWIB
                 && !hasCheckout;
+            // ✅ NEW — sama seperti absen otomatis: HARI INI belum absen pulang → pending
+            const isPendingToday = isPresentOrLate
+                && mr.attendance_date >= CHECKOUT_REQUIRED_FROM
+                && mr.attendance_date === todayWIB
+                && !hasCheckout;
 
             if (noCheckoutPenalty) {
                 if (!noCheckoutByName[name]) noCheckoutByName[name] = new Set();
@@ -4147,7 +4213,8 @@ export default function AttendanceDashboardPage() {
 
             setEff(name, mr.attendance_date,
                 noCheckoutPenalty ? "ABSENT"
-                    : mr.status === "PRESENT" ? "PRESENT" : mr.status === "LATE" ? "LATE" : "ABSENT");
+                    : isPendingToday ? "PENDING"
+                        : mr.status === "PRESENT" ? "PRESENT" : mr.status === "LATE" ? "LATE" : "ABSENT");
         });
 
         const names = new Set<string>();
@@ -4194,11 +4261,12 @@ export default function AttendanceDashboardPage() {
                 else userLeaveSet.delete(date);
             });
 
-            let present = 0, late = 0, score = 0, leave = 0;
+            let present = 0, late = 0, score = 0, leave = 0, pending = 0;
             const absences: AbsenceItem[] = [];
             const offDates: string[] = [];
             const leaveDates: string[] = [];
             const holidayWorkDates: string[] = [];
+            const pendingDates: string[] = []; // ✅ NEW
             let totalWorkdays = 0;
             let pastWorkdays = 0;
 
@@ -4241,14 +4309,32 @@ export default function AttendanceDashboardPage() {
                     continue;
                 }
 
+                 const eff = effByName[name]?.[dk];
+
+                // ✅ NEW — HARI INI yang masih pending (belum absen pulang) BELUM
+                // dihitung sebagai hari kerja sama sekali dulu (totalWorkdays TIDAK
+                // nambah), supaya tidak menyeret turun persentase untuk hari yang
+                // belum selesai. Begitu absen pulang → jadi PRESENT/LATE seperti
+                // biasa. Begitu lewat cutoff 04:00 WIB besok tanpa absen pulang →
+                // otomatis jadi "ABSENT" (ditangani di cabang else di bawah, karena
+                // effByName-nya akan berubah jadi ABSENT saat itu, bukan PENDING lagi).
+                if (eff === "PENDING") {
+                    pending++;
+                    pendingDates.push(dk);
+                    continue;
+                }
+
                 totalWorkdays++;
                 if (!isPastOrToday) continue;
 
                 pastWorkdays++;
-                const eff = effByName[name]?.[dk];
                 if (eff === "PRESENT") { present++; score += 1; }
                 else if (eff === "LATE") { late++; score += 0.5; }
                 else {
+                    // ✅ FIX: kembali ke perilaku semula — hari lampau yang tidak
+                    // absen pulang (sampai cutoff 04:00 WIB) masuk "Tidak Hadir"
+                    // dengan alasan NO_CHECKOUT, BUKAN pending lagi (pending cuma
+                    // untuk hari yang sedang berjalan, lihat di atas).
                     const mr = manualByName[name]?.[dk];
                     const isNoCheckout = noCheckoutByName[name]?.has(dk) ?? false;
                     absences.push({
@@ -4273,6 +4359,7 @@ export default function AttendanceDashboardPage() {
                 userId: resolvedUserId,
                 absences, offDates,
                 holidayWorkDates,
+                pending, pendingDates, // ✅ NEW
             });
         });
 
@@ -4735,7 +4822,10 @@ export default function AttendanceDashboardPage() {
 
             if (manualRec) {
                 const hasCheckout = !!checkoutTimes[`${userId}_${dk}`];
-                const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && dk < todayWIB && !hasCheckout;
+                // ✅ FIX: dk <= todayWIB (bukan cuma < todayWIB) — HARI INI yang
+                // belum absen pulang juga masih "pending", jangan ikut tampil di
+                // detail Tepat/Terlambat (samakan dengan logic di userSummary).
+                const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && dk <= todayWIB && !hasCheckout;
                 if (!noCheckoutPenalty) {
                     if (manualRec.status === "PRESENT") dayStatus = "PRESENT";
                     else if (manualRec.status === "LATE") dayStatus = "LATE";
@@ -4745,7 +4835,7 @@ export default function AttendanceDashboardPage() {
                 manualCreatedBy = manualRec.created_by_name ?? null;
             } else if (autoRec) {
                 const hasCheckout = !!checkoutTimes[`${userId}_${dk}`];
-                const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && dk < todayWIB && !hasCheckout;
+                const noCheckoutPenalty = dk >= CHECKOUT_REQUIRED_FROM && dk <= todayWIB && !hasCheckout;
                 dayStatus = noCheckoutPenalty
                     ? null
                     : autoRec.displayStatus === "PRESENT"
@@ -5573,6 +5663,7 @@ export default function AttendanceDashboardPage() {
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tepat</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Terlambat</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tidak Hadir</th>
+                                            <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Pending</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Cuti</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Lembur Libur</th>
                                             <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Skor</th>
@@ -5657,6 +5748,18 @@ export default function AttendanceDashboardPage() {
                                                                 className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-red-100 text-red-600 text-sm font-black border border-red-200 hover:bg-red-200 hover:scale-105 transition-all cursor-pointer"
                                                                 title={`Lihat detail ketidakhadiran ${u.name}`}>
                                                                 {absent}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-gray-200 text-sm font-black">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        {u.pending > 0 ? (
+                                                            <button
+                                                                onClick={() => setPendingDetail({ name: u.name, dates: u.pendingDates })}
+                                                                className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-orange-100 text-orange-600 text-sm font-black border border-orange-200 hover:bg-orange-200 hover:scale-105 transition-all cursor-pointer"
+                                                                title={`Lihat detail pending absensi ${u.name}`}>
+                                                                {u.pending}
                                                             </button>
                                                         ) : (
                                                             <span className="text-gray-200 text-sm font-black">—</span>
@@ -5804,7 +5907,7 @@ export default function AttendanceDashboardPage() {
                         )}
 
                         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100 flex items-center gap-6 flex-wrap">
-                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"], ["bg-purple-400", "Lembur Libur = 0 poin (dibayar lembur, bukan kehadiran)"]].map(([c, l]) => (
+                            {[["bg-emerald-400", "Tepat = 1.0 poin"], ["bg-amber-400", "Terlambat = 0.5 poin"], ["bg-cyan-400", "Cuti = 1.0 poin (hadir)"], ["bg-red-400", "Tidak hadir = 0 poin"], ["bg-orange-400", "Pending Absensi = 0 poin sementara (belum absen pulang)"], ["bg-purple-400", "Lembur Libur = 0 poin (dibayar lembur, bukan kehadiran)"]].map(([c, l]) => (
                                 <span key={l} className="text-[10px] text-gray-500 font-medium flex items-center gap-2"><span className={`w-2.5 h-2.5 rounded-full ${c}`} />{l}</span>
                             ))}
                             <span className="text-[10px] text-blue-500 ml-auto font-medium">% = skor ÷ total hari kerja bulan ini</span>
@@ -7378,6 +7481,15 @@ export default function AttendanceDashboardPage() {
                     dates={holidayWorkDetail.dates}
                     monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
                     onClose={() => setHolidayWorkDetail(null)}
+                />
+            )}
+
+            {pendingDetail && (
+                <PendingAttendanceDetailModal
+                    name={pendingDetail.name}
+                    dates={pendingDetail.dates}
+                    monthLabel={`${MONTH_NAMES[calMonth]} ${calYear}`}
+                    onClose={() => setPendingDetail(null)}
                 />
             )}
 
