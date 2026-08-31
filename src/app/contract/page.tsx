@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, CheckCircle2, XCircle, Loader2, ShieldAlert, Clock } from "lucide-react";
+import { FileText, CheckCircle2, XCircle, Loader2, ShieldAlert, Clock, ArrowRight } from "lucide-react";
 import { ContractStatus } from "@/lib/contractTemplates";
 import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 import SignaturePad from "@/components/contracts/SignaturePad";
@@ -196,6 +196,14 @@ export default function ContractPage() {
                   )}
                 </div>
               </div>
+
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="w-full h-11 mt-6 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition hover:brightness-110"
+                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}
+              >
+                Lanjutkan ke Dashboard <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           ) : (
             <>
