@@ -27,9 +27,10 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
       .eq("id", id)
       .single();
 
-    // type opsional: 'LAPTOP' | 'AKSESORIS'. Kalau tidak valid, jangan diubah.
-    const typeInput = String(body.type ?? "").toUpperCase();
-    const type = typeInput === "LAPTOP" || typeInput === "AKSESORIS" ? typeInput : null;
+    const typeInput = String(body.type ?? "").trim().toUpperCase();
+    const type = (!typeInput || typeInput === "ALL" || typeInput === "SEMUA" || typeInput === "UMUM")
+      ? null
+      : typeInput;
     const basePayload = {
       name,
       description: body.description?.trim() || null,
@@ -38,13 +39,13 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     let { data, error } = await supabase
       .from("laptop_categories")
-      .update(type ? { ...basePayload, type } : basePayload)
+      .update(type ? { ...basePayload, type } : { ...basePayload, type: null })
       .eq("id", id)
       .select()
       .single();
 
-    // Kolom `type` belum ada (migrasi belum dijalankan) → ulangi tanpa type.
-    if (error?.code === "42703") {
+    // Kolom `type` belum ada (42703) atau check constraint DB lama (23514) → ulangi tanpa type.
+    if (error?.code === "42703" || error?.code === "23514") {
       ({ data, error } = await supabase
         .from("laptop_categories")
         .update(basePayload)

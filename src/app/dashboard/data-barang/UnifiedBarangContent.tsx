@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Search, RotateCcw, X, Plus, Layers, Filter, Tag } from "lucide-react";
+import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Search, RotateCcw, X, Plus, Layers, Filter, Tag, Cpu } from "lucide-react";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
@@ -19,7 +19,7 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
-type ItemType = "LAPTOP" | "AKSESORIS";
+type ItemType = "LAPTOP" | "AKSESORIS" | "SPAREPART";
 
 interface LaptopUnitLite {
     id: string; serial_number: string; status: string;
@@ -402,15 +402,21 @@ export default function UnifiedBarangContent() {
     // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe)
     useEffect(() => { setKategoriFilter(""); }, [tipeFilter]);
 
-    // Kategori dipisah per tipe supaya dropdown laptop tidak menampilkan kategori
-    // aksesoris & sebaliknya. Transition-safe: kategori tanpa `type` (mis. migrasi
-    // belum jalan) tetap ikut muncul di kedua tipe — persis perilaku lama.
+    const isRowSparepart = useCallback((r: UnifiedRow, catList: typeof categories) => {
+        const cat = catList.find(c => c.id === r.kategori_id);
+        if (cat?.type === "SPAREPART") return true;
+        const catName = (cat?.name || r.kategori || "").toUpperCase();
+        const keywords = ["RAM", "SSD", "HDD", "SPAREPART", "PROCESSOR", "CPU", "LCD", "FAN", "KEYBOARD", "MOTHERBOARD", "BATERAI", "BATTERY"];
+        return keywords.some(kw => catName.includes(kw));
+    }, []);
+
+    // Kategori dipisah per tipe dengan opsi SEMUA/UMUM/SPAREPART yang dapat diakses di kedua form
     const laptopCategories = useMemo(
-        () => categories.filter(c => !c.type || c.type === "LAPTOP"),
+        () => categories.filter(c => !c.type || c.type === "ALL" || c.type === "UMUM" || c.type === "LAPTOP" || c.type === "SPAREPART"),
         [categories],
     );
     const accessoryCategories = useMemo(
-        () => categories.filter(c => !c.type || c.type === "AKSESORIS"),
+        () => categories.filter(c => !c.type || c.type === "ALL" || c.type === "UMUM" || c.type === "AKSESORIS" || c.type === "SPAREPART"),
         [categories],
     );
     // Opsi yang tampil di dropdown filter, mengikuti tipe yang sedang dipilih.
@@ -482,7 +488,9 @@ export default function UnifiedBarangContent() {
         let list = rows;
 
         // 1. Tipe
-        if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
+        if (tipeFilter === "LAPTOP") list = list.filter(r => r.tipe === "LAPTOP");
+        else if (tipeFilter === "AKSESORIS") list = list.filter(r => r.tipe === "AKSESORIS" && !isRowSparepart(r, categories));
+        else if (tipeFilter === "SPAREPART") list = list.filter(r => isRowSparepart(r, categories));
 
         // 2. Kategori
         if (kategoriFilter) {
@@ -493,6 +501,7 @@ export default function UnifiedBarangContent() {
                 const matchAksesoris = (r.kategori || "").trim().toUpperCase() === selectedName || r.kategori_id === kategoriFilter;
                 if (tipeFilter === "LAPTOP") return matchLaptop;
                 if (tipeFilter === "AKSESORIS") return matchAksesoris;
+                if (tipeFilter === "SPAREPART") return isRowSparepart(r, categories) && (matchLaptop || matchAksesoris);
                 return r.tipe === "LAPTOP" ? matchLaptop : matchAksesoris;
             });
         }
@@ -600,13 +609,14 @@ export default function UnifiedBarangContent() {
         }
 
         return list;
-    }, [rows, tipeFilter, kategoriFilter, search, filterSN, filterBrand, filterStatus, filterRam, filterPriceRange, filterAudit, sortBy, categories]);
+    }, [rows, tipeFilter, kategoriFilter, search, filterSN, filterBrand, filterStatus, filterRam, filterPriceRange, filterAudit, sortBy, categories, isRowSparepart]);
 
     const counts = useMemo(() => ({
         total: rows.length,
         laptop: rows.filter(r => r.tipe === "LAPTOP").length,
-        aksesoris: rows.filter(r => r.tipe === "AKSESORIS").length,
-    }), [rows]);
+        aksesoris: rows.filter(r => r.tipe === "AKSESORIS" && !isRowSparepart(r, categories)).length,
+        sparepart: rows.filter(r => isRowSparepart(r, categories)).length,
+    }), [rows, categories, isRowSparepart]);
 
     // ── Audit toggle ───────────────────────────────────────────────────────
     const toggleAudit = async (row: UnifiedRow) => {
@@ -872,11 +882,12 @@ export default function UnifiedBarangContent() {
                         {/* Baris 1: Main Scope Switcher (Kiri) & Action Buttons (Kanan) */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100">
                             {/* Segmented Control Scope */}
-                            <div className="inline-flex p-1 bg-zinc-100/90 rounded-2xl border border-zinc-200/60 shadow-xs self-start">
+                            <div className="inline-flex p-1 bg-zinc-100/90 rounded-2xl border border-zinc-200/60 shadow-xs self-start flex-wrap gap-0.5">
                                 {([
                                     ["ALL", `Semua`, counts.total, Layers],
                                     ["LAPTOP", `Laptop`, counts.laptop, LaptopIcon],
                                     ["AKSESORIS", `Aksesoris`, counts.aksesoris, Wrench],
+                                    ["SPAREPART", `Sparepart`, counts.sparepart, Cpu],
                                 ] as const).map(([key, label, count, Icon]) => {
                                     const isActive = tipeFilter === key && !kategoriFilter;
                                     return (
@@ -1685,7 +1696,7 @@ function CategoryQuickModal({
 }) {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
-    const [type, setType] = useState<"LAPTOP" | "AKSESORIS">("AKSESORIS");
+    const [type, setType] = useState<string>("ALL");
     const [submitting, setSubmitting] = useState(false);
 
     if (!isOpen) return null;
@@ -1698,13 +1709,18 @@ function CategoryQuickModal({
             const res = await fetch("/api/categories", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: name.trim(), description: description.trim() || null, type }),
+                body: JSON.stringify({
+                    name: name.trim(),
+                    description: description.trim() || null,
+                    type: type === "ALL" ? null : type,
+                }),
             });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan kategori");
             toast.success(`Kategori "${name.trim()}" berhasil dibuat!`);
             setName("");
             setDescription("");
+            setType("ALL");
             onSuccess();
             onClose();
         } catch (e) {
@@ -1713,6 +1729,13 @@ function CategoryQuickModal({
             setSubmitting(false);
         }
     };
+
+    const typeOptions = [
+        { value: "ALL", label: "Semua / Umum", desc: "Bisa untuk Laptop, Aksesoris & Sparepart" },
+        { value: "LAPTOP", label: "Laptop / Unit", desc: "Khusus untuk unit laptop" },
+        { value: "AKSESORIS", label: "Aksesoris", desc: "Charger, Tas, Kabel, Mouse, dll" },
+        { value: "SPAREPART", label: "Sparepart / Part", desc: "RAM, SSD, HDD, Fan, LCD, dll" },
+    ];
 
     return (
         <div
@@ -1733,12 +1756,12 @@ function CategoryQuickModal({
                             <p className="text-[11px] text-zinc-400">Buat kategori produk langsung tanpa pindah tab</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition">
+                    <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition cursor-pointer">
                         <X size={16} />
                     </button>
                 </div>
 
-                <div className="p-5 space-y-4">
+                <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
                     <div>
                         <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
                             Nama Kategori <span className="text-red-500">*</span>
@@ -1746,34 +1769,34 @@ function CategoryQuickModal({
                         <input
                             value={name}
                             onChange={e => setName(e.target.value)}
-                            placeholder="Contoh: RAM PC4, SSD NVMe, Adapter Charger, dll..."
+                            placeholder="Contoh: RAM PC4, SSD NVMe, Adapter Charger, Fan, dll..."
                             className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
                             autoFocus
                         />
                     </div>
                     <div>
                         <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                            Tipe Kategori
+                            Tipe / Pengelompokan Kategori
                         </label>
                         <div className="grid grid-cols-2 gap-2">
-                            {(["LAPTOP", "AKSESORIS"] as const).map(t => (
+                            {typeOptions.map(t => (
                                 <button
-                                    key={t}
+                                    key={t.value}
                                     type="button"
-                                    onClick={() => setType(t)}
-                                    className={`py-2 rounded-xl border text-xs font-semibold transition cursor-pointer ${
-                                        type === t
-                                            ? "border-zinc-900 bg-zinc-900 text-white shadow-sm"
-                                            : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                                    onClick={() => setType(t.value)}
+                                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                                        type === t.value
+                                            ? "border-zinc-900 bg-zinc-900 text-white shadow-sm ring-1 ring-zinc-900"
+                                            : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
                                     }`}
                                 >
-                                    {t === "LAPTOP" ? "Laptop / Unit" : "Aksesoris / Sparepart"}
+                                    <div className="text-xs font-bold">{t.label}</div>
+                                    <div className={`text-[10px] mt-0.5 line-clamp-1 ${type === t.value ? "text-zinc-300" : "text-zinc-400"}`}>
+                                        {t.desc}
+                                    </div>
                                 </button>
                             ))}
                         </div>
-                        <p className="mt-1.5 text-[11px] text-zinc-400">
-                            Menentukan kategori ini muncul pada kelompok Laptop atau Aksesoris.
-                        </p>
                     </div>
                     <div>
                         <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
