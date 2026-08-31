@@ -448,7 +448,7 @@ function PriceListPedagangContent() {
           </button>
           <button onClick={exportFullSN} disabled={exportingType !== null || filtered.length === 0}
             title={filtered.length === 0 ? "Tidak ada data untuk di-export" : "Export Full SN"}
-            className="inline-flex items-center gap-1.5 h-9 px-4 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-xl text-xs font-semibold text-white hover:from-indigo-700 hover:to-indigo-800 active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/25">
+            className="inline-flex items-center gap-1.5 h-9 px-4 bg-gradient-to-r from-zinc-800 to-zinc-900 rounded-xl text-xs font-semibold text-white hover:from-zinc-900 hover:to-black active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-zinc-900/25">
             <Download className="w-3.5 h-3.5" />
             {exportingType === "sn" ? "Mengexport..." : "Export Full SN"}
           </button>
@@ -482,10 +482,10 @@ function PriceListPedagangContent() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
             </svg>
             <input type="text" placeholder="Cari nama, brand, CPU..." value={search} onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition" />
+              className="w-full h-9 pl-8 pr-3 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-400 focus:bg-white transition" />
           </div>
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-            className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-indigo-400 transition cursor-pointer">
+            className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-zinc-400 transition cursor-pointer">
             <option value="ALL">Semua Status</option>
             <option value="SIAP_JUAL">Siap Jual</option>
             <option value="BELUM_SIAP">Belum Siap</option>
@@ -495,14 +495,14 @@ function PriceListPedagangContent() {
             <option value="PACKING">Packing</option>
           </select>
           <select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)}
-            className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-indigo-400 transition cursor-pointer">
+            className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-zinc-400 transition cursor-pointer">
             <option value="ALL">Semua Grade</option>
             <option value="A">Grade A</option>
             <option value="B">Grade B</option>
             <option value="C">Grade C</option>
           </select>
           <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)}
-            className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-indigo-400 transition cursor-pointer">
+            className="h-9 border border-gray-200 rounded-xl px-3 text-xs bg-gray-50 text-gray-700 focus:outline-none focus:border-zinc-400 transition cursor-pointer">
             {uniqueBrands.map((b) => <option key={b} value={b}>{b === "ALL" ? "Semua Brand" : b}</option>)}
           </select>
         </div>

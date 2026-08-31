@@ -54,7 +54,7 @@ const formatDate = (iso: string) =>
 const TYPE_BADGE: Record<OutflowType, string> = {
     SERVICE: "bg-blue-50 text-blue-700 border-blue-200",
     KEBUTUHAN: "bg-amber-50 text-amber-700 border-amber-200",
-    TRANSAKSI: "bg-violet-50 text-violet-700 border-violet-200",
+    TRANSAKSI: "bg-zinc-100 text-zinc-700 border-zinc-200",
 };
 const TYPE_LABEL: Record<OutflowType, string> = {
     SERVICE: "Service",
@@ -62,7 +62,7 @@ const TYPE_LABEL: Record<OutflowType, string> = {
     TRANSAKSI: "Penjualan",
 };
 const KIND_BADGE: Record<ItemKind, string> = {
-    LAPTOP: "bg-violet-50 text-violet-700 border-violet-200",
+    LAPTOP: "bg-zinc-900 text-white border-zinc-900",
     ACCESSORY: "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
 const KIND_LABEL: Record<ItemKind, string> = {
@@ -204,7 +204,7 @@ export default function OutflowsContent() {
             {/* ── Sub-header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
                 <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl flex items-center justify-center shadow-md shadow-indigo-900/25 flex-shrink-0">
+                    <div className="w-11 h-11 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-xl flex items-center justify-center shadow-md shadow-zinc-900/25 flex-shrink-0">
                         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="white"
                             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="10" />
@@ -219,7 +219,7 @@ export default function OutflowsContent() {
                 {canCreateOutflow && (
                     <button
                         onClick={() => setModalOpen(true)}
-                        className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md shadow-indigo-600/20 transition active:scale-[0.98]"
+                        className="inline-flex items-center gap-2 bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md shadow-zinc-900/20 transition active:scale-[0.98]"
                     >
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -241,7 +241,7 @@ export default function OutflowsContent() {
                             value={searchText}
                             onChange={e => setSearchText(e.target.value)}
                             placeholder="Cari barang, nama, kebutuhan…"
-                            className="w-full pl-8 pr-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                            className="w-full pl-8 pr-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400"
                         />
                     </div>
 
@@ -249,7 +249,7 @@ export default function OutflowsContent() {
                     <select
                         value={filterType}
                         onChange={e => setFilterType(e.target.value as OutflowType | "")}
-                        className="px-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 text-gray-600"
+                        className="px-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400 text-gray-600"
                     >
                         <option value="">Semua Tipe</option>
                         <option value="SERVICE">Service</option>
@@ -261,7 +261,7 @@ export default function OutflowsContent() {
                     <select
                         value={filterKind}
                         onChange={e => setFilterKind(e.target.value as ItemKind | "")}
-                        className="px-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 text-gray-600"
+                        className="px-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400 text-gray-600"
                     >
                         <option value="">Semua Jenis</option>
                         <option value="LAPTOP">Laptop</option>
@@ -272,7 +272,7 @@ export default function OutflowsContent() {
                     <select
                         value={filterPeriod}
                         onChange={e => setFilterPeriod(e.target.value as typeof filterPeriod)}
-                        className="px-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 text-gray-600"
+                        className="px-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400 text-gray-600"
                     >
                         <option value="">Semua Periode</option>
                         <option value="today">Hari Ini</option>
@@ -284,7 +284,7 @@ export default function OutflowsContent() {
                     <select
                         value={filterAudit}
                         onChange={e => setFilterAudit(e.target.value as typeof filterAudit)}
-                        className="px-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 text-gray-600"
+                        className="px-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400 text-gray-600"
                     >
                         <option value="">Semua Audit</option>
                         <option value="audited">Sudah Diaudit</option>
@@ -625,7 +625,7 @@ function OutflowFormModal({
                             {(["SERVICE", "KEBUTUHAN"] as OutflowType[]).map(t => (
                                 <button key={t} type="button" onClick={() => setType(t)}
                                     className={`py-2.5 rounded-xl text-sm font-semibold border transition
-                    ${type === t ? "bg-indigo-600 text-white border-indigo-600 shadow-sm" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
+                    ${type === t ? "bg-zinc-900 text-white border-zinc-900 shadow-sm" : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"}`}>
                                     {TYPE_LABEL[t]}
                                 </button>
                             ))}
@@ -650,7 +650,7 @@ function OutflowFormModal({
                             onFocus={() => setComboOpen(true)}
                             placeholder={optLoading ? "Memuat daftar barang…" : "Cari laptop / aksesoris…"}
                             disabled={optLoading}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-gray-50"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:bg-gray-50"
                         />
                         {comboOpen && !optLoading && (
                             <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
@@ -682,7 +682,7 @@ function OutflowFormModal({
                         <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Kebutuhan</label>
                         <textarea value={purpose} onChange={e => setPurpose(e.target.value)} rows={2}
                             placeholder={type === "SERVICE" ? "Keterangan kebutuhan service…" : "Alasan pemakaian internal…"}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-zinc-400" />
                     </div>
 
                     {/* Nominal — SERVICE only */}
@@ -693,7 +693,7 @@ function OutflowFormModal({
                                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
                                 <input type="number" min={0} value={nominal} onChange={e => setNominal(e.target.value)}
                                     placeholder="0"
-                                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-gray-200 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-gray-200 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-zinc-400" />
                             </div>
                         </div>
                     )}
@@ -705,7 +705,7 @@ function OutflowFormModal({
                         Batal
                     </button>
                     <button onClick={handleSubmit} disabled={submitting}
-                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-sm font-semibold transition disabled:opacity-60 active:scale-[0.98]">
+                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black text-white text-sm font-semibold transition disabled:opacity-60 active:scale-[0.98]">
                         {submitting ? "Menyimpan…" : "Simpan"}
                     </button>
                 </div>
