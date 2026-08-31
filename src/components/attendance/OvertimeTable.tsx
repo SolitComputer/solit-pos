@@ -164,7 +164,7 @@ export function OvertimeTable({
   onRefresh: () => void;
   onOpenDetail?: (row: OvertimeTableRow) => void;
 }) {
-    const [detailModalRow, setDetailModalRow] = useState<OvertimeTableRow | null>(null);
+  const [detailModalRow, setDetailModalRow] = useState<OvertimeTableRow | null>(null);
   const [photoModalRow, setPhotoModalRow] = useState<OvertimeTableRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectModalRow, setRejectModalRow] = useState<OvertimeTableRow | null>(null);
@@ -179,7 +179,7 @@ export function OvertimeTable({
     );
   }
 
-   if (rows.length === 0) {
+  if (rows.length === 0) {
     return <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-sm text-gray-400">Tidak ada data lemburan untuk filter ini.</div>;
   }
 
@@ -205,7 +205,7 @@ export function OvertimeTable({
     } finally { setBusyId(null); }
   };
 
-   const AUDIT_FILTER_TABS: { key: typeof auditFilter; label: string }[] = [
+  const AUDIT_FILTER_TABS: { key: typeof auditFilter; label: string }[] = [
     { key: "ALL", label: "Semua" },
     { key: "NOT_AUDITED", label: "Belum Diaudit" },
     { key: "AUDITED", label: "Sudah Diaudit" },
@@ -218,11 +218,10 @@ export function OvertimeTable({
           <button
             key={tab.key}
             onClick={() => setAuditFilter(tab.key)}
-            className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-colors ${
-              auditFilter === tab.key
-                ? "bg-violet-600 text-white border-violet-600"
+            className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-colors ${auditFilter === tab.key
+                ? "bg-zinc-900 text-white border-zinc-900"
                 : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
-            }`}
+              }`}
           >
             {tab.label}
           </button>
@@ -231,101 +230,104 @@ export function OvertimeTable({
       {filteredRows.length === 0 ? (
         <div className="p-10 text-center text-sm text-gray-400">Tidak ada data lemburan untuk filter audit ini.</div>
       ) : (
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[900px]">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50/60">
-              <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Nama</th>
-              <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Keterangan</th>
-              <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Kategori</th>
-              <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Waktu Lembur</th>
-              <th className="px-4 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Bukti Foto</th>
-              <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Di ACC Oleh</th>
-              <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Di Audit Oleh</th>
-              <th className="px-4 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
-            </tr>
-          </thead>
-                   <tbody className="divide-y divide-gray-50">
-            {filteredRows.map((o) => {
-              const color = getOvertimeColor(o);
-              const style = COLOR_STYLES[color];
-              const isOwner = o.user_id === currentUserId;
-              // ✅ FIX: kepala divisi gak boleh nge-ACC lemburannya sendiri (server
-              // sudah nolak ini, tapi tombolnya sempat tetap nongol di UI karena
-              // fungsi canApprove(targetRole) di sini gak tau siapa target
-              // user-nya). Full-access (Admin) tetap boleh self-approve, sesuai server.
-              const canAccThis = o.status === "PENDING" && !!o.category && !!o.work_description && canApprove(o.users?.role ?? "") && !(isOwner && !canAudit);
-              const canFillDetail = o.status === "PENDING" && isOwner && (!o.category || !o.work_description);
-              const canUploadProof = o.status === "NEED_PROOF" && isOwner;
-              const canAuditThis = o.status === "COMPLETED" && o.audit_status === "PENDING" && canAudit;
-              const isBusy = busyId === o.id;
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/60">
+                <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Nama</th>
+                <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Keterangan</th>
+                <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Kategori</th>
+                <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Waktu Lembur</th>
+                <th className="px-4 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Bukti Foto</th>
+                <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Di ACC Oleh</th>
+                <th className="px-4 py-3 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Di Audit Oleh</th>
+                <th className="px-4 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {filteredRows.map((o) => {
+                const color = getOvertimeColor(o);
+                const style = COLOR_STYLES[color];
+                const isOwner = o.user_id === currentUserId;
+                // ✅ FIX: kepala divisi gak boleh nge-ACC lemburannya sendiri (server
+                // sudah nolak ini, tapi tombolnya sempat tetap nongol di UI karena
+                // fungsi canApprove(targetRole) di sini gak tau siapa target
+                // user-nya). Full-access (Admin) tetap boleh self-approve, sesuai server.
+                const canAccThis = o.status === "PENDING" && !!o.category && !!o.work_description && canApprove(o.users?.role ?? "") && !(isOwner && !canAudit);
+                const canFillDetail = o.status === "PENDING" && isOwner && (!o.category || !o.work_description);
+                const canUploadProof = o.status === "NEED_PROOF" && isOwner;
+                // ✅ FIX: jangan cuma cek === "PENDING" — row yang di-insert manual dulu
+                // tidak pernah set audit_status secara eksplisit, jadi nilainya bisa null.
+                // Yang penting: statusnya COMPLETED dan belum pernah diaudit/ditolak.
+                const canAuditThis = o.status === "COMPLETED" && o.audit_status !== "AUDITED" && o.audit_status !== "REJECTED" && canAudit;
+                const isBusy = busyId === o.id;
 
-              return (
-                <tr key={o.id} className="hover:bg-gray-50/60 transition-colors">
-                  <td className="px-4 py-3">
-                    <p className="font-bold text-gray-800">{o.users?.name ?? "Unknown"}</p>
-                    <p className="text-[10px] text-gray-400">{new Date(o.request_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
-                  </td>
-                  <td className="px-4 py-3 max-w-[220px]">
-                    <p className="text-xs text-gray-700 whitespace-normal break-words" title={o.work_description ?? ""}>{o.work_description || "— belum diisi —"}</p>
-                    {o.direction && <p className="text-[10px] text-gray-400 mt-0.5">{OVERTIME_DIRECTION_LABELS[o.direction as keyof typeof OVERTIME_DIRECTION_LABELS] ?? o.direction}</p>}
-                  </td>
-                  <td className="px-4 py-3">
-                    {o.category
-                      ? <span className="text-[11px] font-semibold text-gray-700">{OVERTIME_CATEGORY_LABELS[o.category as OvertimeCategory] ?? o.category}</span>
-                      : <span className="text-[11px] text-gray-300">— belum diisi —</span>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="font-mono text-xs font-bold text-gray-700">{fmtTime(o.actual_start)} – {fmtTime(o.actual_end)}</p>
-                    <p className="text-[10px] text-gray-400">{formatOvertimeMinutes(o.duration_minutes)}</p>
-                    <span className={`inline-flex items-center gap-1 mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${style.bg} ${style.text} ${style.border}`}>{style.label}</span>
-                    {o.audit_status === "AUDITED" && o.total_pay != null && (
-                      <p className="text-[11px] font-black text-emerald-700 mt-1">{formatRupiah(o.total_pay)}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {o.proof_photo_url ? (
-                      <button
-                        onClick={() => setPhotoModalRow(o)}
-                        className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 inline-block hover:border-violet-400 hover:ring-2 hover:ring-violet-300 transition-all cursor-pointer group"
-                        title="Klik untuk melihat bukti foto & timestamp"
-                      >
-                        <img src={o.proof_photo_url} alt="bukti" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                      </button>
-                    ) : <span className="text-gray-300"><Camera size={16} className="inline" /></span>}
-                  </td>
-                  <td className="px-4 py-3">{o.approver ? <span className="text-xs text-gray-700 font-semibold">{o.approver.name}</span> : <span className="text-[11px] text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3">{o.auditor ? <span className="text-xs text-gray-700 font-semibold">{o.auditor.name}</span> : <span className="text-[11px] text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                      {canFillDetail && <button onClick={() => setDetailModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100">Isi Detail</button>}
-                      {canAccThis && <button disabled={isBusy} onClick={() => runAction(o.id, { action: "APPROVE" })} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50">{isBusy ? "..." : "ACC"}</button>}
-                      {canAccThis && <button disabled={isBusy} onClick={() => setRejectModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50">Tolak</button>}
-                      {canUploadProof && <button onClick={() => setDetailModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100">Upload Bukti</button>}
-                      {canAuditThis && (
-                        <button disabled={isBusy} onClick={() => {
-                          const isTargetPkl = isPKLRole(o.users?.role);
-                          if (o.is_holiday) {
-                            const isLate = o.is_late === true || (o.is_late == null && detectLateFromTimeStr(o.requested_start ?? o.actual_start));
-                            const holidayPay = isTargetPkl ? (isLate ? 25000 : 50000) : (isLate ? 50000 : 100000);
-                            if (confirm(`Audit lemburan hari libur ${o.users?.name}?\n\nStatus: ${isLate ? "Terlambat" : "Tepat Waktu"} — nominal terkunci ${formatRupiah(holidayPay)} (aturan tetap ${isTargetPkl ? "PKL" : "karyawan"}).`)) {
-                              runAction(o.id, { action: "AUDIT", decision: "APPROVE", total_pay: holidayPay, rate_per_hour: null });
-                            }
-                            return;
-                          }
-                          if (confirm(`Audit lemburan ${o.users?.name}? Nominal akan dihitung dan dikunci.`)) runAction(o.id, { action: "AUDIT", decision: "APPROVE" });
-                        }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50">{isBusy ? "..." : "Audit"}</button>
+                return (
+                  <tr key={o.id} className="hover:bg-gray-50/60 transition-colors">
+                    <td className="px-4 py-3">
+                      <p className="font-bold text-gray-800">{o.users?.name ?? "Unknown"}</p>
+                      <p className="text-[10px] text-gray-400">{new Date(o.request_date + "T12:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</p>
+                    </td>
+                    <td className="px-4 py-3 max-w-[220px]">
+                      <p className="text-xs text-gray-700 whitespace-normal break-words" title={o.work_description ?? ""}>{o.work_description || "— belum diisi —"}</p>
+                      {o.direction && <p className="text-[10px] text-gray-400 mt-0.5">{OVERTIME_DIRECTION_LABELS[o.direction as keyof typeof OVERTIME_DIRECTION_LABELS] ?? o.direction}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {o.category
+                        ? <span className="text-[11px] font-semibold text-gray-700">{OVERTIME_CATEGORY_LABELS[o.category as OvertimeCategory] ?? o.category}</span>
+                        : <span className="text-[11px] text-gray-300">— belum diisi —</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-mono text-xs font-bold text-gray-700">{fmtTime(o.actual_start)} – {fmtTime(o.actual_end)}</p>
+                      <p className="text-[10px] text-gray-400">{formatOvertimeMinutes(o.duration_minutes)}</p>
+                      <span className={`inline-flex items-center gap-1 mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${style.bg} ${style.text} ${style.border}`}>{style.label}</span>
+                      {o.audit_status === "AUDITED" && o.total_pay != null && (
+                        <p className="text-[11px] font-black text-emerald-700 mt-1">{formatRupiah(o.total_pay)}</p>
                       )}
-                      {onOpenDetail && <button onClick={() => onOpenDetail(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100">Detail</button>}
-                      {!canFillDetail && !canAccThis && !canUploadProof && !canAuditThis && !onOpenDetail && <span className="text-[10px] text-gray-300">—</span>}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-                    </tbody>
-        </table>
-      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {o.proof_photo_url ? (
+                        <button
+                          onClick={() => setPhotoModalRow(o)}
+                          className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 inline-block hover:border-violet-400 hover:ring-2 hover:ring-violet-300 transition-all cursor-pointer group"
+                          title="Klik untuk melihat bukti foto & timestamp"
+                        >
+                          <img src={o.proof_photo_url} alt="bukti" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                        </button>
+                      ) : <span className="text-gray-300"><Camera size={16} className="inline" /></span>}
+                    </td>
+                    <td className="px-4 py-3">{o.approver ? <span className="text-xs text-gray-700 font-semibold">{o.approver.name}</span> : <span className="text-[11px] text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3">{o.auditor ? <span className="text-xs text-gray-700 font-semibold">{o.auditor.name}</span> : <span className="text-[11px] text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                        {canFillDetail && <button onClick={() => setDetailModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100">Isi Detail</button>}
+                        {canAccThis && <button disabled={isBusy} onClick={() => runAction(o.id, { action: "APPROVE" })} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50">{isBusy ? "..." : "ACC"}</button>}
+                        {canAccThis && <button disabled={isBusy} onClick={() => setRejectModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50">Tolak</button>}
+                        {canUploadProof && <button onClick={() => setDetailModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100">Upload Bukti</button>}
+                        {canAuditThis && (
+                          <button disabled={isBusy} onClick={() => {
+                            const isTargetPkl = isPKLRole(o.users?.role);
+                            if (o.is_holiday) {
+                              const isLate = o.is_late === true || (o.is_late == null && detectLateFromTimeStr(o.requested_start ?? o.actual_start));
+                              const holidayPay = isTargetPkl ? (isLate ? 25000 : 50000) : (isLate ? 50000 : 100000);
+                              if (confirm(`Audit lemburan hari libur ${o.users?.name}?\n\nStatus: ${isLate ? "Terlambat" : "Tepat Waktu"} — nominal terkunci ${formatRupiah(holidayPay)} (aturan tetap ${isTargetPkl ? "PKL" : "karyawan"}).`)) {
+                                runAction(o.id, { action: "AUDIT", decision: "APPROVE", total_pay: holidayPay, rate_per_hour: null });
+                              }
+                              return;
+                            }
+                            if (confirm(`Audit lemburan ${o.users?.name}? Nominal akan dihitung dan dikunci.`)) runAction(o.id, { action: "AUDIT", decision: "APPROVE" });
+                          }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50">{isBusy ? "..." : "Audit"}</button>
+                        )}
+                        {onOpenDetail && <button onClick={() => onOpenDetail(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100">Detail</button>}
+                        {!canFillDetail && !canAccThis && !canUploadProof && !canAuditThis && !onOpenDetail && <span className="text-[10px] text-gray-300">—</span>}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {photoModalRow && photoModalRow.proof_photo_url && (
@@ -340,10 +342,10 @@ export function OvertimeTable({
                 <X size={16} />
               </button>
             </div>
-            
+
             <div className="relative p-3 bg-black flex items-center justify-center min-h-[300px] max-h-[65vh] overflow-hidden">
               <img src={photoModalRow.proof_photo_url} alt="Bukti lembur" className="max-w-full max-h-[62vh] object-contain rounded-xl" />
-              
+
               {/* Floating Timestamp Badge Overlay */}
               <div className="absolute bottom-5 left-5 right-5 sm:right-auto bg-slate-950/90 backdrop-blur-md border border-white/20 rounded-2xl p-3.5 text-white shadow-2xl space-y-1 max-w-sm pointer-events-none">
                 <div className="flex items-center gap-1.5 text-orange-400 font-bold text-[10px] tracking-wider uppercase">

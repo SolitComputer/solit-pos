@@ -15,20 +15,20 @@ interface InventoryDetail {
 
 const GRADE_CONFIG = {
   A: {
-    color: "#18181B",
+    color: "#0f172a",
     bg: "#F4F4F5",
     border: "#E4E4E7",
-    bar: "linear-gradient(90deg, #18181B, #3F3F46)",
-    stripColor: "linear-gradient(90deg, #18181B, #3F3F46)",
+    bar: "linear-gradient(90deg, #6366f1, #818cf8)",
+    stripColor: "linear-gradient(90deg, #6366f1, #818cf8)",
     iconBg: "#F4F4F5",
     label: "Kondisi terbaik",
   },
   B: {
-    color: "#3F3F46",
+    color: "#475569",
     bg: "#F4F4F5",
     border: "#E4E4E7",
-    bar: "linear-gradient(90deg, #52525B, #71717A)",
-    stripColor: "linear-gradient(90deg, #52525B, #71717A)",
+    bar: "linear-gradient(90deg, #6366f1, #818cf8)",
+    stripColor: "linear-gradient(90deg, #6366f1, #818cf8)",
     iconBg: "#F4F4F5",
     label: "Kondisi baik",
   },
@@ -45,7 +45,7 @@ const GRADE_CONFIG = {
 
 export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [data, setData] = useState<InventoryDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isMemuat, setIsMemuat] = useState(false);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
   useEffect(() => {
     if (!isOpen) return;
     const fetchData = async () => {
-      setIsLoading(true);
+      setIsMemuat(true);
       try {
         const res = await fetch("/api/dashboard/inventory-detail");
         const result = await res.json();
@@ -64,7 +64,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
       } catch (e) {
         console.error(e);
       } finally {
-        setIsLoading(false);
+        setIsMemuat(false);
       }
     };
     fetchData();
@@ -82,8 +82,8 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
 
         .idm-shell {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
-          box-shadow: 0 32px 80px rgba(0,0,0,0.16), 0 8px 24px rgba(0,0,0,0.08);
+          border: 1px solid #F1F5F9;
+          box-shadow: 0 4px 20px -4px rgba(0,0,0,0.05);
         }
         .idm-header {
           background: linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%);
@@ -91,15 +91,15 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
         }
         .idm-stat {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+          border: 1px solid #F1F5F9;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.02);
           transition: box-shadow 0.2s, transform 0.2s;
         }
         .idm-stat:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.10); transform: translateY(-2px); }
 
         .idm-grade-card {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
+          border: 1px solid #F1F5F9;
           box-shadow: 0 1px 3px rgba(0,0,0,0.05);
           transition: box-shadow 0.2s, transform 0.2s;
         }
@@ -107,7 +107,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
 
         .idm-row-card {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
+          border: 1px solid #F1F5F9;
           box-shadow: 0 1px 3px rgba(0,0,0,0.05);
           transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
         }
@@ -139,7 +139,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
           transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.34,1.25,0.64,1);
         }
         .idm-close { background: #F4F4F5; color: #A1A1AA; transition: background 0.2s, color 0.2s; }
-        .idm-close:hover { background: #18181B; color: #FFFFFF; }
+        .idm-close:hover { background: #6366f1; color: #FFFFFF; }
         .idm-handle { background: #D4D4D8; }
 
         .idm-footer {
@@ -166,13 +166,13 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
           <div className="idm-header flex items-center justify-between px-5 sm:px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: "linear-gradient(135deg, #18181B 0%, #3F3F46 100%)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)" }}>
+                style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#18181B" }}>Detail Inventory</h2>
+                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#0f172a" }}>Detail Inventory</h2>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Breakdown stok per grade dan brand</p>
               </div>
             </div>
@@ -185,7 +185,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
 
           {/* Scrollable body */}
           <div className="idm-scroll flex-1 overflow-y-auto" style={{ background: "#FAFAFA" }}>
-            {isLoading ? (
+            {isMemuat ? (
               <div className="p-5 space-y-3">
                 <div className="grid grid-cols-2 gap-3">{[1,2].map(i=><div key={i} className="idm-shimmer h-24"/>)}</div>
                 <div className="grid grid-cols-3 gap-3 pt-2">{[1,2,3].map(i=><div key={i} className="idm-shimmer h-28"/>)}</div>
@@ -197,20 +197,20 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="idm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg, #18181B, #3F3F46)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg, #6366f1, #818cf8)" }} />
                     <div className="p-4">
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#F4F4F5" }}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#18181B" strokeWidth="2.5" strokeLinecap="round">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round">
                           <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
                       </div>
                       <p className="idm-section-label">Total Unit</p>
-                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#18181B" }}>{data.total}</p>
+                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#0f172a" }}>{data.total}</p>
                       <p className="text-xs font-medium mt-1" style={{ color: "#A1A1AA" }}>stok tersedia</p>
                     </div>
                   </div>
                   <div className="idm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg, #52525B, #71717A)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg, #6366f1, #818cf8)" }} />
                     <div className="p-4">
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#F4F4F5" }}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round">
@@ -218,7 +218,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                         </svg>
                       </div>
                       <p className="idm-section-label">Total Model</p>
-                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#18181B" }}>{data.totalModels}</p>
+                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#0f172a" }}>{data.totalModels}</p>
                       <p className="text-xs font-medium mt-1" style={{ color: "#A1A1AA" }}>variasi unik</p>
                     </div>
                   </div>
@@ -243,7 +243,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                               {grade}
                             </div>
                             <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Grade {grade}</p>
-                            <p className="text-xl font-extrabold mt-0.5" style={{ color: "#18181B" }}>
+                            <p className="text-xl font-extrabold mt-0.5" style={{ color: "#0f172a" }}>
                               {gradeData.qty} <span className="text-xs font-normal" style={{ color: "#A1A1AA" }}>unit</span>
                             </p>
                             <div className="w-full h-1.5 rounded-full mt-2.5 overflow-hidden" style={{ background: "#F4F4F5" }}>
@@ -292,20 +292,20 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                                   #{idx + 1}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-sm font-semibold truncate" style={{ color: "#18181B" }}>{brand.name}</p>
+                                  <p className="text-sm font-semibold truncate" style={{ color: "#0f172a" }}>{brand.name}</p>
                                   {isTop && (
-                                    <p className="text-[9px] font-bold mt-0.5" style={{ color: "#18181B" }}>Paling banyak</p>
+                                    <p className="text-[9px] font-bold mt-0.5" style={{ color: "#0f172a" }}>Paling banyak</p>
                                   )}
                                 </div>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <p className="text-sm font-bold" style={{ color: "#18181B" }}>{brand.total}</p>
+                                <p className="text-sm font-bold" style={{ color: "#0f172a" }}>{brand.total}</p>
                                 <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>unit</p>
                               </div>
                             </div>
                             <div className="w-full h-1.5 rounded-full mt-3 overflow-hidden" style={{ background: "#F4F4F5" }}>
                               <div className="h-full rounded-full transition-all duration-700"
-                                style={{ width: `${pct}%`, background: isTop ? "linear-gradient(90deg, #18181B, #3F3F46)" : "linear-gradient(90deg, #D4D4D8, #E4E4E7)" }} />
+                                style={{ width: `${pct}%`, background: isTop ? "linear-gradient(90deg, #6366f1, #818cf8)" : "linear-gradient(90deg, #D4D4D8, #E4E4E7)" }} />
                             </div>
                           </div>
                         );
@@ -335,7 +335,7 @@ export function InventoryDetailModal({ isOpen, onClose }: { isOpen: boolean; onC
                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                   </svg>
                 </div>
-                <p className="text-sm font-semibold" style={{ color: "#52525B" }}>Gagal memuat data</p>
+                <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Coba tutup dan buka kembali</p>
               </div>
             )}
