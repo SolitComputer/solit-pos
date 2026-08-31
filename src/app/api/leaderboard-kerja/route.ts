@@ -4,6 +4,8 @@ import { withAuth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+const RAYHAN_ACCOUNTING_USER_ID = "7a0aacab-961c-4332-b4bf-361431126f77";
+
 export const GET = withAuth(async (req, _ctx, user) => {
   try {
     const url = new URL(req.url);
@@ -48,7 +50,6 @@ export const GET = withAuth(async (req, _ctx, user) => {
       return name !== "admin" && name !== "administrator";
     });
 
-    // 2. Fetch parallel aggregated data
     const [
       { data: transactions },
       { data: preparations },
@@ -56,6 +57,8 @@ export const GET = withAuth(async (req, _ctx, user) => {
       { data: ccReports },
       { data: cashflows },
       { data: activities },
+      { data: journalLogs },
+      { data: cashflowAudits },
       { data: missions }
     ] = await Promise.all([
       // Sales: transactions
@@ -69,7 +72,7 @@ export const GET = withAuth(async (req, _ctx, user) => {
       // Penyedia Barang / Pengantaran: preparations (all records to count both creators and preparers)
       supabaseAdmin
         .from("preparation_orders")
-        .select("id, order_number, created_by, done_by, status, created_at, done_at")
+        .select("id, order_number, created_by, done_by, received_by, status, created_at, done_at, delivery_user_id, delivery_user_name, delivery_method, delivered_at, preparation_items(id, is_cancelled)")
         .gte("created_at", startIso)
         .lte("created_at", endIso),
 
@@ -91,14 +94,32 @@ export const GET = withAuth(async (req, _ctx, user) => {
         .gte("created_at", startIso)
         .lte("created_at", endIso),
 
-      // Pengelola Barang & Sotech: activity logs for laptops/units creation
+
       supabaseAdmin
         .from("activity_logs")
         .select("user_id, action, entity")
         .gte("created_at", startIso)
         .lte("created_at", endIso)
-        .eq("action", "CREATE")
+        .in("action", ["CREATE", "SO", "MINUS_FIXED", "AUDIT"])
         .in("entity", ["laptop", "unit"]),
+
+      supabaseAdmin
+        .from("journal_audit_logs")
+        .select("changed_by, action")
+        .gte("created_at", startIso)
+        .lte("created_at", endIso)
+        .in("action", ["CREATE", "CONFIRM"]),
+
+      // Accounting: audit Cashflow — is_audited di-toggle lewat PATCH
+      // /api/cashflow/[id] (action "toggle_audit"), yang SUDAH mencatat
+      // audited_by (user id) & audited_at LANGSUNG di cashflow_entries
+      // sendiri — tidak perlu tabel log terpisah.
+      supabaseAdmin
+        .from("cashflow_entries")
+        .select("audited_by, audited_at")
+        .not("audited_by", "is", null)
+        .gte("audited_at", startIso)
+        .lte("audited_at", endIso),
 
       // Missions: (all)
       supabaseAdmin
@@ -128,27 +149,60 @@ export const GET = withAuth(async (req, _ctx, user) => {
       //   metrics.push({ label: "Buat Format", value: uFormats.length, unit: "order" });
       // }
 
-      // PREPARATIONS (Penyedia Barang / Pengantaran) — DINONAKTIFKAN SEMENTARA.
-      // const uPreparations = (preparations ?? []).filter((p) => p.done_by === uid);
-      // if (uPreparations.length > 0 || hasRole("PENYEDIA") || hasRole("PENGANTARAN") || hasRole("SOTECH") || hasRole("ONPOINT")) {
-      //   score += uPreparations.length * 15;
-      //
-      //   let totalSpeedMs = 0;
-      //   let speedCount = 0;
-      //   uPreparations.forEach((p) => {
-      //     if (p.created_at && p.done_at) {
-      //       const ms = new Date(p.done_at).getTime() - new Date(p.created_at).getTime();
-      //       if (ms > 0) {
-      //         totalSpeedMs += ms;
-      //         speedCount++;
-      //       }
-      //     }
-      //   });
-      //
-      //   const avgSpeedMinutes = speedCount > 0 ? Math.round((totalSpeedMs / speedCount) / 60000) : 0;
-      //   metrics.push({ label: "Barang Disiapkan", value: uPreparations.length, unit: "unit" });
-      //   metrics.push({ label: "Kecepatan Rata-rata", value: avgSpeedMinutes, unit: "menit" });
-      // }
+      // PREPARATIONS (Penyedia Barang) — per UNIT laptop (bukan per order):
+      // 3 poin kalau received_by === done_by (satu orang terima order SAMPAI
+      // selesai cek semua unit sendiri). 1,5 poin kalau beda orang (done_by
+      // cuma finalize/QC akhir, bukan yang menerima order di awal). Unit yang
+      // is_cancelled tidak dihitung sama sekali.
+      const uPreparations = (preparations ?? []).filter((p: any) => p.done_by === uid && p.done_at);
+      if (hasRole("PENYEDIA")) {
+        let fullUnits = 0;
+        let qcOnlyUnits = 0;
+        uPreparations.forEach((p: any) => {
+          const unitCount = (p.preparation_items ?? []).filter((it: any) => !it.is_cancelled).length;
+          if (p.received_by && p.received_by === p.done_by) {
+            fullUnits += unitCount;
+          } else {
+            qcOnlyUnits += unitCount;
+          }
+        });
+        score += fullUnits * 3 + qcOnlyUnits * 1.5;
+
+        let totalSpeedMs = 0;
+        let speedCount = 0;
+        uPreparations.forEach((p: any) => {
+          if (p.created_at && p.done_at) {
+            const ms = new Date(p.done_at).getTime() - new Date(p.created_at).getTime();
+            if (ms > 0) {
+              totalSpeedMs += ms;
+              speedCount++;
+            }
+          }
+        });
+
+        const avgSpeedMinutes = speedCount > 0 ? Math.round((totalSpeedMs / speedCount) / 60000) : 0;
+        metrics.push({ label: "Unit Selesai Penuh", value: fullUnits, unit: "unit" });
+        metrics.push({ label: "Unit QC Saja", value: qcOnlyUnits, unit: "unit" });
+        metrics.push({ label: "Kecepatan Rata-rata", value: avgSpeedMinutes, unit: "menit" });
+      }
+
+      // PENGANTARAN (Delivery) — 6 poin per pesanan yang BERHASIL diantar.
+      // Sumbernya sama kayak PREPARATIONS di atas (tabel preparation_orders),
+      // tapi pengantar ditandai lewat delivery_user_id, BUKAN done_by/received_by
+      // (lihat action "COMPLETE" di /api/preparation/[id]/delivery/route.ts, yang
+      // set status "SELESAI" + delivered_at). Dihitung per ORDER, bukan per unit,
+      // karena satu pengantaran bisa bawa lebih dari 1 laptop sekaligus.
+      const uDeliveries = (preparations ?? []).filter(
+        (p: any) =>
+          p.delivery_user_id === uid &&
+          p.delivery_method === "PENGANTARAN" &&
+          p.status === "SELESAI" &&
+          p.delivered_at
+      );
+      if (hasRole("PENGANTARAN")) {
+        score += uDeliveries.length * 6;
+        metrics.push({ label: "Berhasil Diantar", value: uDeliveries.length, unit: "order" });
+      }
 
       // SERVICE (Teknisi) — 5 poin per laptop solved DI PERIODE TERPILIH. Basis tanggal ikut
       // status: DONE pakai tanggal_selesai, SUDAH_DIAMBIL pakai tanggal_diambil — bukan created_at
@@ -162,7 +216,7 @@ export const GET = withAuth(async (req, _ctx, user) => {
         const doneMs = new Date(doneIso).getTime();
         return doneMs >= startDate.getTime() && doneMs <= endDate.getTime();
       });
-      if (uServices.length > 0 || hasRole("TEKNISI")) {
+      if (hasRole("TEKNISI")) {
         score += uServices.length * 5;
         metrics.push({ label: "Laptop Solved", value: uServices.length, unit: "unit" });
       }
@@ -190,12 +244,44 @@ export const GET = withAuth(async (req, _ctx, user) => {
       //   }
       // }
 
-      // PENGELOLA BARANG & SOTECH (activity logs) — DINONAKTIFKAN SEMENTARA.
-      // const uActivities = (activities ?? []).filter((a) => a.user_id === uid);
-      // if (uActivities.length > 0 || hasRole("PENGELOLA") || hasRole("SOTECH") || hasRole("ONPOINT")) {
-      //   score += uActivities.length * 5;
-      //   metrics.push({ label: "Data Barang Diinput", value: uActivities.length, unit: "unit" });
-      // }
+      // PENGELOLA BARANG — Input Barang (CREATE unit baru/SN masuk stok) =
+      // 1 poin/unit. SO (Stock Opname, baik level model di
+      // laptops/[id]/so maupun level unit di units/[id]/so — keduanya sama-
+      // sama tercatat activity_logs action "SO") = 0,3 poin/aksi. UNSO
+      // (pembatalan SO) TIDAK dihitung. "Input Barang" khusus entity "unit"
+      // (fisik SN) — bikin MODEL laptop baru (entity "laptop", belum tentu
+      // ada unit fisiknya) TIDAK ikut dihitung di sini.
+      const uActivities = (activities ?? []).filter((a: any) => a.user_id === uid);
+      const uInputBarang = uActivities.filter((a: any) => a.action === "CREATE" && a.entity === "unit");
+      const uSo = uActivities.filter((a: any) => a.action === "SO");
+      const uMinusFixed = uActivities.filter((a: any) => a.action === "MINUS_FIXED");
+      if (hasRole("PENGELOLA")) {
+        score += uInputBarang.length * 1 + uSo.length * 0.3 + uMinusFixed.length * 5;
+        metrics.push({ label: "Input Barang", value: uInputBarang.length, unit: "unit" });
+      }
+
+      // ACCOUNTING — Pembukuan Manual (bikin jurnal lewat "+ Jurnal Manual",
+      // journal_audit_logs action "CREATE") = 0,3 poin/entry. Konfirmasi
+      // Pending → Jurnal Umum (action "CONFIRM", 1 baris log per item yang
+      // dikonfirmasi — lihat POST /api/akutansi/jurnal/confirm) = 0,2
+      // poin/item. Rayhan disatukan ke sini lewat ID (lihat konstanta di
+      // atas) — role dia di database TETAP ADMIN.
+      const uJournalLogs = (journalLogs ?? []).filter((j: any) => j.changed_by === uid);
+      const uPembukuanManual = uJournalLogs.filter((j: any) => j.action === "CREATE");
+      const uPembukuanKonfirmasi = uJournalLogs.filter((j: any) => j.action === "CONFIRM");
+      // Audit — gabungan 2 sumber: audit Cashflow (cashflow_entries.audited_by,
+      // sudah tercatat langsung di tabel itu) + audit Data Barang laptop & unit
+      // (activity_logs action "AUDIT" — asumsi endpoint audit laptop/unit
+      // mencatat log dengan pola sama seperti SO).
+      const uCashflowAudits = (cashflowAudits ?? []).filter((c: any) => c.audited_by === uid);
+      const uDataBarangAudits = uActivities.filter((a: any) => a.action === "AUDIT");
+      const uAuditTotal = uCashflowAudits.length + uDataBarangAudits.length;
+      if (hasRole("ACCOUNTING") || uid === RAYHAN_ACCOUNTING_USER_ID) {
+        score += uPembukuanManual.length * 0.3 + uPembukuanKonfirmasi.length * 0.2 + uAuditTotal * 0.5;
+        metrics.push({ label: "Jurnal Manual", value: uPembukuanManual.length, unit: "entry" });
+        metrics.push({ label: "Konfirmasi Pending", value: uPembukuanKonfirmasi.length, unit: "entry" });
+        metrics.push({ label: "Audit", value: uAuditTotal, unit: "aksi" });
+      }
 
       // MISSIONS — DINONAKTIFKAN SEMENTARA (biar leaderboard "Pekerjaan" fokus Purchasing dulu).
       // const uMissions = (missions ?? []).filter((m) => m.assigned_to === uid);

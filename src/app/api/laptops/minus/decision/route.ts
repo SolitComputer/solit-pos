@@ -3,6 +3,7 @@ import { supabase } from "@/services/supabase";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { recalcLaptopParentQty } from "@/lib/laptopStock";
 import { MINUS_REVIEW_ROLES } from "@/lib/permissions";
+import { logActivity } from "@/lib/activityLogger";
 
 // POST — keputusan akhir untuk unit minus yang sudah "Sudah Diatasi":
 // OKE     → status jadi SIAP_JUAL (kembali normal ke Data Barang)
@@ -40,9 +41,28 @@ async function decisionHandler(req: NextRequest, ctx: any, user: AuthUser) {
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 });
 
       await recalcLaptopParentQty(supabase, unit.laptop_id);
+
+      // ✅ Leaderboard Pengelola Barang: sama seperti PUT /api/laptops/minus —
+      // unit yang tadinya minus (SERVICE/BELUM_SIAP) dan diputuskan OKE di
+      // sini otomatis jadi SIAP_JUAL, jadi dihitung +5 poin juga. `unit`
+      // (hasil fetch di atas, SEBELUM update) masih membawa status lama.
+      const wasMinus = unit.status === "SERVICE" || unit.status === "BELUM_SIAP";
+      if (wasMinus) {
+        await logActivity({
+          userId: user.id,
+          userName: user.name,
+          userRole: user.role,
+          action: "MINUS_FIXED",
+          entity: "unit",
+          entityId: unit_id,
+          entityLabel: `SN: ${unit.serial_number}`,
+          beforeData: unit,
+          afterData: data,
+        });
+      }
+
       return NextResponse.json({ success: true, data, moved_to: "SIAP_JUAL" });
     }
-
     // decision === "NO_OKE"
     const { error: insertError } = await supabase.from("dead_assets").insert({
       nama_barang: unit.laptop?.laptop_name || "Tidak diketahui",

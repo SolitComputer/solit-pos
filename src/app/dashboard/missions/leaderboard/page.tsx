@@ -38,7 +38,15 @@ const boardLabels: Record<BoardType, { title: string; desc: string }> = {
   absensi: { title: "Leaderboard Absensi", desc: "Peringkat kehadiran berdasarkan data absensi wajah." },
 };
 
-const getDivision = (role: string) => {
+// Harus SAMA PERSIS dengan konstanta di /api/leaderboard-kerja/route.ts
+const RAYHAN_ACCOUNTING_USER_ID = "7a0aacab-961c-4332-b4bf-361431126f77";
+
+const getDivision = (role: string, id?: string) => {
+  // Rayhan: role sistemnya ADMIN, tapi dikelompokkan ke Divisi Accounting.
+  // Badge nama tetap pakai formatRole(user.role) di tempat lain — jadi
+  // teks "Admin" di sebelah namanya TIDAK berubah, cuma pengelompokan
+  // kartu divisinya yang beda.
+  if (id === RAYHAN_ACCOUNTING_USER_ID) return "Divisi Accounting";
   const r = (role || "").toUpperCase();
   if (r.includes("KEPALA_SALES")) return "Kepala Sales";
   if (r.includes("SALES")) return "Crew Sales";
@@ -187,7 +195,7 @@ export default function MissionLeaderboardPage() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [period, setPeriod] = useState<Period>("today");
+  const [period, setPeriod] = useState<Period>("month");
   const [boardType, setBoardType] = useState<BoardType>("kerja");
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -204,8 +212,8 @@ export default function MissionLeaderboardPage() {
 
       const url =
         b === "kerja" ? `/api/leaderboard-kerja?period=${p}` :
-        b === "absensi" ? `/api/attendance/leaderboard?period=${p}` :
-        `/api/missions/leaderboard?period=${p}`;
+          b === "absensi" ? `/api/attendance/leaderboard?period=${p}` :
+            `/api/missions/leaderboard?period=${p}`;
 
       const res = await fetch(url, { signal: controller.signal });
       const json = await res.json();
@@ -258,7 +266,7 @@ export default function MissionLeaderboardPage() {
   const grouped = useMemo(() => {
     const acc: Record<string, LeaderboardUser[]> = {};
     filteredUsers.forEach(user => {
-      const div = boardType === "absensi" ? "Semua Divisi" : getDivision(user.role);
+      const div = boardType === "absensi" ? "Semua Divisi" : getDivision(user.role, user.id);
       (acc[div] ||= []).push(user);
     });
     Object.values(acc).forEach(list => list.sort((a, b) => b.score - a.score));
@@ -305,9 +313,8 @@ export default function MissionLeaderboardPage() {
               <button
                 key={b}
                 onClick={() => setBoardType(b)}
-                className={`px-3 py-1.5 text-[11px] sm:text-xs font-medium rounded-md transition-all whitespace-nowrap ${
-                  boardType === b ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
-                }`}
+                className={`px-3 py-1.5 text-[11px] sm:text-xs font-medium rounded-md transition-all whitespace-nowrap ${boardType === b ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
+                  }`}
               >
                 {b === "kerja" ? "Pekerjaan" : b === "misi" ? "Misi" : "Absensi"}
               </button>
@@ -319,9 +326,8 @@ export default function MissionLeaderboardPage() {
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 text-[11px] sm:text-xs font-medium rounded-md transition-all whitespace-nowrap ${
-                  period === p ? "bg-blue-600 text-white" : "text-gray-500 hover:text-gray-900"
-                }`}
+                className={`px-3 py-1.5 text-[11px] sm:text-xs font-medium rounded-md transition-all whitespace-nowrap ${period === p ? "bg-blue-600 text-white" : "text-gray-500 hover:text-gray-900"
+                  }`}
               >
                 {periodLabels[p]}
               </button>
@@ -464,24 +470,21 @@ export default function MissionLeaderboardPage() {
                       return (
                         <div
                           key={user.id}
-                          className={`px-4 sm:px-5 py-3 transition-colors ${
-                            isChampion
-                              ? "bg-gradient-to-r from-amber-50/80 to-transparent hover:from-amber-50"
-                              : "hover:bg-gray-50/60"
-                          }`}
+                          className={`px-4 sm:px-5 py-3 transition-colors ${isChampion
+                            ? "bg-gradient-to-r from-amber-50/80 to-transparent hover:from-amber-50"
+                            : "hover:bg-gray-50/60"
+                            }`}
                         >
                           <div className="flex items-center gap-3">
                             {/* Rank */}
-                            <div className={`w-6 shrink-0 text-center text-sm font-semibold tabular-nums ${
-                              idx < 3 ? rankColors[idx] : "text-gray-300"
-                            }`}>
+                            <div className={`w-6 shrink-0 text-center text-sm font-semibold tabular-nums ${idx < 3 ? rankColors[idx] : "text-gray-300"
+                              }`}>
                               {idx + 1}
                             </div>
 
                             {/* Avatar */}
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-[11px] shrink-0 overflow-hidden ${
-                              isChampion ? "bg-amber-100 text-amber-700 ring-2 ring-amber-300" : "bg-gray-100 text-gray-500"
-                            }`}>
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-[11px] shrink-0 overflow-hidden ${isChampion ? "bg-amber-100 text-amber-700 ring-2 ring-amber-300" : "bg-gray-100 text-gray-500"
+                              }`}>
                               {user.photo_url ? (
                                 <img src={user.photo_url} alt={user.name} className="w-full h-full object-cover" />
                               ) : (
@@ -522,9 +525,8 @@ export default function MissionLeaderboardPage() {
                               </div>
                               <div className="h-1 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
                                 <div
-                                  className={`h-full rounded-full transition-all duration-500 ${
-                                    isChampion || idx === 0 ? "bg-gradient-to-r from-amber-400 to-amber-500" : "bg-blue-500/70"
-                                  }`}
+                                  className={`h-full rounded-full transition-all duration-500 ${isChampion || idx === 0 ? "bg-gradient-to-r from-amber-400 to-amber-500" : "bg-blue-500/70"
+                                    }`}
                                   style={{ width: `${Math.max((user.score / maxScore) * 100, 4)}%` }}
                                 />
                               </div>
