@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Search, RotateCcw, X, Plus, Layers, Filter, Tag, Cpu } from "lucide-react";
+import { History as HistoryIcon, Search, RotateCcw, X, Plus, Layers, Filter, Tag } from "lucide-react";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
@@ -19,7 +19,7 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
-type ItemType = "LAPTOP" | "AKSESORIS" | "SPAREPART";
+type ItemType = "LAPTOP" | "AKSESORIS";
 
 interface LaptopUnitLite {
     id: string; serial_number: string; status: string;
@@ -195,7 +195,7 @@ function DeleteConfirm({ row, onClose, onConfirm, loading }: {
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
                 <div className="h-1 w-full bg-gradient-to-r from-rose-400 via-rose-600 to-rose-800" />
                 <div className="bg-gradient-to-r from-rose-600 to-rose-700 px-6 py-5">
-                    <p className="font-bold text-white text-sm">Hapus {row.tipe === "LAPTOP" ? "Laptop" : "Aksesori"}</p>
+                    <p className="font-bold text-white text-sm">Hapus Barang</p>
                     <p className="text-xs text-white/60 mt-0.5">Tindakan ini tidak dapat dibatalkan</p>
                 </div>
                 <div className="p-6">
@@ -266,7 +266,6 @@ export default function UnifiedBarangContent() {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
 
-    const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>("ALL");
     const [kategoriFilter, setKategoriFilter] = useState("");
     const [search, setSearch] = useState("");
     const [filterSN, setFilterSN] = useState("");
@@ -277,7 +276,8 @@ export default function UnifiedBarangContent() {
     const [filterAudit, setFilterAudit] = useState("");
     const [sortBy, setSortBy] = useState("DEFAULT");
 
-    const [formModal, setFormModal] = useState<{ mode: "create" | "edit"; tipe: ItemType; row?: UnifiedRow } | null>(null);
+    const [formModal, setFormModal] = useState<{ mode: "create" | "edit"; row?: UnifiedRow } | null>(null);
+    const [formSelectedCatId, setFormSelectedCatId] = useState("");
     const [laptopForm, setLaptopForm] = useState(EMPTY_LAPTOP_FORM);
     const [accForm, setAccForm] = useState(EMPTY_ACC_FORM);
     const [saving, setSaving] = useState(false);
@@ -331,7 +331,7 @@ export default function UnifiedBarangContent() {
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
     const canCreateAcc = hasAnyRole(userRoles, ACCESSORY_CREATE_ROLES) || matrixCanBarang.create;
     const canEditAcc = hasAnyRole(userRoles, ACCESSORY_EDIT_ROLES) || matrixCanBarang.edit;
-        const canDeleteAcc = hasAnyRole(userRoles, ACCESSORY_DELETE_ROLES) || matrixCanBarang.delete;
+    const canDeleteAcc = hasAnyRole(userRoles, ACCESSORY_DELETE_ROLES) || matrixCanBarang.delete;
 
     // ── Aturan toggle audit: LAPTOP butuh canSeePrivate, AKSESORIS butuh ADMIN.
     // Ini persis aturan yang sudah ada masing-masing di komponen asli — sengaja
@@ -399,62 +399,41 @@ export default function UnifiedBarangContent() {
         })();
     }, []);
 
-    // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe)
-    useEffect(() => { setKategoriFilter(""); }, [tipeFilter]);
-
-    const isRowSparepart = useCallback((r: UnifiedRow, catList: typeof categories) => {
-        const cat = catList.find(c => c.id === r.kategori_id);
-        if (cat?.type === "SPAREPART") return true;
-        const catName = (cat?.name || r.kategori || "").toUpperCase();
-        const keywords = ["RAM", "SSD", "HDD", "SPAREPART", "PROCESSOR", "CPU", "LCD", "FAN", "KEYBOARD", "MOTHERBOARD", "BATERAI", "BATTERY"];
-        return keywords.some(kw => catName.includes(kw));
-    }, []);
-
-    // Kategori dipisah per tipe dengan opsi SEMUA/UMUM/SPAREPART yang dapat diakses di kedua form
-    const laptopCategories = useMemo(
-        () => categories.filter(c => !c.type || c.type === "ALL" || c.type === "UMUM" || c.type === "LAPTOP" || c.type === "SPAREPART"),
-        [categories],
-    );
-    const accessoryCategories = useMemo(
-        () => categories.filter(c => !c.type || c.type === "ALL" || c.type === "UMUM" || c.type === "AKSESORIS" || c.type === "SPAREPART"),
-        [categories],
-    );
-    // Opsi yang tampil di dropdown filter, mengikuti tipe yang sedang dipilih.
-    const filterCategories = tipeFilter === "LAPTOP" ? laptopCategories
-        : tipeFilter === "AKSESORIS" ? accessoryCategories
-        : categories;
+    // Derive tipe form dari kategori yang dipilih di form modal
+    const formTipe: ItemType | null = useMemo(() => {
+        if (!formModal) return null;
+        if (formModal.mode === "edit" && formModal.row) return formModal.row.tipe;
+        const cat = categories.find(c => c.id === formSelectedCatId);
+        if (!cat) return null;
+        return cat.type === "LAPTOP" ? "LAPTOP" : "AKSESORIS";
+    }, [formModal, formSelectedCatId, categories]);
 
     // Jabarkan SEMUA kategori sebagai pill/tag beserta hitungan jumlah barangnya
     const categoryPills = useMemo(() => {
-        const pills: { id: string; name: string; type?: string | null; count: number }[] = [];
+        const pills: { id: string; name: string; count: number }[] = [];
         const seenNames = new Set<string>();
 
-        // 1. Dari master categories di database
         categories.forEach(c => {
             const catNameUpper = (c.name || "").trim().toUpperCase();
             if (!catNameUpper) return;
             seenNames.add(catNameUpper);
-            const count = rows.filter(r => {
-                if (c.type === "LAPTOP") return r.kategori_id === c.id;
-                if (c.type === "AKSESORIS") return r.kategori_id === c.id || (r.kategori || "").trim().toUpperCase() === catNameUpper;
-                return r.kategori_id === c.id || (r.kategori || "").trim().toUpperCase() === catNameUpper;
-            }).length;
-            pills.push({ id: c.id, name: c.name.trim(), type: c.type, count });
+            const count = rows.filter(r =>
+                r.kategori_id === c.id || (r.kategori || "").trim().toUpperCase() === catNameUpper
+            ).length;
+            pills.push({ id: c.id, name: c.name.trim(), count });
         });
 
-        // 2. Dari baris barang jika ada kategori unik yang belum terdaftar di master
         rows.forEach(r => {
             if (r.kategori && r.kategori.trim()) {
                 const nameUpper = r.kategori.trim().toUpperCase();
                 if (!seenNames.has(nameUpper)) {
                     seenNames.add(nameUpper);
                     const count = rows.filter(x => (x.kategori || "").trim().toUpperCase() === nameUpper).length;
-                    pills.push({ id: `custom-${nameUpper}`, name: r.kategori.trim(), type: r.tipe, count });
+                    pills.push({ id: `custom-${nameUpper}`, name: r.kategori.trim(), count });
                 }
             }
         });
 
-        // Urutkan: Kategori yang memiliki barang (>0) di depan, lalu alfabetis A-Z
         return pills.sort((a, b) => {
             if (a.count > 0 && b.count === 0) return -1;
             if (a.count === 0 && b.count > 0) return 1;
@@ -487,26 +466,16 @@ export default function UnifiedBarangContent() {
     const filteredRows = useMemo(() => {
         let list = rows;
 
-        // 1. Tipe
-        if (tipeFilter === "LAPTOP") list = list.filter(r => r.tipe === "LAPTOP");
-        else if (tipeFilter === "AKSESORIS") list = list.filter(r => r.tipe === "AKSESORIS" && !isRowSparepart(r, categories));
-        else if (tipeFilter === "SPAREPART") list = list.filter(r => isRowSparepart(r, categories));
-
-        // 2. Kategori
+        // 1. Kategori
         if (kategoriFilter) {
             const selectedCat = categories.find(c => c.id === kategoriFilter);
             const selectedName = (selectedCat ? selectedCat.name : kategoriFilter.replace(/^custom-/, "")).trim().toUpperCase();
-            list = list.filter(r => {
-                const matchLaptop = r.kategori_id === kategoriFilter;
-                const matchAksesoris = (r.kategori || "").trim().toUpperCase() === selectedName || r.kategori_id === kategoriFilter;
-                if (tipeFilter === "LAPTOP") return matchLaptop;
-                if (tipeFilter === "AKSESORIS") return matchAksesoris;
-                if (tipeFilter === "SPAREPART") return isRowSparepart(r, categories) && (matchLaptop || matchAksesoris);
-                return r.tipe === "LAPTOP" ? matchLaptop : matchAksesoris;
-            });
+            list = list.filter(r =>
+                r.kategori_id === kategoriFilter || (r.kategori || "").trim().toUpperCase() === selectedName
+            );
         }
 
-        // 3. Search umum (Nama, Brand, CPU, Storage, Spek)
+        // 2. Search umum (Nama, Brand, CPU, Storage, Spek)
         if (search.trim()) {
             const t = search.toLowerCase();
             list = list.filter(r => (
@@ -609,14 +578,9 @@ export default function UnifiedBarangContent() {
         }
 
         return list;
-    }, [rows, tipeFilter, kategoriFilter, search, filterSN, filterBrand, filterStatus, filterRam, filterPriceRange, filterAudit, sortBy, categories, isRowSparepart]);
+    }, [rows, kategoriFilter, search, filterSN, filterBrand, filterStatus, filterRam, filterPriceRange, filterAudit, sortBy, categories]);
 
-    const counts = useMemo(() => ({
-        total: rows.length,
-        laptop: rows.filter(r => r.tipe === "LAPTOP").length,
-        aksesoris: rows.filter(r => r.tipe === "AKSESORIS" && !isRowSparepart(r, categories)).length,
-        sparepart: rows.filter(r => isRowSparepart(r, categories)).length,
-    }), [rows, categories, isRowSparepart]);
+    const totalCount = rows.length;
 
     // ── Audit toggle ───────────────────────────────────────────────────────
     const toggleAudit = async (row: UnifiedRow) => {
@@ -749,10 +713,11 @@ export default function UnifiedBarangContent() {
     }, [historyTarget]);
 
     // ── Create / Edit form ───────────────────────────────────────────────────
-    const openCreate = (tipe: ItemType) => {
+    const openCreate = () => {
         setLaptopForm(EMPTY_LAPTOP_FORM);
         setAccForm(EMPTY_ACC_FORM);
-        setFormModal({ mode: "create", tipe });
+        setFormSelectedCatId("");
+        setFormModal({ mode: "create" });
     };
     const openEdit = (row: UnifiedRow) => {
         if (row.tipe === "LAPTOP") {
@@ -762,36 +727,42 @@ export default function UnifiedBarangContent() {
                 cpu: l.cpu || "", ram: l.ram || "", storage: l.storage || "", gpu: l.gpu || "", display: l.display || "",
                 selling_price: String(l.selling_price || ""), condition_note: l.condition_note || "", notes: l.notes || "",
             });
+            setFormSelectedCatId(l.category_id || "");
         } else {
             const a = row.raw as AccessoryRaw;
             setAccForm({
                 name: a.name || "", category: a.category || "", brand: a.brand || "", spec: a.spec || "",
                 buy_price: String(a.buy_price ?? ""), sell_price: String(a.sell_price ?? ""), stock: String(a.stock ?? ""), notes: a.notes || "",
             });
+            const matchCat = categories.find(c => c.name.toUpperCase() === (a.category || "").toUpperCase());
+            setFormSelectedCatId(matchCat?.id || "");
         }
-        setFormModal({ mode: "edit", tipe: row.tipe, row });
+        setFormModal({ mode: "edit", row });
     };
     const closeForm = () => setFormModal(null);
 
     const submitForm = async () => {
         if (!formModal) return;
+        if (!formTipe) { toast.error("Pilih kategori terlebih dahulu"); return; }
         setSaving(true);
         try {
-            if (formModal.tipe === "LAPTOP") {
-                if (!laptopForm.laptop_name.trim()) { toast.error("Nama laptop wajib diisi"); return; }
-                const body = { ...laptopForm, selling_price: Number(laptopForm.selling_price) || 0 };
+            if (formTipe === "LAPTOP") {
+                if (!laptopForm.laptop_name.trim()) { toast.error("Nama barang wajib diisi"); return; }
+                const body = { ...laptopForm, category_id: formSelectedCatId || laptopForm.category_id, selling_price: Number(laptopForm.selling_price) || 0 };
                 const url = formModal.mode === "edit" ? `/api/laptops/${formModal.row!.id}` : "/api/laptops/create";
                 const res = await fetch(url, {
                     method: formModal.mode === "edit" ? "PUT" : "POST",
                     headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
                 });
                 const json = await res.json();
-                if (!json.success) throw new Error(json.message || "Gagal menyimpan laptop");
+                if (!json.success) throw new Error(json.message || "Gagal menyimpan");
             } else {
-                if (!accForm.name.trim()) { toast.error("Nama aksesori wajib diisi"); return; }
-                if (!accForm.category) { toast.error("Kategori wajib dipilih"); return; }
+                if (!accForm.name.trim()) { toast.error("Nama barang wajib diisi"); return; }
+                const catName = categories.find(c => c.id === formSelectedCatId)?.name || accForm.category;
+                if (!catName) { toast.error("Kategori wajib dipilih"); return; }
                 const body = {
                     ...accForm,
+                    category: catName,
                     buy_price: Number(accForm.buy_price) || 0,
                     sell_price: Number(accForm.sell_price) || 0,
                     stock: Number(accForm.stock) || 0,
@@ -802,7 +773,7 @@ export default function UnifiedBarangContent() {
                     headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
                 });
                 const json = await res.json();
-                if (!json.success) throw new Error(json.error || "Gagal menyimpan aksesori");
+                if (!json.success) throw new Error(json.error || "Gagal menyimpan");
             }
             toast.success(formModal.mode === "edit" ? "Berhasil diperbarui" : "Berhasil ditambahkan");
             closeForm();
@@ -834,7 +805,6 @@ export default function UnifiedBarangContent() {
     };
 
     const hasFilter = (
-        tipeFilter !== "ALL" ||
         !!kategoriFilter ||
         !!search.trim() ||
         !!filterSN.trim() ||
@@ -847,7 +817,6 @@ export default function UnifiedBarangContent() {
     );
 
     const resetFilter = () => {
-        setTipeFilter("ALL");
         setKategoriFilter("");
         setSearch("");
         setFilterSN("");
@@ -881,56 +850,21 @@ export default function UnifiedBarangContent() {
                     <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-4 sm:p-5 space-y-3.5">
                         {/* Baris 1: Main Scope Switcher (Kiri) & Action Buttons (Kanan) */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100">
-                            {/* Segmented Control Scope */}
-                            <div className="inline-flex p-1 bg-zinc-100/90 rounded-2xl border border-zinc-200/60 shadow-xs self-start flex-wrap gap-0.5">
-                                {([
-                                    ["ALL", `Semua`, counts.total, Layers],
-                                    ["LAPTOP", `Laptop`, counts.laptop, LaptopIcon],
-                                    ["AKSESORIS", `Aksesoris`, counts.aksesoris, Wrench],
-                                    ["SPAREPART", `Sparepart`, counts.sparepart, Cpu],
-                                ] as const).map(([key, label, count, Icon]) => {
-                                    const isActive = tipeFilter === key && !kategoriFilter;
-                                    return (
-                                        <button
-                                            key={key}
-                                            onClick={() => {
-                                                setTipeFilter(key);
-                                                setKategoriFilter("");
-                                            }}
-                                            className={`inline-flex items-center gap-1.5 h-8 px-3 sm:px-3.5 rounded-xl text-xs font-semibold transition-all duration-150 active:scale-[0.98] cursor-pointer ${
-                                                isActive
-                                                    ? "bg-white text-zinc-900 shadow-sm border border-zinc-200/80 font-bold"
-                                                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
-                                            }`}
-                                        >
-                                            <Icon size={13} className={isActive ? "text-zinc-900" : "text-zinc-400"} />
-                                            <span>{label}</span>
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${isActive ? "bg-zinc-100 text-zinc-800 font-bold" : "text-zinc-400"}`}>
-                                                {count}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-zinc-800">
+                                    {totalCount} <span className="text-zinc-400 font-medium">Barang</span>
+                                </span>
                             </div>
 
                             {/* Tombol Tambah & Kategori Cepat */}
                             <div className="flex items-center gap-2 shrink-0">
-                                {canCreateLaptop && (
+                                {(canCreateLaptop || canCreateAcc) && (
                                     <button
-                                        onClick={() => openCreate("LAPTOP")}
+                                        onClick={() => openCreate()}
                                         className="inline-flex items-center gap-1.5 h-8.5 px-3.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black active:scale-[0.98] transition-all shadow-sm cursor-pointer"
                                     >
                                         <Plus size={13} />
-                                        <span>Laptop</span>
-                                    </button>
-                                )}
-                                {canCreateAcc && (
-                                    <button
-                                        onClick={() => openCreate("AKSESORIS")}
-                                        className="inline-flex items-center gap-1.5 h-8.5 px-3.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black active:scale-[0.98] transition-all shadow-sm cursor-pointer"
-                                    >
-                                        <Plus size={13} />
-                                        <span>Aksesori</span>
+                                        <span>Tambah Barang</span>
                                     </button>
                                 )}
                                 <button
@@ -972,7 +906,6 @@ export default function UnifiedBarangContent() {
                                                         setKategoriFilter("");
                                                     } else {
                                                         setKategoriFilter(cat.id);
-                                                        if (cat.type) setTipeFilter(cat.type as ItemType);
                                                     }
                                                 }}
                                                 className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs shrink-0 transition-all cursor-pointer ${
@@ -1100,7 +1033,7 @@ export default function UnifiedBarangContent() {
                                     className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
                                 >
                                     <option value="">Semua Kategori</option>
-                                    {filterCategories.map((c) => (
+                                    {categories.map((c) => (
                                         <option key={c.id} value={c.id}>
                                             {c.name}
                                         </option>
@@ -1179,12 +1112,6 @@ export default function UnifiedBarangContent() {
                             <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 text-[11px] text-zinc-500 border-t border-zinc-100">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="font-semibold text-zinc-700">Filter Aktif:</span>
-                                    {tipeFilter !== "ALL" && (
-                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
-                                            Tipe: {tipeFilter === "LAPTOP" ? "Laptop" : "Aksesoris"}
-                                            <button onClick={() => setTipeFilter("ALL")} className="hover:text-zinc-900"><X size={11} /></button>
-                                        </span>
-                                    )}
                                     {search && (
                                         <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
                                             Cari: &ldquo;{search}&rdquo;
@@ -1279,9 +1206,8 @@ export default function UnifiedBarangContent() {
                                             {/* Header: tipe + nama + harga jual */}
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0 flex-1">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
-                                                        {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
-                                                        {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-zinc-100 text-zinc-600 border border-zinc-200">
+                                                        {row.kategori || "Tanpa Kategori"}
                                                     </span>
                                                     <h3 className="font-bold text-zinc-900 text-[13.5px] leading-snug mt-1.5 truncate" title={row.nama}>{row.nama}</h3>
                                                     <p className="text-[11px] text-zinc-400 mt-0.5 truncate">
@@ -1393,7 +1319,7 @@ export default function UnifiedBarangContent() {
                                     <table className="w-full text-sm border-collapse">
                                         <thead>
                                             <tr className="whitespace-nowrap">
-                                                {["No", "Tipe", "Nama Barang", "Kategori", "Merk", "CPU", "RAM", "Storage", "Spek",
+                                                {["No", "Tag", "Nama Barang", "Kategori", "Merk", "CPU", "RAM", "Storage", "Spek",
                                                     "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
                                                     "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "M", "Stok", "SO", "Audit", "Aksi"].map((h, hi) => (
                                                         <th key={h}
@@ -1421,9 +1347,8 @@ export default function UnifiedBarangContent() {
                                                     >
                                                         <td className="px-3 py-3 text-xs text-zinc-400 tabular-nums">{idx + 1}</td>
                                                         <td className="px-3 py-3">
-                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
-                                                                {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
-                                                                {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-zinc-100 text-zinc-600 border border-zinc-200">
+                                                                {row.kategori || "Tanpa Kategori"}
                                                             </span>
                                                         </td>
                                                         <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-zinc-800 max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 ${rowBg}`} title={row.nama}>{row.nama}</td>
@@ -1528,31 +1453,37 @@ export default function UnifiedBarangContent() {
                         <div className="h-0.5 w-full bg-gradient-to-r from-zinc-300 via-zinc-600 to-black" />
                         <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
                             <h2 className="font-bold text-zinc-900 text-[15px]">
-                                {formModal.mode === "edit" ? "Edit" : "Tambah"} {formModal.tipe === "LAPTOP" ? "Laptop" : "Aksesori"}
+                                {formModal.mode === "edit" ? "Edit Barang" : "Tambah Barang"}
                             </h2>
                             <button onClick={closeForm} className="text-zinc-400 hover:text-zinc-700">✕</button>
                         </div>
 
-                        {formModal.mode === "create" && (
-                            <div className="px-6 pt-4 flex gap-2">
-                                <button onClick={() => setFormModal({ mode: "create", tipe: "LAPTOP" })}
-                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500"}`}>Laptop</button>
-                                <button onClick={() => setFormModal({ mode: "create", tipe: "AKSESORIS" })}
-                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "AKSESORIS" ? "bg-zinc-700 text-white" : "bg-zinc-100 text-zinc-500"}`}>Aksesoris</button>
-                            </div>
-                        )}
-
                         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-3">
-                            {formModal.tipe === "LAPTOP" ? (
+                            {/* Kategori — menentukan field yang tampil */}
+                            <Field label="Kategori" required>
+                                <select
+                                    className={inputCls}
+                                    value={formSelectedCatId}
+                                    onChange={e => {
+                                        const catId = e.target.value;
+                                        setFormSelectedCatId(catId);
+                                        const cat = categories.find(c => c.id === catId);
+                                        if (cat?.type === "LAPTOP") {
+                                            setLaptopForm(p => ({ ...p, category_id: catId }));
+                                        } else if (cat) {
+                                            setAccForm(p => ({ ...p, category: cat.name }));
+                                        }
+                                    }}
+                                >
+                                    <option value="">-- Pilih Kategori --</option>
+                                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </Field>
+
+                            {formTipe === "LAPTOP" ? (
                                 <>
-                                    <Field label="Nama Laptop" required>
+                                    <Field label="Nama Barang" required>
                                         <input className={inputCls} value={laptopForm.laptop_name} onChange={e => setLaptopForm(p => ({ ...p, laptop_name: e.target.value }))} />
-                                    </Field>
-                                    <Field label="Kategori">
-                                        <select className={inputCls} value={laptopForm.category_id} onChange={e => setLaptopForm(p => ({ ...p, category_id: e.target.value }))}>
-                                            <option value="">Tanpa Kategori</option>
-                                            {laptopCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
                                     </Field>
                                     <div className="grid grid-cols-2 gap-3">
                                         <Field label="Brand"><input className={inputCls} value={laptopForm.brand} onChange={e => setLaptopForm(p => ({ ...p, brand: e.target.value }))} /></Field>
@@ -1566,21 +1497,10 @@ export default function UnifiedBarangContent() {
                                     <Field label="Kondisi Umum"><input className={inputCls} value={laptopForm.condition_note} onChange={e => setLaptopForm(p => ({ ...p, condition_note: e.target.value }))} /></Field>
                                     <Field label="Catatan"><textarea rows={2} className={inputCls} value={laptopForm.notes} onChange={e => setLaptopForm(p => ({ ...p, notes: e.target.value }))} /></Field>
                                 </>
-                            ) : (
+                            ) : formTipe === "AKSESORIS" ? (
                                 <>
-                                    <Field label="Nama Aksesori" required><input className={inputCls} value={accForm.name} onChange={e => setAccForm(p => ({ ...p, name: e.target.value }))} /></Field>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Field label="Kategori" required>
-                                            <select className={inputCls} value={accForm.category} onChange={e => setAccForm(p => ({ ...p, category: e.target.value }))}>
-                                                <option value="">-- Pilih --</option>
-                                                {accessoryCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                                {accForm.category && !accessoryCategories.some(c => c.name.toUpperCase() === accForm.category.toUpperCase()) && (
-                                                    <option value={accForm.category}>{accForm.category}</option>
-                                                )}
-                                            </select>
-                                        </Field>
-                                        <Field label="Merk"><input className={inputCls} value={accForm.brand} onChange={e => setAccForm(p => ({ ...p, brand: e.target.value }))} /></Field>
-                                    </div>
+                                    <Field label="Nama Barang" required><input className={inputCls} value={accForm.name} onChange={e => setAccForm(p => ({ ...p, name: e.target.value }))} /></Field>
+                                    <Field label="Merk"><input className={inputCls} value={accForm.brand} onChange={e => setAccForm(p => ({ ...p, brand: e.target.value }))} /></Field>
                                     <Field label="Spesifikasi"><input className={inputCls} value={accForm.spec} onChange={e => setAccForm(p => ({ ...p, spec: e.target.value }))} /></Field>
                                     <div className="grid grid-cols-2 gap-3">
                                         <Field label="Harga Modal"><input type="number" className={inputCls} value={accForm.buy_price} onChange={e => setAccForm(p => ({ ...p, buy_price: e.target.value }))} /></Field>
@@ -1589,11 +1509,15 @@ export default function UnifiedBarangContent() {
                                     <Field label="Stok" required><input type="number" className={inputCls} value={accForm.stock} onChange={e => setAccForm(p => ({ ...p, stock: e.target.value }))} /></Field>
                                     <Field label="Keterangan"><textarea rows={2} className={inputCls} value={accForm.notes} onChange={e => setAccForm(p => ({ ...p, notes: e.target.value }))} /></Field>
                                 </>
+                            ) : (
+                                <div className="py-8 text-center text-sm text-zinc-400">
+                                    Pilih kategori di atas untuk menampilkan form
+                                </div>
                             )}
                         </div>
                         <div className="flex gap-3 px-6 py-4 border-t border-zinc-100">
                             <button onClick={closeForm} disabled={saving} className="flex-1 h-11 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-zinc-200 transition">Batal</button>
-                            <button onClick={submitForm} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-zinc-800 to-zinc-900 text-white rounded-xl text-sm font-semibold hover:from-zinc-900 hover:to-black transition disabled:opacity-50">
+                            <button onClick={submitForm} disabled={saving || !formTipe} className="flex-1 h-11 bg-gradient-to-r from-zinc-800 to-zinc-900 text-white rounded-xl text-sm font-semibold hover:from-zinc-900 hover:to-black transition disabled:opacity-50">
                                 {saving ? "Menyimpan..." : "Simpan"}
                             </button>
                         </div>
