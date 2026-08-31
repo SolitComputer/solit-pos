@@ -3944,6 +3944,11 @@ export default function AttendanceDashboardPage() {
 
     const todayKey = getWIBToday();
     const uniqueUsers = useMemo(() => { if (allUsers.length > 0) return allUsers.map(u => u.name).sort(); return [...new Set(mergedAttendances.map(a => a.user_name))].sort(); }, [allUsers, mergedAttendances]);
+    // ✅ NEW — id user yang sedang aktif di "Filter Karyawan" (Kalender), dipakai buat prefill dropdown Absen Manual
+    const filterUserId = useMemo(() => {
+        if (filterUser === "Semua") return undefined;
+        return allUsers.find(u => u.name === filterUser)?.id;
+    }, [filterUser, allUsers]);
     const salaryMap = useMemo(() => { const m: Record<string, UserSalary> = {}; salaries.forEach(s => m[s.user_id] = s); return m; }, [salaries]);
 
     // Shift efektif per (user, tanggal): jadwal > shift user > PAGI
@@ -4855,7 +4860,7 @@ export default function AttendanceDashboardPage() {
                         )}
                         {isAdmin && (
                             <button
-                                onClick={() => openAddManual()}
+                                onClick={() => openAddManual(undefined, filterUserId)}
                                 disabled={usersLoading}
                                 className="flex items-center gap-1.5 text-xs font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-60"
                             >
@@ -5194,7 +5199,7 @@ export default function AttendanceDashboardPage() {
                                     <div className="flex items-center gap-2">
                                         {isAdminRole(currentUser?.role)
                                             && (
-                                                <button onClick={() => openAddManual(selectedDate)} className="flex items-center gap-1.5 text-[11px] font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-200 transition-all">
+                                                <button onClick={() => openAddManual(selectedDate, filterUserId)} className="flex items-center gap-1.5 text-[11px] font-bold text-[#1a1a2e] bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-200 transition-all">
                                                     Tambah Manual
                                                 </button>
                                             )}
