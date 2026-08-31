@@ -161,7 +161,7 @@ export async function GET(request: Request) {
         const actualEnd = expired.scheduled_end;
         const startMs = expired.actual_start ? new Date(expired.actual_start).getTime() : NaN;
         const endMs = new Date(actualEnd).getTime();
-       const durationMins = Number.isNaN(startMs) ? 0 : Math.round((endMs - startMs) / 60000);
+        const durationMins = Number.isNaN(startMs) ? 0 : Math.round((endMs - startMs) / 60000);
         const ratePerHour = expired.rate_per_hour ?? 0;
         // ✅ FIX: lembur dihitung proporsional per menit, bukan dibulatkan
         // ke bawah per jam penuh — sebelumnya 1j45m cuma dibayar 1 jam.
@@ -334,7 +334,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: "Kategori lembur tidak valid." }, { status: 400 });
       }
 
-     // ✅ FIX: "hari ini" untuk pengajuan lembur ikut pergantian hari
+      // ✅ FIX: "hari ini" untuk pengajuan lembur ikut pergantian hari
       // absensi jam 04:00 WIB (bukan jam 00:00).
       const todayWIBDate = toAttendanceDateKey(new Date().toISOString());
 
@@ -455,7 +455,7 @@ export async function POST(request: Request) {
         sourceFaceVerificationId: todayOut?.id ?? todayIn?.id ?? null,
         isHoliday: declare_direction === "HOLIDAY",
       });
-      
+
       if (!created) {
         return NextResponse.json({ success: false, message: "Gagal menyimpan pengajuan lembur." }, { status: 500 });
       }
@@ -539,7 +539,7 @@ export async function POST(request: Request) {
         );
       }
 
-     const durationMins = Math.round(
+      const durationMins = Math.round(
         (new Date(actualEnd).getTime() - new Date(actualStart).getTime()) / 60000
       );
 
@@ -572,7 +572,7 @@ export async function POST(request: Request) {
               .select("rate_per_hour")
               .eq("role", targetUserData.role)
               .maybeSingle();
-          finalRate = rateData?.rate_per_hour ?? 0;
+            finalRate = rateData?.rate_per_hour ?? 0;
           }
         }
         // ✅ FIX: proporsional per menit, bukan dibulatkan ke bawah per jam.
@@ -608,6 +608,7 @@ export async function POST(request: Request) {
           auto_completed: false,
           is_holiday: is_holiday === true,
           is_late: manualIsLate,
+          audit_status: "PENDING", // ✅ FIX: eksplisit di-set, jangan gantung ke default kolom DB
           // ✅ rate_per_hour/total_pay TIDAK diisi manual lagi — nominal
           // selalu dihitung otomatis lewat action AUDIT (poin 4).
         })
@@ -707,8 +708,8 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: false, message: "Bukti foto lembur wajib diunggah." }, { status: 400 });
       }
       const { data, error } = await supabase.from("overtime_requests").update({
-        category: cat, 
-        work_description: desc.trim(), 
+        category: cat,
+        work_description: desc.trim(),
         proof_photo_url,
         updated_at: new Date().toISOString(),
       }).eq("id", id).select().single();
@@ -736,7 +737,7 @@ export async function PATCH(request: Request) {
         approved_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      
+
       if (overtime.proof_photo_url) {
         updatePayload.completed_at = new Date().toISOString();
       }
@@ -953,7 +954,7 @@ export async function PATCH(request: Request) {
           updated_at: new Date().toISOString(),
         };
 
-      if (!overtime.actual_end && overtime.scheduled_end && overtime.actual_start) {
+        if (!overtime.actual_end && overtime.scheduled_end && overtime.actual_start) {
           const lockedEnd = overtime.scheduled_end;
           const startMs = new Date(overtime.actual_start).getTime();
           const endMs = new Date(lockedEnd).getTime();
@@ -1007,7 +1008,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: false, message: "Waktu selesai tidak valid" }, { status: 400 });
       }
 
-     const durationMins = Math.round((endMs - startMs) / 60000);
+      const durationMins = Math.round((endMs - startMs) / 60000);
       const ratePerHour = overtime.rate_per_hour ?? 0;
       // ✅ FIX: proporsional per menit, bukan dibulatkan ke bawah per jam.
       const calculatedPay = Math.round((durationMins / 60) * ratePerHour);
@@ -1178,7 +1179,18 @@ export async function PATCH(request: Request) {
       if (newWorkDesc !== undefined) updatePayload.work_description = newWorkDesc;
       if (newProofUrl !== undefined) updatePayload.proof_photo_url = newProofUrl;
       if (newRate !== undefined) updatePayload.rate_per_hour = Math.round(newRate);
-      if (newStatus !== undefined) updatePayload.status = newStatus;
+
+      // ✅ FIX: kalau lembur ini punya foto bukti (baru dikirim lewat Edit, atau
+      // yang lama) tapi status yang mau disimpan masih "NEED_PROOF", paksa jadi
+      // COMPLETED. Nyamain perilaku dengan action ATTACH_PROOF — supaya lembur
+      // yang fotonya ditambahin lewat "Edit" (bukan lewat "Upload Foto") gak
+      // nyangkut di NEED_PROOF dan gak bisa di-Audit.
+      if (newStatus !== undefined) {
+        const proofForCheck = newProofUrl !== undefined ? newProofUrl : overtime.proof_photo_url;
+        const shouldAutoComplete = newStatus === "NEED_PROOF" && !!proofForCheck;
+        updatePayload.status = shouldAutoComplete ? "COMPLETED" : newStatus;
+        if (shouldAutoComplete) updatePayload.completed_at = new Date().toISOString();
+      }
       if (durationMins !== undefined) updatePayload.duration_minutes = durationMins;
       if (computedPay !== undefined) updatePayload.total_pay = Math.round(computedPay);
 
