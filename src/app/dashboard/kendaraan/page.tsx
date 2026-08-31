@@ -11,7 +11,7 @@ import {
   ModalWrapper, ModalHead, ModalFoot, ConfirmModal, VehicleStatusBadge, ApprovedByNote, StatPill,
   formatTime, formatDateTime,
 } from "@/components/kendaraan/ui";
-import { ApproveRequestModal } from "@/components/kendaraan/ApprovalModals";
+import { ApproveRequestModal, RejectRequestModal } from "@/components/kendaraan/ApprovalModals";
 import VehicleSopGate from "@/components/kendaraan/VehicleSopGate";
 
 type LastUsage = {
@@ -255,7 +255,7 @@ export default function KendaraanPage() {
       {borrowTarget && <BorrowModal vehicle={borrowTarget} onClose={() => setBorrowTarget(null)} onSaved={reload} />}
       {checkoutTarget && <CheckoutModal request={checkoutTarget} onClose={() => setCheckoutTarget(null)} onSaved={reload} />}
       {approveTarget && <ApproveRequestModal request={approveTarget} onClose={() => setApproveTarget(null)} onSaved={reload} />}
-      {rejectTarget && <RejectConfirmModal request={rejectTarget} onClose={() => setRejectTarget(null)} onSaved={reload} />}
+      {rejectTarget && <RejectRequestModal request={rejectTarget} onClose={() => setRejectTarget(null)} onSaved={reload} />}
       {addOpen && <VehicleFormModal onClose={() => setAddOpen(false)} onSaved={reload} />}
       {editTarget && <VehicleFormModal vehicle={editTarget} onClose={() => setEditTarget(null)} onSaved={reload} />}
     </DashboardLayout>
@@ -624,55 +624,7 @@ function BorrowModal({ vehicle, onClose, onSaved }: { vehicle: Vehicle; onClose:
   );
 }
 
-// ─── REJECT — konfirmasi cepat Ya/Tidak, TANPA alasan wajib ─────────────────
-function RejectConfirmModal({ request, onClose, onSaved }: { request: BorrowRequest; onClose: () => void; onSaved: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
 
-  const submit = async () => {
-    setBusy(true);
-    setErr("");
-    try {
-      const res = await fetch(`/api/vehicles/borrow/${request.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "REJECT", rejection_note: null }),
-      });
-      const d = await res.json();
-      if (!res.ok || !d.success) throw new Error(d.message || `Error ${res.status}`);
-      onSaved();
-      onClose();
-    } catch (e: any) {
-      setErr(e.message || "Gagal menolak pengajuan");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <ConfirmModal
-      icon={<Ban size={22} />}
-      tone="danger"
-      title="Tolak pengajuan ini?"
-      confirmLabel="Ya, Tolak"
-      cancelLabel="Tidak"
-      busy={busy}
-      onConfirm={submit}
-      onCancel={onClose}
-      message={
-        <>
-          Pengajuan peminjaman <b className="text-gray-900">{request.vehicle?.name ?? "kendaraan ini"}</b> dari{" "}
-          <b className="text-gray-900">{request.borrower?.name ?? "karyawan ini"}</b> akan ditolak. Karyawan akan melihat status ditolak di halaman mereka.
-          {err && (
-            <span className="block mt-3 text-left">
-              <ErrorBanner msg={err} />
-            </span>
-          )}
-        </>
-      }
-    />
-  );
-}
 
 // ─── CHECKOUT (wajib isi lengkap sebelum tombol aktif) ───────────────────────
 function CheckoutModal({ request, onClose, onSaved }: { request: BorrowRequest; onClose: () => void; onSaved: () => void }) {
