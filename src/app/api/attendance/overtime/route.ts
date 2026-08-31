@@ -1133,7 +1133,6 @@ export async function PATCH(request: Request) {
 
       const resolvedStart = newActualStart ?? overtime.actual_start;
       const resolvedEnd = newActualEnd ?? overtime.actual_end;
-      const resolvedRate = newRate ?? overtime.rate_per_hour ?? 0;
 
       let durationMins: number | undefined;
       let computedPay: number | undefined;
@@ -1143,10 +1142,29 @@ export async function PATCH(request: Request) {
         const endMs = new Date(resolvedEnd).getTime();
         if (endMs > startMs) {
           durationMins = Math.round((endMs - startMs) / 60000);
-          // ✅ FIX: proporsional per menit, bukan dibulatkan ke bawah per
-          // jam penuh — konsisten dengan action lain (GET auto-complete,
-          // is_manual, COMPLETE) yang sudah dibenerin sebelumnya.
-          computedPay = Math.round((durationMins / 60) * resolvedRate);
+
+          // ✅ FIX BUG: lembur yang sudah AUDITED lewat mesin gaji normal
+          // dihitung pakai per_minute_rate (dari gaji pokok/hari kerja
+          // efektif saat audit) — rate_per_hour MEMANG null untuk kasus
+          // ini. Kode lama fallback ke `rate_per_hour ?? 0`, jadi begitu
+          // jam lemburnya diedit, bayarannya kehitung durasi × 0 = Rp 0.
+          // Sekarang dihitung ulang proporsional pakai per_minute_rate
+          // yang sama dengan waktu audit.
+          if (overtime.is_holiday) {
+            // Lembur hari libur nominalnya FLAT (gak ngikutin jam kerja),
+            // jadi jangan dihitung ulang di sini — biarin total_pay hasil
+            // audit holiday yang lama tetap kepake walau jamnya diedit.
+          } else if (newRate !== undefined) {
+            // Kalau ada tarif per jam baru yang dikirim eksplisit, pakai itu.
+            computedPay = Math.round((durationMins / 60) * newRate);
+          } else if (overtime.per_minute_rate != null && overtime.per_minute_rate > 0) {
+            computedPay = Math.round(durationMins * overtime.per_minute_rate);
+          } else if (overtime.rate_per_hour) {
+            computedPay = Math.round((durationMins / 60) * overtime.rate_per_hour);
+          }
+          // Kalau belum ada per_minute_rate maupun rate_per_hour (lemburan
+          // belum pernah diaudit), total_pay dibiarkan apa adanya — jangan
+          // dipaksa jadi 0.
         }
       }
 
