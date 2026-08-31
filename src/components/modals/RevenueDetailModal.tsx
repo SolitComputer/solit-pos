@@ -51,7 +51,7 @@ function Skeleton() {
 export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   useRegisterOverlay(isOpen);
   const [data, setData] = useState<RevenueDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isMemuat, setIsMemuat] = useState(false);
   const [activeTab, setActiveTab] = useState<"daily" | "weekly" | "monthly">("daily");
   const [visible, setVisible] = useState(false);
 
@@ -63,7 +63,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
   useEffect(() => {
     if (!isOpen) return;
     const fetchData = async () => {
-      setIsLoading(true);
+      setIsMemuat(true);
       try {
         const res = await fetch("/api/dashboard/revenue-detail");
         const result = await res.json();
@@ -71,7 +71,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
       } catch (e) {
         console.error(e);
       } finally {
-        setIsLoading(false);
+        setIsMemuat(false);
       }
     };
     fetchData();
@@ -104,8 +104,8 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
         .rdm-shell {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
-          box-shadow: 0 32px 80px rgba(0,0,0,0.16), 0 8px 24px rgba(0,0,0,0.08);
+          border: 1px solid #F1F5F9;
+          box-shadow: 0 4px 20px -4px rgba(0,0,0,0.05);
         }
 
         .rdm-header {
@@ -115,8 +115,8 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
         .rdm-stat {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04);
+          border: 1px solid #F1F5F9;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.02);
           transition: box-shadow 0.2s, transform 0.2s;
         }
         .rdm-stat:hover {
@@ -130,7 +130,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
           padding: 4px;
         }
         .rdm-tab-active {
-          background: #18181B;
+          background: #6366f1;
           color: #FFFFFF;
           font-weight: 700;
           box-shadow: 0 2px 8px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.08);
@@ -146,7 +146,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
         .rdm-row-card {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
+          border: 1px solid #F1F5F9;
           box-shadow: 0 1px 3px rgba(0,0,0,0.04);
           transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
         }
@@ -157,9 +157,9 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
         }
 
         .badge-revenue {
-          background: #18181B;
+          background: #6366f1;
           color: #FFFFFF;
-          border: 1px solid #18181B;
+          border: 1px solid #6366f1;
           font-size: 9px;
           font-weight: 700;
           padding: 2px 6px;
@@ -168,16 +168,16 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
         .badge-profit {
           background: #F4F4F5;
           color: #3F3F46;
-          border: 1px solid #E4E4E7;
+          border: 1px solid #F1F5F9;
           font-size: 9px;
           font-weight: 700;
           padding: 2px 6px;
           border-radius: 6px;
         }
         .badge-weekly {
-          background: #27272A;
+          background: #4f46e5;
           color: #FFFFFF;
-          border: 1px solid #27272A;
+          border: 1px solid #4f46e5;
           font-size: 9px;
           font-weight: 700;
           padding: 2px 6px;
@@ -207,7 +207,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
         .rdm-monthly-card {
           background: #FAFAFA;
-          border: 1px solid #E4E4E7;
+          border: 1px solid #F1F5F9;
           border-radius: 14px;
           transition: box-shadow 0.2s;
         }
@@ -218,7 +218,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
           color: #A1A1AA;
           transition: background 0.2s, color 0.2s;
         }
-        .rdm-close:hover { background: #18181B; color: #FFFFFF; }
+        .rdm-close:hover { background: #6366f1; color: #FFFFFF; }
 
         .rdm-handle { background: #D4D4D8; }
       `}</style>
@@ -245,7 +245,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{
-                  background: "linear-gradient(135deg,#18181B 0%,#3F3F46 100%)",
+                  background: "linear-gradient(135deg,#6366f1 0%,#4f46e5 100%)",
                   boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
                 }}
               >
@@ -255,7 +255,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                 </svg>
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#18181B" }}>Detail Omzet</h2>
+                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#0f172a" }}>Detail Omzet</h2>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Rincian penjualan per hari, minggu &amp; bulan</p>
               </div>
             </div>
@@ -272,8 +272,8 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
           {/* ── Scrollable body ── */}
           <div className="rdm-scroll flex-1 overflow-y-auto" style={{ background: "#FAFAFA" }}>
 
-            {/* ── Loading ── */}
-            {isLoading ? (
+            {/* ── Memuat ── */}
+            {isMemuat ? (
               <Skeleton />
 
             ) : data ? (
@@ -284,16 +284,16 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
 
                   {/* Omzet Hari Ini */}
                   <div className="rdm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg,#18181B,#3F3F46)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg,#6366f1,#818cf8)" }} />
                     <div className="p-3">
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2.5" style={{ background: "#F4F4F5" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#18181B" strokeWidth="2.5" strokeLinecap="round">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round">
                           <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Omzet Hari Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#18181B" }}>{fmtRupiah(data.today.revenue)}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#3F3F46" }}>{data.today.count} transaksi</p>
+                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0f172a" }}>{fmtRupiah(data.today.revenue)}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#475569" }}>{data.today.count} transaksi</p>
                     </div>
                   </div>
 
@@ -307,8 +307,8 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Bulan Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#18181B" }}>{fmtRupiah(data.monthly.revenue)}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#52525B" }}>{data.monthly.count} transaksi</p>
+                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0f172a" }}>{fmtRupiah(data.monthly.revenue)}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#475569" }}>{data.monthly.count} transaksi</p>
                     </div>
                   </div>
 
@@ -322,7 +322,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Profit Hari Ini</p>
-                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#18181B" }}>{fmtRupiah(data.today.profit)}</p>
+                      <p className="text-sm font-extrabold mt-0.5 leading-tight" style={{ color: "#0f172a" }}>{fmtRupiah(data.today.profit)}</p>
                       <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#71717A" }}>hari ini</p>
                     </div>
                   </div>
@@ -362,24 +362,24 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                             <div className="flex items-center gap-3 min-w-0">
                               <div
                                 className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-[11px] font-bold"
-                                style={{ background: "#18181B", color: "#FFFFFF" }}
+                                style={{ background: "#6366f1", color: "#FFFFFF" }}
                               >
                                 {String(idx + 1).padStart(2, "0")}
                               </div>
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold truncate" style={{ color: "#18181B" }}>{day.label}</p>
+                                <p className="text-sm font-semibold truncate" style={{ color: "#0f172a" }}>{day.label}</p>
                                 <p className="text-[10px] mt-0.5 font-medium" style={{ color: "#A1A1AA" }}>{day.count} transaksi</p>
                               </div>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className="text-sm font-bold" style={{ color: "#18181B" }}>{fmtRupiah(day.revenue)}</p>
+                              <p className="text-sm font-bold" style={{ color: "#0f172a" }}>{fmtRupiah(day.revenue)}</p>
                               <div className="flex items-center justify-end gap-1 mt-1">
                                 <span className="badge-revenue">{fmtShort(day.revenue)}</span>
                                 <span className="badge-profit">+{fmtShort(day.profit)}</span>
                               </div>
                             </div>
                           </div>
-                          <MiniBar value={day.revenue} max={maxDaily} color="linear-gradient(90deg,#18181B,#3F3F46)" />
+                          <MiniBar value={day.revenue} max={maxDaily} color="linear-gradient(90deg,#6366f1,#818cf8)" />
                         </div>
                       ))
                     )}
@@ -413,12 +413,12 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                                 </svg>
                               </div>
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold truncate" style={{ color: "#18181B" }}>{week.label}</p>
+                                <p className="text-sm font-semibold truncate" style={{ color: "#0f172a" }}>{week.label}</p>
                                 <p className="text-[10px] mt-0.5 font-medium" style={{ color: "#A1A1AA" }}>{week.count} transaksi</p>
                               </div>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className="text-sm font-bold" style={{ color: "#18181B" }}>{fmtRupiah(week.revenue)}</p>
+                              <p className="text-sm font-bold" style={{ color: "#0f172a" }}>{fmtRupiah(week.revenue)}</p>
                               <div className="flex items-center justify-end gap-1 mt-1">
                                 <span className="badge-weekly">{fmtShort(week.revenue)}</span>
                                 <span className="badge-profit">+{fmtShort(week.profit)}</span>
@@ -440,7 +440,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                     <div className="rdm-monthly-card p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#F4F4F5" }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#18181B" strokeWidth="2.2" strokeLinecap="round">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.2" strokeLinecap="round">
                             <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
                           </svg>
                         </div>
@@ -449,7 +449,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                           <p className="text-[9px] font-medium" style={{ color: "#D4D4D8" }}>Bulan ini</p>
                         </div>
                       </div>
-                      <p className="text-xl font-extrabold" style={{ color: "#18181B" }}>{fmtRupiah(data.monthly.revenue)}</p>
+                      <p className="text-xl font-extrabold" style={{ color: "#0f172a" }}>{fmtRupiah(data.monthly.revenue)}</p>
                     </div>
 
                     {/* Total Profit */}
@@ -465,7 +465,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                           <p className="text-[9px] font-medium" style={{ color: "#D4D4D8" }}>Bulan ini</p>
                         </div>
                       </div>
-                      <p className="text-xl font-extrabold" style={{ color: "#18181B" }}>{fmtRupiah(data.monthly.profit)}</p>
+                      <p className="text-xl font-extrabold" style={{ color: "#0f172a" }}>{fmtRupiah(data.monthly.profit)}</p>
                     </div>
 
                     {/* Total Transaksi */}
@@ -483,7 +483,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                           <p className="text-[9px] font-medium" style={{ color: "#D4D4D8" }}>Bulan ini</p>
                         </div>
                       </div>
-                      <p className="text-xl font-extrabold" style={{ color: "#18181B" }}>{data.monthly.count.toLocaleString("id-ID")}</p>
+                      <p className="text-xl font-extrabold" style={{ color: "#0f172a" }}>{data.monthly.count.toLocaleString("id-ID")}</p>
                     </div>
 
                     {/* Profit vs Omzet bar */}
@@ -495,7 +495,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                         </div>
                         <span
                           className="text-sm font-extrabold px-3 py-1 rounded-xl"
-                          style={{ background: "#18181B", color: "#FFFFFF" }}
+                          style={{ background: "#6366f1", color: "#FFFFFF" }}
                         >
                           {data.monthly.revenue > 0
                             ? `${((data.monthly.profit / data.monthly.revenue) * 100).toFixed(1)}%`
@@ -528,7 +528,7 @@ export function RevenueDetailModal({ isOpen, onClose }: { isOpen: boolean; onClo
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
-                <p className="text-sm font-semibold" style={{ color: "#52525B" }}>Gagal memuat data</p>
+                <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Coba tutup dan buka kembali</p>
               </div>
             )}
