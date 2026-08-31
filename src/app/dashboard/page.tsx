@@ -11,12 +11,12 @@ import { LaptopDetailModal } from "@/components/modals/LaptopDetailModal";
 import { GrossProfitDetailModal } from "@/components/modals/GrossProfitDetailModal";
 import { TransactionDetailModal } from "@/components/modals/TransactionDetailModal";
 import ServiceDashboardWidget from "@/components/service/ServiceDashboardWidget";
-import { AdminChatMonitor } from "@/components/ui/AdminChatMonitor";
 import {
-  Medal, Banknote, TrendingUp, ShoppingCart, Calculator, Percent, Award,
-  Laptop, Smartphone, Trophy, Inbox, BarChart3,
+  Medal, Banknote, TrendingUp, ShoppingCart, Award,
+  Laptop, Trophy, Inbox, BarChart3,
   CheckCircle2, Clock, XCircle, ClipboardList,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, Search, RefreshCw, Plus, MapPin, Image as ImageIcon,
+  CreditCard, Wallet, ArrowRight, Activity
 } from "lucide-react";
 
 import {
@@ -31,7 +31,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { Line, Bar } from "react-chartjs-2";
+import { Line, Bar, Doughnut } from "react-chartjs-2";
 import { getAuthUser } from "@/hooks/useAuthUser";
 
 ChartJS.register(
@@ -86,140 +86,62 @@ const getDealPrice = (item: Transaction): number =>
   Number(item.deal_price || item.amount || 0);
 
 const getInitials = (name: string) =>
-  name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  (name || "C").split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
-// Shared card styling token aligned with Laporan Keuangan — soft gray gradient surface
-const CARD = "bg-gradient-to-b from-white to-gray-50 rounded-2xl border border-gray-200 p-5 shadow-sm shadow-gray-100/60 hover:shadow-2xl hover:shadow-gray-300/50 hover:border-gray-300/80 hover:-translate-y-1 transition-all duration-500 ease-out will-change-transform";
+// Card styling aligned with Catalog Dashboard layout
+const CARD_STYLE = "bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_30px_-6px_rgba(99,102,241,0.12)] transition-all duration-300";
 
-// ─── Shimmer ──────────────────────────────────────────────────────────────────
+// Shimmer Loader
 const Shimmer = ({ className = "", style = {} }: { className?: string; style?: React.CSSProperties }) => (
-  <div className={`rounded-lg animate-shimmer bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 bg-[length:200%_100%] ${className}`} style={style} />
+  <div className={`rounded-xl animate-shimmer bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 bg-[length:200%_100%] ${className}`} style={style} />
 );
 
-// ─── Trend Badge ──────────────────────────────────────────────────────────────
+// Trend Badge
 function TrendBadge({ change }: { change: number | null }) {
   if (change === null) return null;
   const up = change >= 0;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-lg tabular-nums border ${up ? "bg-gray-900 text-white border-gray-900" : "bg-gray-100 text-gray-500 border-gray-200"}`}>
-      {up ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />} {Math.abs(change)}%
+    <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full tabular-nums ${up ? "bg-emerald-50 text-emerald-600 border border-emerald-200/60" : "bg-rose-50 text-rose-500 border border-rose-200/60"}`}>
+      {up ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />} {Math.abs(change)}%
     </span>
   );
 }
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({
-  label, value, sub, icon, rank, change,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-  rank?: number;
-  change?: number | null;
-}) {
-  return (
-    <div className="report-stat-card bg-gradient-to-br from-white via-white to-gray-50 rounded-2xl border border-gray-200 p-5 relative overflow-hidden group hover:border-gray-300 hover:-translate-y-1 transition-all duration-500 ease-out w-full h-full flex flex-col justify-between text-left shadow-sm shadow-gray-100/60 hover:shadow-2xl hover:shadow-gray-300/40 will-change-transform">
-      {/* Subtle corner accent */}
-      <div className="absolute top-0 right-0 w-24 h-24 rounded-bl-[56px] bg-gradient-to-br from-gray-100 to-gray-50 group-hover:from-gray-200 group-hover:to-gray-100 transition-colors duration-300" />
-      {/* Diagonal shine sweep on hover */}
-      <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out bg-gradient-to-r from-transparent via-white/50 to-transparent pointer-events-none" />
-      {/* Bottom hairline sheen on hover */}
-      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-      <div className="relative z-10">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-9 h-9 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center text-base group-hover:from-gray-700 group-hover:to-gray-900 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] border border-gray-200 text-gray-600 group-hover:text-white shadow-sm group-hover:shadow-md group-hover:scale-110 group-hover:-rotate-6">
-            {icon}
-          </div>
-          <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">{label}</span>
-        </div>
-        <p className="text-2xl font-extrabold text-gray-900 tracking-tight leading-none tabular-nums transition-transform duration-300 group-hover:scale-[1.03] origin-left">{value}</p>
-        {sub && <p className="text-[11px] text-gray-400 mt-1.5">{sub}</p>}
-        {change !== undefined && change !== null && (
-          <div className="mt-2.5">
-            <TrendBadge change={change} />
-          </div>
-        )}
-      </div>
-
-      {rank !== undefined && (
-        <div className="absolute bottom-4 right-4 text-[9px] font-bold text-gray-400 bg-white/80 backdrop-blur-sm px-1.5 py-0.5 rounded-md border border-gray-200 shadow-sm">
-          #{rank}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Section Header ───────────────────────────────────────────────────────────
-function SectionHeader({ icon, title, badge }: { icon?: React.ReactNode; title: string; badge?: string }) {
-  return (
-    <div className="flex items-center justify-between mb-4 flex-shrink-0">
-      <div className="flex items-center gap-2.5">
-        {icon && (
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-sm border border-gray-200 text-gray-700 shadow-sm">
-            {icon}
-          </div>
-        )}
-        <h2 className="font-bold text-gray-800 text-sm">{title}</h2>
-      </div>
-      {badge && (
-        <span className="text-[10px] text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded-lg border border-gray-200">
-          {badge}
-        </span>
-      )}
-    </div>
-  );
-}
-
-// ─── Top List Item ────────────────────────────────────────────────────────────
+// Top List Item (Top Sales & Laptop)
 function TopListItem({ rank, name, total, maxTotal, extra }: {
   rank: number; name: string; total: number; maxTotal: number; extra?: React.ReactNode;
 }) {
   const medals = [
-    <Medal key="gold" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-900 drop-shadow-sm" />,
-    <Medal key="silver" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 drop-shadow-sm" />,
-    <Medal key="bronze" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300 drop-shadow-sm" />
+    <Medal key="gold" className="w-4 h-4 text-amber-500 drop-shadow-sm" />,
+    <Medal key="silver" className="w-4 h-4 text-slate-400 drop-shadow-sm" />,
+    <Medal key="bronze" className="w-4 h-4 text-amber-700 drop-shadow-sm" />
   ];
   const pct = Math.round((total / Math.max(maxTotal, 1)) * 100);
 
   return (
-    <div className="group/item py-1.5 px-2 -mx-2 rounded-xl hover:bg-gray-100/70 hover:shadow-sm transition-all duration-300 ease-out">
-      <div className="flex items-center gap-2.5 mb-1.5">
-        {/* Rank badge */}
-        <div className="w-6 flex-shrink-0 flex items-center justify-center">
-          {rank <= 3 ? (
-            <span className={`text-base leading-none drop-shadow-sm group-hover/item:scale-125 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] inline-block ${rank === 1 ? "rounded-full ring-2 ring-gray-200/80 group-hover/item:ring-gray-300" : ""}`}>{medals[rank - 1]}</span>
-          ) : (
-            <span className="text-[10px] font-bold text-gray-500 w-5 h-5 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center border border-gray-200">
+    <div className="group/item py-2 px-2.5 -mx-2 rounded-2xl hover:bg-slate-50/80 transition-all duration-200">
+      <div className="flex items-center gap-3 mb-1.5">
+        <div className="w-6 flex-shrink-0 flex items-center justify-center font-bold text-xs">
+          {rank <= 3 ? medals[rank - 1] : (
+            <span className="text-[10px] text-slate-400 font-semibold w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center">
               {rank}
             </span>
           )}
         </div>
-
-        {/* Name */}
-        <p className="text-xs text-gray-700 truncate flex-1 font-medium group-hover/item:text-gray-900 transition">
+        <p className="text-xs text-slate-700 font-semibold truncate flex-1 group-hover/item:text-indigo-600 transition-colors">
           {name}
         </p>
-
         {extra}
-
-        {/* Count */}
-        <div className="text-right flex-shrink-0 flex items-center gap-2">
-          <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md border border-gray-200 font-medium tabular-nums">
-            {total}x
-          </span>
-        </div>
+        <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full tabular-nums">
+          {total}x
+        </span>
       </div>
-
-      {/* Progress bar */}
-      <div className="ml-8.5 h-1 bg-gray-200 rounded-full overflow-hidden">
+      <div className="ml-9 h-1.5 bg-slate-100 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-700 ease-out"
           style={{
             width: `${pct}%`,
-            background: rank === 1 ? "#374151" : rank === 2 ? "#6B7280" : "#9CA3AF",
+            background: rank === 1 ? "linear-gradient(to right, #6366f1, #4f46e5)" : rank === 2 ? "#818cf8" : "#c7d2fe",
           }}
         />
       </div>
@@ -227,11 +149,11 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
   );
 }
 
-// ─── Transaction Row ──────────────────────────────────────────────────────────
+// Transaction Item (Catalog Payment Gateways Style)
 const STATUS_STYLES: Record<string, string> = {
-  PAID: "bg-gray-900 text-white border-gray-900",
-  PENDING: "bg-gray-100 text-gray-700 border-gray-300",
-  CANCELLED: "bg-white text-gray-400 border-gray-200",
+  PAID: "bg-emerald-50 text-emerald-600 border-emerald-200/80",
+  PENDING: "bg-amber-50 text-amber-600 border-amber-200/80",
+  CANCELLED: "bg-rose-50 text-rose-500 border-rose-200/80",
 };
 
 const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -249,106 +171,93 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
   const timeStr = txDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
   const dateStr = txDate.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 
+  const avatarColors = [
+    "from-indigo-500 to-purple-600",
+    "from-rose-500 to-amber-500",
+    "from-blue-500 to-teal-500",
+    "from-violet-500 to-indigo-600",
+  ];
+  const bgGradient = avatarColors[Math.abs(item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) % avatarColors.length];
+
   return (
-       <div className="px-4 sm:px-5 py-3 hover:bg-gray-50/80 hover:translate-x-0.5 transition-all duration-300 ease-out group relative">
-      <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-gray-700 to-gray-900 scale-y-0 group-hover:scale-y-100 transition-transform duration-300 ease-out origin-center rounded-r-full" />
-      <div className="flex items-start gap-3">
-        {/* Avatar */}
-             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 font-bold border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 ring-2 ring-white group-hover:border-gray-300 group-hover:shadow-md group-hover:scale-105 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-sm">
+    <div className="py-3 px-2 rounded-2xl hover:bg-slate-50/80 transition-all duration-200 group">
+      <div className="flex items-center gap-3">
+        {/* Rounded Avatar */}
+        <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${bgGradient} text-white font-bold flex items-center justify-center text-xs flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform`}>
           {getInitials(item.customer_name)}
         </div>
 
-        {/* Info */}
+        {/* Customer & Laptop Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-semibold text-gray-800 text-xs sm:text-sm">{item.customer_name}</span>
-            <span className={`inline-flex items-center gap-1 text-[9px] sm:text-[10px] px-2 py-0.5 rounded-lg border font-medium ${STATUS_STYLES[item.status] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-slate-800 text-xs sm:text-sm truncate">{item.customer_name}</span>
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLES[item.status] || "bg-slate-100 text-slate-600 border-slate-200"}`}>
               {(() => {
                 const StatusIco = STATUS_ICON[item.status] || ClipboardList;
-                return <StatusIco className="w-2.5 h-2.5 sm:w-3 sm:h-3" />;
+                return <StatusIco className="w-3 h-3" />;
               })()}
-              <span className="hidden sm:inline">{item.status}</span>
+              <span>{item.status}</span>
             </span>
+          </div>
+
+          <p className="text-slate-500 text-[11px] mt-0.5 truncate flex items-center gap-1.5">
+            <span className="font-medium text-slate-700">{item.laptop_name}</span>
+            <span className="text-slate-300">•</span>
+            <span className="font-mono text-slate-400 text-[10px]">{item.invoice_number}</span>
+          </p>
+
+          <div className="flex items-center gap-2 mt-1">
+            {item.sales_name && (
+              <span className="text-[10px] text-slate-400 font-medium">
+                Sales: <strong className="text-slate-600 font-semibold">{item.sales_name}</strong>
+              </span>
+            )}
             {item.source_platform && (
-              <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 font-medium hidden sm:inline-flex">
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium border border-slate-200/60">
                 {item.source_platform}
               </span>
             )}
+            {item.payment_photo && (
+              <button
+                onClick={() => onPhotoClick(item.payment_photo!)}
+                className="inline-flex items-center gap-1 text-[9px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-full transition-colors"
+              >
+                <ImageIcon className="w-2.5 h-2.5" />
+                Bukti
+              </button>
+            )}
+            {item.latitude && item.longitude && (
+              <a
+                href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[9px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-full transition-colors"
+              >
+                <MapPin className="w-2.5 h-2.5" />
+                Maps
+              </a>
+            )}
           </div>
-
-          <p className="text-gray-500 text-[10px] sm:text-xs mt-0.5 truncate">
-            <span className="font-medium">{item.laptop_name}</span>
-            <span className="text-gray-300 mx-1">•</span>
-            <span className="font-mono text-[9px] sm:text-[10px] text-gray-400">{item.invoice_number}</span>
-          </p>
-
-          {item.sales_name && (
-            <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
-              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              {item.sales_name}
-            </p>
-          )}
         </div>
 
-        {/* Amount */}
-        <div className="flex-shrink-0 text-right">
-          <p className="text-xs sm:text-sm font-bold text-gray-800 tabular-nums">
+        {/* Right side Amount */}
+        <div className="text-right flex-shrink-0">
+          <p className="text-xs sm:text-sm font-bold text-slate-900 tabular-nums">
             Rp {displayAmount.toLocaleString("id-ID")}
           </p>
-          <p className="text-[9px] sm:text-[10px] text-gray-400 mt-0.5">{dateStr} · {timeStr}</p>
+          <p className="text-[10px] text-slate-400 font-medium mt-0.5">{dateStr} · {timeStr}</p>
           {canSeeFinancials && profit > 0 && (
-            <p className="text-[9px] sm:text-[10px] font-semibold text-gray-900 mt-0.5 tabular-nums">
-              +{profit.toLocaleString("id-ID")}
+            <p className="text-[10px] font-bold text-emerald-600 mt-0.5 tabular-nums">
+              +{fmtShort(profit)} profit
             </p>
           )}
         </div>
-      </div>
-
-      {/* Actions */}
-      <div className="ml-11 sm:ml-12 mt-1.5 flex items-center gap-2 flex-wrap">
-        {item.source_platform && (
-          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 border border-gray-200 font-medium sm:hidden">
-            {item.source_platform}
-          </span>
-        )}
-
-        {item.payment_photo && (
-          <button
-            onClick={() => onPhotoClick(item.payment_photo!)}
-            className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-gray-800 transition-all duration-200 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded-md border border-gray-200"
-          >
-            <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-            <span>Bukti</span>
-          </button>
-        )}
-
-        {item.latitude && item.longitude && (
-          <a
-            href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[9px] sm:text-[10px] text-gray-500 hover:text-gray-800 transition-all duration-200 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded-md border border-gray-200"
-          >
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17.657 16.657L13.414 20.9a8 8 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <circle cx="12" cy="11" r="3" />
-            </svg>
-            Maps
-          </a>
-        )}
       </div>
     </div>
   );
 }
 
-// ─── Photo Modal ──────────────────────────────────────────────────────────────
+// Photo Modal
 function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -356,51 +265,23 @@ function PhotoModal({ url, onClose }: { url: string; onClose: () => void }) {
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn" onClick={onClose}>
       <div className="relative max-w-lg w-full animate-scaleIn" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute -top-12 right-0 text-white/70 hover:text-white transition-all duration-200 flex items-center gap-2 text-xs group">
-          <span className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </span>
-          Tutup
+        <button onClick={onClose} className="absolute -top-10 right-0 text-white/80 hover:text-white transition text-xs flex items-center gap-1.5 font-medium">
+          Tutup ✕
         </button>
-        <img src={url} alt="Bukti Bayar" className="w-full rounded-2xl shadow-2xl border border-white/20" />
+        <img src={url} alt="Bukti Bayar" className="w-full rounded-3xl shadow-2xl border border-white/20" />
         <a href={url} target="_blank" rel="noopener noreferrer"
-          className="mt-4 flex items-center justify-center gap-2 text-white/60 hover:text-white text-xs transition-all duration-200"
+          className="mt-3 flex items-center justify-center gap-1.5 text-white/70 hover:text-white text-xs transition"
           onClick={(e) => e.stopPropagation()}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-            <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-          </svg>
-          Buka di tab baru
+          Buka gambar ukuran penuh
         </a>
       </div>
     </div>
   );
 }
 
-// ─── Refresh Button ───────────────────────────────────────────────────────────
-function RefreshButton({ onRefresh, isLoading }: { onRefresh: () => void; isLoading: boolean }) {
-  return (
-    <button
-      onClick={onRefresh}
-      disabled={isLoading}
-           className="group flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 hover:border-gray-300 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97] active:translate-y-0 transition-all duration-200 ease-out bg-gradient-to-b from-white to-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 shadow-sm"
-    >
-      <svg
-        className={`w-3.5 h-3.5 transition-transform ${isLoading ? "animate-spin" : "group-hover:rotate-90 duration-300"}`}
-        fill="none" stroke="currentColor" viewBox="0 0 24 24"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-      </svg>
-      <span>{isLoading ? "Memuat..." : "Refresh"}</span>
-    </button>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// Main Page Component
 export default function Page() {
   const [stats, setStats] = useState<Stats>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -410,6 +291,9 @@ export default function Page() {
   const [photoModal, setPhotoModal] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  // Modals state
   const [showRevenueModal, setShowRevenueModal] = useState(false);
   const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [showSalesModal, setShowSalesModal] = useState(false);
@@ -467,78 +351,98 @@ export default function Page() {
     return () => clearInterval(interval);
   }, [fetchAll]);
 
-  // ── Chart data (aligned with Laporan Keuangan monochromatic palette) ─────────
+  // Chart data setup
   const weeklyLabels = stats?.weeklyTrend?.map((d) => d.label) ?? [];
   const weeklyRevenue = stats?.weeklyTrend?.map((d) => d.revenue) ?? [];
   const weeklyProfit = stats?.weeklyTrend?.map((d) => d.profit) ?? [];
   const weeklyTrxCount = stats?.weeklyTrend?.map((d) => d.trxCount) ?? [];
   const weeklyLaptopSold = stats?.weeklyTrend?.map((d) => d.laptopSold) ?? [];
 
+  // Line Chart Data (Yearly Sales / Trend style)
   const trendChartData = {
     labels: weeklyLabels,
     datasets: [
       {
         label: "Omzet",
         data: weeklyRevenue,
-        borderColor: "#374151",
-        backgroundColor: "rgba(55,65,81,0.05)",
-        borderWidth: 2,
+        borderColor: "#6366f1",
+        backgroundColor: (context: any) => {
+          const chart = context.chart;
+          const { ctx, chartArea } = chart;
+          if (!chartArea) return "rgba(99,102,241,0.1)";
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, "rgba(99,102,241,0.35)");
+          gradient.addColorStop(1, "rgba(99,102,241,0.0)");
+          return gradient;
+        },
+        borderWidth: 3,
         fill: true,
         tension: 0.4,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-        pointBackgroundColor: "#374151",
-        pointBorderColor: "#fff",
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBackgroundColor: "#6366f1",
+        pointBorderColor: "#ffffff",
         pointBorderWidth: 2,
         yAxisID: "yRevenue",
       },
       {
         label: "Profit",
         data: weeklyProfit,
-        borderColor: "#9CA3AF",
-        backgroundColor: "rgba(156,163,175,0.04)",
-        borderWidth: 1.5,
+        borderColor: "#10b981",
+        backgroundColor: (context: any) => {
+          const chart = context.chart;
+          const { ctx, chartArea } = chart;
+          if (!chartArea) return "rgba(16,185,129,0.05)";
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, "rgba(16,185,129,0.2)");
+          gradient.addColorStop(1, "rgba(16,185,129,0.0)");
+          return gradient;
+        },
+        borderWidth: 2,
         fill: true,
-        tension: 0.4,
-        pointRadius: 2.5,
-        pointHoverRadius: 5,
-        pointBackgroundColor: "#9CA3AF",
-        pointBorderColor: "#fff",
-        pointBorderWidth: 1.5,
-        borderDash: [5, 4],
-        yAxisID: "yRevenue",
-      },
-      {
-        label: "Laptop Terjual",
-        data: weeklyLaptopSold,
-        borderColor: "#6B7280",
-        backgroundColor: "rgba(107,114,128,0)",
-        borderWidth: 1.5,
-        fill: false,
         tension: 0.4,
         pointRadius: 3,
         pointHoverRadius: 6,
-        pointBackgroundColor: "#6B7280",
-        pointBorderColor: "#fff",
-        pointBorderWidth: 1.5,
-        borderDash: [3, 3],
-        yAxisID: "yUnits",
+        pointBackgroundColor: "#10b981",
+        pointBorderColor: "#ffffff",
+        pointBorderWidth: 2,
+        borderDash: [4, 4],
+        yAxisID: "yRevenue",
       },
     ],
   };
 
+  // Bar Chart Data (Revenue Updates style - Vertical rounded pillars)
   const trxBarData = {
     labels: weeklyLabels,
     datasets: [{
       label: "Transaksi",
       data: weeklyTrxCount,
       backgroundColor: weeklyTrxCount.map((_, i) =>
-        i === weeklyTrxCount.length - 1 ? "#374151" : "rgba(55,65,81,0.25)"
+        i === weeklyTrxCount.length - 1 ? "#6366f1" : "rgba(99,102,241,0.25)"
       ),
-      borderRadius: 6,
+      borderRadius: 8,
       borderSkipped: false as const,
-      hoverBackgroundColor: "#111827",
+      hoverBackgroundColor: "#4f46e5",
     }],
+  };
+
+  // Donut Chart Data (Sales Overview style)
+  const donutData = {
+    labels: ["Profit", "Estimasi Modal & Ops"],
+    datasets: [
+      {
+        data: [
+          stats?.todayProfit || 1,
+          Math.max(0, (stats?.todayRevenue || 1) - (stats?.todayProfit || 0)),
+        ],
+        backgroundColor: ["#6366f1", "#06b6d4"],
+        hoverBackgroundColor: ["#4f46e5", "#0891b2"],
+        borderWidth: 0,
+        spacing: 2,
+        borderRadius: 4,
+      },
+    ],
   };
 
   const trendOptions = {
@@ -548,18 +452,14 @@ export default function Page() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "#111827",
-        titleColor: "#F9FAFB",
-        bodyColor: "#D1D5DB",
-        padding: 10,
-        cornerRadius: 10,
+        backgroundColor: "#1e293b",
+        titleColor: "#f8fafc",
+        bodyColor: "#cbd5e1",
+        padding: 12,
+        cornerRadius: 12,
+        displayColors: true,
         callbacks: {
-          label: (ctx: any) => {
-            if (ctx.dataset.label === "Laptop Terjual") {
-              return ` Terjual: ${ctx.raw} unit`;
-            }
-            return `${ctx.dataset.label}: ${fmtShort(ctx.raw as number)}`;
-          },
+          label: (ctx: any) => `${ctx.dataset.label}: ${fmtShort(ctx.raw as number)}`,
         },
       },
     },
@@ -567,30 +467,17 @@ export default function Page() {
       x: {
         grid: { display: false },
         border: { display: false },
-        ticks: { font: { size: 10 }, color: "#9ca3af" },
+        ticks: { font: { size: 10, weight: "bold" as const }, color: "#94a3b8" },
       },
       yRevenue: {
         type: "linear" as const,
         position: "left" as const,
         border: { display: false },
-        grid: { color: "rgba(0,0,0,.04)" },
+        grid: { color: "rgba(226,232,240,0.6)" },
         ticks: {
           font: { size: 10 },
-          color: "#9ca3af",
+          color: "#94a3b8",
           callback: (v: any) => fmtShort(v),
-        },
-      },
-      yUnits: {
-        type: "linear" as const,
-        position: "right" as const,
-        border: { display: false },
-        grid: { drawOnChartArea: false },
-        min: 0,
-        ticks: {
-          font: { size: 10 },
-          color: "#9ca3af",
-          stepSize: 1,
-          callback: (v: any) => `${v}`,
         },
       },
     },
@@ -602,22 +489,54 @@ export default function Page() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "#111827",
-        titleColor: "#F9FAFB",
-        bodyColor: "#D1D5DB",
-        cornerRadius: 10,
-        padding: 10,
+        backgroundColor: "#1e293b",
+        titleColor: "#f8fafc",
+        bodyColor: "#cbd5e1",
+        cornerRadius: 12,
+        padding: 12,
         callbacks: { label: (ctx: any) => `${ctx.raw} transaksi` },
       },
     },
     scales: {
-      x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10 }, color: "#9ca3af" } },
-      y: { grid: { color: "rgba(0,0,0,.04)" }, border: { display: false }, ticks: { font: { size: 10 }, color: "#9ca3af", stepSize: 1 }, beginAtZero: true },
+      x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10, weight: "bold" as const }, color: "#94a3b8" } },
+      y: { grid: { color: "rgba(226,232,240,0.6)" }, border: { display: false }, ticks: { font: { size: 10 }, color: "#94a3b8", stepSize: 1 }, beginAtZero: true },
     },
   };
 
+  const doughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: "75%",
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "#1e293b",
+        titleColor: "#f8fafc",
+        bodyColor: "#cbd5e1",
+        cornerRadius: 12,
+        padding: 10,
+        callbacks: {
+          label: (ctx: any) => ` ${ctx.label}: ${fmtShort(ctx.raw)}`,
+        },
+      },
+    },
+  };
+
+  // Filter transactions if user searches
+  const filteredTransactions = transactions.filter((t) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      t.customer_name.toLowerCase().includes(q) ||
+      t.laptop_name.toLowerCase().includes(q) ||
+      t.invoice_number.toLowerCase().includes(q) ||
+      (t.sales_name && t.sales_name.toLowerCase().includes(q))
+    );
+  });
+
   return (
     <DashboardLayout>
+      {/* Detail Modals */}
       <RevenueDetailModal isOpen={showRevenueModal} onClose={() => setShowRevenueModal(false)} />
       <InventoryDetailModal isOpen={showInventoryModal} onClose={() => setShowInventoryModal(false)} />
       <SalesDetailModal isOpen={showSalesModal} onClose={() => setShowSalesModal(false)} />
@@ -628,314 +547,362 @@ export default function Page() {
         onClose={() => setShowTransactionModal(false)}
         canSeeFinancials={canSeeFinancials}
       />
-      <style>{`
-        .report-stat-card:hover {
-          box-shadow: 0 20px 40px -12px rgba(17,24,39,0.16), 0 4px 12px rgba(17,24,39,0.06);
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .report-stat-card, .fade-up, .animate-shimmer, .animate-spin, .animate-fadeIn, .animate-scaleIn, .animate-slideIn {
-            animation: none !important;
-            transition: none !important;
-          }
-        }
-        @keyframes fade-up {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.9); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateX(-12px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .fade-up { animation: fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
-        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
-        .animate-scaleIn { animation: scaleIn 0.25s ease-out; }
-        .animate-slideIn { animation: slideIn 0.3s ease-out; }
-        .animate-shimmer { animation: shimmer 1.5s ease-in-out infinite; background-size: 200% 100%; }
-        .animate-spin { animation: spin 0.7s linear infinite; }
-      `}</style>
-
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
 
-      <div className="space-y-4 max-w-7xl mx-auto px-4 py-6">
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        .animate-fadeIn { animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-scaleIn { animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-shimmer { animation: shimmer 1.5s ease-in-out infinite; background-size: 200% 100%; }
+      `}</style>
 
-        {/* ── Page Header ── */}
-        <div className="flex flex-wrap items-center justify-between gap-4 fade-up">
+      <div className="space-y-6 max-w-[1400px] mx-auto px-2 sm:px-4 py-2">
+
+        {/* ── TOP HEADER BAR (Matching Catalog Dashboard Header) ── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
+          {/* Left Title */}
           <div>
-            {isLoading ? (
-              <div className="space-y-1.5">
-                <Shimmer className="w-32 sm:w-48 h-2 sm:h-3" />
-                <Shimmer className="w-24 sm:w-32 h-5 sm:h-7 mt-1" />
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                    <rect x="3" y="3" width="7" height="7" />
-                    <rect x="14" y="3" width="7" height="7" />
-                    <rect x="14" y="14" width="7" height="7" />
-                    <rect x="3" y="14" width="7" height="7" />
-                  </svg>
-                </div>
-                <div>
-                  <h1 className="text-xl font-extrabold bg-gradient-to-r from-gray-900 to-gray-500 bg-clip-text text-transparent leading-none tracking-tight">Dashboard</h1>
-                  <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1.5">
-                    <span>{now}</span>
-                    {lastUpdated && (
-                      <>
-                        <span>•</span>
-                        <span className="inline-flex items-center gap-1">
-                          <span className="relative flex h-1.5 w-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-gray-500" />
-                          </span>
-                          Terakhir diperbarui {lastUpdated.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </>
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard</h1>
+            <p className="text-xs text-slate-400 font-medium mt-1 flex items-center gap-2">
+              <span>{now}</span>
+              {lastUpdated && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1.5 text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Terakhir diperbarui {lastUpdated.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </>
+              )}
+            </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <RefreshButton onRefresh={() => fetchAll(true)} isLoading={isRefreshing} />
-            <a
-                       
-              href="/payment/create"
-              className="group relative inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-gray-800 to-gray-900 text-white text-xs font-semibold hover:from-gray-900 hover:to-black active:scale-[0.97] transition-all duration-300 ease-out shadow-md shadow-gray-900/10 hover:shadow-lg hover:shadow-gray-900/30 hover:-translate-y-0.5 whitespace-nowrap overflow-hidden"
+          {/* Right Header Controls: Search + Refresh + New Transaction */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Search Input Bar */}
+            <div className="relative flex-1 sm:flex-initial min-w-[200px] sm:min-w-[260px]">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Cari transaksi / customer..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-100/80 hover:bg-slate-100 focus:bg-white text-slate-700 placeholder-slate-400 text-xs font-medium rounded-full pl-9 pr-4 py-2.5 transition-all outline-none ring-2 ring-transparent focus:ring-indigo-400 border border-slate-200/50"
+              />
+            </div>
+
+            {/* Refresh Button */}
+            <button
+              onClick={() => fetchAll(true)}
+              disabled={isRefreshing}
+              className="p-2.5 sm:px-4 sm:py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-full border border-slate-200 text-xs font-bold flex items-center gap-2 transition-all shadow-sm active:scale-95 disabled:opacity-50"
             >
-              <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="relative transition-transform duration-300 group-hover:rotate-90">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              <span className="relative hidden sm:inline">Buat Transaksi</span>
-              <span className="relative sm:hidden">Buat</span>
-            </a>
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-indigo-600" : ""}`} />
+              <span className="hidden sm:inline">{isRefreshing ? "Memuat..." : "Refresh"}</span>
+            </button>
+
+            {/* Create Transaction CTA Button */}
+            <Link
+              href="/payment/create"
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs rounded-full shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 flex items-center gap-1.5 transition-all hover:-translate-y-0.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Buat Transaksi</span>
+            </Link>
           </div>
         </div>
 
-        {/* ── Stat Cards Grid ── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 fade-up" style={{ animationDelay: "0.05s" }}>
-          {isLoading ? (
-            Array(4).fill(0).map((_, i) => (
-              <div key={i} className="bg-gradient-to-b from-white to-gray-50 rounded-2xl border border-gray-200 p-5 animate-pulse shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-9 h-9 bg-gray-200 rounded-xl" />
-                  <div className="h-3 bg-gray-100 rounded w-16" />
-                </div>
-                <div className="h-7 bg-gray-100 rounded w-24 mb-1" />
-                <div className="h-2 bg-gray-50 rounded w-12" />
-              </div>
-            ))
-          ) : (
-            <>
-              {/* Card 1: Omzet (finansial) atau Transaksi (non-finansial) */}
-              {canSeeFinancials ? (
-                <button
-                  onClick={() => setShowRevenueModal(true)}
-                  className="w-full h-full block focus:outline-none"
-                >
-                  <StatCard
-                    label="Omzet Hari Ini"
-                    value={fmtRupiah(stats?.todayRevenue || 0)}
-                    sub={`${stats?.todayTransactions || 0} transaksi selesai`}
-                    icon={<Banknote className="w-4 h-4 text-gray-500" />}
-                    rank={1}
-                    change={stats?.revenueChange}
-                  />
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowTransactionModal(true)}
-                  className="w-full h-full block focus:outline-none"
-                >
-                  <StatCard
-                    label="Transaksi Hari Ini"
-                    value={String(stats?.todayTransactions || 0)}
-                    sub={`${stats?.todayLaptopSold || 0} unit terjual`}
-                    icon={<ShoppingCart className="w-4 h-4 text-gray-500" />}
-                    rank={1}
-                    change={stats?.trxChange}
-                  />
-                </button>
-              )}
+        {/* ── HERO BANNER: "SALES DISTRIBUTION" (Matching Reference Wave Banner) ── */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-100/90 via-indigo-100/80 to-purple-100/90 p-5 sm:p-7 border border-indigo-100/60 shadow-sm">
+          {/* Decorative Wave Graphics */}
+          <div className="absolute inset-0 pointer-events-none opacity-40 overflow-hidden">
+            <svg className="absolute -right-10 -bottom-10 w-[500px] h-[300px]" viewBox="0 0 500 300" fill="none">
+              <circle cx="350" cy="200" r="180" fill="url(#waveGrad1)" opacity="0.5" />
+              <circle cx="200" cy="150" r="120" fill="url(#waveGrad2)" opacity="0.4" />
+              <defs>
+                <linearGradient id="waveGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#818cf8" />
+                  <stop offset="100%" stopColor="#c084fc" />
+                </linearGradient>
+                <linearGradient id="waveGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#38bdf8" />
+                  <stop offset="100%" stopColor="#818cf8" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
 
-              {/* Card 2: Gross Profit (finansial only) */}
+          <div className="relative z-10 space-y-5">
+            {/* Banner Header */}
+            <div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Distribusi Penjualan</h2>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                Ringkasan performa penjualan & distribusi transaksi platform SOLIT POS
+              </p>
+            </div>
+
+            {/* Floating Stat Cards Grid inside Hero Banner */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+              {/* Stat 1: Main Omzet / Transaksi (Hero Card) */}
+              <div className="col-span-2 sm:col-span-1 lg:col-span-1">
+                {canSeeFinancials ? (
+                  <button
+                    onClick={() => setShowRevenueModal(true)}
+                    className="w-full text-left bg-white/90 hover:bg-white backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-sm border border-white/70 transition-all hover:-translate-y-1 hover:shadow-md group h-full flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Omzet</span>
+                      <p className="text-xl sm:text-2xl font-extrabold text-slate-900 tabular-nums group-hover:text-indigo-600 transition-colors">
+                        {isLoading ? <Shimmer className="w-28 h-7" /> : fmtShort(stats?.todayRevenue || 0)}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 font-medium">{stats?.todayTransactions || 0} transaksi</span>
+                      <TrendBadge change={stats?.revenueChange ?? null} />
+                    </div>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowTransactionModal(true)}
+                    className="w-full text-left bg-white/90 hover:bg-white backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-sm border border-white/70 transition-all hover:-translate-y-1 hover:shadow-md group h-full flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Total Transaksi</span>
+                      <p className="text-2xl font-extrabold text-slate-900 tabular-nums group-hover:text-indigo-600 transition-colors">
+                        {isLoading ? <Shimmer className="w-16 h-7" /> : `${stats?.todayTransactions || 0} trx`}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 font-medium">{stats?.todayLaptopSold || 0} unit terjual</span>
+                      <TrendBadge change={stats?.trxChange ?? null} />
+                    </div>
+                  </button>
+                )}
+              </div>
+
+              {/* Stat 2: Gross Profit (Financials) */}
               {canSeeFinancials && (
                 <button
                   onClick={() => setShowGrossProfitModal(true)}
-                  className="w-full h-full block focus:outline-none"
+                  className="w-full text-left bg-white/90 hover:bg-white backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-sm border border-white/70 transition-all hover:-translate-y-1 hover:shadow-md group h-full flex flex-col justify-between"
                 >
-                  <StatCard
-                    label="Gross Profit Hari Ini"
-                    value={fmtRupiah(stats?.todayProfit || 0)}
-                    sub={stats?.todayRevenue ? `Margin ${Math.round(((stats.todayProfit || 0) / stats.todayRevenue) * 100)}%` : "Margin keuntungan"}
-                    icon={<TrendingUp className="w-4 h-4 text-gray-500" />}
-                    change={stats?.profitChange}
-                  />
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Gross Profit</span>
+                    <p className="text-xl sm:text-2xl font-extrabold text-slate-900 tabular-nums group-hover:text-emerald-600 transition-colors">
+                      {isLoading ? <Shimmer className="w-24 h-7" /> : fmtShort(stats?.todayProfit || 0)}
+                    </p>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {stats?.todayRevenue ? `${Math.round(((stats.todayProfit || 0) / stats.todayRevenue) * 100)}% margin` : "keuntungan"}
+                    </span>
+                    <TrendBadge change={stats?.profitChange ?? null} />
+                  </div>
                 </button>
               )}
 
-              {/* Card 3: Laptop Ready — selalu tampil */}
+              {/* Stat 3: Laptop Ready */}
               <button
                 onClick={() => setShowInventoryModal(true)}
-                className="w-full h-full block focus:outline-none"
+                className="w-full text-left bg-white/90 hover:bg-white backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-sm border border-white/70 transition-all hover:-translate-y-1 hover:shadow-md group h-full flex flex-col justify-between"
               >
-                <StatCard
-                  label="Laptop Ready"
-                  value={`${stats?.laptopReady || 0} tipe`}
-                  sub={`${stats?.stockTotal || 0} unit total`}
-                  icon={<Laptop className="w-4 h-4 text-gray-500" />}
-                />
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Laptop Ready</span>
+                  <p className="text-xl sm:text-2xl font-extrabold text-slate-900 tabular-nums group-hover:text-indigo-600 transition-colors">
+                    {isLoading ? <Shimmer className="w-20 h-7" /> : `${stats?.laptopReady || 0} Tipe`}
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <span className="text-[10px] text-slate-400 font-medium">{stats?.stockTotal || 0} unit total stok</span>
+                </div>
               </button>
 
-              {/* Card 4: Transaksi Hari Ini — selalu tampil */}
+              {/* Stat 4: Transaksi Hari Ini */}
               <button
                 onClick={() => setShowTransactionModal(true)}
-                className="w-full h-full block focus:outline-none"
+                className="w-full text-left bg-white/90 hover:bg-white backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-sm border border-white/70 transition-all hover:-translate-y-1 hover:shadow-md group h-full flex flex-col justify-between"
               >
-                <StatCard
-                  label="Transaksi Hari Ini"
-                  value={`${stats?.todayTransactions || 0} trx`}
-                  sub={`${stats?.todayLaptopSold || 0} unit laptop terjual`}
-                  icon={<ShoppingCart className="w-4 h-4 text-gray-500" />}
-                  change={stats?.trxChange}
-                />
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Transaksi Hari Ini</span>
+                  <p className="text-xl sm:text-2xl font-extrabold text-slate-900 tabular-nums group-hover:text-indigo-600 transition-colors">
+                    {isLoading ? <Shimmer className="w-16 h-7" /> : `${stats?.todayTransactions || 0} Trx`}
+                  </p>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-medium">Hari ini</span>
+                  <TrendBadge change={stats?.trxChange ?? null} />
+                </div>
               </button>
-            </>
-          )}
+
+              {/* Stat 5: Laptop Terjual */}
+              <button
+                onClick={() => setShowLaptopModal(true)}
+                className="w-full text-left bg-white/90 hover:bg-white backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-sm border border-white/70 transition-all hover:-translate-y-1 hover:shadow-md group h-full flex flex-col justify-between"
+              >
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Unit Terjual</span>
+                  <p className="text-xl sm:text-2xl font-extrabold text-slate-900 tabular-nums group-hover:text-indigo-600 transition-colors">
+                    {isLoading ? <Shimmer className="w-16 h-7" /> : `${stats?.todayLaptopSold || 0} Unit`}
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <span className="text-[10px] text-slate-400 font-medium">Terjual hari ini</span>
+                </div>
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* ── Service Dashboard Widget (jika punya akses) ── */}
+        {/* ── MIDDLE CARDS GRID: "Sales Overview", "Revenue Updates", "Yearly Sales" ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-12 gap-5">
+
+          {/* CARD A: Sales Overview (Donut Chart) — 3 cols */}
+          <div className="lg:col-span-3">
+            <div className={`${CARD_STYLE} h-full flex flex-col justify-between`}>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-bold text-slate-900 text-sm">Ringkasan Penjualan</h3>
+                <span className="text-slate-400 text-xs font-bold hover:text-slate-600 cursor-pointer">•••</span>
+              </div>
+
+              {/* Donut Chart Container */}
+              <div className="relative my-4 h-44 flex items-center justify-center">
+                {isLoading ? (
+                  <Shimmer className="w-36 h-36 rounded-full" />
+                ) : (
+                  <>
+                    <Doughnut data={donutData} options={doughnutOptions} />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Profit</span>
+                      <span className="text-base font-extrabold text-slate-900 tabular-nums">
+                        {fmtShort(stats?.todayProfit || 0)}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Legend pills */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="flex items-center gap-2 text-slate-600">
+                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                    Gross Profit
+                  </span>
+                  <span className="text-slate-900 tabular-nums">{fmtShort(stats?.todayProfit || 0)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="flex items-center gap-2 text-slate-600">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
+                    Omzet Total
+                  </span>
+                  <span className="text-slate-900 tabular-nums">{fmtShort(stats?.todayRevenue || 0)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* CARD B: Revenue Updates (Bar Chart) — 4 cols */}
+          <div className="lg:col-span-4">
+            <div className={`${CARD_STYLE} h-full flex flex-col justify-between`}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Pembaruan Pendapatan</h3>
+                  <p className="text-[11px] text-slate-400 font-medium">Transaksi 7 hari terakhir</p>
+                </div>
+                <span className="text-slate-400 text-xs font-bold hover:text-slate-600 cursor-pointer">•••</span>
+              </div>
+
+              <div className="h-48 my-2">
+                {isLoading ? (
+                  <Shimmer className="w-full h-full" />
+                ) : (
+                  <Bar data={trxBarData} options={barOptions} />
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold pt-2 border-t border-slate-100">
+                <span>Rata-rata: <strong className="text-slate-900">{Math.round((weeklyTrxCount.reduce((a, b) => a + b, 0) || 0) / (weeklyTrxCount.length || 1))} trx/hari</strong></span>
+                <span className="text-indigo-600 font-bold">{weeklyTrxCount.reduce((a, b) => a + b, 0)} Total Trx</span>
+              </div>
+            </div>
+          </div>
+
+          {/* CARD C: Yearly Sales / Trend Penjualan (Line Chart) — 5 cols */}
+          <div className="lg:col-span-5">
+            <div className={`${CARD_STYLE} h-full flex flex-col justify-between`}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Tren Penjualan Tahunan</h3>
+                  <p className="text-[11px] text-slate-400 font-medium">Performa Omzet & Profit mingguan</p>
+                </div>
+                <span className="text-slate-400 text-xs font-bold hover:text-slate-600 cursor-pointer">•••</span>
+              </div>
+
+              <div className="h-48 my-2">
+                {isLoading ? (
+                  <Shimmer className="w-full h-full" />
+                ) : (
+                  <Line data={trendChartData} options={trendOptions} />
+                )}
+              </div>
+
+              {/* Chart Legend Tags */}
+              <div className="flex items-center justify-center gap-6 pt-2 border-t border-slate-100 text-xs font-semibold">
+                <div className="flex items-center gap-2 text-indigo-600">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                  <span>Omzet (Rp)</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-600">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span>Profit (Rp)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── Service Dashboard Widget (if permitted) ── */}
         {canSeeServiceDashboard && (
-          <div className="fade-up" style={{ animationDelay: "0.07s" }}>
+          <div>
             <ServiceDashboardWidget canSeeFinancials={canSeeFinancials} />
           </div>
         )}
 
-        {/* ── Section Label: Analitik Penjualan ── */}
-        <div className="flex items-center gap-2 pt-2 fade-up" style={{ animationDelay: "0.08s" }}>
-          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
-          <span className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wider">Analitik Penjualan</span>
-          <div className="flex-1 h-px bg-gradient-to-r from-gray-200 via-gray-100 to-transparent" />
-        </div>
+        {/* ── BOTTOM GRID SECTION: "Active Users / Top Rankings" & "Payment Gateways / Recent Transactions" ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-        {/* ── Analytics Grid ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 fade-up auto-rows-fr" style={{ animationDelay: "0.1s" }}>
+          {/* LEFT BOTTOM: Top Sales & Top Laptop Cards — 7 cols */}
+          <div className="lg:col-span-7 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
 
-          {/* Chart: Trend (finansial) atau Bar transaksi (non-finansial) */}
-          {canSeeFinancials ? (
-            <div className="sm:col-span-2">
-              <div className={`h-full flex flex-col ${CARD}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <SectionHeader title="Tren 7 Hari Terakhir" badge="7 hari" />
+              {/* Top Sales Ranking Card */}
+              <div
+                onClick={() => setShowSalesModal(true)}
+                className={`${CARD_STYLE} cursor-pointer hover:border-indigo-200 transition-all flex flex-col justify-between`}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-4 h-4 text-indigo-600" />
+                    <h3 className="font-bold text-slate-900 text-sm">Top Sales Hari Ini</h3>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-bold bg-slate-100 px-2 py-0.5 rounded-full">Detail</span>
                 </div>
 
-                {/* Legend */}
-                <div className="flex gap-1.5 mb-3 flex-wrap -mt-2">
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-600 font-semibold bg-gray-100 px-2 py-1 rounded-full border border-gray-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-700 inline-block" />
-                    <span>Omzet</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-600 font-semibold bg-gray-100 px-2 py-1 rounded-full border border-gray-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
-                    <span>Profit</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-600 font-semibold bg-gray-100 px-2 py-1 rounded-full border border-gray-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-500 inline-block" />
-                    <span>Laptop Terjual</span>
-                  </div>
-                  <span className="ml-auto text-[10px] text-gray-400 font-medium hidden sm:inline self-center">
-                    axis kanan = unit
-                  </span>
-                </div>
-
-                {isLoading ? (
-                  <Shimmer className="w-full h-36" />
-                ) : weeklyRevenue.length > 0 ? (
-                  <div className="rounded-xl bg-gray-50/70 border border-gray-100 p-3">
-                    <div style={{ height: 164 }} className="sm:h-[174px]">
-                      <Line data={trendChartData} options={trendOptions} />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
-                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-2 border border-gray-200">
-                      <BarChart3 className="w-7 h-7 text-gray-300" />
-                    </div>
-                    <p className="text-gray-400 text-xs">Belum ada data</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="sm:col-span-2">
-              <div className={`h-full flex flex-col ${CARD}`}>
-                <SectionHeader title="Transaksi per Hari" badge="7 hari terakhir" />
-                {isLoading ? (
-                  <Shimmer className="w-full h-36" />
-                ) : weeklyTrxCount.length > 0 ? (
-                  <div className="rounded-xl bg-gray-50/70 border border-gray-100 p-3">
-                    <div style={{ height: 154 }} className="sm:h-[174px]">
-                      <Bar data={trxBarData} options={barOptions} />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
-                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-2 border border-gray-200">
-                      <BarChart3 className="w-7 h-7 text-gray-300" />
-                    </div>
-                    <p className="text-gray-400 text-xs">Belum ada data</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Top Sales */}
-          <div
-            onClick={() => setShowSalesModal(true)}
-            className="text-left w-full cursor-pointer focus:outline-none"
-            role="button"
-            tabIndex={0}
-          >
-            <div className={`h-full flex flex-col ${CARD}`}>
-              <SectionHeader
-                icon={<Award className="w-4 h-4 text-gray-600" />}
-                title="Top Sales"
-                badge="hari ini"
-              />
-              <div className="flex-1 flex flex-col justify-center">
-                {isLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
+                <div className="space-y-2 my-1">
+                  {isLoading ? (
+                    Array(3).fill(0).map((_, i) => (
                       <div key={i} className="flex items-center gap-2">
-                        <Shimmer className="w-6 h-6 rounded-full" />
-                        <Shimmer className="flex-1 h-3" />
-                        <Shimmer className="w-10 h-4 rounded-md" />
+                        <Shimmer className="w-5 h-5 rounded-full" />
+                        <Shimmer className="flex-1 h-4" />
                       </div>
-                    ))}
-                  </div>
-                ) : stats?.topSales?.length ? (
-                  <div className="space-y-1">
-                    {stats.topSales.map((s, i) => (
+                    ))
+                  ) : stats?.topSales?.length ? (
+                    stats.topSales.map((s, i) => (
                       <TopListItem
                         key={s.name}
                         rank={i + 1}
@@ -943,146 +910,117 @@ export default function Page() {
                         total={s.total}
                         maxTotal={stats.topSales[0]?.total || 1}
                         extra={canSeeFinancials && s.profit > 0 ? (
-                          <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md border border-gray-200 font-medium flex-shrink-0 tabular-nums">
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200/60 tabular-nums">
                             +{fmtShort(s.profit)}
                           </span>
                         ) : undefined}
                       />
-                    ))}
+                    ))
+                  ) : (
+                    <div className="py-6 text-center text-slate-400 text-xs">Belum ada data sales hari ini</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Top Laptop Card */}
+              <div
+                onClick={() => setShowLaptopModal(true)}
+                className={`${CARD_STYLE} cursor-pointer hover:border-indigo-200 transition-all flex flex-col justify-between`}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Laptop className="w-4 h-4 text-indigo-600" />
+                    <h3 className="font-bold text-slate-900 text-sm">Laptop Terlaris</h3>
                   </div>
-                ) : (
-                  <div className="text-center py-6 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
-                    <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-2 border border-gray-200">
-                      <Trophy className="w-6 h-6 text-gray-300" />
+                  <span className="text-[10px] text-slate-400 font-bold bg-slate-100 px-2 py-0.5 rounded-full">Detail</span>
+                </div>
+
+                <div className="space-y-2 my-1">
+                  {isLoading ? (
+                    Array(3).fill(0).map((_, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Shimmer className="w-5 h-5 rounded-full" />
+                        <Shimmer className="flex-1 h-4" />
+                      </div>
+                    ))
+                  ) : stats?.topLaptop?.length ? (
+                    stats.topLaptop.map((item, i) => (
+                      <TopListItem
+                        key={item.name}
+                        rank={i + 1}
+                        name={item.name}
+                        total={item.total}
+                        maxTotal={stats.topLaptop[0]?.total || 1}
+                      />
+                    ))
+                  ) : (
+                    <div className="py-6 text-center text-slate-400 text-xs">Belum ada data laptop terjual</div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* RIGHT BOTTOM: Payment Gateways / Transaksi Terbaru — 5 cols */}
+          <div className="lg:col-span-5">
+            <div className={`${CARD_STYLE} flex flex-col justify-between h-full`}>
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">Transaksi Terbaru</h3>
+                    <p className="text-[11px] text-slate-400 font-medium">Payment status & histori real-time</p>
+                  </div>
+                  <span className="text-slate-400 text-xs font-bold hover:text-slate-600 cursor-pointer">•••</span>
+                </div>
+
+                {/* Transaction List */}
+                <div className="divide-y divide-slate-100/80 my-2">
+                  {isLoading ? (
+                    Array(4).fill(0).map((_, i) => (
+                      <div key={i} className="py-3 flex items-center gap-3">
+                        <Shimmer className="w-10 h-10 rounded-2xl" />
+                        <div className="flex-1 space-y-1">
+                          <Shimmer className="w-32 h-3.5" />
+                          <Shimmer className="w-48 h-2.5" />
+                        </div>
+                      </div>
+                    ))
+                  ) : filteredTransactions.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <div className="w-12 h-12 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
+                        <Inbox className="w-6 h-6" />
+                      </div>
+                      <p className="text-slate-600 font-bold text-xs">Belum ada transaksi hari ini</p>
                     </div>
-                    <p className="text-gray-400 text-xs">Belum ada data</p>
-                  </div>
-                )}
+                  ) : (
+                    filteredTransactions.slice(0, 6).map((item) => (
+                      <TransactionRow
+                        key={item.id}
+                        item={item}
+                        onPhotoClick={setPhotoModal}
+                        canSeeFinancials={canSeeFinancials}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Full-width bottom button: "View all transactions" */}
+              <div className="pt-3 border-t border-slate-100">
+                <Link
+                  href="/dashboard/transactions"
+                  className="w-full py-2.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-600 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <span>Lihat Semua Transaksi</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
             </div>
           </div>
 
-          {/* Top Laptop */}
-          <div
-            onClick={() => setShowLaptopModal(true)}
-            className="text-left w-full cursor-pointer focus:outline-none"
-            role="button"
-            tabIndex={0}
-          >
-            <div className={`h-full flex flex-col ${CARD}`}>
-              <SectionHeader
-                icon={<Laptop className="w-4 h-4 text-gray-600" />}
-                title="Laptop Terlaris"
-                badge="hari ini"
-              />
-              {isLoading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <Shimmer className="w-6 h-6 rounded-full" />
-                      <Shimmer className="flex-1 h-3" />
-                      <Shimmer className="w-10 h-4 rounded-md" />
-                    </div>
-                  ))}
-                </div>
-              ) : stats?.topLaptop?.length ? (
-                <div className="space-y-1">
-                  {stats.topLaptop.map((item, i) => (
-                    <TopListItem
-                      key={item.name}
-                      rank={i + 1}
-                      name={item.name}
-                      total={item.total}
-                      maxTotal={stats.topLaptop[0]?.total || 1}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
-                  <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-2 border border-gray-200">
-                    <Laptop className="w-6 h-6 text-gray-300" />
-                  </div>
-                  <p className="text-gray-400 text-xs">Belum ada data</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Bar Chart (finansial only) ── */}
-        {canSeeFinancials && (
-          <div className={`${CARD} fade-up`} style={{ animationDelay: "0.13s" }}>
-            <SectionHeader title="Transaksi per Hari" badge="7 hari terakhir" />
-            {isLoading ? (
-              <Shimmer className="w-full h-36" />
-            ) : weeklyTrxCount.length > 0 ? (
-              <div className="rounded-xl bg-gray-50/70 border border-gray-100 p-3">
-                <div style={{ height: 154 }} className="sm:h-[174px]">
-                  <Bar data={trxBarData} options={barOptions} />
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-2 border border-gray-200">
-                  <BarChart3 className="w-7 h-7 text-gray-300" />
-                </div>
-                <p className="text-gray-400 text-xs">Belum ada data</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Recent Transactions ── */}
-              <div className="bg-gradient-to-b from-white to-gray-50 rounded-2xl border border-gray-200 overflow-hidden hover:border-gray-300/80 transition-all duration-500 ease-out fade-up shadow-sm hover:shadow-xl hover:shadow-gray-200/60" style={{ animationDelay: "0.16s" }}>
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white/60 backdrop-blur-sm">
-            <h2 className="font-bold text-gray-800 text-sm flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center border border-gray-200 text-gray-700 shadow-sm">
-                <ClipboardList className="w-4 h-4" />
-              </span>
-              Transaksi Terbaru
-            </h2>
-            <a href="/dashboard/transactions" className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-all duration-200 flex items-center gap-1 group">
-              Lihat Semua
-              <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </a>
-          </div>
-
-          <div className="divide-y divide-gray-100">
-            {isLoading ? (
-              [1, 2, 3].map((i) => (
-                <div key={i} className="px-5 py-4 flex items-center gap-3 animate-pulse">
-                  <Shimmer className="w-9 h-9 rounded-xl flex-shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <Shimmer className="w-36 h-3.5" />
-                    <Shimmer className="w-52 h-2.5" />
-                  </div>
-                  <div className="space-y-1 text-right flex-shrink-0">
-                    <Shimmer className="w-20 h-4" />
-                    <Shimmer className="w-12 h-2.5" />
-                  </div>
-                </div>
-              ))
-            ) : transactions.length === 0 ? (
-              <div className="py-16 text-center mx-4 my-2 rounded-xl border border-dashed border-gray-200 bg-gray-50/40">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center mb-3 border border-gray-200 shadow-sm">
-                  <Inbox className="w-8 h-8 text-gray-300" />
-                </div>
-                <p className="text-gray-700 font-semibold text-sm">Belum ada transaksi hari ini</p>
-                <p className="text-gray-400 text-xs mt-1">Transaksi akan muncul setelah dibuat</p>
-              </div>
-            ) : (
-              transactions.map((item) => (
-                <TransactionRow
-                  key={item.id}
-                  item={item}
-                  onPhotoClick={setPhotoModal}
-                  canSeeFinancials={canSeeFinancials}
-                />
-              ))
-            )}
-          </div>
         </div>
 
       </div>

@@ -49,18 +49,18 @@ const fmtShort = (n: number): string => {
 };
 
 const PLATFORM_COLOR: Record<string, { bg: string; color: string; border: string }> = {
-  shopee: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
-  tokopedia: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
-  facebook: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
-  olx: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
-  carousell: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
-  cod: { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7" },
+  shopee: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
+  tokopedia: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
+  facebook: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
+  olx: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
+  carousell: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
+  cod: { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7" },
 };
 
 type TabKey = "daily" | "monthly" | "yearly";
 
 // ── Mini bar ──────────────────────────────────────────────────────────────────
-function MiniBar({ value, max, color = "linear-gradient(90deg,#18181B,#3F3F46)" }: { value: number; max: number; color?: string }) {
+function MiniBar({ value, max, color = "linear-gradient(90deg,#6366f1,#818cf8)" }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.max(4, (value / max) * 100) : 4;
   return (
     <div className="w-full h-1.5 rounded-full mt-2 overflow-hidden" style={{ background: "#F4F4F5" }}>
@@ -89,12 +89,12 @@ function LaptopRow({
 
   const rankStyle =
     rank === 1
-      ? { bg: "#F4F4F5", color: "#18181B", border: "#E4E4E7", bar: "linear-gradient(90deg,#18181B,#3F3F46)" }
+      ? { bg: "#F4F4F5", color: "#0f172a", border: "#E4E4E7", bar: "linear-gradient(90deg,#6366f1,#818cf8)" }
       : rank === 2
-        ? { bg: "#F4F4F5", color: "#52525B", border: "#E4E4E7", bar: "linear-gradient(90deg,#71717A,#A1A1AA)" }
+        ? { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7", bar: "linear-gradient(90deg,#71717A,#A1A1AA)" }
         : rank === 3
           ? { bg: "#F4F4F5", color: "#71717A", border: "#E4E4E7", bar: "linear-gradient(90deg,#A1A1AA,#D4D4D8)" }
-          : { bg: "#F4F4F5", color: "#3F3F46", border: "#E4E4E7", bar: "linear-gradient(90deg,#52525B,#71717A)" };
+          : { bg: "#F4F4F5", color: "#475569", border: "#E4E4E7", bar: "linear-gradient(90deg,#52525B,#71717A)" };
 
   return (
     <div
@@ -132,7 +132,7 @@ function LaptopRow({
           className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ background: "#F4F4F5" }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#18181B" strokeWidth="1.75">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="1.75">
             <rect x="2" y="3" width="20" height="14" rx="2" />
             <line x1="8" y1="21" x2="16" y2="21" />
             <line x1="12" y1="17" x2="12" y2="21" />
@@ -141,7 +141,7 @@ function LaptopRow({
 
         {/* Name + bar */}
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-semibold truncate leading-tight" style={{ color: "#18181B" }}>
+          <p className="text-[13px] font-semibold truncate leading-tight" style={{ color: "#0f172a" }}>
             {entry.laptop_name}
           </p>
           <div className="flex items-center gap-2 mt-1.5">
@@ -161,12 +161,12 @@ function LaptopRow({
         <div className="text-right flex-shrink-0 space-y-0.5">
           <span
             className="inline-block text-[11px] font-bold px-2.5 py-0.5 rounded-full"
-            style={{ background: "#18181B", color: "#FFFFFF" }}
+            style={{ background: "#6366f1", color: "#FFFFFF" }}
           >
             {entry.count}x
           </span>
           {canSeeFinancials && (
-            <p className="text-[11px] font-semibold" style={{ color: "#18181B" }}>
+            <p className="text-[11px] font-semibold" style={{ color: "#0f172a" }}>
               {fmtShort(entry.revenue)}
             </p>
           )}
@@ -196,7 +196,7 @@ function LaptopRow({
               const dateStr = txDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
               const timeStr = txDate.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
               const plat = tx.source_platform?.toLowerCase() ?? "";
-              const platStyle = PLATFORM_COLOR[plat] ?? { bg: "#FAFAFA", color: "#52525B", border: "#E4E4E7" };
+              const platStyle = PLATFORM_COLOR[plat] ?? { bg: "#FAFAFA", color: "#475569", border: "#E4E4E7" };
 
               return (
                 <div
@@ -214,7 +214,7 @@ function LaptopRow({
                   }}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-semibold truncate" style={{ color: "#18181B" }}>
+                    <p className="text-[12px] font-semibold truncate" style={{ color: "#0f172a" }}>
                       {tx.customer_name}
                     </p>
                     <p className="text-[10px] font-mono tracking-wide mt-0.5" style={{ color: "#A1A1AA" }}>
@@ -224,7 +224,7 @@ function LaptopRow({
                       {tx.sales_name && (
                         <span
                           className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md"
-                          style={{ background: "#F4F4F5", color: "#52525B", border: "1px solid #E4E4E7" }}
+                          style={{ background: "#F4F4F5", color: "#475569", border: "1px solid #E4E4E7" }}
                         >
                           <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
@@ -261,7 +261,7 @@ function LaptopRow({
                   </div>
                   <div className="text-right flex-shrink-0">
                     {canSeeFinancials && (
-                      <p className="text-[12px] font-bold" style={{ color: "#18181B" }}>
+                      <p className="text-[12px] font-bold" style={{ color: "#0f172a" }}>
                         {fmtRupiah(rev)}
                       </p>
                     )}
@@ -309,13 +309,13 @@ function PeriodSection({
         }}
       >
         <div className="flex items-center gap-3">
-          <div className="w-1 h-7 rounded-full" style={{ background: "linear-gradient(180deg,#18181B,#3F3F46)" }} />
+          <div className="w-1 h-7 rounded-full" style={{ background: "linear-gradient(180deg,#6366f1,#4f46e5)" }} />
           <div>
-            <p className="text-[13px] font-bold" style={{ color: "#18181B" }}>{period.label}</p>
+            <p className="text-[13px] font-bold" style={{ color: "#0f172a" }}>{period.label}</p>
             <p className="text-[11px] mt-0.5" style={{ color: "#71717A" }}>
               {period.count} transaksi
               {canSeeFinancials && (
-                <span style={{ color: "#18181B" }}> · {fmtShort(period.revenue)}</span>
+                <span style={{ color: "#0f172a" }}> · {fmtShort(period.revenue)}</span>
               )}
             </p>
           </div>
@@ -326,7 +326,7 @@ function PeriodSection({
             <span
               className="text-[10px] font-bold px-2 py-1 rounded-full"
               style={{
-                background: "#18181B",
+                background: "#6366f1",
                 color: "#FFFFFF",
               }}
             >
@@ -407,7 +407,7 @@ export function TransactionDetailModal({
   canSeeFinancials?: boolean;
 }) {
   const [data, setData] = useState<TransactionDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isMemuat, setIsMemuat] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("daily");
   const [visible, setVisible] = useState(false);
   useRegisterOverlay(isOpen);
@@ -420,7 +420,7 @@ export function TransactionDetailModal({
   useEffect(() => {
     if (!isOpen) return;
     const load = async () => {
-      setIsLoading(true);
+      setIsMemuat(true);
       try {
         const res = await fetch("/api/dashboard/transaction-detail");
         const result = await res.json();
@@ -428,7 +428,7 @@ export function TransactionDetailModal({
       } catch (e) {
         console.error(e);
       } finally {
-        setIsLoading(false);
+        setIsMemuat(false);
       }
     };
     load();
@@ -463,8 +463,8 @@ export function TransactionDetailModal({
 
         .tdm-shell {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
-          box-shadow: 0 32px 80px rgba(0,0,0,0.16), 0 8px 24px rgba(0,0,0,0.08);
+          border: 1px solid #F1F5F9;
+          box-shadow: 0 4px 20px -4px rgba(0,0,0,0.05);
         }
 
         .tdm-header {
@@ -474,8 +474,8 @@ export function TransactionDetailModal({
 
         .tdm-stat {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04);
+          border: 1px solid #F1F5F9;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.02);
           transition: box-shadow 0.2s, transform 0.2s;
         }
         .tdm-stat:hover {
@@ -489,7 +489,7 @@ export function TransactionDetailModal({
           padding: 4px;
         }
         .tdm-tab-active {
-          background: #18181B;
+          background: #6366f1;
           color: #FFFFFF;
           font-weight: 700;
           box-shadow: 0 2px 8px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.08);
@@ -529,7 +529,7 @@ export function TransactionDetailModal({
           color: #A1A1AA;
           transition: background 0.2s, color 0.2s;
         }
-        .tdm-close:hover { background: #18181B; color: #FFFFFF; }
+        .tdm-close:hover { background: #6366f1; color: #FFFFFF; }
 
         .tdm-handle { background: #D4D4D8; }
 
@@ -562,7 +562,7 @@ export function TransactionDetailModal({
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{
-                    background: "linear-gradient(135deg,#18181B 0%,#3F3F46 100%)",
+                    background: "linear-gradient(135deg,#6366f1 0%,#4f46e5 100%)",
                     boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
                   }}
                 >
@@ -573,7 +573,7 @@ export function TransactionDetailModal({
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold" style={{ color: "#18181B" }}>Detail Transaksi</h2>
+                  <h2 className="text-base sm:text-lg font-bold" style={{ color: "#0f172a" }}>Detail Transaksi</h2>
                   <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Laptop terjual per hari, bulan &amp; tahun</p>
                 </div>
               </div>
@@ -590,17 +590,17 @@ export function TransactionDetailModal({
 
                 {/* Transaksi Hari Ini */}
                 <div className="tdm-stat rounded-2xl overflow-hidden">
-                  <div className="h-1" style={{ background: "linear-gradient(90deg,#18181B,#3F3F46)" }} />
+                  <div className="h-1" style={{ background: "linear-gradient(90deg,#6366f1,#818cf8)" }} />
                   <div className="px-3 py-2.5">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2" style={{ background: "#F4F4F5" }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#18181B" strokeWidth="2.5" strokeLinecap="round">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round">
                         <rect x="3" y="4" width="18" height="18" rx="2" />
                         <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                       </svg>
                     </div>
                     <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Hari Ini</p>
-                    <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#18181B" }}>{data.today.count}</p>
-                    <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#3F3F46" }}>transaksi</p>
+                    <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#0f172a" }}>{data.today.count}</p>
+                    <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#475569" }}>transaksi</p>
                   </div>
                 </div>
 
@@ -615,8 +615,8 @@ export function TransactionDetailModal({
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Omzet</p>
-                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "#18181B" }}>{fmtShort(data.today.revenue)}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#52525B" }}>hari ini</p>
+                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "#0f172a" }}>{fmtShort(data.today.revenue)}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#475569" }}>hari ini</p>
                     </div>
                   </div>
                 ) : (
@@ -631,8 +631,8 @@ export function TransactionDetailModal({
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Bulan Ini</p>
-                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#18181B" }}>{data.monthly[0]?.count ?? 0}</p>
-                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#52525B" }}>transaksi</p>
+                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#0f172a" }}>{data.monthly[0]?.count ?? 0}</p>
+                      <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#475569" }}>transaksi</p>
                     </div>
                   </div>
                 )}
@@ -648,7 +648,7 @@ export function TransactionDetailModal({
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Profit</p>
-                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "#18181B" }}>{fmtShort(data.today.profit)}</p>
+                      <p className="text-lg font-extrabold leading-none mt-0.5" style={{ color: "#0f172a" }}>{fmtShort(data.today.profit)}</p>
                       <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#71717A" }}>hari ini</p>
                     </div>
                   </div>
@@ -664,7 +664,7 @@ export function TransactionDetailModal({
                         </svg>
                       </div>
                       <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#A1A1AA" }}>Tahun Ini</p>
-                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#18181B" }}>{data.yearly[0]?.count ?? 0}</p>
+                      <p className="text-2xl font-extrabold leading-none mt-0.5" style={{ color: "#0f172a" }}>{data.yearly[0]?.count ?? 0}</p>
                       <p className="text-[9px] mt-1.5 font-medium" style={{ color: "#71717A" }}>transaksi</p>
                     </div>
                   </div>
@@ -691,7 +691,7 @@ export function TransactionDetailModal({
 
           {/* ── Content ── */}
           <div className="tdm-scroll flex-1 overflow-y-auto" style={{ background: "#FAFAFA" }}>
-            {isLoading ? (
+            {isMemuat ? (
               <Skeleton />
             ) : data ? (
               <div className="p-4 sm:p-5 space-y-3">
@@ -726,7 +726,7 @@ export function TransactionDetailModal({
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
-                <p className="text-sm font-semibold" style={{ color: "#52525B" }}>Gagal memuat data</p>
+                <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Coba tutup dan buka kembali</p>
               </div>
             )}
