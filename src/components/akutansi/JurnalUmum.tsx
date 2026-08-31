@@ -54,12 +54,13 @@ interface JournalEntry {
     updated_by_user?: { id: string; name: string } | null;
     created_at?: string;
     updated_at?: string;
-    trx_meta?: {
+       trx_meta?: {
         company_name: string | null;
         cpu: string | null;
         ram: string | null;
         storage: string | null;
         modal_missing?: boolean;
+        nama?: string | null;
     } | null;
     has_warning: boolean;
     warning_logs: WarningLog[];
@@ -2771,10 +2772,14 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
     onToggleWarningState,
     setToast,
 }: JournalEntryRowProps) {
-    const badge = SOURCE_BADGE[entry.source_type];
+        const badge = SOURCE_BADGE[entry.source_type];
     const companyBadge = entry.source_type === "TRANSACTION" ? getCompanyBadge(entry.trx_meta?.company_name) : null;
     const specParts = [entry.trx_meta?.cpu, entry.trx_meta?.ram, entry.trx_meta?.storage].filter(Boolean) as string[];
     const modalMissing = entry.source_type === "TRANSACTION" && entry.trx_meta?.modal_missing === true;
+    // Nama pengisi cuma relevan untuk CASHFLOW — semua entry CASHFLOW di jurnal
+    // umum sudah pasti manual (lihat JSDoc getCashflowMetaByIds), jadi tidak
+    // perlu cek source_category lagi di sini.
+    const cashflowNama = entry.source_type === "CASHFLOW" ? entry.trx_meta?.nama ?? null : null;
 
     const displayLines: JournalLine[] = useMemo(() => {
         if (!modalMissing) return entry.lines;
@@ -2880,9 +2885,14 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>
                                                     {badge.label}
                                                 </span>
-                                                {companyBadge && (
+                                                                                               {companyBadge && (
                                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
                                                         {companyBadge.label}
+                                                    </span>
+                                                )}
+                                                {cashflowNama && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-200">
+                                                        {cashflowNama}
                                                     </span>
                                                 )}
                                                 {entry.is_edited && (

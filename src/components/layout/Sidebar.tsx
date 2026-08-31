@@ -9,7 +9,7 @@ import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES } from "@/lib/permissions";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
@@ -221,6 +221,9 @@ const ITEM_ASET_MATOT: MenuItem = { name: "Aset Matot", href: "/dashboard/fixed-
 const ITEM_LAPTOP_SIAP_JUAL: MenuItem = { name: "Barang Siap Jual", href: "/dashboard/laptops/ready", icon: Icons.laptopReady };
 const ITEM_LAPTOP_MINUS: MenuItem = { name: "Barang Minus", href: "/dashboard/laptops/minus", icon: Icons.laptopMinus };
 const ITEM_LAPTOP_MONITORING: MenuItem = { name: "Monitoring Stok", href: "/dashboard/laptops/monitoring", icon: Icons.laptopMonitoring };
+// Pakai icon yang sama dengan "Riwayat Servis" (Icons.serviceHistory) — secara
+// semantik cocok (ikon jam+panah = riwayat), tidak perlu bikin SVG baru.
+const ITEM_RIWAYAT_SO: MenuItem = { name: "Riwayat SO", href: "/dashboard/laptops/so-history", icon: Icons.serviceHistory };
 const ITEM_LEADERBOARD_PEKERJAAN: MenuItem = { name: "Leaderboard Pekerjaan", href: "/dashboard/missions/leaderboard", icon: Icons.leaderboard };
 
 const GROUP_ABSENSI_SIMPLE: MenuGroup = { label: "Absensi", items: [ITEM_ABSENSI, ITEM_DAFTAR_HADIR] };
@@ -868,6 +871,32 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   });
   if (!hasInventaris) {
     ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Inventaris", items: [ITEM_ASET_MATOT] }];
+  }
+});
+
+// Riwayat SO: HANYA untuk SO_HISTORY_VIEW_ROLES. Sengaja tidak ditaruh
+// langsung di const ADMIN_INVENTARIS — grup itu dipakai bareng oleh
+// ASISTEN_CEO juga (lihat `ASISTEN_CEO: [..., ADMIN_INVENTARIS, ...]`), yang
+// sengaja TIDAK boleh lihat menu ini. Item disisipkan TEPAT SETELAH
+// "Monitoring Stok" via findIndex, jadi tidak tergantung urutan array.
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (!(SO_HISTORY_VIEW_ROLES as string[]).includes(role)) return;
+  let hasInventaris = false;
+  ROLE_MENUS[role] = ROLE_MENUS[role].map((g) => {
+    if (g.label !== "Inventaris") return g;
+    hasInventaris = true;
+    if (g.items.some((it) => it.href === ITEM_RIWAYAT_SO.href)) return g;
+    const monitoringIdx = g.items.findIndex((it) => it.href === ITEM_LAPTOP_MONITORING.href);
+    const items = [...g.items];
+    if (monitoringIdx >= 0) {
+      items.splice(monitoringIdx + 1, 0, ITEM_RIWAYAT_SO);
+    } else {
+      items.push(ITEM_RIWAYAT_SO);
+    }
+    return { label: g.label, items };
+  });
+  if (!hasInventaris) {
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Inventaris", items: [ITEM_RIWAYAT_SO] }];
   }
 });
 

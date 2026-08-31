@@ -353,11 +353,48 @@ export async function getCashflowSyncDraftsByIds(
           { account_code: incomeAccountForCashflow(e.category), side: "KREDIT", nominal },
         ];
 
-    const merged = mergeLines(lines);
+       const merged = mergeLines(lines);
     result.set(String(e.id), { lines: merged, total: totalOf(merged), keterangan: cashflowKeterangan(e) });
   }
 
   return result;
+}
+
+export interface CashflowMeta {
+  nama: string | null;
+}
+
+/**
+ * Ambil nama pengisi (kolom `nama` di cashflow_entries) untuk entry CASHFLOW
+ * yang sudah diposting ke Jurnal Umum — dipakai untuk badge "Diinput oleh ..."
+ * di UI. Tidak perlu filter source_type=MANUAL lagi di sini karena SEMUA entry
+ * jurnal dengan source_type CASHFLOW memang berasal dari cashflow_entries yang
+ * source_type-nya MANUAL (lihat buildCashflowDrafts) — entry cashflow AUTO
+ * (dari Transaksi/Service) tidak pernah membentuk journal_entries.source_type
+ * "CASHFLOW", jadi tidak pernah masuk ke sini.
+ */
+export async function getCashflowMetaByIds(
+  supabase: SupabaseClient,
+  ids: string[]
+): Promise<Map<string, CashflowMeta>> {
+  const map = new Map<string, CashflowMeta>();
+  if (ids.length === 0) return map;
+
+  for (const batch of chunkArray(ids, 150)) {
+    const { data, error } = await supabase
+      .from("cashflow_entries")
+      .select("id, nama")
+      .in("id", batch);
+    if (error) {
+      console.error("[akuntansi] fetch cashflow meta:", error.message);
+      return map;
+    }
+    for (const e of (data ?? []) as any[]) {
+      map.set(String(e.id), { nama: (e.nama as string) ?? null });
+    }
+  }
+
+  return map;
 }
 
 /**

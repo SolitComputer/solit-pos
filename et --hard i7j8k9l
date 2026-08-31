@@ -1,0 +1,1935 @@
+[33mf48b8402[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mbranch-jann[m[33m)[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33m619d22c1[m[33m ([m[1;31morigin/main[m[33m)[m update
+[33m9e26f9be[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33m192ef34b[m update
+[33mf9b7a7dd[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33m22ada03f[m update
+[33m6b1d1cb1[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33m04d416d6[m update
+[33m68fce968[m[33m ([m[1;31morigin/branch-jann[m[33m)[m update
+[33m7ba9cac8[m update
+[33m74c70c0e[m update
+[33m5e5eeb1b[m update
+[33m622d1a44[m update
+[33mbb3cb1fd[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33m00abf82c[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m73e89d2e[m[33m ([m[1;31morigin/feature/acl-v2[m[33m)[m absen pulang
+[33m9e3fb9aa[m update
+[33ma1443aef[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33mab1cdb43[m update
+[33m678a13d9[m update
+[33mb6a810e4[m Merge remote-tracking branch 'origin/feature/acl-v2' into branch-jann
+[33ma4b5597f[m akses riwayat trx cs n pkl cs
+[33m719ba242[m Ui dan tolak kendaraan
+[33m33d49fe4[m update
+[33m0d28e74d[m edit pulang dan absensi
+[33m1374f939[m Merge remote-tracking branch 'origin/main' into feature/acl-v2
+[33mb5d8877b[m commit
+[33m3a0f7fe7[m :wq Merge branch 'main' of https://github.com/SolitComputer/solit-pos
+[33m40be582c[m update
+[33meaa7ecc2[m update
+[33m9fcc13c6[m update
+[33ma07cd50f[m update
+[33meb9592e0[m update
+[33m3e491750[m update
+[33ma245c859[m update
+[33m66b81771[m update
+[33m64db59fa[m Merge remote-tracking branch 'origin/main'
+[33m3923726d[m update
+[33m76bd9346[m update
+[33mfd252307[m Merge remote-tracking branch 'origin/branch-jann'
+[33mc5fe7031[m Merge remote-tracking branch 'origin/main'
+[33m4e67b6fc[m update
+[33me012e217[m update
+[33maf1c698b[m update
+[33md1c8a3a7[m update
+[33m979edd24[m Merge remote-tracking branch 'origin/branch-jann'
+[33m56c8f9f5[m update
+[33mdd70e53c[m update
+[33mcbe2d092[m Merge remote-tracking branch 'origin/branch-jann'
+[33m94f7c33c[m Merge remote-tracking branch 'origin/main'
+[33m56e50e5c[m update absensi
+[33mf7a3f193[m update
+[33ma113768a[m update
+[33m25a2ea54[m Merge remote-tracking branch 'origin/main'
+[33mba7fd52e[m update
+[33m3e65f88d[m update
+[33m80998b0d[m Merge remote-tracking branch 'origin/main'
+[33ma774f271[m update absensi
+[33m8b35e72c[m update
+[33m140719f9[m update absensi
+[33m09f013e3[m update
+[33m46160313[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33mdba4989f[m update
+[33m2c1ff658[m update
+[33m8220a594[m update
+[33m1b7c26c2[m Fix syntax error and duplicate isPKL declaration in overtime route
+[33mf8f48069[m Merge remote-tracking branch 'origin/branch-jann'
+[33m3c092996[m Merge remote-tracking branch 'origin/Branch-Dimas' with PKL overtime fixes
+[33m6df0f97e[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m9c5a54c6[m update
+[33m2442c895[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33m1b52aa61[m[33m ([m[1;31morigin/Branch-Dimas[m[33m)[m update
+[33m7b067fd0[m update
+[33m2d696355[m update
+[33m173b7cb5[m update
+[33m9002fc4b[m Download Invoice
+[33m55b422c6[m kendaraan
+[33m92ccc5ce[m Merge remote-tracking branch 'origin/Branch-Dimas'
+[33m9740c9a5[m Merge remote-tracking branch 'origin/branch-jann'
+[33mc7f900dd[m update
+[33m6d4bcfe1[m update
+[33mf6a24f9d[m update
+[33m8f5a47ac[m Merge remote-tracking branch 'origin/Branch-Dimas' into feature/acl-v2
+[33me6f668ab[m update
+[33m50434da7[m Merge remote-tracking branch 'origin/Branch-Dimas' into feature/acl-v2
+[33m9674eee8[m update
+[33m832cd9b6[m Merge remote-tracking branch 'origin/Branch-Dimas' into feature/acl-v2
+[33m47888683[m update
+[33mee87932d[m Audit PKL
+[33mc44823f0[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m75de1f43[m audit lemburan pkl
+[33m2aca376e[m audit lemburan PKL
+[33m948bf40f[m update
+[33me2375e8e[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m08e4665b[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m33147694[m alasan restore riwayat pending
+[33m15a5e9a0[m update
+[33mebf84a5e[m update
+[33mb1b22b36[m Merge remote-tracking branch 'origin/main'
+[33mbf461f7b[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33mc5b1e68d[m Merge remote-tracking branch 'origin/Branch-Dimas'
+[33medad1172[m update
+[33mffa8405f[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m37b85b82[m benerin yang centang buku besar
+[33mc03d6f1e[m update
+[33mceaaaf95[m Merge remote-tracking branch 'origin/main' into Branch-Dimas
+[33m5bfe4e31[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33m882b322a[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33m8037008e[m update
+[33m679d2eec[m Merge remote-tracking branch 'origin/branch-jann'
+[33md530f100[m update
+[33m81069673[m Merge remote-tracking branch 'origin/Branch-Dimas'
+[33mf819f81f[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33ma268ad95[m status sedang disiapkan
+[33m0d0ac8bc[m update
+[33me1e0e8b9[m update
+[33me4d54df0[m update
+[33m78b626aa[m Merge remote-tracking branch 'origin/main'
+[33mb1d83741[m update absensi
+[33ma4a63cb7[m Merge remote-tracking branch 'origin/main'
+[33maff3e465[m Merge remote-tracking branch 'origin/feature/acl-v2' into branch-jann
+[33mdbef39c5[m update
+[33me6428090[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m5c4e1912[m add kategori data barang
+[33mc5064b50[m Merge remote-tracking branch 'origin/Branch-Dimas'
+[33m426ccbd4[m Merge remote-tracking branch 'origin/main' into Branch-Dimas
+[33m3cfcdcbe[m update
+[33m23af88d3[m Merge remote-tracking branch 'origin/main'
+[33m2b15419f[m update absensi
+[33ma832ddad[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33mb6cb89e3[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33m8410dd91[m update
+[33m06e736d1[m Merge remote-tracking branch 'origin/branch-jann'
+[33ma698186c[m Merge remote-tracking branch 'origin/feature/acl-v2' into branch-jann
+[33md85d224b[m Merge remote-tracking branch 'origin/branch-jann' into feature/acl-v2
+[33me369f23f[m Merge remote-tracking branch 'origin/Branch-Dimas' into feature/acl-v2
+[33md4092963[m Merge remote-tracking branch 'origin/Branch-Dimas' into branch-jann
+[33m94b8e6d3[m Merge remote-tracking branch 'origin/branch-jann'
+[33m55663751[m Merge remote-tracking branch 'origin/Branch-Dimas'
+[33m5a8f4714[m update
+[33mdfa2dda2[m Merge remote-tracking branch 'origin/Branch-Dimas'
+[33mfe196f13[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m1bf642f4[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m03aa6f9c[m sales fu
+[33m1a744fb7[m update
+[33m1e395c2d[m bucket upload foto selesai dong
+[33mca160543[m Merge remote-tracking branch 'origin/main' into Branch-Dimas
+[33m6419d4ab[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33m84e621d2[m update
+[33md997b5c4[m update
+[33m344badba[m update
+[33mbc1f6221[m update
+[33mec676fdb[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m5ff1f23d[m edit harga sparepart
+[33mcf717502[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m17f61cd5[m SO reset jam 00.00
+[33mf488c15d[m Merge remote-tracking branch 'origin/Branch-Dimas'
+[33mbce47305[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m376e8dc5[m update
+[33meb556786[m tandai ceklis jurnal umum
+[33m34d5784b[m Merge remote-tracking branch 'origin/Branch-Dimas' into feature/acl-v2
+[33m7df30b5d[m Merge remote-tracking branch 'origin/branch-jann' into feature/acl-v2
+[33me08194a0[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33mcc5c9ef2[m update accounting
+[33mff1fd432[m Merge remote-tracking branch 'origin/main'
+[33ma5aaa3f0[m update absensi
+[33m16899417[m update accounting
+[33m290a53b5[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33mcc198130[m Merge remote-tracking branch 'origin/branch-jann'
+[33m5a633284[m Merge remote-tracking branch 'origin/main'
+[33m31908345[m update absensi
+[33m8d7bce04[m update
+[33m41b14eb6[m update
+[33md7824457[m riwayat pending
+[33m63a9e050[m update accounting
+[33me1fff0ca[m Merge remote-tracking branch 'origin/Branch-Dimas'
+[33m6bfb8e73[m update
+[33mee586a6b[m update all
+[33m56bc74ea[m Merge remote-tracking branch 'origin/branch-jann'
+[33m7d983073[m Merge remote-tracking branch 'origin/develop'
+[33m31f8b117[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33maabd8071[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m05ece050[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m23ca8c13[m Merge remote-tracking branch 'origin/develop'
+[33m0bc6ebaf[m[33m ([m[1;31morigin/develop[m[33m, [m[1;31morigin/HEAD[m[33m)[m update absensi
+[33mdb7af9c2[m update
+[33md8a03dc7[m Merge remote-tracking branch 'origin/feature/acl-v2' into branch-jann
+[33ma86ec6ae[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m3b21a62c[m riwayat pending
+[33ma254ac55[m update
+[33m6d91ee25[m Merge remote-tracking branch 'origin/branch-jann'
+[33m6a213e4b[m update
+[33m30e34a47[m fix: un-comment gitignore rule untuk sw.js (sempat ter-comment, bikin ke-track lagi)
+[33ma8297b8d[m Merge branch 'main' of https://github.com/SolitComputer/solit-pos
+[33mfd5df1aa[m fix: naikkan rate limit global (3000->8000 read, 600->1200 write) karena 1 IP kantor dipakai banyak staff
+[33me810943a[m update
+[33m462a0098[m Merge remote-tracking branch 'origin/main' into feature/acl-v2
+[33md08ebf20[m rst
+[33mb0935814[m update
+[33mf4858361[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33md11ceb08[m next.config.ts
+[33m6a6bbb90[m update
+[33m70e98da4[m Merge remote-tracking branch 'origin/Branch-Dimas'
+[33m18edb61e[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33ma0abb3e2[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33m2f13e86b[m ini sw.js dimas
+[33m6362e98a[m update
+[33m9d97be1b[m upload foto services services
+[33m74867f89[m filter riwayat services
+[33mb1afe4aa[m update
+[33meb19df23[m filter penyedia barang
+[33mf80834aa[m Merge branch 'feature/acl-v2' of https://github.com/SolitComputer/solit-pos into feature/acl-v2
+[33m3e7cba71[m Merge remote-tracking branch 'origin/main'
+[33m231c9aa6[m chore: stop tracking PWA auto-generated files to prevent merge conflicts
+[33m871d69de[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m55435224[m Merge remote-tracking branch 'origin/main' into Branch-Dimas
+[33m05d8ea8b[m up lemburan
+[33m1948d4a4[m update
+[33ma9374f55[m Merge remote-tracking branch 'origin'
+[33m8e722746[m resolve conflict: keep sw.js untracked
+[33m0a19adba[m chore: stop tracking generated sw.js
+[33m1561e924[m Merge remote-tracking branch 'origin/branch-jann'
+[33m5f0348c6[m update
+[33m4076d620[m update akuntansi
+[33mb27f5026[m update
+[33m3e510504[m Merge remote-tracking branch 'origin' :wq
+[33m941b3299[m update
+[33m48807eb5[m update merge
+[33mac61b75f[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33m27437ac2[m update-database
+[33mc7fc6ba0[m update
+[33mb3cb0d19[m update merge
+[33mae2fb7d1[m Merge remote-tracking branch 'origin/main'
+[33mcbdd25c5[m update akuntansi
+[33m7555a847[m update
+[33md0204828[m update akuntansi
+[33m7acbd896[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33md610c1db[m face_status
+[33m6cf3fce3[m ctrl Z lemburan huhu
+[33m2213549d[m Merge remote-tracking branch 'origin/main' into Branch-Dimas
+[33mb53bfeb8[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m88c8b201[m y
+[33m265514a7[m Upload foto sebelum di acc oleh kepala, Overtime ini yeah
+[33m38410d9c[m update
+[33m74f9d72e[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33m7a172fda[m update
+[33m83006327[m update merge
+[33m503c7de5[m update
+[33me432cad5[m update merge
+[33ma7cb768b[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m69e929f2[m update
+[33m1ae57723[m Merge remote-tracking branch 'origin/branch-jann'
+[33m6862d4b8[m update
+[33mbb8abd83[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m686e5043[m fixbug prep
+[33md53ed5dc[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33m23312c1d[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33mece2ea3a[m Merge remote-tracking branch 'origin/develop'
+[33m7e0ee101[m update jurnal
+[33m1550c6cd[m fixbug prep
+[33m27ed5034[m Merge remote-tracking branch 'origin/develop'
+[33m0aaae4d7[m update jurnal
+[33mbfca6cf0[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m8d4e8fb7[m fixbug prep
+[33m12bf4aee[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m301302fd[m fixbug prep
+[33m146c6901[m Merge remote-tracking branch 'origin/main' into branch-jann
+[33mdc8c4bcd[m update
+[33m291919b1[m update
+[33mc731a7f0[m Merge remote-tracking branch 'origin/develop'
+[33md09ae25c[m update merge
+[33mecf4cfc4[m update
+[33me4c6d9d7[m Merge remote-tracking branch 'origin/branch-jann'
+[33m10f09d13[m Merge remote-tracking branch 'origin'
+[33m5799aaf5[m update merge
+[33m4b31874f[m update
+[33mf887e4c6[m update
+[33m4ce5ab91[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m2101a0ea[m cancel prep
+[33mcd16e770[m update
+[33m8b6e7dbc[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33m34bbf2df[m fixbug prep
+[33mc1267c8d[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33ma676f429[m fixbug
+[33m1aed1007[m update
+[33m172b695c[m Merge remote-tracking branch 'origin/feature/acl-v2'
+[33mc3aa779a[m e commerce penyedia barang
+[33mbc629510[m update
+[33ma49b44f2[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33mdb5f80ef[m Merge remote-tracking branch 'origin/branch-jann' into feature/acl-v2
+[33mb93dbd9d[m update merge
+[33m12573436[m update
+[33md208dfb6[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m494c697d[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m3ffc8299[m update
+[33m168d486b[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33m69db9f09[m update
+[33mdb838a59[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m71fd55b6[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33m325944ed[m update
+[33md9692700[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m56dabbcb[m update barang
+[33m4ccd7dd7[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m29e86397[m suara penyedia barang
+[33mb2efac86[m update
+[33m34c0e91b[m update barang
+[33mb5edaa5a[m update barang
+[33m474eed67[m data barang, penyedia barang
+[33mf5a140a8[m update
+[33m6f0fad5e[m update
+[33m0a42cbe3[m update barang
+[33m7209a7a2[m update barang
+[33m97f898a2[m update
+[33m8540ea10[m so anak PKL
+[33m0992b1e9[m ya
+[33m89326562[m ya
+[33m96f1a4d4[m update
+[33m055a6f5c[m Data Barang, Penyedia Barang dan Pengantaran 2108
+[33m82c893d0[m update
+[33m5afa6681[m update
+[33m81db6b0c[m update barang
+[33m01d409ae[m update barang
+[33m728b1df3[m update barang
+[33mdb0dc5a4[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m701f6c0b[m update
+[33mf3d6ffa0[m update
+[33m0fb7b1ff[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m405f1577[m fix(api): optimize polling hooks and prevent 408 request timeouts
+[33m8e8dd2df[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m95cecaa8[m update
+[33m4a33bbba[m suara
+[33mfc23cff5[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m9bab82cd[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m3e5b3f7f[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m207bbfb5[m update
+[33m15dba1eb[m update barang
+[33m5cc1e0d3[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m9b86ecc6[m penyedia brg
+[33mc8eac968[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m2c0adb14[m update
+[33m241f4bc8[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m4e58bbf2[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m81a245f1[m update
+[33m859b4b10[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m312021ba[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33m976ba04f[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m08f030c1[m penyedia brg
+[33m6fa054ce[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m72bf6a2e[m update
+[33m32df5a78[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m64334c8a[m 408
+[33m2a235a26[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m3f2da027[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mbc103856[m 408
+[33mbaecf7c5[m update barang
+[33mc0a94005[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m68c524fb[m dashboard UI
+[33m5a23489c[m update barang
+[33m900b5d4a[m update
+[33m0168585d[m merge moreno dimas
+[33m6949971c[m update
+[33m7747756d[m y
+[33m1730779d[m merge moreno dimas
+[33mb169c615[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33md9065b64[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m6693d78b[m update
+[33m93e23b79[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m7d0c77d1[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33mfa5972a7[m merge moreno dimas
+[33mab69be02[m update
+[33m326d816e[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33mff438262[m update
+[33m34a1d310[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m5678b98b[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33m20bf69fc[m update
+[33m5cff96e9[m fix: notifikasi alarm penyiapan barang untuk penyedia barang
+[33m8c8b2015[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33md9b0ecde[m update
+[33m6b572f01[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33me3d26282[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mc3ba63b9[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33m5aaa9fa7[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33me0480176[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33mf2295471[m benerin cashflow detail srv dll
+[33m5250b681[m update
+[33m06cf0fdf[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m7dd1d908[m update
+[33m82c32abb[m ubahwarnadashboard
+[33m11e12448[m update
+[33m7838dd1b[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m0d2b75ca[m y
+[33m7cd90eaf[m ubahwarnadashboard
+[33maa58f207[m update
+[33mb8e886c3[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m2b003e5a[m update
+[33m5b80ace3[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33ma21937cb[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33mb4e963e4[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33mb8e1de0d[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33ma30bfb4f[m absensi jam 04.00
+[33m849ede01[m update
+[33md0d29360[m update
+[33m176bcefc[m update
+[33mc70e594d[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m72fcb295[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33mde190668[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33mb136cc0e[m update
+[33m2b5bbb8e[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m54524e86[m update
+[33m8821e721[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m3b4e0e7b[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m6c7ced26[m update
+[33m4c0739bf[m update whatsapp
+[33m0442f54a[m riwayat pending
+[33m62601f5a[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33mdb4f95be[m test
+[33m0c0c5218[m update
+[33md1832fc7[m update whatsapp
+[33m541c1d7e[m update
+[33ma119ae67[m update whatsapp
+[33me8b1f6a8[m update
+[33mc086342c[m update whatsapp
+[33m18e98cbe[m update whatsapp
+[33m70e07ea9[m update whatsapp
+[33mc98d1c20[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33me8061cd5[m update whatsapp
+[33m9727d991[m Merge branch 'develop' of https://github.com/SolitComputer/solit-pos into branch-jann
+[33m6c0fb2f7[m update whatsapp
+[33md2bd40f7[m update whatsapp
+[33m293cb43c[m update whatsapp
+[33mb19c3584[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m39900c0a[m jurnal umum
+[33m0e1d566d[m Merge remote-tracking branch 'origin/develop' into develop
+[33me6bf10d9[m update whatsapp
+[33m53c49f8e[m Merge branch 'branch-jann' of https://github.com/SolitComputer/solit-pos into branch-jann
+[33md3dbfb30[m update
+[33m7ffa755a[m update
+[33mab8fa6df[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m083ac862[m update whatsapp
+[33md15b393f[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33md9f27ef7[m update
+[33mbb86225f[m update whatsapp
+[33mab297870[m perbaiki absen dan overtime
+[33mf5e14d20[m perbaiki absen dan overtime
+[33mf9b8e1c6[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mbed1633d[m upload photo pelunasan
+[33m7adba518[m update
+[33m8bcbb86d[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33me30b1ce2[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m5a1f68a0[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33m6d0d4e65[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m9f864ee9[m cashflow
+[33mba321e8d[m jurnal umum
+[33m8c9c2e51[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mca1a1ff6[m select klik jurnal
+[33m41d80d6c[m perbaiki absen dan overtime
+[33m21badecc[m Merge remote-tracking branch 'origin/branch-jann' into feature/acl-v2
+[33m5f4b0fd8[m perbaiki absen dan overtime
+[33m2a8dd581[m update
+[33m8f95c354[m jurnal umum pending duplicate
+[33m3a0e527a[m SN pengantaran
+[33m2bfa6654[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33mece8b7b5[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m981eb2ad[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33mb14dcc9e[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m8cad5c35[m update
+[33m1f8fb88f[m search data laptop duplicate
+[33m2c536c45[m Merge remote-tracking branch 'origin/Branch-Dimas' into branch-jann
+[33mdb16c418[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33mb089c1ee[m fix: use handleFilterReset in reset filter button
+[33mf190efb4[m fix(cashflow): sync date range filters with table rows and summary cards
+[33m55d9c57c[m perbaiki absen dan overtime
+[33m26a6a7c0[m perbaiki absen dan overtime
+[33mc4adab0a[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33me6620736[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m61906203[m fix(akuntansi): prevent skeleton loading and scroll jumping on entry update
+[33m991e21cb[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33m7cd8de94[m revert dashboard and fixed-assets to origin/develop clean UI
+[33mfb29acd4[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33m637cf857[m update
+[33mb65f426a[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m833aeecc[m update dashboard & fixed-assets
+[33m97f7c189[m cashflow filt tf tunai
+[33mb7355793[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mb5adf04a[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m3834471c[m token deepseek semoga sesuai
+[33m743a5226[m perbaiki absen dan overtime
+[33m19bff64e[m update
+[33mc7ba2df3[m perbaiki absen dan overtime
+[33m57c40615[m perbaiki absen
+[33m05700e94[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m6f38043d[m perbaiki kategori contract
+[33m10e57451[m ai
+[33mb2319d5f[m update
+[33m6c985084[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33mac2191dc[m ai
+[33m18b62019[m yaa
+[33m31b51713[m update
+[33m17514014[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33md17eb3d4[m feat(akutansi): tambah fitur pindah multi-entry jurnal umum & optimasi performa
+[33md060b534[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mfe98bb77[m ai
+[33m8164c165[m data asset tetap feat
+[33mcfb9eb30[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m9ae83f1b[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m3b99af62[m update
+[33m255fa8d0[m akuntansi
+[33ma4818edd[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m992dfbb0[m Merge remote-tracking branch 'origin/feature/acl-v2' into branch-jann
+[33mdb5270e5[m jurnal umum
+[33m7aded49b[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m75f8d8d3[m kontrak
+[33m70f5ec0e[m update
+[33m2c036c1f[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mf2b8e916[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33md8fb0c8d[m transaksi
+[33mf4e56828[m update
+[33mc6c81e86[m aksesories cs
+[33m3174318b[m bottom bar
+[33m06c961e9[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mc43288ff[m aksesories cs
+[33m2cd9c7f4[m jurnal umum akuntan
+[33mc5df168c[m update ai
+[33m7b0fad87[m benerin absensi
+[33ma5de04ba[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m2c8d86af[m audit barang
+[33m71648a48[m aksesories cs
+[33m67698ae6[m aksesories cs
+[33m7d9fa6c8[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m8789969a[m search aksesories cs
+[33m57f364d3[m update akuntansi
+[33m79d42518[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33ma93e6857[m edit payment
+[33m83c1adef[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m5db22d92[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m08af002f[m update
+[33maa9b0b69[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m7cb3f253[m update akuntansi
+[33m2fa8235e[m update
+[33md8a59cc6[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33mab4eb355[m acces mass rafii
+[33mb5775cd8[m penyedia barang n hak akses
+[33m2ba797d9[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33maa48e3d8[m updatee neraca ya
+[33m7e690dd9[m update
+[33m2de18f8a[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m38e9fb0b[m updatee neraca ya
+[33mc1283908[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m052f9906[m tes
+[33mf7ced1a1[m acounting
+[33m7199da98[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mbdd1aa0b[m absensi n penyedia barang
+[33m5f5c0a95[m acounting
+[33mfe8940a6[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m4bdbb89c[m Merge remote-tracking branch 'origin/Branch-Dimas' into feature/acl-v2
+[33m6948d29e[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33mea50b53d[m update
+[33m79a8dda0[m update
+[33m804ad5b2[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33mb544bf10[m acounting
+[33mdb143232[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mafd22976[m jam di ambil di jurnal umum
+[33mf01ce853[m update
+[33ma27fb5c1[m hardresetv2
+[33maa20f911[m update
+[33m5e9d8340[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m0b7f54a6[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m47dffb09[m update
+[33m242f9a8a[m update
+[33m4c43b1bf[m update
+[33m06d612a5[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33m275446ae[m pricelist pedagang, data-barang
+[33mb32b25c8[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33me6f0c5ac[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33me5cc10cc[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mbb0cd063[m Merge remote-tracking branch 'origin/branch-jann' into feature/acl-v2
+[33m05c0c011[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mf1a4c76c[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33ma7fb6430[m update
+[33m1944fee4[m update
+[33m8d378024[m benerin rekapan lemburan
+[33mcf0bae95[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m939c6351[m benerin rekapan lemburan
+[33me56ec4e0[m update contract
+[33m44820771[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33mbbe84792[m Merge remote-tracking branch 'origin/branch-jann' into feature/acl-v2
+[33m0e7fd996[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m9aefb62e[m btm bar
+[33mdd1fe5a5[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m34b9cc6f[m hardresetv2
+[33mabdd3686[m hardresetv2
+[33mfc7f5021[m hardreset
+[33maff882ce[m update
+[33me95b3460[m Servicesan
+[33mde265deb[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mf2195ea2[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m35a1761d[m ket lemburan
+[33m838f303f[m update
+[33m13397a11[m update
+[33maf5818b8[m delete data barang
+[33mf4bb1cd3[m update
+[33me607c088[m hardresetv2
+[33m218931cc[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m29417773[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m7abe274e[m update
+[33m5b7f22ab[m popup bottom bar dst
+[33mf3047d40[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33mba8682a4[m update
+[33m0a2fa3d9[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33mc7d58458[m yyy
+[33mb2ff0c89[m Merge remote-tracking branch 'origin/Branch-Dimas' into feature/acl-v2
+[33mdb4e559b[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m0f956763[m btm br
+[33m1c051699[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33me6b77875[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33mfc964f64[m update
+[33ma4c8e56f[m hardresetv2
+[33mda93e764[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33me2201282[m full services wellll
+[33m5d49a4ff[m update
+[33m8aa89251[m bottomnavbar ;3
+[33m6f7890e9[m hardresetv2
+[33m8662a295[m hardresetv2
+[33m37958eb4[m update
+[33m5fe23ccf[m update
+[33m463b6b03[m profile :D
+[33mafff9e28[m update
+[33md3f38e07[m update
+[33m47098b5f[m update
+[33mf9d64156[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m84b76570[m update
+[33m1b3b9587[m dp services
+[33m713a3dbf[m update
+[33m5ebcefb6[m profil yayaaa
+[33md6171392[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m6fd94959[m update
+[33m99573562[m update absensi
+[33mf9771e15[m update absensi
+[33mfce18109[m update absensi
+[33m66d1f54b[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m73c6ace3[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m8258f326[m benerin absensi yang tampilan mobile
+[33m89aeba0a[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m7589615f[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m11684c50[m Merge remote-tracking branch 'origin/branch-jann' into feature/acl-v2
+[33m61663b03[m update
+[33m42fdf2dc[m update absensi
+[33mb6cdb26c[m update
+[33m2058bb05[m update
+[33m6c61b7e5[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m777ebeca[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33mba63e08e[m update
+[33md7f6e5c8[m update
+[33mec7f7937[m update
+[33m89fae2b3[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m7f00bc67[m update
+[33m5431c573[m update
+[33m7c48c658[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33ma6afb129[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m24d4579d[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m62d2acb1[m update
+[33m907c19b7[m edit transaksi/restore kelihatan siapa yan g restore/edit
+[33m018a6987[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33mdbb088ad[m update
+[33m1056d0cd[m payment pending ultah opsional
+[33m2a04f792[m update
+[33med4bcc9d[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mc9a63b03[m export excel official
+[33m9d5b5b85[m update
+[33m76bdcd59[m update
+[33m47149926[m update
+[33mc8428f8d[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m3854d223[m update
+[33me0330eca[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m52b7595b[m bismillah absensi bener :)
+[33m14db6b6b[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m930c6a52[m logika_absen
+[33ma8e4336a[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m1874b9da[m update
+[33m8d608a02[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m559a5b5e[m logika_absen
+[33m59eac502[m logika_absen
+[33m8c4339a8[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mf8f0b709[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m7cd3d4c3[m update
+[33m10aa38a7[m update
+[33mf33fd1dd[m Merge remote-tracking branch 'origin/branch-jann' into feature/acl-v2
+[33mee2cd98a[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m2db43d32[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33mdcaea42c[m Social song profile
+[33m5fb5e9ac[m update
+[33mf499903b[m update
+[33m6c94acbc[m Benerin data siap jual dan pl pedagang
+[33m56a6f81c[m update
+[33m10bb6850[m update
+[33m673e9ae1[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m7d8d105a[m update
+[33m57288abd[m update
+[33m7d21af26[m update
+[33m44634a00[m update
+[33mee44a55c[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m0373064e[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m56113881[m update
+[33md981807e[m update
+[33m616f413b[m penyedia-pengantaran-salles
+[33m13e0a05a[m update
+[33mef5e0038[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33mee7219ed[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mdc9ff5b0[m update
+[33ma78f6cd2[m update
+[33mad64b4b2[m update
+[33mb4306c89[m update
+[33m5873dae0[m update
+[33m86e8fb93[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33md8ef5165[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m303bf8dc[m Benerin data barang dan SO reset 00.00
+[33m86fea929[m update
+[33m323ce642[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m3f4dc392[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mda5db049[m update
+[33m68212dd8[m update
+[33m15dba34d[m update
+[33m32234018[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m1a1ca151[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mb58a4178[m update
+[33m69dbf3f5[m transaksii aksesoris
+[33m82684fac[m Title profile
+[33m03a37f3d[m gajadii
+[33m72537b5e[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m0f414b0b[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m924cf1cd[m Data barang
+[33m7e538298[m update
+[33m4f435965[m update
+[33me6be99c6[m update
+[33m5a3515fb[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m62049ca6[m SO Audit Data Barang
+[33m61d07c05[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m2af40d34[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m4b64f8ed[m update
+[33m516015ee[m profile UI
+[33ma3386476[m update
+[33ma8b4548f[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m489a84a5[m update
+[33m4e5646b2[m update
+[33m0bb120f3[m update
+[33ma627eb97[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m1574d47c[m Tambahin template kategori jurnal Umum
+[33m254b82a7[m update
+[33m62b2b2aa[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m56ebcc38[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m64cfaddc[m update
+[33m00107b58[m revisi alur penyedia barang yaa
+[33maa4ab76e[m update
+[33m4e395ebc[m update
+[33m9efd5007[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m20239cd2[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33me6689a80[m Benerin harga Official +300
+[33m88f29766[m update
+[33mb01a6b74[m update
+[33md13c00c5[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m3a8dc756[m update
+[33m86271fe6[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mb2b125b6[m restore tidak error
+[33m7238c15e[m update
+[33m72c5097b[m update
+[33m70ada20f[m banner profile chat gelembung muser
+[33m80f600eb[m update
+[33m9a445c0f[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m8ee043c1[m update
+[33m58790b57[m update
+[33m8ec0870d[m update
+[33m612d2714[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m245b1fa9[m tess
+[33m77739ba9[m Menambahkan button SO di data barang
+[33m517b8d6f[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m3943c998[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m3430f777[m update
+[33m8b6a0d23[m conflict merge
+[33mc6f5cbb7[m Gross Profit Aksesories
+[33md92bf26d[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m5b244a51[m update
+[33m7e6c33e7[m update
+[33md4694593[m update
+[33mb62e4148[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33mc0ed4cca[m update
+[33ma942b276[m update
+[33m68c22878[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m2089bc26[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m410b49a1[m akuntansi ganti foto dan search nominal
+[33m2e644264[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m294b7ad8[m update
+[33m5ad773e4[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m99405987[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m06931658[m update
+[33md954eb91[m search di jurnal umum
+[33m45ffe245[m update
+[33mc08a232b[m update
+[33m402a6f33[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33m8eed7863[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33m08b0b999[m Menambahkan halaman Daftar Hadir
+[33m701bace8[m update
+[33mdc7ffd66[m update
+[33m97035e86[m update
+[33m576f3f3e[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m9255fbd3[m update
+[33m06e9e888[m update
+[33me9ea4b62[m manajement seller yang ecommerc tidak boleh msk
+[33m6044ccf0[m update
+[33mfdb575e5[m update
+[33md90827dc[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m85c78191[m update
+[33m733efd29[m REVISI DATA BARANGGGG AGAIN :>
+[33m5596f6f3[m update
+[33ma3bf0546[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m5f25e560[m update
+[33m18585da5[m update
+[33m5348ece6[m update
+[33me67784a1[m update
+[33mb5422c4f[m update
+[33m50a276c9[m update
+[33mfe4eac6b[m update
+[33mb748a5ab[m update
+[33m59a4e245[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m2572f62f[m update
+[33m93a8a4a7[m update
+[33m0e39396a[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch-Dimas
+[33m4af34838[m benerin akses kepala sotech dn sidebar
+[33m4860fb33[m benerin akuntansi sama data barang biar di benerin
+[33mf33609c9[m feat: excel-style filter di InventoryTable, dst
+[33m741fa263[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m973aa113[m update
+[33me3418ab9[m update
+[33mc7461e33[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m173eef03[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mac247ec5[m update
+[33ma1fdc241[m update
+[33m1c9376a9[m Add: history Audit data barang
+[33m18b3dce0[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m52e0a548[m update
+[33m023ab002[m benerin biar harga sn yang borongan kelihatan
+[33mf300bb14[m update
+[33mddf13f58[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m58795f65[m update
+[33mf5ce5da5[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m91eaf3af[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m44d2cca8[m update
+[33m86462f26[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m87a4cafd[m revisi data-barang
+[33m275d8724[m update
+[33mf9d41b0a[m update
+[33mca86fd67[m Merge remote-tracking branch 'origin/branch-jann' into Branch-Dimas
+[33m753b72a2[m update
+[33m9a238772[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33md636990a[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m20f4eafc[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m40eb8795[m update
+[33mbda8f459[m Benerin cashflow klik
+[33m3cc2c3f7[m update
+[33m3a5c79b1[m Merge origin/develop into Branch-Dimas
+[33m713a6dfc[m Commit local changes before merging origin/develop
+[33m9dc111c1[m update
+[33m79258b6e[m Merge origin/develop into Branch-Dimas
+[33m6e1b4b58[m Update transaction restore, item outflow restore, and label Harga Official
+[33m46671319[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33mb6534179[m update
+[33mff83a294[m update
+[33mea459f7e[m benerin yang kolom keterangan menjadi nama customer dan nama laptopnya
+[33m75ebd887[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m06181d74[m update
+[33m6c46cfba[m update
+[33m1b52b79e[m benerin metode cashflow uang masuk tunai and ttf
+[33m4eaf62fe[m update
+[33mecbbb164[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m9d74a099[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m9c00bc13[m Benerin metode cashflow uang masuk
+[33m9c7528dd[m update
+[33m80fc957f[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m096c7f47[m update payment
+[33mbb551518[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m2600f655[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m7bbb4e74[m Hak akses/permission Data Barang
+[33mc9985a56[m update
+[33m039f7459[m update
+[33m5caee019[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33mcdf30648[m merombak data barang rev
+[33m09a32343[m Merge origin/develop into Branch-Dimas
+[33mde0075f6[m Merge origin/develop into Branch-Dimas
+[33m9ffcc526[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33md4760827[m merombak data barang
+[33m1e71674f[m update
+[33m0404f991[m update
+[33m51024fb4[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m32b27018[m update
+[33mdb725c19[m update
+[33ma34e4375[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m11a875c1[m update
+[33m0c56bc71[m update
+[33m4e612f55[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m74e11c28[m update
+[33m38fd6555[m update
+[33m3227a990[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m0cb3be90[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33mdb0ec1d0[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33meba3e8f4[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mb0df92bf[m update
+[33m395fa58a[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m882b362c[m Add per-account audit access management for cashflow Uang Keluar
+[33m0d0dc17a[m update
+[33m74a6c6f0[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m99b38e66[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33md6463431[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mb09ca0f0[m adain SN di pricelist pedagang rorrrrr
+[33md46fcdb8[m update
+[33m0e8eabfe[m benerin data laptop yang tabnya
+[33mf0e8861b[m update
+[33m993633a7[m update
+[33m0a2c775b[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m8342b709[m update
+[33m09690061[m update
+[33mb13e6628[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m7a4d3a97[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33meae52f02[m update sidebar
+[33m01ec6824[m benerin dan revisi akuntansi neraca dan laba rugi
+[33ma53ac1eb[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m5acbaacd[m sembunyikan beberapa akun akuntansi
+[33mb2c0fe42[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33ma62e9e57[m update
+[33m20241d91[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mfdebe19e[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mc97a293d[m edit no telp di management seller
+[33m31e8ae39[m update sidebar
+[33m2dd573b7[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m6faf3c35[m update sidebar
+[33m796f797c[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m65a46420[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33ma8e02323[m update
+[33m68b1add2[m fix laba rugi accounting dan buku besar accounting, insyaallah dikit lagi benar :'D
+[33m91ef1854[m update
+[33m553345d0[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mb4761c8c[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m84f5bf70[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m754dd17e[m update
+[33m25c2455a[m update
+[33mfe1bc6aa[m update
+[33m0e047946[m update
+[33ma2340297[m fix manajement seller
+[33mb3c734d6[m update
+[33m9803385b[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m80d5450a[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33m1cc557f8[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m8a8727fa[m update
+[33m2bd6dcba[m update
+[33md9c8a92d[m update
+[33mab522d3f[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m22ca6899[m benerin edit dn delete role manajement user
+[33m891aea2f[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m74c3dc9e[m update
+[33m43505641[m update
+[33mf0082116[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mb874e51a[m revisi akutansi jurnal umum
+[33m40a6220a[m munculin data barang
+[33mb7fe7243[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mfe96c9a2[m munculin data barang
+[33m8d3a9731[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33mbb418caf[m Merge remote-tracking branch 'origin/develop' into Branch-Dimas
+[33m52f3f734[m update
+[33m8a191134[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m2866ed67[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33me0244432[m update
+[33mc9e327db[m update
+[33mea80e112[m benerin popup yang klik file
+[33m7116c73c[m update
+[33m4047fce2[m update
+[33m8481a4b4[m Merge remote-tracking branch 'origin/Branch-Dimas' into develop
+[33mdf9e9458[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mc97d7be3[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m8facbd59[m update
+[33ma3847f06[m akuntansii welll
+[33md71b43a5[m update
+[33m5289f6f9[m update
+[33m54853e63[m update
+[33m44fc1166[m update
+[33m3e9c9c36[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m94e7b5a9[m cashflow dan akuntansi
+[33m7fcd7cb0[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mab36806e[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mbe6d133f[m update
+[33m243be372[m update
+[33mea94aeb2[m update
+[33m063b929e[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m96460ccb[m yayayayayaya
+[33m9432c18d[m DP&ambil tidak jadi
+[33m0c3d056b[m[33m ([m[1;31morigin/Branch_Dimas[m[33m)[m update
+[33m15bc5ea9[m update
+[33m404080c7[m update
+[33mdf5ce847[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33mc06ae94d[m update_icon
+[33md60bf78c[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33me73701a9[m update
+[33md462c894[m update
+[33mc28ad9a7[m update_icon
+[33m5ef4e5bc[m tambahin kategori piutang uang keluar cashflow
+[33mf45cfd76[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m78feeb48[m update
+[33m630da2ab[m update
+[33mb83c5e2b[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m7f9a8a68[m update
+[33m9bfd8d47[m update
+[33m13f407b0[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mb46f5226[m data barangggg wellll
+[33m916932f5[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33meec9e438[m update_export
+[33m51630e45[m payment aksesories
+[33mae5aea60[m update
+[33mce0c635f[m update
+[33m9a1d8e8b[m update
+[33m5767bfd8[m benerinn lemburann monitorrrr
+[33mbe294f02[m update
+[33ma7a430b8[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m3b23f6f7[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m34e18dda[m fix munculin data laptop
+[33mab1a3791[m update_filter
+[33me7bd09c6[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33m5b804725[m update
+[33m347fe000[m Monitoring Lemburan untuk CEO
+[33m0a1960e0[m update
+[33m9a8cc5ce[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m230ef2f4[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33mf8653d06[m update
+[33mf899eb55[m update
+[33m4e5314af[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33mba6f7c67[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m081d3446[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mdeecf55e[m update
+[33m68005ecd[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33mc885a74f[m update
+[33m33c03be3[m filterasi cashflow
+[33mfba77475[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33m0490a69f[m update
+[33m3b034988[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33m2d1274fd[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mbfe9aa97[m benerin invoice whatsapp
+[33ma2bb82b4[m update
+[33m76b82416[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33m2f86de66[m update
+[33mbfb6e750[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m4fb73ecd[m update
+[33mb14a8275[m update
+[33m1bfbfede[m update
+[33m60d785d6[m fix kepala zenit
+[33m3b02d378[m leaderboard absensiii :]
+[33m43f68aa2[m update
+[33m687b35ce[m update
+[33m81ba7bc0[m leaderboard lembur
+[33m447114b4[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m6c3f0fb1[m Merge branch 'branch-jann' of https://github.com/SolitComputer/solit-pos into develop
+[33m372c00ba[m update
+[33m459e96bd[m fix bug detail againn :)
+[33m37b631b3[m update
+[33m6896aef4[m fix bug detail transaksii
+[33m414e24ba[m update
+[33m123d47d8[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33mc8aacccb[m update
+[33md7e0ff14[m statistik penyedia barang
+[33ma1aa2b47[m benerin ui akuntansi huhu
+[33mc915bbe9[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33m0cdb0bfd[m welwel
+[33m485581b3[m update
+[33mc9c41a06[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m25ed7cd2[m update
+[33mc99aea94[m update
+[33m4c65222e[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33mef018106[m Update local changes before merge
+[33m3d832623[m update
+[33m211fd88f[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m1f6a5a75[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m02086361[m update
+[33me9e12f2e[m update
+[33mc3cef29b[m Merge remote-tracking branch 'origin/develop' into feature/acl-v2
+[33ma0a73549[m update
+[33mb0f1860d[m update
+[33m43591d15[m benerin akses role zenithh yaaak
+[33m2420fc1b[m[33m ([m[1;32mdevelop[m[33m)[m update
+[33me0432b12[m update
+[33me64fa1b1[m update
+[33mcfd94a59[m update
+[33mb4e96678[m update
+[33m370e42c0[m update
+[33m4f5ba566[m update
+[33m4a04db2a[m benerin ui huhu
+[33me70fbf5d[m benerin status batal di laporan cc
+[33m6bb4f202[m update
+[33m7d96e7fc[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mf3f046ad[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m18142c58[m update
+[33m83603374[m update
+[33m5e610393[m Benerin data laptop terjual ilangin dan benerin yang stok tersisa
+[33m17bd5aae[m update
+[33me84a4dcd[m update_management_barang_dan_management_seller
+[33m453a895e[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mab2118f7[m update
+[33m63ec9256[m revisi_databarang_filter_dll
+[33m39f38f92[m update
+[33m5fde2143[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m6e67b50a[m update
+[33m641cd570[m update
+[33m22f1250e[m drag_reordering
+[33mfd092139[m benerin laporan konten
+[33m422cda8c[m update
+[33mda939004[m update
+[33m068bed56[m update
+[33mf8efe006[m benerin_emoji_jadi_lucide_icon
+[33m5d22ac1f[m Merge origin/develop and resolve GroupChatPanel conflict
+[33m84003a41[m Merge develop into branch and fix conflicts
+[33mad0b3b84[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33medd629b1[m benerin Akuntansi
+[33m947e585c[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33meb19830d[m benerin CoA Akuntansi
+[33m109e8a5f[m update
+[33me29828f2[m merge ikmal
+[33m33150dc8[m update
+[33m007fdd0f[m menambahkan fitur membuat grup
+[33m77a25863[m update
+[33m72cf9f7d[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33mc21181c5[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m048bb69f[m update
+[33m5fe39853[m update
+[33md76fea26[m Merge remote-tracking branch 'origin/feature/acl-v2' into Branch_Dimas
+[33m3004aa94[m create_filter_zenit_transaksi
+[33me84edc5d[m mengubah font yaaw
+[33m460420ea[m update
+[33m31ecf95e[m update
+[33mc467157d[m Merge remote-tracking branch 'origin/feature/acl-v2' into develop
+[33m8129b802[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33m3ef96d71[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33ma91b14c2[m Membuat fitur pengambilan barang agar tercatat dalam system :D
+[33m738fc11a[m yaya
+[33m7032e861[m benerin_payment_zenit
+[33mfe04f97c[m benerin_lembur
+[33m50f312ec[m apus_riwayat_keluar_aksesoris
+[33m6cbebb91[m[33m ([m[1;31morigin/feature/acl-permissions[m[33m, [m[1;31morigin/branch-moreno[m[33m, [m[1;31morigin/backup-moreno-2026-07-14[m[33m)[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33mb6330510[m update
+[33ma2e8a6f1[m update
+[33m398afc3d[m buat_riwayat_keluar_aksesoris
+[33m1506fbab[m update
+[33m12dfde9e[m update
+[33m9c59d79e[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m89b586c5[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m426e2d02[m benerin todo huhu
+[33m0d30e278[m update
+[33m9dc7e395[m update
+[33m4d8ece7a[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mf8e7b785[m update
+[33mb2bac231[m update
+[33mcec79012[m update
+[33me9b5abc9[m update
+[33m945cb2fd[m update
+[33mb3ed7d1d[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m289417b9[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mc059efa0[m fix bug fu
+[33m4bbbd070[m update
+[33mb7df014e[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33m8da5acb1[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m5e6245da[m benerin manajement seller
+[33m7a193724[m benerin_leaderboard_misi/absensi
+[33mf5ca6bef[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33ma5ad1148[m benerin_leaderboard_misi\pekerjaan
+[33ma718d587[m update
+[33m0b4d4e85[m update merge
+[33m4c64eaea[m update
+[33mb368beac[m update merge
+[33m2cd55ab8[m update
+[33m5abcc95a[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mabc40c38[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33m9658ad36[m update
+[33m09ce4a31[m update
+[33me0122bd0[m update
+[33mc9f598ab[m update
+[33m35042767[m update
+[33m54ad05d1[m update
+[33m1bdcfd33[m hapus_page_terjual_unit_sold
+[33mf289b921[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33m0dd7d985[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m82aff893[m adain notifikasi suara misiion
+[33me08faf7d[m filter_cashflow
+[33m2ff985ba[m Merge remote-tracking branch 'origin/branch-jann' into Branch_Dimas
+[33m70ce4519[m update
+[33mf70db618[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33mb9b04aa1[m munculin manajemen seller role crew sales
+[33m519d35c0[m update
+[33m2065bfd8[m fix todolist
+[33mf20e78dd[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m3d8a8df7[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33m78b9e77a[m update
+[33m10e007bf[m leaderboard
+[33m48763e9c[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33me2e6c197[m menambahkan filter onpoint di riwayat transaksi
+[33m18248446[m buat_page_leaderboard
+[33mfb5c66cf[m bisa hapus data laptop yang di restore
+[33m6a9513de[m update
+[33m1b528b96[m update
+[33mb8e817ad[m update tiktok
+[33m56abdb6a[m nambah role zenith
+[33mae6065ed[m update
+[33m7fa0f0a0[m update
+[33m08b6d9c0[m yang bisa lihat modal hny adm, prog, dn akntnsi
+[33m141f3735[m update
+[33m2884309a[m update
+[33m0b4b8088[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mdda71638[m update nyakkkkk
+[33m302eef5d[m update merge
+[33m1706fa36[m update merge
+[33ma98c3973[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mc3699a17[m bikin fitur todolist yaaw
+[33ma816192b[m update
+[33m9584de0d[m Merge remote-tracking branch 'origin/branch-jann' into branch-moreno
+[33m31198b89[m update
+[33m4790d1c1[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33m24814ba3[m update edit hover yaw
+[33m3fce5bf4[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33me1e36f56[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m28059c58[m update
+[33me8b4fd1b[m update
+[33mba9ec042[m update
+[33m67872e92[m update cashflow insyaallah fix :D
+[33ma4f12e84[m update
+[33mebfbe03b[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m06c1bb4d[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m9a549b58[m update yang Kirim WA
+[33m1bb52aea[m update
+[33mb08d7d21[m update
+[33m6bdc9759[m update
+[33m47aeabb2[m update
+[33m047c29f0[m update
+[33me099c7a9[m update
+[33m718c5518[m birthday sales
+[33m982af6c6[m update
+[33m5eff16d8[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33madd2628a[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mffedc7c7[m benerin_error
+[33m89540b10[m update
+[33mfa147ebc[m add birthday alert
+[33m6d5b0fc2[m update
+[33m7f94feca[m benerin_filter_cashvlo
+[33m0337f7d3[m update
+[33m2db0c7eb[m update
+[33mba1a7bbc[m update
+[33mdd09f25b[m update
+[33m55064443[m benerin_pengantaran
+[33m6d3db9a6[m update
+[33m9022c0a7[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m20b2be75[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m32ad0157[m update riwayat transaksi
+[33m16594594[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m768608a9[m update
+[33maddd1c2c[m update
+[33mcbe168ef[m update
+[33m35e6032c[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33m076724b2[m update riwayat transaksi
+[33m7394ae47[m update
+[33m0a0185d6[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mb78264fa[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m84bf2176[m adain fitur restore k sotech k onpoint
+[33m9acd4b86[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mb6644cc0[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mae2e6350[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33mb56230e5[m tambah kategori uang keluar
+[33m817f912c[m update
+[33m75609bca[m update
+[33mce48d4ce[m update
+[33mc85d23bc[m update
+[33m61f0234d[m update
+[33m8ae1fcb2[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m682eade1[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33ma0e04731[m fix upload
+[33ma5c8d03a[m update
+[33mf32924c5[m benerin_audit_misi
+[33m83a703bc[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m6a9c8d01[m revisi lagi cashflow
+[33m149e40f0[m menambahkan method cash atau saldo di cashflow
+[33m04b3a5ca[m semuaunit_total_modal_merah_ketika_melebihi_modal
+[33m0083d35c[m semuaunit_total_modal_merah_ketika_melebihi_modal
+[33mbeac3afd[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33ma5eb0258[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33m92e3d629[m update
+[33m3051d2ba[m kasih_input_flow
+[33m7289cab9[m kasih_filter_dashboard_cashflow
+[33m43fa48ea[m Merge remote-tracking branch 'origin/develop' into Branch_Dimas
+[33m44b4fec7[m feat: add cashflow list pagination and resolve conflict
+[33mb2e37f8c[m update yaa
+[33m509c56dd[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33m6594b542[m test
+[33mf8853b41[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33maca13b81[m update
+[33m5e0d5b29[m update
+[33mf6d52c1c[m update
+[33m245724fb[m fix
+[33mfbafb5d0[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m75d35d74[m update
+[33md957df51[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mab609cb7[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m90cd490c[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m486edfad[m fix
+[33mb5b2cb4c[m kasih_filter_dashboard_cashflow
+[33m968407f1[m menambahkan role purcashing
+[33me73e911f[m update
+[33m1c2590a8[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33me7bfa417[m update
+[33mc3f5fb5f[m chore: add netlify config for next runtime
+[33md5dd23e2[m merge
+[33mf524a306[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m326878c6[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m9eb09df4[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33m6641b5e8[m update buggg bismillah
+[33m5b6c0cce[m merge
+[33m553f8e66[m benerin_misi
+[33mc9fea7c4[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m815f6426[m update
+[33m11aa8458[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33m489221f7[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33m7413880d[m merge
+[33mf68a633f[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m8993b9a1[m update
+[33m9289f915[m update_udh_bisa_misi_perdivisi
+[33m12a8046c[m update whatsapp + payment
+[33mc605200f[m revisi halaman semua unit
+[33mb322dfcc[m update
+[33m4ffa1074[m update whatsapp
+[33mf3641c6c[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33m5fbcfa06[m munculin_misi
+[33mc6a2d701[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m603878d9[m filter lemburan antara karyawan dengan pkl
+[33m39fe8153[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m5946171e[m update
+[33mcf6aa5a1[m upatee sn
+[33m5e4f2c29[m upatee sn
+[33mc8ca9f37[m benerin kamera sn aksesoris
+[33m25600f29[m upate merge
+[33m3e385ea3[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33meeaa2dc8[m upate merge
+[33m0098d24a[m upate merge
+[33m50de9411[m update
+[33mac9c0893[m mengubah akses kepala on point kepala sotech
+[33m4b59663c[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m94f51ecd[m Merge remote-tracking branch 'origin/Branch_Dimas' into develop
+[33ma4025bed[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mb54af874[m masih revisi ads dn fb
+[33m44f4000e[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m557aba46[m revisi ads ig dn fb
+[33m03a5eef6[m menambahkan ads ig dan fb
+[33mbed2412e[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m981f0cf5[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m5e51f2ae[m update_pages_semua_unit
+[33m24bc03ad[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m56046232[m update
+[33me7027356[m upate merge
+[33ma2ce622a[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m3528601a[m update
+[33m9f85e23a[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m0cf8c7b3[m benerin reset pass dan hapus akun
+[33m21343911[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mc8d02fe7[m update
+[33m0df399e3[m upate merge
+[33m11e46d7d[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mfc334bc0[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m5826f2d9[m benerin aksess hmmmmmmmmmmmmmmmmm
+[33m1ab26ea0[m update
+[33m1153c2f7[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33me60710dd[m upate merge
+[33m27d4c1ce[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mba9b4127[m nambah filter terjual di data laptop
+[33me7ffd313[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m485a50d0[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33mfcb1bf6b[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m50549ab2[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33me35dc295[m benerin biar ada button hapus di misi
+[33mc86ff278[m upate chat
+[33m61d53374[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m8bbfcded[m update halaman DP
+[33mcf4f9fff[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m308b4787[m update halaman DP
+[33ma1b92c45[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mab7c759f[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m30820947[m benerin edit harga modal
+[33mb8133e18[m update misi
+[33m024f2d0d[m Merge remote-tracking branch 'origin/branch-jann' into branch-moreno
+[33m1a69c887[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m8b2e45ad[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m510e2df1[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m92564a47[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33mf1f004fc[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mab85743d[m benerin akses role pkl data laptop
+[33m487d6b02[m update misi
+[33m87e545f0[m update
+[33mb6bc8931[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m2b25c9bf[m update role pkl
+[33mad1af9dc[m update role pkl
+[33m3009b915[m update role pkl pengantaran
+[33mbff1e764[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m3533688f[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33me3f8f389[m update
+[33m30da9deb[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m3f00e049[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m6cb6b2dc[m benerin akses role PKL
+[33m6af0d2f1[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m29188a6a[m masih belum benar VN nyaa
+[33mb9371eff[m update
+[33m5650882c[m update merge
+[33mb2db7901[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m61b93e8d[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33me339e17a[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m65b3f79b[m update
+[33mfde4c656[m update pengantaran
+[33mf15c7b06[m update
+[33m7eb01785[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m4d46fc28[m update sidebar
+[33m7229255f[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m1e625a07[m benerin total kasbon dn pensiunan
+[33m44344cbe[m update bubble chatt yaaa
+[33m86d332a3[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m315e347a[m update merge
+[33m1fa31306[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m1daa55d5[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mffeef16c[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m5a5b48b9[m update
+[33m5e84bc99[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33me9107338[m fix sidebar misi
+[33mc6f3dc17[m update
+[33ma8e9da3d[m fix management seller
+[33m39604675[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m3cc29bd4[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33m0edaa32a[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m7a7c5096[m update
+[33ma56d08e1[m update
+[33mda87e5c0[m benerin unit banyak di data aksesories
+[33m78d42274[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m984fc52a[m update
+[33mf3930fcf[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mb7499ac7[m update
+[33m4b7a6f69[m update
+[33m197bc509[m update
+[33m19b711e5[m update
+[33maddc0b5f[m update
+[33m3d805fd2[m update
+[33m0b8ae6f7[m update
+[33mf7ff0152[m update
+[33m9f8597f4[m update
+[33m4c0d4560[m update
+[33m8902104e[m ini akses penyedia barang sama benerin role pkl tpi role pkl masih revisi sih
+[33ma1eb7c99[m update
+[33m21a48a0d[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33m044fa702[m updateeee loginnn yaaa
+[33mae8420c4[m update
+[33m084e47b1[m akses riwayat transaksi 2 role
+[33m1d16106f[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33m9db2ba3e[m test
+[33md6d94366[m update
+[33md243acf7[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m05aaaf27[m update
+[33m2e15af5a[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33maf6727f6[m update
+[33m10b7e422[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m5bc709f9[m update
+[33m60c38773[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33ma478e023[m fix ajukan lemburan
+[33ma0a4c0f1[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33me8ee6a5d[m update
+[33mdd0b6906[m benerin akses rolee semoga benar :)
+[33m235f9987[m update
+[33m843c0875[m update
+[33md11c6187[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m0bbb5277[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33m4d50e8c3[m tes
+[33m58c6d701[m update
+[33m19b6a35e[m update
+[33m912cdd04[m update
+[33m605287db[m update
+[33mbc8b3208[m update
+[33m019d493e[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m57dd12c8[m benerin lemburan lewat tanggal
+[33me6c92e25[m update
+[33m30f00ada[m update
+[33m6f5d0aa1[m update
+[33m06680072[m update
+[33m73481677[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m0619318b[m update
+[33mcbad2529[m update
+[33m2e0222e0[m fix input lemburan bulan lalu
+[33m091cc4ec[m update
+[33m724879e7[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m3be65578[m update
+[33m0e1a6af1[m fix management user sama 2 role dll
+[33m1e57d39d[m update role
+[33m496dbc14[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33me18a22f5[m update
+[33mbc68efd7[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m9b00ab98[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m0e0a94d8[m update
+[33m757daf46[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m8810905a[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m1de1bbe4[m update
+[33md7c9c769[m benerin ui sold
+[33m6a77dc48[m update
+[33mc6721c11[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mfca479f0[m fix kepala pengelola barang
+[33m36b1f3b3[m benerin edit modal di data laptop
+[33md4f7f0ba[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33me908933c[m update
+[33m54cd3333[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33ma4a022b1[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m10555755[m update
+[33m1980d00c[m update
+[33mc03a10ce[m update
+[33m7ca92fe6[m update
+[33m007b65a2[m benerin yang edit modal
+[33m54eee74e[m update
+[33md06dca6c[m update
+[33m33c5994f[m Merge remote-tracking branch 'origin/branch-jann' into branch-moreno
+[33m35769aed[m update
+[33m01c6ec48[m Merge remote-tracking branch 'origin/branch-jann' into branch-moreno
+[33m3ed8a9d5[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33md19f8000[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m1d335716[m update
+[33m7550b8ea[m update
+[33mcb117508[m update
+[33mf0d80f3e[m update
+[33m219711e6[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m6917fcd6[m update penyedia barang
+[33md621fd36[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mdd291035[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33meb9b1dc6[m update absensi popup
+[33mbe6b7cc6[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m04f5edb5[m fix lemburann insyaallah
+[33m2180875a[m fix lemburan insyaallah
+[33md946daba[m update
+[33m28e7a982[m fix pilih karyawannya sesuai dgn divisi
+[33m9e1d978f[m update absensi popup
+[33m0b784b0b[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mfd0202b8[m fix lemburan manual
+[33mfc5f051b[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mfd0dff03[m fix restore yang statusnya diambil
+[33md88f342e[m fix input manual lembur kepala-kepala
+[33me8506651[m update absensi popup
+[33m8f24dba7[m update merge
+[33m4a1b5d56[m update merge
+[33m585a018d[m update
+[33mbcb35abe[m fix sidebar
+[33ma29f6ac3[m update absensi libur
+[33md24d9238[m test
+[33m50958ddb[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mff7e3ad8[m update absensi libur
+[33m9fde2645[m chat monitor
+[33m8dc03ba6[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mdb2a6360[m update
+[33me433afa6[m update absensi libur
+[33m7e45baf7[m update absensi libur
+[33m06ef9ede[m update absensi libur
+[33m74cd2bbf[m update
+[33m653bd858[m fix lemburan di hari libur
+[33m97c48e11[m update management seller
+[33m4c3e3c20[m update management seller
+[33m32691f5b[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33md462c01a[m update
+[33m6ae9cdfc[m update merge
+[33md6811f3d[m update
+[33mf92676e4[m update merge
+[33me76c4c28[m fixxxxx
+[33mc29495ca[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33mfe4ba16c[m sidebar
+[33m2192d192[m update chat
+[33m4c3a9467[m update
+[33mb2fc8282[m update
+[33mcb63a3df[m update
+[33m4a04e4f6[m data aksesories
+[33m7fbd5013[m update permission
+[33mf48374d6[m data aksesories
+[33m2ce1b2c2[m update web chat
+[33mfa55299f[m update
+[33mccc59f24[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m841142c1[m update
+[33mc6250bcd[m update
+[33ma84f48da[m update web solit03
+[33m882262ed[m update laporan kerja
+[33m3d185f89[m update
+[33mbc0b028b[m update role
+[33m7ba0505b[m update
+[33m728cf0be[m update role pkl
+[33mb59dcb66[m update
+[33madb8fa0d[m nambah role baru kepala pengelola barang
+[33ma1399f2e[m update chat
+[33m136a1a8f[m update chat
+[33meb5124ae[m update chat
+[33me6bd9166[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m35e01d0a[m update chat
+[33mbb30c14e[m fix lemburan agar bisa di acc sama kepala
+[33m4b43fd2d[m update data laptop
+[33m1d1dca5f[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m40e07393[m update data laptop
+[33maacfa1f2[m fix tampilan
+[33m87391d1f[m edit hapus gpu dan update modal laptop
+[33meefe5f24[m update absensi
+[33m65901f1f[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33md598fbca[m update merge
+[33m59cf6f2c[m fix edit
+[33m9edcd4e3[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m28532a75[m update merge
+[33mbbdc5450[m updateee
+[33mfb30dc20[m update merge
+[33mfb00cfe5[m update
+[33m77664ba9[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m29674f3f[m update absensi
+[33m3b7da9ac[m fix update modal laptop
+[33me050b015[m nambah kolom metode di riwayat transaksi
+[33m066ea882[m update data laptop
+[33m1159fd92[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33ma09a0751[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33m0fcdcac2[m update absensi
+[33mde20119a[m Merge remote-tracking branch 'origin/branch-jann' into branch-moreno
+[33m41b7d4dd[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33mbc2d4571[m update
+[33mf27e6d8d[m update laptop minus
+[33m969f172e[m update
+[33m4508e9a5[m fix form tambah unit, bismillah :'))
+[33m692c62f8[m absensin pkl
+[33m8bc0acf2[m Merge remote-tracking branch 'origin/branch-jann' into branch-moreno
+[33ma5305006[m update
+[33ma0826285[m fix bubble chat, bismillah :'))
+[33mc82300b0[m absensin pkl
+[33m073e255c[m klik status online bubble
+[33m64ed699f[m update ;3
+[33m8eff6c30[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m0cf731cc[m update
+[33m63de6f45[m lemburan
+[33m4e375a0f[m update anak pkl + role teknisi
+[33mf2665e28[m update anak pkl + role teknisi
+[33m735feb0a[m updateeeeee chatt
+[33mc9a39a86[m update cuti
+[33mbf645130[m updatee message
+[33m14c8d86d[m Merge remote-tracking branch 'origin/branch-jann' into branch-moreno
+[33mc605d85c[m Merge remote-tracking branch 'origin/branch-jann' into develop
+[33mfe8c9201[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m2e092ea3[m update absensi
+[33mecc36572[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m12f13cd9[m update
+[33mc42ca7ea[m updatee group chat yaaaa
+[33m2da9ae27[m update
+[33m265fee3c[m  edit dan delete
+[33m7bd4a02e[m add edit dan delete
+[33m0c3cb959[m update
+[33ma2859e8e[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33mbe1adaa8[m update
+[33m7c61f1de[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33m56398580[m update manage user
+[33m45568ccd[m tes
+[33m839afc68[m update manage user
+[33me08d8e99[m fix: push notification permissions and middleware
+[33med9f3166[m add service worker for push notifications
+[33ma317f5df[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m1aa90718[m fix
+[33m66b1fbdc[m Merge remote-tracking branch 'origin/develop' into branch-moreno
+[33mbab715c4[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m259fddd0[m fix notif chat
+[33m0fc5c3ce[m update
+[33m214c59ff[m update
+[33ma036668d[m add fitur chat all
+[33m74381e34[m Merge remote-tracking branch 'origin/branch-moreno' into branch-jann
+[33m351dbc60[m Merge remote-tracking branch 'origin/develop' into branch-jann
+[33m1fda9362[m fix management user dll
+[33m0aad798b[m fix management user dll
+[33mbb59417c[m update teknisi
+[33m79331314[m update teknisi
+[33m9995d2eb[m update teknisi
+[33m85776303[m update
+[33mfe3ca875[m update transaksi
+[33m233a0414[m update transaksi
+[33mbfbf2975[m update merge
+[33m5d1c17f0[m fix role againnnn
+[33m7a5dff25[m update stock
+[33md4a1203b[m update stock
+[33mdf2cc22d[m access data laptop k/onpoint
+[33m4c9b49ad[m fix lemburan sama fix role k.sotech
+[33m1bdf4014[m update stock
+[33m7ec3ff87[m stock
+[33m333edeb0[m update shift dan popup absen
+[33m33fda1bd[m update spek
+[33mf3a8dd1c[m update role + merge ojan
+[33mbff554b3[m update role + merge moreno
+[33me511af35[m redesign and fix pop up dashboard
+[33mf9d97617[m update
+[33md2bc35c1[m fix dashboard diagram n popup
+[33mbc0b716b[m update transaksi
+[33m9505ae79[m Merge remote-tracking branch 'origin/branch-ojan' into develop
+[33m2b96b807[m Merge remote-tracking branch 'origin/develop' into branch-ojan
+[33maa0f2cbb[m Merge remote-tracking branch 'origin/branch-moreno' into branch-ojan
+[33mad9b3c18[m update teks laptop
+[33m515bb117[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m81da3925[m semoga ini bener lagi :D
+[33m3676741f[m update teks laptop
+[33m84c75b70[m update teks laptop
+[33m12942d79[m update
+[33mc36ce19a[m update
+[33mcb334728[m update teks laptop
+[33md193bd2c[m update tukar libur
+[33mebaa6059[m update tukar libur
+[33ma12979fa[m update camera realtime
+[33mc218ec37[m update tukar libur
+[33me76a77aa[m fix lemburan
+[33mcf82fbc8[m update halaman transaksi SN
+[33m75424265[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mbe91daad[m update halaman transaksi SN
+[33mcca8bfb6[m masih tahap revisi : )
+[33mfc65ecae[m update yaa
+[33mbd0078d6[m update yaa
+[33mdd519a1f[m update
+[33m9accc954[m update yaa
+[33m9575e5ac[m update yaa
+[33ma86e773a[m update yaa
+[33m3d055d23[m insyaallah fix
+[33m7109a501[m update yaa
+[33me2a7f903[m Merge remote-tracking branch 'origin/branch-ojan' into branch-moreno
+[33m73a8369e[m fix input lemburan rev
+[33m7e0474a3[m update
+[33ma38ff7d1[m fix input lemburan rev
+[33md68065d0[m Merge remote-tracking branch 'origin/develop' into branch-ojan
+[33m84ec8637[m update yaa
+[33m31a93a68[m update yaa
+[33maa6fecb2[m update
+[33m2131e96a[m update ui lembur
+[33m961858a0[m update laptop dan report
+[33m592af0a6[m update laptop dan report
+[33m208004ce[m add table alasan dan desk work
+[33m61195d0f[m update laptop dan report
+[33mba474726[m update yaa
+[33m0090d0cd[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mac7f2e78[m update yaa
+[33m129a4840[m update input manual lemburan
+[33ma1ae6184[m Merge remote-tracking branch 'origin/develop' into branch-ojan
+[33m4900fae0[m update yaa
+[33m61ab25d7[m update yaa
+[33m4939d2ea[m update yaa
+[33mb9f77b7d[m Merge remote-tracking branch 'origin/develop' into branch-ojan
+[33m67d3c7de[m update laptop dan report
+[33m8752dfe1[m Merge remote-tracking branch 'origin/branch-ojan' into branch-moreno
+[33m851ada31[m Merge remote-tracking branch 'origin/branch-ojan' into develop
+[33m80abc80c[m update yaa
+[33m0d9a5594[m update yaa
+[33m50a71cc7[m update yaa
+[33mf5fd899d[m fix
+[33ma666dcff[m update yaa
+[33m5273841d[m fix konten
+[33m2589bf03[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m6d232ccc[m fix rolee
+[33m8f1e3ad7[m Merge remote-tracking branch 'origin/develop' into branch-ojan
+[33m91f90527[m update
+[33mc6a47d17[m update yaa
+[33m0c3bd026[m update
+[33m6598942b[m update
+[33m7b0416d7[m update yaa
+[33mce272e70[m update yaa
+[33m7737615a[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33mf8b2463e[m fix management user
+[33m0f1cf59f[m update yaa
+[33m84a529d4[m update yaa
+[33m49f3850a[m update yaa
+[33m9fa76ea5[m update yaa
+[33m90644661[m Merge remote-tracking branch 'origin/branch-moreno' into branch-ojan
+[33md7dbc9e2[m fix overtime
+[33me99a19ef[m backup perubahan overtime
+[33m7fc9277c[m Merge remote-tracking branch 'origin/branch-moreno' into develop
+[33m723a6859[m backup perubahan overtime
+[33m49e48915[m update overtime
+[33m142d669c[m update yaa
+[33m0eb12789[m update yaa
+[33m2bb3e83c[m update yaa
+[33m5c7487bc[m Merge remote-tracking branch 'origin/branch-ojan' into develop
+[33md9276f6e[m update
+[33mf015aa7d[m updateee :3
+[33m0005fc35[m updateee :3
+[33ma1d8a532[m update yaa
+[33mfe5995a5[m update yaa
+[33m43830f83[m update yaa
+[33m3734d58d[m update yaa
+[33m39c1a02b[m update yaa
+[33md173a339[m update yaa
+[33m832753d9[m update yaa
+[33m55f2e186[m update yaa
+[33mad3f92d0[m update yaa
+[33m27ca129e[m update yaa
+[33m672b70b6[m update yaa
+[33md1449863[m update yaa
+[33ma3976f5c[m update yaa
+[33mf203fb4c[m update yaa
+[33m66b69e10[m update yaa
+[33m19b9e290[m update yaa
+[33md6e1542d[m update yaa
+[33m3254d1a3[m update yaa
+[33m09cd72cc[m update yaa
+[33m82f25143[m update yaa
+[33m49fcb157[m update yaa
+[33mdc9fc857[m update yaa
+[33mf90b75d0[m update yaa
+[33m30b94502[m update yaa
+[33mb3552222[m update yaa
+[33m6010fe85[m update yaa
+[33m025aa7bf[m update merge
+[33m34d65812[m Fix merge conflict: restore users page from remote
+[33mef857669[m Update dashboard pages
+[33m93387c7f[m Update dashboard pages
+[33me86f43c9[m update yaa
+[33mc7237689[m update yaa
+[33m3be45696[m update yaa
+[33m59215d3e[m update yaa
+[33m11ad589e[m update yaa
+[33m26d62ead[m update yaa
+[33md9e33ab8[m update merge
+[33mc0fa2297[m update yaa
+[33m89000e24[m update yaa
+[33m17e3530b[m update yaa
+[33m897125c1[m update yaa
+[33me165d527[m update yaa
+[33mfc54a08b[m update yaa
+[33m6374ed6f[m update merge
+[33mcfe5699b[m update merge
+[33mece2de33[m update merge
+[33m808f978e[m update merge
+[33mc6ebbd5a[m update dashboard
+[33m60a3623c[m update yaa
+[33m16121997[m update yaa
+[33m5f49ec04[m update yaa
+[33m6cf76d12[m update yaa
+[33m2f8309a1[m update yaa
+[33mf2a75ec8[m update yaa
+[33m45f945dd[m update yaa
+[33m82479b4c[m update yaa
+[33mc7eebadf[m update yaa
+[33me55e7083[m update yaa
+[33m955c17ae[m update yaa
+[33m458d6335[m update yaa
+[33mf2848be5[m update yaa
+[33ma32d5387[m update yaa
+[33ma9f93541[m update yaa
+[33m0701bf3b[m update yaa
+[33mab4d7abb[m update yaa
+[33m43c9f5f5[m update yaa
+[33m55503e81[m update yaa
+[33m90e83a23[m update yaa
+[33mebc0fe3c[m update jam
+[33mf7adacff[m update jam
+[33mac6df4a3[m update jam
+[33mf3eff590[m update yaa
+[33m6053c1d0[m update yaa
+[33m3a7dba87[m update yaa
+[33m1db4d23d[m update yaa
+[33m2fad1b41[m update yaa
+[33mf84e8ff3[m update yaa
+[33me7864ace[m update yaa
+[33me2b94d4c[m update yaa
+[33m9a72143f[m update yaa
+[33m6d63ab38[m update yaa
+[33m08e8819c[m update yaa
+[33m40618158[m update yaa
+[33ma67fda0d[m update yaa
+[33m9f86f6cb[m update yaa
+[33me4aaa9ae[m update yaa
+[33m52cf4002[m update
+[33m6fb4425b[m update yaa
+[33m272f0f7d[m update yaa
+[33m88e037af[m update yaa
+[33md3854965[m update yaa
+[33m946e2db4[m update yaa
+[33m3dc8d2d0[m update yaa
+[33m29ad44a8[m update yaa
+[33mc79a988b[m update yaa
+[33mc97a801c[m update yaa
+[33mf009423e[m update yaa
+[33m723702a4[m update yaa
+[33m18cd8b1f[m update yaa
+[33mcd590907[m update yaa
+[33m6e2be2fa[m update yaa
+[33m8230eea7[m update yaa
+[33m18f33e33[m update yaa
+[33mbde7878a[m update yaa
+[33m3a243133[m update yaa
+[33mff620ad1[m update login page
+[33m8dfd1b42[m update login page
+[33m4dab1b81[m update login page
+[33m18c32413[m update yaa
+[33m88785738[m update login page
+[33mddf3c3fa[m update yaa
+[33mc51496c9[m update
+[33mcf4d1a43[m update
+[33mdeca0eaa[m update
+[33m3fceb1e9[m update
+[33m14375ea2[m update
+[33m3a2abb13[m update
+[33m3a09d9b5[m update
+[33me6cb55f3[m update
+[33m3b84ae4d[m update
+[33mda4a03e4[m update
+[33mcc791960[m update
+[33m4f361547[m update
+[33m62717153[m update
+[33me4a8f9d8[m update
+[33mcb4e63e9[m update
+[33m6c5fcb15[m update
+[33m36adbb04[m update
+[33m11a61e20[m update
+[33m52350314[m update
+[33mb6593fdc[m hahahah
+[33m5d585e84[m hahahah
+[33m8efc6aac[m hahahah
+[33m11d05252[m hahahah
+[33m222f5fb5[m hahahah
+[33m095428f1[m hahahah
+[33mbbd51f47[m hahahah
+[33m7a038e5d[m hahahah
+[33md2938971[m hahahah
+[33me9684c84[m update
+[33me1f082a5[m update
+[33m35567aec[m update
+[33md68aca56[m update
+[33m80c563d6[m update bug
+[33m56a31bf4[m update bug
+[33me48fbd4c[m fix webhook stock update
+[33m9d10e1e1[m fix webhook stock update
+[33m5d91654e[m fix webhook stock update
+[33mbacc7a0f[m fix webhook stock update
+[33md0e3a26f[m fix webhook stock update
+[33m8d2b072a[m fix webhook stock update
+[33m18efe01a[m fix webhook stock update
+[33m45100e15[m first commit
+[33mba17f442[m first commit
+[33m331d98dc[m first commit
+[33m40e4113b[m first commit
+[33m77136083[m Initial commit from Create Next App
