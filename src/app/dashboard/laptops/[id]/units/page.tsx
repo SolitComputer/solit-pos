@@ -824,7 +824,7 @@ export default function UnitsPage() {
 
                     {/* Breadcrumb */}
                     <div className="flex items-center gap-2 text-sm">
-                        <Link href="/dashboard/data-barang?tab=laptops" className="text-gray-400 hover:text-gray-600 transition">Data Laptop</Link>
+                        <Link href="/dashboard/data-barang" className="text-gray-400 hover:text-gray-600 transition">Data Laptop</Link>
                         <svg className="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
