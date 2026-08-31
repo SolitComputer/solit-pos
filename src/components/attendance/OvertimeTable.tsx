@@ -164,10 +164,12 @@ export function OvertimeTable({
   onRefresh: () => void;
   onOpenDetail?: (row: OvertimeTableRow) => void;
 }) {
-  const [detailModalRow, setDetailModalRow] = useState<OvertimeTableRow | null>(null);
+    const [detailModalRow, setDetailModalRow] = useState<OvertimeTableRow | null>(null);
   const [photoModalRow, setPhotoModalRow] = useState<OvertimeTableRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectModalRow, setRejectModalRow] = useState<OvertimeTableRow | null>(null);
+  // ✅ NEW — filter tab "Sudah Diaudit / Belum Diaudit"
+  const [auditFilter, setAuditFilter] = useState<"ALL" | "AUDITED" | "NOT_AUDITED">("ALL");
 
   if (loading) {
     return (
@@ -177,9 +179,16 @@ export function OvertimeTable({
     );
   }
 
-  if (rows.length === 0) {
+   if (rows.length === 0) {
     return <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-sm text-gray-400">Tidak ada data lemburan untuk filter ini.</div>;
   }
+
+  // ✅ NEW — audit_status "AUDITED" = sudah diaudit, selain itu (PENDING/REJECTED/null) = belum diaudit
+  const filteredRows = auditFilter === "ALL"
+    ? rows
+    : auditFilter === "AUDITED"
+      ? rows.filter((o) => o.audit_status === "AUDITED")
+      : rows.filter((o) => o.audit_status !== "AUDITED");
 
   const runAction = async (id: string, body: any) => {
     setBusyId(id);
@@ -196,8 +205,32 @@ export function OvertimeTable({
     } finally { setBusyId(null); }
   };
 
+   const AUDIT_FILTER_TABS: { key: typeof auditFilter; label: string }[] = [
+    { key: "ALL", label: "Semua" },
+    { key: "NOT_AUDITED", label: "Belum Diaudit" },
+    { key: "AUDITED", label: "Sudah Diaudit" },
+  ];
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-1.5 flex-wrap px-4 py-3 border-b border-gray-100 bg-gray-50/40">
+        {AUDIT_FILTER_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setAuditFilter(tab.key)}
+            className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-colors ${
+              auditFilter === tab.key
+                ? "bg-violet-600 text-white border-violet-600"
+                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {filteredRows.length === 0 ? (
+        <div className="p-10 text-center text-sm text-gray-400">Tidak ada data lemburan untuk filter audit ini.</div>
+      ) : (
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[900px]">
           <thead>
@@ -212,8 +245,8 @@ export function OvertimeTable({
               <th className="px-4 py-3 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Aksi</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
-            {rows.map((o) => {
+                   <tbody className="divide-y divide-gray-50">
+            {filteredRows.map((o) => {
               const color = getOvertimeColor(o);
               const style = COLOR_STYLES[color];
               const isOwner = o.user_id === currentUserId;
@@ -290,9 +323,10 @@ export function OvertimeTable({
                 </tr>
               );
             })}
-          </tbody>
+                    </tbody>
         </table>
       </div>
+      )}
 
       {photoModalRow && photoModalRow.proof_photo_url && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-5" style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)" }} onClick={() => setPhotoModalRow(null)}>
