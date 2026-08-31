@@ -1,4 +1,3 @@
-
 "use client";
 
 import Sidebar from "./Sidebar";
@@ -79,7 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
        * akan membuka kunci autoplay browser.
        */}
       <div
-        className="flex min-h-screen bg-[#F7F7F8]"
+        className="flex min-h-screen bg-gradient-to-br from-[#F5F6FB] to-[#EEF0FA]"
         onClick={() => { void unlockRef.current(); unlockReminderAudio(); }}
         onKeyDown={() => { void unlockRef.current(); unlockReminderAudio(); }}
         onTouchStart={() => { void unlockRef.current(); unlockReminderAudio(); }}
