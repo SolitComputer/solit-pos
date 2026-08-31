@@ -355,9 +355,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
-    "/dashboard/laptops/monitoring": [
+      "/dashboard/laptops/monitoring": [
     ...FULL_ACCESS, "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
   ],
+  // Riwayat SO gabungan (lintas semua laptop). Sengaja ditulis literal, BUKAN
+  // pakai SO_HISTORY_VIEW_ROLES — constant itu didefinisikan setelah
+  // ROUTE_PERMISSIONS di file ini (lihat komentar dekat SO_ROLES di bawah).
+  "/dashboard/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
 
     "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
   "/dashboard/audit-barang-keluar": [...ITEM_OUTFLOW_ROLES],
@@ -414,7 +418,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "CUSTOMER_SERVICE",
     "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
   ],
-  "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
+   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
+  "/api/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
   "/api/dashboard": [...ALL_ROLES],
   "/api/transaction/create": [
     ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
@@ -1027,6 +1032,18 @@ export function canSoUnit(
   if (userId && SO_LIMITED_USER_IDS.includes(userId)) return unitStatus === "SIAP_JUAL";
   return false;
 }
+
+// ── Riwayat SO: halaman gabungan (lintas semua laptop) di sidebar Inventaris,
+// tepat di bawah "Monitoring Stok". HARUS disamakan MANUAL dengan entry
+// ROUTE_PERMISSIONS "/dashboard/laptops/so-history" & "/api/laptops/so-history"
+// di atas — constant ini didefinisikan setelah ROUTE_PERMISSIONS di file ini,
+// jadi tidak bisa dipakai langsung di sana (const belum ter-inisialisasi).
+export const SO_HISTORY_VIEW_ROLES: UserRole[] = [
+  "ADMIN",
+  "PROGRAMMER",
+  "KEPALA_PENGELOLA_BARANG",
+  "PENGELOLA_BARANG",
+];
 
 // ── Data Barang: Role yang boleh melihat tab Data Laptop & Aksesoris ──────────
 // Kepala Sales, Kepala Zenith, Kepala Onpoint, Kepala Sotech, Crew Sales, dan Sales tidak diperbolehkan.

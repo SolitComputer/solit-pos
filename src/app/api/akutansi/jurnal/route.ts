@@ -18,6 +18,7 @@ import {
   getTransactionMetaByInvoices,
   getTransactionSyncDraftsByInvoices,
   getCashflowSyncDraftsByIds,
+  getCashflowMetaByIds,
   getServiceSyncDraftsByIds,
 } from "@/lib/accountingSource";
 
@@ -127,18 +128,20 @@ export const GET = withAuth(async (req) => {
     ),
   ];
 
-  const [syncDraftMap, cashflowSyncDraftMap, serviceSyncDraftMap] = await Promise.all([
+    const [syncDraftMap, cashflowSyncDraftMap, cashflowMetaMap, serviceSyncDraftMap] = await Promise.all([
     getTransactionSyncDraftsByInvoices(supabase, primaryTrxInvoiceNumbers),
     getCashflowSyncDraftsByIds(supabase, primaryCashflowIds),
+    getCashflowMetaByIds(supabase, primaryCashflowIds),
     getServiceSyncDraftsByIds(supabase, primaryServiceIds),
   ]);
 
-  const entriesWithMeta = entries.map((e: any) => {
+   const entriesWithMeta = entries.map((e: any) => {
        if (e.source_type === "CASHFLOW" && e.source_id) {
       const syncDraft = cashflowSyncDraftMap.get(e.source_id as string);
       const syncAvailable =
         !!syncDraft && (!linesEqual(e.lines ?? [], syncDraft.lines) || e.keterangan !== syncDraft.keterangan);
-      return { ...e, trx_meta: null, sync_available: syncAvailable };
+      const cashflowMeta = cashflowMetaMap.get(e.source_id as string);
+      return { ...e, trx_meta: { nama: cashflowMeta?.nama ?? null }, sync_available: syncAvailable };
     }
 
        if (e.source_type === "SERVICE" && e.source_id) {
