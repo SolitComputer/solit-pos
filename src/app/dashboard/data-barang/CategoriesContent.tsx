@@ -20,7 +20,7 @@ function TypeBadge({ type }: { type?: string | null }) {
     if (type !== "LAPTOP" && type !== "AKSESORIS") return null;
     const isLaptop = type === "LAPTOP";
     return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${isLaptop ? "bg-indigo-50 text-indigo-700" : "bg-violet-50 text-violet-700"}`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${isLaptop ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
             {isLaptop ? "Laptop" : "Aksesoris"}
         </span>
     );
@@ -94,7 +94,7 @@ export default function CategoriesContent() {
             {/* ── Sub-header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
                 <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl flex items-center justify-center shadow-md shadow-indigo-900/25 flex-shrink-0">
+                    <div className="w-11 h-11 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-xl flex items-center justify-center shadow-md shadow-zinc-900/25 flex-shrink-0">
                         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="white"
                             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <rect x="3" y="3" width="7" height="7" rx="1.5" />
@@ -111,7 +111,7 @@ export default function CategoriesContent() {
                 {canManage && (
                     <button
                         onClick={openCreate}
-                        className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md shadow-indigo-600/20 transition active:scale-[0.98]"
+                        className="inline-flex items-center gap-2 bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-md shadow-zinc-900/20 transition active:scale-[0.98]"
                     >
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -131,7 +131,7 @@ export default function CategoriesContent() {
                         value={searchText}
                         onChange={e => setSearchText(e.target.value)}
                         placeholder="Cari nama kategori..."
-                        className="w-full pl-8 pr-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        className="w-full pl-8 pr-3 py-2 text-[13px] border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400"
                     />
                 </div>
                 <p className="mt-2.5 text-[12px] text-gray-400">{filtered.length} dari {categories.length} kategori</p>
@@ -189,7 +189,7 @@ export default function CategoriesContent() {
                                                 <div className="flex items-center justify-end gap-1.5">
                                                     <button
                                                         onClick={() => openEdit(cat)}
-                                                        className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                                                        className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition"
                                                         title="Edit kategori"
                                                     >
                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
@@ -324,7 +324,7 @@ function CategoryFormModal({
                             value={name}
                             onChange={e => setName(e.target.value)}
                             placeholder="Contoh: Gaming, Ultrabook, Workstation…"
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
                             autoFocus
                         />
                     </div>
@@ -337,7 +337,7 @@ function CategoryFormModal({
                                     type="button"
                                     onClick={() => setType(t)}
                                     className={`py-2.5 rounded-xl border text-sm font-semibold transition ${type === t
-                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                        ? "border-zinc-900 bg-zinc-900 text-white"
                                         : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}
                                 >
                                     {t === "LAPTOP" ? "Laptop" : "Aksesoris"}
@@ -353,7 +353,7 @@ function CategoryFormModal({
                             onChange={e => setDescription(e.target.value)}
                             rows={3}
                             placeholder="Keterangan singkat tentang kategori ini…"
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-zinc-400"
                         />
                     </div>
                 </div>
@@ -364,7 +364,7 @@ function CategoryFormModal({
                         Batal
                     </button>
                     <button onClick={handleSubmit} disabled={submitting}
-                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-sm font-semibold transition disabled:opacity-60 active:scale-[0.98]">
+                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black text-white text-sm font-semibold transition disabled:opacity-60 active:scale-[0.98]">
                         {submitting ? "Menyimpan…" : "Simpan"}
                     </button>
                 </div>
