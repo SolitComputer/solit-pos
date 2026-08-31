@@ -563,7 +563,7 @@ const TONE: Record<string, { bg: string; text: string }> = {
   teal: { bg: "bg-teal-50", text: "text-teal-600" },
   sky: { bg: "bg-sky-50", text: "text-sky-600" },
   amber: { bg: "bg-amber-50", text: "text-amber-600" },
-  violet: { bg: "bg-violet-50", text: "text-violet-600" },
+  violet: { bg: "bg-zinc-100", text: "text-zinc-700" },
 };
 
 function StatCard({

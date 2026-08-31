@@ -238,7 +238,7 @@ function StatCard({
 }
 
 // ── Action Types & Button ─────────────────────────────────────────────────────
-type ActionColor = "blue" | "green" | "orange" | "rose" | "purple" | "indigo"; //  NEW — indigo untuk tombol Bayar
+type ActionColor = "blue" | "green" | "orange" | "rose" | "purple" | "zinc"; //  NEW — zinc untuk tombol Bayar
 
 type ActionItem = {
   label: string;
@@ -252,7 +252,7 @@ const ACTION_VARIANTS: Record<ActionColor, string> = {
   orange: "bg-orange-50 text-orange-700 hover:bg-orange-100 border-orange-200 focus-visible:ring-orange-300",
   rose: "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200 focus-visible:ring-rose-300",
   purple: "bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 focus-visible:ring-purple-300",
-  indigo: "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200 focus-visible:ring-indigo-300", //  NEW
+  zinc: "bg-zinc-100 text-zinc-800 hover:bg-zinc-200 border-zinc-300 focus-visible:ring-zinc-400", //  NEW
 };
 
 function ActionBtn({
@@ -401,7 +401,7 @@ function EstimasiValue({ order, align = "left" }: { order: ServiceOrder; align?:
 
   return (
     <div className={`flex flex-col ${alignCls}`}>
-      <span className="text-xs font-black tabular-nums text-indigo-600">{fmtRupiah(total)}</span>
+      <span className="text-xs font-black tabular-nums text-zinc-900">{fmtRupiah(total)}</span>
       {sp > 0 && (
         <span className="mt-0.5 text-[10px] font-medium text-gray-400">
           jasa {fmtRupiah(est) ?? "Rp 0"} + part {fmtRupiah(sp)}
@@ -604,7 +604,7 @@ export default function AntrianPage() {
         { label: "Cicil", color: "orange", onClick: () => handleCicilDimukaClick(o) },
       );
     } else if (!o.payment_amount) { //  FIX — payment_status bisa default "LUNAS" walau belum ada duit masuk
-      actions.push({ label: "Bayar", color: "indigo", onClick: () => handleBayarClick(o) });
+      actions.push({ label: "Bayar", color: "zinc", onClick: () => handleBayarClick(o) });
     }
 
     return actions;
