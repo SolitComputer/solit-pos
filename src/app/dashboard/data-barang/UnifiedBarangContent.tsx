@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { History as HistoryIcon, Search, RotateCcw, X, Plus, Layers, Filter, Tag } from "lucide-react";
+import { Laptop as LaptopIcon, Wrench, History as HistoryIcon } from "lucide-react";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
@@ -195,7 +194,7 @@ function DeleteConfirm({ row, onClose, onConfirm, loading }: {
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
                 <div className="h-1 w-full bg-gradient-to-r from-rose-400 via-rose-600 to-rose-800" />
                 <div className="bg-gradient-to-r from-rose-600 to-rose-700 px-6 py-5">
-                    <p className="font-bold text-white text-sm">Hapus Barang</p>
+                    <p className="font-bold text-white text-sm">Hapus {row.tipe === "LAPTOP" ? "Laptop" : "Aksesori"}</p>
                     <p className="text-xs text-white/60 mt-0.5">Tindakan ini tidak dapat dibatalkan</p>
                 </div>
                 <div className="p-6">
@@ -266,18 +265,11 @@ export default function UnifiedBarangContent() {
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
 
+    const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>("ALL");
     const [kategoriFilter, setKategoriFilter] = useState("");
     const [search, setSearch] = useState("");
-    const [filterSN, setFilterSN] = useState("");
-    const [filterBrand, setFilterBrand] = useState("ALL");
-    const [filterStatus, setFilterStatus] = useState("ALL");
-    const [filterRam, setFilterRam] = useState("ALL");
-    const [filterPriceRange, setFilterPriceRange] = useState("ALL");
-    const [filterAudit, setFilterAudit] = useState("");
-    const [sortBy, setSortBy] = useState("DEFAULT");
 
-    const [formModal, setFormModal] = useState<{ mode: "create" | "edit"; row?: UnifiedRow } | null>(null);
-    const [formSelectedCatId, setFormSelectedCatId] = useState("");
+    const [formModal, setFormModal] = useState<{ mode: "create" | "edit"; tipe: ItemType; row?: UnifiedRow } | null>(null);
     const [laptopForm, setLaptopForm] = useState(EMPTY_LAPTOP_FORM);
     const [accForm, setAccForm] = useState(EMPTY_ACC_FORM);
     const [saving, setSaving] = useState(false);
@@ -331,7 +323,7 @@ export default function UnifiedBarangContent() {
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
     const canCreateAcc = hasAnyRole(userRoles, ACCESSORY_CREATE_ROLES) || matrixCanBarang.create;
     const canEditAcc = hasAnyRole(userRoles, ACCESSORY_EDIT_ROLES) || matrixCanBarang.edit;
-    const canDeleteAcc = hasAnyRole(userRoles, ACCESSORY_DELETE_ROLES) || matrixCanBarang.delete;
+        const canDeleteAcc = hasAnyRole(userRoles, ACCESSORY_DELETE_ROLES) || matrixCanBarang.delete;
 
     // ── Aturan toggle audit: LAPTOP butuh canSeePrivate, AKSESORIS butuh ADMIN.
     // Ini persis aturan yang sudah ada masing-masing di komponen asli — sengaja
@@ -373,19 +365,15 @@ export default function UnifiedBarangContent() {
         }
     }, [fetchAll]);
 
-    const [categoryModalOpen, setCategoryModalOpen] = useState(false);
-
-    const fetchCategories = useCallback(async () => {
-        try {
-            const res = await fetch("/api/categories");
-            const json = await res.json();
-            if (json.success) setCategories(json.data);
-        } catch { /* dropdown kosong kalau gagal, tidak fatal */ }
-    }, []);
-
     useEffect(() => {
-        fetchCategories();
-    }, [fetchCategories]);
+        (async () => {
+            try {
+                const res = await fetch("/api/categories");
+                const json = await res.json();
+                if (json.success) setCategories(json.data);
+            } catch { /* dropdown kosong kalau gagal, tidak fatal */ }
+        })();
+    }, []);
 
     useEffect(() => {
         (async () => {
@@ -399,188 +387,76 @@ export default function UnifiedBarangContent() {
         })();
     }, []);
 
-    // Derive tipe form dari kategori yang dipilih di form modal
-    const formTipe: ItemType | null = useMemo(() => {
-        if (!formModal) return null;
-        if (formModal.mode === "edit" && formModal.row) return formModal.row.tipe;
-        const cat = categories.find(c => c.id === formSelectedCatId);
-        if (!cat) return null;
-        return cat.type === "LAPTOP" ? "LAPTOP" : "AKSESORIS";
-    }, [formModal, formSelectedCatId, categories]);
+    // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe)
+    useEffect(() => { setKategoriFilter(""); }, [tipeFilter]);
 
-    // Jabarkan SEMUA kategori sebagai pill/tag beserta hitungan jumlah barangnya
-    const categoryPills = useMemo(() => {
-        const pills: { id: string; name: string; count: number }[] = [];
-        const seenNames = new Set<string>();
-
-        categories.forEach(c => {
-            const catNameUpper = (c.name || "").trim().toUpperCase();
-            if (!catNameUpper) return;
-            seenNames.add(catNameUpper);
-            const count = rows.filter(r =>
-                r.kategori_id === c.id || (r.kategori || "").trim().toUpperCase() === catNameUpper
-            ).length;
-            pills.push({ id: c.id, name: c.name.trim(), count });
-        });
-
-        rows.forEach(r => {
-            if (r.kategori && r.kategori.trim()) {
-                const nameUpper = r.kategori.trim().toUpperCase();
-                if (!seenNames.has(nameUpper)) {
-                    seenNames.add(nameUpper);
-                    const count = rows.filter(x => (x.kategori || "").trim().toUpperCase() === nameUpper).length;
-                    pills.push({ id: `custom-${nameUpper}`, name: r.kategori.trim(), count });
-                }
-            }
-        });
-
-        return pills.sort((a, b) => {
-            if (a.count > 0 && b.count === 0) return -1;
-            if (a.count === 0 && b.count > 0) return 1;
-            return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-        });
-    }, [categories, rows]);
-
-    // List Brand unik dari data
-    const uniqueBrands = useMemo(() => {
-        const set = new Set<string>();
-        rows.forEach(r => {
-            if (r.brand && r.brand.trim()) set.add(r.brand.trim());
-        });
-        return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))];
-    }, [rows]);
-
-    // List RAM unik dari data
-    const uniqueRams = useMemo(() => {
-        const set = new Set<string>();
-        rows.forEach(r => {
-            if (r.ram && r.ram.trim()) set.add(r.ram.trim().toUpperCase());
-        });
-        return ["ALL", ...Array.from(set).sort((a, b) => {
-            const numA = parseInt(a) || 0;
-            const numB = parseInt(b) || 0;
-            return numA - numB;
-        })];
-    }, [rows]);
+    // Kategori dipisah per tipe supaya dropdown laptop tidak menampilkan kategori
+    // aksesoris & sebaliknya. Transition-safe: kategori tanpa `type` (mis. migrasi
+    // belum jalan) tetap ikut muncul di kedua tipe — persis perilaku lama.
+    const laptopCategories = useMemo(
+        () => categories.filter(c => !c.type || c.type === "LAPTOP"),
+        [categories],
+    );
+    const accessoryCategories = useMemo(
+        () => categories.filter(c => !c.type || c.type === "AKSESORIS"),
+        [categories],
+    );
+    // Opsi yang tampil di dropdown filter, mengikuti tipe yang sedang dipilih.
+    const filterCategories = tipeFilter === "LAPTOP" ? laptopCategories
+        : tipeFilter === "AKSESORIS" ? accessoryCategories
+        : categories;
 
     const filteredRows = useMemo(() => {
         let list = rows;
-
-        // 1. Kategori
+        if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
         if (kategoriFilter) {
-            const selectedCat = categories.find(c => c.id === kategoriFilter);
-            const selectedName = (selectedCat ? selectedCat.name : kategoriFilter.replace(/^custom-/, "")).trim().toUpperCase();
-            list = list.filter(r =>
-                r.kategori_id === kategoriFilter || (r.kategori || "").trim().toUpperCase() === selectedName
-            );
+            // kategoriFilter selalu berupa ID kategori. Laptop menyimpan kategori
+            // sebagai kategori_id, tapi aksesoris hanya menyimpan NAMA (kolom
+            // `category`, tanpa category_id). Jadi resolusi id → nama dulu supaya
+            // aksesoris ikut cocok — termasuk saat tipe = "Semua".
+            const selectedName = (categories.find(c => c.id === kategoriFilter)?.name || "").toUpperCase();
+            const matchLaptop = (r: UnifiedRow) => r.kategori_id === kategoriFilter;
+            const matchAksesoris = (r: UnifiedRow) => (r.kategori || "").toUpperCase() === selectedName;
+            list = list.filter(r => {
+                if (tipeFilter === "LAPTOP") return matchLaptop(r);
+                if (tipeFilter === "AKSESORIS") return matchAksesoris(r);
+                return r.tipe === "LAPTOP" ? matchLaptop(r) : matchAksesoris(r);
+            });
         }
-
-        // 2. Search umum (Nama, Brand, CPU, Storage, Spek)
         if (search.trim()) {
             const t = search.toLowerCase();
-            list = list.filter(r => (
-                r.nama?.toLowerCase().includes(t) ||
-                r.brand?.toLowerCase().includes(t) ||
-                r.cpu?.toLowerCase().includes(t) ||
-                r.ram?.toLowerCase().includes(t) ||
-                r.storage?.toLowerCase().includes(t) ||
-                r.spek?.toLowerCase().includes(t) ||
-                r.sn?.toLowerCase().includes(t)
-            ));
-        }
-
-        // 4. Search Khusus Serial Number (SN)
-        if (filterSN.trim()) {
-            const snQ = filterSN.trim().toLowerCase();
             list = list.filter(r => {
-                if (r.sn && r.sn.toLowerCase().includes(snQ)) return true;
+                const matchString = (
+                    r.nama?.toLowerCase().includes(t) ||
+                    r.brand?.toLowerCase().includes(t) ||
+                    r.cpu?.toLowerCase().includes(t) ||
+                    r.ram?.toLowerCase().includes(t) ||
+                    r.storage?.toLowerCase().includes(t) ||
+                    r.spek?.toLowerCase().includes(t) ||
+                    r.sn?.toLowerCase().includes(t)
+                );
+
+                if (matchString) return true;
+
+                // Also check inside laptop_units array if there are multiple units
                 if (r.tipe === "LAPTOP" && r.raw && "laptop_units" in r.raw) {
                     const units = (r.raw as LaptopRaw).laptop_units;
-                    if (units && units.some(u => u.serial_number?.toLowerCase().includes(snQ))) return true;
+                    if (units && units.some(u => u.serial_number?.toLowerCase().includes(t))) {
+                        return true;
+                    }
                 }
+
                 return false;
             });
         }
-
-        // 5. Filter Brand
-        if (filterBrand !== "ALL") {
-            const bQ = filterBrand.toLowerCase();
-            list = list.filter(r => r.brand?.toLowerCase() === bQ);
-        }
-
-        // 6. Filter RAM
-        if (filterRam !== "ALL") {
-            const ramQ = filterRam.toUpperCase();
-            list = list.filter(r => r.ram?.toUpperCase().includes(ramQ));
-        }
-
-        // 7. Filter Rentang Harga
-        if (filterPriceRange !== "ALL") {
-            list = list.filter(r => {
-                const p = r.harga_jual || 0;
-                switch (filterPriceRange) {
-                    case "0-2": return p < 2000000;
-                    case "2-3": return p >= 2000000 && p <= 3000000;
-                    case "3-5": return p > 3000000 && p <= 5000000;
-                    case "5-8": return p > 5000000 && p <= 8000000;
-                    case "8+": return p > 8000000;
-                    default: return true;
-                }
-            });
-        }
-
-        // 8. Filter Status Unit & Stok
-        if (filterStatus !== "ALL") {
-            list = list.filter(r => {
-                if (filterStatus === "SIAP_JUAL") {
-                    return (r.siap_jual ?? 0) > 0 || (r.stok ?? 0) > 0;
-                }
-                if (filterStatus === "BELUM_SIAP" || filterStatus === "SERVICE" || filterStatus === "RESERVED" || filterStatus === "HELD" || filterStatus === "PACKING") {
-                    if (r.tipe === "LAPTOP" && r.raw && "laptop_units" in r.raw) {
-                        return (r.raw as LaptopRaw).laptop_units?.some(u => u.status === filterStatus);
-                    }
-                    return false;
-                }
-                if (filterStatus === "TERSEDIA") {
-                    return (r.stok_tersedia ?? r.stok ?? 0) > 0;
-                }
-                if (filterStatus === "HABIS") {
-                    return (r.stok_tersedia ?? r.stok ?? 0) <= 0;
-                }
-                return true;
-            });
-        }
-
-        // 9. Status Audit
-        if (filterAudit) {
-            const AUDIT_TTL = 2 * 24 * 60 * 60 * 1000;
-            const isAudited = (r: UnifiedRow) => r.audited_at ? (Date.now() - new Date(r.audited_at).getTime() < AUDIT_TTL) : false;
-            list = list.filter(r => filterAudit === "audited" ? isAudited(r) : !isAudited(r));
-        }
-
-        // 10. Sorting
-        if (sortBy !== "DEFAULT") {
-            list = [...list].sort((a, b) => {
-                switch (sortBy) {
-                    case "AZ": return a.nama.localeCompare(b.nama);
-                    case "ZA": return b.nama.localeCompare(a.nama);
-                    case "PRICE_ASC": return (a.harga_jual || 0) - (b.harga_jual || 0);
-                    case "PRICE_DESC": return (b.harga_jual || 0) - (a.harga_jual || 0);
-                    case "MODAL_ASC": return (a.harga_modal || 0) - (b.harga_modal || 0);
-                    case "MODAL_DESC": return (b.harga_modal || 0) - (a.harga_modal || 0);
-                    case "STOK_DESC": return (b.stok_tersedia ?? b.stok ?? 0) - (a.stok_tersedia ?? a.stok ?? 0);
-                    case "STOK_ASC": return (a.stok_tersedia ?? a.stok ?? 0) - (b.stok_tersedia ?? b.stok ?? 0);
-                    case "DATE_DESC": return (b.tanggal_masuk ? new Date(b.tanggal_masuk).getTime() : 0) - (a.tanggal_masuk ? new Date(a.tanggal_masuk).getTime() : 0);
-                    case "DATE_ASC": return (a.tanggal_masuk ? new Date(a.tanggal_masuk).getTime() : 0) - (b.tanggal_masuk ? new Date(b.tanggal_masuk).getTime() : 0);
-                    default: return 0;
-                }
-            });
-        }
-
         return list;
-    }, [rows, kategoriFilter, search, filterSN, filterBrand, filterStatus, filterRam, filterPriceRange, filterAudit, sortBy, categories]);
+    }, [rows, tipeFilter, kategoriFilter, search, categories]);
 
-    const totalCount = rows.length;
+    const counts = useMemo(() => ({
+        total: rows.length,
+        laptop: rows.filter(r => r.tipe === "LAPTOP").length,
+        aksesoris: rows.filter(r => r.tipe === "AKSESORIS").length,
+    }), [rows]);
 
     // ── Audit toggle ───────────────────────────────────────────────────────
     const toggleAudit = async (row: UnifiedRow) => {
@@ -713,11 +589,10 @@ export default function UnifiedBarangContent() {
     }, [historyTarget]);
 
     // ── Create / Edit form ───────────────────────────────────────────────────
-    const openCreate = () => {
+    const openCreate = (tipe: ItemType) => {
         setLaptopForm(EMPTY_LAPTOP_FORM);
         setAccForm(EMPTY_ACC_FORM);
-        setFormSelectedCatId("");
-        setFormModal({ mode: "create" });
+        setFormModal({ mode: "create", tipe });
     };
     const openEdit = (row: UnifiedRow) => {
         if (row.tipe === "LAPTOP") {
@@ -727,42 +602,36 @@ export default function UnifiedBarangContent() {
                 cpu: l.cpu || "", ram: l.ram || "", storage: l.storage || "", gpu: l.gpu || "", display: l.display || "",
                 selling_price: String(l.selling_price || ""), condition_note: l.condition_note || "", notes: l.notes || "",
             });
-            setFormSelectedCatId(l.category_id || "");
         } else {
             const a = row.raw as AccessoryRaw;
             setAccForm({
                 name: a.name || "", category: a.category || "", brand: a.brand || "", spec: a.spec || "",
                 buy_price: String(a.buy_price ?? ""), sell_price: String(a.sell_price ?? ""), stock: String(a.stock ?? ""), notes: a.notes || "",
             });
-            const matchCat = categories.find(c => c.name.toUpperCase() === (a.category || "").toUpperCase());
-            setFormSelectedCatId(matchCat?.id || "");
         }
-        setFormModal({ mode: "edit", row });
+        setFormModal({ mode: "edit", tipe: row.tipe, row });
     };
     const closeForm = () => setFormModal(null);
 
     const submitForm = async () => {
         if (!formModal) return;
-        if (!formTipe) { toast.error("Pilih kategori terlebih dahulu"); return; }
         setSaving(true);
         try {
-            if (formTipe === "LAPTOP") {
-                if (!laptopForm.laptop_name.trim()) { toast.error("Nama barang wajib diisi"); return; }
-                const body = { ...laptopForm, category_id: formSelectedCatId || laptopForm.category_id, selling_price: Number(laptopForm.selling_price) || 0 };
+            if (formModal.tipe === "LAPTOP") {
+                if (!laptopForm.laptop_name.trim()) { toast.error("Nama laptop wajib diisi"); return; }
+                const body = { ...laptopForm, selling_price: Number(laptopForm.selling_price) || 0 };
                 const url = formModal.mode === "edit" ? `/api/laptops/${formModal.row!.id}` : "/api/laptops/create";
                 const res = await fetch(url, {
                     method: formModal.mode === "edit" ? "PUT" : "POST",
                     headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
                 });
                 const json = await res.json();
-                if (!json.success) throw new Error(json.message || "Gagal menyimpan");
+                if (!json.success) throw new Error(json.message || "Gagal menyimpan laptop");
             } else {
-                if (!accForm.name.trim()) { toast.error("Nama barang wajib diisi"); return; }
-                const catName = categories.find(c => c.id === formSelectedCatId)?.name || accForm.category;
-                if (!catName) { toast.error("Kategori wajib dipilih"); return; }
+                if (!accForm.name.trim()) { toast.error("Nama aksesori wajib diisi"); return; }
+                if (!accForm.category) { toast.error("Kategori wajib dipilih"); return; }
                 const body = {
                     ...accForm,
-                    category: catName,
                     buy_price: Number(accForm.buy_price) || 0,
                     sell_price: Number(accForm.sell_price) || 0,
                     stock: Number(accForm.stock) || 0,
@@ -773,7 +642,7 @@ export default function UnifiedBarangContent() {
                     headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
                 });
                 const json = await res.json();
-                if (!json.success) throw new Error(json.error || "Gagal menyimpan");
+                if (!json.success) throw new Error(json.error || "Gagal menyimpan aksesori");
             }
             toast.success(formModal.mode === "edit" ? "Berhasil diperbarui" : "Berhasil ditambahkan");
             closeForm();
@@ -804,29 +673,8 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    const hasFilter = (
-        !!kategoriFilter ||
-        !!search.trim() ||
-        !!filterSN.trim() ||
-        filterBrand !== "ALL" ||
-        filterStatus !== "ALL" ||
-        filterRam !== "ALL" ||
-        filterPriceRange !== "ALL" ||
-        !!filterAudit ||
-        sortBy !== "DEFAULT"
-    );
-
-    const resetFilter = () => {
-        setKategoriFilter("");
-        setSearch("");
-        setFilterSN("");
-        setFilterBrand("ALL");
-        setFilterStatus("ALL");
-        setFilterRam("ALL");
-        setFilterPriceRange("ALL");
-        setFilterAudit("");
-        setSortBy("DEFAULT");
-    };
+    const hasFilter = tipeFilter !== "ALL" || !!kategoriFilter || !!search;
+    const resetFilter = () => { setTipeFilter("ALL"); setKategoriFilter(""); setSearch(""); };
 
     return (
         <>
@@ -835,343 +683,39 @@ export default function UnifiedBarangContent() {
                 @keyframes popIn  { from{opacity:0;transform:scale(0.94) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
                 .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
                 .animate-popIn  { animation: popIn 0.25s cubic-bezier(0.34,1.56,0.64,1); }
-                .table-scroll { scrollbar-width: thin; scrollbar-color: #d4d4d8 #fafafa; }
+                               .table-scroll { scrollbar-width: thin; scrollbar-color: #d4d4d8 #fafafa; }
                 .table-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
                 .table-scroll::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 99px; }
                 .table-scroll::-webkit-scrollbar-track { background: #fafafa; border-radius: 99px; }
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
             <main className="min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8">
                 <div className="max-w-full mx-auto space-y-5">
 
-                    {/* ── CARD FILTER & AKSI ──────────────────────────────── */}
-                    <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-4 sm:p-5 space-y-3.5">
-                        {/* Baris 1: Main Scope Switcher (Kiri) & Action Buttons (Kanan) */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100">
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-zinc-800">
-                                    {totalCount} <span className="text-zinc-400 font-medium">Barang</span>
-                                </span>
-                            </div>
+                    {/* ── FILTER TIPE BARANG ─────────────────────────────── */}
+                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 flex flex-wrap items-center gap-2">
+                        {([["ALL", `Semua (${counts.total})`], ["LAPTOP", `Laptop (${counts.laptop})`], ["AKSESORIS", `Aksesoris (${counts.aksesoris})`]] as const).map(([key, label]) => (
+                            <button key={key} onClick={() => setTipeFilter(key)}
+                                className={`h-9 px-4 rounded-xl text-sm font-semibold transition-all ${tipeFilter === key ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/25" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}>
+                                {label}
+                            </button>
+                        ))}
+                        <div className="flex-1" />
+                        {canCreateLaptop && <button onClick={() => openCreate("LAPTOP")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black transition">+ Laptop</button>}
+                        {canCreateAcc && <button onClick={() => openCreate("AKSESORIS")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-600 to-zinc-700 hover:from-zinc-700 hover:to-zinc-800 transition">+ Aksesori</button>}
+                    </div>
 
-                            {/* Tombol Tambah & Kategori Cepat */}
-                            <div className="flex items-center gap-2 shrink-0">
-                                {(canCreateLaptop || canCreateAcc) && (
-                                    <button
-                                        onClick={() => openCreate()}
-                                        className="inline-flex items-center gap-1.5 h-8.5 px-3.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black active:scale-[0.98] transition-all shadow-sm cursor-pointer"
-                                    >
-                                        <Plus size={13} />
-                                        <span>Tambah Barang</span>
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => setCategoryModalOpen(true)}
-                                    className="inline-flex items-center gap-1.5 h-8.5 px-3.5 rounded-xl text-xs font-semibold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200/80 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
-                                    title="Buat Kategori Baru"
-                                >
-                                    <Plus size={13} />
-                                    <span>Kategori</span>
-                                </button>
-                            </div>
+                    {/* ── FILTER LANJUTAN ─────────────────────────────────── */}
+                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            <input className="h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 col-span-2"
+                                placeholder="Cari nama, brand, spek, SN..." value={search} onChange={e => setSearch(e.target.value)} />
+                            <select className="h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
+                                <option value="">Semua Kategori</option>
+                                {filterCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                            <button onClick={resetFilter} disabled={!hasFilter} className="h-9 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 disabled:opacity-40 transition">Reset</button>
                         </div>
-
-                        {/* Baris 2: Kategori Horizontal Scroll Tray (Rapi & Tidak Bleber) */}
-                        {categoryPills.length > 0 && (
-                            <div className="flex items-center gap-2 pt-0.5 pb-1">
-                                <div className="flex items-center gap-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider shrink-0 mr-0.5 hidden sm:flex">
-                                    <Tag size={12} />
-                                    <span>Kategori:</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 no-scrollbar scroll-smooth flex-1">
-                                    <button
-                                        onClick={() => setKategoriFilter("")}
-                                        className={`inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs font-medium shrink-0 transition-all cursor-pointer ${
-                                            !kategoriFilter
-                                                ? "bg-zinc-900 text-white shadow-xs font-semibold"
-                                                : "bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
-                                        }`}
-                                    >
-                                        <span>Semua Kategori</span>
-                                    </button>
-                                    {categoryPills.map(cat => {
-                                        const isActive = kategoriFilter === cat.id;
-                                        return (
-                                            <button
-                                                key={cat.id}
-                                                onClick={() => {
-                                                    if (isActive) {
-                                                        setKategoriFilter("");
-                                                    } else {
-                                                        setKategoriFilter(cat.id);
-                                                    }
-                                                }}
-                                                className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs shrink-0 transition-all cursor-pointer ${
-                                                    isActive
-                                                        ? "bg-zinc-900 text-white shadow-xs font-semibold ring-1 ring-zinc-900"
-                                                        : "bg-zinc-50 border border-zinc-200/90 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
-                                                }`}
-                                                title={`Filter kategori ${cat.name}`}
-                                            >
-                                                <span>{cat.name}</span>
-                                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                                                    isActive ? "bg-white/20 text-white" : "bg-zinc-200/80 text-zinc-600"
-                                                }`}>
-                                                    {cat.count}
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Baris Filter 1: Input Search, Search SN, Status, Brand, & Reset */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5">
-                            {/* Input Pencarian Nama/Spek */}
-                            <div className="relative lg:col-span-4">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-                                <input
-                                    type="text"
-                                    placeholder="Cari nama, brand, CPU, spek..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="w-full h-9 pl-8.5 pr-7 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 text-zinc-900 placeholder:text-zinc-400 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all"
-                                />
-                                {search && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSearch("")}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-zinc-400 hover:text-zinc-600 rounded"
-                                    >
-                                        <X size={13} />
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Input Pencarian SN */}
-                            <div className="relative lg:col-span-3">
-                                <input
-                                    type="text"
-                                    placeholder="Cari Serial Number (SN)..."
-                                    value={filterSN}
-                                    onChange={(e) => setFilterSN(e.target.value)}
-                                    className="w-full h-9 px-3 pr-7 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 text-zinc-900 placeholder:text-zinc-400 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all"
-                                />
-                                {filterSN && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setFilterSN("")}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-zinc-400 hover:text-zinc-600 rounded"
-                                    >
-                                        <X size={13} />
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Filter Status */}
-                            <div className="lg:col-span-2">
-                                <select
-                                    value={filterStatus}
-                                    onChange={(e) => setFilterStatus(e.target.value)}
-                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
-                                >
-                                    <option value="ALL">Semua Status</option>
-                                    <option value="SIAP_JUAL">Siap Jual</option>
-                                    <option value="BELUM_SIAP">Belum Siap</option>
-                                    <option value="SERVICE">Service</option>
-                                    <option value="RESERVED">Dipesan (DP)</option>
-                                    <option value="HELD">Diambil Dulu</option>
-                                    <option value="PACKING">Packing</option>
-                                    <option value="TERSEDIA">Stok Ada (&gt;0)</option>
-                                    <option value="HABIS">Stok Habis (0)</option>
-                                </select>
-                            </div>
-
-                            {/* Filter Brand */}
-                            <div className="lg:col-span-2">
-                                <select
-                                    value={filterBrand}
-                                    onChange={(e) => setFilterBrand(e.target.value)}
-                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
-                                >
-                                    {uniqueBrands.map((b) => (
-                                        <option key={b} value={b}>
-                                            {b === "ALL" ? "Semua Brand" : b}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Tombol Reset */}
-                            <div className="lg:col-span-1 flex items-center">
-                                <button
-                                    onClick={resetFilter}
-                                    disabled={!hasFilter}
-                                    className={`w-full inline-flex items-center justify-center gap-1 h-9 px-2 rounded-xl text-xs font-semibold transition-all duration-150 ${
-                                        hasFilter
-                                            ? "bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 hover:border-red-300 active:scale-95 shadow-xs cursor-pointer"
-                                            : "bg-zinc-100/70 border border-zinc-200/50 text-zinc-400 cursor-not-allowed opacity-60"
-                                    }`}
-                                    title={hasFilter ? "Reset semua filter" : "Tidak ada filter aktif"}
-                                >
-                                    <RotateCcw size={12} />
-                                    <span>Reset</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Baris Filter 2: Filter Kategori, RAM, Rentang Harga, Urutan, Audit */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                            {/* Filter Kategori */}
-                            <div className="relative">
-                                <select
-                                    value={kategoriFilter}
-                                    onChange={(e) => setKategoriFilter(e.target.value)}
-                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
-                                >
-                                    <option value="">Semua Kategori</option>
-                                    {categories.map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Filter RAM */}
-                            <div>
-                                <select
-                                    value={filterRam}
-                                    onChange={(e) => setFilterRam(e.target.value)}
-                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
-                                >
-                                    {uniqueRams.map((r) => (
-                                        <option key={r} value={r}>
-                                            {r === "ALL" ? "Semua RAM" : `RAM ${r}`}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Filter Rentang Harga */}
-                            <div>
-                                <select
-                                    value={filterPriceRange}
-                                    onChange={(e) => setFilterPriceRange(e.target.value)}
-                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
-                                >
-                                    <option value="ALL">Semua Harga</option>
-                                    <option value="0-2">&lt; Rp 2 jt</option>
-                                    <option value="2-3">Rp 2 jt – 3 jt</option>
-                                    <option value="3-5">Rp 3 jt – 5 jt</option>
-                                    <option value="5-8">Rp 5 jt – 8 jt</option>
-                                    <option value="8+">&ge; Rp 8 jt</option>
-                                </select>
-                            </div>
-
-                            {/* Urutan / Sort */}
-                            <div>
-                                <select
-                                    value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value)}
-                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
-                                >
-                                    <option value="DEFAULT">Urutan Default</option>
-                                    <option value="AZ">Nama: A → Z</option>
-                                    <option value="ZA">Nama: Z → A</option>
-                                    <option value="PRICE_ASC">Harga Jual: Rendah → Tinggi</option>
-                                    <option value="PRICE_DESC">Harga Jual: Tinggi → Rendah</option>
-                                    {canSeePrivate && <option value="MODAL_ASC">Modal: Rendah → Tinggi</option>}
-                                    {canSeePrivate && <option value="MODAL_DESC">Modal: Tinggi → Rendah</option>}
-                                    <option value="STOK_DESC">Stok: Terbanyak</option>
-                                    <option value="STOK_ASC">Stok: Tersedikit</option>
-                                    <option value="DATE_DESC">Tanggal: Terbaru</option>
-                                    <option value="DATE_ASC">Tanggal: Terlama</option>
-                                </select>
-                            </div>
-
-                            {/* Filter Audit */}
-                            <div>
-                                <select
-                                    value={filterAudit}
-                                    onChange={(e) => setFilterAudit(e.target.value)}
-                                    className="w-full h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50/60 hover:bg-white focus:bg-white text-zinc-800 font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-500 transition-all cursor-pointer"
-                                >
-                                    <option value="">Semua Audit</option>
-                                    <option value="audited">Sudah Diaudit</option>
-                                    <option value="unaudited">Belum Diaudit</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Indikator Filter Aktif & Total Hasil */}
-                        {hasFilter && (
-                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 text-[11px] text-zinc-500 border-t border-zinc-100">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-semibold text-zinc-700">Filter Aktif:</span>
-                                    {search && (
-                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
-                                            Cari: &ldquo;{search}&rdquo;
-                                            <button onClick={() => setSearch("")} className="hover:text-zinc-900"><X size={11} /></button>
-                                        </span>
-                                    )}
-                                    {filterSN && (
-                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
-                                            SN: &ldquo;{filterSN}&rdquo;
-                                            <button onClick={() => setFilterSN("")} className="hover:text-zinc-900"><X size={11} /></button>
-                                        </span>
-                                    )}
-                                    {filterStatus !== "ALL" && (
-                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
-                                            Status: {filterStatus}
-                                            <button onClick={() => setFilterStatus("ALL")} className="hover:text-zinc-900"><X size={11} /></button>
-                                        </span>
-                                    )}
-                                    {filterBrand !== "ALL" && (
-                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
-                                            Brand: {filterBrand}
-                                            <button onClick={() => setFilterBrand("ALL")} className="hover:text-zinc-900"><X size={11} /></button>
-                                        </span>
-                                    )}
-                                    {kategoriFilter && (
-                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
-                                            Kategori: {categories.find(c => c.id === kategoriFilter)?.name || "Kategori"}
-                                            <button onClick={() => setKategoriFilter("")} className="hover:text-zinc-900"><X size={11} /></button>
-                                        </span>
-                                    )}
-                                    {filterRam !== "ALL" && (
-                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
-                                            RAM: {filterRam}
-                                            <button onClick={() => setFilterRam("ALL")} className="hover:text-zinc-900"><X size={11} /></button>
-                                        </span>
-                                    )}
-                                    {filterPriceRange !== "ALL" && (
-                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
-                                            Harga: {filterPriceRange}
-                                            <button onClick={() => setFilterPriceRange("ALL")} className="hover:text-zinc-900"><X size={11} /></button>
-                                        </span>
-                                    )}
-                                    {filterAudit && (
-                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
-                                            Audit: {filterAudit === "audited" ? "Sudah Diaudit" : "Belum Diaudit"}
-                                            <button onClick={() => setFilterAudit("")} className="hover:text-zinc-900"><X size={11} /></button>
-                                        </span>
-                                    )}
-                                    {sortBy !== "DEFAULT" && (
-                                        <span className="inline-flex items-center gap-1 bg-zinc-100 border border-zinc-200 text-zinc-700 px-2 py-0.5 rounded-md font-medium">
-                                            Sort: {sortBy}
-                                            <button onClick={() => setSortBy("DEFAULT")} className="hover:text-zinc-900"><X size={11} /></button>
-                                        </span>
-                                    )}
-                                </div>
-                                <span className="font-medium text-zinc-400 shrink-0">
-                                    Ditemukan <strong className="text-zinc-800">{filteredRows.length}</strong> barang
-                                </span>
-                            </div>
-                        )}
                     </div>
 
                     {/* ── TABEL / DAFTAR BARANG ────────────────────────────── */}
@@ -1206,8 +750,9 @@ export default function UnifiedBarangContent() {
                                             {/* Header: tipe + nama + harga jual */}
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0 flex-1">
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-zinc-100 text-zinc-600 border border-zinc-200">
-                                                        {row.kategori || "Tanpa Kategori"}
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
+                                                        {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
+                                                        {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
                                                     </span>
                                                     <h3 className="font-bold text-zinc-900 text-[13.5px] leading-snug mt-1.5 truncate" title={row.nama}>{row.nama}</h3>
                                                     <p className="text-[11px] text-zinc-400 mt-0.5 truncate">
@@ -1319,7 +864,7 @@ export default function UnifiedBarangContent() {
                                     <table className="w-full text-sm border-collapse">
                                         <thead>
                                             <tr className="whitespace-nowrap">
-                                                {["No", "Tag", "Nama Barang", "Kategori", "Merk", "CPU", "RAM", "Storage", "Spek",
+                                                {["No", "Tipe", "Nama Barang", "Kategori", "Merk", "CPU", "RAM", "Storage", "Spek",
                                                     "Harga Modal", "Modal Sparepart", "Harga Jual", "Total Jual", "Gross Profit",
                                                     "Sumber", "Tgl Masuk", "SN", "ST", "SJ", "M", "Stok", "SO", "Audit", "Aksi"].map((h, hi) => (
                                                         <th key={h}
@@ -1347,8 +892,9 @@ export default function UnifiedBarangContent() {
                                                     >
                                                         <td className="px-3 py-3 text-xs text-zinc-400 tabular-nums">{idx + 1}</td>
                                                         <td className="px-3 py-3">
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-zinc-100 text-zinc-600 border border-zinc-200">
-                                                                {row.kategori || "Tanpa Kategori"}
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${row.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
+                                                                {row.tipe === "LAPTOP" ? <LaptopIcon size={11} /> : <Wrench size={11} />}
+                                                                {row.tipe === "LAPTOP" ? "Laptop" : "Aksesoris"}
                                                             </span>
                                                         </td>
                                                         <td className={`sticky left-0 z-[1] min-w-[160px] px-3 py-3 font-semibold text-zinc-800 max-w-[200px] truncate border-r border-zinc-100 group-hover:bg-zinc-100 ${rowBg}`} title={row.nama}>{row.nama}</td>
@@ -1453,37 +999,31 @@ export default function UnifiedBarangContent() {
                         <div className="h-0.5 w-full bg-gradient-to-r from-zinc-300 via-zinc-600 to-black" />
                         <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
                             <h2 className="font-bold text-zinc-900 text-[15px]">
-                                {formModal.mode === "edit" ? "Edit Barang" : "Tambah Barang"}
+                                {formModal.mode === "edit" ? "Edit" : "Tambah"} {formModal.tipe === "LAPTOP" ? "Laptop" : "Aksesori"}
                             </h2>
                             <button onClick={closeForm} className="text-zinc-400 hover:text-zinc-700">✕</button>
                         </div>
 
-                        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-3">
-                            {/* Kategori — menentukan field yang tampil */}
-                            <Field label="Kategori" required>
-                                <select
-                                    className={inputCls}
-                                    value={formSelectedCatId}
-                                    onChange={e => {
-                                        const catId = e.target.value;
-                                        setFormSelectedCatId(catId);
-                                        const cat = categories.find(c => c.id === catId);
-                                        if (cat?.type === "LAPTOP") {
-                                            setLaptopForm(p => ({ ...p, category_id: catId }));
-                                        } else if (cat) {
-                                            setAccForm(p => ({ ...p, category: cat.name }));
-                                        }
-                                    }}
-                                >
-                                    <option value="">-- Pilih Kategori --</option>
-                                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
-                            </Field>
+                        {formModal.mode === "create" && (
+                            <div className="px-6 pt-4 flex gap-2">
+                                <button onClick={() => setFormModal({ mode: "create", tipe: "LAPTOP" })}
+                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "LAPTOP" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-500"}`}>Laptop</button>
+                                <button onClick={() => setFormModal({ mode: "create", tipe: "AKSESORIS" })}
+                                    className={`flex-1 h-9 rounded-xl text-sm font-semibold ${formModal.tipe === "AKSESORIS" ? "bg-zinc-700 text-white" : "bg-zinc-100 text-zinc-500"}`}>Aksesoris</button>
+                            </div>
+                        )}
 
-                            {formTipe === "LAPTOP" ? (
+                        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-3">
+                            {formModal.tipe === "LAPTOP" ? (
                                 <>
-                                    <Field label="Nama Barang" required>
+                                    <Field label="Nama Laptop" required>
                                         <input className={inputCls} value={laptopForm.laptop_name} onChange={e => setLaptopForm(p => ({ ...p, laptop_name: e.target.value }))} />
+                                    </Field>
+                                    <Field label="Kategori">
+                                        <select className={inputCls} value={laptopForm.category_id} onChange={e => setLaptopForm(p => ({ ...p, category_id: e.target.value }))}>
+                                            <option value="">Tanpa Kategori</option>
+                                            {laptopCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
                                     </Field>
                                     <div className="grid grid-cols-2 gap-3">
                                         <Field label="Brand"><input className={inputCls} value={laptopForm.brand} onChange={e => setLaptopForm(p => ({ ...p, brand: e.target.value }))} /></Field>
@@ -1497,10 +1037,21 @@ export default function UnifiedBarangContent() {
                                     <Field label="Kondisi Umum"><input className={inputCls} value={laptopForm.condition_note} onChange={e => setLaptopForm(p => ({ ...p, condition_note: e.target.value }))} /></Field>
                                     <Field label="Catatan"><textarea rows={2} className={inputCls} value={laptopForm.notes} onChange={e => setLaptopForm(p => ({ ...p, notes: e.target.value }))} /></Field>
                                 </>
-                            ) : formTipe === "AKSESORIS" ? (
+                            ) : (
                                 <>
-                                    <Field label="Nama Barang" required><input className={inputCls} value={accForm.name} onChange={e => setAccForm(p => ({ ...p, name: e.target.value }))} /></Field>
-                                    <Field label="Merk"><input className={inputCls} value={accForm.brand} onChange={e => setAccForm(p => ({ ...p, brand: e.target.value }))} /></Field>
+                                    <Field label="Nama Aksesori" required><input className={inputCls} value={accForm.name} onChange={e => setAccForm(p => ({ ...p, name: e.target.value }))} /></Field>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Field label="Kategori" required>
+                                            <select className={inputCls} value={accForm.category} onChange={e => setAccForm(p => ({ ...p, category: e.target.value }))}>
+                                                <option value="">-- Pilih --</option>
+                                                {accessoryCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                                {accForm.category && !accessoryCategories.some(c => c.name.toUpperCase() === accForm.category.toUpperCase()) && (
+                                                    <option value={accForm.category}>{accForm.category}</option>
+                                                )}
+                                            </select>
+                                        </Field>
+                                        <Field label="Merk"><input className={inputCls} value={accForm.brand} onChange={e => setAccForm(p => ({ ...p, brand: e.target.value }))} /></Field>
+                                    </div>
                                     <Field label="Spesifikasi"><input className={inputCls} value={accForm.spec} onChange={e => setAccForm(p => ({ ...p, spec: e.target.value }))} /></Field>
                                     <div className="grid grid-cols-2 gap-3">
                                         <Field label="Harga Modal"><input type="number" className={inputCls} value={accForm.buy_price} onChange={e => setAccForm(p => ({ ...p, buy_price: e.target.value }))} /></Field>
@@ -1509,15 +1060,11 @@ export default function UnifiedBarangContent() {
                                     <Field label="Stok" required><input type="number" className={inputCls} value={accForm.stock} onChange={e => setAccForm(p => ({ ...p, stock: e.target.value }))} /></Field>
                                     <Field label="Keterangan"><textarea rows={2} className={inputCls} value={accForm.notes} onChange={e => setAccForm(p => ({ ...p, notes: e.target.value }))} /></Field>
                                 </>
-                            ) : (
-                                <div className="py-8 text-center text-sm text-zinc-400">
-                                    Pilih kategori di atas untuk menampilkan form
-                                </div>
                             )}
                         </div>
                         <div className="flex gap-3 px-6 py-4 border-t border-zinc-100">
                             <button onClick={closeForm} disabled={saving} className="flex-1 h-11 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-semibold hover:bg-zinc-200 transition">Batal</button>
-                            <button onClick={submitForm} disabled={saving || !formTipe} className="flex-1 h-11 bg-gradient-to-r from-zinc-800 to-zinc-900 text-white rounded-xl text-sm font-semibold hover:from-zinc-900 hover:to-black transition disabled:opacity-50">
+                            <button onClick={submitForm} disabled={saving} className="flex-1 h-11 bg-gradient-to-r from-zinc-800 to-zinc-900 text-white rounded-xl text-sm font-semibold hover:from-zinc-900 hover:to-black transition disabled:opacity-50">
                                 {saving ? "Menyimpan..." : "Simpan"}
                             </button>
                         </div>
@@ -1595,164 +1142,7 @@ export default function UnifiedBarangContent() {
                     }}
                 />
             )}
-
-            {/* ── Pop-up Buat Kategori Cepat ──────────────────────────── */}
-            <CategoryQuickModal
-                isOpen={categoryModalOpen}
-                onClose={() => setCategoryModalOpen(false)}
-                onSuccess={() => {
-                    fetchCategories();
-                }}
-            />
         </>
-    );
-}
-
-// ── Pop-up Form Tambah Kategori Cepat ───────────────────────────────────────
-function CategoryQuickModal({
-    isOpen,
-    onClose,
-    onSuccess,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
-}) {
-    const [name, setName] = useState("");
-    const [description, setDescription] = useState("");
-    const [type, setType] = useState<string>("ALL");
-    const [submitting, setSubmitting] = useState(false);
-
-    if (!isOpen) return null;
-
-    const handleSubmit = async () => {
-        if (!name.trim()) return toast.error("Nama kategori wajib diisi");
-
-        setSubmitting(true);
-        try {
-            const res = await fetch("/api/categories", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: name.trim(),
-                    description: description.trim() || null,
-                    type: type === "ALL" ? null : type,
-                }),
-            });
-            const json = await res.json();
-            if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan kategori");
-            toast.success(`Kategori "${name.trim()}" berhasil dibuat!`);
-            setName("");
-            setDescription("");
-            setType("ALL");
-            onSuccess();
-            onClose();
-        } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Terjadi kesalahan");
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const typeOptions = [
-        { value: "ALL", label: "Semua / Umum", desc: "Bisa untuk Laptop, Aksesoris & Sparepart" },
-        { value: "LAPTOP", label: "Laptop / Unit", desc: "Khusus untuk unit laptop" },
-        { value: "AKSESORIS", label: "Aksesoris", desc: "Charger, Tas, Kabel, Mouse, dll" },
-        { value: "SPAREPART", label: "Sparepart / Part", desc: "RAM, SSD, HDD, Fan, LCD, dll" },
-    ];
-
-    return (
-        <div
-            className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4 animate-fadeIn"
-            onClick={onClose}
-        >
-            <div
-                className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden animate-popIn"
-                onClick={e => e.stopPropagation()}
-            >
-                <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 bg-white">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center">
-                            <Layers size={16} />
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-bold text-zinc-900">Tambah Kategori Baru</h3>
-                            <p className="text-[11px] text-zinc-400">Buat kategori produk langsung tanpa pindah tab</p>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition cursor-pointer">
-                        <X size={16} />
-                    </button>
-                </div>
-
-                <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
-                    <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                            Nama Kategori <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                            placeholder="Contoh: RAM PC4, SSD NVMe, Adapter Charger, Fan, dll..."
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
-                            autoFocus
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                            Tipe / Pengelompokan Kategori
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {typeOptions.map(t => (
-                                <button
-                                    key={t.value}
-                                    type="button"
-                                    onClick={() => setType(t.value)}
-                                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
-                                        type === t.value
-                                            ? "border-zinc-900 bg-zinc-900 text-white shadow-sm ring-1 ring-zinc-900"
-                                            : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
-                                    }`}
-                                >
-                                    <div className="text-xs font-bold">{t.label}</div>
-                                    <div className={`text-[10px] mt-0.5 line-clamp-1 ${type === t.value ? "text-zinc-300" : "text-zinc-400"}`}>
-                                        {t.desc}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
-                            Deskripsi (Opsional)
-                        </label>
-                        <textarea
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
-                            rows={2}
-                            placeholder="Keterangan singkat tentang kategori ini…"
-                            className="w-full px-3.5 py-2 rounded-xl border border-zinc-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-zinc-400"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex gap-2 px-5 py-4 border-t border-zinc-100 bg-zinc-50/50">
-                    <button
-                        onClick={onClose}
-                        className="flex-1 py-2.5 rounded-xl border border-zinc-200 text-sm font-semibold text-zinc-600 hover:bg-zinc-100 transition cursor-pointer"
-                    >
-                        Batal
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={submitting}
-                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-zinc-800 to-zinc-900 hover:from-zinc-900 hover:to-black text-white text-sm font-semibold transition disabled:opacity-60 active:scale-[0.98] shadow-sm cursor-pointer"
-                    >
-                        {submitting ? "Menyimpan…" : "Simpan Kategori"}
-                    </button>
-                </div>
-            </div>
-        </div>
     );
 }
 
