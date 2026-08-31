@@ -53,6 +53,36 @@ export async function PATCH(
 
     const supabase = getSupabase();
 
+    // Ambil is_done SEBELUM diubah — dipakai buat deteksi transisi
+    // false→true, pola sama persis dengan PATCH /api/todos/[id] (parent).
+    // Catatan: query update di bawah sudah difilter .eq("user_id", user.id),
+    // jadi request ini CUMA bisa sukses kalau item itu memang milik user
+    // yang sedang login — makanya completed_by = user.id di sini selalu akurat.
+    const { data: existingItem } = await supabase
+        .from("todo_items")
+        .select("is_done")
+        .eq("id", itemId)
+        .eq("todo_id", todo_id)
+        .eq("user_id", user.id)
+        .single();
+
+    if ("is_done" in updates) {
+        if (updates.is_done === true && !existingItem?.is_done) {
+            const { data: completerData } = await supabase
+                .from("users")
+                .select("name")
+                .eq("id", user.id)
+                .single();
+            updates.completed_by = user.id;
+            updates.completed_by_name = completerData?.name ?? null;
+            updates.completed_at = new Date().toISOString();
+        } else if (updates.is_done === false) {
+            updates.completed_by = null;
+            updates.completed_by_name = null;
+            updates.completed_at = null;
+        }
+    }
+
     // Update item — gunakan user_id untuk ownership check
     const { data, error } = await supabase
         .from("todo_items")
