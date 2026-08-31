@@ -4,17 +4,16 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { DATA_BARANG_LAPTOP_ROLES, BARANG_FULL_ACCESS_ROLES, hasAnyRole } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
 
-// Normalisasi input tipe kategori → 'LAPTOP' | 'AKSESORIS' | null.
-function normalizeType(v: unknown): "LAPTOP" | "AKSESORIS" | null {
-  const t = String(v ?? "").toUpperCase();
-  return t === "LAPTOP" || t === "AKSESORIS" ? t : null;
+// Normalisasi input tipe kategori → 'LAPTOP' | 'AKSESORIS' | 'SPAREPART' | null.
+function normalizeType(v: unknown): string | null {
+  if (!v || v === "ALL" || v === "SEMUA" || v === "UMUM") return null;
+  const t = String(v).trim().toUpperCase();
+  return t || null;
 }
 
 // GET: daftar kategori — dipakai tab Kategori & dropdown Tambah/Edit barang.
-// Query opsional ?type=LAPTOP|AKSESORIS untuk memisahkan kategori laptop vs aksesoris.
-// Transition-safe: kalau kolom `type` belum ada (migrasi belum dijalankan) atau
-// baris belum di-set type-nya, kategori tetap muncul di kedua tipe — persis
-// perilaku lama, jadi tidak ada regresi sebelum SQL migrasi dijalankan.
+// Query opsional ?type=LAPTOP|AKSESORIS|SPAREPART untuk memisahkan kategori.
+// Transition-safe: kalau kolom `type` belum ada atau baris bernilai null, kategori tetap muncul di semua tipe.
 async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   try {
     const { data, error } = await supabase
@@ -28,7 +27,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
     const wantType = normalizeType(new URL(req.url).searchParams.get("type"));
     const list = wantType
-      ? (data ?? []).filter((c: { type?: string | null }) => !c.type || c.type === wantType)
+      ? (data ?? []).filter((c: { type?: string | null }) => !c.type || c.type === "ALL" || c.type === "UMUM" || c.type === wantType)
       : data;
 
     return NextResponse.json({ success: true, data: list });
@@ -50,7 +49,7 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       return NextResponse.json({ success: false, message: "Nama kategori wajib diisi" }, { status: 400 });
     }
 
-    const type = normalizeType(body.type) ?? "AKSESORIS";
+    const type = normalizeType(body.type);
     const basePayload = {
       name,
       description: body.description?.trim() || null,
@@ -59,12 +58,12 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
 
     let { data, error } = await supabase
       .from("laptop_categories")
-      .insert({ ...basePayload, type })
+      .insert({ ...basePayload, ...(type ? { type } : {}) })
       .select()
       .single();
 
-    // Kolom `type` belum ada (migrasi belum dijalankan) → ulangi tanpa type.
-    if (error?.code === "42703") {
+    // Kolom `type` belum ada (42703) atau check constraint DB lama (23514) → ulangi tanpa type
+    if (error?.code === "42703" || error?.code === "23514") {
       ({ data, error } = await supabase
         .from("laptop_categories")
         .insert(basePayload)
