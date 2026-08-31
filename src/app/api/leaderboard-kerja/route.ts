@@ -6,6 +6,14 @@ export const dynamic = "force-dynamic";
 
 const RAYHAN_ACCOUNTING_USER_ID = "7a0aacab-961c-4332-b4bf-361431126f77";
 
+// Sales Offline — CUMA 4 orang spesifik ini (bukan semua role yang
+// mengandung "SALES"), makanya dicek via ID, bukan hasRole("SALES").
+const SALES_OFFLINE_USER_IDS = [
+  "2c570a8b-9c98-46f5-ad86-b0b0953a2afc", // Novita Glory Sendouw
+  "1b59e57c-94cf-4dd1-b5fb-7173ecb03cad", // Andini Sazkia Putri
+  "26f13a77-9179-4ac7-97ec-e1dfa1af4096", // Amaliyah
+  "680c7e1c-512b-4223-85f2-df38dcdd7a97", // Nova Rovatul Walidah
+];
 // ke scoring & divisi Programmer lewat ID (bukan lewat hasRole("PROGRAMMER")).
 const PROGRAMMER_USER_IDS = [
   "3d8fe0d7-1735-492d-afe8-71991154c066",
@@ -71,13 +79,16 @@ export const GET = withAuth(async (req, _ctx, user) => {
       { data: todoItems },
       { data: missions }
     ] = await Promise.all([
-      // Sales: transactions
+      // Sales Offline: transactions — kolom SEBELUMNYA salah nama
+      // (created_by/invoice/total_amount TIDAK ADA di tabel ini; nama
+      // aslinya sales_id/invoice_number/amount), jadi query ini gagal
+      // diam-diam sejak awal dan "transactions" selalu jadi array kosong.
       supabaseAdmin
         .from("transactions")
-        .select("created_by, invoice, total_amount, status")
+        .select("sales_id, invoice_number, amount, status")
         .gte("created_at", startIso)
         .lte("created_at", endIso)
-        .eq("status", "LUNAS"),
+        .eq("status", "PAID"),
 
       // Penyedia Barang / Pengantaran: preparations (all records to count both creators and preparers)
       supabaseAdmin
@@ -184,16 +195,18 @@ export const GET = withAuth(async (req, _ctx, user) => {
       const userRoles = u.roles || [u.role];
       const hasRole = (roleMatch: string) => userRoles.some((r: string) => r && r.includes(roleMatch));
 
-      // TRANSACTIONS (Sales) — DINONAKTIFKAN SEMENTARA, cuma Purchasing dulu yang aktif.
-      // Uncomment blok ini kapan aja buat aktifin lagi scoring Sales.
-      // const uTransactions = (transactions ?? []).filter((t) => t.created_by === uid);
-      // const uFormats = (preparations ?? []).filter((p) => p.created_by === uid);
-      // if (uTransactions.length > 0 || uFormats.length > 0 || hasRole("SALES")) {
-      //   score += uTransactions.length * 20; // 20 points per transaction
-      //   score += uFormats.length * 5; // 5 points per format
-      //   metrics.push({ label: "Total Payment", value: uTransactions.length, unit: "trx" });
-      //   metrics.push({ label: "Buat Format", value: uFormats.length, unit: "order" });
-      // }
+      // SALES OFFLINE — 5 poin per transaksi yang berhasil dilayani (status
+      // LUNAS, created_by = siapa yang proses pembayarannya). "Terima
+      // pembayaran" dan "Buat Format Preparation" dianggap SATU aksi yang
+      // sama (melayani 1 customer) — sengaja CUMA dihitung dari transaksi
+      // LUNAS, supaya tidak dobel-hitung kalau 1 transaksi juga bikin 1
+      // format. Berlaku untuk semua role yang mengandung "SALES"
+      // (PKL_SALES, CREW_SALES, KEPALA_SALES).
+      const uTransactions = (transactions ?? []).filter((t: any) => t.sales_id === uid);
+      if (SALES_OFFLINE_USER_IDS.includes(uid)) {
+        score += uTransactions.length * 5;
+        metrics.push({ label: "Customer Dilayani", value: uTransactions.length, unit: "trx" });
+      }
 
       // PREPARATIONS (Penyedia Barang) — per UNIT laptop (bukan per order):
       // 3 poin kalau received_by === done_by (satu orang terima order SAMPAI
