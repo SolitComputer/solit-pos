@@ -9,10 +9,13 @@ const supabase = createClient(
 
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
     const body = await req.json();
-    const { decision, note } = body;
+    const { decision, note, signature_data } = body;
 
     if (!["APPROVE", "REJECT"].includes(decision)) {
         return NextResponse.json({ success: false, message: "decision harus APPROVE atau REJECT" }, { status: 400 });
+    }
+    if (decision === "APPROVE" && (!signature_data || typeof signature_data !== "string" || !signature_data.startsWith("data:image/"))) {
+        return NextResponse.json({ success: false, message: "Tanda tangan digital wajib diisi sebelum menyetujui kontrak" }, { status: 400 });
     }
 
     const { data: userRow, error: userError } = await supabase
@@ -38,11 +41,17 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
         return NextResponse.json({ success: false, message: "Kontrak ini sudah direspon sebelumnya" }, { status: 400 });
     }
 
-    const newStatus = decision === "APPROVE" ? "APPROVED" : "REJECTED";
+    const newStatus = decision === "APPROVE" ? "PENDING_ADMIN_SIGNATURE" : "REJECTED";
 
     const { error: updateContractError } = await supabase
         .from("user_contracts")
-        .update({ status: newStatus, responded_at: new Date().toISOString(), response_note: note || null })
+        .update({
+            status: newStatus,
+            responded_at: new Date().toISOString(),
+            response_note: note || null,
+            user_signature_url: decision === "APPROVE" ? signature_data : null,
+            user_signed_at: decision === "APPROVE" ? new Date().toISOString() : null,
+        })
         .eq("id", contract.id);
 
     if (updateContractError) {

@@ -3,6 +3,7 @@ import { withAuth, AuthUser } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
 import { computeValidUntil } from "@/lib/contractTemplates";
 import { CAREER_LEVELS } from "@/lib/careerLevels";
+import { getContractSignerId, isExcludedFromContracts } from "@/lib/contractSigners";
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +28,7 @@ async function getHandler(req: NextRequest, _ctx: any, user: AuthUser) {
 
     const { data, error } = await supabase
         .from("user_contracts")
-        .select("*")
+        .select("*, admin:admin_signed_by(name)")
         .eq("user_id", userId)
         .order("sent_at", { ascending: false });
 
@@ -50,6 +51,9 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
             { success: false, message: "user_id, contract_type, title, content, valid_from wajib diisi" },
             { status: 400 }
         );
+    }
+    if (isExcludedFromContracts(user_id)) {
+        return NextResponse.json({ success: false, message: "User ini tidak menerima kontrak kerja" }, { status: 400 });
     }
     if (!["PENGANTARAN", "GAJI_FLAT", "GAJI_NON_FLAT", "CUSTOM"].includes(contract_type)) {
         return NextResponse.json({ success: false, message: "contract_type tidak valid" }, { status: 400 });
@@ -74,6 +78,7 @@ async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
             career_level: career_level ?? null,
             status: "PENDING",
             sent_by: user.id,
+            signer_id: getContractSignerId(user_id),
             valid_from,
             duration_months: months,
             valid_until: validUntil,

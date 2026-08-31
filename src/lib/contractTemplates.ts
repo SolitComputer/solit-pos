@@ -1,5 +1,5 @@
 export type ContractType = "PENGANTARAN" | "GAJI_FLAT" | "GAJI_NON_FLAT" | "CUSTOM";
-export type ContractStatus = "NONE" | "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED";
+export type ContractStatus = "NONE" | "PENDING" | "PENDING_ADMIN_SIGNATURE" | "APPROVED" | "REJECTED" | "EXPIRED";
 
 export const CONTRACT_TYPE_LABELS: Record<ContractType, string> = {
   PENGANTARAN: "Kontrak Pengantaran",
@@ -15,6 +15,7 @@ export const CONTRACT_DEFAULT_TITLE = "Kontrak Kerja Karyawan";
 export const CONTRACT_STATUS_META: Record<ContractStatus, { label: string; color: string; bg: string; border: string }> = {
   NONE: { label: "Belum Dikirim", color: "text-gray-500", bg: "bg-gray-100", border: "border-gray-200" },
   PENDING: { label: "Menunggu Persetujuan", color: "text-amber-700", bg: "bg-amber-100", border: "border-amber-200" },
+  PENDING_ADMIN_SIGNATURE: { label: "Menunggu TTD Admin", color: "text-blue-700", bg: "bg-blue-100", border: "border-blue-200" },
   APPROVED: { label: "Disetujui", color: "text-emerald-700", bg: "bg-emerald-100", border: "border-emerald-200" },
   REJECTED: { label: "Ditolak", color: "text-red-700", bg: "bg-red-100", border: "border-red-200" },
   EXPIRED: { label: "Kadaluarsa", color: "text-red-700", bg: "bg-red-100", border: "border-red-200" },
