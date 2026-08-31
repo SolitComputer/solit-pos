@@ -55,20 +55,20 @@ const Shimmer = ({ className = "" }: { className?: string }) => (
   <div className={`rounded-lg bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 animate-pulse ${className}`} />
 );
 
-const MEDAL_COLORS = ["text-white", "text-gray-600", "text-gray-700"];
+const MEDAL_COLORS = ["text-white", "text-white", "text-white"];
 
 const STAT_CARDS = [
-  { key: "antrian" as const, label: "Antrian", color: "text-gray-600 bg-gray-50 border-gray-200", dot: "bg-gray-400", href: "/dashboard/service/antrian" },
-  { key: "sedangDikerjakan" as const, label: "Dikerjakan", color: "text-gray-700 bg-gray-100 border-gray-300", dot: "bg-gray-500", href: "/dashboard/service/antrian" },
-  { key: "menungguSparepart" as const, label: "Tunggu Part", color: "text-gray-800 bg-gray-100 border-gray-400", dot: "bg-gray-600", href: "/dashboard/service/antrian" },
-  { key: "done" as const, label: "Siap Diambil", color: "text-gray-900 bg-white border-gray-300", dot: "bg-gray-900", href: "/dashboard/service/done" },
-  { key: "gagal" as const, label: "Gagal", color: "text-white bg-gray-900 border-gray-900", dot: "bg-white", href: "/dashboard/service/done" },
-  { key: "sudahDiambilHariIni" as const, label: "Selesai Hari Ini", color: "text-gray-700 bg-gray-50 border-gray-200", dot: "bg-gray-400", href: "/dashboard/service/history" },
+  { key: "antrian" as const, label: "Antrian", color: "text-slate-600 bg-slate-50 border-slate-100", dot: "bg-slate-400", href: "/dashboard/service/antrian" },
+  { key: "sedangDikerjakan" as const, label: "Dikerjakan", color: "text-indigo-600 bg-indigo-50 border-indigo-100", dot: "bg-indigo-500", href: "/dashboard/service/antrian" },
+  { key: "menungguSparepart" as const, label: "Tunggu Part", color: "text-indigo-600 bg-indigo-50 border-indigo-100", dot: "bg-indigo-400", href: "/dashboard/service/antrian" },
+  { key: "done" as const, label: "Siap Diambil", color: "text-emerald-600 bg-emerald-50 border-emerald-100", dot: "bg-emerald-500", href: "/dashboard/service/done" },
+  { key: "gagal" as const, label: "Gagal", color: "text-rose-600 bg-rose-50 border-rose-100", dot: "bg-rose-500", href: "/dashboard/service/done" },
+  { key: "sudahDiambilHariIni" as const, label: "Selesai Hari Ini", color: "text-emerald-600 bg-emerald-50 border-emerald-100", dot: "bg-emerald-500", href: "/dashboard/service/history" },
 ];
 
 export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFinancials: boolean }) {
   const [data, setData] = useState<ServiceStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setMemuat] = useState(true);
   const [rankTab, setRankTab] = useState<"today" | "alltime">("today");
 
   const fetchStats = useCallback(async () => {
@@ -77,7 +77,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
       const json = await res.json();
       if (json.success) setData(json.data);
     } finally {
-      setLoading(false);
+      setMemuat(false);
     }
   }, []);
 
@@ -103,14 +103,14 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
 
       {/* Section label */}
       <div className="flex items-center gap-2">
-        <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-900 animate-pulse ring-2 ring-gray-300 flex-shrink-0" />
+        <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-indigo-500 animate-pulse ring-2 ring-indigo-200 flex-shrink-0" />
         <span className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wider">
           Dashboard Servis
         </span>
         <div className="flex-1 h-px bg-gradient-to-r from-gray-200 to-transparent" />
         <Link
           href="/dashboard/service/antrian"
-          className="text-[10px] sm:text-xs font-semibold text-gray-400 hover:text-gray-600 transition flex items-center gap-1 group"
+          className="text-[10px] sm:text-xs font-semibold text-gray-400 hover:text-indigo-600 transition flex items-center gap-1 group"
         >
           Kelola Antrian
           <svg className="w-2.5 h-2.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,10 +120,10 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
       </div>
 
       {/* 6 stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {loading
           ? Array(6).fill(0).map((_, i) => (
-            <div key={i} className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm space-y-2">
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-3 shadow-sm space-y-2">
               <Shimmer className="w-16 h-2.5" />
               <Shimmer className="w-10 h-7" />
             </div>
@@ -132,7 +132,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
             <Link
               key={s.key}
               href={s.href}
-              className={`group relative rounded-xl border px-3 py-3 shadow-sm hover:shadow-lg hover:shadow-gray-300/40 transition-all duration-300 ease-out hover:-translate-y-1 ${s.color}`}
+              className={`group relative rounded-2xl border px-4 py-4 shadow-sm hover:shadow-lg hover:shadow-indigo-200/40 transition-all duration-300 ease-out hover:-translate-y-1 ${s.color}`}
             >
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-transform duration-300 group-hover:scale-150 ${s.dot}`} />
@@ -154,13 +154,13 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
       </div>
 
       {/* Bottom 3 cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Antrian Terlama */}
-        <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:shadow-gray-200/60 hover:border-gray-200 transition-all duration-300 ease-out overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm hover:shadow-lg hover:shadow-indigo-200/40 transition-all duration-300 ease-out overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
             <h3 className="text-xs font-bold text-gray-700 flex items-center gap-2">
-              <Hourglass className="w-3.5 h-3.5 text-gray-600" /> Antrian Terlama
+              <Hourglass className="w-3.5 h-3.5 text-slate-400" /> Antrian Terlama
             </h3>
             {totalAktif > 0 && (
               <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -171,7 +171,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
           <div className="divide-y divide-gray-50">
             {loading ? (
               [1, 2, 3].map(i => (
-                <div key={i} className="px-4 py-3 flex items-center gap-3">
+                <div key={i} className="px-5 py-3.5 flex items-center gap-3">
                   <Shimmer className="w-7 h-7 rounded-lg" />
                   <div className="flex-1 space-y-1.5">
                     <Shimmer className="w-28 h-2.5" />
@@ -187,14 +187,14 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
               </div>
             ) : (
               data.terlamaAntrian.map(o => (
-                <div key={o.no_urut} className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 hover:translate-x-0.5 transition-all duration-200 ease-out">                  <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-[10px] font-bold text-gray-700">#{o.no_urut}</span>
+                <div key={o.no_urut} className="px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50 hover:translate-x-0.5 transition-all duration-200 ease-out">                  <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[10px] font-bold text-slate-600">#{o.no_urut}</span>
                 </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-gray-800 truncate">{o.nama}</p>
                     <p className="text-[10px] text-gray-400 truncate">{o.type_laptop}</p>
                   </div>
-                  <span className="text-[10px] font-mono font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">
+                  <span className="text-[10px] font-mono font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">
                     {getDuration(o.tanggal_masuk)}
                   </span>
                 </div>
@@ -204,13 +204,13 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
         </div>
 
         {/* Sedang Dikerjakan */}
-        <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:shadow-gray-200/60 hover:border-gray-200 transition-all duration-300 ease-out overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm hover:shadow-lg hover:shadow-indigo-200/40 transition-all duration-300 ease-out overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
             <h3 className="text-xs font-bold text-gray-700 flex items-center gap-2">
-              <Wrench className="w-3.5 h-3.5 text-gray-600" /> Sedang Dikerjakan
+              <Wrench className="w-3.5 h-3.5 text-indigo-500" /> Sedang Dikerjakan
             </h3>
             {canSeeFinancials && !loading && (data?.pendapatanHariIni ?? 0) > 0 && (
-              <span className="text-[10px] font-semibold text-gray-900 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
                 {fmtRupiah(data!.pendapatanHariIni)} hari ini
               </span>
             )}
@@ -218,7 +218,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
           <div className="divide-y divide-gray-50">
             {loading ? (
               [1, 2, 3].map(i => (
-                <div key={i} className="px-4 py-3 flex items-center gap-3">
+                <div key={i} className="px-5 py-3.5 flex items-center gap-3">
                   <Shimmer className="w-7 h-7 rounded-lg" />
                   <div className="flex-1 space-y-1.5">
                     <Shimmer className="w-28 h-2.5" />
@@ -234,8 +234,8 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
               </div>
             ) : (
               data.sedangDetail.map(o => (
-                <div key={o.no_urut} className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 hover:translate-x-0.5 transition-all duration-200 ease-out">                  <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-[10px] font-bold text-gray-700">#{o.no_urut}</span>
+                <div key={o.no_urut} className="px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50 hover:translate-x-0.5 transition-all duration-200 ease-out">                  <div className="w-7 h-7 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[10px] font-bold text-indigo-600">#{o.no_urut}</span>
                 </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-gray-800 truncate">{o.nama}</p>
@@ -246,17 +246,17 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
                       )}
                     </p>
                   </div>
-                  <span className="text-[10px] font-mono font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">
+                  <span className="text-[10px] font-mono font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap">
                     {getDuration(o.tanggal_masuk)}
                   </span>
                 </div>
               ))
             )}
           </div>
-          <div className="px-4 py-2.5 border-t border-gray-50 flex justify-end">
+          <div className="px-5 py-3 border-t border-gray-50 flex justify-end">
             <Link
               href="/dashboard/service/antrian"
-              className="text-[10px] text-gray-400 hover:text-gray-600 font-semibold flex items-center gap-1 transition group"
+              className="text-[10px] text-gray-400 hover:text-indigo-600 font-semibold flex items-center gap-1 transition group"
             >
               Kelola antrian
               <svg className="w-2.5 h-2.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -267,17 +267,17 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
         </div>
 
         {/*  Ranking Teknisi */}
-        <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:shadow-gray-200/60 hover:border-gray-200 transition-all duration-300 ease-out overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm hover:shadow-lg hover:shadow-indigo-200/40 transition-all duration-300 ease-out overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
             <h3 className="text-xs font-bold text-gray-700 flex items-center gap-2">
-              <Trophy className="w-3.5 h-3.5 text-gray-700" /> Ranking Teknisi
+              <Trophy className="w-3.5 h-3.5 text-amber-500" /> Ranking Teknisi
             </h3>
             <div className="flex items-center gap-0.5 p-0.5 bg-gray-100 rounded-lg">
               <button
                 onClick={() => setRankTab("today")}
                 className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all duration-200 ease-out ${rankTab === "today"
-                    ? "bg-white text-gray-800 shadow-sm scale-105"
-                    : "text-gray-400 hover:text-gray-600"
+                    ? "bg-white text-indigo-600 shadow-sm scale-105"
+                    : "text-gray-400 hover:text-indigo-600"
                   }`}
               >
                 Hari Ini
@@ -285,8 +285,8 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
               <button
                 onClick={() => setRankTab("alltime")}
                 className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-all duration-200 ease-out ${rankTab === "alltime"
-                    ? "bg-white text-gray-800 shadow-sm scale-105"
-                    : "text-gray-400 hover:text-gray-600"
+                    ? "bg-white text-indigo-600 shadow-sm scale-105"
+                    : "text-gray-400 hover:text-indigo-600"
                   }`}
               >
                 All Time
@@ -294,7 +294,7 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
             </div>
           </div>
 
-          <div className="px-4 py-3 space-y-3">
+          <div className="px-5 py-4 space-y-3">
             {loading ? (
               [1, 2, 3].map(i => (
                 <div key={i} className="flex items-center gap-3">
@@ -317,14 +317,14 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
               rankList.map((t, i) => {
                 const pct = Math.round((t.count / maxCount) * 100);
                 const badgeColor =
-                  i === 0 ? "bg-gray-900 text-white" :
-                    i === 1 ? "bg-gray-100 text-gray-600" :
-                      i === 2 ? "bg-gray-200 text-gray-700" :
+                  i === 0 ? "bg-amber-400 text-white" :
+                    i === 1 ? "bg-slate-300 text-white" :
+                      i === 2 ? "bg-orange-300 text-white" :
                         "bg-gray-50 text-gray-400";
                 const barColor =
-                  i === 0 ? "from-gray-800 to-gray-900" :
-                    i === 1 ? "from-gray-500 to-gray-600" :
-                      i === 2 ? "from-gray-300 to-gray-400" :
+                  i === 0 ? "from-amber-400 to-amber-500" :
+                    i === 1 ? "from-slate-300 to-slate-400" :
+                      i === 2 ? "from-orange-300 to-orange-400" :
                         "from-gray-200 to-gray-300";
 
                 return (
@@ -353,10 +353,10 @@ export default function ServiceDashboardWidget({ canSeeFinancials }: { canSeeFin
             )}
           </div>
 
-          <div className="px-4 py-2.5 border-t border-gray-50 flex justify-end">
+          <div className="px-5 py-3 border-t border-gray-50 flex justify-end">
             <Link
               href="/dashboard/service/history"
-              className="text-[10px] text-gray-400 hover:text-gray-600 font-semibold flex items-center gap-1 transition group"
+              className="text-[10px] text-gray-400 hover:text-indigo-600 font-semibold flex items-center gap-1 transition group"
             >
               Lihat riwayat
               <svg className="w-2.5 h-2.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">

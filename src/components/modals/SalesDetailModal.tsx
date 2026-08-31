@@ -28,7 +28,7 @@ const fmtShort = (n: number): string => {
 export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   useRegisterOverlay(isOpen);
   const [data, setData] = useState<SalesDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isMemuat, setIsMemuat] = useState(false);
   const [expandedSales, setExpandedSales] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -40,7 +40,7 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
   useEffect(() => {
     if (!isOpen) return;
     const fetch_ = async () => {
-      setIsLoading(true);
+      setIsMemuat(true);
       try {
         const res = await fetch("/api/dashboard/sales-detail");
         const result = await res.json();
@@ -48,7 +48,7 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
       } catch (e) {
         console.error(e);
       } finally {
-        setIsLoading(false);
+        setIsMemuat(false);
       }
     };
     fetch_();
@@ -57,7 +57,7 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
   if (!isOpen) return null;
 
   const RANK_STYLES = [
-    { bg: "linear-gradient(135deg, #18181B, #27272A)", shadow: "0 4px 12px rgba(0,0,0,0.35)", color: "white" },
+    { bg: "linear-gradient(135deg, #6366f1, #4f46e5)", shadow: "0 4px 12px rgba(0,0,0,0.35)", color: "white" },
     { bg: "linear-gradient(135deg, #52525B, #3F3F46)", shadow: "0 4px 12px rgba(0,0,0,0.25)", color: "white" },
     { bg: "linear-gradient(135deg, #A1A1AA, #71717A)", shadow: "0 4px 12px rgba(0,0,0,0.20)", color: "white" },
   ];
@@ -70,8 +70,8 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
 
         .sdm-shell {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
-          box-shadow: 0 32px 80px rgba(0,0,0,0.16), 0 8px 24px rgba(0,0,0,0.08);
+          border: 1px solid #F1F5F9;
+          box-shadow: 0 4px 20px -4px rgba(0,0,0,0.05);
         }
         .sdm-header {
           background: linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%);
@@ -79,15 +79,15 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
         }
         .sdm-stat {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
-          box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+          border: 1px solid #F1F5F9;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.02);
           transition: box-shadow 0.2s, transform 0.2s;
         }
         .sdm-stat:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.10); transform: translateY(-2px); }
 
         .sdm-sales-card {
           background: #FFFFFF;
-          border: 1px solid #E4E4E7;
+          border: 1px solid #F1F5F9;
           box-shadow: 0 1px 3px rgba(0,0,0,0.05);
           transition: box-shadow 0.2s;
         }
@@ -123,7 +123,7 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
           transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.34,1.25,0.64,1);
         }
         .sdm-close { background: #F4F4F5; color: #A1A1AA; transition: background 0.2s, color 0.2s; }
-        .sdm-close:hover { background: #18181B; color: #FFFFFF; }
+        .sdm-close:hover { background: #6366f1; color: #FFFFFF; }
         .sdm-handle { background: #D4D4D8; }
         .sdm-section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #A1A1AA; }
         .sdm-footer { background: linear-gradient(135deg, #FAFAFA 0%, #F4F4F5 100%); border-top: 1px solid #E4E4E7; }
@@ -147,13 +147,13 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
           <div className="sdm-header flex items-center justify-between px-5 sm:px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: "linear-gradient(135deg, #18181B 0%, #3F3F46 100%)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)" }}>
+                style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", boxShadow: "0 4px 14px rgba(0,0,0,0.35)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round">
                   <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                 </svg>
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#18181B" }}>Detail Top Sales</h2>
+                <h2 className="text-base sm:text-lg font-bold" style={{ color: "#0f172a" }}>Detail Top Sales</h2>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Performa penjual dan breakdown harian</p>
               </div>
             </div>
@@ -166,7 +166,7 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
 
           {/* Body */}
           <div className="sdm-scroll flex-1 overflow-y-auto" style={{ background: "#FAFAFA" }}>
-            {isLoading ? (
+            {isMemuat ? (
               <div className="p-5 space-y-3">
                 <div className="grid grid-cols-2 gap-3">{[1,2].map(i=><div key={i} className="sdm-shimmer h-28"/>)}</div>
                 <div className="space-y-2 pt-2">{[1,2,3].map(i=><div key={i} className="sdm-shimmer h-16"/>)}</div>
@@ -177,24 +177,24 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="sdm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg, #18181B, #3F3F46)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg, #6366f1, #818cf8)" }} />
                     <div className="p-4">
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#F4F4F5" }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#18181B" strokeWidth="2.5" strokeLinecap="round">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round">
                           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                         </svg>
                       </div>
                       <p className="sdm-section-label">Hari Ini</p>
-                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#18181B" }}>{data.today.count}</p>
+                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#0f172a" }}>{data.today.count}</p>
                       <p className="text-xs font-medium mt-1" style={{ color: "#A1A1AA" }}>transaksi</p>
                       <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #F4F4F5" }}>
                         <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>Revenue: {fmtShort(data.today.revenue)}</p>
-                        <p className="text-[9px] font-bold mt-0.5" style={{ color: "#18181B" }}>Profit: +{fmtShort(data.today.profit)}</p>
+                        <p className="text-[9px] font-bold mt-0.5" style={{ color: "#0f172a" }}>Profit: +{fmtShort(data.today.profit)}</p>
                       </div>
                     </div>
                   </div>
                   <div className="sdm-stat rounded-2xl overflow-hidden">
-                    <div className="h-1" style={{ background: "linear-gradient(90deg, #52525B, #71717A)" }} />
+                    <div className="h-1" style={{ background: "linear-gradient(90deg, #6366f1, #818cf8)" }} />
                     <div className="p-4">
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: "#F4F4F5" }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2.5" strokeLinecap="round">
@@ -202,11 +202,11 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
                         </svg>
                       </div>
                       <p className="sdm-section-label">Bulan Ini</p>
-                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#18181B" }}>{data.monthly.count}</p>
+                      <p className="text-3xl font-extrabold mt-1" style={{ color: "#0f172a" }}>{data.monthly.count}</p>
                       <p className="text-xs font-medium mt-1" style={{ color: "#A1A1AA" }}>transaksi</p>
                       <div className="mt-2.5 pt-2.5" style={{ borderTop: "1px solid #F4F4F5" }}>
                         <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>Revenue: {fmtShort(data.monthly.revenue)}</p>
-                        <p className="text-[9px] font-bold mt-0.5" style={{ color: "#18181B" }}>Profit: +{fmtShort(data.monthly.profit)}</p>
+                        <p className="text-[9px] font-bold mt-0.5" style={{ color: "#0f172a" }}>Profit: +{fmtShort(data.monthly.profit)}</p>
                       </div>
                     </div>
                   </div>
@@ -216,7 +216,7 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <p className="sdm-section-label">Top Performers (30 Hari)</p>
-                    <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: "#F4F4F5", color: "#3F3F46" }}>
+                    <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: "#F4F4F5", color: "#475569" }}>
                       {data.salesPerformance.length} sales
                     </span>
                   </div>
@@ -252,18 +252,18 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
                                   {idx + 1}
                                 </div>
                                 <div className="flex-1 min-w-0 text-left">
-                                  <p className="text-sm font-semibold truncate" style={{ color: "#18181B" }}>{sales.name}</p>
+                                  <p className="text-sm font-semibold truncate" style={{ color: "#0f172a" }}>{sales.name}</p>
                                   <div className="flex items-center gap-2 mt-0.5">
                                     <span className="text-[10px] font-medium" style={{ color: "#A1A1AA" }}>{sales.total} transaksi</span>
                                     <span className="w-1 h-1 rounded-full" style={{ background: "#E4E4E7" }} />
-                                    <span className="text-[10px] font-semibold" style={{ color: "#18181B" }}>{fmtShort(sales.revenue)}</span>
+                                    <span className="text-[10px] font-semibold" style={{ color: "#0f172a" }}>{fmtShort(sales.revenue)}</span>
                                   </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
                                 <div className="hidden sm:block text-right">
                                   <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>profit</p>
-                                  <p className="text-xs font-bold" style={{ color: "#18181B" }}>+{fmtShort(sales.profit)}</p>
+                                  <p className="text-xs font-bold" style={{ color: "#0f172a" }}>+{fmtShort(sales.profit)}</p>
                                 </div>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" strokeWidth="2"
                                   className={`flex-shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}>
@@ -277,7 +277,7 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
                                 <div className="px-4 py-3">
                                   <div className="flex items-center gap-2 mb-3">
                                     <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "#F4F4F5" }}>
-                                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#18181B" strokeWidth="2.5">
+                                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5">
                                         <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
                                       </svg>
                                     </div>
@@ -292,21 +292,21 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
                                           <div className="flex items-center justify-between gap-3">
                                             <div className="flex items-center gap-2.5">
                                               <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-                                                style={{ background: "#F4F4F5", color: "#18181B" }}>
+                                                style={{ background: "#F4F4F5", color: "#0f172a" }}>
                                                 {i + 1}
                                               </div>
                                               <div>
-                                                <p className="text-xs font-semibold" style={{ color: "#18181B" }}>{day.label}</p>
+                                                <p className="text-xs font-semibold" style={{ color: "#0f172a" }}>{day.label}</p>
                                                 <p className="text-[9px] font-medium" style={{ color: "#A1A1AA" }}>{day.total} transaksi</p>
                                               </div>
                                             </div>
                                             <div className="text-right">
-                                              <p className="text-xs font-bold" style={{ color: "#18181B" }}>{fmtRupiah(day.revenue)}</p>
-                                              <p className="text-[9px] font-semibold" style={{ color: "#3F3F46" }}>+{fmtRupiah(day.profit)}</p>
+                                              <p className="text-xs font-bold" style={{ color: "#0f172a" }}>{fmtRupiah(day.revenue)}</p>
+                                              <p className="text-[9px] font-semibold" style={{ color: "#475569" }}>+{fmtRupiah(day.profit)}</p>
                                               <div className="w-16 h-1 rounded-full mt-1 overflow-hidden" style={{ background: "#F4F4F5" }}>
                                                 <div className="h-full rounded-full" style={{
                                                   width: `${(day.revenue / sales.revenue) * 100}%`,
-                                                  background: "linear-gradient(90deg, #18181B, #3F3F46)"
+                                                  background: "linear-gradient(90deg, #6366f1, #818cf8)"
                                                 }} />
                                               </div>
                                             </div>
@@ -332,7 +332,7 @@ export function SalesDetailModal({ isOpen, onClose }: { isOpen: boolean; onClose
                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                   </svg>
                 </div>
-                <p className="text-sm font-semibold" style={{ color: "#52525B" }}>Gagal memuat data</p>
+                <p className="text-sm font-semibold" style={{ color: "#475569" }}>Gagal memuat data</p>
                 <p className="text-xs font-medium" style={{ color: "#A1A1AA" }}>Coba tutup dan buka kembali</p>
               </div>
             )}
