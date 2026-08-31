@@ -40,6 +40,12 @@ const boardLabels: Record<BoardType, { title: string; desc: string }> = {
 
 // Harus SAMA PERSIS dengan konstanta di /api/leaderboard-kerja/route.ts
 const RAYHAN_ACCOUNTING_USER_ID = "7a0aacab-961c-4332-b4bf-361431126f77";
+const PROGRAMMER_USER_IDS = [
+  "3d8fe0d7-1735-492d-afe8-71991154c066",
+  "63d839c4-f019-40da-b673-52a6e3a854eb",
+  "a106053f-8168-4574-9586-6049300bb614",
+  "a136bb0a-d6de-4439-946c-c17a85b11a67",
+];
 
 const getDivision = (role: string, id?: string) => {
   // Rayhan: role sistemnya ADMIN, tapi dikelompokkan ke Divisi Accounting.
@@ -47,6 +53,9 @@ const getDivision = (role: string, id?: string) => {
   // teks "Admin" di sebelah namanya TIDAK berubah, cuma pengelompokan
   // kartu divisinya yang beda.
   if (id === RAYHAN_ACCOUNTING_USER_ID) return "Divisi Accounting";
+  // 4 akun Programmer: role sistemnya ADMIN juga, dikelompokkan ke Divisi
+  // Programmer lewat ID — pola sama dengan Rayhan di atas.
+  if (id && PROGRAMMER_USER_IDS.includes(id)) return "Divisi Programmer";
   const r = (role || "").toUpperCase();
   if (r.includes("KEPALA_SALES")) return "Kepala Sales";
   if (r.includes("SALES")) return "Crew Sales";

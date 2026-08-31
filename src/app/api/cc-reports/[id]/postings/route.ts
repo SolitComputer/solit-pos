@@ -1,8 +1,8 @@
-// src/app/api/cc-reports/[id]/postings/route.ts
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { NextRequest, NextResponse } from "next/server";
 import { parsePostUrl } from "@/lib/ccMetrics";
 import { syncPosting } from "@/lib/ccSync";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +49,8 @@ export async function POST(
   const gotMetrics = out?.status === "OK" || out?.status === "PARTIAL";
   const manual = (v: unknown) => Number(v) || 0;
 
+  const currentUser = await getCurrentUser();
+
   const { data, error } = await supabaseAdmin
     .from("cc_postings")
     .insert({
@@ -57,13 +59,15 @@ export async function POST(
       post_url: postUrl,
       posted_at: body?.posted_at || null,
       external_id: out?.externalId ?? parsed?.externalId ?? null,
-      provider_media_id: out?.providerMediaId ?? null,   
-      views:    gotMetrics && out!.views    !== null ? out!.views    : manual(body?.views),
-      likes:    gotMetrics && out!.likes    !== null ? out!.likes    : manual(body?.likes),
+      provider_media_id: out?.providerMediaId ?? null,
+      views: gotMetrics && out!.views !== null ? out!.views : manual(body?.views),
+      likes: gotMetrics && out!.likes !== null ? out!.likes : manual(body?.likes),
       comments: gotMetrics && out!.comments !== null ? out!.comments : manual(body?.comments),
       sync_status: out?.status ?? "PENDING",
       sync_error: out?.error ?? null,
       last_synced_at: out ? new Date().toISOString() : null,
+      created_by: currentUser?.id ?? null,
+      created_by_name: currentUser?.name ?? null,
     })
     .select("*")
     .single();

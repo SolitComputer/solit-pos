@@ -74,18 +74,39 @@ export async function PATCH(
     );
   }
 
+  // Ambil user sekali di sini — dipakai untuk cek akses is_cancelled DAN untuk
+  // mencatat siapa yang menyelesaikan tahap Take/Editing (buat leaderboard
+  // Konten: 4 poin Take, 4 poin Edit). take_done_by/edit_done_by TIDAK ada
+  // di ALLOWED, jadi client tidak bisa kirim/spoof sendiri — selalu diisi
+  // dari sesi login di sini.
+  const currentUser = await getCurrentUser();
+
   // ✅ SECURITY FIX: tombol "Batalkan Konten" cuma disembunyikan di UI untuk
   // role yang bukan CC_REPORT_MANAGE_ROLES — server tidak pernah mengecek ini,
   // jadi role lain tetap bisa kirim PATCH { is_cancelled: true } langsung dan
   // mengunci konten secara permanen. Sekarang dicek di sini juga.
   if ("is_cancelled" in patch) {
-    const user = await getCurrentUser();
-    if (!user || !hasAnyRole(user.roles ?? [user.role], CC_REPORT_MANAGE_ROLES)) {
+    if (!currentUser || !hasAnyRole(currentUser.roles ?? [currentUser.role], CC_REPORT_MANAGE_ROLES)) {
       return NextResponse.json(
         { success: false, error: "Kamu tidak punya akses untuk membatalkan konten ini" },
         { status: 403 }
       );
     }
+  }
+
+  // Leaderboard Konten: dicatat SAAT take_done/edit_done di-set true dari
+  // request ini. Kalau ditandai ulang (mis. edit_done di-set true lagi
+  // setelah siklus revisi), yang tercatat cuma orang PALING TERAKHIR yang
+  // menandainya — bukan riwayat semua orang yang pernah mengerjakannya.
+  if (patch.take_done === true && currentUser) {
+    patch.take_done_by = currentUser.id;
+    patch.take_done_by_name = currentUser.name;
+    patch.take_done_at = new Date().toISOString();
+  }
+  if (patch.edit_done === true && currentUser) {
+    patch.edit_done_by = currentUser.id;
+    patch.edit_done_by_name = currentUser.name;
+    patch.edit_done_at = new Date().toISOString();
   }
 
   // 🚫 Konten yang sudah di-Cancel (is_cancelled) terkunci total di level API —

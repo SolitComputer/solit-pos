@@ -6,6 +6,13 @@ export const dynamic = "force-dynamic";
 
 const RAYHAN_ACCOUNTING_USER_ID = "7a0aacab-961c-4332-b4bf-361431126f77";
 
+// ke scoring & divisi Programmer lewat ID (bukan lewat hasRole("PROGRAMMER")).
+const PROGRAMMER_USER_IDS = [
+  "3d8fe0d7-1735-492d-afe8-71991154c066",
+  "63d839c4-f019-40da-b673-52a6e3a854eb",
+  "a106053f-8168-4574-9586-6049300bb614",
+  "a136bb0a-d6de-4439-946c-c17a85b11a67",
+];
 export const GET = withAuth(async (req, _ctx, user) => {
   try {
     const url = new URL(req.url);
@@ -55,10 +62,12 @@ export const GET = withAuth(async (req, _ctx, user) => {
       { data: preparations },
       { data: serviceOrders },
       { data: ccReports },
+      { data: ccPostings },
       { data: cashflows },
       { data: activities },
       { data: journalLogs },
       { data: cashflowAudits },
+      { data: todos },
       { data: missions }
     ] = await Promise.all([
       // Sales: transactions
@@ -81,10 +90,19 @@ export const GET = withAuth(async (req, _ctx, user) => {
         .select("id, status, dikerjakan_by, tanggal_selesai, tanggal_diambil")
         .in("status", ["DONE", "SUDAH_DIAMBIL"]),
 
-      // Konten: cc_reports
+      // Konten: cc_reports — ambil SEMUA yang take_done/edit_done true (tanpa
+      // filter tanggal di query, sama pola dengan service_orders di atas),
+      // lalu difilter per periode di JS pakai take_done_at/edit_done_at
+      // (kapan tahap itu SELESAI ditandai, bukan kapan report-nya dibuat).
       supabaseAdmin
         .from("cc_reports")
-        .select("id, created_by_id")
+        .select("id, take_done, take_done_by, take_done_at, edit_done, edit_done_by, edit_done_at")
+        .or("take_done.eq.true,edit_done.eq.true"),
+
+      // Konten: cc_postings — tiap link posting yang ditambahkan (Upload)
+      supabaseAdmin
+        .from("cc_postings")
+        .select("id, created_by, created_at")
         .gte("created_at", startIso)
         .lte("created_at", endIso),
 
@@ -120,6 +138,15 @@ export const GET = withAuth(async (req, _ctx, user) => {
         .not("audited_by", "is", null)
         .gte("audited_at", startIso)
         .lte("audited_at", endIso),
+
+      // Programmer: todos yang DISELESAIKAN (completed_by + completed_at,
+      // diisi PATCH /api/todos/[id] saat is_done false → true) — 3 poin/tugas.
+      supabaseAdmin
+        .from("todos")
+        .select("id, completed_by, completed_at")
+        .not("completed_by", "is", null)
+        .gte("completed_at", startIso)
+        .lte("completed_at", endIso),
 
       // Missions: (all)
       supabaseAdmin
@@ -221,12 +248,27 @@ export const GET = withAuth(async (req, _ctx, user) => {
         metrics.push({ label: "Laptop Solved", value: uServices.length, unit: "unit" });
       }
 
-      // KONTEN (cc_reports) — DINONAKTIFKAN SEMENTARA.
-      // const uReports = (ccReports ?? []).filter((c) => c.created_by_id === uid);
-      // if (uReports.length > 0 || hasRole("KONTEN")) {
-      //   score += uReports.length * 15;
-      //   metrics.push({ label: "Konten Dibuat", value: uReports.length, unit: "doc" });
-      // }
+      // KONTEN — Take Video (menyelesaikan tahap Take, take_done_by) = 4
+      // poin/konten. Edit Selesai (edit_done_by, pola sama) = 4 poin/konten.
+      // Upload = 1 poin PER LINK POSTING yang ditambahkan (cc_postings.
+      // created_by) — jadi 1 konten yang di-upload ke 3 platform = 3 poin.
+      const uTakeReports = (ccReports ?? []).filter((c: any) => {
+        if (c.take_done_by !== uid || !c.take_done_at) return false;
+        const ms = new Date(c.take_done_at).getTime();
+        return ms >= startDate.getTime() && ms <= endDate.getTime();
+      });
+      const uEditReports = (ccReports ?? []).filter((c: any) => {
+        if (c.edit_done_by !== uid || !c.edit_done_at) return false;
+        const ms = new Date(c.edit_done_at).getTime();
+        return ms >= startDate.getTime() && ms <= endDate.getTime();
+      });
+      const uPostings = (ccPostings ?? []).filter((p: any) => p.created_by === uid);
+      if (hasRole("KONTEN")) {
+        score += uTakeReports.length * 4 + uEditReports.length * 4 + uPostings.length * 1;
+        metrics.push({ label: "Take Video", value: uTakeReports.length, unit: "konten" });
+        metrics.push({ label: "Edit Selesai", value: uEditReports.length, unit: "konten" });
+        metrics.push({ label: "Upload", value: uPostings.length, unit: "post" });
+      }
 
       if (hasRole("PURCHASING")) {
         const uManualCashflows = (cashflows ?? []).filter(
@@ -281,6 +323,15 @@ export const GET = withAuth(async (req, _ctx, user) => {
         metrics.push({ label: "Jurnal Manual", value: uPembukuanManual.length, unit: "entry" });
         metrics.push({ label: "Konfirmasi Pending", value: uPembukuanKonfirmasi.length, unit: "entry" });
         metrics.push({ label: "Audit", value: uAuditTotal, unit: "aksi" });
+      }
+
+      // PROGRAMMER — 3 poin per tugas To-Do yang DISELESAIKAN. Role sistem
+      // ke-4 akun ini ADMIN, makanya dicek lewat PROGRAMMER_USER_IDS
+      // (array), bukan hasRole("PROGRAMMER").
+      const uTodos = (todos ?? []).filter((t: any) => t.completed_by === uid);
+      if (hasRole("PROGRAMMER") || PROGRAMMER_USER_IDS.includes(uid)) {
+        score += uTodos.length * 3;
+        metrics.push({ label: "Tugas Selesai", value: uTodos.length, unit: "tugas" });
       }
 
       // MISSIONS — DINONAKTIFKAN SEMENTARA (biar leaderboard "Pekerjaan" fokus Purchasing dulu).

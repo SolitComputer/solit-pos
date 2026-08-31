@@ -61,7 +61,7 @@ export async function PATCH(
     // Cek ownership dulu
     const { data: existing } = await supabase
         .from("todos")
-        .select("user_id")
+        .select("user_id, is_done")
         .eq("id", id)
         .single();
 
@@ -71,6 +71,29 @@ export async function PATCH(
     const isOwner = existing.user_id === user.id;
     if (!isOwner && !isAdmin(user)) {
         return NextResponse.json({ error: "Tidak memiliki akses untuk mengedit todo ini" }, { status: 403 });
+    }
+
+    // Leaderboard Programmer: 3 poin per tugas yang DISELESAIKAN (is_done
+    // false → true). Board ini shared — siapa pun yang menekan toggle
+    // (bukan cuma pemiliknya) yang tercatat sebagai penyelesai. Kalau
+    // dibuka lagi (is_done → false), field-nya direset ke null supaya
+    // tidak "nyangkut" ke penyelesai lama kalau nanti diselesaikan ulang
+    // oleh orang lain.
+    if ("is_done" in updates) {
+        if (updates.is_done === true && !existing.is_done) {
+            const { data: completerData } = await supabase
+                .from("users")
+                .select("name")
+                .eq("id", user.id)
+                .single();
+            updates.completed_by = user.id;
+            updates.completed_by_name = completerData?.name ?? null;
+            updates.completed_at = new Date().toISOString();
+        } else if (updates.is_done === false) {
+            updates.completed_by = null;
+            updates.completed_by_name = null;
+            updates.completed_at = null;
+        }
     }
 
     const { data, error } = await supabase
