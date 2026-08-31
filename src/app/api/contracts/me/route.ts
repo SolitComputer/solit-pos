@@ -29,7 +29,7 @@ async function getHandler(_req: NextRequest, _ctx: any, user: AuthUser) {
 
   const { data: contract, error: contractError } = await supabase
     .from("user_contracts")
-    .select("id, contract_type, title, content, status, sent_at, responded_at, valid_from, valid_until, duration_months, career_level")
+        .select("id, contract_type, title, content, status, sent_at, responded_at, valid_from, valid_until, duration_months, career_level, user_signature_url, user_signed_at, admin_signature_url, admin_signed_at, admin:admin_signed_by(name)")
     .eq("id", userRow.active_contract_id)
     .maybeSingle();
 

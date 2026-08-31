@@ -16,7 +16,11 @@ interface ContractRow {
   responded_at: string | null;
   valid_from: string | null;
   valid_until: string | null;
-  signature_url: string | null;
+  user_signature_url: string | null;
+  user_signed_at: string | null;
+  admin_signature_url: string | null;
+  admin_signed_at: string | null;
+  admin?: { name: string } | null;
   response_note: string | null;
   career_level: string | null;
 }
@@ -77,6 +81,30 @@ export default function ContractDetailModal({ userId, userName, onClose }: {
                 <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs text-gray-600 whitespace-pre-wrap max-h-40 overflow-y-auto">
                   {c.content}
                 </div>
+                {(c.user_signature_url || c.admin_signature_url) && (
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="border border-gray-100 rounded-xl p-2 text-center">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-1">Ttd Karyawan</p>
+                      {c.user_signature_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.user_signature_url} alt="Tanda tangan karyawan" className="h-10 mx-auto" />
+                      ) : (
+                        <p className="text-[10px] text-gray-300 py-2">—</p>
+                      )}
+                    </div>
+                    <div className="border border-gray-100 rounded-xl p-2 text-center">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-1">
+                        Ttd Admin{c.admin?.name ? ` · ${c.admin.name}` : ""}
+                      </p>
+                      {c.admin_signature_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={c.admin_signature_url} alt="Tanda tangan admin" className="h-10 mx-auto" />
+                      ) : (
+                        <p className="text-[10px] text-gray-300 py-2">—</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))
           )}
