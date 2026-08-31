@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Search, RotateCcw, X, Plus, Layers, Filter } from "lucide-react";
+import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Search, RotateCcw, X, Plus, Layers, Filter, Tag } from "lucide-react";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
@@ -418,6 +418,38 @@ export default function UnifiedBarangContent() {
         : tipeFilter === "AKSESORIS" ? accessoryCategories
         : categories;
 
+    // Jabarkan SEMUA kategori sebagai pill/tag beserta hitungan jumlah barangnya
+    const categoryPills = useMemo(() => {
+        const pills: { id: string; name: string; type?: string | null; count: number }[] = [];
+        const seenNames = new Set<string>();
+
+        // 1. Dari master categories di database
+        categories.forEach(c => {
+            const catNameUpper = (c.name || "").trim().toUpperCase();
+            seenNames.add(catNameUpper);
+            const count = rows.filter(r => {
+                if (c.type === "LAPTOP") return r.kategori_id === c.id;
+                if (c.type === "AKSESORIS") return r.kategori_id === c.id || (r.kategori || "").trim().toUpperCase() === catNameUpper;
+                return r.kategori_id === c.id || (r.kategori || "").trim().toUpperCase() === catNameUpper;
+            }).length;
+            pills.push({ id: c.id, name: c.name, type: c.type, count });
+        });
+
+        // 2. Dari baris barang jika ada kategori unik yang belum terdaftar di master
+        rows.forEach(r => {
+            if (r.kategori && r.kategori.trim()) {
+                const nameUpper = r.kategori.trim().toUpperCase();
+                if (!seenNames.has(nameUpper)) {
+                    seenNames.add(nameUpper);
+                    const count = rows.filter(x => (x.kategori || "").trim().toUpperCase() === nameUpper).length;
+                    pills.push({ id: `custom-${nameUpper}`, name: r.kategori.trim(), type: r.tipe, count });
+                }
+            }
+        });
+
+        return pills;
+    }, [categories, rows]);
+
     // List Brand unik dari data
     const uniqueBrands = useMemo(() => {
         const set = new Set<string>();
@@ -448,13 +480,14 @@ export default function UnifiedBarangContent() {
 
         // 2. Kategori
         if (kategoriFilter) {
-            const selectedName = (categories.find(c => c.id === kategoriFilter)?.name || "").toUpperCase();
-            const matchLaptop = (r: UnifiedRow) => r.kategori_id === kategoriFilter;
-            const matchAksesoris = (r: UnifiedRow) => (r.kategori || "").toUpperCase() === selectedName;
+            const selectedCat = categories.find(c => c.id === kategoriFilter);
+            const selectedName = (selectedCat ? selectedCat.name : kategoriFilter.replace(/^custom-/, "")).trim().toUpperCase();
             list = list.filter(r => {
-                if (tipeFilter === "LAPTOP") return matchLaptop(r);
-                if (tipeFilter === "AKSESORIS") return matchAksesoris(r);
-                return r.tipe === "LAPTOP" ? matchLaptop(r) : matchAksesoris(r);
+                const matchLaptop = r.kategori_id === kategoriFilter;
+                const matchAksesoris = (r.kategori || "").trim().toUpperCase() === selectedName || r.kategori_id === kategoriFilter;
+                if (tipeFilter === "LAPTOP") return matchLaptop;
+                if (tipeFilter === "AKSESORIS") return matchAksesoris;
+                return r.tipe === "LAPTOP" ? matchLaptop : matchAksesoris;
             });
         }
 
@@ -828,20 +861,23 @@ export default function UnifiedBarangContent() {
 
                     {/* ── CARD FILTER & AKSI ──────────────────────────────── */}
                     <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-4 sm:p-5 space-y-3.5">
-                        {/* Baris Atas: Tab Tipe Barang & Tombol Tambah */}
+                        {/* Baris Atas: Tab Tipe Barang, Pills Kategori & Tombol Tambah */}
                         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-100">
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                                 {([
                                     ["ALL", `Semua (${counts.total})`, Layers],
                                     ["LAPTOP", `Laptop (${counts.laptop})`, LaptopIcon],
                                     ["AKSESORIS", `Aksesoris (${counts.aksesoris})`, Wrench],
                                 ] as const).map(([key, label, Icon]) => {
-                                    const isActive = tipeFilter === key;
+                                    const isActive = tipeFilter === key && !kategoriFilter;
                                     return (
                                         <button
                                             key={key}
-                                            onClick={() => setTipeFilter(key)}
-                                            className={`inline-flex items-center gap-2 h-9 px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-[0.98] ${
+                                            onClick={() => {
+                                                setTipeFilter(key);
+                                                setKategoriFilter("");
+                                            }}
+                                            className={`inline-flex items-center gap-1.5 h-8.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-[0.98] cursor-pointer ${
                                                 isActive
                                                     ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/20 ring-1 ring-zinc-900"
                                                     : "bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 hover:border-zinc-300"
@@ -849,6 +885,43 @@ export default function UnifiedBarangContent() {
                                         >
                                             <Icon size={14} className={isActive ? "text-zinc-200" : "text-zinc-400"} />
                                             {label}
+                                        </button>
+                                    );
+                                })}
+
+                                {categoryPills.length > 0 && (
+                                    <div className="h-5 w-px bg-zinc-200 mx-0.5 hidden sm:block" />
+                                )}
+
+                                {/* Pills SEMUA Kategori Dijabarkan */}
+                                {categoryPills.map(cat => {
+                                    const isActive = kategoriFilter === cat.id;
+                                    return (
+                                        <button
+                                            key={cat.id}
+                                            onClick={() => {
+                                                if (isActive) {
+                                                    setKategoriFilter("");
+                                                    setTipeFilter("ALL");
+                                                } else {
+                                                    setKategoriFilter(cat.id);
+                                                    if (cat.type) setTipeFilter(cat.type as ItemType);
+                                                }
+                                            }}
+                                            className={`inline-flex items-center gap-1.5 h-8.5 px-2.5 sm:px-3 rounded-xl text-xs font-semibold transition-all duration-150 active:scale-[0.98] cursor-pointer ${
+                                                isActive
+                                                    ? "bg-zinc-900 text-white shadow-md shadow-zinc-900/20 ring-1 ring-zinc-900"
+                                                    : "bg-zinc-50 border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 hover:border-zinc-300"
+                                            }`}
+                                            title={`Filter kategori ${cat.name}`}
+                                        >
+                                            <Tag size={12} className={isActive ? "text-zinc-200" : "text-zinc-400"} />
+                                            <span>{cat.name}</span>
+                                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                                isActive ? "bg-white/20 text-white" : "bg-zinc-200/70 text-zinc-600"
+                                            }`}>
+                                                {cat.count}
+                                            </span>
                                         </button>
                                     );
                                 })}
