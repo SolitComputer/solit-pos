@@ -15,13 +15,32 @@ interface Category {
     created_at: string;
 }
 
-// Badge tipe kategori. Kategori tanpa type (migrasi belum jalan) tidak dikasih badge.
+// Badge tipe kategori
 function TypeBadge({ type }: { type?: string | null }) {
-    if (type !== "LAPTOP" && type !== "AKSESORIS") return null;
-    const isLaptop = type === "LAPTOP";
+    if (!type || type === "ALL" || type === "UMUM") {
+        return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 border border-blue-200">
+                Semua / Umum
+            </span>
+        );
+    }
+    if (type === "LAPTOP") {
+        return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-zinc-900 text-white">
+                Laptop
+            </span>
+        );
+    }
+    if (type === "SPAREPART") {
+        return (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-800 border border-amber-200">
+                Sparepart
+            </span>
+        );
+    }
     return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${isLaptop ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600 border border-zinc-200"}`}>
-            {isLaptop ? "Laptop" : "Aksesoris"}
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-zinc-100 text-zinc-600 border border-zinc-200">
+            Aksesoris
         </span>
     );
 }
@@ -272,11 +291,17 @@ function CategoryFormModal({
     const isEdit = !!category;
     const [name, setName] = useState(category?.name ?? "");
     const [description, setDescription] = useState(category?.description ?? "");
-    // Default AKSESORIS untuk kategori baru (mayoritas kategori adalah aksesoris).
-    const [type, setType] = useState<"LAPTOP" | "AKSESORIS">(
-        category?.type === "LAPTOP" ? "LAPTOP" : "AKSESORIS",
+    const [type, setType] = useState<string>(
+        category?.type ? category.type : "ALL"
     );
     const [submitting, setSubmitting] = useState(false);
+
+    const typeOptions = [
+        { value: "ALL", label: "Semua / Umum", desc: "Bisa untuk Laptop, Aksesoris & Sparepart" },
+        { value: "LAPTOP", label: "Laptop / Unit", desc: "Khusus untuk unit laptop" },
+        { value: "AKSESORIS", label: "Aksesoris", desc: "Charger, Tas, Kabel, Mouse, dll" },
+        { value: "SPAREPART", label: "Sparepart / Part", desc: "RAM, SSD, HDD, Fan, LCD, dll" },
+    ];
 
     const handleSubmit = async () => {
         if (!name.trim()) return toast.error("Nama kategori wajib diisi");
@@ -288,7 +313,11 @@ function CategoryFormModal({
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: name.trim(), description: description.trim() || null, type }),
+                body: JSON.stringify({
+                    name: name.trim(),
+                    description: description.trim() || null,
+                    type: type === "ALL" ? null : type,
+                }),
             });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.message || "Gagal menyimpan kategori");
@@ -323,28 +352,32 @@ function CategoryFormModal({
                         <input
                             value={name}
                             onChange={e => setName(e.target.value)}
-                            placeholder="Contoh: Gaming, Ultrabook, Workstation…"
+                            placeholder="Contoh: RAM PC4, SSD NVMe, Adapter Charger, Fan, dll..."
                             className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
                             autoFocus
                         />
                     </div>
                     <div>
-                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Tipe Kategori</label>
+                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Tipe / Pengelompokan Kategori</label>
                         <div className="grid grid-cols-2 gap-2">
-                            {(["LAPTOP", "AKSESORIS"] as const).map(t => (
+                            {typeOptions.map(t => (
                                 <button
-                                    key={t}
+                                    key={t.value}
                                     type="button"
-                                    onClick={() => setType(t)}
-                                    className={`py-2.5 rounded-xl border text-sm font-semibold transition ${type === t
-                                        ? "border-zinc-900 bg-zinc-900 text-white"
-                                        : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+                                    onClick={() => setType(t.value)}
+                                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
+                                        type === t.value
+                                            ? "border-zinc-900 bg-zinc-900 text-white shadow-sm"
+                                            : "border-gray-200 text-gray-700 hover:bg-gray-50"
+                                    }`}
                                 >
-                                    {t === "LAPTOP" ? "Laptop" : "Aksesoris"}
+                                    <div className="text-xs font-bold">{t.label}</div>
+                                    <div className={`text-[10px] mt-0.5 line-clamp-1 ${type === t.value ? "text-zinc-300" : "text-gray-400"}`}>
+                                        {t.desc}
+                                    </div>
                                 </button>
                             ))}
                         </div>
-                        <p className="mt-1.5 text-[11px] text-gray-400">Menentukan kategori ini muncul di dropdown Laptop atau Aksesoris.</p>
                     </div>
                     <div>
                         <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Deskripsi (Opsional)</label>
