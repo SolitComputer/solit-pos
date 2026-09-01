@@ -23,6 +23,7 @@ export type UserRole =
   | "PKL"
   | "PKL_MARKETING"
   | "PKL_SALES"
+  | "PKL_ZENITH"
   | "KEPALA_ZENITH"
   | "PKL_PENYEDIA_BARANG"
   | "PKL_SOTECH"
@@ -32,6 +33,7 @@ export type UserRole =
   | "PKL_PENGANTARAN"
   | "PKL_CUSTOMER_SERVICE"
   | "PKL_PENGELOLA_BARANG"
+  | "PKL_ACCOUNTING"
   | "KEPALA_PENGELOLA_BARANG"
   | "CUSTOMER_SERVICE";
 
@@ -72,6 +74,8 @@ export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
   PKL_PENGANTARAN: "/dashboard/preparation/pengantaran",
   CUSTOMER_SERVICE: "/dashboard/service/antrian",
   KEPALA_ZENITH: "/dashboard",
+  PKL_ZENITH: "/dashboard/laptops/ready", // sama kayak PKL_SALES
+  PKL_ACCOUNTING: "/dashboard/akutansi",  // landing langsung ke halaman kerja mereka
 };
 
 // ─── Base Role Groups ─────────────────────────────────────────────────────────
@@ -85,10 +89,10 @@ const ALL_ROLES: UserRole[] = [
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
   "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KEPALA_PENGELOLA_BARANG", "KONTEN",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",
-  "PKL_PENGELOLA_BARANG",
+  "PKL_PENGELOLA_BARANG", "PKL_ACCOUNTING",
   "CUSTOMER_SERVICE",
 ];
 
@@ -137,8 +141,12 @@ export const ALL_UNITS_ROLES: UserRole[] = [
   ...FULL_ACCESS, "ACCOUNTING", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "PENGELOLA_BARANG",
 ];
 // ─── Akuntansi ────────────────────────────────────────────────────────────────
-export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
-/** Yang boleh konfirmasi / edit / hapus jurnal */
+// PKL_ACCOUNTING sengaja HANYA ditambah di sini (view Akutansi), TIDAK di
+// CASHFLOW_ROLES dan TIDAK di-mapping ke ACCOUNTING lewat PKL_PARENT_ROLE —
+// supaya dia gak ikut ke-expand dapat akses Cashflow.
+export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PKL_ACCOUNTING"];
+/** Yang boleh konfirmasi / edit / hapus jurnal — PKL_ACCOUNTING sengaja TIDAK
+ *  dimasukkan, dia cuma boleh lihat, bukan konfirmasi/edit/hapus jurnal. */
 export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 
 // ─── Data Aset Tetap (Fixed Assets) ───────────────────────────────────────────
@@ -186,7 +194,7 @@ export const ITEM_OUTFLOW_ROLES: UserRole[] = [
 
 // ─── Preparation Roles ────────────────────────────────────────────────────────
 const PKL_PREP_ROLES: UserRole[] = [
-  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
   "PKL_PENGANTARAN",
 ];
@@ -195,7 +203,7 @@ const PREPARATION_SALES_ROLES: UserRole[] = [
   "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
   "KEPALA_MARKETING",
-  "PKL_SALES",
+  "PKL_SALES", "PKL_ZENITH",
 ];
 
 const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
@@ -208,9 +216,8 @@ const PREPARATION_PENYEDIA_EXTRA_ROLES: UserRole[] = [
   // lagi di sini, supaya mereka tidak dapat akses "Selesai Disiapkan" (terima & cek unit).
   // Terima/cek unit hanya untuk PREPARATION_PENYEDIA_ROLES (Penyedia Barang, Kepala
   // Penyedia Barang, PKL Penyedia Barang).
-  "CREW_SALES", "KEPALA_MARKETING", "KONTEN", "PKL_SALES",
+  "CREW_SALES", "KEPALA_MARKETING", "KONTEN", "PKL_SALES", "PKL_ZENITH",
 ];
-
 export const PREPARATION_CREATE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
 ]));
@@ -245,7 +252,7 @@ export const PREPARATION_DELIVERY_ROLES: UserRole[] = [
 export const PREPARATION_ANTRIAN_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
   ...PREPARATION_DONE_ROLES,
   "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "KEPALA_MARKETING", "KEPALA_SOTECH", "SOTECH",
-  "ONPOINT", "KEPALA_ONPOINT", "KONTEN", "PKL_SALES",
+  "ONPOINT", "KEPALA_ONPOINT", "KONTEN", "PKL_SALES", "PKL_ZENITH",
   "PENGANTARAN",
 ]));
 
@@ -339,8 +346,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
     "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
-    "PKL_SALES",
+      "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
+    "PKL_SALES", "PKL_ZENITH",
     "PKL_MARKETING", "PKL_PENYEDIA_BARANG", "PKL_SOTECH", "PKL_ONPOINT",
     "PKL_TEKNISI", "PKL_KONTEN", "PKL_PENGANTARAN",
     "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
@@ -350,7 +357,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "ACCOUNTING", "PURCHASING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
     "KEPALA_ONPOINT", "ONPOINT", "PKL", "KEPALA_SOTECH",
-    "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
+    "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
     "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
   ],
@@ -370,8 +377,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
     "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
     "PENGANTARAN", "KEPALA_MARKETING", "KEPALA_ZENITH",
-    "KEPALA_ONPOINT", "KEPALA_SOTECH",
-    "PKL_SALES",
+      "KEPALA_ONPOINT", "KEPALA_SOTECH",
+    "PKL_SALES", "PKL_ZENITH",
   ],
 
   "/dashboard/transactions": [
