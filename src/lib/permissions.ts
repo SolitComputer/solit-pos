@@ -318,6 +318,14 @@ export const LEADS_CHAT_MANAGE_ROLES: UserRole[] = [
   ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING",
 ];
 
+export const SALES_REPORT_ROLES: UserRole[] = [
+  ...FULL_ACCESS,
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "PKL_SALES",
+];
+export const SALES_REPORT_DELETE_ROLES: UserRole[] = [...FULL_ACCESS];
+
 export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
@@ -355,7 +363,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
   ],
   "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
-      "/dashboard/laptops/monitoring": [
+  "/dashboard/laptops/monitoring": [
     ...FULL_ACCESS, "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
   ],
   // Riwayat SO gabungan (lintas semua laptop). Sengaja ditulis literal, BUKAN
@@ -363,7 +371,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ROUTE_PERMISSIONS di file ini (lihat komentar dekat SO_ROLES di bawah).
   "/dashboard/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
 
-    "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
+  "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
   "/dashboard/audit-barang-keluar": [...ITEM_OUTFLOW_ROLES],
 
   "/dashboard/warranty": [
@@ -418,7 +426,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "CUSTOMER_SERVICE",
     "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
   ],
-   "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
+  "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
   "/api/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
   "/api/dashboard": [...ALL_ROLES],
   "/api/transaction/create": [
@@ -518,7 +526,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/preparation/antrian": [...PREPARATION_ANTRIAN_VIEW_ROLES],
   "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
   "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
-   "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
+  "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
   "/dashboard/preparation/buat-pengantaran": [...PREPARATION_DIRECT_DELIVERY_ROLES],
   "/dashboard/preparation/history": [...PREPARATION_VIEW_ROLES],
   "/dashboard/preparation/statistik": [...DELIVERY_LEADERBOARD_VIEW_ROLES],
@@ -548,6 +556,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 
   "/dashboard/leads-chat": [...LEADS_CHAT_ROLES],
   "/api/leads-chat": [...LEADS_CHAT_ROLES],
+
+  "/dashboard/laporan-harian-sales": [...SALES_REPORT_ROLES],
+  "/api/sales-reports": [...SALES_REPORT_ROLES],
 
   "/dashboard/todos": [...TODO_ROLES],
   "/api/todos": [...TODO_ROLES],
@@ -684,7 +695,7 @@ export const PERMISSIONS = {
   CREATE_SERVICE: [...SERVICE_CREATE_ROLES] as UserRole[],
   UPDATE_SERVICE_STATUS: [...SERVICE_TEKNISI_ROLES] as UserRole[],
   COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
-   CONFIRM_SERVICE_PICKUP: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE"] as UserRole[],
+  CONFIRM_SERVICE_PICKUP: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE"] as UserRole[],
 
   // ── Management Seller ──────────────────────────────────────────────────────
   VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
