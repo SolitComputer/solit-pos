@@ -93,7 +93,7 @@ const CARD_STYLE = "bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shad
 
 // Shimmer Loader
 const Shimmer = ({ className = "", style = {} }: { className?: string; style?: React.CSSProperties }) => (
-  <div className={`rounded-xl animate-shimmer bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 bg-[length:200%_100%] ${className}`} style={style} />
+  <span className={`block rounded-xl animate-shimmer bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 bg-[length:200%_100%] ${className}`} style={style} />
 );
 
 // Trend Badge
