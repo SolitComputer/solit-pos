@@ -132,12 +132,12 @@ function BarcodeScanModal({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
-        <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-4 py-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-slate-900/80 backdrop-blur-sm animate-fadeIn">
+      <div className="relative bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl animate-scaleIn">
+        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-4 flex items-center justify-between">
           <div>
-            <p className="text-white font-bold text-base flex items-center gap-1.5"><Camera size={16} /> Scan Barcode</p>
-            <p className="text-gray-400 text-xs mt-0.5">
+            <p className="text-white font-extrabold text-base flex items-center gap-1.5"><Camera size={16} /> Scan Barcode</p>
+            <p className="text-indigo-200 text-xs mt-0.5 font-medium">
               Arahkan ke barcode Serial Number
               {engine === "zxing" && " · mode kompatibel"}
             </p>
@@ -182,10 +182,10 @@ function BarcodeScanModal({
           </div>
         )}
 
-        <div className="p-4 border-t">
+        <div className="p-4 border-t border-slate-100">
           <button
             onClick={onClose}
-            className="w-full h-11 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium transition"
+            className="w-full h-11 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-sm font-bold transition"
           >
             Tutup Kamera
           </button>
@@ -326,20 +326,20 @@ function CreateModal({
   };
 
   const inputCls =
-    "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition";
+    "w-full h-10 border border-slate-200/50 rounded-2xl px-3.5 text-sm bg-slate-100/80 hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition text-slate-700 font-medium";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 flex-shrink-0">
+    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden animate-scaleIn">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 flex-shrink-0">
           <div>
-            <h2 className="font-bold text-gray-800 text-lg">Buat Penyiapan Barang</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Input format SN untuk disiapkan penyedia barang</p>
+            <h2 className="font-extrabold text-slate-900 text-lg">Buat Penyiapan Barang</h2>
+            <p className="text-xs text-slate-400 mt-0.5 font-medium">Input format SN untuk disiapkan penyedia barang</p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -355,7 +355,7 @@ function CreateModal({
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                 Nama Customer <span className="text-red-500">*</span>
               </label>
               <input
@@ -366,7 +366,7 @@ function CreateModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                 No. WhatsApp
               </label>
               <input
@@ -378,7 +378,7 @@ function CreateModal({
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
               Alamat (opsional, kalau diantar)
             </label>
             <input
@@ -389,22 +389,22 @@ function CreateModal({
             />
           </div>
 
-          <div className="border-t border-gray-100 pt-4">
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+          <div className="border-t border-slate-100 pt-4">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
               Channel Penjualan
             </label>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <button
                 type="button"
                 onClick={() => { setSalesChannel("MANUAL"); setEcommercePlatform(""); }}
-                className={`h-10 rounded-xl text-sm font-semibold border transition ${salesChannel === "MANUAL" ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+                className={`h-10 rounded-2xl text-sm font-bold border transition ${salesChannel === "MANUAL" ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
               >
                 Manual / Langsung
               </button>
               <button
                 type="button"
                 onClick={() => setSalesChannel("ECOMMERCE")}
-                className={`h-10 rounded-xl text-sm font-semibold border transition ${salesChannel === "ECOMMERCE" ? "bg-[#1a1a2e] text-white border-[#1a1a2e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+                className={`h-10 rounded-2xl text-sm font-bold border transition ${salesChannel === "ECOMMERCE" ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
               >
                 E-commerce
               </button>
@@ -417,7 +417,7 @@ function CreateModal({
                     key={p}
                     type="button"
                     onClick={() => setEcommercePlatform(p)}
-                    className={`h-10 rounded-xl text-xs font-bold border transition ${ecommercePlatform === p ? "bg-orange-500 text-white border-orange-500" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+                    className={`h-10 rounded-2xl text-xs font-bold border transition ${ecommercePlatform === p ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
                   >
                     {p === "SHOPEE" ? "Shopee" : p === "TOKOPEDIA" ? "Tokopedia" : p === "TIKTOK" ? "TikTok" : "Lazada"}
                   </button>
@@ -425,9 +425,9 @@ function CreateModal({
               </div>
             )}
 
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
               Nominal / Harga Jual {salesChannel === "MANUAL" && <span className="text-red-500">*</span>}
-              {salesChannel === "ECOMMERCE" && <span className="text-gray-400 font-normal"> (opsional)</span>}
+              {salesChannel === "ECOMMERCE" && <span className="text-slate-400 font-normal"> (opsional)</span>}
             </label>
             <input
               type="number"
@@ -438,13 +438,13 @@ function CreateModal({
             />
           </div>
 
-          <div className="border-t border-gray-100 pt-4">
+          <div className="border-t border-slate-100 pt-4">
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-semibold text-gray-600">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Serial Number
               </label>
               {items.length > 0 && (
-                <span className="text-xs font-bold text-[#1a1a2e] bg-gray-100 px-2.5 py-0.5 rounded-full">
+                <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200/60">
                   {items.length}
                 </span>
               )}
@@ -460,22 +460,22 @@ function CreateModal({
                 className={inputCls}
               />
               {searching && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-gray-200 border-t-[#1a1a2e] rounded-full animate-spin" />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-slate-200 border-t-indigo-600 rounded-full animate-spin" />
               )}
             </div>
             {snResults.length > 0 && (
-              <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden bg-white max-h-44 overflow-y-auto shadow-sm">
+              <div className="mt-2 border border-slate-200 rounded-2xl overflow-hidden bg-white max-h-44 overflow-y-auto shadow-sm">
                 {snResults.map((u: any) => (
                   <button
                     key={u.id}
                     type="button"
                     onClick={() => addUnit(u)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0 transition"
+                    className="w-full px-4 py-3 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 transition"
                   >
-                    <p className="font-mono text-sm font-semibold text-gray-800">
+                    <p className="font-mono text-sm font-bold text-slate-800">
                       {u.serial_number}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-slate-500">
                       {u.laptop_name}
                       {u.grade ? ` · Grade ${u.grade}` : ""}
                     </p>
@@ -510,7 +510,7 @@ function CreateModal({
               <button
                 type="button"
                 onClick={() => setShowBarcode(true)}
-                className="px-3 h-10 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition whitespace-nowrap shadow-sm hover:shadow-md"
+                className="px-3 h-10 rounded-2xl bg-indigo-500 text-white text-sm font-bold hover:bg-indigo-600 transition whitespace-nowrap shadow-sm hover:shadow-md"
                 title="Scan barcode SN"
               >
                 <Camera size={18} />
@@ -518,7 +518,7 @@ function CreateModal({
               <button
                 type="button"
                 onClick={addManual}
-                className="px-4 h-10 rounded-xl bg-[#1a1a2e] text-white text-sm font-semibold hover:bg-[#16213e] transition whitespace-nowrap shadow-sm hover:shadow-md"
+                className="px-4 h-10 rounded-2xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition whitespace-nowrap shadow-md shadow-indigo-500/20"
               >
                 + Tambah
               </button>
@@ -529,19 +529,19 @@ function CreateModal({
                 {items.map((it, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 hover:border-gray-300 transition"
+                    className="flex items-center justify-between bg-slate-50/50 border border-slate-100 rounded-2xl px-4 py-2.5 hover:bg-slate-50 hover:border-slate-200 transition"
                   >
                     <div className="min-w-0">
-                      <p className="font-mono text-xs font-bold text-gray-800">
+                      <p className="font-mono text-xs font-bold text-slate-800">
                         {it.serial_number}
                       </p>
                       {it.laptop_name && (
-                        <p className="text-[10px] text-gray-500 truncate">{it.laptop_name}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{it.laptop_name}</p>
                       )}
                     </div>
                     <button
                       onClick={() => removeItem(i)}
-                      className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded-lg transition"
+                      className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded-2xl transition"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
@@ -559,7 +559,7 @@ function CreateModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
               Catatan
             </label>
             <textarea
@@ -567,7 +567,7 @@ function CreateModal({
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder="Catatan untuk penyedia barang..."
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 focus:border-[#1a1a2e] focus:bg-white transition resize-none"
+              className="w-full border border-slate-200/50 rounded-2xl px-3.5 py-2.5 text-sm bg-slate-100/80 hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 transition resize-none text-slate-700 font-medium"
             />
           </div>
 
@@ -590,17 +590,17 @@ function CreateModal({
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0 bg-gray-50/50">
+        <div className="px-6 py-4 border-t border-slate-100 flex gap-3 flex-shrink-0 bg-slate-50/50">
           <button
             onClick={onClose}
-            className="flex-1 h-11 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 hover:border-gray-300 transition"
+            className="flex-1 h-11 bg-white border border-slate-200 text-slate-600 rounded-2xl text-sm font-bold hover:bg-slate-50 hover:border-slate-300 transition"
           >
             Batal
           </button>
           <button
             onClick={submit}
             disabled={saving}
-            className="flex-1 h-11 bg-[#1a1a2e] text-white rounded-xl text-sm font-semibold hover:bg-[#16213e] transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+            className="flex-1 h-11 bg-indigo-600 text-white rounded-2xl text-sm font-bold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30"
           >
             {saving ? "Menyimpan..." : "Buat Penyiapan"}
           </button>
