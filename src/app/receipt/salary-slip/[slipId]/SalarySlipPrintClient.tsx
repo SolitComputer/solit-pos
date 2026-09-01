@@ -9,6 +9,7 @@ type Slip = {
   month: number;
   salary_type: "FIXED" | "PERCENTAGE";
   base_salary: number;
+  salary_income?: number;
   allowance_wife: number;
   allowance_child: number;
   allowance_transport: number;
@@ -565,7 +566,7 @@ export default function SalarySlipPrintClient({
           <div className="table-section">
             <div className="table-header">Penghasilan</div>
             <div className="table-body">
-              <TableRow label="Gaji Pokok" amount={slip.base_salary} />
+              <TableRow label="Gaji Pokok" amount={slip.salary_income ?? slip.base_salary} />
               <TableRow label="Tunjangan Istri" amount={slip.allowance_wife} />
               <TableRow label="Tunjangan Anak" amount={slip.allowance_child} />
               <TableRow label="Tunjangan Transport" amount={slip.allowance_transport} />
