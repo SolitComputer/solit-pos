@@ -1,96 +1,100 @@
-  export type UserRole =
-    | "ADMIN"
-    | "KEPALA_SALES"
-    | "CREW_SALES"
-    | "ACCOUNTING"
-    | "PURCHASING"
-    | "PENGELOLA_BARANG"
-    | "TEKNISI"
-    | "KEPALA_TEKNISI"
-    | "PENGANTARAN"
-    | "MARKETING"
-    | "KEBERSIHAN"
-    | "KEPALA_MARKETING"
-    | "PROGRAMMER"
-    | "SOTECH"
-    | "ASISTEN_CEO"
-    | "PENYEDIA_BARANG"
-    | "KEPALA_PENYEDIA_BARANG"
-    | "KONTEN"
-    | "KEPALA_ONPOINT"
-    | "ONPOINT"
-    | "KEPALA_SOTECH"
-    | "PKL"
-    | "PKL_MARKETING"
-    | "PKL_SALES"
-    | "KEPALA_ZENITH"
-    | "PKL_PENYEDIA_BARANG"
-    | "PKL_SOTECH"
-    | "PKL_ONPOINT"
-    | "PKL_TEKNISI"
-    | "PKL_KONTEN"
-    | "PKL_PENGANTARAN"
-    | "PKL_CUSTOMER_SERVICE"
-    | "PKL_PENGELOLA_BARANG"
-    | "KEPALA_PENGELOLA_BARANG"
-    | "CUSTOMER_SERVICE";
+export type UserRole =
+  | "ADMIN"
+  | "KEPALA_SALES"
+  | "CREW_SALES"
+  | "ACCOUNTING"
+  | "PURCHASING"
+  | "PENGELOLA_BARANG"
+  | "TEKNISI"
+  | "KEPALA_TEKNISI"
+  | "PENGANTARAN"
+  | "MARKETING"
+  | "KEBERSIHAN"
+  | "KEPALA_MARKETING"
+  | "PROGRAMMER"
+  | "SOTECH"
+  | "ASISTEN_CEO"
+  | "PENYEDIA_BARANG"
+  | "KEPALA_PENYEDIA_BARANG"
+  | "KONTEN"
+  | "KEPALA_ONPOINT"
+  | "ONPOINT"
+  | "KEPALA_SOTECH"
+  | "PKL"
+  | "PKL_MARKETING"
+  | "PKL_SALES"
+  | "PKL_ZENITH"
+  | "KEPALA_ZENITH"
+  | "PKL_PENYEDIA_BARANG"
+  | "PKL_SOTECH"
+  | "PKL_ONPOINT"
+  | "PKL_TEKNISI"
+  | "PKL_KONTEN"
+  | "PKL_PENGANTARAN"
+  | "PKL_CUSTOMER_SERVICE"
+  | "PKL_PENGELOLA_BARANG"
+  | "PKL_ACCOUNTING"
+  | "KEPALA_PENGELOLA_BARANG"
+  | "CUSTOMER_SERVICE";
 
 
-  export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
-    ADMIN: "/dashboard",
-    PROGRAMMER: "/dashboard",
-    ASISTEN_CEO: "/dashboard",
-    KEPALA_SALES: "/dashboard",
-    CREW_SALES: "/dashboard",
-    ACCOUNTING: "/dashboard",
-    PURCHASING: "/dashboard/cashflow",
-    PENGELOLA_BARANG: "/dashboard/laptops",
-    KEPALA_PENGELOLA_BARANG: "/dashboard/laptops",
-    TEKNISI: "/dashboard/service/antrian",
-    KEPALA_TEKNISI: "/dashboard/service/antrian",
-    PENGANTARAN: "/dashboard/preparation/pengantaran",
-    PKL_CUSTOMER_SERVICE: "/dashboard/service/antrian",
-    PKL_PENGELOLA_BARANG: "/dashboard/laptops",
-    MARKETING: "/dashboard/laptops",
-    KEBERSIHAN: "/dashboard",
-    KEPALA_MARKETING: "/dashboard",
-    SOTECH: "/dashboard",
-    PENYEDIA_BARANG: "/dashboard/preparation/antrian",
-    KEPALA_PENYEDIA_BARANG: "/dashboard/preparation/antrian",
-    KONTEN: "/dashboard",
-    KEPALA_ONPOINT: "/dashboard",
-    ONPOINT: "/dashboard",
-    KEPALA_SOTECH: "/dashboard",
-    PKL: "/dashboard/laptops/ready",
-    PKL_MARKETING: "/dashboard/laptops/ready",
-    PKL_SALES: "/dashboard/laptops/ready",
-    PKL_PENYEDIA_BARANG: "/dashboard/laptops/ready",
-    PKL_SOTECH: "/dashboard/laptops/ready",
-    PKL_ONPOINT: "/dashboard/laptops/ready",
-    PKL_TEKNISI: "/dashboard/laptops/ready",
-    PKL_KONTEN: "/dashboard/laptops/ready",
-    PKL_PENGANTARAN: "/dashboard/preparation/pengantaran",
-    CUSTOMER_SERVICE: "/dashboard/service/antrian",
-    KEPALA_ZENITH: "/dashboard",
-  };
+export const ROLE_DEFAULT_REDIRECT: Record<UserRole, string> = {
+  ADMIN: "/dashboard",
+  PROGRAMMER: "/dashboard",
+  ASISTEN_CEO: "/dashboard",
+  KEPALA_SALES: "/dashboard",
+  CREW_SALES: "/dashboard",
+  ACCOUNTING: "/dashboard",
+  PURCHASING: "/dashboard/cashflow",
+  PENGELOLA_BARANG: "/dashboard/laptops",
+  KEPALA_PENGELOLA_BARANG: "/dashboard/laptops",
+  TEKNISI: "/dashboard/service/antrian",
+  KEPALA_TEKNISI: "/dashboard/service/antrian",
+  PENGANTARAN: "/dashboard/preparation/pengantaran",
+  PKL_CUSTOMER_SERVICE: "/dashboard/service/antrian",
+  PKL_PENGELOLA_BARANG: "/dashboard/laptops",
+  MARKETING: "/dashboard/laptops",
+  KEBERSIHAN: "/dashboard",
+  KEPALA_MARKETING: "/dashboard",
+  SOTECH: "/dashboard",
+  PENYEDIA_BARANG: "/dashboard/preparation/antrian",
+  KEPALA_PENYEDIA_BARANG: "/dashboard/preparation/antrian",
+  KONTEN: "/dashboard",
+  KEPALA_ONPOINT: "/dashboard",
+  ONPOINT: "/dashboard",
+  KEPALA_SOTECH: "/dashboard",
+  PKL: "/dashboard/laptops/ready",
+  PKL_MARKETING: "/dashboard/laptops/ready",
+  PKL_SALES: "/dashboard/laptops/ready",
+  PKL_PENYEDIA_BARANG: "/dashboard/laptops/ready",
+  PKL_SOTECH: "/dashboard/laptops/ready",
+  PKL_ONPOINT: "/dashboard/laptops/ready",
+  PKL_TEKNISI: "/dashboard/laptops/ready",
+  PKL_KONTEN: "/dashboard/laptops/ready",
+  PKL_PENGANTARAN: "/dashboard/preparation/pengantaran",
+  CUSTOMER_SERVICE: "/dashboard/service/antrian",
+  KEPALA_ZENITH: "/dashboard",
+  PKL_ZENITH: "/dashboard/laptops/ready", // sama kayak PKL_SALES
+  PKL_ACCOUNTING: "/dashboard/akutansi",  // landing langsung ke halaman kerja mereka
+};
 
   // ─── Base Role Groups ─────────────────────────────────────────────────────────
   const FULL_ACCESS: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
-  const ALL_ROLES: UserRole[] = [
-    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-    "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
-    "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
-    "PENGELOLA_BARANG",
-    "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
-    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KEPALA_PENGELOLA_BARANG", "KONTEN",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",
-    "PKL_PENGELOLA_BARANG",
-    "CUSTOMER_SERVICE",
-  ];
+const ALL_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+  "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
+  "PENGELOLA_BARANG",
+  "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KEPALA_PENGELOLA_BARANG", "KONTEN",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE",
+  "PKL_PENGELOLA_BARANG", "PKL_ACCOUNTING",
+  "CUSTOMER_SERVICE",
+];
 
   export const ALL_STATIC_ROLES: string[] = [...ALL_ROLES];
 
@@ -132,14 +136,18 @@
   /** Role yang muncul sebagai kandidat di dropdown checklist PIC */
   export const SELLER_PIC_CANDIDATE_ROLES: UserRole[] = ["CREW_SALES", "KEPALA_MARKETING"];
 
-  /** Role yang bisa akses halaman "Semua Unit" (global inventory view lintas laptop) */
-  export const ALL_UNITS_ROLES: UserRole[] = [
-    ...FULL_ACCESS, "ACCOUNTING", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "PENGELOLA_BARANG",
-  ];
-  // ─── Akuntansi ────────────────────────────────────────────────────────────────
-  export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
-  /** Yang boleh konfirmasi / edit / hapus jurnal */
-  export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
+/** Role yang bisa akses halaman "Semua Unit" (global inventory view lintas laptop) */
+export const ALL_UNITS_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "ACCOUNTING", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "PENGELOLA_BARANG",
+];
+// ─── Akuntansi ────────────────────────────────────────────────────────────────
+// PKL_ACCOUNTING sengaja HANYA ditambah di sini (view Akutansi), TIDAK di
+// CASHFLOW_ROLES dan TIDAK di-mapping ke ACCOUNTING lewat PKL_PARENT_ROLE —
+// supaya dia gak ikut ke-expand dapat akses Cashflow.
+export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PKL_ACCOUNTING"];
+/** Yang boleh konfirmasi / edit / hapus jurnal — PKL_ACCOUNTING sengaja TIDAK
+ *  dimasukkan, dia cuma boleh lihat, bukan konfirmasi/edit/hapus jurnal. */
+export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 
   // ─── Data Aset Tetap (Fixed Assets) ───────────────────────────────────────────
   // Input manual murni (nama aset + nominal), tidak terhubung ke modul akutansi/inventaris lain.
@@ -184,36 +192,35 @@
     "KEPALA_ZENITH",
   ];
 
-  // ─── Preparation Roles ────────────────────────────────────────────────────────
-  const PKL_PREP_ROLES: UserRole[] = [
-    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    "PKL_PENGANTARAN",
-  ];
+// ─── Preparation Roles ────────────────────────────────────────────────────────
+const PKL_PREP_ROLES: UserRole[] = [
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  "PKL_PENGANTARAN",
+];
 
-  const PREPARATION_SALES_ROLES: UserRole[] = [
-    "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
-    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
-    "KEPALA_MARKETING",
-    "PKL_SALES",
-  ];
+const PREPARATION_SALES_ROLES: UserRole[] = [
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "KEPALA_MARKETING",
+  "PKL_SALES", "PKL_ZENITH",
+];
 
   const PREPARATION_PENYEDIA_ROLES: UserRole[] = [
     "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
     "PKL_PENYEDIA_BARANG",
   ];
 
-  const PREPARATION_PENYEDIA_EXTRA_ROLES: UserRole[] = [
-    // KEPALA_SALES, KEPALA_ZENITH, KEPALA_SOTECH, KEPALA_ONPOINT sengaja TIDAK dimasukkan
-    // lagi di sini, supaya mereka tidak dapat akses "Selesai Disiapkan" (terima & cek unit).
-    // Terima/cek unit hanya untuk PREPARATION_PENYEDIA_ROLES (Penyedia Barang, Kepala
-    // Penyedia Barang, PKL Penyedia Barang).
-    "CREW_SALES", "KEPALA_MARKETING", "KONTEN", "PKL_SALES",
-  ];
-
-  export const PREPARATION_CREATE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
-    ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
-  ]));
+const PREPARATION_PENYEDIA_EXTRA_ROLES: UserRole[] = [
+  // KEPALA_SALES, KEPALA_ZENITH, KEPALA_SOTECH, KEPALA_ONPOINT sengaja TIDAK dimasukkan
+  // lagi di sini, supaya mereka tidak dapat akses "Selesai Disiapkan" (terima & cek unit).
+  // Terima/cek unit hanya untuk PREPARATION_PENYEDIA_ROLES (Penyedia Barang, Kepala
+  // Penyedia Barang, PKL Penyedia Barang).
+  "CREW_SALES", "KEPALA_MARKETING", "KONTEN", "PKL_SALES", "PKL_ZENITH",
+];
+export const PREPARATION_CREATE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...FULL_ACCESS, ...PREPARATION_SALES_ROLES, ...PKL_PREP_ROLES,
+]));
 
 
   export const PREPARATION_DONE_ROLES: UserRole[] = Array.from(new Set<UserRole>([
@@ -242,12 +249,12 @@
     "KEPALA_SALES", "KEPALA_SOTECH", "KEPALA_ZENITH", "KEPALA_ONPOINT",
   ];
 
-  export const PREPARATION_ANTRIAN_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
-    ...PREPARATION_DONE_ROLES,
-    "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "KEPALA_MARKETING", "KEPALA_SOTECH", "SOTECH",
-    "ONPOINT", "KEPALA_ONPOINT", "KONTEN", "PKL_SALES",
-    "PENGANTARAN",
-  ]));
+export const PREPARATION_ANTRIAN_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...PREPARATION_DONE_ROLES,
+  "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "KEPALA_MARKETING", "KEPALA_SOTECH", "SOTECH",
+  "ONPOINT", "KEPALA_ONPOINT", "KONTEN", "PKL_SALES", "PKL_ZENITH",
+  "PENGANTARAN",
+]));
 
   export const PROVIDER_PERFORMANCE_ROLES: UserRole[] = [
     "KEPALA_PENYEDIA_BARANG", "PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG",
@@ -311,12 +318,20 @@
     ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING",
   ];
 
-  export const LEADS_CHAT_ROLES: UserRole[] = [
-    ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING", "MARKETING", "KONTEN",
-  ];
-  export const LEADS_CHAT_MANAGE_ROLES: UserRole[] = [
-    ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING",
-  ];
+export const LEADS_CHAT_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING", "MARKETING", "KONTEN",
+];
+export const LEADS_CHAT_MANAGE_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "ACCOUNTING", "KEPALA_MARKETING",
+];
+
+export const SALES_REPORT_ROLES: UserRole[] = [
+  ...FULL_ACCESS,
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "PKL_SALES",
+];
+export const SALES_REPORT_DELETE_ROLES: UserRole[] = [...FULL_ACCESS];
 
   export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
   export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
@@ -328,66 +343,66 @@
   export const NOTIFICATION_SETTINGS_ROLES: UserRole[] = [...FULL_ACCESS];
   export const NOTIF_SOUND_KEYS = ["default", "urgent", "bell", "double_beep", "custom"] as const;
 
-  // ─── Route Permissions ────────────────────────────────────────────────────────
-  export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
-    "/dashboard/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"],
-    "/dashboard/laptops/edit": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"],
-    "/dashboard/units": [...ALL_UNITS_ROLES],
-    "/api/item-outflows": [...ITEM_OUTFLOW_ROLES],
-    "/dashboard/laptops": [
-      ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
-      "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
-      "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
-      "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+// ─── Route Permissions ────────────────────────────────────────────────────────
+export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
+  "/dashboard/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"],
+  "/dashboard/laptops/edit": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"],
+  "/dashboard/units": [...ALL_UNITS_ROLES],
+  "/api/item-outflows": [...ITEM_OUTFLOW_ROLES],
+  "/dashboard/laptops": [
+    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
+    "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
+    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
       "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
-      "PKL_SALES",
-      "PKL_MARKETING", "PKL_PENYEDIA_BARANG", "PKL_SOTECH", "PKL_ONPOINT",
-      "PKL_TEKNISI", "PKL_KONTEN", "PKL_PENGANTARAN",
-      "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
-    ],
-    "/dashboard/laptops/ready": [
-      ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH",
-      "ACCOUNTING", "PURCHASING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
-      "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-      "KEPALA_ONPOINT", "ONPOINT", "PKL", "KEPALA_SOTECH",
-      "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-      "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
-    ],
-    "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
-        "/dashboard/laptops/monitoring": [
-      ...FULL_ACCESS, "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
-    ],
-    // Riwayat SO gabungan (lintas semua laptop). Sengaja ditulis literal, BUKAN
-    // pakai SO_HISTORY_VIEW_ROLES — constant itu didefinisikan setelah
-    // ROUTE_PERMISSIONS di file ini (lihat komentar dekat SO_ROLES di bawah).
-    "/dashboard/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
+    "PKL_SALES", "PKL_ZENITH",
+    "PKL_MARKETING", "PKL_PENYEDIA_BARANG", "PKL_SOTECH", "PKL_ONPOINT",
+    "PKL_TEKNISI", "PKL_KONTEN", "PKL_PENGANTARAN",
+    "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
+  ],
+  "/dashboard/laptops/ready": [
+    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH",
+    "ACCOUNTING", "PURCHASING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
+    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+    "KEPALA_ONPOINT", "ONPOINT", "PKL", "KEPALA_SOTECH",
+    "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
+  ],
+  "/dashboard/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
+  "/dashboard/laptops/monitoring": [
+    ...FULL_ACCESS, "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI",
+  ],
+  // Riwayat SO gabungan (lintas semua laptop). Sengaja ditulis literal, BUKAN
+  // pakai SO_HISTORY_VIEW_ROLES — constant itu didefinisikan setelah
+  // ROUTE_PERMISSIONS di file ini (lihat komentar dekat SO_ROLES di bawah).
+  "/dashboard/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
 
-      "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
-    "/dashboard/audit-barang-keluar": [...ITEM_OUTFLOW_ROLES],
+  "/dashboard/data-barang": ["ADMIN", "PROGRAMMER", "ACCOUNTING", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SOTECH", "KEPALA_SALES", "KEPALA_ONPOINT", "KEPALA_ZENITH"],
+  "/dashboard/audit-barang-keluar": [...ITEM_OUTFLOW_ROLES],
 
-    "/dashboard/warranty": [
-      ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
-      "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
-      "PENGANTARAN", "KEPALA_MARKETING", "KEPALA_ZENITH",
+  "/dashboard/warranty": [
+    ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
+    "PENGANTARAN", "KEPALA_MARKETING", "KEPALA_ZENITH",
       "KEPALA_ONPOINT", "KEPALA_SOTECH",
-      "PKL_SALES",
-    ],
+    "PKL_SALES", "PKL_ZENITH",
+  ],
 
-    "/dashboard/transactions": [
-      ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
-      "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
-      ...TRANSACTION_VIEW,
-      "PKL_SALES", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
-    ],
-    "/dashboard": [...ALL_ROLES],
-    "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
-    "/dashboard/users": ALL_ROLES.filter(r => !r.startsWith("PKL")),
-    "/dashboard/attendance": [...ALL_ROLES],
-    "/dashboard/daftar-hadir": [...ALL_ROLES],
-    "/dashboard/attendance/overtime": [...ALL_ROLES],
-    "/api/attendance/today": [...ALL_ROLES],
+  "/dashboard/transactions": [
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "ACCOUNTING",
+    "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
+    ...TRANSACTION_VIEW,
+    "PKL_SALES", "PKL_ZENITH", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
+  ],
+  "/dashboard": [...ALL_ROLES],
+  "/dashboard/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
+  "/dashboard/users": ALL_ROLES.filter(r => !r.startsWith("PKL")),
+  "/dashboard/attendance": [...ALL_ROLES],
+  "/dashboard/daftar-hadir": [...ALL_ROLES],
+  "/dashboard/attendance/overtime": [...ALL_ROLES],
+  "/api/attendance/today": [...ALL_ROLES],
 
     "/dashboard/service": [...SERVICE_VIEW_ROLES],
     "/dashboard/service/antrian": [...SERVICE_VIEW_ROLES],
@@ -395,67 +410,67 @@
     "/dashboard/service/history": [...SERVICE_VIEW_ROLES],
     "/dashboard/service/statistik": [...SERVICE_VIEW_ROLES],
 
-    "/payment": [
-      ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
-      "PKL_SALES", "KEPALA_ZENITH", "CUSTOMER_SERVICE",
-    ],
+  "/payment": [
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "PKL",
+    "PKL_SALES", "PKL_ZENITH", "KEPALA_ZENITH", "CUSTOMER_SERVICE",
+  ],
 
     "/api/messages": ALL_ROLES.filter(r => !r.startsWith("PKL")),
     "/api/group-chat": ALL_ROLES.filter(r => !r.startsWith("PKL")),
     "/api/chat-groups": ALL_ROLES.filter(r => !r.startsWith("PKL")),
     "/api/push/subscribe": [...ALL_ROLES],
 
-    "/api/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"],
-    "/api/laptops": [
-      ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH",
-      "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PURCHASING", "PENGANTARAN",
-      "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
-      "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-      "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
-      "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-      "CUSTOMER_SERVICE",
-      "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
-    ],
-    "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
-    "/api/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
-    "/api/dashboard": [...ALL_ROLES],
-    "/api/transaction/create": [
-      ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
-      "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-      "CUSTOMER_SERVICE",
-    ],
-    "/api/transaction": [
-      ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "PURCHASING", "CREW_SALES", "SOTECH",
-      "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING", "KEPALA_ZENITH",
-      ...TRANSACTION_VIEW,
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-      "PKL_SALES", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
-    ],
+  "/api/laptops/create": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"],
+  "/api/laptops": [
+    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH",
+    "TEKNISI", "KEPALA_TEKNISI", "ACCOUNTING", "PURCHASING", "PENGANTARAN",
+    "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
+    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "CUSTOMER_SERVICE",
+    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
+  ],
+  "/api/laptops/minus": [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"],
+  "/api/laptops/so-history": ["ADMIN", "PROGRAMMER", "KEPALA_PENGELOLA_BARANG", "PENGELOLA_BARANG"],
+  "/api/dashboard": [...ALL_ROLES],
+  "/api/transaction/create": [
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "CUSTOMER_SERVICE",
+  ],
+  "/api/transaction": [
+    ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "PURCHASING", "CREW_SALES", "SOTECH",
+    "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING", "KEPALA_ZENITH",
+    ...TRANSACTION_VIEW,
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL_SALES", "PKL_ZENITH", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
+  ],
 
-    "/api/warranty": [
-      ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
-      "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING",
-      "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
-      "PKL_SALES",
-    ],
+  "/api/warranty": [
+    ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES",
+    "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING",
+    "KEPALA_ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
+    "PKL_SALES", "PKL_ZENITH",
+  ],
 
-    "/api/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
-    "/api/units/reserve": [
-      ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
-      "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    ],
-    "/api/units/hold": [
-      ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_ZENITH",
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-      "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    ],
+  "/api/reports": [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"],
+  "/api/units/reserve": [
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  ],
+  "/api/units/hold": [
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_ZENITH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  ],
 
     "/api/units/confirm-payment": [
       ...FULL_ACCESS,
@@ -491,37 +506,37 @@
     "/api/attendance": [...ALL_ROLES],
     "/api/service": [...SERVICE_VIEW_ROLES],
 
-    // AFTER
-    "/dashboard/pkl-reports": [
-      ...FULL_ACCESS,
-      "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
-      "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
-      "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-      "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
-    ],
-    "/api/pkl-reports": [
-      ...FULL_ACCESS,
-      "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
-      "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
-      "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-      "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
-    ],
+  // AFTER
+  "/dashboard/pkl-reports": [
+    ...FULL_ACCESS,
+    "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG", "PKL_ACCOUNTING",
+  ],
+  "/api/pkl-reports": [
+    ...FULL_ACCESS,
+    "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+    "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG", "PKL_ACCOUNTING",
+  ],
 
     "/dashboard/management-seller": [...SELLER_FOLLOWUP_VIEW_ROLES],
     "/api/seller-followups": [...SELLER_FOLLOWUP_VIEW_ROLES],
     "/api/seller-pics": [...SELLER_FOLLOWUP_VIEW_ROLES],
 
-    // ── Preparation routes ─────────────────────────────────────────────────────
-    "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
-    "/dashboard/preparation/antrian": [...PREPARATION_ANTRIAN_VIEW_ROLES],
-    "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
-    "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
-    "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
-    "/dashboard/preparation/buat-pengantaran": [...PREPARATION_DIRECT_DELIVERY_ROLES],
-    "/dashboard/preparation/history": [...PREPARATION_VIEW_ROLES],
-    "/dashboard/preparation/statistik": [...DELIVERY_LEADERBOARD_VIEW_ROLES],
+  // ── Preparation routes ─────────────────────────────────────────────────────
+  "/dashboard/preparation": [...PREPARATION_VIEW_ROLES],
+  "/dashboard/preparation/antrian": [...PREPARATION_ANTRIAN_VIEW_ROLES],
+  "/dashboard/preparation/done": [...PREPARATION_DONE_ROLES],
+  "/dashboard/preparation/siap-kirim": [...PREPARATION_DISPATCH_ROLES],
+  "/dashboard/preparation/pengantaran": [...PREPARATION_DELIVERY_ROLES],
+  "/dashboard/preparation/buat-pengantaran": [...PREPARATION_DIRECT_DELIVERY_ROLES],
+  "/dashboard/preparation/history": [...PREPARATION_VIEW_ROLES],
+  "/dashboard/preparation/statistik": [...DELIVERY_LEADERBOARD_VIEW_ROLES],
 
     "/api/preparation": [...PREPARATION_VIEW_ROLES],
     "/api/preparation/my-deliveries": [...PREPARATION_DELIVERY_ROLES],
@@ -546,8 +561,11 @@
     "/dashboard/cc-reports": [...CC_REPORT_ROLES],
     "/api/cc-reports": [...CC_REPORT_ROLES],
 
-    "/dashboard/leads-chat": [...LEADS_CHAT_ROLES],
-    "/api/leads-chat": [...LEADS_CHAT_ROLES],
+  "/dashboard/leads-chat": [...LEADS_CHAT_ROLES],
+  "/api/leads-chat": [...LEADS_CHAT_ROLES],
+
+  "/dashboard/laporan-harian-sales": [...SALES_REPORT_ROLES],
+  "/api/sales-reports": [...SALES_REPORT_ROLES],
 
     "/dashboard/todos": [...TODO_ROLES],
     "/api/todos": [...TODO_ROLES],
@@ -588,27 +606,27 @@
     VIEW_FINANCIALS: ["ADMIN", "ACCOUNTING", "PROGRAMMER"] as UserRole[],
     VIEW_REPORTS: [...FULL_ACCESS, "ACCOUNTING", "PURCHASING"] as UserRole[],
 
-    VIEW_TRANSACTIONS: [
-      ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "PURCHASING", "CREW_SALES", "SOTECH",
-      "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING", "MARKETING",
-      ...TRANSACTION_VIEW,
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
-      "PKL_SALES", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
-    ] as UserRole[],
+  VIEW_TRANSACTIONS: [
+    ...FULL_ACCESS, "KEPALA_SALES", "ACCOUNTING", "PURCHASING", "CREW_SALES", "SOTECH",
+    "PENGELOLA_BARANG", "PENGANTARAN", "KEBERSIHAN", "KEPALA_MARKETING", "MARKETING",
+    ...TRANSACTION_VIEW,
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
+    "PKL_SALES", "PKL_ZENITH", "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
+  ] as UserRole[],
 
-    CREATE_TRANSACTION: [
-      ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
-      "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-      "CUSTOMER_SERVICE",
-    ] as UserRole[],
+  CREATE_TRANSACTION: [
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "SOTECH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH", "KEPALA_ZENITH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "CUSTOMER_SERVICE",
+  ] as UserRole[],
 
-    EDIT_TRANSACTION: [
-      ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "KEPALA_ZENITH",
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-      "PKL_SALES",
-    ] as UserRole[],
+  EDIT_TRANSACTION: [
+    ...FULL_ACCESS, "KEPALA_SALES", "CREW_SALES", "KEPALA_ZENITH",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL_SALES", "PKL_ZENITH",
+  ] as UserRole[],
 
     RESTORE_TRANSACTION: [
       ...FULL_ACCESS,
@@ -618,26 +636,26 @@
       "KEPALA_ONPOINT",
     ] as UserRole[],
 
-    RESERVE_UNIT: [
-      ...FULL_ACCESS,
-      "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH",
-      "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-      "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    ] as UserRole[],
+  RESERVE_UNIT: [
+    ...FULL_ACCESS,
+    "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH",
+    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  ] as UserRole[],
 
-    VIEW_LAPTOPS: [
-      ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
-      "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING", "PENGANTARAN", "MARKETING",
-      "KEBERSIHAN", "KEPALA_MARKETING", "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-      "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
-      "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-      "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
-    ] as UserRole[],
-    CREATE_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
-    EDIT_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"] as UserRole[],
+  VIEW_LAPTOPS: [
+    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING", "PENGANTARAN", "MARKETING",
+    "KEBERSIHAN", "KEPALA_MARKETING", "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT", "PKL", "CUSTOMER_SERVICE",
+    "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
+  ] as UserRole[],
+  CREATE_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
+  EDIT_LAPTOP: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG"] as UserRole[],
 
     VIEW_BARCODE: [
       ...FULL_ACCESS, "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
@@ -645,46 +663,46 @@
       "KEPALA_ONPOINT", "KEPALA_SOTECH",
     ] as UserRole[],
 
-    VIEW_UNITS: [
-      ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
-      "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEPALA_MARKETING",
-      "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
-      "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-      "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
-      "CUSTOMER_SERVICE",
-    ] as UserRole[],
-    CREATE_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
-    EDIT_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
+  VIEW_UNITS: [
+    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "ACCOUNTING", "PENGANTARAN", "MARKETING", "KEPALA_MARKETING",
+    "KEPALA_SOTECH", "KEPALA_ONPOINT", "ONPOINT",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
+    "CUSTOMER_SERVICE",
+  ] as UserRole[],
+  CREATE_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
+  EDIT_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
 
     VIEW_ALL_UNITS: [...ALL_UNITS_ROLES] as UserRole[],
 
-    VIEW_WARRANTY: [
-      ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES", "CREW_SALES",
-      "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING", "KEPALA_ZENITH",
-      "KEPALA_ONPOINT", "KEPALA_SOTECH",
-      "PKL_SALES",
-    ] as UserRole[],
-    EDIT_WARRANTY: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
+  VIEW_WARRANTY: [
+    ...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "KEPALA_SALES", "CREW_SALES",
+    "SOTECH", "ACCOUNTING", "PENGANTARAN", "KEPALA_MARKETING", "KEPALA_ZENITH",
+    "KEPALA_ONPOINT", "KEPALA_SOTECH",
+    "PKL_SALES", "PKL_ZENITH",
+  ] as UserRole[],
+  EDIT_WARRANTY: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
 
-    VIEW_READY_LAPTOPS: [
-      ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH",
-      "ACCOUNTING", "PURCHASING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
-      "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-      "TEKNISI", "KEPALA_TEKNISI",
-      "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
-      "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-      "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-      "CUSTOMER_SERVICE",
-    ] as UserRole[],
-    VIEW_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
-    EDIT_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
+  VIEW_READY_LAPTOPS: [
+    ...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH",
+    "ACCOUNTING", "PURCHASING", "PENGANTARAN", "MARKETING", "KEBERSIHAN", "KEPALA_MARKETING",
+    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+    "TEKNISI", "KEPALA_TEKNISI",
+    "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
+    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+    "CUSTOMER_SERVICE",
+  ] as UserRole[],
+  VIEW_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
+  EDIT_MINUS_LAPTOPS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "TEKNISI", "KEPALA_TEKNISI"] as UserRole[],
 
-    VIEW_SERVICE: [...SERVICE_VIEW_ROLES] as UserRole[],
-    CREATE_SERVICE: [...SERVICE_CREATE_ROLES] as UserRole[],
-    UPDATE_SERVICE_STATUS: [...SERVICE_TEKNISI_ROLES] as UserRole[],
-    COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
-    CONFIRM_SERVICE_PICKUP: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE"] as UserRole[],
+  VIEW_SERVICE: [...SERVICE_VIEW_ROLES] as UserRole[],
+  CREATE_SERVICE: [...SERVICE_CREATE_ROLES] as UserRole[],
+  UPDATE_SERVICE_STATUS: [...SERVICE_TEKNISI_ROLES] as UserRole[],
+  COMPLETE_SERVICE: [...SERVICE_TEKNISI_ROLES] as UserRole[],
+  CONFIRM_SERVICE_PICKUP: [...FULL_ACCESS, "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE"] as UserRole[],
 
     // ── Management Seller ──────────────────────────────────────────────────────
     VIEW_SELLER_FOLLOWUP: [...SELLER_FOLLOWUP_VIEW_ROLES] as UserRole[],
@@ -741,61 +759,49 @@
     return (allowed as UserRole[]).includes(role);
   }
 
-  // ── Dashboard: role dengan tampilan terbatas ──────────────────────────────
-  // Crew Sales cuma boleh lihat 3 widget di /dashboard: Laptop Ready,
-  // Top Sales Hari Ini, dan Laptop Terlaris. Card finansial (Omzet, Gross
-  // Profit), 3 chart (Ringkasan Penjualan, Pembaruan Pendapatan, Tren
-  // Penjualan), dan Transaksi Terbaru disembunyikan untuk role ini.
-  // Mau tambah PKL_SALES juga? tinggal push ke array di bawah.
-  export const DASHBOARD_LIMITED_ROLES: UserRole[] = ["CREW_SALES"];
+export const DIVISION_MAP: Record<string, UserRole[]> = {
+  KEPALA_TEKNISI: [
+    "TEKNISI", "PKL_TEKNISI",
+    "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
+    "PENGELOLA_BARANG",
+  ],
+  KEPALA_SALES: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN"],
+  KEPALA_ZENITH: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN", "PKL_ZENITH"],
+  KEPALA_MARKETING: ["KONTEN", "PKL_MARKETING", "PKL_KONTEN"],
+  KEPALA_ONPOINT: ["ONPOINT", "PKL_ONPOINT"],
+  KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG"],
+  KEPALA_SOTECH: ["SOTECH", "PKL_SOTECH"],
+  KEPALA_PENGELOLA_BARANG: [
+    "PENGELOLA_BARANG", "PKL_PENGELOLA_BARANG",
+  ],
+  ADMIN: ["PENGELOLA_BARANG"],
+};
 
-  export function isDashboardLimited(role: string | null | undefined): boolean {
-    if (!role) return false;
-    return (DASHBOARD_LIMITED_ROLES as string[]).includes(role);
-  }
-
-  export const DIVISION_MAP: Record<string, UserRole[]> = {
-    KEPALA_TEKNISI: [
-      "TEKNISI", "PKL_TEKNISI",
-      "CUSTOMER_SERVICE", "PKL_CUSTOMER_SERVICE",
-      "PENGELOLA_BARANG",
-    ],
-    KEPALA_SALES: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN"],
-    KEPALA_ZENITH: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN"],
-    KEPALA_MARKETING: ["KONTEN", "PKL_MARKETING", "PKL_KONTEN"],
-    KEPALA_ONPOINT: ["ONPOINT", "PKL_ONPOINT"],
-    KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG"],
-    KEPALA_SOTECH: ["SOTECH", "PKL_SOTECH"],
-    KEPALA_PENGELOLA_BARANG: [
-      "PENGELOLA_BARANG", "PKL_PENGELOLA_BARANG",
-    ],
-    ADMIN: ["PENGELOLA_BARANG"],
-  };
-
-  export const PKL_ROLES: UserRole[] = [
-    "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    "PKL_PENGANTARAN",
-    "PKL_CUSTOMER_SERVICE",
-    "PKL_PENGELOLA_BARANG",
-  ];
+export const PKL_ROLES: UserRole[] = [
+  "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  "PKL_PENGANTARAN",
+  "PKL_CUSTOMER_SERVICE",
+  "PKL_PENGELOLA_BARANG",
+  "PKL_ACCOUNTING",
+];
 
   export const PKL_VISIBLE_ROLES: UserRole[] = PKL_ROLES;
 
-  export const LAPTOP_VIEW_ROLES: UserRole[] = [
-    "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-    "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
-    "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
-    "ACCOUNTING", "PURCHASING", "PENGANTARAN",
-    "MARKETING", "KEPALA_MARKETING",
-    "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
-    "KEPALA_ONPOINT", "ONPOINT",
-    "KEPALA_TEKNISI", "TEKNISI",
-    "PKL", "CUSTOMER_SERVICE",
-    "PKL_MARKETING", "PKL_SALES", "PKL_PENYEDIA_BARANG",
-    "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
-    "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
-  ];
+export const LAPTOP_VIEW_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
+  "KEPALA_SALES", "KEPALA_ZENITH", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "ACCOUNTING", "PURCHASING", "PENGANTARAN",
+  "MARKETING", "KEPALA_MARKETING",
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+  "KEPALA_ONPOINT", "ONPOINT",
+  "KEPALA_TEKNISI", "TEKNISI",
+  "PKL", "CUSTOMER_SERVICE",
+  "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
+  "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
+  "PKL_PENGANTARAN", "PKL_CUSTOMER_SERVICE", "PKL_PENGELOLA_BARANG",
+];
 
   export const LAPTOP_READY_VIEW_ROLES: UserRole[] = [
     ...LAPTOP_VIEW_ROLES,
@@ -813,19 +819,24 @@
     "KEPALA_TEKNISI",
   ];
 
-  // ─── PKL → Parent Role Mapping ────────────────────────────────────────────────
-  export const PKL_PARENT_ROLE: Partial<Record<UserRole, UserRole>> = {
-    PKL_SALES: "CREW_SALES",
-    PKL_MARKETING: "MARKETING",
-    PKL_PENYEDIA_BARANG: "PENYEDIA_BARANG",
-    PKL_SOTECH: "SOTECH",
-    PKL_ONPOINT: "ONPOINT",
-    PKL_TEKNISI: "TEKNISI",
-    PKL_KONTEN: "KONTEN",
-    PKL_PENGANTARAN: "PENGANTARAN",
-    PKL_CUSTOMER_SERVICE: "CUSTOMER_SERVICE",
-    PKL_PENGELOLA_BARANG: "PENGELOLA_BARANG",
-  };
+// ─── PKL → Parent Role Mapping ────────────────────────────────────────────────
+export const PKL_PARENT_ROLE: Partial<Record<UserRole, UserRole>> = {
+  PKL_SALES: "CREW_SALES",
+  PKL_ZENITH: "CREW_SALES", // sengaja SAMA kayak PKL_SALES sesuai requirement
+  PKL_MARKETING: "MARKETING",
+  PKL_PENYEDIA_BARANG: "PENYEDIA_BARANG",
+  PKL_SOTECH: "SOTECH",
+  PKL_ONPOINT: "ONPOINT",
+  PKL_TEKNISI: "TEKNISI",
+  PKL_KONTEN: "KONTEN",
+  PKL_PENGANTARAN: "PENGANTARAN",
+  PKL_CUSTOMER_SERVICE: "CUSTOMER_SERVICE",
+  PKL_PENGELOLA_BARANG: "PENGELOLA_BARANG",
+  // PKL_ACCOUNTING SENGAJA TIDAK dimapping ke ACCOUNTING di sini — kalau
+  // dimapping, dia bakal ikut ke-expand dapat semua akses ACCOUNTING
+  // (termasuk Cashflow), padahal requirement-nya PKL Accounting cuma boleh
+  // lihat sidebar Keuangan/Akutansi + absensi, TANPA Cashflow.
+};
 
   export function getPKLParentRole(role: string): UserRole | null {
     return (PKL_PARENT_ROLE[role as UserRole] ?? null) as UserRole | null;
