@@ -284,8 +284,16 @@ export async function GET() {
       }
     }
 
+    // ✅ FIX: `alreadyAttended` sekarang murni dari DB (`alreadyAttendedDB`),
+    // tidak lagi di-OR dengan cookie face_verified/face_attended. Cookie bisa
+    // masih "valid" (belum expired) walau baris absen hari ini sudah dihapus
+    // admin, atau expiry-nya di-set fungsi lain (getAttendanceExpiry di
+    // face-verify POST) yang tidak konsisten dengan getAttendanceDayExpiry
+    // di file ini — akibatnya user yang SEBENARNYA belum absen tetap dianggap
+    // "Sudah Absen". DB selalu fresh karena di-query ulang tiap request, jadi
+    // itu satu-satunya sumber kebenaran yang valid.
     const alreadyFromCookie = faceVerified === user.id || faceAttended === user.id;
-    const alreadyAttended = alreadyFromCookie || alreadyAttendedDB;
+    const alreadyAttended = alreadyAttendedDB;
 
    const { count: biometricCredCount } = await supabase
       .from("user_webauthn_credentials")
