@@ -177,6 +177,7 @@ const Icons = {
   fixedAsset: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01" /></svg>),
   assetMatot: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v8" /><path d="M18.36 6.64a9 9 0 11-12.73 0" /></svg>),
   kendaraan: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 11l1.5-4.5A2 2 0 018.4 5h7.2a2 2 0 011.9 1.5L19 11" /><path d="M3 11h18v5a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H6v1a1 1 0 01-1 1H4a1 1 0 01-1-1z" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></svg>),
+  salesReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" /><path d="M9 12l2 2 4-4" /></svg>),
 };
 
 const ITEM_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard", icon: Icons.dashboard };
@@ -201,7 +202,7 @@ const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile"
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
-const ITEM_CONTRACT_SIGN: MenuItem = { name: "Tanda Tangan Kontrak", href: "/contract/pending-signature", icon: Icons.pklReport }; 
+const ITEM_CONTRACT_SIGN: MenuItem = { name: "Tanda Tangan Kontrak", href: "/contract/pending-signature", icon: Icons.pklReport };
 const ITEM_KENDARAAN: MenuItem = { name: "Management Kendaraan", href: "/dashboard/kendaraan", icon: Icons.kendaraan };
 const ITEM_KENDARAAN_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard/kendaraan/dashboard", icon: Icons.reports };
 
@@ -210,6 +211,7 @@ const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-lo
 const ITEM_LAPORAN_KEUANGAN: MenuItem = { name: "Laporan Keuangan", href: "/dashboard/reports", icon: Icons.reports };
 const ITEM_MONITOR_CHAT: MenuItem = { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat };
 const ITEM_LEADS_CHAT: MenuItem = { name: "Leads Chat Masuk", href: "/dashboard/leads-chat", icon: Icons.leadsChat };
+const ITEM_LAPORAN_SALES_HARIAN: MenuItem = { name: "Laporan Harian Sales", href: "/dashboard/laporan-harian-sales", icon: Icons.salesReport };
 const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashboard/hasil-penjualan", icon: Icons.salesResult };
 const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboard/employee-birthdays", icon: Icons.employeeBirthday };
 
@@ -377,6 +379,7 @@ const ADMIN_TRANSAKSI: MenuGroup = {
     { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
+    ITEM_LAPORAN_SALES_HARIAN,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -414,6 +417,7 @@ const SALES_TRANSAKSI: MenuGroup = {
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     ITEM_MANAGEMENT_SELLER,
+    ITEM_LAPORAN_SALES_HARIAN,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -1019,12 +1023,13 @@ function NavItem({ item, isActive, onClick, badge, rail }: { item: MenuItem; isA
 }
 
 function SidebarContent({
-  user, loading, groups, pathname, onClose, onLogout, badges, rail, onToggleRail, openMap, onToggleGroup,
+  user, loading, groups, pathname, onClose, onLogout, badges, rail, onToggleRail, openMap, onToggleGroup, searchQuery, onSearchChange,
 }: {
   user: any; loading: boolean; groups: MenuGroup[]; pathname: string;
   onClose?: () => void; onLogout: () => void; badges?: Record<string, number>;
   rail?: boolean; onToggleRail?: () => void;
   openMap: Record<string, boolean>; onToggleGroup: (label: string) => void;
+  searchQuery: string; onSearchChange: (value: string) => void;
 }) {
   const initials = user?.name ? getInitials(user.name) : "?";
   const navRef = useRef<HTMLElement>(null);
@@ -1107,6 +1112,35 @@ function SidebarContent({
 
       <div className={`h-px bg-gray-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
 
+      {!rail && (
+        <div className="px-3 pt-3 pb-1 flex-shrink-0">
+          <div className="relative">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" />
+            </svg>
+            <input
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Cari menu..."
+              className="w-full pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200/70 rounded-lg outline-none focus:border-[#1a1a2e]/30 focus:bg-white transition-colors placeholder:text-gray-400"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => onSearchChange("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Hapus pencarian"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <nav ref={navRef} onScroll={handleNavScroll} className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${rail ? "px-2 space-y-1" : "px-3 space-y-2"}`} style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
         {loading ? (
           <div className="space-y-1 pt-1">
@@ -1123,9 +1157,13 @@ function SidebarContent({
               {gi < groups.length - 1 && <div className="mx-2 my-1.5 h-px bg-gray-100" />}
             </div>
           ))
+        ) : groups.length === 0 && searchQuery.trim() ? (
+          <div className="px-3 py-8 text-center text-xs text-gray-400">
+            Menu "{searchQuery}" tidak ditemukan.
+          </div>
         ) : (
           groups.map((group, gi) => {
-            const isOpen = openMap[group.label] ?? true;
+            const isOpen = searchQuery.trim() ? true : (openMap[group.label] ?? true);
             const hasActive = group.items.some((it) => isItemActive(it.href, pathname));
             return (
               <div key={group.label} style={{ animation: "solitGroupIn 0.3s ease-out both", animationDelay: `${gi * 50}ms` }}>
@@ -1255,6 +1293,7 @@ export default function Sidebar() {
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
   const [reminderDismissed, setReminderDismissed] = useState(false);
   const [contractDismissed, setContractDismissed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const cached = getCachedUser();
@@ -1457,9 +1496,17 @@ export default function Sidebar() {
     ),
   }));
 
+  const searchTerm = searchQuery.trim().toLowerCase();
+  const filteredGroups: MenuGroup[] = searchTerm
+    ? displayGroups
+      .map((g) => ({ ...g, items: g.items.filter((it) => it.name.toLowerCase().includes(searchTerm)) }))
+      .filter((g) => g.items.length > 0)
+    : displayGroups;
+
   const sharedContentProps = {
-    user, loading, groups: displayGroups, pathname,
+    user, loading, groups: filteredGroups, pathname,
     onLogout: handleLogout, badges, openMap, onToggleGroup: toggleGroup,
+    searchQuery, onSearchChange: setSearchQuery,
   };
 
   return (
