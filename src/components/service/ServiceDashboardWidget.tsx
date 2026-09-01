@@ -52,7 +52,7 @@ function fmtRupiah(n: number): string {
 }
 
 const Shimmer = ({ className = "" }: { className?: string }) => (
-  <div className={`rounded-lg bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 animate-pulse ${className}`} />
+  <span className={`block rounded-lg bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 animate-pulse ${className}`} />
 );
 
 const MEDAL_COLORS = ["text-white", "text-white", "text-white"];
