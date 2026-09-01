@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { PERMISSIONS, UserRole, hasPermission } from "@/lib/permissions";
+import { PERMISSIONS, UserRole, hasPermission, isDashboardLimited } from "@/lib/permissions";
 import { RevenueDetailModal } from "@/components/modals/RevenueDetailModal";
 import { InventoryDetailModal } from "@/components/modals/InventoryDetailModal";
 import { SalesDetailModal } from "@/components/modals/SalesDetailModal";
@@ -302,6 +302,9 @@ export default function Page() {
   const [showTransactionModal, setShowTransactionModal] = useState(false);
 
   const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
+  // Crew Sales (atau role lain di DASHBOARD_LIMITED_ROLES) → dashboard cuma
+  // nampilin Laptop Ready, Top Sales Hari Ini, dan Laptop Terlaris.
+  const dashboardLimited = isDashboardLimited(userRole);
   const SERVICE_DASHBOARD_ROLES = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
@@ -645,6 +648,8 @@ export default function Page() {
 
             {/* Floating Stat Cards Grid inside Hero Banner */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+              {!dashboardLimited && (
+              <>
               {/* Stat 1: Main Omzet / Transaksi (Hero Card) */}
               <div className="col-span-2 sm:col-span-1 lg:col-span-1">
                 {canSeeFinancials ? (
@@ -702,6 +707,8 @@ export default function Page() {
                   </div>
                 </button>
               )}
+              </>
+              )}
 
               {/* Stat 3: Laptop Ready */}
               <button
@@ -719,6 +726,8 @@ export default function Page() {
                 </div>
               </button>
 
+              {!dashboardLimited && (
+              <>
               {/* Stat 4: Transaksi Hari Ini */}
               <button
                 onClick={() => setShowTransactionModal(true)}
@@ -751,11 +760,14 @@ export default function Page() {
                   <span className="text-[10px] text-slate-400 font-medium">Terjual hari ini</span>
                 </div>
               </button>
+              </>
+              )}
             </div>
           </div>
         </div>
 
         {/* ── MIDDLE CARDS GRID: "Sales Overview", "Revenue Updates", "Yearly Sales" ── */}
+        {!dashboardLimited && (
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-12 gap-5">
 
           {/* CARD A: Sales Overview (Donut Chart) — 3 cols */}
@@ -863,6 +875,7 @@ export default function Page() {
           </div>
 
         </div>
+        )}
 
         {/* ── Service Dashboard Widget (if permitted) ── */}
         {canSeeServiceDashboard && (
@@ -874,8 +887,8 @@ export default function Page() {
         {/* ── BOTTOM GRID SECTION: "Active Users / Top Rankings" & "Payment Gateways / Recent Transactions" ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-          {/* LEFT BOTTOM: Top Sales & Top Laptop Cards — 7 cols */}
-          <div className="lg:col-span-7 space-y-5">
+          {/* LEFT BOTTOM: Top Sales & Top Laptop Cards — 7 cols (12 cols kalau dashboard dibatasi) */}
+          <div className={dashboardLimited ? "lg:col-span-12 space-y-5" : "lg:col-span-7 space-y-5"}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
 
               {/* Top Sales Ranking Card */}
@@ -964,7 +977,8 @@ export default function Page() {
             </div>
           </div>
 
-          {/* RIGHT BOTTOM: Payment Gateways / Transaksi Terbaru — 5 cols */}
+          {/* RIGHT BOTTOM: Payment Gateways / Transaksi Terbaru — 5 cols (disembunyikan utk dashboard terbatas) */}
+          {!dashboardLimited && (
           <div className="lg:col-span-5">
             <div className={`${CARD_STYLE} flex flex-col justify-between h-full`}>
               <div>
@@ -1020,6 +1034,7 @@ export default function Page() {
               </div>
             </div>
           </div>
+          )}
 
         </div>
 

@@ -741,6 +741,19 @@
     return (allowed as UserRole[]).includes(role);
   }
 
+  // ── Dashboard: role dengan tampilan terbatas ──────────────────────────────
+  // Crew Sales cuma boleh lihat 3 widget di /dashboard: Laptop Ready,
+  // Top Sales Hari Ini, dan Laptop Terlaris. Card finansial (Omzet, Gross
+  // Profit), 3 chart (Ringkasan Penjualan, Pembaruan Pendapatan, Tren
+  // Penjualan), dan Transaksi Terbaru disembunyikan untuk role ini.
+  // Mau tambah PKL_SALES juga? tinggal push ke array di bawah.
+  export const DASHBOARD_LIMITED_ROLES: UserRole[] = ["CREW_SALES"];
+
+  export function isDashboardLimited(role: string | null | undefined): boolean {
+    if (!role) return false;
+    return (DASHBOARD_LIMITED_ROLES as string[]).includes(role);
+  }
+
   export const DIVISION_MAP: Record<string, UserRole[]> = {
     KEPALA_TEKNISI: [
       "TEKNISI", "PKL_TEKNISI",
