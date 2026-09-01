@@ -1,6 +1,6 @@
 {
   "buildStamp": "H-2026-06-19-rt7",
-  "seq": 10,
+  "seq": 20,
   "bootstrap": {
     "state": {
       "player": {
@@ -46,31 +46,36 @@
       }
     },
     "quests": [],
-    "cards": [],
+    "cards": [
+      {
+        "id": "commit-changes",
+        "title": "🔒 Sellar Partida con un Commit",
+        "description": "Hay 1 archivo(s) modificados sin sello reciente. Tal vez convenga fijar el progreso antes de seguir explorando.",
+        "action": "commit_changes",
+        "target": {
+          "file": null,
+          "line": null,
+          "function_name": null
+        },
+        "reward": "+50 EXP, +20 Oro",
+        "risk": "Podrías consagrar cambios aún inmaduros",
+        "priority": "high"
+      }
+    ],
     "ideSummary": {
-      "generatedAt": "2026-08-31T02:38:18.022Z",
+      "generatedAt": "2026-09-01T07:30:10.129Z",
       "workspaceName": "solit-pos",
       "activeFile": {
         "name": "page.tsx",
-        "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx",
+        "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\page.tsx",
         "language": "typescriptreact",
         "isDirty": false
       },
-      "modifiedCount": 3,
+      "modifiedCount": 1,
       "modifiedFiles": [
         {
-          "name": "page.tsx",
-          "status": "modified",
-          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx"
-        },
-        {
-          "name": "ApprovalModals.tsx",
-          "status": "modified",
-          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\components\\kendaraan\\ApprovalModals.tsx"
-        },
-        {
           "name": "webview-runtime.json",
-          "status": "untracked",
+          "status": "modified",
           "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\.nocodequest\\webview-runtime.json"
         }
       ],
@@ -83,7 +88,7 @@
     "sceneMood": {
       "state": "stable",
       "label": "Mazmorra estable",
-      "reason": "Cambios controlados: 3 archivo(s) modificado(s)",
+      "reason": "Cambios controlados: 1 archivo(s) modificado(s)",
       "backdropKey": "bg_home",
       "errorCount": 0,
       "warnCount": 0,
@@ -101,112 +106,49 @@
       "id": 1,
       "command": "refreshQuestBoard",
       "quests": [],
-      "ts": 1788143898009
+      "ts": 1788247810111
     },
     {
       "id": 2,
       "command": "refreshQuestBoard",
       "quests": [],
-      "ts": 1788143898016
+      "ts": 1788247810115
     },
     {
       "id": 3,
       "command": "refreshQuestBoard",
       "quests": [],
-      "ts": 1788143898023
+      "ts": 1788247810120
     },
     {
       "id": 4,
-      "command": "syncIdeSummary",
-      "summary": {
-        "generatedAt": "2026-08-31T02:38:18.015Z",
-        "workspaceName": "solit-pos",
-        "activeFile": {
-          "name": "page.tsx",
-          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx",
-          "language": "typescriptreact",
-          "isDirty": false
-        },
-        "modifiedCount": 3,
-        "modifiedFiles": [
-          {
-            "name": "page.tsx",
-            "status": "modified",
-            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx"
-          },
-          {
-            "name": "ApprovalModals.tsx",
-            "status": "modified",
-            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\components\\kendaraan\\ApprovalModals.tsx"
-          },
-          {
-            "name": "webview-runtime.json",
-            "status": "untracked",
-            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\.nocodequest\\webview-runtime.json"
-          }
-        ],
-        "diagnostics": {
-          "errorCount": 0,
-          "warnCount": 0,
-          "topError": null
-        }
-      },
-      "ts": 1788143898026
+      "command": "refreshQuestBoard",
+      "quests": [],
+      "ts": 1788247810125
     },
     {
       "id": 5,
-      "command": "updateSceneMood",
-      "mood": {
-        "state": "stable",
-        "label": "Mazmorra estable",
-        "reason": "Cambios controlados: 3 archivo(s) modificado(s)",
-        "backdropKey": "bg_home",
-        "errorCount": 0,
-        "warnCount": 0,
-        "overlayAlpha": 0.08,
-        "overlayColor": 858660
-      },
-      "ts": 1788143898029
+      "command": "refreshQuestBoard",
+      "quests": [],
+      "ts": 1788247810130
     },
     {
       "id": 6,
-      "command": "showAdventureCards",
-      "cards": [],
-      "ts": 1788143898032
-    },
-    {
-      "id": 7,
-      "command": "refreshQuestBoard",
-      "quests": [],
-      "ts": 1788143898035
-    },
-    {
-      "id": 8,
       "command": "syncIdeSummary",
       "summary": {
-        "generatedAt": "2026-08-31T02:38:18.022Z",
+        "generatedAt": "2026-09-01T07:30:10.115Z",
         "workspaceName": "solit-pos",
         "activeFile": {
           "name": "page.tsx",
-          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx",
+          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\page.tsx",
           "language": "typescriptreact",
           "isDirty": false
         },
-        "modifiedCount": 3,
+        "modifiedCount": 1,
         "modifiedFiles": [
           {
-            "name": "page.tsx",
-            "status": "modified",
-            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\kendaraan\\page.tsx"
-          },
-          {
-            "name": "ApprovalModals.tsx",
-            "status": "modified",
-            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\components\\kendaraan\\ApprovalModals.tsx"
-          },
-          {
             "name": "webview-runtime.json",
-            "status": "untracked",
+            "status": "modified",
             "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\.nocodequest\\webview-runtime.json"
           }
         ],
@@ -216,28 +158,253 @@
           "topError": null
         }
       },
-      "ts": 1788143898038
+      "ts": 1788247810132
     },
     {
-      "id": 9,
+      "id": 7,
       "command": "updateSceneMood",
       "mood": {
         "state": "stable",
         "label": "Mazmorra estable",
-        "reason": "Cambios controlados: 3 archivo(s) modificado(s)",
+        "reason": "Cambios controlados: 1 archivo(s) modificado(s)",
         "backdropKey": "bg_home",
         "errorCount": 0,
         "warnCount": 0,
         "overlayAlpha": 0.08,
         "overlayColor": 858660
       },
-      "ts": 1788143898041
+      "ts": 1788247810137
+    },
+    {
+      "id": 8,
+      "command": "showAdventureCards",
+      "cards": [
+        {
+          "id": "commit-changes",
+          "title": "🔒 Sellar Partida con un Commit",
+          "description": "Hay 1 archivo(s) modificados sin sello reciente. Tal vez convenga fijar el progreso antes de seguir explorando.",
+          "action": "commit_changes",
+          "target": {
+            "file": null,
+            "line": null,
+            "function_name": null
+          },
+          "reward": "+50 EXP, +20 Oro",
+          "risk": "Podrías consagrar cambios aún inmaduros",
+          "priority": "high"
+        }
+      ],
+      "ts": 1788247810142
+    },
+    {
+      "id": 9,
+      "command": "refreshQuestBoard",
+      "quests": [],
+      "ts": 1788247810147
     },
     {
       "id": 10,
+      "command": "syncIdeSummary",
+      "summary": {
+        "generatedAt": "2026-09-01T07:30:10.120Z",
+        "workspaceName": "solit-pos",
+        "activeFile": {
+          "name": "page.tsx",
+          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\page.tsx",
+          "language": "typescriptreact",
+          "isDirty": false
+        },
+        "modifiedCount": 1,
+        "modifiedFiles": [
+          {
+            "name": "webview-runtime.json",
+            "status": "modified",
+            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\.nocodequest\\webview-runtime.json"
+          }
+        ],
+        "diagnostics": {
+          "errorCount": 0,
+          "warnCount": 0,
+          "topError": null
+        }
+      },
+      "ts": 1788247810151
+    },
+    {
+      "id": 11,
+      "command": "updateSceneMood",
+      "mood": {
+        "state": "stable",
+        "label": "Mazmorra estable",
+        "reason": "Cambios controlados: 1 archivo(s) modificado(s)",
+        "backdropKey": "bg_home",
+        "errorCount": 0,
+        "warnCount": 0,
+        "overlayAlpha": 0.08,
+        "overlayColor": 858660
+      },
+      "ts": 1788247810154
+    },
+    {
+      "id": 12,
       "command": "showAdventureCards",
-      "cards": [],
-      "ts": 1788143898045
+      "cards": [
+        {
+          "id": "commit-changes",
+          "title": "🔒 Sellar Partida con un Commit",
+          "description": "Hay 1 archivo(s) modificados sin sello reciente. Tal vez convenga fijar el progreso antes de seguir explorando.",
+          "action": "commit_changes",
+          "target": {
+            "file": null,
+            "line": null,
+            "function_name": null
+          },
+          "reward": "+50 EXP, +20 Oro",
+          "risk": "Podrías consagrar cambios aún inmaduros",
+          "priority": "high"
+        }
+      ],
+      "ts": 1788247810157
+    },
+    {
+      "id": 13,
+      "command": "refreshQuestBoard",
+      "quests": [],
+      "ts": 1788247810160
+    },
+    {
+      "id": 14,
+      "command": "syncIdeSummary",
+      "summary": {
+        "generatedAt": "2026-09-01T07:30:10.124Z",
+        "workspaceName": "solit-pos",
+        "activeFile": {
+          "name": "page.tsx",
+          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\page.tsx",
+          "language": "typescriptreact",
+          "isDirty": false
+        },
+        "modifiedCount": 1,
+        "modifiedFiles": [
+          {
+            "name": "webview-runtime.json",
+            "status": "modified",
+            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\.nocodequest\\webview-runtime.json"
+          }
+        ],
+        "diagnostics": {
+          "errorCount": 0,
+          "warnCount": 0,
+          "topError": null
+        }
+      },
+      "ts": 1788247810164
+    },
+    {
+      "id": 15,
+      "command": "updateSceneMood",
+      "mood": {
+        "state": "stable",
+        "label": "Mazmorra estable",
+        "reason": "Cambios controlados: 1 archivo(s) modificado(s)",
+        "backdropKey": "bg_home",
+        "errorCount": 0,
+        "warnCount": 0,
+        "overlayAlpha": 0.08,
+        "overlayColor": 858660
+      },
+      "ts": 1788247810168
+    },
+    {
+      "id": 16,
+      "command": "showAdventureCards",
+      "cards": [
+        {
+          "id": "commit-changes",
+          "title": "🔒 Sellar Partida con un Commit",
+          "description": "Hay 1 archivo(s) modificados sin sello reciente. Tal vez convenga fijar el progreso antes de seguir explorando.",
+          "action": "commit_changes",
+          "target": {
+            "file": null,
+            "line": null,
+            "function_name": null
+          },
+          "reward": "+50 EXP, +20 Oro",
+          "risk": "Podrías consagrar cambios aún inmaduros",
+          "priority": "high"
+        }
+      ],
+      "ts": 1788247810171
+    },
+    {
+      "id": 17,
+      "command": "refreshQuestBoard",
+      "quests": [],
+      "ts": 1788247810173
+    },
+    {
+      "id": 18,
+      "command": "syncIdeSummary",
+      "summary": {
+        "generatedAt": "2026-09-01T07:30:10.129Z",
+        "workspaceName": "solit-pos",
+        "activeFile": {
+          "name": "page.tsx",
+          "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\src\\app\\dashboard\\page.tsx",
+          "language": "typescriptreact",
+          "isDirty": false
+        },
+        "modifiedCount": 1,
+        "modifiedFiles": [
+          {
+            "name": "webview-runtime.json",
+            "status": "modified",
+            "path": "c:\\Users\\SOLIT\\Documents\\Web_Solit\\solit-pos\\.nocodequest\\webview-runtime.json"
+          }
+        ],
+        "diagnostics": {
+          "errorCount": 0,
+          "warnCount": 0,
+          "topError": null
+        }
+      },
+      "ts": 1788247810175
+    },
+    {
+      "id": 19,
+      "command": "updateSceneMood",
+      "mood": {
+        "state": "stable",
+        "label": "Mazmorra estable",
+        "reason": "Cambios controlados: 1 archivo(s) modificado(s)",
+        "backdropKey": "bg_home",
+        "errorCount": 0,
+        "warnCount": 0,
+        "overlayAlpha": 0.08,
+        "overlayColor": 858660
+      },
+      "ts": 1788247810177
+    },
+    {
+      "id": 20,
+      "command": "showAdventureCards",
+      "cards": [
+        {
+          "id": "commit-changes",
+          "title": "🔒 Sellar Partida con un Commit",
+          "description": "Hay 1 archivo(s) modificados sin sello reciente. Tal vez convenga fijar el progreso antes de seguir explorando.",
+          "action": "commit_changes",
+          "target": {
+            "file": null,
+            "line": null,
+            "function_name": null
+          },
+          "reward": "+50 EXP, +20 Oro",
+          "risk": "Podrías consagrar cambios aún inmaduros",
+          "priority": "high"
+        }
+      ],
+      "ts": 1788247810180
     }
   ]
 }

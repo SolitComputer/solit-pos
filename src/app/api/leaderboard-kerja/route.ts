@@ -21,6 +21,13 @@ const PROGRAMMER_USER_IDS = [
   "a106053f-8168-4574-9586-6049300bb614",
   "a136bb0a-d6de-4439-946c-c17a85b11a67",
 ];
+// Sales Online — role yang dapat poin dari Laporan Harian Sales (chat leads),
+// role-based (bukan per akun). Harus disamakan manual dengan
+// SALES_REPORT_ROLES di src/lib/permissions.ts.
+const SALES_ONLINE_ROLES = [
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH", "PKL_SALES",
+];
 export const GET = withAuth(async (req, _ctx, user) => {
   try {
     const url = new URL(req.url);
@@ -77,7 +84,8 @@ export const GET = withAuth(async (req, _ctx, user) => {
       { data: cashflowAudits },
       { data: todos },
       { data: todoItems },
-      { data: missions }
+      { data: missions },
+      { data: salesOnlineReports }
     ] = await Promise.all([
       // Sales Offline: transactions — kolom SEBELUMNYA salah nama
       // (created_by/invoice/total_amount TIDAK ADA di tabel ini; nama
@@ -175,7 +183,15 @@ export const GET = withAuth(async (req, _ctx, user) => {
         .select("id, assigned_to, status")
         .gte("created_at", startIso)
         .lte("created_at", endIso)
-        .eq("status", "DONE")
+        .eq("status", "DONE"),
+
+      // Sales Online: laporan harian sales (chat leads) — 1 baris = 1 chat
+      // yang diisi manual lewat halaman Laporan Harian Sales.
+      supabaseAdmin
+        .from("sales_online_reports")
+        .select("id, filled_by")
+        .gte("created_at", startIso)
+        .lte("created_at", endIso)
     ]);
 
     // Programmer: peta jumlah sub-task per tugas — dipakai buat nentuin
@@ -206,6 +222,14 @@ export const GET = withAuth(async (req, _ctx, user) => {
       if (SALES_OFFLINE_USER_IDS.includes(uid)) {
         score += uTransactions.length * 5;
         metrics.push({ label: "Customer Dilayani", value: uTransactions.length, unit: "trx" });
+      }
+
+      // SALES ONLINE — 1 poin per laporan (chat) yang diisi manual di
+      // Laporan Harian Sales (nomor telepon + minat + status beli/tidak).
+      const uSalesOnlineReports = (salesOnlineReports ?? []).filter((r: any) => r.filled_by === uid);
+      if (userRoles.some((r: string) => SALES_ONLINE_ROLES.includes(r))) {
+        score += uSalesOnlineReports.length * 1;
+        metrics.push({ label: "Chat Dilayani", value: uSalesOnlineReports.length, unit: "chat" });
       }
 
       // PREPARATIONS (Penyedia Barang) — per UNIT laptop (bukan per order):
