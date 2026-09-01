@@ -16,7 +16,7 @@ import {
   Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
   Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
   ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint, FileText,
-  Mars, Venus,
+  Mars, Venus, Plus,
 } from "lucide-react";
 
 interface User {
@@ -235,6 +235,11 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
   );
 }
 
+// ── Shimmer (loading placeholder, selaras dashboard) ───────────────────────────
+function Shimmer({ className = "" }: { className?: string }) {
+  return <span className={`block rounded-xl animate-shimmer bg-gradient-to-r from-slate-100 via-slate-200 to-slate-100 bg-[length:200%_100%] ${className}`} />;
+}
+
 // ── Modal Shell ───────────────────────────────────────────────────────────────
 function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
@@ -255,29 +260,24 @@ function ModalHeader({ title, subtitle, icon, onClose }: {
   title: string; subtitle: string; icon: React.ReactNode; onClose: () => void;
 }) {
   return (
-    <div className="relative px-5 sm:px-6 py-4 sm:py-5 flex items-center justify-between overflow-hidden flex-shrink-0"
-      style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
-      <div className="absolute inset-0 pointer-events-none"
-        style={{ backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.18) 0%, transparent 60%)" }} />
+    <div className="relative px-5 sm:px-6 py-4 sm:py-5 flex items-center justify-between overflow-hidden flex-shrink-0 bg-white border-b border-slate-100">
       <div className="flex items-center gap-3 z-10 min-w-0">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.12)" }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-indigo-500 to-purple-600 shadow-sm">
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="font-bold text-white text-sm tracking-tight truncate">{title}</p>
-          <p className="text-[10.5px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.45)" }}>{subtitle}</p>
+          <p className="font-extrabold text-slate-900 text-sm tracking-tight truncate">{title}</p>
+          <p className="text-[10.5px] mt-0.5 truncate text-slate-400">{subtitle}</p>
         </div>
       </div>
       <button onClick={onClose}
-        className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110 z-10 flex-shrink-0 ml-2"
-        style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
+        className="w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110 z-10 flex-shrink-0 ml-2 bg-slate-100 hover:bg-slate-200 text-slate-500">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
       <div className="absolute bottom-0 left-0 right-0 h-0.5"
-        style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6 40%, #ec4899 80%, transparent)" }} />
+        style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6 40%, #a855f7 80%, transparent)" }} />
     </div>
   );
 }
@@ -297,7 +297,7 @@ function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full h-11 sm:h-10 border rounded-xl px-3.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+      className="w-full h-11 sm:h-10 border rounded-xl px-3.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
       style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#1e293b" }}
     />
   );
@@ -360,9 +360,9 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <div className="flex gap-2">
             {([{ v: "L", label: "Laki-laki", Icon: Mars }, { v: "P", label: "Perempuan", Icon: Venus }] as const).map(({ v, label, Icon }) => (
               <button key={v} type="button" onClick={() => setGender(v)}
-                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                className="flex-1 h-11 sm:h-10 rounded-full text-xs font-bold border transition-all active:scale-95"
                 style={gender === v
-                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                  ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
                   : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
                 <span className="inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
               </button>
@@ -380,9 +380,9 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <div className="flex gap-2">
             {(["PAGI", "SORE"] as const).map(s => (
               <button key={s} type="button" onClick={() => setShift(s)}
-                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                className="flex-1 h-11 sm:h-10 rounded-full text-xs font-bold border transition-all active:scale-95"
                 style={shift === s
-                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                  ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
                   : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
                 {s === "PAGI"
                   ? <span className="inline-flex items-center gap-1.5"><Sunrise className="w-3.5 h-3.5" /> Pagi</span>
@@ -394,13 +394,13 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
       </div>
       <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid #f1f5f9" }}>
         <button onClick={onClose}
-          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
+          className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
           style={{ background: "#f1f5f9", color: "#64748b" }}>
           Batal
         </button>
         <button onClick={save} disabled={saving}
-          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
-          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
+          className="flex-1 h-11 sm:h-10 rounded-full text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95"
+          style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)", boxShadow: "0 4px 14px rgba(99,102,241,0.35)" }}>
           {saving
             ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Membuat...</>
             : <><CheckCircle2 className="w-4 h-4" /> Buat Akun</>}
@@ -498,14 +498,14 @@ function MultiRoleSelect({
   return (
     <div className="space-y-3">
       {values.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl min-h-[40px]"
+        <div className="flex flex-wrap gap-1.5 p-2.5 rounded-2xl min-h-[40px]"
           style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}>
           {values.map((role, idx) => {
             const badge = getBadge(role);
             const isPrimary = idx === 0;
             return (
               <div key={role}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold"
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold"
                 style={{ background: badge.bg, color: badge.text, border: `1px solid ${badge.border}` }}>
                 {isPrimary && (
                   <span className="text-[8px] font-black px-1 py-0.5 rounded mr-0.5"
@@ -555,7 +555,7 @@ function MultiRoleSelect({
                     key={role}
                     type="button"
                     onClick={() => toggle(role)}
-                    className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all active:scale-95 border"
+                    className="px-2 py-1 rounded-full text-[10px] font-bold transition-all active:scale-95 border"
                     style={isSelected
                       ? { background: badge.bg, color: badge.text, borderColor: badge.border, boxShadow: `0 0 0 1.5px ${badge.border}` }
                       : { background: "#f8fafc", color: "#94a3b8", borderColor: "#e2e8f0" }
@@ -641,9 +641,9 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
           <div className="flex gap-2">
             {([{ v: "L", label: "Laki-laki", Icon: Mars }, { v: "P", label: "Perempuan", Icon: Venus }] as const).map(({ v, label, Icon }) => (
               <button key={v} type="button" onClick={() => setGender(v)}
-                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                className="flex-1 h-11 sm:h-10 rounded-full text-xs font-bold border transition-all active:scale-95"
                 style={gender === v
-                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                  ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
                   : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
                 <span className="inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
               </button>
@@ -658,9 +658,9 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
           <div className="flex gap-2">
             {(["PAGI", "SORE"] as const).map(s => (
               <button key={s} type="button" onClick={() => setShift(s)}
-                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                className="flex-1 h-11 sm:h-10 rounded-full text-xs font-bold border transition-all active:scale-95"
                 style={shift === s
-                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                  ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
                   : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
                 {s === "PAGI" ? <Sunrise className="w-3.5 h-3.5 inline" /> : <Sunset className="w-3.5 h-3.5 inline" />} {s}
               </button>
@@ -670,13 +670,13 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
       </div>
       <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid #f1f5f9" }}>
         <button onClick={onClose}
-          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
+          className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
           style={{ background: "#f1f5f9", color: "#64748b" }}>
           Batal
         </button>
         <button onClick={save} disabled={saving}
-          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
-          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
+          className="flex-1 h-11 sm:h-10 rounded-full text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95"
+          style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)", boxShadow: "0 4px 14px rgba(99,102,241,0.35)" }}>
           {saving
             ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Menyimpan...</>
             : <><Save className="w-4 h-4" /> Simpan</>}
@@ -701,12 +701,12 @@ function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
         <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">Session aktif user ini akan diakhiri segera.</p>
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
             style={{ background: "#f1f5f9", color: "#64748b" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95"
             style={{ background: "linear-gradient(135deg, #ea580c, #dc2626)", boxShadow: "0 4px 14px rgba(234,88,12,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
@@ -739,12 +739,12 @@ function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
         </div>
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
             style={{ background: "#f1f5f9", color: "#64748b" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95"
             style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
@@ -777,12 +777,12 @@ function ConfirmResetPasswordModal({ user, onClose, onConfirm, loading }: {
         </div>
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
             style={{ background: "#f1f5f9", color: "#64748b" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95"
             style={{ background: "linear-gradient(135deg, #d97706, #b45309)", boxShadow: "0 4px 14px rgba(217,119,6,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
@@ -811,12 +811,12 @@ function ConfirmResetBiometricModal({ user, onClose, onConfirm, loading }: {
         </p>
         <div className="flex gap-2.5">
           <button onClick={onClose} disabled={loading}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
             style={{ background: "#f1f5f9", color: "#64748b" }}>
             Batal
           </button>
           <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95"
             style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
             {loading
               ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
@@ -846,16 +846,15 @@ function StatCard({ icon, value, label, sub, accent }: {
   icon: React.ReactNode; value: number; label: string; sub: string; accent: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden group transition-all hover:shadow-md"
-      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+    <div className="bg-white/90 hover:bg-white backdrop-blur-md rounded-2xl p-3.5 sm:p-4 relative overflow-hidden group shadow-sm border border-white/70 hover:-translate-y-1 hover:shadow-md transition-all duration-300">
       <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: accent }} />
       <div className="pl-2.5 sm:pl-3">
         <div className="flex items-start justify-between mb-2 sm:mb-3">
-          <span className="text-slate-700">{icon}</span>
-          <span className="text-2xl sm:text-3xl font-black tabular-nums" style={{ color: "#0f172a" }}>{value}</span>
+          <span className="text-slate-500 group-hover:text-indigo-600 transition-colors">{icon}</span>
+          <span className="text-2xl sm:text-3xl font-extrabold tabular-nums text-slate-900">{value}</span>
         </div>
-        <p className="text-[10.5px] sm:text-[11px] font-bold truncate" style={{ color: "#64748b" }}>{label}</p>
-        <p className="text-[9.5px] sm:text-[10px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>{sub}</p>
+        <p className="text-[10.5px] sm:text-[11px] font-bold truncate text-slate-500">{label}</p>
+        <p className="text-[9.5px] sm:text-[10px] mt-0.5 truncate text-slate-400">{sub}</p>
       </div>
     </div>
   );
@@ -1111,12 +1110,12 @@ export default function UsersPage() {
             <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">User harus scan ulang wajah saat login berikutnya.</p>
             <div className="flex gap-2.5">
               <button onClick={() => setConfirmReset(null)}
-                className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-all"
+                className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold hover:bg-slate-100 transition-all"
                 style={{ background: "#f1f5f9", color: "#64748b" }}>
                 Batal
               </button>
               <button onClick={() => handleReset(confirmReset)} disabled={resetting === confirmReset.id}
-                className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
+                className="flex-1 h-11 sm:h-10 rounded-full text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
                 style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
                 {resetting === confirmReset.id
                   ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
@@ -1153,21 +1152,21 @@ export default function UsersPage() {
       )}
 
       <div className="min-h-screen bg-[#F7F7F8]">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-5">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-5 sm:space-y-6">
 
-          {/* ── Header ─────────────────────────────────────────────────── */}
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+          {/* ── Top bar: judul halaman + aksi utama (pola sama seperti header Dashboard) ── */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.35)" }}>
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-indigo-500 to-purple-600"
+                style={{ boxShadow: "0 4px 14px rgba(99,102,241,0.35)" }}>
                 <svg style={{ width: 18, height: 18 }} fill="none" stroke="white" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight truncate">Manajemen Aktifitas</h1>
-                <p className="text-[11px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>
+                <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight truncate">Manajemen Aktifitas</h1>
+                <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5 truncate">
                   {isAdmin
                     ? "Kelola akun, role, shift, dan wajah karyawan"
                     : isKepala
@@ -1181,36 +1180,73 @@ export default function UsersPage() {
               <NotificationToggle />
               <button
                 onClick={() => setOpenGroupChat(true)}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 h-10 sm:h-auto sm:py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
-                style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.35)" }}>
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 h-10 bg-white hover:bg-slate-50 text-emerald-600 rounded-full border border-emerald-200 text-xs font-bold transition-all shadow-sm active:scale-95 whitespace-nowrap">
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
                 </svg>
-                <span>Grup Chat</span>
+                <span className="hidden sm:inline">Grup Chat</span>
+                <span className="sm:hidden">Chat</span>
               </button>
               {isAdmin && (
                 <button
                   onClick={() => setShowCreate(true)}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 h-10 sm:h-auto sm:py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
-                  style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
-                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 sm:px-4 h-10 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-full text-xs font-bold shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5 transition-all whitespace-nowrap">
+                  <Plus className="w-4 h-4 flex-shrink-0" />
                   <span>Tambah User</span>
                 </button>
               )}
             </div>
           </div>
 
-          {/* ── Stat cards ─────────────────────────────────────────────── */}
-          {!loading && isAdmin && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-              <StatCard icon={<Users className="w-5 h-5" />} value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
-              <StatCard icon={<Crown className="w-5 h-5" />} value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
-              <StatCard icon={<ScanFace className="w-5 h-5" />} value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
-              <StatCard icon={<AlertTriangle className="w-5 h-5" />} value={pwNotSet} label="Belum Set PW" sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
-                accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"} />
+          {/* ── Hero banner: Ringkasan Tim (pola sama seperti "Distribusi Penjualan" di Dashboard) ── */}
+          {isAdmin && (
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-100/90 via-indigo-100/80 to-purple-100/90 p-5 sm:p-7 border border-indigo-100/60 shadow-sm">
+              <div className="absolute inset-0 pointer-events-none opacity-40 overflow-hidden">
+                <svg className="absolute -right-10 -bottom-10 w-[500px] h-[300px]" viewBox="0 0 500 300" fill="none">
+                  <circle cx="350" cy="200" r="180" fill="url(#usersWaveGrad1)" opacity="0.5" />
+                  <circle cx="200" cy="150" r="120" fill="url(#usersWaveGrad2)" opacity="0.4" />
+                  <defs>
+                    <linearGradient id="usersWaveGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#818cf8" />
+                      <stop offset="100%" stopColor="#c084fc" />
+                    </linearGradient>
+                    <linearGradient id="usersWaveGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#38bdf8" />
+                      <stop offset="100%" stopColor="#818cf8" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+
+              <div className="relative z-10 space-y-5">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Ringkasan Tim</h2>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                    Statistik akun, akses, dan status karyawan &amp; PKL di SOLIT POS
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                  {loading ? (
+                    Array(4).fill(0).map((_, i) => (
+                      <div key={i} className="bg-white/90 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 border border-white/70 shadow-sm">
+                        <Shimmer className="w-5 h-5 mb-3" />
+                        <Shimmer className="h-6 w-16 mb-2" />
+                        <Shimmer className="h-3 w-20" />
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <StatCard icon={<Users className="w-5 h-5" />} value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
+                      <StatCard icon={<Crown className="w-5 h-5" />} value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
+                      <StatCard icon={<ScanFace className="w-5 h-5" />} value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
+                      <StatCard icon={<AlertTriangle className="w-5 h-5" />} value={pwNotSet} label="Belum Set PW" sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
+                        accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"} />
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -1231,7 +1267,7 @@ export default function UsersPage() {
                     className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
                     style={
                       mainTab === t.key
-                        ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
+                        ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff" }
                         : { background: "#f5f7ff", color: "#64748b" }
                     }
                   >
@@ -1248,8 +1284,7 @@ export default function UsersPage() {
           ) : (
             <>
               {isAdmin && (
-                <div className="bg-white rounded-2xl p-1.5"
-                  style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                <div className="bg-white rounded-2xl p-1.5 border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
                   <div className="flex gap-1.5">
                     {([
                       { key: "karyawan", label: "Karyawan", icon: <Users className="w-3.5 h-3.5" />, count: totalKaryawan },
@@ -1259,7 +1294,7 @@ export default function UsersPage() {
                         onClick={() => { setActiveTab(t.key); setFilterRole("Semua"); }}
                         className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
                         style={activeTab === t.key
-                          ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                          ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff", boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }
                           : { background: "#f5f7ff", color: "#64748b" }}>
                         <span>{t.icon}</span>
                         <span>{t.label}</span>
@@ -1280,8 +1315,7 @@ export default function UsersPage() {
                 <div className="flex-1 min-w-0 w-full space-y-3">
 
                   {/* ── Search / sort / filter panel ─────────────────── */}
-                  <div className="bg-white rounded-2xl overflow-hidden"
-                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                  <div className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
                     <div className="px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-3.5 space-y-3">
                       <div className="flex gap-2 items-center">
                         <div className="relative flex-1 min-w-0">
@@ -1291,7 +1325,7 @@ export default function UsersPage() {
                           </svg>
                           <input type="text" placeholder="Cari nama atau nomor..."
                             value={search} onChange={e => setSearch(e.target.value)}
-                            className="w-full h-10 sm:h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition"
+                            className="w-full h-10 sm:h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400/30 transition"
                             style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }} />
                           {search && (
                             <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform">
@@ -1302,8 +1336,8 @@ export default function UsersPage() {
                           )}
                         </div>
                         <button onClick={() => setSortOrder(s => s === "asc" ? "desc" : "asc")}
-                          className="h-10 sm:h-9 px-3 sm:px-3.5 rounded-xl text-[10.5px] font-black text-white flex-shrink-0 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
-                          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 2px 8px rgba(15,12,41,0.25)" }}>
+                          className="h-10 sm:h-9 px-3 sm:px-3.5 rounded-full text-[10.5px] font-black text-white flex-shrink-0 flex items-center gap-1.5 transition-all hover:-translate-y-0.5 active:scale-95"
+                          style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }}>
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                               d={sortOrder === "asc"
@@ -1317,9 +1351,9 @@ export default function UsersPage() {
                       <div className="flex gap-1.5 flex-wrap max-h-[5.5rem] sm:max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
                         {["Semua", ...tabRoles].map(r => (
                           <button key={r} onClick={() => setFilterRole(r)}
-                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex-shrink-0 active:scale-95"
+                            className="px-2.5 py-1 rounded-full text-[10px] font-bold transition-all flex-shrink-0 active:scale-95"
                             style={filterRole === r
-                              ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
+                              ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "#fff" }
                               : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
                             {r === "Semua" ? `Semua (${totalInTab})` : <>{getRoleIcon(r)} {getRoleLabel(r)}</>}
                           </button>
@@ -1329,11 +1363,10 @@ export default function UsersPage() {
                   </div>
 
                   {/* ── User list ─────────────────────────────────────── */}
-                  <div className="bg-white rounded-2xl overflow-hidden"
-                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                  <div className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
 
-                    <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between flex-wrap gap-2"
-                      style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
+                    <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between flex-wrap gap-2 border-b border-slate-100"
+                      style={{ background: "#fafbff" }}>
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
                         <p className="text-[11px] font-bold truncate" style={{ color: "#64748b" }}>
@@ -1355,16 +1388,15 @@ export default function UsersPage() {
                     </div>
 
                     {loading ? (
-                      <div>
+                      <div className="divide-y divide-slate-100/80">
                         {Array(6).fill(0).map((_, i) => (
-                          <div key={i} className="px-3.5 sm:px-5 py-4 flex items-center gap-3 sm:gap-3.5 animate-pulse"
-                            style={{ borderBottom: "1px solid #f8f8fc" }}>
-                            <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
+                          <div key={i} className="px-3.5 sm:px-5 py-4 flex items-center gap-3 sm:gap-3.5">
+                            <Shimmer className="w-10 h-10 rounded-full flex-shrink-0" />
                             <div className="flex-1 space-y-2 min-w-0">
-                              <div className="h-3 rounded-full w-32 max-w-full" style={{ background: "#e2e8f0" }} />
-                              <div className="h-2.5 rounded-full w-20" style={{ background: "#f1f5f9" }} />
+                              <Shimmer className="h-3 w-32 max-w-full" />
+                              <Shimmer className="h-2.5 w-20" />
                             </div>
-                            <div className="w-16 h-7 rounded-lg flex-shrink-0 hidden sm:block" style={{ background: "#f1f5f9" }} />
+                            <Shimmer className="w-16 h-7 hidden sm:block" />
                           </div>
                         ))}
                       </div>
@@ -1384,16 +1416,15 @@ export default function UsersPage() {
                       </div>
 
                     ) : (
-                      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 260px)", minHeight: "420px" }}>
-                        {filtered.map((user, idx) => {
+                      <div className="overflow-y-auto divide-y divide-slate-100/80" style={{ maxHeight: "calc(100vh - 260px)", minHeight: "420px" }}>
+                        {filtered.map((user) => {
                           const avatarColor = getAvatarColor(user.role);
                           const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
                           const canChat = currentUserInfo && user.id !== currentUserInfo.id;
 
                           return (
                             <div key={user.id}
-                              className="px-3.5 sm:px-5 py-3 sm:py-3.5 hover:bg-slate-50/70 transition-colors group"
-                              style={{ borderBottom: idx < filtered.length - 1 ? "1px solid #f5f5fb" : "none" }}>
+                              className="px-3.5 sm:px-5 py-3 sm:py-3.5 hover:bg-slate-50/70 transition-colors duration-200 group rounded-2xl">
                               <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
 
                                 <div
@@ -1411,7 +1442,7 @@ export default function UsersPage() {
                                         style={{ background: "#f5f3ff", borderRight: "1px solid #ddd6fe", borderBottom: "1px solid #ddd6fe" }} />
                                     </div>
                                   )}
-                                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-black overflow-hidden"
+                                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-black overflow-hidden group-hover:scale-105 transition-transform duration-200"
                                     style={{
                                       background: isFullAccess
                                         ? "linear-gradient(135deg, #7c3aed, #6d28d9)"
@@ -1679,8 +1710,10 @@ export default function UsersPage() {
       <style jsx>{`
         @keyframes slideIn  { from { opacity: 0; transform: translateX(60px); }  to { opacity: 1; transform: translateX(0); } }
         @keyframes scaleIn  { from { opacity: 0; transform: scale(0.94);      }  to { opacity: 1; transform: scale(1);    } }
+        @keyframes shimmer  { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
         .animate-slideIn { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .animate-scaleIn { animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-shimmer { animation: shimmer 1.5s ease-in-out infinite; background-size: 200% 100%; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
