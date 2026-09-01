@@ -238,6 +238,27 @@ function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClos
     </div>
   );
 }
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
+  useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
+  return (
+    <div
+      className={`fixed top-4 right-4 left-4 sm:left-auto sm:top-5 sm:right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
+        }`}
+      style={{ boxShadow: type === "ok" ? "0 8px 32px rgba(0,0,0,0.10)" : "0 8px 32px rgba(220,38,38,0.12)" }}
+    >
+      {type === "ok"
+        ? <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+        </div>
+        : <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </div>
+      }
+      <span className="truncate">{msg}</span>
+    </div>
+  );
+}
 
 // ── Shimmer (loading placeholder, selaras dashboard) ───────────────────────────
 function Shimmer({ className = "" }: { className?: string }) {
@@ -286,6 +307,16 @@ function ModalHeader({ title, subtitle, icon, onClose }: {
   );
 }
 
+  function Field({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+      <div>
+        <label className="text-[10.5px] font-bold mb-1.5 block uppercase tracking-widest" style={{ color: "#94a3b8" }}>
+          {label}
+        </label>
+        {children}
+      </div>
+    );
+  }
   function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
       <div>
@@ -1715,10 +1746,8 @@ function StatCard({ icon, value, label, sub, accent }: {
       <style jsx>{`
         @keyframes slideIn  { from { opacity: 0; transform: translateX(60px); }  to { opacity: 1; transform: translateX(0); } }
         @keyframes scaleIn  { from { opacity: 0; transform: scale(0.94);      }  to { opacity: 1; transform: scale(1);    } }
-        @keyframes shimmer  { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
         .animate-slideIn { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .animate-scaleIn { animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
-        .animate-shimmer { animation: shimmer 1.5s ease-in-out infinite; background-size: 200% 100%; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
