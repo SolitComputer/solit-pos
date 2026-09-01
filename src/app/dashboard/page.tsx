@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { PERMISSIONS, UserRole, hasPermission, isDashboardLimited } from "@/lib/permissions";
+import { PERMISSIONS, UserRole, hasPermission, isDashboardLimited, getDashboardTopWidgetConfig } from "@/lib/permissions";
 import { RevenueDetailModal } from "@/components/modals/RevenueDetailModal";
 import { InventoryDetailModal } from "@/components/modals/InventoryDetailModal";
 import { SalesDetailModal } from "@/components/modals/SalesDetailModal";
@@ -69,6 +69,12 @@ interface Transaction {
   payment_photo?: string; latitude?: string; longitude?: string;
   paid_at?: string; created_at: string;
 }
+interface LeaderboardEntry {
+  id: string;
+  name: string;
+  role: string;
+  score: number;
+}
 
 const fmtShort = (n: number): string => {
   const sign = n < 0 ? "-" : "";
@@ -108,8 +114,8 @@ function TrendBadge({ change }: { change: number | null }) {
 }
 
 // Top List Item (Top Sales & Laptop)
-function TopListItem({ rank, name, total, maxTotal, extra }: {
-  rank: number; name: string; total: number; maxTotal: number; extra?: React.ReactNode;
+function TopListItem({ rank, name, total, maxTotal, extra, unit = "x" }: {
+  rank: number; name: string; total: number; maxTotal: number; extra?: React.ReactNode; unit?: string;
 }) {
   const medals = [
     <Medal key="gold" className="w-4 h-4 text-amber-500 drop-shadow-sm" />,
@@ -133,7 +139,7 @@ function TopListItem({ rank, name, total, maxTotal, extra }: {
         </p>
         {extra}
         <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full tabular-nums">
-          {total}x
+          {total}{unit}
         </span>
       </div>
       <div className="ml-9 h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -300,11 +306,18 @@ export default function Page() {
   const [showLaptopModal, setShowLaptopModal] = useState(false);
   const [showGrossProfitModal, setShowGrossProfitModal] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [leaderboardTop, setLeaderboardTop] = useState<LeaderboardEntry[]>([]);
 
   const canSeeFinancials = userRole ? hasPermission(userRole, PERMISSIONS.VIEW_FINANCIALS) : false;
-  // Crew Sales (atau role lain di DASHBOARD_LIMITED_ROLES) → dashboard cuma
-  // nampilin Laptop Ready, Top Sales Hari Ini, dan Laptop Terlaris.
+  // Role di luar FULL_ACCESS (Admin/Programmer/Asisten CEO) → dashboard versi
+  // ringkas: Laptop Ready + widget "Top X Hari Ini" (beda per divisi) +
+  // Laptop Terlaris. Admin/Programmer/Asisten CEO tetap full seperti semula.
   const dashboardLimited = isDashboardLimited(userRole);
+  // Full dashboard SELALU pakai "Top Sales" (perilaku lama, tidak berubah);
+  // logic per-divisi cuma berlaku kalau dashboard-nya dibatasi.
+  const topWidgetConfig = dashboardLimited
+    ? getDashboardTopWidgetConfig(userRole)
+    : { label: "Top Sales Hari Ini", source: "sales" as const, matchRole: undefined };
   const SERVICE_DASHBOARD_ROLES = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
     "TEKNISI", "KEPALA_TEKNISI", "CUSTOMER_SERVICE",
@@ -353,6 +366,30 @@ export default function Page() {
     const interval = setInterval(() => { fetchAll(true); }, 60000);
     return () => clearInterval(interval);
   }, [fetchAll]);
+
+  // Widget "Top X Hari Ini" (non-sales) sumbernya /api/leaderboard-kerja —
+  // endpoint itu berat (~13 query paralel, sebagian tanpa filter tanggal),
+  // makanya SENGAJA dipisah dari poll 60 detik utama & pakai interval 5
+  // menit sendiri, biar tidak nambah beban di siklus refresh dashboard biasa
+  // (lihat riwayat 408/timeout akibat query berat + polling).
+  useEffect(() => {
+    if (topWidgetConfig.source !== "leaderboard") return;
+
+    let cancelled = false;
+    const fetchLeaderboard = async () => {
+      try {
+        const res = await fetch("/api/leaderboard-kerja?period=today");
+        const json = await res.json();
+        if (!cancelled && json.success) setLeaderboardTop(json.data || []);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    fetchLeaderboard();
+    const interval = setInterval(fetchLeaderboard, 5 * 60_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [topWidgetConfig.source]);
 
   // Chart data setup
   const weeklyLabels = stats?.weeklyTrend?.map((d) => d.label) ?? [];
@@ -524,6 +561,16 @@ export default function Page() {
       },
     },
   };
+
+  // Data untuk widget "Top X Hari Ini" non-sales (leaderboard-kerja, sudah
+  // terurut skor tertinggi dari API — cukup filter by role lalu ambil 5 teratas)
+  const topWidgetData: { name: string; total: number }[] =
+    topWidgetConfig.source === "leaderboard" && topWidgetConfig.matchRole
+      ? leaderboardTop
+          .filter((e) => e.role && e.role.includes(topWidgetConfig.matchRole as string))
+          .slice(0, 5)
+          .map((e) => ({ name: e.name, total: Math.round(e.score * 10) / 10 }))
+      : [];
 
   // Filter transactions if user searches
   const filteredTransactions = transactions.filter((t) => {
@@ -889,51 +936,75 @@ export default function Page() {
 
           {/* LEFT BOTTOM: Top Sales & Top Laptop Cards — 7 cols (12 cols kalau dashboard dibatasi) */}
           <div className={dashboardLimited ? "lg:col-span-12 space-y-5" : "lg:col-span-7 space-y-5"}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className={`grid grid-cols-1 gap-5 ${topWidgetConfig.source === "none" ? "" : "sm:grid-cols-2"}`}>
 
-              {/* Top Sales Ranking Card */}
+              {/* Top X Ranking Card — "Top Sales" (data transaksi) untuk role
+                  sales-like, atau "Top Teknisi/Konten/dst" (data leaderboard-kerja)
+                  untuk role lain; disembunyikan total kalau role tidak punya
+                  metrik apa pun (source: "none", mis. Customer Service/Kebersihan) */}
+              {topWidgetConfig.source !== "none" && (
               <div
-                onClick={() => setShowSalesModal(true)}
-                className={`${CARD_STYLE} cursor-pointer hover:border-indigo-200 transition-all flex flex-col justify-between`}
-                role="button"
-                tabIndex={0}
+                onClick={() => topWidgetConfig.source === "sales" && setShowSalesModal(true)}
+                className={`${CARD_STYLE} ${topWidgetConfig.source === "sales" ? "cursor-pointer hover:border-indigo-200" : ""} transition-all flex flex-col justify-between`}
+                role={topWidgetConfig.source === "sales" ? "button" : undefined}
+                tabIndex={topWidgetConfig.source === "sales" ? 0 : undefined}
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Award className="w-4 h-4 text-indigo-600" />
-                    <h3 className="font-bold text-slate-900 text-sm">Top Sales Hari Ini</h3>
+                    <h3 className="font-bold text-slate-900 text-sm">{topWidgetConfig.label}</h3>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-bold bg-slate-100 px-2 py-0.5 rounded-full">Detail</span>
+                  {topWidgetConfig.source === "sales" && (
+                    <span className="text-[10px] text-slate-400 font-bold bg-slate-100 px-2 py-0.5 rounded-full">Detail</span>
+                  )}
                 </div>
 
                 <div className="space-y-2 my-1">
-                  {isLoading ? (
-                    Array(3).fill(0).map((_, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <Shimmer className="w-5 h-5 rounded-full" />
-                        <Shimmer className="flex-1 h-4" />
-                      </div>
-                    ))
-                  ) : stats?.topSales?.length ? (
-                    stats.topSales.map((s, i) => (
-                      <TopListItem
-                        key={s.name}
-                        rank={i + 1}
-                        name={s.name}
-                        total={s.total}
-                        maxTotal={stats.topSales[0]?.total || 1}
-                        extra={canSeeFinancials && s.profit > 0 ? (
-                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200/60 tabular-nums">
-                            +{fmtShort(s.profit)}
-                          </span>
-                        ) : undefined}
-                      />
-                    ))
+                  {topWidgetConfig.source === "sales" ? (
+                    isLoading ? (
+                      Array(3).fill(0).map((_, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <Shimmer className="w-5 h-5 rounded-full" />
+                          <Shimmer className="flex-1 h-4" />
+                        </div>
+                      ))
+                    ) : stats?.topSales?.length ? (
+                      stats.topSales.map((s, i) => (
+                        <TopListItem
+                          key={s.name}
+                          rank={i + 1}
+                          name={s.name}
+                          total={s.total}
+                          maxTotal={stats.topSales[0]?.total || 1}
+                          extra={canSeeFinancials && s.profit > 0 ? (
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200/60 tabular-nums">
+                              +{fmtShort(s.profit)}
+                            </span>
+                          ) : undefined}
+                        />
+                      ))
+                    ) : (
+                      <div className="py-6 text-center text-slate-400 text-xs">Belum ada data sales hari ini</div>
+                    )
                   ) : (
-                    <div className="py-6 text-center text-slate-400 text-xs">Belum ada data sales hari ini</div>
+                    topWidgetData.length ? (
+                      topWidgetData.map((s, i) => (
+                        <TopListItem
+                          key={s.name}
+                          rank={i + 1}
+                          name={s.name}
+                          total={s.total}
+                          maxTotal={topWidgetData[0]?.total || 1}
+                          unit=" poin"
+                        />
+                      ))
+                    ) : (
+                      <div className="py-6 text-center text-slate-400 text-xs">Belum ada data hari ini</div>
+                    )
                   )}
                 </div>
               </div>
+              )}
 
               {/* Top Laptop Card */}
               <div
