@@ -460,6 +460,19 @@ const PKL_SALES_MENU: MenuGroup[] = [
   PREPARATION_SALES_MENU, PREPARATION_PENYEDIA_MENU, PREPARATION_SALES_DELIVERY_MENU,
 ];
 
+// PKL Zenith: akses-nya SENGAJA identik dengan PKL Sales (keputusan bisnis
+// "PKL biasa di tim Zenith, akses = sama kayak PKL Sales") — makanya PKL_ZENITH
+// di ROLE_MENUS di bawah reuse array PKL_SALES_MENU ini, bukan didefinisikan ulang.
+
+// PKL Accounting: SENGAJA cuma "Utama" + "Absensi" + "Keuangan" (Akutansi doang,
+// TANPA Cashflow & TANPA Laporan Keuangan) — sesuai requirement: "cuma boleh
+// lihat sidebar keuangan (akutansi), tanpa cashflow, dikasih absensi".
+const PKL_ACCOUNTING_MENU: MenuGroup[] = [
+  { label: "Utama", items: [ITEM_DASHBOARD] },
+  { label: "Absensi", items: [ITEM_ABSENSI, ITEM_PKL_REPORT] },
+  { label: "Keuangan", items: [ITEM_AKUNTANSI] },
+];
+
 const PKL_PENYEDIA_MENU: MenuGroup[] = [
   { label: "Utama", items: [ITEM_DASHBOARD] },
   { label: "Absensi", items: [ITEM_ABSENSI, ITEM_DAFTAR_HADIR, ITEM_PKL_REPORT] },
@@ -691,6 +704,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL: PKL_MENU,
   PKL_MARKETING: PKL_MENU,
   PKL_SALES: PKL_SALES_MENU,
+  PKL_ZENITH: PKL_SALES_MENU,
   PKL_PENYEDIA_BARANG: PKL_PENYEDIA_MENU,
   PKL_SOTECH: PKL_MENU,
   PKL_ONPOINT: PKL_MENU,
@@ -699,6 +713,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_PENGANTARAN: [...PKL_MENU],
   PKL_CUSTOMER_SERVICE: [...PKL_MENU],
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
+  PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
 };
 
 const MISSION_HREFS = new Set([...MISSIONS_MENU.items.map((i) => i.href), ITEM_MISSION_ALL.href]);
@@ -963,6 +978,7 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL: { label: "PKL", className: "bg-amber-50 text-amber-700" },
   PKL_MARKETING: { label: "PKL Marketing", className: "bg-amber-50 text-amber-700" },
   PKL_SALES: { label: "PKL Sales", className: "bg-amber-50 text-amber-700" },
+  PKL_ZENITH: { label: "PKL Zenith", className: "bg-amber-50 text-amber-700" },
   PKL_PENYEDIA_BARANG: { label: "PKL Penyedia Barang", className: "bg-amber-50 text-amber-700" },
   PKL_SOTECH: { label: "PKL Sotech", className: "bg-amber-50 text-amber-700" },
   PKL_ONPOINT: { label: "PKL Onpoint", className: "bg-amber-50 text-amber-700" },
@@ -971,6 +987,7 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL_PENGANTARAN: { label: "PKL Pengantaran", className: "bg-amber-50 text-amber-700" },
   PKL_CUSTOMER_SERVICE: { label: "PKL Customer Service", className: "bg-amber-50 text-amber-700" },
   PKL_PENGELOLA_BARANG: { label: "PKL Pengelola Barang", className: "bg-amber-50 text-amber-700" },
+  PKL_ACCOUNTING: { label: "PKL Accounting", className: "bg-amber-50 text-amber-700" },
   KEPALA_ZENITH: { label: "Kepala Zenith", className: "bg-purple-50 text-purple-700" },
 };
 

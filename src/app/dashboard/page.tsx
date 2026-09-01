@@ -180,7 +180,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
   const bgGradient = avatarColors[Math.abs(item.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) % avatarColors.length];
 
   return (
-    <div className="py-3 px-2 rounded-2xl hover:bg-slate-50/80 transition-all duration-200 group">
+     <div className="py-2 px-2 rounded-2xl hover:bg-slate-50/80 transition-all duration-200 group">
       <div className="flex items-center gap-3">
         {/* Rounded Avatar */}
         <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${bgGradient} text-white font-bold flex items-center justify-center text-xs flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform`}>
@@ -996,7 +996,7 @@ export default function Page() {
                       <p className="text-slate-600 font-bold text-xs">Belum ada transaksi hari ini</p>
                     </div>
                   ) : (
-                    filteredTransactions.slice(0, 6).map((item) => (
+                     filteredTransactions.slice(0, 4).map((item) => (
                       <TransactionRow
                         key={item.id}
                         item={item}
