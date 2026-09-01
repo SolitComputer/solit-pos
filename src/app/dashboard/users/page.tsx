@@ -1,23 +1,23 @@
   "use client";
 
-  import { useEffect, useState, useMemo } from "react";
-  import { useRouter } from "next/navigation";
-  import DashboardLayout from "@/components/layout/DashboardLayout";
-  import { OnlineUsersPanel } from "@/components/layout/OnlineUsersPanel";
-  import { getCurrentUserClient } from "@/lib/auth-client";
-  import { useChatContext } from "@/contexts/ChatContext";
-  import { NotificationToggle } from "@/components/ui/NotificationToggle";
-  import RoleAccessManager from "@/components/users/RoleAccessManager";
-  import { ContractBadge } from "@/components/contracts/ContractBadge";
-  import SendContractModal from "@/components/contracts/SendContractModal";
-  import {
-    Crown, Code2, Handshake, BarChart3, Target, Wrench, Briefcase, DollarSign,
-    Package, Truck, Smartphone, Sparkles, Factory, Building2, MapPin,
-    Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
-    Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
-    ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint, FileText,
-    Mars, Venus,
-  } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import { OnlineUsersPanel } from "@/components/layout/OnlineUsersPanel";
+import { getCurrentUserClient } from "@/lib/auth-client";
+import { useChatContext } from "@/contexts/ChatContext";
+import { NotificationToggle } from "@/components/ui/NotificationToggle";
+import RoleAccessManager from "@/components/users/RoleAccessManager";
+import { ContractBadge } from "@/components/contracts/ContractBadge";
+import SendContractModal from "@/components/contracts/SendContractModal";
+import {
+  Crown, Code2, Handshake, BarChart3, Target, Wrench, Briefcase, DollarSign,
+  Package, Truck, Smartphone, Sparkles, Factory, Building2, MapPin,
+  Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
+  Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
+  ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint, FileText,
+  Mars, Venus,
+} from "lucide-react";
 
   interface User {
     id: string;
@@ -217,27 +217,27 @@
     return age;
   }
 
-  // ── Toast ─────────────────────────────────────────────────────────────────────
-  function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
-    useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
-    return (
-      <div
-        className={`fixed top-4 right-4 left-4 sm:left-auto sm:top-5 sm:right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
-          }`}
-        style={{ boxShadow: type === "ok" ? "0 8px 32px rgba(0,0,0,0.10)" : "0 8px 32px rgba(220,38,38,0.12)" }}
-      >
-        {type === "ok"
-          ? <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
-          </div>
-          : <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </div>
-        }
-        <span className="truncate">{msg}</span>
-      </div>
-    );
-  }
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
+  useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
+  return (
+    <div
+      className={`fixed top-4 right-4 left-4 sm:left-auto sm:top-5 sm:right-5 z-[9999] px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 animate-slideIn ${type === "ok" ? "bg-white text-slate-700 border border-slate-100" : "bg-white text-red-600 border border-red-100"
+        }`}
+      style={{ boxShadow: type === "ok" ? "0 8px 32px rgba(0,0,0,0.10)" : "0 8px 32px rgba(220,38,38,0.12)" }}
+    >
+      {type === "ok"
+        ? <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+        </div>
+        : <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </div>
+      }
+      <span className="truncate">{msg}</span>
+    </div>
+  );
+}
 
   // ── Modal Shell ───────────────────────────────────────────────────────────────
   function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
@@ -255,36 +255,36 @@
     );
   }
 
-  function ModalHeader({ title, subtitle, icon, onClose }: {
-    title: string; subtitle: string; icon: React.ReactNode; onClose: () => void;
-  }) {
-    return (
-      <div className="relative px-5 sm:px-6 py-4 sm:py-5 flex items-center justify-between overflow-hidden flex-shrink-0"
-        style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
-        <div className="absolute inset-0 pointer-events-none"
-          style={{ backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.18) 0%, transparent 60%)" }} />
-        <div className="flex items-center gap-3 z-10 min-w-0">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.12)" }}>
-            {icon}
-          </div>
-          <div className="min-w-0">
-            <p className="font-bold text-white text-sm tracking-tight truncate">{title}</p>
-            <p className="text-[10.5px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.45)" }}>{subtitle}</p>
-          </div>
+function ModalHeader({ title, subtitle, icon, onClose }: {
+  title: string; subtitle: string; icon: React.ReactNode; onClose: () => void;
+}) {
+  return (
+    <div className="relative px-5 sm:px-6 py-4 sm:py-5 flex items-center justify-between overflow-hidden flex-shrink-0"
+      style={{ background: "linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)" }}>
+      <div className="absolute inset-0 pointer-events-none"
+        style={{ backgroundImage: "radial-gradient(ellipse at 80% 50%, rgba(99,102,241,0.18) 0%, transparent 60%)" }} />
+      <div className="flex items-center gap-3 z-10 min-w-0">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.12)" }}>
+          {icon}
         </div>
-        <button onClick={onClose}
-          className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110 z-10 flex-shrink-0 ml-2"
-          style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-        <div className="absolute bottom-0 left-0 right-0 h-0.5"
-          style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6 40%, #ec4899 80%, transparent)" }} />
+        <div className="min-w-0">
+          <p className="font-bold text-white text-sm tracking-tight truncate">{title}</p>
+          <p className="text-[10.5px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.45)" }}>{subtitle}</p>
+        </div>
       </div>
-    );
-  }
+      <button onClick={onClose}
+        className="w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:scale-110 z-10 flex-shrink-0 ml-2"
+        style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      <div className="absolute bottom-0 left-0 right-0 h-0.5"
+        style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6 40%, #ec4899 80%, transparent)" }} />
+    </div>
+  );
+}
 
   function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
@@ -297,15 +297,15 @@
     );
   }
 
-  function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-    return (
-      <input
-        {...props}
-        className="w-full h-11 sm:h-10 border rounded-xl px-3.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-        style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#1e293b" }}
-      />
-    );
-  }
+function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      className="w-full h-11 sm:h-10 border rounded-xl px-3.5 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-violet-400/30"
+      style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#1e293b" }}
+    />
+  );
+}
 
   // ── CreateUserModal ───────────────────────────────────────────────────────────
   function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
@@ -334,85 +334,85 @@
       finally { setSaving(false); }
     };
 
-    return (
-      <ModalShell onClose={onClose}>
-        <ModalHeader
-          title="Tambah User Baru"
-          subtitle="Admin membuat akun, user set password sendiri"
-          onClose={onClose}
-          icon={
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-            </svg>
-          }
-        />
-        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
-          {error && (
-            <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
-              style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
-            </div>
-          )}
-          <Field label="Nama Lengkap">
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="contoh: Budi Santoso" />
-          </Field>
-        <Field label="Tanggal Lahir">
-            <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
-          </Field>
-          <Field label="Jenis Kelamin">
-            <div className="flex gap-2">
-              {([{ v: "L", label: "Laki-laki", Icon: Mars }, { v: "P", label: "Perempuan", Icon: Venus }] as const).map(({ v, label, Icon }) => (
-                <button key={v} type="button" onClick={() => setGender(v)}
-                  className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
-                  style={gender === v
-                    ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
-                    : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                  <span className="inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="Nomor WhatsApp">
-            <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08123456789" />
-            <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>Digunakan sebagai username login</p>
-          </Field>
-          <Field label="Role (bisa pilih lebih dari 1)">
-            <MultiRoleSelect values={roles} onChange={setRoles} />
-          </Field>
-          <Field label="Shift Kerja">
-            <div className="flex gap-2">
-              {(["PAGI", "SORE"] as const).map(s => (
-                <button key={s} type="button" onClick={() => setShift(s)}
-                  className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
-                  style={shift === s
-                    ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
-                    : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                  {s === "PAGI"
-                    ? <span className="inline-flex items-center gap-1.5"><Sunrise className="w-3.5 h-3.5" /> Pagi</span>
-                    : <span className="inline-flex items-center gap-1.5"><Sunset className="w-3.5 h-3.5" /> Sore</span>}
-                </button>
-              ))}
-            </div>
-          </Field>
-        </div>
-        <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid #f1f5f9" }}>
-          <button onClick={onClose}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
-            style={{ background: "#f1f5f9", color: "#64748b" }}>
-            Batal
-          </button>
-          <button onClick={save} disabled={saving}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
-            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
-            {saving
-              ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Membuat...</>
-              : <><CheckCircle2 className="w-4 h-4" /> Buat Akun</>}
-          </button>
-        </div>
-      </ModalShell>
-    );
-  }
+  return (
+    <ModalShell onClose={onClose}>
+      <ModalHeader
+        title="Tambah User Baru"
+        subtitle="Admin membuat akun, user set password sendiri"
+        onClose={onClose}
+        icon={
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+          </svg>
+        }
+      />
+      <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+        {error && (
+          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
+            style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
+          </div>
+        )}
+        <Field label="Nama Lengkap">
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="contoh: Budi Santoso" />
+        </Field>
+       <Field label="Tanggal Lahir">
+          <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
+        </Field>
+        <Field label="Jenis Kelamin">
+          <div className="flex gap-2">
+            {([{ v: "L", label: "Laki-laki", Icon: Mars }, { v: "P", label: "Perempuan", Icon: Venus }] as const).map(({ v, label, Icon }) => (
+              <button key={v} type="button" onClick={() => setGender(v)}
+                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                style={gender === v
+                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                <span className="inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
+              </button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Nomor WhatsApp">
+          <Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="08123456789" />
+          <p className="text-[10px] mt-1.5" style={{ color: "#94a3b8" }}>Digunakan sebagai username login</p>
+        </Field>
+        <Field label="Role (bisa pilih lebih dari 1)">
+          <MultiRoleSelect values={roles} onChange={setRoles} />
+        </Field>
+        <Field label="Shift Kerja">
+          <div className="flex gap-2">
+            {(["PAGI", "SORE"] as const).map(s => (
+              <button key={s} type="button" onClick={() => setShift(s)}
+                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                style={shift === s
+                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                {s === "PAGI"
+                  ? <span className="inline-flex items-center gap-1.5"><Sunrise className="w-3.5 h-3.5" /> Pagi</span>
+                  : <span className="inline-flex items-center gap-1.5"><Sunset className="w-3.5 h-3.5" /> Sore</span>}
+              </button>
+            ))}
+          </div>
+        </Field>
+      </div>
+      <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid #f1f5f9" }}>
+        <button onClick={onClose}
+          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
+          style={{ background: "#f1f5f9", color: "#64748b" }}>
+          Batal
+        </button>
+        <button onClick={save} disabled={saving}
+          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
+          {saving
+            ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Membuat...</>
+            : <><CheckCircle2 className="w-4 h-4" /> Buat Akun</>}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
 
   // ── MultiRoleSelect ───────────────────────────────────────────────────────────
   // FIX: fetch role custom dari /api/admin/roles supaya muncul di dropdown.
@@ -500,84 +500,84 @@
       onChange([role, ...values.filter(r => r !== role)]);
     };
 
-    return (
-      <div className="space-y-3">
-        {values.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl min-h-[40px]"
-            style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}>
-            {values.map((role, idx) => {
-              const badge = getBadge(role);
-              const isPrimary = idx === 0;
-              return (
-                <div key={role}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold"
-                  style={{ background: badge.bg, color: badge.text, border: `1px solid ${badge.border}` }}>
-                  {isPrimary && (
-                    <span className="text-[8px] font-black px-1 py-0.5 rounded mr-0.5"
-                      style={{ background: badge.text, color: badge.bg }}>
-                      UTAMA
-                    </span>
-                  )}
-                  <span>{getIcon(role)} {getLabel(role)}</span>
-                  {!isPrimary && (
-                    <button
-                      type="button"
-                      onClick={() => setPrimary(role)}
-                      title="Jadikan role utama"
-                      className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity text-[9px] font-black"
-                    >
-                      <ChevronUp className="w-2.5 h-2.5" />
-                    </button>
-                  )}
+  return (
+    <div className="space-y-3">
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl min-h-[40px]"
+          style={{ background: "#f5f7ff", border: "1px solid #e8ecf5" }}>
+          {values.map((role, idx) => {
+            const badge = getBadge(role);
+            const isPrimary = idx === 0;
+            return (
+              <div key={role}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold"
+                style={{ background: badge.bg, color: badge.text, border: `1px solid ${badge.border}` }}>
+                {isPrimary && (
+                  <span className="text-[8px] font-black px-1 py-0.5 rounded mr-0.5"
+                    style={{ background: badge.text, color: badge.bg }}>
+                    UTAMA
+                  </span>
+                )}
+                <span>{getIcon(role)} {getLabel(role)}</span>
+                {!isPrimary && (
                   <button
                     type="button"
-                    onClick={() => toggle(role)}
-                    className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                    onClick={() => setPrimary(role)}
+                    title="Jadikan role utama"
+                    className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity text-[9px] font-black"
                   >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    <ChevronUp className="w-2.5 h-2.5" />
                   </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="max-h-48 overflow-y-auto space-y-2 pr-0.5">
-          {ALL_ROLE_GROUPS.map(group => (
-            <div key={group.label}>
-              <p className="text-[9px] font-bold uppercase tracking-widest mb-1"
-                style={{ color: "#94a3b8" }}>
-                {group.label}
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {group.roles.map(role => {
-                  const isSelected = values.includes(role);
-                  const badge = getBadge(role);
-                  return (
-                    <button
-                      key={role}
-                      type="button"
-                      onClick={() => toggle(role)}
-                      className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all active:scale-95 border"
-                      style={isSelected
-                        ? { background: badge.bg, color: badge.text, borderColor: badge.border, boxShadow: `0 0 0 1.5px ${badge.border}` }
-                        : { background: "#f8fafc", color: "#94a3b8", borderColor: "#e2e8f0" }
-                      }
-                    >
-                      {isSelected && <Check className="w-2.5 h-2.5 inline mr-0.5" />}
-                      {getIcon(role)} {getLabel(role)}
-                    </button>
-                  );
-                })}
+                )}
+                <button
+                  type="button"
+                  onClick={() => toggle(role)}
+                  className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
               </div>
-            </div>
-          ))}
-          {loadingCustom && (
-            <p className="text-[9px] text-slate-300 italic">Memuat role custom...</p>
-          )}
+            );
+          })}
         </div>
+      )}
+
+      <div className="max-h-48 overflow-y-auto space-y-2 pr-0.5">
+        {ALL_ROLE_GROUPS.map(group => (
+          <div key={group.label}>
+            <p className="text-[9px] font-bold uppercase tracking-widest mb-1"
+              style={{ color: "#94a3b8" }}>
+              {group.label}
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {group.roles.map(role => {
+                const isSelected = values.includes(role);
+                const badge = getBadge(role);
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => toggle(role)}
+                    className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all active:scale-95 border"
+                    style={isSelected
+                      ? { background: badge.bg, color: badge.text, borderColor: badge.border, boxShadow: `0 0 0 1.5px ${badge.border}` }
+                      : { background: "#f8fafc", color: "#94a3b8", borderColor: "#e2e8f0" }
+                    }
+                  >
+                    {isSelected && <Check className="w-2.5 h-2.5 inline mr-0.5" />}
+                    {getIcon(role)} {getLabel(role)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {loadingCustom && (
+          <p className="text-[9px] text-slate-300 italic">Memuat role custom...</p>
+        )}
+      </div>
 
         {values.some(r => FULL_ACCESS_ROLES.has(r)) && (
           <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10.5px] font-semibold"
@@ -618,220 +618,220 @@
       finally { setSaving(false); }
     };
 
-    return (
-      <ModalShell onClose={onClose}>
-        <ModalHeader
-          title="Edit User"
-          subtitle={user.name}
-          onClose={onClose}
-          icon={
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black"
-              style={{ background: `${getAvatarColor(user.role)}cc` }}>
-              {getInitials(user.name)}
-            </div>
-          }
-        />
-        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
-          {error && (
-            <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
-              style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
-            </div>
-          )}
-          <Field label="Nama"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
-          <Field label="Tanggal Lahir">
-            <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
-          </Field>
-          <Field label="Jenis Kelamin">
-            <div className="flex gap-2">
-              {([{ v: "L", label: "Laki-laki", Icon: Mars }, { v: "P", label: "Perempuan", Icon: Venus }] as const).map(({ v, label, Icon }) => (
-                <button key={v} type="button" onClick={() => setGender(v)}
-                  className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
-                  style={gender === v
-                    ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
-                    : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                  <span className="inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="Nomor WhatsApp"><Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
-          <Field label="Role (bisa pilih lebih dari 1)">
-            <MultiRoleSelect values={roles} onChange={setRoles} />
-          </Field>
-          <Field label="Shift">
-            <div className="flex gap-2">
-              {(["PAGI", "SORE"] as const).map(s => (
-                <button key={s} type="button" onClick={() => setShift(s)}
-                  className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
-                  style={shift === s
-                    ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
-                    : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                  {s === "PAGI" ? <Sunrise className="w-3.5 h-3.5 inline" /> : <Sunset className="w-3.5 h-3.5 inline" />} {s}
-                </button>
-              ))}
-            </div>
-          </Field>
-        </div>
-        <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid #f1f5f9" }}>
-          <button onClick={onClose}
-            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
+  return (
+    <ModalShell onClose={onClose}>
+      <ModalHeader
+        title="Edit User"
+        subtitle={user.name}
+        onClose={onClose}
+        icon={
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black"
+            style={{ background: `${getAvatarColor(user.role)}cc` }}>
+            {getInitials(user.name)}
+          </div>
+        }
+      />
+      <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+        {error && (
+          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
+            style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
+          </div>
+        )}
+        <Field label="Nama"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
+        <Field label="Tanggal Lahir">
+          <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
+        </Field>
+        <Field label="Jenis Kelamin">
+          <div className="flex gap-2">
+            {([{ v: "L", label: "Laki-laki", Icon: Mars }, { v: "P", label: "Perempuan", Icon: Venus }] as const).map(({ v, label, Icon }) => (
+              <button key={v} type="button" onClick={() => setGender(v)}
+                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                style={gender === v
+                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                <span className="inline-flex items-center gap-1.5"><Icon className="w-3.5 h-3.5" /> {label}</span>
+              </button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Nomor WhatsApp"><Input type="tel" value={phone} onChange={e => setPhone(e.target.value)} /></Field>
+        <Field label="Role (bisa pilih lebih dari 1)">
+          <MultiRoleSelect values={roles} onChange={setRoles} />
+        </Field>
+        <Field label="Shift">
+          <div className="flex gap-2">
+            {(["PAGI", "SORE"] as const).map(s => (
+              <button key={s} type="button" onClick={() => setShift(s)}
+                className="flex-1 h-11 sm:h-10 rounded-xl text-xs font-bold border transition-all active:scale-95"
+                style={shift === s
+                  ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", border: "1px solid transparent", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                  : { background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
+                {s === "PAGI" ? <Sunrise className="w-3.5 h-3.5 inline" /> : <Sunset className="w-3.5 h-3.5 inline" />} {s}
+              </button>
+            ))}
+          </div>
+        </Field>
+      </div>
+      <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-4 flex gap-2.5 flex-shrink-0" style={{ borderTop: "1px solid #f1f5f9" }}>
+        <button onClick={onClose}
+          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold transition-all hover:bg-slate-100 active:scale-95"
+          style={{ background: "#f1f5f9", color: "#64748b" }}>
+          Batal
+        </button>
+        <button onClick={save} disabled={saving}
+          className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
+          {saving
+            ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Menyimpan...</>
+            : <><Save className="w-4 h-4" /> Simpan</>}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+// ── ConfirmLogoutModal ────────────────────────────────────────────────────────
+function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
+  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
+        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}><DoorOpen className="w-8 h-8" style={{ color: "#ea580c" }} /></div>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">Paksa Logout {user.name}?</h3>
+        <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">Session aktif user ini akan diakhiri segera.</p>
+        <div className="flex gap-2.5">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
             style={{ background: "#f1f5f9", color: "#64748b" }}>
             Batal
           </button>
-          <button onClick={save} disabled={saving}
+          <button onClick={onConfirm} disabled={loading}
             className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
-            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
-            {saving
-              ? <><div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />Menyimpan...</>
-              : <><Save className="w-4 h-4" /> Simpan</>}
+            style={{ background: "linear-gradient(135deg, #ea580c, #dc2626)", boxShadow: "0 4px 14px rgba(234,88,12,0.3)" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+              : <><DoorOpen className="w-4 h-4" /> Ya, Logout</>}
           </button>
         </div>
-      </ModalShell>
-    );
-  }
+      </div>
+    </div>
+  );
+}
 
-  // ── ConfirmLogoutModal ────────────────────────────────────────────────────────
-  function ConfirmLogoutModal({ user, onClose, onConfirm, loading }: {
-    user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
-  }) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
-          style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}><DoorOpen className="w-8 h-8" style={{ color: "#ea580c" }} /></div>
-          <h3 className="font-black text-slate-800 text-center text-base mb-1">Paksa Logout {user.name}?</h3>
-          <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">Session aktif user ini akan diakhiri segera.</p>
-          <div className="flex gap-2.5">
-            <button onClick={onClose} disabled={loading}
-              className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
-              style={{ background: "#f1f5f9", color: "#64748b" }}>
-              Batal
-            </button>
-            <button onClick={onConfirm} disabled={loading}
-              className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
-              style={{ background: "linear-gradient(135deg, #ea580c, #dc2626)", boxShadow: "0 4px 14px rgba(234,88,12,0.3)" }}>
-              {loading
-                ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-                : <><DoorOpen className="w-4 h-4" /> Ya, Logout</>}
-            </button>
-          </div>
+// ── ConfirmDeleteModal ────────────────────────────────────────────────────────
+function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
+  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
+        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><Trash2 className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">Hapus Akun {user.name}?</h3>
+        <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
+          Akun ini akan dihapus permanen dari sistem.
+        </p>
+        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
+          style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}>
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> Tindakan ini tidak bisa dibatalkan!
+        </div>
+        <div className="flex gap-2.5">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            Batal
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+              : <><Trash2 className="w-4 h-4" /> Ya, Hapus</>}
+          </button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  // ── ConfirmDeleteModal ────────────────────────────────────────────────────────
-  function ConfirmDeleteModal({ user, onClose, onConfirm, loading }: {
-    user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
-  }) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
-          style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><Trash2 className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
-          <h3 className="font-black text-slate-800 text-center text-base mb-1">Hapus Akun {user.name}?</h3>
-          <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
-            Akun ini akan dihapus permanen dari sistem.
-          </p>
-          <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
-            style={{ background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }}>
-            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> Tindakan ini tidak bisa dibatalkan!
-          </div>
-          <div className="flex gap-2.5">
-            <button onClick={onClose} disabled={loading}
-              className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
-              style={{ background: "#f1f5f9", color: "#64748b" }}>
-              Batal
-            </button>
-            <button onClick={onConfirm} disabled={loading}
-              className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
-              style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
-              {loading
-                ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-                : <><Trash2 className="w-4 h-4" /> Ya, Hapus</>}
-            </button>
-          </div>
+// ── ConfirmResetPasswordModal ─────────────────────────────────────────────────
+function ConfirmResetPasswordModal({ user, onClose, onConfirm, loading }: {
+  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
+        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "#fffbeb", border: "1px solid #fde68a" }}><KeyRound className="w-8 h-8" style={{ color: "#d97706" }} /></div>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">Reset Password {user.name}?</h3>
+        <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
+          Password akan direset. User harus membuat password baru saat login berikutnya.
+        </p>
+        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
+          style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
+          <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" /> Status "Belum PW" akan aktif kembali
+        </div>
+        <div className="flex gap-2.5">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            Batal
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{ background: "linear-gradient(135deg, #d97706, #b45309)", boxShadow: "0 4px 14px rgba(217,119,6,0.3)" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+              : <><KeyRound className="w-4 h-4" /> Ya, Reset</>}
+          </button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  // ── ConfirmResetPasswordModal ─────────────────────────────────────────────────
-  function ConfirmResetPasswordModal({ user, onClose, onConfirm, loading }: {
-    user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
-  }) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
-          style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "#fffbeb", border: "1px solid #fde68a" }}><KeyRound className="w-8 h-8" style={{ color: "#d97706" }} /></div>
-          <h3 className="font-black text-slate-800 text-center text-base mb-1">Reset Password {user.name}?</h3>
-          <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
-            Password akan direset. User harus membuat password baru saat login berikutnya.
-          </p>
-          <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
-            style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}>
-            <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" /> Status "Belum PW" akan aktif kembali
-          </div>
-          <div className="flex gap-2.5">
-            <button onClick={onClose} disabled={loading}
-              className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
-              style={{ background: "#f1f5f9", color: "#64748b" }}>
-              Batal
-            </button>
-            <button onClick={onConfirm} disabled={loading}
-              className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
-              style={{ background: "linear-gradient(135deg, #d97706, #b45309)", boxShadow: "0 4px 14px rgba(217,119,6,0.3)" }}>
-              {loading
-                ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-                : <><KeyRound className="w-4 h-4" /> Ya, Reset</>}
-            </button>
-          </div>
+// ── ConfirmResetBiometricModal ────────────────────────────────────────────────
+function ConfirmResetBiometricModal({ user, onClose, onConfirm, loading }: {
+  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
+        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><Fingerprint className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">Reset Sidik Jari {user.name}?</h3>
+        <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">
+          Kredensial di device lama akan dihapus. User perlu daftar ulang di HP-nya untuk pakai absen biometrik lagi.
+        </p>
+        <div className="flex gap-2.5">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            Batal
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+              : <><Fingerprint className="w-4 h-4" /> Ya, Reset</>}
+          </button>
         </div>
       </div>
-    );
-  }
-
-  // ── ConfirmResetBiometricModal ────────────────────────────────────────────────
-  function ConfirmResetBiometricModal({ user, onClose, onConfirm, loading }: {
-    user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
-  }) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
-        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
-          style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><Fingerprint className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
-          <h3 className="font-black text-slate-800 text-center text-base mb-1">Reset Sidik Jari {user.name}?</h3>
-          <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">
-            Kredensial di device lama akan dihapus. User perlu daftar ulang di HP-nya untuk pakai absen biometrik lagi.
-          </p>
-          <div className="flex gap-2.5">
-            <button onClick={onClose} disabled={loading}
-              className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
-              style={{ background: "#f1f5f9", color: "#64748b" }}>
-              Batal
-            </button>
-            <button onClick={onConfirm} disabled={loading}
-              className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
-              style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
-              {loading
-                ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-                : <><Fingerprint className="w-4 h-4" /> Ya, Reset</>}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    </div>
+  );
+}
 
   // ── ActionBtn ─────────────────────────────────────────────────────────────────
   function ActionBtn({ onClick, title, bg, color, children }: {
@@ -846,25 +846,25 @@
     );
   }
 
-  // ── StatCard ──────────────────────────────────────────────────────────────────
-  function StatCard({ icon, value, label, sub, accent }: {
-    icon: React.ReactNode; value: number; label: string; sub: string; accent: string;
-  }) {
-    return (
-      <div className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden group transition-all hover:shadow-md"
-        style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-        <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: accent }} />
-        <div className="pl-2.5 sm:pl-3">
-          <div className="flex items-start justify-between mb-2 sm:mb-3">
-            <span className="text-slate-700">{icon}</span>
-            <span className="text-2xl sm:text-3xl font-black tabular-nums" style={{ color: "#0f172a" }}>{value}</span>
-          </div>
-          <p className="text-[10.5px] sm:text-[11px] font-bold truncate" style={{ color: "#64748b" }}>{label}</p>
-          <p className="text-[9.5px] sm:text-[10px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>{sub}</p>
+// ── StatCard ──────────────────────────────────────────────────────────────────
+function StatCard({ icon, value, label, sub, accent }: {
+  icon: React.ReactNode; value: number; label: string; sub: string; accent: string;
+}) {
+  return (
+    <div className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden group transition-all hover:shadow-md"
+      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+      <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: accent }} />
+      <div className="pl-2.5 sm:pl-3">
+        <div className="flex items-start justify-between mb-2 sm:mb-3">
+          <span className="text-slate-700">{icon}</span>
+          <span className="text-2xl sm:text-3xl font-black tabular-nums" style={{ color: "#0f172a" }}>{value}</span>
         </div>
+        <p className="text-[10.5px] sm:text-[11px] font-bold truncate" style={{ color: "#64748b" }}>{label}</p>
+        <p className="text-[9.5px] sm:text-[10px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>{sub}</p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   export default function UsersPage() {
     const router = useRouter();
@@ -1105,274 +1105,274 @@
       <DashboardLayout>
         {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
-        {isAdmin && confirmReset && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => setConfirmReset(null)} />
-            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
-              style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
-                style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><ScanFace className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
-              <h3 className="font-black text-slate-800 text-center text-base mb-1">Reset Wajah {confirmReset.name}?</h3>
-              <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">User harus scan ulang wajah saat login berikutnya.</p>
-              <div className="flex gap-2.5">
-                <button onClick={() => setConfirmReset(null)}
-                  className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-all"
-                  style={{ background: "#f1f5f9", color: "#64748b" }}>
-                  Batal
-                </button>
-                <button onClick={() => handleReset(confirmReset)} disabled={resetting === confirmReset.id}
-                  className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
-                  style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
-                  {resetting === confirmReset.id
-                    ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-                    : <><ScanFace className="w-4 h-4" /> Ya, Reset</>}
-                </button>
-              </div>
+      {isAdmin && confirmReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => setConfirmReset(null)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
+            style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: "#fff1f2", border: "1px solid #fecaca" }}><ScanFace className="w-8 h-8" style={{ color: "#dc2626" }} /></div>
+            <h3 className="font-black text-slate-800 text-center text-base mb-1">Reset Wajah {confirmReset.name}?</h3>
+            <p className="text-sm text-slate-400 text-center mb-6 leading-relaxed">User harus scan ulang wajah saat login berikutnya.</p>
+            <div className="flex gap-2.5">
+              <button onClick={() => setConfirmReset(null)}
+                className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-all"
+                style={{ background: "#f1f5f9", color: "#64748b" }}>
+                Batal
+              </button>
+              <button onClick={() => handleReset(confirmReset)} disabled={resetting === confirmReset.id}
+                className="flex-1 h-11 sm:h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
+                style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)", boxShadow: "0 4px 14px rgba(220,38,38,0.3)" }}>
+                {resetting === confirmReset.id
+                  ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+                  : <><ScanFace className="w-4 h-4" /> Ya, Reset</>}
+              </button>
             </div>
           </div>
-        )}
-        {isAdmin && confirmLogoutUser && (
-          <ConfirmLogoutModal user={confirmLogoutUser} onClose={() => setConfirmLogoutUser(null)} onConfirm={handleForceLogout} loading={loggingOut} />
-        )}
-        {isAdmin && confirmDeleteUser && (
-          <ConfirmDeleteModal user={confirmDeleteUser} onClose={() => setConfirmDeleteUser(null)} onConfirm={handleDeleteUser} loading={deleting} />
-        )}
-        {isAdmin && confirmResetPwUser && (
-          <ConfirmResetPasswordModal user={confirmResetPwUser} onClose={() => setConfirmResetPwUser(null)} onConfirm={handleResetPassword} loading={resettingPw} />
-        )}
-        {isAdmin && confirmResetBiometricUser && (
-          <ConfirmResetBiometricModal user={confirmResetBiometricUser} onClose={() => setConfirmResetBiometricUser(null)} onConfirm={handleResetBiometric} loading={resettingBiometric} />
-        )}
-        {isAdmin && showCreate && (
-          <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />
-        )}
-        {isAdmin && editUser && (
-          <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }} />
-        )}
-        {isAdmin && sendContractUser && (
-          <SendContractModal
-            user={{ id: sendContractUser.id, name: sendContractUser.name }}
-            onClose={() => setSendContractUser(null)}
-            onSent={() => { fetchUsers(); showToast(`Kontrak berhasil dikirim ke ${sendContractUser.name}`, "ok"); }}
-          />
-        )}
+        </div>
+      )}
+      {isAdmin && confirmLogoutUser && (
+        <ConfirmLogoutModal user={confirmLogoutUser} onClose={() => setConfirmLogoutUser(null)} onConfirm={handleForceLogout} loading={loggingOut} />
+      )}
+      {isAdmin && confirmDeleteUser && (
+        <ConfirmDeleteModal user={confirmDeleteUser} onClose={() => setConfirmDeleteUser(null)} onConfirm={handleDeleteUser} loading={deleting} />
+      )}
+      {isAdmin && confirmResetPwUser && (
+        <ConfirmResetPasswordModal user={confirmResetPwUser} onClose={() => setConfirmResetPwUser(null)} onConfirm={handleResetPassword} loading={resettingPw} />
+      )}
+      {isAdmin && confirmResetBiometricUser && (
+        <ConfirmResetBiometricModal user={confirmResetBiometricUser} onClose={() => setConfirmResetBiometricUser(null)} onConfirm={handleResetBiometric} loading={resettingBiometric} />
+      )}
+      {isAdmin && showCreate && (
+        <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />
+      )}
+      {isAdmin && editUser && (
+        <EditUserModal user={editUser} onClose={() => setEditUser(null)} onSaved={() => { fetchUsers(); showToast("User berhasil diupdate", "ok"); }} />
+      )}
+      {isAdmin && sendContractUser && (
+        <SendContractModal
+          user={{ id: sendContractUser.id, name: sendContractUser.name }}
+          onClose={() => setSendContractUser(null)}
+          onSent={() => { fetchUsers(); showToast(`Kontrak berhasil dikirim ke ${sendContractUser.name}`, "ok"); }}
+        />
+      )}
 
-        <div className="min-h-screen bg-[#F7F7F8]">
-          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-5">
+      <div className="min-h-screen bg-[#F7F7F8]">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-5">
 
-            {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.35)" }}>
-                  <svg style={{ width: 18, height: 18 }} fill="none" stroke="white" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight truncate">Manajemen Aktifitas</h1>
-                  <p className="text-[11px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>
-                    {isAdmin
-                      ? "Kelola akun, role, shift, dan wajah karyawan"
-                      : isKepala
-                        ? "Lihat detail dan chat dengan anggota tim"
-                        : "Lihat dan chat dengan rekan kerja"}
-                  </p>
-                </div>
+          {/* ── Header ─────────────────────────────────────────────────── */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.35)" }}>
+                <svg style={{ width: 18, height: 18 }} fill="none" stroke="white" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
               </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <NotificationToggle />
-                <button
-                  onClick={() => setOpenGroupChat(true)}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 h-10 sm:h-auto sm:py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
-                  style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.35)" }}>
-                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
-                  </svg>
-                  <span>Grup Chat</span>
-                </button>
-                {isAdmin && (
-                  <button
-                    onClick={() => setShowCreate(true)}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 h-10 sm:h-auto sm:py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
-                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
-                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span>Tambah User</span>
-                  </button>
-                )}
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight truncate">Manajemen Aktifitas</h1>
+                <p className="text-[11px] mt-0.5 truncate" style={{ color: "#94a3b8" }}>
+                  {isAdmin
+                    ? "Kelola akun, role, shift, dan wajah karyawan"
+                    : isKepala
+                      ? "Lihat detail dan chat dengan anggota tim"
+                      : "Lihat dan chat dengan rekan kerja"}
+                </p>
               </div>
             </div>
 
-            {/* ── Stat cards ─────────────────────────────────────────────── */}
-            {!loading && isAdmin && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-                <StatCard icon={<Users className="w-5 h-5" />} value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
-                <StatCard icon={<Crown className="w-5 h-5" />} value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
-                <StatCard icon={<ScanFace className="w-5 h-5" />} value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
-                <StatCard icon={<AlertTriangle className="w-5 h-5" />} value={pwNotSet} label="Belum Set PW" sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
-                  accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"} />
-              </div>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              <NotificationToggle />
+              <button
+                onClick={() => setOpenGroupChat(true)}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 h-10 sm:h-auto sm:py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
+                style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.35)" }}>
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+                </svg>
+                <span>Grup Chat</span>
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setShowCreate(true)}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 h-10 sm:h-auto sm:py-2.5 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
+                  style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span>Tambah User</span>
+                </button>
+              )}
+            </div>
+          </div>
 
-            {/* ── Main tab switch (Users / Roles) ───────────────────────── */}
-            {isRoleManager && (
-              <div className="bg-white rounded-2xl p-1.5 border border-slate-100">
-                <div className="flex gap-1.5">
-                  {([
-                    { key: "users", label: "Daftar User", icon: <Users className="w-3.5 h-3.5" /> },
-                    { key: "roles", label: "Role & Hak Akses", icon: <Lock className="w-3.5 h-3.5" /> },
-                  ] as const).map((t) => (
-                    <button
-                      key={t.key}
-                      onClick={() => {
-                        setMainTab(t.key);
-                        if (t.key === "users") fetchCustomRoles();
-                      }}
-                      className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
-                      style={
-                        mainTab === t.key
-                          ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
-                          : { background: "#f5f7ff", color: "#64748b" }
-                      }
-                    >
-                      <span>{t.icon}</span>
-                      <span className="truncate">{t.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+          {/* ── Stat cards ─────────────────────────────────────────────── */}
+          {!loading && isAdmin && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+              <StatCard icon={<Users className="w-5 h-5" />} value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
+              <StatCard icon={<Crown className="w-5 h-5" />} value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
+              <StatCard icon={<ScanFace className="w-5 h-5" />} value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
+              <StatCard icon={<AlertTriangle className="w-5 h-5" />} value={pwNotSet} label="Belum Set PW" sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
+                accent={pwNotSet > 0 ? "linear-gradient(180deg, #fbbf24, #d97706)" : "linear-gradient(180deg, #e2e8f0, #cbd5e1)"} />
+            </div>
+          )}
 
-            {mainTab === "roles" && isRoleManager ? (
-              <RoleAccessManager />
-            ) : (
-              <>
-                {isAdmin && (
-                  <div className="bg-white rounded-2xl p-1.5"
-                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                    <div className="flex gap-1.5">
-                      {([
-                        { key: "karyawan", label: "Karyawan", icon: <Users className="w-3.5 h-3.5" />, count: totalKaryawan },
-                        { key: "pkl", label: "PKL", icon: <GraduationCap className="w-3.5 h-3.5" />, count: totalPKL },
-                      ] as const).map(t => (
-                        <button key={t.key}
-                          onClick={() => { setActiveTab(t.key); setFilterRole("Semua"); }}
-                          className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
+          {/* ── Main tab switch (Users / Roles) ───────────────────────── */}
+          {isRoleManager && (
+            <div className="bg-white rounded-2xl p-1.5 border border-slate-100">
+              <div className="flex gap-1.5">
+                {([
+                  { key: "users", label: "Daftar User", icon: <Users className="w-3.5 h-3.5" /> },
+                  { key: "roles", label: "Role & Hak Akses", icon: <Lock className="w-3.5 h-3.5" /> },
+                ] as const).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => {
+                      setMainTab(t.key);
+                      if (t.key === "users") fetchCustomRoles();
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
+                    style={
+                      mainTab === t.key
+                        ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
+                        : { background: "#f5f7ff", color: "#64748b" }
+                    }
+                  >
+                    <span>{t.icon}</span>
+                    <span className="truncate">{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {mainTab === "roles" && isRoleManager ? (
+            <RoleAccessManager />
+          ) : (
+            <>
+              {isAdmin && (
+                <div className="bg-white rounded-2xl p-1.5"
+                  style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                  <div className="flex gap-1.5">
+                    {([
+                      { key: "karyawan", label: "Karyawan", icon: <Users className="w-3.5 h-3.5" />, count: totalKaryawan },
+                      { key: "pkl", label: "PKL", icon: <GraduationCap className="w-3.5 h-3.5" />, count: totalPKL },
+                    ] as const).map(t => (
+                      <button key={t.key}
+                        onClick={() => { setActiveTab(t.key); setFilterRole("Semua"); }}
+                        className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
+                        style={activeTab === t.key
+                          ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
+                          : { background: "#f5f7ff", color: "#64748b" }}>
+                        <span>{t.icon}</span>
+                        <span>{t.label}</span>
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black"
                           style={activeTab === t.key
-                            ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
-                            : { background: "#f5f7ff", color: "#64748b" }}>
-                          <span>{t.icon}</span>
-                          <span>{t.label}</span>
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black"
-                            style={activeTab === t.key
-                              ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
-                              : { background: "#e8ecf5", color: "#64748b" }}>
-                            {t.count}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                            ? { background: "rgba(255,255,255,0.15)", color: "#fff" }
+                            : { background: "#e8ecf5", color: "#64748b" }}>
+                          {t.count}
+                        </span>
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
+              )}
 
                 <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 items-start">
 
                   <div className="flex-1 min-w-0 w-full space-y-3">
 
-                    {/* ── Search / sort / filter panel ─────────────────── */}
-                    <div className="bg-white rounded-2xl overflow-hidden"
-                      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                      <div className="px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-3.5 space-y-3">
-                        <div className="flex gap-2 items-center">
-                          <div className="relative flex-1 min-w-0">
-                            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }}
-                              fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                            <input type="text" placeholder="Cari nama atau nomor..."
-                              value={search} onChange={e => setSearch(e.target.value)}
-                              className="w-full h-10 sm:h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition"
-                              style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }} />
-                            {search && (
-                              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform">
-                                <svg className="w-3 h-3" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                          <button onClick={() => setSortOrder(s => s === "asc" ? "desc" : "asc")}
-                            className="h-10 sm:h-9 px-3 sm:px-3.5 rounded-xl text-[10.5px] font-black text-white flex-shrink-0 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
-                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 2px 8px rgba(15,12,41,0.25)" }}>
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d={sortOrder === "asc"
-                                  ? "M3 4h13M3 8h9M3 12h5m11 0l-4-4m4 4l-4 4"
-                                  : "M3 4h13M3 8h9M3 12h9m-2 4l4-4m-4 4l4 4"} />
-                            </svg>
-                            {sortOrder === "asc" ? "A–Z" : "Z–A"}
-                          </button>
-                        </div>
-
-                        <div className="flex gap-1.5 flex-wrap max-h-[5.5rem] sm:max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
-                          {["Semua", ...tabRoles].map(r => (
-                            <button key={r} onClick={() => setFilterRole(r)}
-                              className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex-shrink-0 active:scale-95"
-                              style={filterRole === r
-                                ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
-                                : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
-                              {r === "Semua" ? `Semua (${totalInTab})` : <>{getRoleIcon(r)} {getRoleLabel(r)}</>}
+                  {/* ── Search / sort / filter panel ─────────────────── */}
+                  <div className="bg-white rounded-2xl overflow-hidden"
+                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div className="px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-3.5 space-y-3">
+                      <div className="flex gap-2 items-center">
+                        <div className="relative flex-1 min-w-0">
+                          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "#94a3b8" }}
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          <input type="text" placeholder="Cari nama atau nomor..."
+                            value={search} onChange={e => setSearch(e.target.value)}
+                            className="w-full h-10 sm:h-9 rounded-xl pl-9 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-violet-400/30 transition"
+                            style={{ border: "1px solid #e8ecf5", background: "#f5f7ff", color: "#334155" }} />
+                          {search && (
+                            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 hover:scale-110 transition-transform">
+                              <svg className="w-3 h-3" style={{ color: "#94a3b8" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
                             </button>
-                          ))}
+                          )}
                         </div>
+                        <button onClick={() => setSortOrder(s => s === "asc" ? "desc" : "asc")}
+                          className="h-10 sm:h-9 px-3 sm:px-3.5 rounded-xl text-[10.5px] font-black text-white flex-shrink-0 flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-95"
+                          style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 2px 8px rgba(15,12,41,0.25)" }}>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                              d={sortOrder === "asc"
+                                ? "M3 4h13M3 8h9M3 12h5m11 0l-4-4m4 4l-4 4"
+                                : "M3 4h13M3 8h9M3 12h9m-2 4l4-4m-4 4l4 4"} />
+                          </svg>
+                          {sortOrder === "asc" ? "A–Z" : "Z–A"}
+                        </button>
+                      </div>
+
+                      <div className="flex gap-1.5 flex-wrap max-h-[5.5rem] sm:max-h-[4.5rem] overflow-y-auto pb-0.5 scrollbar-hide">
+                        {["Semua", ...tabRoles].map(r => (
+                          <button key={r} onClick={() => setFilterRole(r)}
+                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex-shrink-0 active:scale-95"
+                            style={filterRole === r
+                              ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff" }
+                              : { background: "#f5f7ff", color: "#64748b", border: "1px solid #e8ecf5" }}>
+                            {r === "Semua" ? `Semua (${totalInTab})` : <>{getRoleIcon(r)} {getRoleLabel(r)}</>}
+                          </button>
+                        ))}
                       </div>
                     </div>
+                  </div>
 
-                    {/* ── User list ─────────────────────────────────────── */}
-                    <div className="bg-white rounded-2xl overflow-hidden"
-                      style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                  {/* ── User list ─────────────────────────────────────── */}
+                  <div className="bg-white rounded-2xl overflow-hidden"
+                    style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
 
-                      <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between flex-wrap gap-2"
-                        style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
-                          <p className="text-[11px] font-bold truncate" style={{ color: "#64748b" }}>
-                            {filtered.length === totalInTab
-                              ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
-                              : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
-                          </p>
-                        </div>
-                        {isAdmin && (
-                          <div className="hidden sm:flex items-center gap-3 text-[10px] flex-shrink-0" style={{ color: "#94a3b8" }}>
-                            <span className="flex items-center gap-1.5">
-                              <div className="w-2 h-2 rounded-full bg-emerald-400" />Wajah OK
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <div className="w-2 h-2 rounded-full bg-violet-400" />Akses penuh
-                            </span>
-                          </div>
-                        )}
+                    <div className="px-3.5 sm:px-5 py-3 sm:py-3.5 flex items-center justify-between flex-wrap gap-2"
+                      style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: "linear-gradient(180deg, #6366f1, #8b5cf6)" }} />
+                        <p className="text-[11px] font-bold truncate" style={{ color: "#64748b" }}>
+                          {filtered.length === totalInTab
+                            ? `${totalInTab} ${activeTab === "pkl" ? "Pkl" : "Karyawan"}`
+                            : `${filtered.length} dari ${totalInTab} ${activeTab === "pkl" ? "magang" : "karyawan"}`}
+                        </p>
                       </div>
-
-                      {loading ? (
-                        <div>
-                          {Array(6).fill(0).map((_, i) => (
-                            <div key={i} className="px-3.5 sm:px-5 py-4 flex items-center gap-3 sm:gap-3.5 animate-pulse"
-                              style={{ borderBottom: "1px solid #f8f8fc" }}>
-                              <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
-                              <div className="flex-1 space-y-2 min-w-0">
-                                <div className="h-3 rounded-full w-32 max-w-full" style={{ background: "#e2e8f0" }} />
-                                <div className="h-2.5 rounded-full w-20" style={{ background: "#f1f5f9" }} />
-                              </div>
-                              <div className="w-16 h-7 rounded-lg flex-shrink-0 hidden sm:block" style={{ background: "#f1f5f9" }} />
-                            </div>
-                          ))}
+                      {isAdmin && (
+                        <div className="hidden sm:flex items-center gap-3 text-[10px] flex-shrink-0" style={{ color: "#94a3b8" }}>
+                          <span className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-emerald-400" />Wajah OK
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-violet-400" />Akses penuh
+                          </span>
                         </div>
+                      )}
+                    </div>
+
+                    {loading ? (
+                      <div>
+                        {Array(6).fill(0).map((_, i) => (
+                          <div key={i} className="px-3.5 sm:px-5 py-4 flex items-center gap-3 sm:gap-3.5 animate-pulse"
+                            style={{ borderBottom: "1px solid #f8f8fc" }}>
+                            <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: "#f1f5f9" }} />
+                            <div className="flex-1 space-y-2 min-w-0">
+                              <div className="h-3 rounded-full w-32 max-w-full" style={{ background: "#e2e8f0" }} />
+                              <div className="h-2.5 rounded-full w-20" style={{ background: "#f1f5f9" }} />
+                            </div>
+                            <div className="w-16 h-7 rounded-lg flex-shrink-0 hidden sm:block" style={{ background: "#f1f5f9" }} />
+                          </div>
+                        ))}
+                      </div>
 
                       ) : filtered.length === 0 ? (
                         <div className="text-center py-16 sm:py-20 px-4">
@@ -1388,52 +1388,52 @@
                           )}
                         </div>
 
-                      ) : (
-                        <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 260px)", minHeight: "420px" }}>
-                          {filtered.map((user, idx) => {
-                            const avatarColor = getAvatarColor(user.role);
-                            const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
-                            const canChat = currentUserInfo && user.id !== currentUserInfo.id;
+                    ) : (
+                      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 260px)", minHeight: "420px" }}>
+                        {filtered.map((user, idx) => {
+                          const avatarColor = getAvatarColor(user.role);
+                          const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
+                          const canChat = currentUserInfo && user.id !== currentUserInfo.id;
 
-                            return (
-                              <div key={user.id}
-                                className="px-3.5 sm:px-5 py-3 sm:py-3.5 hover:bg-slate-50/70 transition-colors group"
-                                style={{ borderBottom: idx < filtered.length - 1 ? "1px solid #f5f5fb" : "none" }}>
-                                <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
+                          return (
+                            <div key={user.id}
+                              className="px-3.5 sm:px-5 py-3 sm:py-3.5 hover:bg-slate-50/70 transition-colors group"
+                              style={{ borderBottom: idx < filtered.length - 1 ? "1px solid #f5f5fb" : "none" }}>
+                              <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
 
-                                  <div
-                                    className="relative flex-shrink-0 cursor-pointer"
-                                    onClick={() => router.push(`/dashboard/profile/${user.id}`)}
-                                    title={`Lihat profil ${user.name}`}
-                                  >
-                                    {user.status_note && (
-                                      <div className="absolute -top-2.5 left-0 z-10 max-w-[150px] sm:max-w-[190px]">
-                                        <div className="px-2 py-1 rounded-xl text-[9px] font-semibold truncate shadow-sm"
-                                          style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#5b21b6" }}>
-                                          {user.status_note}
-                                        </div>
-                                        <div className="absolute left-5 -translate-x-1/2 -bottom-[3px] w-2 h-2 rotate-45"
-                                          style={{ background: "#f5f3ff", borderRight: "1px solid #ddd6fe", borderBottom: "1px solid #ddd6fe" }} />
+                                <div
+                                  className="relative flex-shrink-0 cursor-pointer"
+                                  onClick={() => router.push(`/dashboard/profile/${user.id}`)}
+                                  title={`Lihat profil ${user.name}`}
+                                >
+                                  {user.status_note && (
+                                    <div className="absolute -top-2.5 left-0 z-10 max-w-[150px] sm:max-w-[190px]">
+                                      <div className="px-2 py-1 rounded-xl text-[9px] font-semibold truncate shadow-sm"
+                                        style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#5b21b6" }}>
+                                        {user.status_note}
                                       </div>
-                                    )}
-                                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-black overflow-hidden"
-                                      style={{
-                                        background: isFullAccess
-                                          ? "linear-gradient(135deg, #7c3aed, #6d28d9)"
-                                          : `linear-gradient(135deg, ${avatarColor}dd, ${avatarColor})`,
-                                        boxShadow: `0 2px 8px ${avatarColor}30`,
-                                      }}>
-                                      {user.profile_photo_url
-                                        ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
-                                        : getInitials(user.name)}
+                                      <div className="absolute left-5 -translate-x-1/2 -bottom-[3px] w-2 h-2 rotate-45"
+                                        style={{ background: "#f5f3ff", borderRight: "1px solid #ddd6fe", borderBottom: "1px solid #ddd6fe" }} />
                                     </div>
-                                    {isAdmin && user.face_embedding && (
-                                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-white flex items-center justify-center"
-                                        style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                      </div>
-                                    )}
+                                  )}
+                                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-black overflow-hidden"
+                                    style={{
+                                      background: isFullAccess
+                                        ? "linear-gradient(135deg, #7c3aed, #6d28d9)"
+                                        : `linear-gradient(135deg, ${avatarColor}dd, ${avatarColor})`,
+                                      boxShadow: `0 2px 8px ${avatarColor}30`,
+                                    }}>
+                                    {user.profile_photo_url
+                                      ? <img src={user.profile_photo_url} alt={user.name} className="w-full h-full object-cover" />
+                                      : getInitials(user.name)}
                                   </div>
+                                  {isAdmin && user.face_embedding && (
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-white flex items-center justify-center"
+                                      style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.12)" }}>
+                                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                    </div>
+                                  )}
+                                </div>
 
                                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/dashboard/profile/${user.id}`)} title={`Lihat profil ${user.name}`}>
                                     <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
@@ -1681,14 +1681,14 @@
           </div>
         </div>
 
-        <style jsx>{`
-          @keyframes slideIn  { from { opacity: 0; transform: translateX(60px); }  to { opacity: 1; transform: translateX(0); } }
-          @keyframes scaleIn  { from { opacity: 0; transform: scale(0.94);      }  to { opacity: 1; transform: scale(1);    } }
-          .animate-slideIn { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-          .animate-scaleIn { animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
-          .scrollbar-hide::-webkit-scrollbar { display: none; }
-          .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        `}</style>
-      </DashboardLayout>
-    );
-  }
+      <style jsx>{`
+        @keyframes slideIn  { from { opacity: 0; transform: translateX(60px); }  to { opacity: 1; transform: translateX(0); } }
+        @keyframes scaleIn  { from { opacity: 0; transform: scale(0.94);      }  to { opacity: 1; transform: scale(1);    } }
+        .animate-slideIn { animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-scaleIn { animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+    </DashboardLayout>
+  );
+}
