@@ -570,7 +570,7 @@ export default function Page() {
       t.invoice_number.toLowerCase().includes(q) ||
       (t.sales_name && t.sales_name.toLowerCase().includes(q))
     );
-  });
+  }); 
 
   return (
     <DashboardLayout>
