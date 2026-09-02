@@ -759,6 +759,73 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     return (allowed as UserRole[]).includes(role);
   }
 
+  // ── Dashboard: tampilan per role ──────────────────────────────────────────
+  // Dashboard lengkap (semua card + chart + transaksi terbaru) HANYA untuk
+  // FULL_ACCESS (Admin, Programmer, Asisten CEO). Role lain dapat versi
+  // ringkas: Laptop Ready + widget "Top X Hari Ini" (beda per divisi) +
+  // Laptop Terlaris.
+  export const DASHBOARD_FULL_ROLES: UserRole[] = [...FULL_ACCESS];
+
+  export function isDashboardLimited(role: string | null | undefined): boolean {
+    if (!role) return false;
+    return !(DASHBOARD_FULL_ROLES as string[]).includes(role);
+  }
+
+  export type DashboardTopWidgetSource = "sales" | "leaderboard" | "none";
+
+  export interface DashboardTopWidgetConfig {
+    label: string;
+    source: DashboardTopWidgetSource;
+    /** substring yang dicocokkan ke field `role` hasil /api/leaderboard-kerja
+     *  — HARUS disamakan manual dengan hasRole() di api/leaderboard-kerja/route.ts.
+     *  Cuma dipakai kalau source === "leaderboard". */
+    matchRole?: string;
+  }
+
+  // Role sales & variannya (onpoint/sotech/zenith) tetap pakai widget "Top
+  // Sales" existing — sumber datanya stats.topSales (hitung transaksi),
+  // BUKAN /api/leaderboard-kerja.
+  const DASHBOARD_SALES_LIKE_ROLES: UserRole[] = [
+    "CREW_SALES", "KEPALA_SALES", "SOTECH", "KEPALA_SOTECH",
+    "ONPOINT", "KEPALA_ONPOINT", "KEPALA_ZENITH",
+    "PKL_SALES", "PKL_ZENITH", "PKL_SOTECH", "PKL_ONPOINT",
+  ];
+
+  export function getDashboardTopWidgetConfig(
+    role: string | null | undefined
+  ): DashboardTopWidgetConfig {
+    if (!role) return { label: "Top Hari Ini", source: "none" };
+
+    if ((DASHBOARD_SALES_LIKE_ROLES as string[]).includes(role)) {
+      return { label: "Top Sales Hari Ini", source: "sales" };
+    }
+    if (role.includes("TEKNISI")) {
+      return { label: "Top Teknisi Hari Ini", source: "leaderboard", matchRole: "TEKNISI" };
+    }
+    if (role.includes("KONTEN") || role === "MARKETING" || role === "KEPALA_MARKETING") {
+      return { label: "Top Konten Hari Ini", source: "leaderboard", matchRole: "KONTEN" };
+    }
+    if (role.includes("PENYEDIA")) {
+      return { label: "Top Penyedia Barang Hari Ini", source: "leaderboard", matchRole: "PENYEDIA" };
+    }
+    if (role.includes("PENGANTARAN")) {
+      return { label: "Top Pengantaran Hari Ini", source: "leaderboard", matchRole: "PENGANTARAN" };
+    }
+    if (role.includes("PENGELOLA")) {
+      return { label: "Top Pengelola Barang Hari Ini", source: "leaderboard", matchRole: "PENGELOLA" };
+    }
+    if (role === "PURCHASING") {
+      return { label: "Top Purchasing Hari Ini", source: "leaderboard", matchRole: "PURCHASING" };
+    }
+    if (role.includes("ACCOUNTING")) {
+      return { label: "Top Accounting Hari Ini", source: "leaderboard", matchRole: "ACCOUNTING" };
+    }
+
+    // CUSTOMER_SERVICE, KEBERSIHAN, dll — belum ada skor di leaderboard-kerja,
+    // widget "Top X" disembunyikan (cuma tampil Laptop Ready + Laptop Terlaris).
+    return { label: "Top Hari Ini", source: "none" };
+  }
+
 export const DIVISION_MAP: Record<string, UserRole[]> = {
   KEPALA_TEKNISI: [
     "TEKNISI", "PKL_TEKNISI",
