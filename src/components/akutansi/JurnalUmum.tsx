@@ -122,21 +122,77 @@ function computeLineDiff(beforeLines: SyncSnapshotLine[], afterLines: SyncSnapsh
 
     for (const l of beforeLines ?? []) {
         const k = `${l.account_code}-${l.side}`;
-        const row = map.get(k) ?? { account_code: l.account_code, account_name: l.account_name ?? "", side: l.side, before: 0, after: 0 };
+        const row = map.get(k) ?? { account_code: l.account_code, account_name: l.account_name || accountName(l.account_code), side: l.side, before: 0, after: 0 };
         row.before += Number(l.nominal || 0);
         map.set(k, row);
     }
     for (const l of afterLines ?? []) {
         const k = `${l.account_code}-${l.side}`;
-        const row = map.get(k) ?? { account_code: l.account_code, account_name: l.account_name ?? "", side: l.side, before: 0, after: 0 };
+        const row = map.get(k) ?? { account_code: l.account_code, account_name: l.account_name || accountName(l.account_code), side: l.side, before: 0, after: 0 };
         row.after += Number(l.nominal || 0);
-        if (!row.account_name) row.account_name = l.account_name ?? "";
+        if (!row.account_name) row.account_name = l.account_name || accountName(l.account_code);
         map.set(k, row);
     }
 
     return Array.from(map.values())
         .map((r) => ({ ...r, changed: r.before !== r.after }))
         .sort((a, b) => (a.side === b.side ? a.account_code.localeCompare(b.account_code) : a.side === "DEBIT" ? -1 : 1));
+}
+
+// Daftar baris jurnal apa adanya — dipakai buat rincian CREATE/DELETE/CONFIRM di History Perubahan
+function AuditLineList({ lines, tone }: { lines: SyncSnapshotLine[]; tone: "red" | "emerald" | "gray" }) {
+    if (!lines || lines.length === 0) return null;
+    const border = tone === "red" ? "border-red-100" : tone === "emerald" ? "border-emerald-100" : "border-gray-200";
+    return (
+        <div className={`mt-1 rounded-lg border ${border} divide-y divide-gray-100 overflow-hidden`}>
+            {lines.map((l, i) => (
+                <div key={`${l.account_code}-${l.side}-${i}`} className="flex items-center justify-between px-2 py-1 bg-white text-[11px]">
+                    <span className="text-gray-600 truncate pr-2">
+                        <span className="font-mono font-bold text-gray-400 mr-1">{l.account_code}</span>
+                        {l.account_name || accountName(l.account_code)}
+                        <span className={`ml-1.5 text-[9px] font-bold ${l.side === "DEBIT" ? "text-blue-600" : "text-emerald-600"}`}>
+                            {l.side === "DEBIT" ? "D" : "K"}
+                        </span>
+                    </span>
+                    <span className="font-mono font-bold text-gray-800 shrink-0">{rp(Number(l.nominal || 0))}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// Tabel perbandingan baris jurnal SEBELUM vs SESUDAH per akun — dipakai EDIT & SYNC di History Perubahan
+function AuditLineDiffTable({ diff }: { diff: ReturnType<typeof computeLineDiff> }) {
+    if (diff.length === 0) return null;
+    return (
+        <div className="mt-1 rounded-lg border border-gray-100 divide-y divide-gray-100 overflow-hidden">
+            {diff.map((d) => (
+                <div
+                    key={`${d.account_code}-${d.side}`}
+                    className={`flex items-center justify-between px-2 py-1 text-[11px] ${d.changed ? "bg-amber-50/60" : "bg-white"}`}
+                >
+                    <span className="text-gray-600 truncate pr-2">
+                        <span className="font-mono font-bold text-gray-400 mr-1">{d.account_code}</span>
+                        {d.account_name}
+                        <span className={`ml-1.5 text-[9px] font-bold ${d.side === "DEBIT" ? "text-blue-600" : "text-emerald-600"}`}>
+                            {d.side === "DEBIT" ? "D" : "K"}
+                        </span>
+                    </span>
+                    <span className="font-mono shrink-0">
+                        {d.changed ? (
+                            <>
+                                <span className="text-red-500 line-through">{rp(d.before)}</span>
+                                {" → "}
+                                <span className="text-emerald-600 font-bold">{rp(d.after)}</span>
+                            </>
+                        ) : (
+                            <span className="text-gray-400">{rp(d.after)}</span>
+                        )}
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
 }
 
 function getCompanyBadge(company?: string | null): { label: string; color: string } | null {
@@ -2450,12 +2506,12 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl max-h-[80dvh] flex flex-col overflow-hidden">
+                  <div className="relative bg-white w-full max-w-3xl rounded-2xl shadow-2xl max-h-[90dvh] flex flex-col overflow-hidden">
                 <div className="h-1 bg-gradient-to-r from-[#0f0c29] to-[#1a1545] shrink-0" />
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
                     <div>
                         <h3 className="font-bold text-gray-900 text-sm">Riwayat Perubahan</h3>
-                        <p className="text-[11px] text-gray-400 truncate max-w-[280px]">{entry.keterangan}</p>
+                        <p className="text-[11px] text-gray-400 truncate max-w-[420px]">{entry.keterangan}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 active:scale-90 transition-all duration-150 flex items-center justify-center"><X className="w-4 h-4" /></button>
                 </div>
@@ -2476,17 +2532,43 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
                                     oleh <b className="text-gray-700">{l.changed_by_user?.name ?? "—"}</b>
                                 </p>
                                 {l.action === "EDIT" && l.before_data && (
-                                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
-                                        <div className="bg-white border border-red-100 rounded-lg p-2">
-                                            <p className="text-red-500 font-bold mb-0.5">Sebelum</p>
-                                            <p className="text-gray-600">{l.before_data.keterangan}</p>
-                                            <p className="font-mono text-gray-500">{rp(Number(l.before_data.total ?? 0))}</p>
+                                    <div className="mt-2 space-y-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                                            <div className="bg-white border border-red-100 rounded-lg p-2">
+                                                <p className="text-red-500 font-bold mb-0.5">Sebelum</p>
+                                                <p className="text-gray-600">{l.before_data.keterangan}</p>
+                                                <p className="text-gray-400 mt-0.5">{fmtTgl(l.before_data.tanggal)}{l.before_data.ref ? ` · Ref: ${l.before_data.ref}` : ""}</p>
+                                                <p className="font-mono text-gray-500 mt-0.5">{rp(Number(l.before_data.total ?? 0))}</p>
+                                            </div>
+                                            <div className="bg-white border border-emerald-100 rounded-lg p-2">
+                                                <p className="text-emerald-600 font-bold mb-0.5">Sesudah</p>
+                                                <p className="text-gray-600">{l.after_data?.keterangan}</p>
+                                                <p className="text-gray-400 mt-0.5">{l.after_data?.tanggal ? fmtTgl(l.after_data.tanggal) : "—"}{l.after_data?.ref ? ` · Ref: ${l.after_data.ref}` : ""}</p>
+                                                <p className="font-mono text-gray-500 mt-0.5">{rp(Number(l.after_data?.total ?? 0))}</p>
+                                            </div>
                                         </div>
-                                        <div className="bg-white border border-emerald-100 rounded-lg p-2">
-                                            <p className="text-emerald-600 font-bold mb-0.5">Sesudah</p>
-                                            <p className="text-gray-600">{l.after_data?.keterangan}</p>
-                                            <p className="font-mono text-gray-500">{rp(Number(l.after_data?.total ?? 0))}</p>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-amber-700 mb-1">Rincian Per Akun (Sebelum → Sesudah):</p>
+                                            <AuditLineDiffTable diff={computeLineDiff(l.before_data.lines ?? [], l.after_data?.lines ?? [])} />
                                         </div>
+                                    </div>
+                                )}
+                                {l.action === "CREATE" && l.after_data && (
+                                    <div className="mt-2">
+                                        <p className="text-[10px] font-bold text-emerald-700 mb-1">Rincian Akun:</p>
+                                        <AuditLineList lines={l.after_data.lines ?? []} tone="emerald" />
+                                    </div>
+                                )}
+                                {l.action === "DELETE" && l.before_data && (
+                                    <div className="mt-2">
+                                        <p className="text-[10px] font-bold text-red-700 mb-1">Rincian Akun yang Dihapus:</p>
+                                        <AuditLineList lines={l.before_data.lines ?? []} tone="red" />
+                                    </div>
+                                )}
+                                {l.action === "CONFIRM" && (l.after_data?.lines?.length ?? 0) > 0 && (
+                                    <div className="mt-2">
+                                        <p className="text-[10px] font-bold text-blue-700 mb-1">Rincian Akun:</p>
+                                        <AuditLineList lines={l.after_data.lines ?? []} tone="gray" />
                                     </div>
                                 )}
                                 {l.action === "SYNC" && l.before_data && (
@@ -2503,22 +2585,11 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
                                                 </div>
                                             </div>
                                         )}
-                                        <p className="text-[10px] font-bold text-blue-600 mb-1">Perubahan Nominal:</p>
-                                        {computeLineDiff(l.before_data.lines ?? [], l.after_data?.lines ?? [])
-                                            .filter((d) => d.changed)
-                                            .map((d) => (
-                                                <div key={`${d.account_code}-${d.side}`} className="flex items-center justify-between text-[10px] bg-white border border-blue-100 rounded-lg px-2 py-1">
-                                                    <span className="text-gray-600">{d.account_code} · {d.account_name}</span>
-                                                    <span className="font-mono">
-                                                        <span className="text-red-500 line-through">{rp(d.before)}</span>
-                                                        {" → "}
-                                                        <span className="text-emerald-600 font-bold">{rp(d.after)}</span>
-                                                    </span>
-                                                </div>
-                                            ))}
+                                        <p className="text-[10px] font-bold text-blue-600 mb-1">Rincian Per Akun (Sebelum → Sesudah):</p>
+                                        <AuditLineDiffTable diff={computeLineDiff(l.before_data.lines ?? [], l.after_data?.lines ?? [])} />
                                     </div>
                                 )}
-                                {l.action === "ACTIVATE" && l.reason && (
+                                {(l.action === "ACTIVATE" || l.action === "DEACTIVATE") && l.reason && (
                                     <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2 text-[10px]">
                                         <p className="text-red-700 font-bold mb-0.5">Alasan:</p>
                                         <p className="text-red-600/80">{l.reason}</p>
