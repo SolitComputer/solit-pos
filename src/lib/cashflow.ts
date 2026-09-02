@@ -48,6 +48,7 @@ export const EXPENSE_CATEGORIES = {
   UTANG: "Utang",
   PIUTANG: "Piutang",
   KEUNTUNGAN_MITRA: "Keuntungan Mitra Reseller",
+  BIAYA_PRINTILAN: "Biaya Printilan Barang",
   BIAYA_LAIN: "Biaya Lain-lain",
 } as const;
 

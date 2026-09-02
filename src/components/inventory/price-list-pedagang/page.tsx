@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import ExcelJS from "exceljs";
+import type ExcelJS from "exceljs";
 import { UserRole, hasAnyRole } from "@/lib/permissions";
 import { Tags, Package, Wallet, Download, RefreshCw } from "lucide-react";
 import { getAuthUser } from "@/hooks/useAuthUser";
@@ -131,6 +131,7 @@ async function buildPricelistSheet(
   cols: PricelistColDef[],
   rows: Record<string, string | number>[],
 ) {
+  const { default: ExcelJS } = await import("exceljs");
   const wb = new ExcelJS.Workbook();
   wb.creator = "Solit 03";
   wb.created = new Date();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import ExcelJS from "exceljs";
+import type ExcelJS from "exceljs";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasAnyRole } from "@/lib/permissions";
 import { Trash2, ArrowUp, ArrowDown, Inbox } from "lucide-react";
@@ -780,6 +780,7 @@ export default function AllUnitsPage() {
         if (isExporting) return;
         setIsExporting(true);
         try {
+            const { default: ExcelJS } = await import("exceljs");
             const wb = new ExcelJS.Workbook();
             wb.creator = "Solit POS";
             wb.created = new Date();
