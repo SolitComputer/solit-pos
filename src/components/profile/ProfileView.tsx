@@ -99,6 +99,8 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [qualityRank, setQualityRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
     const [kerjaRank, setKerjaRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
     const [deliveryBadge, setDeliveryBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+    const [providerBadge, setProviderBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+    const [salesBadge, setSalesBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -163,13 +165,15 @@ export default function ProfileView({ userId }: { userId: string }) {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes] = await Promise.all([
+            const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes] = await Promise.all([
                 getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
                 fetch(`/api/profile?userId=${userId}`),
                 fetch(`/api/achievements?userId=${userId}`),
                 fetch(`/api/attendance/quality-rank?userId=${userId}`),
                 fetch(`/api/leaderboard-kerja/quality-rank?userId=${userId}`),
                 fetch(`/api/preparation/delivery-milestones?userId=${userId}`),
+                fetch(`/api/preparation/provider-milestones?userId=${userId}`),
+                fetch(`/api/transaction/sales-milestones?userId=${userId}`),
             ]);
             const meData = await meRes.json();
             const profileData = await profileRes.json();
@@ -177,12 +181,16 @@ export default function ProfileView({ userId }: { userId: string }) {
             const qualityData = await qualityRes.json();
             const kerjaData = await kerjaRes.json();
             const deliveryData = await deliveryRes.json();
+            const providerData = await providerRes.json();
+            const salesData = await salesRes.json();
             if (meData.user) setCurrentUser(meData.user);
             if (profileData.success) { setProfile(profileData.data); setBioDraft(profileData.data.bio ?? ""); }
             if (achData.success) setAchievements(achData.data);
             if (qualityData.success) setQualityRank(qualityData.data);
             if (kerjaData.success) setKerjaRank(kerjaData.data);
             if (deliveryData.success) setDeliveryBadge(deliveryData.data);
+            if (providerData.success) setProviderBadge(providerData.data);
+            if (salesData.success) setSalesBadge(salesData.data);
         } catch {
             showToast("Gagal memuat profil", "err");
         } finally {
@@ -833,7 +841,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 ))}
                             </div>
                         </div>
-                        {achievements && <AchievementTitles achievements={achievements} qualityRank={qualityRank} kerjaRank={kerjaRank} deliveryBadge={deliveryBadge} />}
+                                            {achievements && <AchievementTitles achievements={achievements} qualityRank={qualityRank} kerjaRank={kerjaRank} deliveryBadge={deliveryBadge} providerBadge={providerBadge} salesBadge={salesBadge} />}
                     </div>
 
                     <div className="mt-3">
@@ -1077,11 +1085,13 @@ function RankBadge({ rank }: { rank: number }) {
     );
 }
 
-function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge }: {
+function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge, providerBadge, salesBadge }: {
     achievements: AchievementsData;
     qualityRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
     kerjaRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
     deliveryBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+    providerBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+    salesBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
 }) {
     const titles: { rank: number; label: string }[] = [];
     if (achievements.attendance.rankThisMonth !== null && achievements.attendance.rankThisMonth <= 10) {
@@ -1101,7 +1111,16 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     // BUKAN level bulanan, tapi milestone total pengantaran (50/100/.../1000),
     // dan cuma tampil kalau server sudah menandai hasBadge (artinya Top 3).
     const hasDeliveryBadge = !!(deliveryBadge && deliveryBadge.hasBadge);
-    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge) return null;
+    // ✅ NEW — Lencana Penyedia Barang (tab "Penyedia Barang" di /dashboard/lencana):
+    // MILESTONE kumulatif total unit laptop yang berhasil disiapkan
+    // (100/300/.../3000), bersifat all-time & tidak dibatasi Top 3 — tampil
+    // untuk siapa pun yang sudah meraih milestone-nya.
+    const hasProviderBadge = !!(providerBadge && providerBadge.hasBadge);
+    // ✅ NEW — Lencana Sales (tab "Sales" di /dashboard/lencana): MILESTONE
+    // kumulatif total transaksi Lunas (1000/2000/.../20000), bersifat
+    // all-time & tidak dibatasi Top 3 — sama polanya dengan Penyedia Barang.
+    const hasSalesBadge = !!(salesBadge && salesBadge.hasBadge);
+    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge && !hasProviderBadge && !hasSalesBadge) return null;
     titles.sort((a, b) => a.rank - b.rank);
 
     return (
@@ -1114,6 +1133,12 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
             )}
             {hasDeliveryBadge && (
                 <DeliveryMilestoneBadge rank={deliveryBadge!.rank} milestone={deliveryBadge!.milestone} />
+            )}
+            {hasProviderBadge && (
+                <ProviderMilestoneBadge rank={providerBadge!.rank} milestone={providerBadge!.milestone} />
+            )}
+            {hasSalesBadge && (
+                <SalesMilestoneBadge rank={salesBadge!.rank} milestone={salesBadge!.milestone} />
             )}
             {titles.map((t) => (
                 <AchievementTitleBadge key={t.label} rank={t.rank} label={t.label} />
@@ -1153,6 +1178,80 @@ function DeliveryMilestoneBadge({ rank, milestone }: { rank: number; milestone: 
                 <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">TOP {rank}</p>
                 <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
                     Pengantaran · {milestone}+
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ✅ NEW — badge lencana Penyedia Barang: TIDAK berbasis level/streak seperti
+// LevelBadgeDisplay, dan BEDA dari DeliveryMilestoneBadge — ini MILESTONE
+// kumulatif total unit laptop yang berhasil disiapkan (100/300/.../3000)
+// sepanjang waktu, bersifat permanen begitu tercapai & TIDAK dibatasi Top 3
+// (tier warna ditentukan besar milestone-nya, bukan rank).
+function ProviderMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = milestone >= 2000 ? "gold" : milestone >= 700 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #2dd4bf, #0d9488, #115e59)",
+        silver: "linear-gradient(135deg, #5eead4, #14b8a6, #0f766e)",
+        bronze: "linear-gradient(135deg, #99f6e4, #2dd4bf, #14b8a6)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(13,148,136,0.35)",
+        silver: "rgba(20,184,166,0.35)",
+        bronze: "rgba(45,212,191,0.35)",
+    };
+
+    return (
+        <div
+            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
+            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
+            title={`Peringkat #${rank} · ${milestone}+ unit disiapkan`}
+        >
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
+            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            </div>
+            <div className="relative leading-tight">
+                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">{milestone}+ UNIT</p>
+                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
+                    Penyedia Barang
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ✅ NEW — badge lencana Sales: pola sama persis dengan ProviderMilestoneBadge
+// (MILESTONE kumulatif all-time, TIDAK dibatasi Top 3) tapi satuannya total
+// TRANSAKSI Lunas (1000/2000/.../20000), bukan unit laptop disiapkan.
+function SalesMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = milestone >= 10000 ? "gold" : milestone >= 4000 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #fb7185, #e11d48, #9f1239)",
+        silver: "linear-gradient(135deg, #fda4af, #f43f5e, #be123c)",
+        bronze: "linear-gradient(135deg, #fecdd3, #fb7185, #f43f5e)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(225,29,72,0.35)",
+        silver: "rgba(244,63,94,0.35)",
+        bronze: "rgba(251,113,133,0.35)",
+    };
+
+    return (
+        <div
+            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
+            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
+            title={`Peringkat #${rank} · ${milestone}+ transaksi`}
+        >
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
+            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            </div>
+            <div className="relative leading-tight">
+                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">{milestone}+ TRX</p>
+                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
+                    Sales
                 </p>
             </div>
         </div>
