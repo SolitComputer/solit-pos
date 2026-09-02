@@ -50,7 +50,7 @@ function LevelBadge({ level, isPermanent }: { level: number; isPermanent: boolea
 }
 
 
-type SubTab = "absensi" | "kerja" | "pengantaran";
+type SubTab = "absensi" | "kerja" | "pengantaran" | "penyedia" | "sales";
 
 function QualityBadgeIcon({ rank }: { rank: number }) {
     const tier: "gold" | "silver" | "bronze" = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
@@ -502,6 +502,206 @@ function PengantaranLeaderboard() {
     );
 }
 
+type PenyediaBarangRow = {
+    user_id: string;
+    name: string;
+    role: string;
+    total: number;
+    milestone: number;
+    rank: number;
+};
+
+function PenyediaBarangLeaderboard() {
+    const [board, setBoard] = useState<PenyediaBarangRow[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const r = await fetch(`/api/preparation/provider-milestones?list=true`);
+            const d = await r.json();
+            if (d.success) setBoard(d.data || []);
+        } catch {
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const maxTotal = Math.max(...board.map((u) => u.total), 1);
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-teal-50 to-cyan-50 flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <p className="text-base font-bold text-gray-800">Lencana Penyedia Barang</p>
+                    <p className="text-[11px] text-gray-500 mt-1 max-w-xl">
+                        Dihitung dari <strong>total unit laptop</strong> yang berhasil disiapkan (tidak termasuk item yang dibatalkan) sepanjang waktu bekerja. Lencana didapat berdasarkan MILESTONE total unit yang sudah dicapai: 100, 300, 500, 700, 1000, 1500, 2000, sampai 3000 unit — bersifat kumulatif &amp; permanen begitu tercapai, ditampilkan untuk semua yang sudah meraihnya (tidak dibatasi Top 3).
+                    </p>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+            ) : board.length === 0 ? (
+                <div className="py-16 text-center px-6">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                        <Trophy className="w-7 h-7 text-gray-300" />
+                    </div>
+                    <p className="text-sm text-gray-400 font-medium">Belum ada data Penyedia Barang</p>
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-gray-100 bg-gray-50/60">
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-14">Rank</th>
+                                <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Lencana</th>
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[160px]">Total Unit Disiapkan</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {board.map((u) => {
+                                const isTop3 = u.rank <= 3;
+                                const tierBg = u.rank === 1 ? "bg-amber-50" : u.rank === 2 ? "bg-gray-50" : u.rank === 3 ? "bg-orange-50/60" : "";
+                                return (
+                                    <tr key={u.user_id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${tierBg}`}>
+                                        <td className="px-6 py-4">
+                                            {isTop3 ? <QualityBadgeIcon rank={u.rank} /> : <span className="text-sm font-bold text-gray-400">{u.rank}</span>}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">{initials(u.name)}</div>
+                                                <div>
+                                                    <span className="font-bold text-gray-800 block">{u.name}</span>
+                                                    <span className="text-[10px] text-gray-400">{(u.role || "").replace(/_/g, " ")}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-4 text-center">
+                                            <MilestoneBadge milestone={u.milestone} />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
+                                                    <div className="h-full rounded-full bg-gradient-to-r from-teal-400 to-cyan-500 transition-all duration-700" style={{ width: `${Math.max((u.total / maxTotal) * 100, 4)}%` }} />
+                                                </div>
+                                                <span className="text-sm font-black w-16 text-right flex-shrink-0 text-teal-600">{u.total.toLocaleString()}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+type SalesRow = {
+    user_id: string;
+    name: string;
+    role: string;
+    total: number;
+    milestone: number;
+    rank: number;
+};
+
+function SalesLeaderboard() {
+    const [board, setBoard] = useState<SalesRow[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const r = await fetch(`/api/transaction/sales-milestones?list=true`);
+            const d = await r.json();
+            if (d.success) setBoard(d.data || []);
+        } catch {
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const maxTotal = Math.max(...board.map((u) => u.total), 1);
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-rose-50 to-pink-50 flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <p className="text-base font-bold text-gray-800">Lencana Sales</p>
+                    <p className="text-[11px] text-gray-500 mt-1 max-w-xl">
+                        Dihitung dari <strong>total transaksi Lunas</strong> yang berhasil diselesaikan sepanjang waktu bekerja. Lencana didapat berdasarkan MILESTONE total transaksi yang sudah dicapai: 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, sampai 20000 transaksi — bersifat kumulatif &amp; permanen begitu tercapai, ditampilkan untuk semua yang sudah meraihnya (tidak dibatasi Top 3).
+                    </p>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+            ) : board.length === 0 ? (
+                <div className="py-16 text-center px-6">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                        <Trophy className="w-7 h-7 text-gray-300" />
+                    </div>
+                    <p className="text-sm text-gray-400 font-medium">Belum ada data Sales</p>
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-gray-100 bg-gray-50/60">
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-14">Rank</th>
+                                <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Lencana</th>
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[160px]">Total Transaksi</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {board.map((u) => {
+                                const isTop3 = u.rank <= 3;
+                                const tierBg = u.rank === 1 ? "bg-amber-50" : u.rank === 2 ? "bg-gray-50" : u.rank === 3 ? "bg-orange-50/60" : "";
+                                return (
+                                    <tr key={u.user_id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${tierBg}`}>
+                                        <td className="px-6 py-4">
+                                            {isTop3 ? <QualityBadgeIcon rank={u.rank} /> : <span className="text-sm font-bold text-gray-400">{u.rank}</span>}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">{initials(u.name)}</div>
+                                                <div>
+                                                    <span className="font-bold text-gray-800 block">{u.name}</span>
+                                                    <span className="text-[10px] text-gray-400">{(u.role || "").replace(/_/g, " ")}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-4 text-center">
+                                            <MilestoneBadge milestone={u.milestone} />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
+                                                    <div className="h-full rounded-full bg-gradient-to-r from-rose-400 to-pink-500 transition-all duration-700" style={{ width: `${Math.max((u.total / maxTotal) * 100, 4)}%` }} />
+                                                </div>
+                                                <span className="text-sm font-black w-16 text-right flex-shrink-0 text-rose-600">{u.total.toLocaleString()}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function LencanaPage() {
     const [subTab, setSubTab] = useState<SubTab>("absensi");
     const [currentUser, setCurrentUser] = useState<any>(null);
@@ -544,11 +744,25 @@ export default function LencanaPage() {
                     >
                         Pengantaran
                     </button>
+                    <button
+                        onClick={() => setSubTab("penyedia")}
+                        className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 ${subTab === "penyedia" ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+                    >
+                        Penyedia Barang
+                    </button>
+                    <button
+                        onClick={() => setSubTab("sales")}
+                        className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 ${subTab === "sales" ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+                    >
+                        Sales
+                    </button>
                 </div>
 
                 {subTab === "absensi" && <AbsensiLeaderboard isAdmin={isAdminUser(currentUser)} />}
                 {subTab === "kerja" && <KerjaLeaderboard isAdmin={isAdminUser(currentUser)} />}
                 {subTab === "pengantaran" && <PengantaranLeaderboard />}
+                {subTab === "penyedia" && <PenyediaBarangLeaderboard />}
+                {subTab === "sales" && <SalesLeaderboard />}
             </div>
         </DashboardLayout>
     );
