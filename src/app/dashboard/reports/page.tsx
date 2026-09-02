@@ -1,21 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import {
-  Chart as ChartJS,
-  CategoryScale, LinearScale,
-  PointElement, LineElement, BarElement,
-  Filler, Tooltip, Legend,
-} from "chart.js";
 import { Medal, Banknote, TrendingUp, ShoppingCart, Calculator, Percent, Award, Laptop, Smartphone } from "lucide-react";
-import { Line, Bar } from "react-chartjs-2";
 
-ChartJS.register(
-  CategoryScale, LinearScale,
-  PointElement, LineElement, BarElement,
-  Filler, Tooltip, Legend
-);
+const chartLoading = () => <div className="w-full h-full animate-pulse bg-gray-100 rounded-xl" />;
+const LineChart = dynamic(() => import("./ReportsCharts").then(m => m.LineChart), { ssr: false, loading: chartLoading });
+const BarChart = dynamic(() => import("./ReportsCharts").then(m => m.BarChart), { ssr: false, loading: chartLoading });
 
 const fmtRupiah = (n: number): string =>
   "Rp " + (n || 0).toLocaleString("id-ID");
@@ -614,7 +606,7 @@ export default function ReportsPage() {
                 </div>
               </div>
               <div className="h-[200px] sm:h-[260px]">
-                <Line data={lineData} options={chartOpts} />
+                <LineChart data={lineData} options={chartOpts} />
               </div>
             </div>
 
@@ -630,7 +622,7 @@ export default function ReportsPage() {
                 </span>
               </div>
               <div className="h-[200px] sm:h-[260px]">
-                <Bar data={barData} options={barOpts} />
+                <BarChart data={barData} options={barOpts} />
               </div>
             </div>
           </div>

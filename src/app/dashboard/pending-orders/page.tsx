@@ -5,7 +5,6 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban, Wallet, Receipt, Download } from "lucide-react";
 import { getAuthUser } from "@/hooks/useAuthUser";
-import html2canvas from "html2canvas";
 
 interface PendingTransaction {
     id: string;
@@ -1065,6 +1064,7 @@ export default function PendingOrdersPage() {
                     iframe.style.height = `${doc.body.scrollHeight}px`;
                     await new Promise(resolve => setTimeout(resolve, 100));
 
+                    const { default: html2canvas } = await import("html2canvas");
                     const fullCanvas = await html2canvas(doc.body, {
                         backgroundColor: "#ffffff",
                         scale: 2,

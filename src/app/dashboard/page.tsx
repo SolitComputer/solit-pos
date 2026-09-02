@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { PERMISSIONS, UserRole, hasPermission, isDashboardLimited, getDashboardTopWidgetConfig } from "@/lib/permissions";
@@ -19,25 +20,12 @@ import {
   CreditCard, Wallet, ArrowRight, Activity
 } from "lucide-react";
 
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Filler,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import { Line, Bar, Doughnut } from "react-chartjs-2";
 import { getAuthUser } from "@/hooks/useAuthUser";
 
-ChartJS.register(
-  CategoryScale, LinearScale, PointElement, LineElement,
-  BarElement, ArcElement, Filler, Tooltip, Legend
-);
+const chartLoading = () => <div className="w-full h-full animate-pulse bg-slate-100 rounded-xl" />;
+const DoughnutChart = dynamic(() => import("./DashboardCharts").then(m => m.DoughnutChart), { ssr: false, loading: chartLoading });
+const BarChart = dynamic(() => import("./DashboardCharts").then(m => m.BarChart), { ssr: false, loading: chartLoading });
+const LineChart = dynamic(() => import("./DashboardCharts").then(m => m.LineChart), { ssr: false, loading: chartLoading });
 
 interface WeeklyTrendItem {
   date: string;
@@ -831,7 +819,7 @@ export default function Page() {
                   <Shimmer className="w-36 h-36 rounded-full" />
                 ) : (
                   <>
-                    <Doughnut data={donutData} options={doughnutOptions} />
+                    <DoughnutChart data={donutData} options={doughnutOptions} />
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Profit</span>
                       <span className="text-base font-extrabold text-slate-900 tabular-nums">
@@ -877,7 +865,7 @@ export default function Page() {
                 {isLoading ? (
                   <Shimmer className="w-full h-full" />
                 ) : (
-                  <Bar data={trxBarData} options={barOptions} />
+                  <BarChart data={trxBarData} options={barOptions} />
                 )}
               </div>
 
@@ -903,7 +891,7 @@ export default function Page() {
                 {isLoading ? (
                   <Shimmer className="w-full h-full" />
                 ) : (
-                  <Line data={trendChartData} options={trendOptions} />
+                  <LineChart data={trendChartData} options={trendOptions} />
                 )}
               </div>
 

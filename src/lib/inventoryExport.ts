@@ -10,7 +10,7 @@
 // Sheet ke-2 inilah yang menjawab kebutuhan "harus benar-benar detail":
 // semua data per-unit yang di web tersembunyi di balik Pop-up Detail ikut terekspor.
 
-import ExcelJS from "exceljs";
+import type ExcelJS from "exceljs";
 
 // Harga Official selalu dihitung dari Harga Setor + markup ini — SAMA dengan
 // rumus di InventoryTable.tsx (tabel web), supaya export & web selalu sinkron.
@@ -128,6 +128,7 @@ export async function exportInventoryExcel(opts: {
 }) {
     const { laptops, canSeePrivate, filterLabel, fileSuffix = "" } = opts;
 
+    const { default: ExcelJS } = await import("exceljs");
     const wb = new ExcelJS.Workbook();
     wb.creator = "Solit POS";
     wb.created = new Date();
