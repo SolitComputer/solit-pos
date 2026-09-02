@@ -2390,9 +2390,14 @@ function EntryFormModal({
                         className={`rounded-xl border p-3 flex flex-wrap items-center justify-between gap-2 ${balanced ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
                             }`}
                     >
-                        <span className={`text-xs font-bold inline-flex items-center gap-1 ${balanced ? "text-emerald-700" : "text-red-700"}`}>
+                                               <span className={`text-xs font-bold inline-flex items-center gap-1 ${balanced ? "text-emerald-700" : "text-red-700"}`}>
                             {balanced ? <><Check className="w-3.5 h-3.5" /> Balance</> : <><X className="w-3.5 h-3.5" /> Tidak balance</>}
                         </span>
+                        {!balanced && (
+                            <span className="text-xs font-mono font-bold text-red-700 bg-red-100 px-2.5 py-0.5 rounded-full">
+                                Selisih {rp(Math.abs(debit - kredit))}
+                            </span>
+                        )}
                         <span className="text-xs font-mono font-bold text-gray-700">
                             D {rp(debit)} &nbsp;·&nbsp; K {rp(kredit)}
                         </span>
