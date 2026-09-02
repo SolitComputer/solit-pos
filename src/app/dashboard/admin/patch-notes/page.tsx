@@ -51,6 +51,9 @@ export default function PatchNotesAdminPage() {
   const [category, setCategory] = useState<PatchNoteCategory>("FITUR_BARU");
   const [targetRoles, setTargetRoles] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<PatchNoteCategory | "all">("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "most_read" | "least_read">("newest");
 
   const [list, setList] = useState<PatchNoteRow[]>([]);
   const [listLoading, setListLoading] = useState(true);
@@ -178,15 +181,24 @@ export default function PatchNotesAdminPage() {
   }
   grouped["Lainnya"] = ALL_STATIC_ROLES.filter((r) => !covered.has(r));
 
-  const filteredList = list.filter((item) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      item.title.toLowerCase().includes(q) ||
-      item.description.toLowerCase().includes(q) ||
-      item.category.toLowerCase().includes(q)
-    );
-  });
+  const filteredList = list
+    .filter((item) => {
+      if (categoryFilter !== "all" && item.category !== categoryFilter) return false;
+      if (roleFilter !== "all" && item.target_roles.length > 0 && !item.target_roles.includes(roleFilter)) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        item.title.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === "oldest") return a.created_at.localeCompare(b.created_at);
+      if (sortBy === "most_read") return (b.reads?.length ?? 0) - (a.reads?.length ?? 0);
+      if (sortBy === "least_read") return (a.reads?.length ?? 0) - (b.reads?.length ?? 0);
+      return b.created_at.localeCompare(a.created_at);
+    });
 
   return (
     <DashboardLayout>
@@ -274,9 +286,8 @@ export default function PatchNotesAdminPage() {
                       key={cat}
                       type="button"
                       onClick={() => setCategory(cat)}
-                      className={`h-11 rounded-xl border-2 text-xs font-bold transition-all duration-200 ${
-                        active ? "shadow-sm scale-[1.02]" : "hover:border-gray-300"
-                      }`}
+                      className={`h-11 rounded-xl border-2 text-xs font-bold transition-all duration-200 ${active ? "shadow-sm scale-[1.02]" : "hover:border-gray-300"
+                        }`}
                       style={
                         active
                           ? { background: meta.bg, color: meta.text, borderColor: meta.border }
@@ -313,11 +324,10 @@ export default function PatchNotesAdminPage() {
                               key={role}
                               type="button"
                               onClick={() => toggleRole(role)}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all duration-150 ${
-                                active
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all duration-150 ${active
                                   ? "bg-gradient-to-r from-slate-800 to-indigo-900 text-white border-slate-800 shadow-sm"
                                   : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                              }`}
+                                }`}
                             >
                               {humanizeRoleKey(role)}
                             </button>
@@ -372,6 +382,60 @@ export default function PatchNotesAdminPage() {
               </div>
             </div>
 
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value as PatchNoteCategory | "all")}
+                aria-label="Filter kategori"
+                className="h-9 px-3 text-xs font-semibold bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all shadow-sm text-gray-600 cursor-pointer"
+              >
+                <option value="all">Semua Kategori</option>
+                {VALID_PATCH_NOTE_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>{PATCH_NOTE_CATEGORY_META[cat].label}</option>
+                ))}
+              </select>
+
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                aria-label="Filter target role"
+                className="h-9 px-3 text-xs font-semibold bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all shadow-sm text-gray-600 cursor-pointer"
+              >
+                <option value="all">Semua Role</option>
+                {Object.entries(grouped).map(([head, subs]) =>
+                  subs.length === 0 ? null : (
+                    <optgroup key={head} label={humanizeRoleKey(head)}>
+                      {subs.map((role) => (
+                        <option key={role} value={role}>{humanizeRoleKey(role)}</option>
+                      ))}
+                    </optgroup>
+                  )
+                )}
+              </select>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                aria-label="Urutkan"
+                className="h-9 px-3 text-xs font-semibold bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all shadow-sm text-gray-600 cursor-pointer"
+              >
+                <option value="newest">Terbaru</option>
+                <option value="oldest">Terlama</option>
+                <option value="most_read">Paling Banyak Dibaca</option>
+                <option value="least_read">Paling Sedikit Dibaca</option>
+              </select>
+
+              {(categoryFilter !== "all" || roleFilter !== "all" || sortBy !== "newest") && (
+                <button
+                  type="button"
+                  onClick={() => { setCategoryFilter("all"); setRoleFilter("all"); setSortBy("newest"); }}
+                  className="h-9 px-3 text-xs font-semibold text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+                >
+                  Reset Filter
+                </button>
+              )}
+            </div>
+
             {listLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
@@ -399,9 +463,8 @@ export default function PatchNotesAdminPage() {
                   return (
                     <div
                       key={note.id}
-                      className={`group bg-white rounded-2xl border p-4 sm:p-5 transition-all shadow-sm hover:shadow-md ${
-                        isEditing ? "border-indigo-300 ring-2 ring-indigo-500/10" : "border-gray-100 hover:border-gray-200"
-                      }`}
+                      className={`group bg-white rounded-2xl border p-4 sm:p-5 transition-all shadow-sm hover:shadow-md ${isEditing ? "border-indigo-300 ring-2 ring-indigo-500/10" : "border-gray-100 hover:border-gray-200"
+                        }`}
                       style={{ borderLeftWidth: 3, borderLeftColor: isEditing ? undefined : meta.border }}
                     >
                       <div className="flex items-start justify-between gap-3 mb-2">
