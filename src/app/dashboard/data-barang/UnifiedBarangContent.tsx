@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Laptop as LaptopIcon, Wrench, History as HistoryIcon } from "lucide-react";
+import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Filter, RotateCcw, SlidersHorizontal, ArrowUpDown, Search, X, ChevronDown, ChevronUp, Tag } from "lucide-react";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
@@ -268,7 +268,14 @@ export default function UnifiedBarangContent() {
 
     const [tipeFilter, setTipeFilter] = useState<"ALL" | ItemType>("ALL");
     const [kategoriFilter, setKategoriFilter] = useState("");
+    const [brandFilter, setBrandFilter] = useState("");
+    const [stokFilter, setStokFilter] = useState<"ALL" | "READY" | "EMPTY" | "SIAP_JUAL" | "MINUS">("ALL");
+    const [minPrice, setMinPrice] = useState("");
+    const [maxPrice, setMaxPrice] = useState("");
+    const [statusAuditSoFilter, setStatusAuditSoFilter] = useState<"ALL" | "SO_TODAY" | "SO_NEED" | "AUDIT_ACTIVE">("ALL");
+    const [sortBy, setSortBy] = useState<"NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST">("NAMA_ASC");
     const [search, setSearch] = useState("");
+    const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
 
     const [formModal, setFormModal] = useState<{ mode: "create" | "edit"; tipe: ItemType; row?: UnifiedRow } | null>(null);
     const [laptopForm, setLaptopForm] = useState(EMPTY_LAPTOP_FORM);
@@ -407,14 +414,27 @@ export default function UnifiedBarangContent() {
         : tipeFilter === "AKSESORIS" ? accessoryCategories
         : categories;
 
+    // Daftar Brand unik yang ada di data
+    const availableBrands = useMemo(() => {
+        const set = new Set<string>();
+        rows.forEach(r => {
+            if (r.brand && r.brand.trim()) {
+                if (tipeFilter === "ALL" || r.tipe === tipeFilter) {
+                    set.add(r.brand.trim());
+                }
+            }
+        });
+        return Array.from(set).sort((a, b) => a.localeCompare(b, "id-ID"));
+    }, [rows, tipeFilter]);
+
     const filteredRows = useMemo(() => {
         let list = rows;
+
+        // 1. Tipe Barang
         if (tipeFilter !== "ALL") list = list.filter(r => r.tipe === tipeFilter);
+
+        // 2. Kategori
         if (kategoriFilter) {
-            // kategoriFilter selalu berupa ID kategori. Laptop menyimpan kategori
-            // sebagai kategori_id, tapi aksesoris hanya menyimpan NAMA (kolom
-            // `category`, tanpa category_id). Jadi resolusi id → nama dulu supaya
-            // aksesoris ikut cocok — termasuk saat tipe = "Semua".
             const selectedName = (categories.find(c => c.id === kategoriFilter)?.name || "").toUpperCase();
             const matchLaptop = (r: UnifiedRow) => r.kategori_id === kategoriFilter;
             const matchAksesoris = (r: UnifiedRow) => (r.kategori || "").toUpperCase() === selectedName;
@@ -424,6 +444,46 @@ export default function UnifiedBarangContent() {
                 return r.tipe === "LAPTOP" ? matchLaptop(r) : matchAksesoris(r);
             });
         }
+
+        // 3. Brand
+        if (brandFilter) {
+            const b = brandFilter.toLowerCase();
+            list = list.filter(r => (r.brand || "").toLowerCase() === b);
+        }
+
+        // 4. Status Stok
+        if (stokFilter !== "ALL") {
+            list = list.filter(r => {
+                const stokVal = r.tipe === "LAPTOP" ? (r.stok_tersedia ?? 0) : (r.stok ?? 0);
+                if (stokFilter === "READY") return stokVal > 0;
+                if (stokFilter === "EMPTY") return stokVal === 0;
+                if (stokFilter === "SIAP_JUAL") return r.tipe === "LAPTOP" && (r.siap_jual ?? 0) > 0;
+                if (stokFilter === "MINUS") return r.tipe === "LAPTOP" && (r.minus ?? 0) > 0;
+                return true;
+            });
+        }
+
+        // 5. Rentang Harga Jual
+        const pMin = minPrice.trim() !== "" ? parseFloat(minPrice) : null;
+        const pMax = maxPrice.trim() !== "" ? parseFloat(maxPrice) : null;
+        if (pMin !== null && !isNaN(pMin)) {
+            list = list.filter(r => (r.harga_jual || 0) >= pMin);
+        }
+        if (pMax !== null && !isNaN(pMax)) {
+            list = list.filter(r => (r.harga_jual || 0) <= pMax);
+        }
+
+        // 6. Status Audit & Stock Opname (SO)
+        if (statusAuditSoFilter !== "ALL") {
+            list = list.filter(r => {
+                if (statusAuditSoFilter === "SO_TODAY") return isSoActive(r.so_at);
+                if (statusAuditSoFilter === "SO_NEED") return r.tipe === "LAPTOP" && !isSoActive(r.so_at);
+                if (statusAuditSoFilter === "AUDIT_ACTIVE") return isAuditActive(r);
+                return true;
+            });
+        }
+
+        // 7. Pencarian Teks
         if (search.trim()) {
             const t = search.toLowerCase();
             list = list.filter(r => {
@@ -439,7 +499,6 @@ export default function UnifiedBarangContent() {
 
                 if (matchString) return true;
 
-                // Also check inside laptop_units array if there are multiple units
                 if (r.tipe === "LAPTOP" && r.raw && "laptop_units" in r.raw) {
                     const units = (r.raw as LaptopRaw).laptop_units;
                     if (units && units.some(u => u.serial_number?.toLowerCase().includes(t))) {
@@ -450,8 +509,31 @@ export default function UnifiedBarangContent() {
                 return false;
             });
         }
-        return list;
-    }, [rows, tipeFilter, kategoriFilter, search, categories]);
+
+        // 8. Urutkan Data (Sorting)
+        return [...list].sort((a, b) => {
+            if (sortBy === "NAMA_ASC") return a.nama.localeCompare(b.nama, "id-ID");
+            if (sortBy === "NAMA_DESC") return b.nama.localeCompare(a.nama, "id-ID");
+            if (sortBy === "HARGA_DESC") return (b.harga_jual || 0) - (a.harga_jual || 0);
+            if (sortBy === "HARGA_ASC") return (a.harga_jual || 0) - (b.harga_jual || 0);
+            if (sortBy === "STOK_DESC") {
+                const stokA = a.tipe === "LAPTOP" ? (a.stok_tersedia ?? 0) : (a.stok ?? 0);
+                const stokB = b.tipe === "LAPTOP" ? (b.stok_tersedia ?? 0) : (b.stok ?? 0);
+                return stokB - stokA;
+            }
+            if (sortBy === "STOK_ASC") {
+                const stokA = a.tipe === "LAPTOP" ? (a.stok_tersedia ?? 0) : (a.stok ?? 0);
+                const stokB = b.tipe === "LAPTOP" ? (b.stok_tersedia ?? 0) : (b.stok ?? 0);
+                return stokA - stokB;
+            }
+            if (sortBy === "NEWEST") {
+                const dateA = a.tanggal_masuk ? new Date(a.tanggal_masuk).getTime() : 0;
+                const dateB = b.tanggal_masuk ? new Date(b.tanggal_masuk).getTime() : 0;
+                return dateB - dateA;
+            }
+            return 0;
+        });
+    }, [rows, tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, search, categories, sortBy]);
 
         const counts = useMemo(() => ({
         total: rows.length,
@@ -754,8 +836,31 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    const hasFilter = tipeFilter !== "ALL" || !!kategoriFilter || !!search;
-    const resetFilter = () => { setTipeFilter("ALL"); setKategoriFilter(""); setSearch(""); };
+    const activeFilterCount = [
+        tipeFilter !== "ALL",
+        !!kategoriFilter,
+        !!brandFilter,
+        stokFilter !== "ALL",
+        !!minPrice.trim(),
+        !!maxPrice.trim(),
+        statusAuditSoFilter !== "ALL",
+        sortBy !== "NAMA_ASC",
+        !!search.trim(),
+    ].filter(Boolean).length;
+
+    const hasFilter = activeFilterCount > 0;
+
+    const resetFilter = () => {
+        setTipeFilter("ALL");
+        setKategoriFilter("");
+        setBrandFilter("");
+        setStokFilter("ALL");
+        setMinPrice("");
+        setMaxPrice("");
+        setStatusAuditSoFilter("ALL");
+        setSortBy("NAMA_ASC");
+        setSearch("");
+    };
 
     return (
         <>
@@ -764,7 +869,7 @@ export default function UnifiedBarangContent() {
                 @keyframes popIn  { from{opacity:0;transform:scale(0.94) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
                 .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
                 .animate-popIn  { animation: popIn 0.25s cubic-bezier(0.34,1.56,0.64,1); }
-                               .table-scroll { scrollbar-width: thin; scrollbar-color: #d4d4d8 #fafafa; }
+                                .table-scroll { scrollbar-width: thin; scrollbar-color: #d4d4d8 #fafafa; }
                 .table-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
                 .table-scroll::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 99px; }
                 .table-scroll::-webkit-scrollbar-track { background: #fafafa; border-radius: 99px; }
@@ -790,16 +895,197 @@ export default function UnifiedBarangContent() {
                         {canCreateAcc && <button onClick={() => openCreate("AKSESORIS")} className="h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-zinc-600 to-zinc-700 hover:from-zinc-700 hover:to-zinc-800 transition">+ Aksesori</button>}
                     </div>
 
-                    {/* ── FILTER LANJUTAN ─────────────────────────────────── */}
-                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-5">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <input className="h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 col-span-2"
-                                placeholder="Cari nama, brand, spek, SN..." value={search} onChange={e => setSearch(e.target.value)} />
-                            <select className="h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50" value={kategoriFilter} onChange={e => setKategoriFilter(e.target.value)}>
-                                <option value="">Semua Kategori</option>
-                                {filterCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                            <button onClick={resetFilter} disabled={!hasFilter} className="h-9 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 disabled:opacity-40 transition">Reset</button>
+                    {/* ── FILTER UTAMA & LANJUTAN (FULL FILTER) ───────────── */}
+                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-4 sm:p-5 space-y-3">
+                        {/* Row 1: Search, Kategori, Brand, Toggle Lanjutan, & Reset */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-center">
+                            {/* Search Input */}
+                            <div className="relative lg:col-span-4">
+                                <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 pointer-events-none" />
+                                <input
+                                    className="w-full h-9 pl-9 pr-8 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 transition"
+                                    placeholder="Cari nama, brand, spek, SN..."
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                />
+                                {search && (
+                                    <button onClick={() => setSearch("")} className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-600">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Kategori Dropdown */}
+                            <div className="lg:col-span-3">
+                                <select
+                                    className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-zinc-700 font-medium"
+                                    value={kategoriFilter}
+                                    onChange={e => setKategoriFilter(e.target.value)}
+                                >
+                                    <option value="">Semua Kategori</option>
+                                    {filterCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Brand Dropdown */}
+                            <div className="lg:col-span-2">
+                                <select
+                                    className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 text-zinc-700 font-medium"
+                                    value={brandFilter}
+                                    onChange={e => setBrandFilter(e.target.value)}
+                                >
+                                    <option value="">Semua Brand</option>
+                                    {availableBrands.map(b => <option key={b} value={b}>{b}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Action Buttons: Toggle Advanced + Reset */}
+                            <div className="lg:col-span-3 flex items-center gap-2">
+                                <button
+                                    onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
+                                    className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition border ${
+                                        showAdvancedFilter || activeFilterCount > (tipeFilter !== "ALL" || kategoriFilter || brandFilter || search ? 1 : 0)
+                                            ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
+                                            : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+                                    }`}
+                                >
+                                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                                    <span>Filter Lanjutan</span>
+                                    {activeFilterCount > 0 && (
+                                        <span className="w-4 h-4 rounded-full bg-amber-400 text-zinc-900 font-bold text-[10px] flex items-center justify-center ml-0.5">
+                                            {activeFilterCount}
+                                        </span>
+                                    )}
+                                    {showAdvancedFilter ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                </button>
+
+                                <button
+                                    onClick={resetFilter}
+                                    disabled={!hasFilter}
+                                    className="h-9 px-3 bg-zinc-100 text-zinc-600 rounded-xl text-xs font-medium hover:bg-zinc-200 disabled:opacity-40 transition flex items-center gap-1.5"
+                                    title="Reset Semua Filter"
+                                >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Reset</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Collapsible Panel: Filter Lanjutan */}
+                        {showAdvancedFilter && (
+                            <div className="pt-3 border-t border-zinc-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-fadeIn">
+                                {/* Status Stok */}
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Status Stok</label>
+                                    <select
+                                        className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 text-zinc-700"
+                                        value={stokFilter}
+                                        onChange={e => setStokFilter(e.target.value as any)}
+                                    >
+                                        <option value="ALL">Semua Stok</option>
+                                        <option value="READY">Stok Tersedia (&gt; 0)</option>
+                                        <option value="EMPTY">Stok Habis (= 0)</option>
+                                        <option value="SIAP_JUAL">Ada Unit Siap Jual</option>
+                                        <option value="MINUS">Ada Stock Minus / Service</option>
+                                    </select>
+                                </div>
+
+                                {/* Status Audit & Stock Opname */}
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Status Audit / SO</label>
+                                    <select
+                                        className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 text-zinc-700"
+                                        value={statusAuditSoFilter}
+                                        onChange={e => setStatusAuditSoFilter(e.target.value as any)}
+                                    >
+                                        <option value="ALL">Semua Status Audit &amp; SO</option>
+                                        <option value="SO_TODAY">Sudah SO Hari Ini</option>
+                                        <option value="SO_NEED">Belum SO Hari Ini (Laptop)</option>
+                                        <option value="AUDIT_ACTIVE">Audit Aktif</option>
+                                    </select>
+                                </div>
+
+                                {/* Rentang Harga Jual (Min & Max) */}
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Harga Jual (Rp)</label>
+                                    <div className="flex items-center gap-1.5">
+                                        <input
+                                            type="number"
+                                            placeholder="Min"
+                                            className="w-1/2 h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none"
+                                            value={minPrice}
+                                            onChange={e => setMinPrice(e.target.value)}
+                                        />
+                                        <span className="text-zinc-300 text-xs">-</span>
+                                        <input
+                                            type="number"
+                                            placeholder="Max"
+                                            className="w-1/2 h-9 px-2.5 border border-zinc-200 rounded-xl text-xs bg-zinc-50 focus:outline-none"
+                                            value={maxPrice}
+                                            onChange={e => setMaxPrice(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Sorting Dropdown */}
+                                <div>
+                                    <label className="block text-[11px] font-semibold text-zinc-500 mb-1">Urutkan Berdasarkan</label>
+                                    <select
+                                        className="w-full h-9 px-3 border border-zinc-200 rounded-xl text-xs bg-zinc-50 text-zinc-700 font-medium"
+                                        value={sortBy}
+                                        onChange={e => setSortBy(e.target.value as any)}
+                                    >
+                                        <option value="NAMA_ASC">Nama (A - Z)</option>
+                                        <option value="NAMA_DESC">Nama (Z - A)</option>
+                                        <option value="HARGA_DESC">Harga Jual (Termahal)</option>
+                                        <option value="HARGA_ASC">Harga Jual (Termurah)</option>
+                                        <option value="STOK_DESC">Stok (Terbanyak)</option>
+                                        <option value="STOK_ASC">Stok (Tersedikit)</option>
+                                        <option value="NEWEST">Terbaru Masuk</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Active Filter Badges & Counter */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100/80 text-xs text-zinc-500">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-[11px] font-medium text-zinc-400">Total:</span>
+                                <span className="font-bold text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded-lg text-[11px]">
+                                    {filteredRows.length} dari {rows.length} barang
+                                </span>
+
+                                {kategoriFilter && (
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium">
+                                        Kategori: {categories.find(c => c.id === kategoriFilter)?.name || kategoriFilter}
+                                        <button onClick={() => setKategoriFilter("")} className="hover:text-rose-600"><X className="w-3 h-3" /></button>
+                                    </span>
+                                )}
+                                {brandFilter && (
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium">
+                                        Brand: {brandFilter}
+                                        <button onClick={() => setBrandFilter("")} className="hover:text-rose-600"><X className="w-3 h-3" /></button>
+                                    </span>
+                                )}
+                                {stokFilter !== "ALL" && (
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium">
+                                        Stok: {stokFilter}
+                                        <button onClick={() => setStokFilter("ALL")} className="hover:text-rose-600"><X className="w-3 h-3" /></button>
+                                    </span>
+                                )}
+                                {(minPrice || maxPrice) && (
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium">
+                                        Harga: {minPrice ? fmt(Number(minPrice)) : "0"} - {maxPrice ? fmt(Number(maxPrice)) : "∞"}
+                                        <button onClick={() => { setMinPrice(""); setMaxPrice(""); }} className="hover:text-rose-600"><X className="w-3 h-3" /></button>
+                                    </span>
+                                )}
+                                {statusAuditSoFilter !== "ALL" && (
+                                    <span className="inline-flex items-center gap-1 bg-zinc-100 text-zinc-700 px-2 py-0.5 rounded-lg text-[11px] font-medium">
+                                        Audit/SO: {statusAuditSoFilter}
+                                        <button onClick={() => setStatusAuditSoFilter("ALL")} className="hover:text-rose-600"><X className="w-3 h-3" /></button>
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 

@@ -39,7 +39,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    const allowed = ["title", "description", "is_done", "priority", "due_date"];
+        const allowed = ["title", "description", "is_done", "priority", "due_date", "assigned_to", "assignee_read"];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
         if (key in body) updates[key] = body[key];
@@ -61,7 +61,7 @@ export async function PATCH(
     // Cek ownership dulu
     const { data: existing } = await supabase
         .from("todos")
-        .select("user_id, is_done")
+        .select("user_id, is_done, assigned_to")
         .eq("id", id)
         .single();
 
@@ -79,7 +79,7 @@ export async function PATCH(
     // dibuka lagi (is_done → false), field-nya direset ke null supaya
     // tidak "nyangkut" ke penyelesai lama kalau nanti diselesaikan ulang
     // oleh orang lain.
-    if ("is_done" in updates) {
+        if ("is_done" in updates) {
         if (updates.is_done === true && !existing.is_done) {
             const { data: completerData } = await supabase
                 .from("users")
@@ -94,6 +94,13 @@ export async function PATCH(
             updates.completed_by_name = null;
             updates.completed_at = null;
         }
+    }
+
+    // Assignment berubah (bukan cuma "assignee_read" dikirim sendirian buat
+    // tandai-sudah-dibaca) → reset assignee_read: false kalau ditugaskan ke
+    // orang baru (badge "Baru" muncul lagi), true kalau di-unassign.
+    if ("assigned_to" in updates && updates.assigned_to !== existing.assigned_to) {
+        updates.assignee_read = updates.assigned_to ? false : true;
     }
 
     const { data, error } = await supabase
