@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { usePrepNotify } from "@/hooks/usePrepNotify";
 import { useOvertimeNotify } from "@/hooks/useOvertimeNotify";
@@ -21,6 +21,7 @@ const CACHE_KEY = "solit_sidebar_userit";
 const RAIL_KEY = "solit_sidebar_rail";
 const WIDTH_KEY = "solit_sidebar_width";
 const GROUPS_KEY = "solit_sidebar_groups_open";
+const PINNED_KEY = "solit_sidebar_pinned";
 const MIN_W = 208;
 const MAX_W = 360;
 const DEFAULT_W = 240;
@@ -1012,7 +1013,10 @@ function RoleBadges({ user }: { user: any }) {
   );
 }
 
-function NavItem({ item, isActive, onClick, badge, rail }: { item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number; rail?: boolean; }) {
+function NavItem({ item, isActive, onClick, badge, rail, isPinned, onTogglePin }: {
+  item: MenuItem; isActive: boolean; onClick?: () => void; badge?: number; rail?: boolean;
+  isPinned?: boolean; onTogglePin?: (e: React.MouseEvent) => void;
+}) {
   return (
     <Link
       href={item.href}
@@ -1030,23 +1034,63 @@ function NavItem({ item, isActive, onClick, badge, rail }: { item: MenuItem; isA
       {badge && badge > 0 ? (
         <span
           style={{ animation: "solitBadgePop 0.3s ease-out both" }}
-          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${rail ? "absolute top-0.5 right-1" : "ml-auto"} ${isActive ? "bg-white text-[#1a1a2e]" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
+          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${rail ? "absolute top-0.5 right-1" : "ml-auto mr-1"} ${isActive ? "bg-white text-[#1a1a2e]" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
         >
           {badge > 99 ? "99+" : badge}
         </span>
       ) : null}
+
+      {/* Tombol Sematkan / Pin */}
+      {!rail && onTogglePin && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onTogglePin(e);
+          }}
+          title={isPinned ? "Lepas sematan" : "Sematkan menu"}
+          aria-label={isPinned ? `Lepas sematan ${item.name}` : `Sematkan ${item.name}`}
+          className={`p-1 rounded-md transition-all duration-150 flex-shrink-0 ${
+            isPinned
+              ? isActive
+                ? "opacity-100 text-amber-300 hover:text-amber-200 hover:bg-white/10"
+                : "opacity-100 text-amber-500 hover:text-amber-600 hover:bg-amber-50"
+              : isActive
+                ? "opacity-0 group-hover:opacity-80 hover:!opacity-100 text-white/70 hover:text-white hover:bg-white/10"
+                : "opacity-0 group-hover:opacity-70 hover:!opacity-100 text-gray-400 hover:text-gray-700 hover:bg-gray-200/70"
+          }`}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill={isPinned ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`transition-transform duration-200 ${isPinned ? "rotate-45" : "-rotate-12 group-hover:rotate-0"}`}
+          >
+            <path d="M12 17v5" />
+            <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z" />
+          </svg>
+        </button>
+      )}
     </Link>
   );
 }
 
 function SidebarContent({
   user, loading, groups, pathname, onClose, onLogout, badges, rail, onToggleRail, openMap, onToggleGroup, searchQuery, onSearchChange,
+  pinnedItems, pinnedHrefs, onTogglePin,
 }: {
   user: any; loading: boolean; groups: MenuGroup[]; pathname: string;
   onClose?: () => void; onLogout: () => void; badges?: Record<string, number>;
   rail?: boolean; onToggleRail?: () => void;
   openMap: Record<string, boolean>; onToggleGroup: (label: string) => void;
   searchQuery: string; onSearchChange: (value: string) => void;
+  pinnedItems: MenuItem[]; pinnedHrefs: string[]; onTogglePin: (href: string) => void;
 }) {
   const initials = user?.name ? getInitials(user.name) : "?";
   const navRef = useRef<HTMLElement>(null);
@@ -1166,45 +1210,120 @@ function SidebarContent({
             ))}
           </div>
         ) : rail ? (
-          groups.map((group, gi) => (
-            <div key={group.label} className="space-y-0.5">
-              {group.items.map((item) => (
-                <NavItem key={item.href} item={item} isActive={isItemActive(item.href, pathname)} onClick={onClose} badge={badges?.[item.href]} rail />
-              ))}
-              {gi < groups.length - 1 && <div className="mx-2 my-1.5 h-px bg-gray-100" />}
-            </div>
-          ))
-        ) : groups.length === 0 && searchQuery.trim() ? (
-          <div className="px-3 py-8 text-center text-xs text-gray-400">
-            Menu "{searchQuery}" tidak ditemukan.
-          </div>
+          <>
+            {pinnedItems.length > 0 && (
+              <div className="space-y-0.5 pb-2 mb-2 border-b border-gray-100">
+                {pinnedItems.map((item) => (
+                  <NavItem
+                    key={`pinned-rail-${item.href}`}
+                    item={item}
+                    isActive={isItemActive(item.href, pathname)}
+                    onClick={onClose}
+                    badge={badges?.[item.href]}
+                    rail
+                    isPinned={true}
+                    onTogglePin={() => onTogglePin(item.href)}
+                  />
+                ))}
+              </div>
+            )}
+            {groups.map((group, gi) => (
+              <div key={group.label} className="space-y-0.5">
+                {group.items.map((item) => (
+                  <NavItem
+                    key={item.href}
+                    item={item}
+                    isActive={isItemActive(item.href, pathname)}
+                    onClick={onClose}
+                    badge={badges?.[item.href]}
+                    rail
+                    isPinned={pinnedHrefs.includes(item.href)}
+                    onTogglePin={() => onTogglePin(item.href)}
+                  />
+                ))}
+                {gi < groups.length - 1 && <div className="mx-2 my-1.5 h-px bg-gray-100" />}
+              </div>
+            ))}
+          </>
         ) : (
-          groups.map((group, gi) => {
-            const isOpen = searchQuery.trim() ? true : (openMap[group.label] ?? true);
-            const hasActive = group.items.some((it) => isItemActive(it.href, pathname));
-            return (
-              <div key={group.label} style={{ animation: "solitGroupIn 0.3s ease-out both", animationDelay: `${gi * 50}ms` }}>
-                <button onClick={() => onToggleGroup(group.label)} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition group/cat">
-                  <span className={`text-[10px] font-bold uppercase tracking-[0.08em] flex-1 text-left truncate ${hasActive ? "text-[#1a1a2e]" : "text-gray-400 group-hover/cat:text-gray-600"}`}>
-                    {group.label}
-                  </span>
-                  {hasActive && !isOpen && <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse" />}
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-300 group-hover/cat:text-gray-500 flex-shrink-0" style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .25s ease" }}>
-                    <polyline points="6 9 12 15 18 9" />
+          <>
+            {/* ── Section Menu Disematkan (Pinned) ── */}
+            {pinnedItems.length > 0 && (
+              <div className="mb-2.5 pb-2.5 border-b border-gray-100/90" style={{ animation: "solitGroupIn 0.25s ease-out both" }}>
+                <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-amber-600">
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="rotate-45"
+                  >
+                    <path d="M12 17v5" />
+                    <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z" />
                   </svg>
-                </button>
-                <div className={`grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 mt-0.5" : "grid-rows-[0fr] opacity-0"}`}>
-                  <div className="overflow-hidden min-h-0">
-                    <div className="space-y-0.5">
-                      {group.items.map((item) => (
-                        <NavItem key={item.href} item={item} isActive={isItemActive(item.href, pathname)} onClick={onClose} badge={badges?.[item.href]} />
-                      ))}
-                    </div>
-                  </div>
+                  <span className="flex-1">Disematkan ({pinnedItems.length})</span>
+                </div>
+                <div className="space-y-0.5 mt-1">
+                  {pinnedItems.map((item) => (
+                    <NavItem
+                      key={`pinned-${item.href}`}
+                      item={item}
+                      isActive={isItemActive(item.href, pathname)}
+                      onClick={onClose}
+                      badge={badges?.[item.href]}
+                      isPinned={true}
+                      onTogglePin={() => onTogglePin(item.href)}
+                    />
+                  ))}
                 </div>
               </div>
-            );
-          })
+            )}
+
+            {groups.length === 0 && searchQuery.trim() ? (
+              <div className="px-3 py-8 text-center text-xs text-gray-400">
+                Menu "{searchQuery}" tidak ditemukan.
+              </div>
+            ) : (
+              groups.map((group, gi) => {
+                const isOpen = searchQuery.trim() ? true : (openMap[group.label] ?? true);
+                const hasActive = group.items.some((it) => isItemActive(it.href, pathname));
+                return (
+                  <div key={group.label} style={{ animation: "solitGroupIn 0.3s ease-out both", animationDelay: `${gi * 50}ms` }}>
+                    <button onClick={() => onToggleGroup(group.label)} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition group/cat">
+                      <span className={`text-[10px] font-bold uppercase tracking-[0.08em] flex-1 text-left truncate ${hasActive ? "text-[#1a1a2e]" : "text-gray-400 group-hover/cat:text-gray-600"}`}>
+                        {group.label}
+                      </span>
+                      {hasActive && !isOpen && <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse" />}
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-300 group-hover/cat:text-gray-500 flex-shrink-0" style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .25s ease" }}>
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </button>
+                    <div className={`grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 mt-0.5" : "grid-rows-[0fr] opacity-0"}`}>
+                      <div className="overflow-hidden min-h-0">
+                        <div className="space-y-0.5">
+                          {group.items.map((item) => (
+                            <NavItem
+                              key={item.href}
+                              item={item}
+                              isActive={isItemActive(item.href, pathname)}
+                              onClick={onClose}
+                              badge={badges?.[item.href]}
+                              isPinned={pinnedHrefs.includes(item.href)}
+                              onTogglePin={() => onTogglePin(item.href)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </>
         )}
       </nav>
 
@@ -1311,6 +1430,25 @@ export default function Sidebar() {
   const [reminderDismissed, setReminderDismissed] = useState(false);
   const [contractDismissed, setContractDismissed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PINNED_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setPinnedHrefs(parsed);
+      }
+    } catch { }
+  }, []);
+
+  const togglePin = useCallback((href: string) => {
+    setPinnedHrefs((prev) => {
+      const next = prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href];
+      try { localStorage.setItem(PINNED_KEY, JSON.stringify(next)); } catch { }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const cached = getCachedUser();
@@ -1520,10 +1658,31 @@ export default function Sidebar() {
       .filter((g) => g.items.length > 0)
     : displayGroups;
 
+  const allAvailableItems = useMemo(() => {
+    const map = new Map<string, MenuItem>();
+    for (const g of displayGroups) {
+      for (const it of g.items) {
+        if (!map.has(it.href)) map.set(it.href, it);
+      }
+    }
+    return map;
+  }, [displayGroups]);
+
+  const pinnedItems: MenuItem[] = useMemo(() => {
+    const items = pinnedHrefs
+      .map((href) => allAvailableItems.get(href))
+      .filter((it): it is MenuItem => Boolean(it));
+    if (searchTerm) {
+      return items.filter((it) => it.name.toLowerCase().includes(searchTerm));
+    }
+    return items;
+  }, [pinnedHrefs, allAvailableItems, searchTerm]);
+
   const sharedContentProps = {
     user, loading, groups: filteredGroups, pathname,
     onLogout: handleLogout, badges, openMap, onToggleGroup: toggleGroup,
     searchQuery, onSearchChange: setSearchQuery,
+    pinnedItems, pinnedHrefs, onTogglePin: togglePin,
   };
 
   return (
