@@ -96,6 +96,9 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [currentUser, setCurrentUser] = useState<{ id: string; role: string; roles?: string[] } | null>(null);
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [achievements, setAchievements] = useState<AchievementsData | null>(null);
+    const [qualityRank, setQualityRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
+    const [kerjaRank, setKerjaRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
+    const [deliveryBadge, setDeliveryBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -160,17 +163,26 @@ export default function ProfileView({ userId }: { userId: string }) {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [meRes, profileRes, achRes] = await Promise.all([
+            const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes] = await Promise.all([
                 getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
                 fetch(`/api/profile?userId=${userId}`),
                 fetch(`/api/achievements?userId=${userId}`),
+                fetch(`/api/attendance/quality-rank?userId=${userId}`),
+                fetch(`/api/leaderboard-kerja/quality-rank?userId=${userId}`),
+                fetch(`/api/preparation/delivery-milestones?userId=${userId}`),
             ]);
             const meData = await meRes.json();
             const profileData = await profileRes.json();
             const achData = await achRes.json();
+            const qualityData = await qualityRes.json();
+            const kerjaData = await kerjaRes.json();
+            const deliveryData = await deliveryRes.json();
             if (meData.user) setCurrentUser(meData.user);
             if (profileData.success) { setProfile(profileData.data); setBioDraft(profileData.data.bio ?? ""); }
             if (achData.success) setAchievements(achData.data);
+            if (qualityData.success) setQualityRank(qualityData.data);
+            if (kerjaData.success) setKerjaRank(kerjaData.data);
+            if (deliveryData.success) setDeliveryBadge(deliveryData.data);
         } catch {
             showToast("Gagal memuat profil", "err");
         } finally {
@@ -821,7 +833,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 ))}
                             </div>
                         </div>
-                        {achievements && <AchievementTitles achievements={achievements} />}
+                        {achievements && <AchievementTitles achievements={achievements} qualityRank={qualityRank} kerjaRank={kerjaRank} deliveryBadge={deliveryBadge} />}
                     </div>
 
                     <div className="mt-3">
@@ -1065,8 +1077,12 @@ function RankBadge({ rank }: { rank: number }) {
     );
 }
 
-// ── Title achievement ala Mobile Legends: menampilkan "TOP {rank}" untuk kategori yang masuk 5 besar ───
-function AchievementTitles({ achievements }: { achievements: AchievementsData }) {
+function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge }: {
+    achievements: AchievementsData;
+    qualityRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
+    kerjaRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
+    deliveryBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+}) {
     const titles: { rank: number; label: string }[] = [];
     if (achievements.attendance.rankThisMonth !== null && achievements.attendance.rankThisMonth <= 10) {
         titles.push({ rank: achievements.attendance.rankThisMonth, label: "Kehadiran" });
@@ -1074,14 +1090,134 @@ function AchievementTitles({ achievements }: { achievements: AchievementsData })
     if (achievements.overtime.rankThisMonth !== null && achievements.overtime.rankThisMonth <= 10) {
         titles.push({ rank: achievements.overtime.rankThisMonth, label: "Lembur" });
     }
-    if (titles.length === 0) return null;
+    // ✅ NEW — Kualitas Absensi sekarang berbasis LEVEL berjenjang (lihat
+    // /dashboard/lencana), bukan cuma rank bulan ini — jadi ditampilkan
+    // terpisah dari 2 kategori TOP di atas.
+    const hasQualityBadge = !!(qualityRank && qualityRank.level > 0);
+    // ✅ NEW — Lencana Kualitas Pekerjaan (tab "Pekerjaan" di /dashboard/lencana),
+    // polanya sama dengan Kualitas Absensi, cuma sumbernya leaderboard-kerja.
+    const hasKerjaBadge = !!(kerjaRank && kerjaRank.level > 0);
+    // ✅ NEW — Lencana Pengantaran (tab "Pengantaran" di /dashboard/lencana):
+    // BUKAN level bulanan, tapi milestone total pengantaran (50/100/.../1000),
+    // dan cuma tampil kalau server sudah menandai hasBadge (artinya Top 3).
+    const hasDeliveryBadge = !!(deliveryBadge && deliveryBadge.hasBadge);
+    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge) return null;
     titles.sort((a, b) => a.rank - b.rank);
 
     return (
         <div className="flex flex-row sm:flex-col flex-wrap justify-end sm:justify-start items-end gap-2 flex-shrink-0">
+            {hasQualityBadge && (
+                <LevelBadgeDisplay level={qualityRank!.level} isPermanent={qualityRank!.isPermanent} isOngoingMonth={qualityRank!.isOngoingMonth} />
+            )}
+            {hasKerjaBadge && (
+                <LevelBadgeDisplay level={kerjaRank!.level} isPermanent={kerjaRank!.isPermanent} isOngoingMonth={kerjaRank!.isOngoingMonth} label="Kualitas Pekerjaan" colorScheme="indigo" />
+            )}
+            {hasDeliveryBadge && (
+                <DeliveryMilestoneBadge rank={deliveryBadge!.rank} milestone={deliveryBadge!.milestone} />
+            )}
             {titles.map((t) => (
                 <AchievementTitleBadge key={t.label} rank={t.rank} label={t.label} />
             ))}
+        </div>
+    );
+}
+
+
+// ✅ NEW — badge lencana Pengantaran: TIDAK berbasis level/streak seperti
+// LevelBadgeDisplay, melainkan MILESTONE total pengantaran (50/100/.../1000)
+// dan rank Top 1-3 di periode yang sedang dipakai (default rolling 1 bulan).
+function DeliveryMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #fb923c, #ea580c, #9a3412)",
+        silver: "linear-gradient(135deg, #fdba74, #f97316, #c2410c)",
+        bronze: "linear-gradient(135deg, #fed7aa, #fb923c, #ea580c)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(234,88,12,0.35)",
+        silver: "rgba(249,115,22,0.35)",
+        bronze: "rgba(251,146,60,0.35)",
+    };
+
+    return (
+        <div
+            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
+            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
+            title={`Top ${rank} Pengantaran · ${milestone}+ pengantaran`}
+        >
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
+            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            </div>
+            <div className="relative leading-tight">
+                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">TOP {rank}</p>
+                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
+                    Pengantaran · {milestone}+
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ✅ NEW — badge lencana berjenjang (Level 1-10) untuk Kualitas Absensi di
+// halaman profil. Beda dari AchievementTitleBadge (yang berbasis rank bulan
+// ini): ini berbasis level konsistensi, dan tetap tampil "Permanen" walau
+// bulan ini performanya turun (kalau sudah pernah tembus Level 3).
+function LevelBadgeDisplay({
+    level, isPermanent, isOngoingMonth, label = "Kualitas Absensi", colorScheme = "emerald",
+}: {
+    level: number; isPermanent: boolean; isOngoingMonth: boolean;
+    label?: string; colorScheme?: "emerald" | "indigo";
+}) {
+    const tier: "gold" | "silver" | "bronze" = isPermanent ? "gold" : level >= 2 ? "silver" : "bronze";
+    const gradientsByScheme: Record<"emerald" | "indigo", Record<typeof tier, string>> = {
+        emerald: {
+            gold: "linear-gradient(135deg, #34d399, #059669, #047857)",
+            silver: "linear-gradient(135deg, #fde68a, #f59e0b, #b45309)",
+            bronze: "linear-gradient(135deg, #fdba74, #c2410c, #7c2d12)",
+        },
+        indigo: {
+            gold: "linear-gradient(135deg, #818cf8, #4f46e5, #3730a3)",
+            silver: "linear-gradient(135deg, #93c5fd, #2563eb, #1e3a8a)",
+            bronze: "linear-gradient(135deg, #a5b4fc, #6366f1, #4338ca)",
+        },
+    };
+    const glowByScheme: Record<"emerald" | "indigo", Record<typeof tier, string>> = {
+        emerald: {
+            gold: "rgba(5,150,105,0.35)",
+            silver: "rgba(245,158,11,0.35)",
+            bronze: "rgba(194,65,12,0.35)",
+        },
+        indigo: {
+            gold: "rgba(79,70,229,0.35)",
+            silver: "rgba(37,99,235,0.35)",
+            bronze: "rgba(99,102,241,0.35)",
+        },
+    };
+    const gradients = gradientsByScheme[colorScheme];
+    const glow = glowByScheme[colorScheme];
+
+    const showProvisional = !isPermanent && isOngoingMonth;
+
+    return (
+        <div
+            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
+            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
+            title={isPermanent ? `Level ${level} · Lencana Permanen` : showProvisional ? `Level ${level} · Sementara, bulan berjalan belum final` : `Level ${level}`}
+        >
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
+            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            </div>
+            <div className="relative leading-tight">
+                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">LEVEL {level}</p>
+                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
+                    {label}{isPermanent ? " · Permanen" : showProvisional ? " · Sementara" : ""}
+                </p>
+                {showProvisional && (
+                    <p className="text-[7px] sm:text-[7.5px] font-semibold" style={{ color: "rgba(255,255,255,0.7)" }}>Bulan berjalan, belum final</p>
+                )}
+            </div>
         </div>
     );
 }
