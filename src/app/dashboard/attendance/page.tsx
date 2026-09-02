@@ -14,7 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { pickSchedule, SHIFT_DEFAULTS, type ShiftScheduleRow } from "@/lib/shiftSchedule";
 import { Check, Clock, Frown, FileText, X, Umbrella, Shield, ShieldAlert, Sun, Moon, Plus, Pencil, Trash2, ArrowRightLeft, ChevronRight, CheckCircle2, Inbox, CalendarDays, GraduationCap, Briefcase, Trophy } from "lucide-react";
 import { ShiftScheduleTab } from "./ShiftScheduleTab";
-import ExcelJS from "exceljs";
+import type ExcelJS from "exceljs";
 import { ContractBadge } from "@/components/contracts/ContractBadge";
 import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 import SendContractModal from "@/components/contracts/SendContractModal";
@@ -4614,6 +4614,7 @@ export default function AttendanceDashboardPage() {
             return;
         }
 
+        const { default: ExcelJS } = await import("exceljs");
         const workbook = new ExcelJS.Workbook();
         workbook.creator = "Solit 03";
         workbook.created = new Date();

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { toPng } from "html-to-image";
 import { buildWhatsappReceiptBlock, type ReceiptLineItem } from "@/lib/receiptItems";
 
 interface Props {
@@ -143,6 +142,7 @@ export default function ReceiptActions({
         try {
             window.scrollTo(0, 0);
 
+            const { toPng } = await import("html-to-image");
             const dataUrl = await toPng(card, {
                 cacheBust: true,
                 pixelRatio: 2,
