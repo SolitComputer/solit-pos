@@ -9,6 +9,11 @@ import {
   fmtDate, fmtDateTime, isFromCeo, isOverdue, missionProgress,
   StatusBadge, PriorityPill, WorkspaceHeader,
 } from "./missionShared";
+import {
+  Crown, Flame, ArrowRight, ArrowDown, Search, SlidersHorizontal, RotateCcw,
+  AlertTriangle, ShieldAlert, ChevronDown, Image as ImageIcon,
+  type LucideIcon,
+} from "lucide-react";
 
 interface UserOption { id: string; name: string; role: string; roles: string[]; }
 
@@ -30,7 +35,7 @@ const PRIORITY_OPTIONS: { value: MissionPriority | ""; label: string }[] = [
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
 
-/** Dot indicator untuk priority — lebih hemat ruang dari pill */
+/** Icon + label untuk priority — lebih hemat ruang dari pill, konsisten dgn PriorityBadge di MissionsWorkspace */
 function PriorityDot({ priority }: { priority: MissionPriority }) {
   const colors: Record<MissionPriority, string> = {
     HIGH: "#ef4444",
@@ -42,12 +47,15 @@ function PriorityDot({ priority }: { priority: MissionPriority }) {
     MEDIUM: "Sedang",
     LOW: "Rendah",
   };
+  const icons: Record<MissionPriority, LucideIcon> = {
+    HIGH: Flame,
+    MEDIUM: ArrowRight,
+    LOW: ArrowDown,
+  };
+  const Icon = icons[priority];
   return (
     <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-      <span
-        className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
-        style={{ background: colors[priority] }}
-      />
+      <Icon className="w-3 h-3 flex-shrink-0" style={{ color: colors[priority] }} />
       {labels[priority]}
     </span>
   );
@@ -80,9 +88,9 @@ function ProgressBar({ done, total, pct }: { done: number; total: number; pct: n
 /** Badge kecil untuk CEO tag */
 function CeoTag() {
   return (
-    <span className="inline-flex items-center h-4 px-1.5 text-[9px] font-black rounded tracking-wide"
+    <span className="inline-flex items-center gap-0.5 h-4 px-1.5 text-[9px] font-black rounded tracking-wide"
       style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>
-      CEO
+      <Crown className="w-2.5 h-2.5" /> CEO
     </span>
   );
 }
@@ -126,11 +134,7 @@ function ExpandedDetail({ m }: { m: Mission }) {
           )}
           {m.proof_photo_url && (
             <div className="col-span-2 lg:col-span-4 flex items-center gap-2 pt-0.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.2">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <path d="M21 15l-5-5L5 21" />
-              </svg>
+              <ImageIcon className="w-3.5 h-3.5" style={{ color: "#6366f1" }} />
               <a href={m.proof_photo_url} target="_blank" rel="noopener noreferrer"
                 className="text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:underline underline-offset-2">
                 Lihat bukti foto →
@@ -182,11 +186,7 @@ function MobileExpandedDetail({ m }: { m: Mission }) {
       {m.proof_photo_url && (
         <a href={m.proof_photo_url} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:underline underline-offset-2">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <path d="M21 15l-5-5L5 21" />
-          </svg>
+          <ImageIcon className="w-3.5 h-3.5" />
           Lihat bukti foto
         </a>
       )}
@@ -262,10 +262,7 @@ export default function AdminAllMissionsWorkspace() {
         <main className="min-h-screen bg-gradient-to-b from-slate-100/70 via-[#f7f8fa] to-[#f7f8fa] p-4 sm:p-6 lg:p-8">
           <div className="max-w-md mx-auto bg-white rounded-2xl shadow-lg border border-slate-200/80 p-8 sm:p-12 text-center">
             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-red-50 to-red-100 border border-red-200 flex items-center justify-center">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" />
-                <path d="M7 11V7a5 5 0 0110 0v4" />
-              </svg>
+              <ShieldAlert className="w-8 h-8" style={{ color: "#ef4444" }} />
             </div>
             <h2 className="text-2xl font-bold text-slate-800 mb-2">Akses Ditolak</h2>
             <p className="text-sm text-slate-500 leading-relaxed">
@@ -309,11 +306,7 @@ export default function AdminAllMissionsWorkspace() {
               <div className="flex gap-2">
                 {/* Search */}
                 <div className="relative flex-1">
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                   <input
                     value={search}
                     onChange={e => setSearch(e.target.value)}
@@ -347,9 +340,7 @@ export default function AdminAllMissionsWorkspace() {
                       : { background: "#f8fafc", color: "#475569", border: "1px solid #e2e8f0" }
                   }
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
-                  </svg>
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
                   Filter
                   {activeFilterCount > 0 && (
                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-white text-indigo-600 leading-none">
@@ -408,10 +399,7 @@ export default function AdminAllMissionsWorkspace() {
                   {activeFilterCount > 0 && (
                     <button onClick={resetFilters}
                       className="w-full h-8 rounded-lg text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 hover:bg-rose-100 active:scale-[0.99] transition flex items-center justify-center gap-1.5">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M3 12a9 9 0 109-9 9 9 0 00-6.36 2.64L3 8" />
-                        <path d="M3 3v5h5" />
-                      </svg>
+                      <RotateCcw className="w-3 h-3" />
                       Reset semua filter ({activeFilterCount})
                     </button>
                   )}
@@ -453,28 +441,19 @@ export default function AdminAllMissionsWorkspace() {
           ) : error ? (
             <div className="bg-white rounded-2xl border border-rose-200 shadow-sm px-4 py-12 text-center">
               <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-rose-100 flex items-center justify-center">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2.2">
-                  <path d="M12 9v4M12 17h.01" />
-                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                </svg>
+                <AlertTriangle className="w-6 h-6" style={{ color: "#e11d48" }} />
               </div>
               <p className="text-sm font-bold text-rose-700 mb-4">{error}</p>
               <button onClick={() => void refetch()}
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 bg-white border border-rose-200 rounded-lg px-4 h-9 hover:bg-rose-50 active:scale-[0.98] transition">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M3 12a9 9 0 109-9 9 9 0 00-6.36 2.64L3 8" />
-                  <path d="M3 3v5h5" />
-                </svg>
+                <RotateCcw className="w-3 h-3" />
                 Coba lagi
               </button>
             </div>
           ) : missions.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm py-16 text-center">
               <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 flex items-center justify-center">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2">
-                  <path d="M21 21l-4.35-4.35" />
-                  <circle cx="11" cy="11" r="8" />
-                </svg>
+                <Search className="w-8 h-8" style={{ color: "#94a3b8" }} />
               </div>
               <p className="text-base font-bold text-slate-700 tracking-tight">Tidak ada misi yang cocok</p>
               <p className="text-sm mt-1.5 text-slate-400">Coba longgarkan filter atau ubah kata kunci.</p>
@@ -550,13 +529,10 @@ export default function AdminAllMissionsWorkspace() {
                               </td>
                               {/* Chevron */}
                               <td className="px-2 py-3 text-slate-300 group-hover:text-indigo-400 transition-colors">
-                                <svg
-                                  width="14" height="14" viewBox="0 0 24 24"
-                                  fill="none" stroke="currentColor" strokeWidth="2.5"
+                                <ChevronDown
+                                  className="w-3.5 h-3.5"
                                   style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }}
-                                >
-                                  <path d="M6 9l6 6 6-6" />
-                                </svg>
+                                />
                               </td>
                             </tr>
 
@@ -589,14 +565,10 @@ export default function AdminAllMissionsWorkspace() {
                           {ceo && <div className="mb-1.5"><CeoTag /></div>}
                           <h3 className="text-sm font-semibold text-slate-800 leading-snug">{m.title}</h3>
                         </div>
-                        <svg
-                          width="15" height="15" viewBox="0 0 24 24"
-                          fill="none" stroke="currentColor" strokeWidth="2.5"
-                          className="text-slate-400 flex-shrink-0 mt-0.5"
+                        <ChevronDown
+                          className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5"
                           style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s ease" }}
-                        >
-                          <path d="M6 9l6 6 6-6" />
-                        </svg>
+                        />
                       </div>
 
                       {/* Badge row: status + priority + progress */}
