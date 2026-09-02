@@ -1004,7 +1004,7 @@ function RoleBadges({ user }: { user: any }) {
       {roles.map((role) => {
         const meta = ROLE_META[role as UserRole];
         return (
-          <span key={role} className={`inline-block text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-gray-50 text-gray-700"}`}>
+          <span key={role} className={`inline-block text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-slate-50 text-slate-700"}`}>
             {meta?.label ?? role}
           </span>
         );
@@ -1022,19 +1022,19 @@ function NavItem({ item, isActive, onClick, badge, rail, isPinned, onTogglePin }
       href={item.href}
       onClick={onClick}
       title={rail ? item.name : undefined}
-      className={`group relative flex items-center rounded-xl text-sm font-medium tracking-[-0.005em] outline-none transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-[#1a1a2e]/30 ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2 hover:translate-x-0.5"} ${isActive ? "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4a] text-white shadow-md shadow-[#1a1a2e]/20" : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"}`}
+      className={`group relative flex items-center rounded-xl text-sm font-medium tracking-[-0.005em] outline-none transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:ring-indigo-500/30 ${rail ? "justify-center py-2.5" : "gap-2.5 px-3 py-2 hover:translate-x-0.5"} ${isActive ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-500/20" : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"}`}
     >
       {!rail && (
         <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-white transition-all duration-300 ease-out ${isActive ? "h-5 opacity-90" : "h-0 opacity-0"}`} />
       )}
-      <span className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? (rail ? "text-white" : "text-white/80") : "text-gray-400 group-hover:text-gray-600"}`}>
+      <span className={`flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? (rail ? "text-white" : "text-white/80") : "text-slate-400 group-hover:text-slate-600"}`}>
         {item.icon}
       </span>
       {!rail && <span className="flex-1 truncate">{item.name}</span>}
       {badge && badge > 0 ? (
         <span
           style={{ animation: "solitBadgePop 0.3s ease-out both" }}
-          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${rail ? "absolute top-0.5 right-1" : "ml-auto mr-1"} ${isActive ? "bg-white text-[#1a1a2e]" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
+          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black tabular-nums ${rail ? "absolute top-0.5 right-1" : "ml-auto mr-1"} ${isActive ? "bg-white text-indigo-600" : "bg-red-500 text-white shadow-sm shadow-red-500/40"}`}
         >
           {badge > 99 ? "99+" : badge}
         </span>
@@ -1051,15 +1051,14 @@ function NavItem({ item, isActive, onClick, badge, rail, isPinned, onTogglePin }
           }}
           title={isPinned ? "Lepas sematan" : "Sematkan menu"}
           aria-label={isPinned ? `Lepas sematan ${item.name}` : `Sematkan ${item.name}`}
-          className={`p-1 rounded-md transition-all duration-150 flex-shrink-0 ${
-            isPinned
-              ? isActive
-                ? "opacity-100 text-amber-300 hover:text-amber-200 hover:bg-white/10"
-                : "opacity-100 text-amber-500 hover:text-amber-600 hover:bg-amber-50"
-              : isActive
-                ? "opacity-0 group-hover:opacity-80 hover:!opacity-100 text-white/70 hover:text-white hover:bg-white/10"
-                : "opacity-0 group-hover:opacity-70 hover:!opacity-100 text-gray-400 hover:text-gray-700 hover:bg-gray-200/70"
-          }`}
+          className={`p-1 rounded-md transition-all duration-150 flex-shrink-0 ${isPinned
+            ? isActive
+              ? "opacity-100 text-amber-300 hover:text-amber-200 hover:bg-white/10"
+              : "opacity-100 text-amber-500 hover:text-amber-600 hover:bg-amber-50"
+            : isActive
+              ? "opacity-0 group-hover:opacity-80 hover:!opacity-100 text-white/70 hover:text-white hover:bg-white/10"
+              : "opacity-0 group-hover:opacity-70 hover:!opacity-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200/70"
+            }`}
         >
           <svg
             width="12"
@@ -1114,14 +1113,14 @@ function SidebarContent({
       <div className={`pt-5 pb-4 flex-shrink-0 ${rail ? "px-2" : "px-4"}`}>
         <div className={`flex items-center mb-5 ${rail ? "justify-center" : "justify-between"}`}>
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-[#1a1a2e]">
+            <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-indigo-600">
               <img src="/assets/solit03.jpeg" alt="Solit" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
-            {!rail && <span className="text-sm font-extrabold text-[#1a1a2e] tracking-[-0.01em]">Solit POS</span>}
+                       {!rail && <span className="text-sm font-extrabold text-[#1a1a2e] tracking-[-0.01em]">Solit POS</span>}
           </div>
           <div className="flex items-center gap-1">
             {onToggleRail && (
-              <button onClick={onToggleRail} className={`hidden lg:flex p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition ${rail ? "mx-auto mt-2" : ""}`} title={rail ? "Perbesar sidebar" : "Perkecil sidebar"} aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}>
+              <button onClick={onToggleRail} className={`hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition ${rail ? "mx-auto mt-2" : ""}`} title={rail ? "Perbesar sidebar" : "Perkecil sidebar"} aria-label={rail ? "Perbesar sidebar" : "Perkecil sidebar"}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ transform: rail ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
                   <polyline points="11 17 6 12 11 7" />
                   <polyline points="18 17 13 12 18 7" />
@@ -1129,7 +1128,7 @@ function SidebarContent({
               </button>
             )}
             {onClose && (
-              <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition" aria-label="Tutup sidebar">
+              <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition" aria-label="Tutup sidebar">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
@@ -1141,17 +1140,17 @@ function SidebarContent({
 
         {loading || !user ? (
           <div className={`flex items-center gap-3 ${rail ? "justify-center" : ""}`}>
-            <div className="w-9 h-9 rounded-full bg-gray-100 animate-pulse flex-shrink-0" />
+            <div className="w-9 h-9 rounded-full bg-slate-100 animate-pulse flex-shrink-0" />
             {!rail && (
               <div className="flex-1 space-y-1.5">
-                <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
-                <div className="h-2.5 w-14 bg-gray-100 rounded animate-pulse" />
+                <div className="h-3 w-24 bg-slate-100 rounded animate-pulse" />
+                <div className="h-2.5 w-14 bg-slate-100 rounded animate-pulse" />
               </div>
             )}
           </div>
         ) : rail ? (
           <Link href="/dashboard/profile" className="flex justify-center" title="Profil saya">
-            <div className="w-9 h-9 rounded-full bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold overflow-hidden" title={user?.name || ""}>
+            <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden" title={user?.name || ""}>
               {user?.profile_photo_url
                 ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
                 : initials}
@@ -1159,24 +1158,23 @@ function SidebarContent({
           </Link>
         ) : (
           <Link href="/dashboard/profile" className="flex items-center gap-3 group/profile" title="Profil saya">
-            <div className="w-9 h-9 rounded-full bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+            <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
               {user?.profile_photo_url
                 ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
                 : initials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-800 tracking-tight truncate group-hover/profile:underline">{user?.name || "—"}</p>
+              <p className="text-sm font-semibold text-slate-900 tracking-tight truncate group-hover/profile:underline">{user?.name || "—"}</p>
               <RoleBadges user={user} />
             </div>
           </Link>
         )}      </div>
 
-      <div className={`h-px bg-gray-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
-
+      <div className={`h-px bg-slate-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
       {!rail && (
         <div className="px-3 pt-3 pb-1 flex-shrink-0">
           <div className="relative">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
               <circle cx="11" cy="11" r="7" />
               <path d="M21 21l-4.3-4.3" />
             </svg>
@@ -1184,12 +1182,12 @@ function SidebarContent({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Cari menu..."
-              className="w-full pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200/70 rounded-lg outline-none focus:border-[#1a1a2e]/30 focus:bg-white transition-colors placeholder:text-gray-400"
+              className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200/70 rounded-lg outline-none focus:border-indigo-500/30 focus:bg-white transition-colors placeholder:text-slate-400"
             />
             {searchQuery && (
               <button
                 onClick={() => onSearchChange("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 aria-label="Hapus pencarian"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1206,13 +1204,13 @@ function SidebarContent({
         {loading ? (
           <div className="space-y-1 pt-1">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-9 rounded-xl bg-gray-100 animate-pulse mb-1" style={{ animationDelay: `${i * 40}ms` }} />
+              <div key={i} className="h-9 rounded-xl bg-slate-100 animate-pulse mb-1" style={{ animationDelay: `${i * 40}ms` }} />
             ))}
           </div>
         ) : rail ? (
           <>
             {pinnedItems.length > 0 && (
-              <div className="space-y-0.5 pb-2 mb-2 border-b border-gray-100">
+              <div className="space-y-0.5 pb-2 mb-2 border-b border-slate-100">
                 {pinnedItems.map((item) => (
                   <NavItem
                     key={`pinned-rail-${item.href}`}
@@ -1241,7 +1239,7 @@ function SidebarContent({
                     onTogglePin={() => onTogglePin(item.href)}
                   />
                 ))}
-                {gi < groups.length - 1 && <div className="mx-2 my-1.5 h-px bg-gray-100" />}
+                {gi < groups.length - 1 && <div className="mx-2 my-1.5 h-px bg-slate-100" />}
               </div>
             ))}
           </>
@@ -1249,7 +1247,7 @@ function SidebarContent({
           <>
             {/* ── Section Menu Disematkan (Pinned) ── */}
             {pinnedItems.length > 0 && (
-              <div className="mb-2.5 pb-2.5 border-b border-gray-100/90" style={{ animation: "solitGroupIn 0.25s ease-out both" }}>
+              <div className="mb-2.5 pb-2.5 border-b border-slate-100/90" style={{ animation: "solitGroupIn 0.25s ease-out both" }}>
                 <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-amber-600">
                   <svg
                     width="11"
@@ -1284,7 +1282,7 @@ function SidebarContent({
             )}
 
             {groups.length === 0 && searchQuery.trim() ? (
-              <div className="px-3 py-8 text-center text-xs text-gray-400">
+              <div className="px-3 py-8 text-center text-xs text-slate-400">
                 Menu "{searchQuery}" tidak ditemukan.
               </div>
             ) : (
@@ -1293,12 +1291,12 @@ function SidebarContent({
                 const hasActive = group.items.some((it) => isItemActive(it.href, pathname));
                 return (
                   <div key={group.label} style={{ animation: "solitGroupIn 0.3s ease-out both", animationDelay: `${gi * 50}ms` }}>
-                    <button onClick={() => onToggleGroup(group.label)} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition group/cat">
-                      <span className={`text-[10px] font-bold uppercase tracking-[0.08em] flex-1 text-left truncate ${hasActive ? "text-[#1a1a2e]" : "text-gray-400 group-hover/cat:text-gray-600"}`}>
+                    <button onClick={() => onToggleGroup(group.label)} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition group/cat">
+                      <span className={`text-[10px] font-bold uppercase tracking-[0.08em] flex-1 text-left truncate ${hasActive ? "text-indigo-600" : "text-slate-400 group-hover/cat:text-slate-600"}`}>
                         {group.label}
                       </span>
-                      {hasActive && !isOpen && <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a2e] animate-pulse" />}
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-300 group-hover/cat:text-gray-500 flex-shrink-0" style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .25s ease" }}>
+                      {hasActive && !isOpen && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />}
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-slate-300 group-hover/cat:text-slate-500 flex-shrink-0" style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .25s ease" }}>
                         <polyline points="6 9 12 15 18 9" />
                       </svg>
                     </button>
@@ -1327,8 +1325,8 @@ function SidebarContent({
         )}
       </nav>
 
-      <div className={`border-t border-gray-100 flex-shrink-0 ${rail ? "p-2 pb-5" : "p-3 pb-24 md:pb-5"}`}>
-        <button onClick={onLogout} title={rail ? "Keluar" : undefined} className={`w-full group flex items-center rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all ${rail ? "justify-center py-2.5" : "gap-3 px-3 py-2"}`}>
+      <div className={`border-t border-slate-100 flex-shrink-0 ${rail ? "p-2 pb-5" : "p-3 pb-24 md:pb-5"}`}>
+        <button onClick={onLogout} title={rail ? "Keluar" : undefined} className={`w-full group flex items-center rounded-xl text-sm font-medium text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all ${rail ? "justify-center py-2.5" : "gap-3 px-3 py-2"}`}>
           <span className="flex-shrink-0 group-hover:text-red-500">{Icons.logout}</span>
           {!rail && <span>Keluar</span>}
         </button>
@@ -1789,10 +1787,10 @@ export default function Sidebar() {
       {!onOvertimePage && overtimeNotify.count > 0 && (
         <button
           onClick={() => router.push("/dashboard/attendance/overtime")}
-          className="lg:hidden fixed top-2 right-3 z-[58] w-9 h-9 rounded-full bg-white shadow-lg border border-gray-100 flex items-center justify-center active:scale-95 transition"
+          className="lg:hidden fixed top-2 right-3 z-[58] w-9 h-9 rounded-full bg-white shadow-lg border border-slate-100 flex items-center justify-center active:scale-95 transition"
           aria-label={`${overtimeNotify.count} lemburan menunggu ACC`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-[#1a1a2e]">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-indigo-600">
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
             <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
           </svg>
@@ -1833,7 +1831,7 @@ export default function Sidebar() {
         </div>
       )}
 
-      <button onClick={() => setOpen(true)} className="lg:hidden fixed top-0 left-0 z-50 w-12 h-12 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition" aria-label="Buka menu">
+      <button onClick={() => setOpen(true)} className="lg:hidden fixed top-0 left-0 z-50 w-12 h-12 flex items-center justify-center text-slate-600 hover:bg-slate-50 transition" aria-label="Buka menu">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <line x1="3" y1="6" x2="21" y2="6" />
           <line x1="3" y1="12" x2="21" y2="12" />
@@ -1843,15 +1841,15 @@ export default function Sidebar() {
 
       <div className={`lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`} onClick={() => setOpen(false)} aria-hidden="true" />
 
-      <aside className={`solit-sidebar-scope lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`solit-sidebar-scope lg:hidden fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-slate-100 shadow-2xl transition-transform duration-300 ease-out will-change-transform ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <SidebarContent {...sharedContentProps} onClose={() => setOpen(false)} />
       </aside>
 
-      <aside style={{ width: rail ? RAIL_W : width, transition: dragging || !hydrated ? "none" : "width 0.2s ease-out" }} className="solit-sidebar-scope relative hidden lg:flex lg:flex-col bg-white border-r border-gray-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start">
+      <aside style={{ width: rail ? RAIL_W : width, transition: dragging || !hydrated ? "none" : "width 0.2s ease-out" }} className="solit-sidebar-scope relative hidden lg:flex lg:flex-col bg-white border-r border-slate-100 flex-shrink-0 h-screen sticky top-0 overflow-hidden self-start">
         <SidebarContent {...sharedContentProps} rail={rail} onToggleRail={toggleRail} />
         {!rail && (
           <div onMouseDown={startResize} className="absolute top-0 right-0 z-20 h-full w-1.5 cursor-col-resize group/resize" title="Geser untuk ubah lebar">
-            <div className="mx-auto h-full w-px bg-transparent group-hover/resize:bg-[#1a1a2e]/30 transition-colors" />
+            <div className="mx-auto h-full w-px bg-transparent group-hover/resize:bg-indigo-500/30 transition-colors" />
           </div>
         )}
       </aside>
