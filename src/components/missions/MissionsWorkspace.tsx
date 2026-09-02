@@ -16,7 +16,14 @@ import {
     canReviewMission,
     isMissionFullAccess,
 } from "@/lib/missions";
-import { Clock, Settings, Search, Check, X, ArrowDown, ArrowRight, Flame, AlertCircle, Inbox } from "lucide-react";
+import {
+    Clock, Settings, Search, Check, X, ArrowDown, ArrowRight, Flame, AlertCircle, Inbox,
+    Crown, Code2, ShieldCheck, Megaphone, TrendingUp, Users, GraduationCap, Truck, Video,
+    Wrench, Headphones, Factory, MapPin, Cpu, Package, Calculator, Wallet, UtensilsCrossed,
+    Trophy, Medal, Award, Target, ShoppingCart, LayoutGrid, Send, ChevronLeft, ChevronRight,
+    CalendarDays, User, Timer, Loader2, Trash2, CheckCircle2,
+    type LucideIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { hasFullAccess } from "@/components/missions/missionShared";
 
@@ -35,54 +42,54 @@ const supabaseRealtime = createClient(
 
 // ── Role visual ───────────────────────────────────────────────────────────────
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
-const ROLE_VISUAL: Record<string, { label: string; emoji: string; color: string; border: string }> = {
-    ADMIN: { label: "Admin / CEO", emoji: "[ADM]", color: "#7c3aed", border: "#ddd6fe" },
-    PROGRAMMER: { label: "Programmer", emoji: "[PROG]", color: "#4f46e5", border: "#c7d2fe" },
-    ASISTEN_CEO: { label: "Asisten CEO", emoji: "[AST]", color: "#9333ea", border: "#e9d5ff" },
-    KEPALA_MARKETING: { label: "Kepala Marketing", emoji: "[MKT]", color: "#e11d48", border: "#fecdd3" },
-    KEPALA_SALES: { label: "Kepala Sales", emoji: "[SLS]", color: "#059669", border: "#a7f3d0" },
-    CREW_SALES: { label: "Crew Sales", emoji: "[CREW]", color: "#0284c7", border: "#bae6fd" },
-    PKL_SALES: { label: "PKL Sales", emoji: "[PKL]", color: "#0284c7", border: "#bae6fd" },
-    PENGANTARAN: { label: "Pengantaran", emoji: "[TRIP]", color: "#0d9488", border: "#99f6e4" },
-    PKL_PENGANTARAN: { label: "PKL Pengantaran", emoji: "[PKL]", color: "#0d9488", border: "#99f6e4" },
-    KONTEN: { label: "Konten Kreator", emoji: "[CONTENT]", color: "#a21caf", border: "#f0abfc" },
-    PKL_KONTEN: { label: "PKL Konten", emoji: "[PKL]", color: "#a21caf", border: "#f0abfc" },
-    MARKETING: { label: "Marketing", emoji: "[MKT]", color: "#db2777", border: "#fbcfe8" },
-    PKL_MARKETING: { label: "PKL Marketing", emoji: "[PKL]", color: "#db2777", border: "#fbcfe8" },
-    KEPALA_TEKNISI: { label: "Kepala Teknisi", emoji: "[TEK]", color: "#dc2626", border: "#fecaca" },
-    CUSTOMER_SERVICE: { label: "Customer Service", emoji: "[CS]", color: "#0369a1", border: "#bae6fd" },
-    PKL_CUSTOMER_SERVICE: { label: "PKL CS", emoji: "[PKL]", color: "#0369a1", border: "#bae6fd" },
-    TEKNISI: { label: "Teknisi", emoji: "[TEK]", color: "#ea580c", border: "#fed7aa" },
-    PKL_TEKNISI: { label: "PKL Teknisi", emoji: "[PKL]", color: "#ea580c", border: "#fed7aa" },
-    KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia", emoji: "[PENYEDIA]", color: "#c2410c", border: "#fed7aa" },
-    PENYEDIA_BARANG: { label: "Penyedia Barang", emoji: "[FACTORY]", color: "#ca8a04", border: "#fef08a" },
-    PKL_PENYEDIA_BARANG: { label: "PKL Penyedia", emoji: "[PKL]", color: "#ca8a04", border: "#fef08a" },
-    KEPALA_ONPOINT: { label: "Kepala Onpoint", emoji: "[ONPOINT]", color: "#16a34a", border: "#bbf7d0" },
-    ONPOINT: { label: "Onpoint", emoji: "[GPS]", color: "#15803d", border: "#a7f3d0" },
-    PKL_ONPOINT: { label: "PKL Onpoint", emoji: "[PKL]", color: "#15803d", border: "#a7f3d0" },
-    KEPALA_SOTECH: { label: "Kepala Sotech", emoji: "[SOTECH]", color: "#4d7c0f", border: "#d9f99d" },
-    SOTECH: { label: "Sotech", emoji: "[SOTECH]", color: "#65a30d", border: "#d9f99d" },
-    PKL_SOTECH: { label: "PKL Sotech", emoji: "[PKL]", color: "#65a30d", border: "#d9f99d" },
-    KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola", emoji: "[INV]", color: "#1d4ed8", border: "#bfdbfe" },
-    PENGELOLA_BARANG: { label: "Pengelola Barang", emoji: "[INV]", color: "#2563eb", border: "#bfdbfe" },
-    PKL_PENGELOLA_BARANG: { label: "PKL Pengelola", emoji: "[PKL]", color: "#2563eb", border: "#bfdbfe" },
-    ACCOUNTING: { label: "Accounting", emoji: "[ACC]", color: "#d97706", border: "#fde68a" },
+const ROLE_VISUAL: Record<string, { label: string; Icon: LucideIcon; color: string; border: string }> = {
+    ADMIN: { label: "Admin / CEO", Icon: Crown, color: "#7c3aed", border: "#ddd6fe" },
+    PROGRAMMER: { label: "Programmer", Icon: Code2, color: "#4f46e5", border: "#c7d2fe" },
+    ASISTEN_CEO: { label: "Asisten CEO", Icon: ShieldCheck, color: "#9333ea", border: "#e9d5ff" },
+    KEPALA_MARKETING: { label: "Kepala Marketing", Icon: Megaphone, color: "#e11d48", border: "#fecdd3" },
+    KEPALA_SALES: { label: "Kepala Sales", Icon: TrendingUp, color: "#059669", border: "#a7f3d0" },
+    CREW_SALES: { label: "Crew Sales", Icon: Users, color: "#0284c7", border: "#bae6fd" },
+    PKL_SALES: { label: "PKL Sales", Icon: GraduationCap, color: "#0284c7", border: "#bae6fd" },
+    PENGANTARAN: { label: "Pengantaran", Icon: Truck, color: "#0d9488", border: "#99f6e4" },
+    PKL_PENGANTARAN: { label: "PKL Pengantaran", Icon: GraduationCap, color: "#0d9488", border: "#99f6e4" },
+    KONTEN: { label: "Konten Kreator", Icon: Video, color: "#a21caf", border: "#f0abfc" },
+    PKL_KONTEN: { label: "PKL Konten", Icon: GraduationCap, color: "#a21caf", border: "#f0abfc" },
+    MARKETING: { label: "Marketing", Icon: Megaphone, color: "#db2777", border: "#fbcfe8" },
+    PKL_MARKETING: { label: "PKL Marketing", Icon: GraduationCap, color: "#db2777", border: "#fbcfe8" },
+    KEPALA_TEKNISI: { label: "Kepala Teknisi", Icon: Wrench, color: "#dc2626", border: "#fecaca" },
+    CUSTOMER_SERVICE: { label: "Customer Service", Icon: Headphones, color: "#0369a1", border: "#bae6fd" },
+    PKL_CUSTOMER_SERVICE: { label: "PKL CS", Icon: GraduationCap, color: "#0369a1", border: "#bae6fd" },
+    TEKNISI: { label: "Teknisi", Icon: Wrench, color: "#ea580c", border: "#fed7aa" },
+    PKL_TEKNISI: { label: "PKL Teknisi", Icon: GraduationCap, color: "#ea580c", border: "#fed7aa" },
+    KEPALA_PENYEDIA_BARANG: { label: "Kepala Penyedia", Icon: Factory, color: "#c2410c", border: "#fed7aa" },
+    PENYEDIA_BARANG: { label: "Penyedia Barang", Icon: Factory, color: "#ca8a04", border: "#fef08a" },
+    PKL_PENYEDIA_BARANG: { label: "PKL Penyedia", Icon: GraduationCap, color: "#ca8a04", border: "#fef08a" },
+    KEPALA_ONPOINT: { label: "Kepala Onpoint", Icon: MapPin, color: "#16a34a", border: "#bbf7d0" },
+    ONPOINT: { label: "Onpoint", Icon: MapPin, color: "#15803d", border: "#a7f3d0" },
+    PKL_ONPOINT: { label: "PKL Onpoint", Icon: GraduationCap, color: "#15803d", border: "#a7f3d0" },
+    KEPALA_SOTECH: { label: "Kepala Sotech", Icon: Cpu, color: "#4d7c0f", border: "#d9f99d" },
+    SOTECH: { label: "Sotech", Icon: Cpu, color: "#65a30d", border: "#d9f99d" },
+    PKL_SOTECH: { label: "PKL Sotech", Icon: GraduationCap, color: "#65a30d", border: "#d9f99d" },
+    KEPALA_PENGELOLA_BARANG: { label: "Kepala Pengelola", Icon: Package, color: "#1d4ed8", border: "#bfdbfe" },
+    PENGELOLA_BARANG: { label: "Pengelola Barang", Icon: Package, color: "#2563eb", border: "#bfdbfe" },
+    PKL_PENGELOLA_BARANG: { label: "PKL Pengelola", Icon: GraduationCap, color: "#2563eb", border: "#bfdbfe" },
+    ACCOUNTING: { label: "Accounting", Icon: Calculator, color: "#d97706", border: "#fde68a" },
 };
 function roleVis(r: string) {
-    return ROLE_VISUAL[r] ?? { label: r.replace(/_/g, " "), emoji: "", color: "#64748b", border: "#e2e8f0" };
+    return ROLE_VISUAL[r] ?? { label: r.replace(/_/g, " "), Icon: User, color: "#64748b", border: "#e2e8f0" };
 }
 
 // ── Struktur hak akses (display, sesuai bagan) ────────────────────────────────
-interface DNode { key: string; role?: string; label: string; emoji: string; color: string; virtual?: boolean; children: DNode[]; }
+interface DNode { key: string; role?: string; label: string; Icon: LucideIcon; color: string; virtual?: boolean; children: DNode[]; }
 function rnode(role: string, children: DNode[] = []): DNode {
     const v = roleVis(role);
-    return { key: role, role, label: v.label, emoji: v.emoji, color: v.color, children };
+    return { key: role, role, label: v.label, Icon: v.Icon, color: v.color, children };
 }
 const ACCESS_TREE: DNode = {
-    key: "CEO", label: "CEO / Akses Penuh", emoji: "", color: "#7c3aed", virtual: true,
+    key: "CEO", label: "CEO / Akses Penuh", Icon: Crown, color: "#7c3aed", virtual: true,
     children: [
         {
-            key: "FINANCE", label: "Finance", emoji: "", color: "#0f766e", virtual: true,
+            key: "FINANCE", label: "Finance", Icon: Wallet, color: "#0f766e", virtual: true,
             children: [
                 rnode("KEPALA_MARKETING", [
                     rnode("KEPALA_SALES", [rnode("CREW_SALES"), rnode("PKL_SALES"), rnode("PENGANTARAN"), rnode("PKL_PENGANTARAN")]),
@@ -92,13 +99,13 @@ const ACCESS_TREE: DNode = {
                 ]),
                 rnode("KEPALA_TEKNISI", [rnode("CUSTOMER_SERVICE"), rnode("PKL_CUSTOMER_SERVICE"), rnode("TEKNISI"), rnode("PKL_TEKNISI")]),
                 rnode("KEPALA_PENYEDIA_BARANG", [rnode("PENYEDIA_BARANG"), rnode("PKL_PENYEDIA_BARANG")]),
-                { key: "MASAK", label: "Masak / Dapur", emoji: "", color: "#a16207", virtual: true, children: [] },
+                { key: "MASAK", label: "Masak / Dapur", Icon: UtensilsCrossed, color: "#a16207", virtual: true, children: [] },
             ],
         },
         rnode("ACCOUNTING", [
             rnode("KEPALA_PENGELOLA_BARANG", [rnode("PENGELOLA_BARANG"), rnode("PKL_PENGELOLA_BARANG")]),
         ]),
-        { key: "PROGRAMMER", role: "PROGRAMMER", label: "Programmer", emoji: "", color: "#4f46e5", children: [] },
+        { key: "PROGRAMMER", role: "PROGRAMMER", label: "Programmer", Icon: Code2, color: "#4f46e5", children: [] },
         rnode("KEPALA_SOTECH", [rnode("SOTECH"), rnode("PKL_SOTECH")]),
         rnode("KEPALA_ONPOINT", [rnode("ONPOINT"), rnode("PKL_ONPOINT")]),
     ],
@@ -220,7 +227,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 }
 function ErrorBox({ msg }: { msg: string }) {
     return <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
-        style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}> {msg}</div>;
+        style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}><AlertCircle className="w-4 h-4 flex-shrink-0" /> {msg}</div>;
 }
 function ProgressBar({ percent, thin }: { percent: number; thin?: boolean }) {
     return (
@@ -252,8 +259,7 @@ function RoleChip({ node, mine }: { node: DNode; mine: Set<string> }) {
         <div className="vt-chip" style={highlight
             ? { borderColor: "#c4b5fd", background: "linear-gradient(135deg,#f5f3ff,#faf5ff)", boxShadow: "0 0 0 2px #ddd6fe" }
             : node.virtual ? { borderColor: "#e5e7f5", background: "#fbfbfe" } : { borderColor: "#eef2f7", background: "#fff" }}>
-            <span className="vt-dot" style={{ background: node.color }} />
-            <span className="vt-emoji">{node.emoji}</span>
+            <node.Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: node.color }} />
             <span className="vt-label" style={{ color: highlight ? "#5b21b6" : "#334155" }}>{node.label}</span>
             {highlight && <span className="vt-you">kamu</span>}
         </div>
@@ -305,16 +311,17 @@ function HeadlineBlock({ mission }: { mission: Mission }) {
             <div className="flex flex-wrap gap-2">
                 <PriorityBadge priority={mission.priority} />
                 {mission.due_date && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
                         style={overdue ? { background: "#fff1f2", color: "#be123c", border: "1px solid #fecdd3" }
                             : { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}>
-                        Tenggat {fmtDateShort(mission.due_date)}{overdue ? " • Lewat" : ""}
+                        <CalendarDays className="w-3 h-3" /> Tenggat {fmtDateShort(mission.due_date)}{overdue ? " • Lewat" : ""}
                     </span>
                 )}
             </div>
             {mission.status === "REJECTED" && mission.rejection_reason && (
-                <div className="rounded-xl p-3 text-xs" style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
-                    <span className="font-bold">Alasan ditolak:</span> {mission.rejection_reason}
+                <div className="flex items-start gap-2 rounded-xl p-3 text-xs" style={{ background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c" }}>
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span><span className="font-bold">Alasan ditolak:</span> {mission.rejection_reason}</span>
                 </div>
             )}
         </>
@@ -360,7 +367,9 @@ function ChecklistBlock({ mission, interactive, togglingId, onToggle }: {
     return (
         <div className="space-y-2.5 rounded-2xl p-3.5" style={{ background: "#fafbff", border: "1px solid #eef2f7" }}>
             <div className="flex items-center justify-between">
-                <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: "#94a3b8" }}>Checklist ({done}/{total})</p>
+                <p className="inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-widest" style={{ color: "#94a3b8" }}>
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Checklist ({done}/{total})
+                </p>
                 <span className="text-xs font-black" style={{ color: percent === 100 ? "#059669" : "#6366f1" }}>{percent}%</span>
             </div>
             <ProgressBar percent={percent} />
@@ -448,7 +457,7 @@ function MissionCard({
                 <div className="flex items-center gap-2 flex-wrap mt-2.5 pt-2.5" style={{ borderTop: "1px dashed #eef2f7" }}>
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
                         style={{ background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0" }}>
-                        Dibuat {fmtDateShort(m.created_at)}
+                        <CalendarDays className="w-2.5 h-2.5" /> Dibuat {fmtDateShort(m.created_at)}
                     </span>
                     <span className="text-[9.5px] text-slate-400">{timeAgo(m.created_at)}</span>
                     {m.due_date && (
@@ -478,12 +487,7 @@ function MissionCard({
                         boxShadow: "0 2px 6px rgba(220,38,38,0.15)",
                     }}
                 >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6" />
-                        <path d="M10 11v6M14 11v6" />
-                        <path d="M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2" />
-                    </svg>
+                    <Trash2 className="w-3.5 h-3.5" />
                 </button>
             )}
         </div>
@@ -541,18 +545,21 @@ function MissionCalendar({
     const nextMonth = () => setCursor(c => { const d = new Date(c.y, c.m + 1, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
     const goToday = () => { const n = new Date(); setCursor({ y: n.getFullYear(), m: n.getMonth() }); onSelectDate(today); };
 
-    const navBtn = "w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 transition text-lg font-bold flex-shrink-0";
+    const navBtn = "w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 active:scale-90 transition flex-shrink-0";
 
     return (
         <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
             <div className="px-3 sm:px-4 py-3 flex items-center justify-between gap-2" style={{ borderBottom: "1px solid #f5f5fb", background: "#fafbff" }}>
                 <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                    <button onClick={prevMonth} className={navBtn} aria-label="Bulan sebelumnya">‹</button>
-                    <div className="text-center min-w-0">
-                        <p className="text-sm font-black text-slate-800 leading-tight truncate">{ID_MONTHS[cursor.m]} {cursor.y}</p>
-                        <p className="text-[10px] text-slate-400">{monthTotal} misi</p>
+                    <button onClick={prevMonth} className={navBtn} aria-label="Bulan sebelumnya"><ChevronLeft className="w-4 h-4" /></button>
+                    <div className="flex items-center gap-1.5 text-center min-w-0 px-1">
+                        <CalendarDays className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#a78bfa" }} />
+                        <div className="min-w-0">
+                            <p className="text-sm font-black text-slate-800 leading-tight truncate">{ID_MONTHS[cursor.m]} {cursor.y}</p>
+                            <p className="text-[10px] text-slate-400">{monthTotal} misi</p>
+                        </div>
                     </div>
-                    <button onClick={nextMonth} className={navBtn} aria-label="Bulan berikutnya">›</button>
+                    <button onClick={nextMonth} className={navBtn} aria-label="Bulan berikutnya"><ChevronRight className="w-4 h-4" /></button>
                 </div>
                 <button onClick={goToday}
                     className="text-[11px] font-bold px-3 py-1.5 rounded-lg transition active:scale-95 flex-shrink-0"
@@ -831,7 +838,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                                     <span className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black flex-shrink-0" style={{ background: "#eef2ff", color: "#6366f1" }}>{idx + 1}</span>
                                     <span className="flex-1 text-xs font-semibold text-slate-700 truncate">{it}</span>
                                     <button type="button" onClick={() => removeItem(idx)} className="text-slate-300 hover:text-red-500 transition-colors flex-shrink-0">
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                        <X className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
                             ))}
@@ -867,7 +874,7 @@ function CreateMissionModal({ onClose, onCreated }: { onClose: () => void; onCre
                 <button onClick={save} disabled={saving}
                     className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95"
                     style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)", boxShadow: "0 4px 14px rgba(15,12,41,0.3)" }}>
-                    {saving ? "Menyimpan..." : " Beri Misi"}
+                    {saving ? (<><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</>) : (<><Send className="w-4 h-4" /> Beri Misi</>)}
                 </button>
             </div>
         </ModalShell>
@@ -904,15 +911,18 @@ function ConfirmDeleteModal({
                     )}
                 </div>
 
-                <div className="rounded-xl p-3 text-xs"
+                <div className="flex items-start gap-2 rounded-xl p-3 text-xs"
                     style={{ background: "#fffbeb", border: "1px solid #fde68a", color: "#92400e" }}>
-                    Misi & semua sub-tugas akan dihapus permanen dari sistem.
-                    {mission.status === "IN_PROGRESS" && (
-                        <p className="mt-1 font-semibold">Catatan: misi ini sedang dikerjakan penerima.</p>
-                    )}
-                    {mission.status === "REJECTED" && (
-                        <p className="mt-1 font-semibold">Catatan: misi ini sebelumnya ditolak dan sedang direvisi.</p>
-                    )}
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <div>
+                        Misi & semua sub-tugas akan dihapus permanen dari sistem.
+                        {mission.status === "IN_PROGRESS" && (
+                            <p className="mt-1 font-semibold">Catatan: misi ini sedang dikerjakan penerima.</p>
+                        )}
+                        {mission.status === "REJECTED" && (
+                            <p className="mt-1 font-semibold">Catatan: misi ini sebelumnya ditolak dan sedang direvisi.</p>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -928,13 +938,13 @@ function ConfirmDeleteModal({
                 <button
                     onClick={onConfirm}
                     disabled={deleting}
-                    className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-50"
+                    className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
                     style={{
                         background: "linear-gradient(135deg, #dc2626, #b91c1c)",
                         boxShadow: "0 4px 14px rgba(220,38,38,0.3)",
                     }}
                 >
-                    {deleting ? "Menghapus..." : " Ya, Hapus"}
+                    {deleting ? (<><Loader2 className="w-4 h-4 animate-spin" /> Menghapus...</>) : (<><Trash2 className="w-4 h-4" /> Ya, Hapus</>)}
                 </button>
             </div>
         </ModalShell>
@@ -1025,11 +1035,11 @@ function MissionDetailAssignee({ mission, onClose, onChanged, onMissionUpdated, 
                             style={{ background: "#f1f5f9", color: "#64748b" }}>Tutup</button>
                         {canSubmit && (
                             <button onClick={() => checklistComplete ? setMode("submit") : showToast("Selesaikan semua sub-tugas dulu", "err")}
-                                className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
+                                className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95 flex items-center justify-center gap-2"
                                 style={checklistComplete
                                     ? { background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.3)" }
                                     : { background: "linear-gradient(135deg, #94a3b8, #64748b)" }}>
-                                {checklistComplete ? " Selesaikan" : ` Selesaikan (${percent}%)`}
+                                <CheckCircle2 className="w-4 h-4" /> {checklistComplete ? "Selesaikan" : `Selesaikan (${percent}%)`}
                             </button>
                         )}
                     </>
@@ -1038,8 +1048,10 @@ function MissionDetailAssignee({ mission, onClose, onChanged, onMissionUpdated, 
                         <button onClick={() => setMode("view")} disabled={busy} className="flex-1 h-10 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-all disabled:opacity-50"
                             style={{ background: "#f1f5f9", color: "#64748b" }}>Kembali</button>
                         <button onClick={submitProof} disabled={busy}
-                            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all active:scale-95"
-                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>{busy ? "Mengirim..." : " Kirim Bukti"}</button>
+                            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2"
+                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                            {busy ? (<><Loader2 className="w-4 h-4 animate-spin" /> Mengirim...</>) : (<><Send className="w-4 h-4" /> Kirim Bukti</>)}
+                        </button>
                     </>
                 )}
             </div>
@@ -1128,11 +1140,13 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
                         {canDecide && (
                             <div className="flex gap-2.5">
                                 <button onClick={() => setMode("reject")} disabled={busy}
-                                    className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-50"
-                                    style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}> Tolak</button>
+                                    className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                    style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}><X className="w-4 h-4" /> Tolak</button>
                                 <button onClick={() => decide("approve")} disabled={busy}
-                                    className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-50"
-                                    style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.3)" }}>{busy ? "..." : " ACC"}</button>
+                                    className="flex-1 h-10 rounded-xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                    style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 4px 14px rgba(5,150,105,0.3)" }}>
+                                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : (<><Check className="w-4 h-4" /> ACC</>)}
+                                </button>
                             </div>
                         )}
                         <div className="flex gap-2.5">
@@ -1140,8 +1154,8 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
                                 style={{ background: "#f1f5f9", color: "#64748b" }}>Tutup</button>
                             {canDelete && (
                                 <button onClick={() => setMode("confirmDelete")}
-                                    className="px-4 h-10 rounded-xl text-sm font-bold transition-all active:scale-95"
-                                    style={{ background: "#fff1f2", color: "#dc2626", border: "1px solid #fecdd3" }}> Hapus</button>
+                                    className="px-4 h-10 rounded-xl text-sm font-bold transition-all active:scale-95 inline-flex items-center justify-center gap-1.5"
+                                    style={{ background: "#fff1f2", color: "#dc2626", border: "1px solid #fecdd3" }}><Trash2 className="w-4 h-4" /> Hapus</button>
                             )}
                         </div>
                     </>
@@ -1151,8 +1165,10 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
                         <button onClick={() => setMode("view")} disabled={busy} className="flex-1 h-10 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-all disabled:opacity-50"
                             style={{ background: "#f1f5f9", color: "#64748b" }}>Kembali</button>
                         <button onClick={() => decide("reject")} disabled={busy}
-                            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all active:scale-95"
-                            style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}>{busy ? "..." : "Konfirmasi Tolak"}</button>
+                            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2"
+                            style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}>
+                            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : (<><X className="w-4 h-4" /> Konfirmasi Tolak</>)}
+                        </button>
                     </div>
                 )}
                 {mode === "confirmDelete" && (
@@ -1160,8 +1176,10 @@ function MissionDetailReviewer({ mission, currentUser, onClose, onChanged, showT
                         <button onClick={() => setMode("view")} disabled={busy} className="flex-1 h-10 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-all disabled:opacity-50"
                             style={{ background: "#f1f5f9", color: "#64748b" }}>Batal</button>
                         <button onClick={del} disabled={busy}
-                            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all active:scale-95"
-                            style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}>{busy ? "..." : " Ya, Hapus"}</button>
+                            className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2"
+                            style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}>
+                            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : (<><Trash2 className="w-4 h-4" /> Ya, Hapus</>)}
+                        </button>
                     </div>
                 )}
             </div>
@@ -1187,6 +1205,13 @@ function fmtDuration(ms: number): string {
     if (hrs < 24) return `${hrs}j ${mins % 60}m`;
     const days = Math.floor(hrs / 24);
     return `${days}h ${hrs % 24}j`;
+}
+
+// Badge peringkat 1/2/3 (emas/perak/perunggu) untuk leaderboard
+function RankBadge({ rank }: { rank: number }) {
+    if (rank === 0) return <Trophy className="w-4 h-4" style={{ color: "#f59e0b" }} />;
+    if (rank === 1) return <Medal className="w-4 h-4" style={{ color: "#94a3b8" }} />;
+    return <Award className="w-4 h-4" style={{ color: "#d97706" }} />;
 }
 
 function MissionStatsPanel() {
@@ -1234,8 +1259,6 @@ function MissionStatsPanel() {
 
     if (!data || data.total === 0) return null;
 
-    const MEDAL = ["", "", ""];
-
     return (
         <div className="space-y-3">
             {/* Stat Cards Row */}
@@ -1277,8 +1300,8 @@ function MissionStatsPanel() {
                         <p className="text-2xl sm:text-3xl font-black mt-0.5 tabular-nums" style={{ color: data.overdue > 0 ? "#dc2626" : "#0f172a" }}>
                             {data.overdue}
                         </p>
-                        <p className="text-[9px] font-bold mt-1.5" style={{ color: data.overdue > 0 ? "#f43f5e" : "#94a3b8" }}>
-                            {data.overdue > 0 ? " Perlu perhatian" : " Semua aman"}
+                        <p className="inline-flex items-center gap-1 text-[9px] font-bold mt-1.5" style={{ color: data.overdue > 0 ? "#f43f5e" : "#94a3b8" }}>
+                            {data.overdue > 0 ? (<><AlertCircle className="w-2.5 h-2.5" /> Perlu perhatian</>) : (<><CheckCircle2 className="w-2.5 h-2.5" /> Semua aman</>)}
                         </p>
                     </div>
                 </div>
@@ -1291,12 +1314,12 @@ function MissionStatsPanel() {
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Prioritas</p>
                         <div className="flex items-end gap-2 mt-1">
                             {[
-                                { key: "HIGH", label: "", color: "#dc2626" },
-                                { key: "MEDIUM", label: "", color: "#d97706" },
-                                { key: "LOW", label: "", color: "#059669" },
+                                { key: "HIGH", Icon: Flame, color: "#dc2626" },
+                                { key: "MEDIUM", Icon: ArrowRight, color: "#d97706" },
+                                { key: "LOW", Icon: ArrowDown, color: "#059669" },
                             ].map(p => (
                                 <div key={p.key} className="text-center">
-                                    <span className="text-xs">{p.label}</span>
+                                    <p.Icon className="w-3.5 h-3.5 mx-auto" style={{ color: p.color }} />
                                     <p className="text-sm font-black tabular-nums" style={{ color: p.color }}>{data.priorityCounts[p.key] ?? 0}</p>
                                 </div>
                             ))}
@@ -1311,9 +1334,9 @@ function MissionStatsPanel() {
                 <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                     <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "linear-gradient(135deg,#fafbff,#f5f3ff)" }}>
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                                 style={{ background: "linear-gradient(135deg,#fbbf24,#f59e0b)", boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>
-
+                                <Timer className="w-4 h-4 text-white" />
                             </div>
                             <div>
                                 <p className="text-sm font-black text-slate-800">Leaderboard Tercepat</p>
@@ -1334,9 +1357,9 @@ function MissionStatsPanel() {
                                 <div key={u.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 group hover:bg-slate-50/50 transition-colors"
                                     style={i === 0 ? { background: "linear-gradient(90deg,#fffbeb 0%,transparent 100%)" } : undefined}>
                                     {/* Rank */}
-                                    <div className="w-7 text-center flex-shrink-0">
+                                    <div className="w-7 flex items-center justify-center flex-shrink-0">
                                         {i < 3 ? (
-                                            <span className="text-lg">{MEDAL[i]}</span>
+                                            <RankBadge rank={i} />
                                         ) : (
                                             <span className="text-[10px] font-black text-slate-400 bg-slate-100 w-5 h-5 rounded-full inline-flex items-center justify-center">{i + 1}</span>
                                         )}
@@ -1396,9 +1419,9 @@ function MissionStatsPanel() {
                 <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                     <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "linear-gradient(135deg,#fafbff,#eff6ff)" }}>
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                                 style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }}>
-
+                                <Target className="w-4 h-4 text-white" />
                             </div>
                             <div>
                                 <p className="text-sm font-black text-slate-800">Top Pemberi Misi</p>
@@ -1417,9 +1440,9 @@ function MissionStatsPanel() {
                             const pct = Math.max(8, Math.round((u.count / maxCount) * 100));
                             return (
                                 <div key={u.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 hover:bg-slate-50/50 transition-colors">
-                                    <div className="w-7 text-center flex-shrink-0">
+                                    <div className="w-7 flex items-center justify-center flex-shrink-0">
                                         {i < 3 ? (
-                                            <span className="text-lg">{MEDAL[i]}</span>
+                                            <RankBadge rank={i} />
                                         ) : (
                                             <span className="text-[10px] font-black text-slate-400 bg-slate-100 w-5 h-5 rounded-full inline-flex items-center justify-center">{i + 1}</span>
                                         )}
@@ -1456,9 +1479,9 @@ function MissionStatsPanel() {
                 <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                     <div className="px-4 sm:px-5 py-3.5" style={{ borderBottom: "1px solid #f5f5fb", background: "linear-gradient(135deg,#fafbff,#ecfdf5)" }}>
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                                 style={{ background: "linear-gradient(135deg,#34d399,#059669)", boxShadow: "0 2px 8px rgba(5,150,105,0.3)" }}>
-                                🛒
+                                <ShoppingCart className="w-4 h-4 text-white" />
                             </div>
                             <div>
                                 <p className="text-sm font-black text-slate-800">Leaderboard Purchasing</p>
@@ -1472,9 +1495,9 @@ function MissionStatsPanel() {
                             const pct = Math.max(8, Math.round((u.points / maxPoints) * 100));
                             return (
                                 <div key={u.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 hover:bg-slate-50/50 transition-colors">
-                                    <div className="w-7 text-center flex-shrink-0">
+                                    <div className="w-7 flex items-center justify-center flex-shrink-0">
                                         {i < 3 ? (
-                                            <span className="text-lg">{MEDAL[i]}</span>
+                                            <RankBadge rank={i} />
                                         ) : (
                                             <span className="text-[10px] font-black text-slate-400 bg-slate-100 w-5 h-5 rounded-full inline-flex items-center justify-center">{i + 1}</span>
                                         )}
@@ -1547,13 +1570,15 @@ function MissionStatsPanel() {
     );
 }
 
-function MiniStat({ icon, value, label, accent }: { icon: string; value: number; label: string; accent: string }) {
+function MiniStat({ icon, value, label, accent }: { icon: React.ReactNode; value: number; label: string; accent: string }) {
     return (
         <div className="bg-white rounded-2xl p-3 sm:p-4 relative overflow-hidden" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
             <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ background: accent }} />
             <div className="pl-2.5 sm:pl-3">
                 <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-                    <span className="text-base sm:text-lg">{icon}</span>
+                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: accent }}>
+                        <span className="text-white [&>svg]:w-3.5 [&>svg]:h-3.5 sm:[&>svg]:w-4 sm:[&>svg]:h-4">{icon}</span>
+                    </span>
                     <span className="text-xl sm:text-2xl font-black tabular-nums" style={{ color: "#0f172a" }}>{value}</span>
                 </div>
                 <p className="text-[10px] sm:text-[11px] font-bold leading-tight" style={{ color: "#64748b" }}>{label}</p>
@@ -1840,9 +1865,9 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                     {/* Stats */}
                     {!showStructure && (
                         <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                            <MiniStat icon="" value={stats.pending} label="On Progress" accent="linear-gradient(180deg,#60a5fa,#2563eb)" />
-                            <MiniStat icon="" value={stats.review} label="Audit" accent="linear-gradient(180deg,#fbbf24,#d97706)" />
-                            <MiniStat icon="" value={stats.done} label="Selesai" accent="linear-gradient(180deg,#34d399,#059669)" />
+                            <MiniStat icon={<Clock />} value={stats.pending} label="On Progress" accent="linear-gradient(180deg,#60a5fa,#2563eb)" />
+                            <MiniStat icon={<Search />} value={stats.review} label="Audit" accent="linear-gradient(180deg,#fbbf24,#d97706)" />
+                            <MiniStat icon={<Check />} value={stats.done} label="Selesai" accent="linear-gradient(180deg,#34d399,#059669)" />
                         </div>
                     )}
 
@@ -1855,16 +1880,16 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
                     <div className="bg-white rounded-2xl p-1.5" style={{ border: "1px solid #f0f0f8", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
                         <div className="flex gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar">
                             {([
-                                { key: "received", label: "Misi Saya", emoji: "", onClick: () => { setBox("received"); setShowStructure(false); }, active: !showStructure && box === "received" },
-                                ...(iCanAssign ? [{ key: "assigned", label: "Diberikan", emoji: "", onClick: () => { setBox("assigned"); setShowStructure(false); }, active: !showStructure && box === "assigned" }] : []),
-                                ...(iAmAdmin && section === "dashboard" ? [{ key: "all", label: "Semua Misi", emoji: "", onClick: () => router.push("/dashboard/missions/all"), active: false }] : []),
-                                ...(section === "dashboard" ? [{ key: "structure", label: "Hak Akses", emoji: "", onClick: () => setShowStructure(true), active: showStructure }] : []),
+                                { key: "received", label: "Misi Saya", Icon: Inbox, onClick: () => { setBox("received"); setShowStructure(false); }, active: !showStructure && box === "received" },
+                                ...(iCanAssign ? [{ key: "assigned", label: "Diberikan", Icon: Send, onClick: () => { setBox("assigned"); setShowStructure(false); }, active: !showStructure && box === "assigned" }] : []),
+                                ...(iAmAdmin && section === "dashboard" ? [{ key: "all", label: "Semua Misi", Icon: LayoutGrid, onClick: () => router.push("/dashboard/missions/all"), active: false }] : []),
+                                ...(section === "dashboard" ? [{ key: "structure", label: "Hak Akses", Icon: ShieldCheck, onClick: () => setShowStructure(true), active: showStructure }] : []),
                             ]).map(t => (
                                 <button key={t.key} onClick={t.onClick}
                                     className="flex-1 min-w-[72px] flex items-center justify-center gap-1 sm:gap-1.5 py-2 sm:py-2.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold whitespace-nowrap transition-all"
                                     style={t.active ? { background: "linear-gradient(135deg, #0f0c29, #1a1545)", color: "#fff", boxShadow: "0 4px 12px rgba(15,12,41,0.25)" }
                                         : { background: "#f5f7ff", color: "#64748b" }}>
-                                    <span className="text-sm">{t.emoji}</span><span>{t.label}</span>
+                                    <t.Icon className="w-3.5 h-3.5" /><span>{t.label}</span>
                                 </button>
                             ))}
                         </div>
@@ -1991,8 +2016,6 @@ export default function MissionsWorkspace({ section }: { section: MissionSection
           background: linear-gradient(135deg,#0f0c29,#1a1545); border-color: transparent;
           box-shadow: 0 6px 18px rgba(15,12,41,0.3); padding: 8px 13px; gap: 9px;
         }
-        .vt-dot { width: 8px; height: 8px; border-radius: 99px; flex: 0 0 auto; }
-        .vt-emoji { font-size: 13px; flex: 0 0 auto; }
         .vt-label { font-size: 11.5px; font-weight: 700; line-height: 1.2; }
         .vt-you { font-size: 8.5px; font-weight: 800; color: #7c3aed; background: #f5f3ff; border: 1px solid #ddd6fe; padding: 1px 5px; border-radius: 99px; flex: 0 0 auto; }
       `}</style>
