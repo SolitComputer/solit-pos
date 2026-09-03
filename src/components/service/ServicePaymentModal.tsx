@@ -2,7 +2,7 @@
 // src/components/service/ServicePaymentModal.tsx
 
 import { useState, useEffect, useRef } from "react";
-import { Banknote, Landmark, QrCode, Wallet, Check, Upload, Loader2 } from "lucide-react";
+import { Banknote, Landmark, QrCode, Wallet, Check, Upload, Loader2, Camera, Image as ImageIcon } from "lucide-react";
 import type { ServiceOrder } from "@/types/service";
 
 interface Props {
@@ -53,7 +53,9 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false); //  NEW — toggle popup Kamera/Galeri
+  const fileInputRef = useRef<HTMLInputElement>(null); // input untuk pilih dari Galeri
+  const cameraInputRef = useRef<HTMLInputElement>(null); //  NEW — input khusus buka Kamera
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -119,6 +121,7 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
     setProofPreview(null);
     setProofUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = ""; //  NEW
   };
 
   const handleConfirm = async () => {
@@ -177,8 +180,10 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
     setProofPreview(null); //  NEW
     setProofUrl(null); //  NEW
     setUploading(false); //  NEW
+    setShowPhotoOptions(false); //  NEW
     setError("");
     if (fileInputRef.current) fileInputRef.current.value = ""; //  NEW
+    if (cameraInputRef.current) cameraInputRef.current.value = ""; //  NEW
   };
 
   const handleClose = () => {
@@ -498,15 +503,52 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
               </label>
 
               {!proofPreview ? (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-[#1a1a2e]/30 hover:text-[#1a1a2e] transition"
-                >
-                  <Upload className="w-5 h-5" />
-                  <span className="text-xs font-semibold">Upload foto bukti transfer / pembayaran</span>
-                  <span className="text-[10px] text-gray-300">JPG, PNG, atau WEBP · maks 5MB</span>
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowPhotoOptions(v => !v)}
+                    className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-[#1a1a2e]/30 hover:text-[#1a1a2e] transition"
+                  >
+                    <Upload className="w-5 h-5" />
+                    <span className="text-xs font-semibold">Upload foto bukti transfer / pembayaran</span>
+                    <span className="text-[10px] text-gray-300">JPG, PNG, atau WEBP · maks 5MB</span>
+                  </button>
+
+                  {/*  NEW — popup pilihan sumber foto: Kamera atau Galeri */}
+                  {showPhotoOptions && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-[70]"
+                        onClick={() => setShowPhotoOptions(false)}
+                      />
+                      <div className="absolute left-0 right-0 top-full mt-2 z-[80] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPhotoOptions(false);
+                            cameraInputRef.current?.click();
+                          }}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                        >
+                          <Camera className="w-4 h-4 text-[#1a1a2e]" />
+                          Ambil dari Kamera
+                        </button>
+                        <div className="h-px bg-gray-100" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowPhotoOptions(false);
+                            fileInputRef.current?.click();
+                          }}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                        >
+                          <ImageIcon className="w-4 h-4 text-[#1a1a2e]" />
+                          Pilih dari Galeri
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : (
                 <div className="relative w-full overflow-hidden rounded-xl border border-gray-200">
                   <img src={proofPreview} alt="Bukti pembayaran" className="w-full max-h-56 object-contain bg-gray-50" />
@@ -538,6 +580,16 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
                 ref={fileInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={e => handleFileSelect(e.target.files?.[0] ?? null)}
+              />
+
+              {/*  NEW — input khusus kamera; capture="environment" langsung buka kamera belakang di HP */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
                 className="hidden"
                 onChange={e => handleFileSelect(e.target.files?.[0] ?? null)}
               />

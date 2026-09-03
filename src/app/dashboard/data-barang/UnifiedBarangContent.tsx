@@ -86,6 +86,21 @@ const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
 
+//  Aksesoris: tentukan aksi Unit berdasarkan STOK EFEKTIF (row.stok — sudah
+//  fallback ke kolom stock manual kalau belum ada SN sama sekali), BUKAN
+//  row.unit_count saja. Aksesori lama (stok manual tanpa SN) unit_count-nya
+//  selalu 0 walau stoknya puluhan — itu sebabnya tombol "Kelola Unit" dulu
+//  tidak pernah muncul meski kolom STOK di tabel sudah >1.
+//  "units"  → arahkan ke halaman Units (bisa bulk-add banyak SN sekaligus)
+//  "detail" → sudah tepat ada 1 SN tercatat → buka pop-up detail unit itu
+//  "add"    → belum ada SN & stok ≤ 1 → buka pop-up tambah 1 unit
+function getAccessoryUnitAction(row: UnifiedRow): "units" | "add" | "detail" | null {
+    if (row.tipe !== "AKSESORIS") return null;
+    const stok = row.stok ?? 0;
+    if (stok > 1) return "units";
+    if (row.unit_count === 1) return "detail";
+    return "add";
+}
 
 function normalizeLaptop(l: LaptopRaw): UnifiedRow {
     const units = l.laptop_units ?? [];
@@ -769,13 +784,17 @@ export default function UnifiedBarangContent() {
             return;
         }
         if (row.tipe === "AKSESORIS") {
-            if (row.unit_count === 0 && canAddUnit) {
+            const action = getAccessoryUnitAction(row);
+            if (action === "add" && canAddUnit) {
                 setAddUnitAccessoryTarget(row);
                 return;
             }
-            if (row.unit_count === 1 && canViewUnits) {
+            if (action === "detail" && canViewUnits) {
                 openAccessoryUnitDetail(row);
             }
+            // action === "units" → sengaja TIDAK diapa-apakan di sini, sama
+            // seperti LAPTOP saat unit_count > 1: klik baris tidak ngapa-ngapain,
+            // user wajib klik tombol "Kelola Unit" di kolom Aksi.
         }
     };
 
@@ -1163,10 +1182,12 @@ export default function UnifiedBarangContent() {
                                     const expanded = expandedIds.has(rowKey);
                                     const canEditThis = row.tipe === "LAPTOP" ? canEditLaptop : canEditAcc;
                                     const canDeleteThis = row.tipe === "LAPTOP" ? canDeleteLaptop : canDeleteAcc;
-                                    const isRowClickable = (row.tipe === "LAPTOP" || row.tipe === "AKSESORIS") && (
-                                        (row.unit_count === 0 && canAddUnit) ||
-                                        (row.unit_count === 1 && canViewUnits)
-                                    );
+                                    const accAction = getAccessoryUnitAction(row);
+                                    const isRowClickable = row.tipe === "LAPTOP"
+                                        ? ((row.unit_count === 0 && canAddUnit) || (row.unit_count === 1 && canViewUnits))
+                                        : row.tipe === "AKSESORIS"
+                                            ? ((accAction === "add" && canAddUnit) || (accAction === "detail" && canViewUnits))
+                                            : false;
                                     return (
                                         <div
                                             key={rowKey}
@@ -1265,16 +1286,16 @@ export default function UnifiedBarangContent() {
                                                         Kelola Unit ({row.unit_count})
                                                     </Link>
                                                 )}
-                                                {row.tipe === "AKSESORIS" && row.unit_count === 0 && canAddUnit && (
+                                                {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
                                                     <button onClick={() => setAddUnitAccessoryTarget(row)}
                                                         className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
                                                         Tambah Unit
                                                     </button>
                                                 )}
-                                                {row.tipe === "AKSESORIS" && row.unit_count > 1 && canViewUnits && (
+                                                {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
                                                     <Link href={`/dashboard/accessories/${row.id}/units`}
                                                         className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                        Kelola Unit ({row.unit_count})
+                                                        Kelola Unit ({row.stok ?? 0})
                                                     </Link>
                                                 )}
                                                 {row.tipe === "LAPTOP" && canViewBarcode && (
@@ -1318,10 +1339,12 @@ export default function UnifiedBarangContent() {
                                                 const soActive = isSoActive(row.so_at);
                                                 const zebra = idx % 2 === 1;
                                                 const rowBg = zebra ? "bg-zinc-50" : "bg-white";
-                                                const isRowClickable = (row.tipe === "LAPTOP" || row.tipe === "AKSESORIS") && (
-                                                    (row.unit_count === 0 && canAddUnit) ||
-                                                    (row.unit_count === 1 && canViewUnits)
-                                                );
+                                                const accAction = getAccessoryUnitAction(row);
+                                                const isRowClickable = row.tipe === "LAPTOP"
+                                                    ? ((row.unit_count === 0 && canAddUnit) || (row.unit_count === 1 && canViewUnits))
+                                                    : row.tipe === "AKSESORIS"
+                                                        ? ((accAction === "add" && canAddUnit) || (accAction === "detail" && canViewUnits))
+                                                        : false;
                                                 return (
                                                     <tr
                                                         key={`${row.tipe}-${row.id}`}
@@ -1403,15 +1426,15 @@ export default function UnifiedBarangContent() {
                                                                         Kelola Unit ({row.unit_count})
                                                                     </Link>
                                                                 )}
-                                                                {row.tipe === "AKSESORIS" && row.unit_count === 0 && canAddUnit && (
+                                                                {row.tipe === "AKSESORIS" && accAction === "add" && canAddUnit && (
                                                                     <button onClick={() => setAddUnitAccessoryTarget(row)}
                                                                         className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
                                                                         Tambah Unit
                                                                     </button>
                                                                 )}
-                                                                {row.tipe === "AKSESORIS" && row.unit_count > 1 && canViewUnits && (
+                                                                {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
                                                                     <Link href={`/dashboard/accessories/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                                        Kelola Unit ({row.unit_count})
+                                                                        Kelola Unit ({row.stok ?? 0})
                                                                     </Link>
                                                                 )}
                                                                 {row.tipe === "LAPTOP" && canViewBarcode && (
