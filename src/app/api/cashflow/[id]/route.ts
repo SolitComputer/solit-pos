@@ -206,8 +206,8 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
     if (!isValidCategory(entry.direction, category))
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
 
-    if (entry.direction === "OUT") {
-        if (!payment_method || !["CASH", "SALDO"].includes(payment_method))
+    if (payment_method) {
+        if (!["CASH", "SALDO"].includes(payment_method))
             return NextResponse.json(
                 { success: false, message: "Metode pembayaran harus CASH atau SALDO" },
                 { status: 400 }
@@ -222,7 +222,7 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
         keterangan: keterangan?.trim() || null,
         tanggal: tanggal || jakartaToday,
     };
-    if (entry.direction === "OUT") {
+    if (payment_method) {
         updatePayload.payment_method = payment_method;
     }
 

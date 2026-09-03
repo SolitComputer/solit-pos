@@ -10,6 +10,11 @@ import { getAuthUser } from "@/hooks/useAuthUser";
 import { ContractBadge } from "@/components/contracts/ContractBadge";
 import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 import ContractInfoModal from "@/components/contracts/ContractInfoModal";
+import SolitBorder from "@/components/solit-coins/SolitBorder";
+import SolitBanner from "@/components/solit-coins/SolitBanner";
+import SolitCoinsWidget from "@/components/solit-coins/SolitCoinsWidget";
+import SolitCoinsModal from "@/components/solit-coins/SolitCoinsModal";
+import type { EquippedBorder } from "@/lib/solit-coins/types";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
     Loader2, Pencil, Check, X, Music, Play, Pause,
@@ -33,6 +38,8 @@ interface ProfileData {
     song_preview_url: string | null;
     song_clip_start: number;
     song_expires_at: string | null;
+    equipped_border?: EquippedBorder | null;
+    equipped_banner?: EquippedBorder | null;
 }
 
 interface AchievementBlock {
@@ -141,12 +148,25 @@ export default function ProfileView({ userId }: { userId: string }) {
         admin?: { name: string } | null;
     } | null>(null);
     const [showContractModal, setShowContractModal] = useState(false);
+    const [showCoins, setShowCoins] = useState(false);
 
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
     const callerRoles = currentUser?.roles?.length ? currentUser.roles : [currentUser?.role].filter(Boolean) as string[];
     const isAdmin = callerRoles.some((r) => ADMIN_ROLES.includes(r));
     const canViewOthersContract = callerRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
+
+    // Popup Solit Coins: buka via ?solitcoins=1 (dari chip lintas-halaman) atau
+    // event "solit:open-coins" (chip saat sudah di halaman profil).
+    useEffect(() => {
+        if (!isSelf) return;
+        try {
+            if (new URLSearchParams(window.location.search).get("solitcoins") === "1") setShowCoins(true);
+        } catch { /* ignore */ }
+        const openCoins = () => setShowCoins(true);
+        window.addEventListener("solit:open-coins", openCoins);
+        return () => window.removeEventListener("solit:open-coins", openCoins);
+    }, [isSelf]);
 
     const songPicker = useSongPicker(
         (song: SavedSong) => {
@@ -762,6 +782,9 @@ export default function ProfileView({ userId }: { userId: string }) {
                         <img src={profile.banner_url} alt="Banner" className="absolute inset-0 w-full h-full object-cover" />
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-black/0 to-transparent pointer-events-none" />
+                    {profile.equipped_banner && (
+                        <SolitBanner style={profile.equipped_banner.style} thickness={6} openBottom className="absolute inset-0 z-[2] rounded-t-3xl" />
+                    )}
                     {(isSelf || isAdmin) && (
                         <button onClick={() => bannerInputRef.current?.click()} disabled={uploadingBanner} title="Ganti banner"
                             className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/30 hover:bg-black/45 backdrop-blur-sm flex items-center justify-center transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
@@ -795,19 +818,27 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 </button>
                             )}
 
-                            <div className="rounded-full p-[3px]"
-                                style={{
-                                    background: hasStatusBubble ? "linear-gradient(135deg, #1db954, #6366f1, #8b5cf6)" : "transparent",
-                                    boxShadow: hasStatusBubble ? "0 8px 22px -6px rgba(99,102,241,0.45)" : "0 4px 14px rgba(15,12,41,0.10)",
-                                }}>
-                                <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
-                                    className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
-                                    style={{ background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)", animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none" }}>
-                                    {profile.profile_photo_url
-                                        ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
-                                        : getInitials(profile.name)}
-                                </div>
-                            </div>
+                            {(() => {
+                                const avatarInner = (
+                                    <div className="rounded-full p-[3px]"
+                                        style={{
+                                            background: hasStatusBubble ? "linear-gradient(135deg, #1db954, #6366f1, #8b5cf6)" : "transparent",
+                                            boxShadow: hasStatusBubble ? "0 8px 22px -6px rgba(99,102,241,0.45)" : "0 4px 14px rgba(15,12,41,0.10)",
+                                        }}>
+                                        <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
+                                            className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
+                                            style={{ background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)", animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none" }}>
+                                            {profile.profile_photo_url
+                                                ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
+                                                : getInitials(profile.name)}
+                                        </div>
+                                    </div>
+                                );
+                                // Border Solit Coins ter-equip: tampilkan cincin hanya bila ada border.
+                                return profile.equipped_border
+                                    ? <SolitBorder style={profile.equipped_border.style} thickness={4}>{avatarInner}</SolitBorder>
+                                    : avatarInner;
+                            })()}
 
                             {(isSelf || isAdmin) && (
                                 <button onClick={() => setShowPhotoActions(true)} disabled={uploading} title="Opsi foto profil"
@@ -859,6 +890,14 @@ export default function ProfileView({ userId }: { userId: string }) {
                         </div>
                         {achievements && <AchievementTitles achievements={achievements} qualityRank={qualityRank} kerjaRank={kerjaRank} deliveryBadge={deliveryBadge} providerBadge={providerBadge} salesBadge={salesBadge} teknisiBadge={teknisiBadge} kontenBadge={kontenBadge} lemburanRank={lemburanRank} pengelolaBarangRank={pengelolaBarangRank} />}
                     </div>
+
+                    {isSelf && (
+                        <div className="mt-4">
+                            <SolitCoinsWidget onOpen={() => setShowCoins(true)} />
+                        </div>
+                    )}
+
+                    {isSelf && <SolitCoinsModal open={showCoins} onClose={() => setShowCoins(false)} />}
 
                     <div className="mt-3">
                         {editingNote ? (

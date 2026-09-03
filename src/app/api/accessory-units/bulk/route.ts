@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth } from "@/lib/auth";
 import { UserRole } from "@/lib/permissions";
+import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
 
 const ALLOWED_ROLES: UserRole[] = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -143,6 +144,10 @@ export const POST = withAuth(async (req: NextRequest) => {
             { status: error.code === "23505" ? 409 : 500 }
         );
     }
+
+    // ✅ FIX: dulu accessories.stock tidak pernah di-sync setelah bulk insert —
+    // sama seperti bug di POST /api/accessory-units single-unit.
+    await recalcAccessoryParentStock(supabaseAdmin, accessory_id);
 
     return NextResponse.json(
         {
