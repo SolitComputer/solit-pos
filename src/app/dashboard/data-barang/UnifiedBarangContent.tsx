@@ -7,6 +7,8 @@ import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Filter, RotateCcw
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
+import AddUnitModalAccessory from "@/components/inventory/AddUnitModalAccessory";
+import AccessoryUnitDetailModal, { AccessoryUnitDetailData } from "@/components/inventory/AccessoryUnitDetailModal";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { usePagePermission } from "@/hooks/usePagePermission";
 import * as XLSX from "xlsx";
@@ -34,10 +36,15 @@ interface LaptopRaw {
     so_at?: string | null; so_by?: string | null;
     laptop_units?: LaptopUnitLite[];
 }
+interface AccessoryUnitLite {
+    id: string; serial_number: string; condition: string; status: string;
+    buy_price?: number; selling_price?: number; created_at?: string;
+}
 interface AccessoryRaw {
     id: string; name: string; category: string; brand: string | null; spec: string | null;
     buy_price?: number; sell_price: number; stock: number; notes: string | null; created_at: string;
     audited_at?: string | null; audited_by?: string | null;
+    accessory_units?: AccessoryUnitLite[];
 }
 
 interface UnifiedRow {
@@ -116,18 +123,26 @@ function normalizeLaptop(l: LaptopRaw): UnifiedRow {
 }
 
 function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
+    const units = a.accessory_units ?? [];
+    const aktif = units.filter(u => u.status !== "TERJUAL");
+    const one = aktif.length === 1 ? aktif[0] : null;
     const margin = (a.sell_price || 0) - (a.buy_price || 0);
     return {
         id: a.id, tipe: "AKSESORIS", nama: a.name, kategori: a.category,
         brand: a.brand || null, cpu: null, ram: null, storage: null, spek: a.spec || null,
-        harga_modal: a.buy_price ?? null, modal_sparepart: null,
+        harga_modal: one ? (one.buy_price ?? 0) : (a.buy_price ?? null), modal_sparepart: null,
         harga_jual: a.sell_price || 0, total_jual: null,
         gross_profit: a.buy_price != null && a.buy_price > 0 ? margin : null,
-        sumber: null, tanggal_masuk: null, sn: null,
-        stok_tersedia: null, siap_jual: null, minus: null, stok: a.stock ?? 0,
+        sumber: null,
+        tanggal_masuk: one ? (one.created_at ?? null) : null,
+        sn: one ? one.serial_number : null,
+        sn_note: one ? undefined : (aktif.length > 1 ? `${aktif.length} SN` : undefined),
+        stok_tersedia: null, siap_jual: null, minus: null,
+        stok: units.length > 0 ? aktif.length : (a.stock ?? 0),
         so_at: null, so_by: null,
         audited_at: a.audited_at ?? null, audited_by: a.audited_by ?? null,
-        unit_count: 0, raw: a,
+        unit_id: one ? one.id : undefined, unit_count: aktif.length,
+        raw: a,
     };
 }
 
@@ -303,6 +318,12 @@ export default function UnifiedBarangContent() {
     //  data di tabel gabungan ini tidak menyertakan condition_note/notes.
     const [unitDetailTarget, setUnitDetailTarget] = useState<{ unit: UnitDetailData; row: UnifiedRow } | null>(null);
     const [unitDetailLoading, setUnitDetailLoading] = useState(false);
+    //  Versi AKSESORIS dari 2 state di atas — struktur data unit beda
+    //  (buy_price/condition, bukan purchase_price/grade), dipisah supaya
+    //  tidak mencampur shape data laptop & aksesori di satu state.
+    const [addUnitAccessoryTarget, setAddUnitAccessoryTarget] = useState<UnifiedRow | null>(null);
+    const [unitDetailAccessoryTarget, setUnitDetailAccessoryTarget] = useState<{ unit: AccessoryUnitDetailData; row: UnifiedRow } | null>(null);
+    const [unitDetailAccessoryLoading, setUnitDetailAccessoryLoading] = useState(false);
 
     // Set berisi key row ("TIPE-id") yang kartunya sedang dibuka detailnya — khusus mode mobile.
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -707,6 +728,29 @@ export default function UnifiedBarangContent() {
         }
     };
 
+        //  Versi AKSESORIS dari openUnitDetail — fetch ke endpoint asli
+    //  (GET /api/accessory-units?accessory_id=X), bukan endpoint nested
+    //  yang sudah dihapus karena duplikat & tidak konsisten dengan yang asli.
+    const openAccessoryUnitDetail = async (row: UnifiedRow) => {
+        setUnitDetailAccessoryLoading(true);
+        try {
+            const res = await fetch(`/api/accessory-units?accessory_id=${row.id}`);
+            const json = await res.json();
+            if (!res.ok || json.success === false) throw new Error(json.message || "Gagal memuat detail unit");
+            const units = (json.data ?? []) as AccessoryUnitDetailData[];
+            const active = units.find(u => u.status !== "TERJUAL") ?? units[0];
+            if (!active) {
+                toast.error("Unit tidak ditemukan untuk aksesori ini");
+                return;
+            }
+            setUnitDetailAccessoryTarget({ unit: active, row });
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal memuat detail unit");
+        } finally {
+            setUnitDetailAccessoryLoading(false);
+        }
+    };
+
     // ── Klik baris (desktop) / tap kartu (mobile) ───────────────────────────
     // Stok 0  → buka pop-up "Tambah Unit" (unit pertama belum ada).
     // Stok 1  → buka pop-up "Detail Unit" untuk edit SN yang sudah ada ATAU
@@ -714,13 +758,24 @@ export default function UnifiedBarangContent() {
     // Stok >1 → TIDAK diberi aksi klik — edit SN dilakukan di halaman Units
     //           lewat tombol "Kelola Unit" yang sudah ada.
     const handleRowClick = (row: UnifiedRow) => {
-        if (row.tipe !== "LAPTOP") return;
-        if (row.unit_count === 0 && canAddUnit) {
-            setAddUnitTarget(row);
+        if (row.tipe === "LAPTOP") {
+            if (row.unit_count === 0 && canAddUnit) {
+                setAddUnitTarget(row);
+                return;
+            }
+            if (row.unit_count === 1 && canViewUnits) {
+                openUnitDetail(row);
+            }
             return;
         }
-        if (row.unit_count === 1 && canViewUnits) {
-            openUnitDetail(row);
+        if (row.tipe === "AKSESORIS") {
+            if (row.unit_count === 0 && canAddUnit) {
+                setAddUnitAccessoryTarget(row);
+                return;
+            }
+            if (row.unit_count === 1 && canViewUnits) {
+                openAccessoryUnitDetail(row);
+            }
         }
     };
 
@@ -1108,7 +1163,7 @@ export default function UnifiedBarangContent() {
                                     const expanded = expandedIds.has(rowKey);
                                     const canEditThis = row.tipe === "LAPTOP" ? canEditLaptop : canEditAcc;
                                     const canDeleteThis = row.tipe === "LAPTOP" ? canDeleteLaptop : canDeleteAcc;
-                                    const isRowClickable = row.tipe === "LAPTOP" && (
+                                    const isRowClickable = (row.tipe === "LAPTOP" || row.tipe === "AKSESORIS") && (
                                         (row.unit_count === 0 && canAddUnit) ||
                                         (row.unit_count === 1 && canViewUnits)
                                     );
@@ -1210,6 +1265,18 @@ export default function UnifiedBarangContent() {
                                                         Kelola Unit ({row.unit_count})
                                                     </Link>
                                                 )}
+                                                {row.tipe === "AKSESORIS" && row.unit_count === 0 && canAddUnit && (
+                                                    <button onClick={() => setAddUnitAccessoryTarget(row)}
+                                                        className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
+                                                        Tambah Unit
+                                                    </button>
+                                                )}
+                                                {row.tipe === "AKSESORIS" && row.unit_count > 1 && canViewUnits && (
+                                                    <Link href={`/dashboard/accessories/${row.id}/units`}
+                                                        className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
+                                                        Kelola Unit ({row.unit_count})
+                                                    </Link>
+                                                )}
                                                 {row.tipe === "LAPTOP" && canViewBarcode && (
                                                     <button onClick={() => setBarcodeTarget({ id: row.id, name: row.nama })}
                                                         className="h-7 px-2 text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">Barcode</button>
@@ -1251,7 +1318,7 @@ export default function UnifiedBarangContent() {
                                                 const soActive = isSoActive(row.so_at);
                                                 const zebra = idx % 2 === 1;
                                                 const rowBg = zebra ? "bg-zinc-50" : "bg-white";
-                                                const isRowClickable = row.tipe === "LAPTOP" && (
+                                                const isRowClickable = (row.tipe === "LAPTOP" || row.tipe === "AKSESORIS") && (
                                                     (row.unit_count === 0 && canAddUnit) ||
                                                     (row.unit_count === 1 && canViewUnits)
                                                 );
@@ -1333,6 +1400,17 @@ export default function UnifiedBarangContent() {
                                                                 )}
                                                                 {row.tipe === "LAPTOP" && row.unit_count > 1 && canViewUnits && (
                                                                     <Link href={`/dashboard/laptops/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
+                                                                        Kelola Unit ({row.unit_count})
+                                                                    </Link>
+                                                                )}
+                                                                {row.tipe === "AKSESORIS" && row.unit_count === 0 && canAddUnit && (
+                                                                    <button onClick={() => setAddUnitAccessoryTarget(row)}
+                                                                        className="h-7 px-2 text-[11px] font-semibold text-white bg-zinc-800 rounded-lg hover:bg-zinc-900 transition">
+                                                                        Tambah Unit
+                                                                    </button>
+                                                                )}
+                                                                {row.tipe === "AKSESORIS" && row.unit_count > 1 && canViewUnits && (
+                                                                    <Link href={`/dashboard/accessories/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
                                                                         Kelola Unit ({row.unit_count})
                                                                     </Link>
                                                                 )}
@@ -1508,6 +1586,52 @@ export default function UnifiedBarangContent() {
                     }}
                     onCreated={(created: UnitDetailData) => {
                         setUnitDetailTarget(null);
+                        fetchAll();
+                        toast.success(`Unit dengan SN "${created.serial_number}" berhasil ditambahkan`);
+                    }}
+                />
+            )}
+
+            {/* ✅ FIX: blok render 2 modal AKSESORIS ini sebelumnya HILANG —
+                state & logic-nya (addUnitAccessoryTarget, openAccessoryUnitDetail,
+                handleRowClick) sudah benar, tapi tanpa render ini popup-nya
+                tidak pernah benar-benar muncul di layar. */}
+            {addUnitAccessoryTarget && (
+                <AddUnitModalAccessory
+                    accessoryId={addUnitAccessoryTarget.id}
+                    accessoryName={addUnitAccessoryTarget.nama}
+                    defaultSellingPrice={addUnitAccessoryTarget.harga_jual}
+                    onClose={() => setAddUnitAccessoryTarget(null)}
+                    onCreated={(unit) => {
+                        setAddUnitAccessoryTarget(null);
+                        fetchAll();
+                        toast.success(`Unit dengan SN "${unit.serial_number}" berhasil ditambahkan`);
+                    }}
+                />
+            )}
+
+            {unitDetailAccessoryLoading && (
+                <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
+                    <div className="w-8 h-8 border-2 border-zinc-200 border-t-zinc-900 rounded-full animate-spin" />
+                </div>
+            )}
+
+            {unitDetailAccessoryTarget && (
+                <AccessoryUnitDetailModal
+                    unit={unitDetailAccessoryTarget.unit}
+                    accessoryName={unitDetailAccessoryTarget.row.nama}
+                    accessoryMeta={[unitDetailAccessoryTarget.row.brand, unitDetailAccessoryTarget.row.spek].filter(Boolean).join(" · ")}
+                    canEdit={canAddUnit}
+                    canSeePrivate={canSeePrivate}
+                    defaultSellingPrice={unitDetailAccessoryTarget.row.harga_jual}
+                    onClose={() => setUnitDetailAccessoryTarget(null)}
+                    onSaved={() => {
+                        setUnitDetailAccessoryTarget(null);
+                        fetchAll();
+                        toast.success("Data unit berhasil diperbarui");
+                    }}
+                    onCreated={(created) => {
+                        setUnitDetailAccessoryTarget(null);
                         fetchAll();
                         toast.success(`Unit dengan SN "${created.serial_number}" berhasil ditambahkan`);
                     }}
