@@ -136,20 +136,24 @@ export const GET = withAuth(async (req) => {
   ]);
 
    const entriesWithMeta = entries.map((e: any) => {
-       if (e.source_type === "CASHFLOW" && e.source_id) {
+            if (e.source_type === "CASHFLOW" && e.source_id) {
       const syncDraft = cashflowSyncDraftMap.get(e.source_id as string);
       const syncAvailable =
         !!syncDraft && (!linesEqual(e.lines ?? [], syncDraft.lines) || e.keterangan !== syncDraft.keterangan);
       const cashflowMeta = cashflowMetaMap.get(e.source_id as string);
-      return { ...e, trx_meta: { nama: cashflowMeta?.nama ?? null }, sync_available: syncAvailable };
+      // ⬅️ BARU: kirim draft (keterangan + lines) hasil sync buat preview before/after di frontend
+      const sync_preview = syncAvailable && syncDraft ? { keterangan: syncDraft.keterangan, lines: syncDraft.lines } : null;
+      return { ...e, trx_meta: { nama: cashflowMeta?.nama ?? null }, sync_available: syncAvailable, sync_preview };
     }
 
-       if (e.source_type === "SERVICE" && e.source_id) {
+           if (e.source_type === "SERVICE" && e.source_id) {
       const baseId = (e.source_id as string).split("__")[0];
       const syncDraft = serviceSyncDraftMap.get(baseId);
       const syncAvailable =
         !!syncDraft && (!linesEqual(e.lines ?? [], syncDraft.lines) || e.keterangan !== syncDraft.keterangan);
-      return { ...e, trx_meta: null, sync_available: syncAvailable };
+      // ⬅️ BARU
+      const sync_preview = syncAvailable && syncDraft ? { keterangan: syncDraft.keterangan, lines: syncDraft.lines } : null;
+      return { ...e, trx_meta: null, sync_available: syncAvailable, sync_preview };
     }
 
     if (e.source_type !== "TRANSACTION" || !e.source_id) {
@@ -163,9 +167,11 @@ export const GET = withAuth(async (req) => {
     const hasModalLine = (e.lines ?? []).some((l: any) => l.account_code === AKUN.HPP);
     const modalAddressed = hasModalLine || e.is_edited === true;
 
-      const syncDraft = syncDraftMap.get(e.source_id as string);
+          const syncDraft = syncDraftMap.get(e.source_id as string);
     const syncAvailable =
       !!syncDraft && (!linesEqual(e.lines ?? [], syncDraft.lines) || e.keterangan !== syncDraft.keterangan);
+    // ⬅️ BARU
+    const sync_preview = syncAvailable && syncDraft ? { keterangan: syncDraft.keterangan, lines: syncDraft.lines } : null;
 
     return {
       ...e,
@@ -174,6 +180,7 @@ export const GET = withAuth(async (req) => {
         modal_missing: isRevenueEntry && !modalAddressed,
       },
       sync_available: syncAvailable,
+      sync_preview,
     };
   });
 

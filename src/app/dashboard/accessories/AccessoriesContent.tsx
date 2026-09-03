@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import * as XLSX from "xlsx-js-style";
 import {
@@ -11,7 +12,9 @@ import {
 } from "lucide-react";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { usePagePermission } from "@/hooks/usePagePermission";
-import { ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES } from "@/lib/permissions";
+import { ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES } from "@/lib/permissions";
+import AccessoryUnitDetailModal, { AccessoryUnitDetailData } from "@/components/inventory/AccessoryUnitDetailModal";
+import AddUnitModalAccessory from "@/components/inventory/AddUnitModalAccessory";
 
 // ─── Types──────────────────────────────────────────────────────────────────
 interface Accessory {
@@ -29,6 +32,9 @@ interface Accessory {
     stock_total?: number;
     audited_at?: string | null;
     audited_by?: string | null;
+    //  Daftar unit/SN aksesori ini — dikirim API accessories/route.ts (GET)
+    //  lewat join accessory_units(*). Reuse type dari modal biar 1 sumber kebenaran.
+    accessory_units?: AccessoryUnitDetailData[];
 }
 
 type AccessoryForm = {
@@ -190,6 +196,7 @@ function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete, canEdit, c
     useEffect(() => { if (!accessory) return; const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [accessory, onClose]);
     if (!accessory) return null;
     const stock = accessory.stock ?? 0; const margin = (accessory.sell_price || 0) - (accessory.buy_price || 0); const CatIcon = getCategoryIcon(accessory.category);
+    const unitCount = (accessory.accessory_units ?? []).filter(u => u.status !== "TERJUAL").length;
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
@@ -209,7 +216,7 @@ function AccessoryDetailModal({ accessory, onClose, onEdit, onDelete, canEdit, c
                     <div><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Informasi</p><div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">{[{ label: "Kategori", value: accessory.category }, { label: "Merk", value: accessory.brand }, { label: "Spesifikasi", value: accessory.spec }].map(({ label, value }) => (<div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100"><p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</p><p className="text-sm font-semibold text-gray-800 break-all leading-tight">{value || <span className="text-gray-300 font-normal">—</span>}</p></div>))}</div></div>
                     {accessory.notes && (<div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5"><p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">Keterangan</p><p className="text-sm text-amber-900">{accessory.notes}</p></div>)}
                 </div>
-                <div className="flex items-center justify-between gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0 flex-wrap"><p className="text-xs text-gray-400">{new Date(accessory.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}</p><div className="flex gap-2">{canEdit && <button onClick={onEdit} className="h-9 px-4 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 active:scale-[0.97] transition-all duration-150">Edit</button>}{canDelete && <button onClick={onDelete} className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">Hapus</button>}</div></div>
+                <div className="flex items-center justify-between gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0 flex-wrap"><p className="text-xs text-gray-400">{new Date(accessory.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}</p><div className="flex gap-2">{unitCount > 1 && <Link href={`/dashboard/accessories/${accessory.id}/units`} className="h-9 px-4 inline-flex items-center text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 active:scale-[0.97] transition-all duration-150">Lihat Units</Link>}{canEdit && <button onClick={onEdit} className="h-9 px-4 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 active:scale-[0.97] transition-all duration-150">Edit</button>}{canDelete && <button onClick={onDelete} className="h-9 px-4 text-sm font-semibold text-red-500 bg-red-50 rounded-xl hover:bg-red-100 active:scale-[0.97] transition-all duration-150">Hapus</button>}</div></div>
             </div>
         </div>
     );
@@ -322,6 +329,9 @@ function AccessoriesContent() {
     const [view, setView] = useState<"detail" | null>(null);
     const [auditingId, setAuditingId] = useState<string | null>(null);
     const [historyAcc, setHistoryAcc] = useState<Accessory | null>(null);
+    //  Kelola Unit (SN): pop-up detail 1 unit (stok=1) & tambah unit pertama (stok=0)
+    const [unitDetailTarget, setUnitDetailTarget] = useState<{ unit: AccessoryUnitDetailData; accessory: Accessory } | null>(null);
+    const [addUnitTarget, setAddUnitTarget] = useState<Accessory | null>(null);
 
     // Audit cuma boleh ditekan oleh ADMIN — role lain cuma bisa lihat status/riwayat
     const { user } = useAuthUser();
@@ -336,6 +346,9 @@ function AccessoriesContent() {
     const canCreateAcc = userRoles.some(r => (ACCESSORY_CREATE_ROLES as string[]).includes(r)) || matrixCan.create;
     const canEditAcc = userRoles.some(r => (ACCESSORY_EDIT_ROLES as string[]).includes(r)) || matrixCan.edit;
     const canDeleteAcc = userRoles.some(r => (ACCESSORY_EDIT_ROLES as string[]).includes(r)) || matrixCan.delete;
+    //  Kelola Unit (SN) — disamakan dgn canManageUnits di accessories/[id]/units/page.tsx
+    const canManageUnits = userRoles.some(r => (PERMISSIONS.EDIT_UNITS as string[]).includes(r)) || matrixCan.edit;
+    const canSeePrivate = userRoles.some(r => (BARANG_PRIVATE_VIEW_ROLES as string[]).includes(r));
 
     const LIMIT = 9999;
     const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -422,6 +435,15 @@ function AccessoriesContent() {
         } finally {
             setAuditingId(null);
         }
+    };
+
+    //  Router klik baris — persis pola handleRowClick di LaptopsContent.tsx:
+    //    unit aktif = 1  → langsung buka Pop-up Detail unit (skip halaman Units)
+    //    unit aktif ≠ 1  → tetap buka Detail Aksesori (agregat), sama seperti sebelumnya
+    const handleRowClick = (item: Accessory) => {
+        const activeUnits = (item.accessory_units ?? []).filter(u => u.status !== "TERJUAL");
+        if (activeUnits.length !== 1) { setSelectedAcc(item); setView("detail"); return; }
+        setUnitDetailTarget({ unit: activeUnits[0], accessory: item });
     };
 
     const exportToExcel = async () => {
@@ -528,8 +550,10 @@ function AccessoriesContent() {
                                     <tbody>
                                         {items.map((item, idx) => {
                                             const grossProfit = (item.sell_price || 0) - (item.buy_price || 0);
+                                            //  Jumlah unit aktif (SN, bukan TERJUAL) — dipakai tombol Units/Tambah Unit
+                                            const activeUnitCount = (item.accessory_units ?? []).filter(u => u.status !== "TERJUAL").length;
                                             return (
-                                                <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0" onClick={() => { setSelectedAcc(item); setView("detail"); }}>
+                                                <tr key={item.id} className="group cursor-pointer data-row border-b border-gray-50 last:border-0" onClick={() => handleRowClick(item)}>
                                                     <td className="px-4 py-3.5 text-center w-10"><span className="text-xs font-semibold text-gray-300 tabular-nums">{String((page - 1) * LIMIT + idx + 1).padStart(2, "0")}</span></td>
                                                     <td className="px-4 py-3.5 max-w-[220px]"><span className="block font-semibold text-gray-800 truncate text-[13px]" title={item.name}>{item.name}</span>{item.notes && <span className="block text-[11px] text-gray-400 truncate mt-0.5">{item.notes}</span>}</td>
                                                     <td className="px-4 py-3.5 whitespace-nowrap"><CategoryBadge cat={item.category} /></td>
@@ -553,7 +577,25 @@ function AccessoriesContent() {
                                                             </button>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}><div className="flex items-center justify-end gap-1">{canEditAcc && <button onClick={() => { setEditAcc(item); setAccModalOpen(true); }} className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>}{canDeleteAcc && <button onClick={() => setDeleteAcc(item)} className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>}</div></td>
+                                                    <td className="px-4 py-3.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            {canManageUnits && activeUnitCount > 1 && (
+                                                                <Link href={`/dashboard/accessories/${item.id}/units`}
+                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition flex items-center gap-1">
+                                                                    Units
+                                                                    <span className="text-[10px] font-bold text-gray-400 tabular-nums">{activeUnitCount}</span>
+                                                                </Link>
+                                                            )}
+                                                            {canManageUnits && activeUnitCount === 0 && (
+                                                                <button onClick={() => setAddUnitTarget(item)} title="Tambah unit/SN pertama untuk aksesori ini"
+                                                                    className="h-7 px-2.5 text-[11px] font-semibold text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">
+                                                                    Tambah Unit
+                                                                </button>
+                                                            )}
+                                                            {canEditAcc && <button onClick={() => { setEditAcc(item); setAccModalOpen(true); }} className="h-7 px-2.5 text-[11px] font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Edit</button>}
+                                                            {canDeleteAcc && <button onClick={() => setDeleteAcc(item)} className="h-7 px-2.5 text-[11px] font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition">Hapus</button>}
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             );
                                         })}
@@ -572,6 +614,28 @@ function AccessoriesContent() {
             {view === "detail" && (<AccessoryDetailModal accessory={selectedAcc} onClose={() => { setView(null); setSelectedAcc(null); }} onEdit={() => { setEditAcc(selectedAcc); setView(null); setAccModalOpen(true); }} onDelete={() => setDeleteAcc(selectedAcc)} canEdit={canEditAcc} canDelete={canDeleteAcc} />)}
             <DeleteConfirm open={!!deleteAcc} title="Hapus Aksesori" name={deleteAcc?.name ?? ""} onClose={() => setDeleteAcc(null)} onConfirm={handleDeleteAcc} loading={deletingAcc} />
             <AuditHistoryModal accessory={historyAcc} onClose={() => setHistoryAcc(null)} />
+            {unitDetailTarget && (
+                <AccessoryUnitDetailModal
+                    unit={unitDetailTarget.unit}
+                    accessoryName={unitDetailTarget.accessory.name}
+                    accessoryMeta={[unitDetailTarget.accessory.brand, unitDetailTarget.accessory.spec, unitDetailTarget.accessory.category].filter(Boolean).join(" · ")}
+                    canEdit={canManageUnits}
+                    canSeePrivate={canSeePrivate}
+                    defaultSellingPrice={unitDetailTarget.accessory.sell_price}
+                    onClose={() => setUnitDetailTarget(null)}
+                    onSaved={() => { setUnitDetailTarget(null); fetchItems(page); }}
+                    onCreated={() => { setUnitDetailTarget(null); fetchItems(page); }}
+                />
+            )}
+            {addUnitTarget && (
+                <AddUnitModalAccessory
+                    accessoryId={addUnitTarget.id}
+                    accessoryName={addUnitTarget.name}
+                    defaultSellingPrice={addUnitTarget.sell_price}
+                    onClose={() => setAddUnitTarget(null)}
+                    onCreated={() => { setAddUnitTarget(null); fetchItems(page); }}
+                />
+            )}
         </>
     );
 }
