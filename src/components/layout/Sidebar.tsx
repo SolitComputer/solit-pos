@@ -143,6 +143,7 @@ const Icons = {
   pendingOrders: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l2 3h6l2-3h4" /><path d="M5.5 5h13l2.5 7v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6z" /></svg>),
   users: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" /><circle cx="9" cy="8" r="4" /><path d="M22.5 21v-2a4 4 0 00-3-3.87" /><path d="M16.5 3.2a4 4 0 010 7.6" /></svg>),
   leaderboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4h10v5a5 5 0 01-10 0z" /><path d="M7 5H4.5a2 2 0 000 4H7M17 5h2.5a2 2 0 010 4H17" /><path d="M12 14v3" /><path d="M8 21h8" /></svg>),
+  lencana: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5" /><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5" /></svg>),
   code: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l-6-6 6-6" /><path d="M15 6l6 6-6 6" /></svg>),
   serviceQueue: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.7 2.7-2-2z" /></svg>),
   serviceDone: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>),
@@ -200,6 +201,7 @@ const ITEM_AI_CEO: MenuItem = { name: "AI CEO", href: "/dashboard/ai-ceo", icon:
 const ITEM_TANYA_CEO: MenuItem = { name: "Tanya CEO", href: "/dashboard/tanya-ceo", icon: Icons.tanyaCeo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
+const ITEM_LENCANA: MenuItem = { name: "Lencana", href: "/dashboard/lencana", icon: Icons.lencana };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
@@ -931,11 +933,13 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
     if (!utama.items.some((it) => it.href === ITEM_PROFILE.href)) {
       utama.items.push(ITEM_PROFILE);
     }
+    if (!utama.items.some((it) => it.href === ITEM_LENCANA.href)) {
+      utama.items.push(ITEM_LENCANA);
+    }
   } else {
-    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE] }, ...ROLE_MENUS[role]];
+    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE, ITEM_LENCANA] }, ...ROLE_MENUS[role]];
   }
 });
-
 // Kendaraan: grup sendiri (collapsible) berisi Dashboard + Management Kendaraan.
 // Disuntik di level groups final (BUKAN per-role static), supaya muncul untuk SEMUA
 // user — termasuk yang pakai role dinamis (menu dari DB) yang tidak lewat ROLE_MENUS.

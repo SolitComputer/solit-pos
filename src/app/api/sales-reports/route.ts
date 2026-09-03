@@ -134,3 +134,62 @@ export const DELETE = withAuth(async (req, _ctx, user) => {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 });
+
+// PATCH /api/sales-reports?id=xxx
+// Boleh diedit oleh: pembuatnya sendiri (masih di hari yang sama) ATAU
+// role full-access (Admin/Programmer/Asisten CEO) — aturan sama seperti DELETE.
+export const PATCH = withAuth(async (req, _ctx, user) => {
+  try {
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ success: false, message: "id wajib diisi" }, { status: 400 });
+    }
+
+    const body = await req.json();
+    const phoneNumber = (body.phone_number ?? "").toString().trim();
+    const interest = (body.interest ?? "").toString().trim();
+    const purchased = Boolean(body.purchased);
+
+    if (!phoneNumber) {
+      return NextResponse.json({ success: false, message: "Nomor telepon wajib diisi" }, { status: 400 });
+    }
+    if (!interest) {
+      return NextResponse.json({ success: false, message: "Minat wajib diisi" }, { status: 400 });
+    }
+
+    const userRoles: string[] = user.roles?.length > 0 ? user.roles : [user.role];
+
+    const { data: existing, error: fetchError } = await supabaseAdmin
+      .from("sales_online_reports")
+      .select("id, filled_by, created_at")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !existing) {
+      return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+    }
+
+    const isOwner = existing.filled_by === user.id;
+    const isSameDay = new Date(existing.created_at).toDateString() === new Date().toDateString();
+    const canEdit = hasAnyRole(userRoles, SALES_REPORT_DELETE_ROLES) || (isOwner && isSameDay);
+
+    if (!canEdit) {
+      return NextResponse.json({ success: false, message: "Tidak punya akses edit" }, { status: 403 });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("sales_online_reports")
+      .update({ phone_number: phoneNumber, interest, purchased })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    return NextResponse.json({ success: true, data });
+  } catch (error: any) {
+    console.error("Sales report PATCH error:", error);
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+});
