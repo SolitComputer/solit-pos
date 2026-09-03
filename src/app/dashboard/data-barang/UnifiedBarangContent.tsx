@@ -86,21 +86,18 @@ const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
 const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
 const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
 
-//  Aksesoris: tentukan aksi Unit berdasarkan row.unit_count — jumlah SN yang
-//  BENERAN tercatat di accessory_units, BUKAN row.stok (angka stok manual).
-//  Sengaja DIBALIKIN dari versi sebelumnya yang sempat pakai row.stok: itu
-//  bikin barang generic bervolume besar (charger/RAM/HDD/mouse dst, yang
-//  MEMANG diputuskan tidak perlu SN individual — lihat diskusi migrasi)
-//  ikut nampilin "Kelola Unit (90)" padahal isinya kosong beneran, karena
-//  90 itu cuma angka stok manual, bukan jumlah SN yang ada. Sekarang:
-//  belum ada SN sama sekali → tetap "Tambah Unit" selamanya (gak masalah
-//  walau stok manualnya gede), sampe user sengaja mulai isi SN-nya sendiri.
-//  "units"  → sudah ada >1 SN tercatat → arahkan ke halaman Units
-//  "detail" → sudah ada tepat 1 SN tercatat → buka pop-up detail unit itu
-//  "add"    → belum ada SN sama sekali → buka pop-up tambah 1 unit
+//  Aksesoris: tentukan aksi Unit berdasarkan STOK EFEKTIF (row.stok — sudah
+//  fallback ke kolom stock manual kalau belum ada SN sama sekali), BUKAN
+//  row.unit_count saja. Aksesori lama (stok manual tanpa SN) unit_count-nya
+//  selalu 0 walau stoknya puluhan — itu sebabnya tombol "Kelola Unit" dulu
+//  tidak pernah muncul meski kolom STOK di tabel sudah >1.
+//  "units"  → arahkan ke halaman Units (bisa bulk-add banyak SN sekaligus)
+//  "detail" → sudah tepat ada 1 SN tercatat → buka pop-up detail unit itu
+//  "add"    → belum ada SN & stok ≤ 1 → buka pop-up tambah 1 unit
 function getAccessoryUnitAction(row: UnifiedRow): "units" | "add" | "detail" | null {
     if (row.tipe !== "AKSESORIS") return null;
-    if (row.unit_count > 1) return "units";
+    const stok = row.stok ?? 0;
+    if (stok > 1) return "units";
     if (row.unit_count === 1) return "detail";
     return "add";
 }
@@ -1298,7 +1295,7 @@ export default function UnifiedBarangContent() {
                                                 {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
                                                     <Link href={`/dashboard/accessories/${row.id}/units`}
                                                         className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                        Kelola Unit ({row.unit_count})
+                                                        Kelola Unit ({row.stok ?? 0})
                                                     </Link>
                                                 )}
                                                 {row.tipe === "LAPTOP" && canViewBarcode && (
@@ -1437,7 +1434,7 @@ export default function UnifiedBarangContent() {
                                                                 )}
                                                                 {row.tipe === "AKSESORIS" && accAction === "units" && canViewUnits && (
                                                                     <Link href={`/dashboard/accessories/${row.id}/units`} className="h-7 px-2 inline-flex items-center text-[11px] font-semibold text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition">
-                                                                        Kelola Unit ({row.unit_count})
+                                                                        Kelola Unit ({row.stok ?? 0})
                                                                     </Link>
                                                                 )}
                                                                 {row.tipe === "LAPTOP" && canViewBarcode && (
