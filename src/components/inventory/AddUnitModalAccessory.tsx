@@ -2,41 +2,35 @@
 
 import { useState } from "react";
 
-export interface CreatedUnit {
+export interface CreatedAccessoryUnit {
     id: string;
     serial_number: string;
     [key: string]: unknown;
 }
 
-const GRADE_OPTIONS = ["A", "B", "C"] as const;
-const STATUS_OPTIONS = [
-    { value: "SIAP_JUAL", label: "Siap Jual" },
-    { value: "BELUM_SIAP", label: "Belum Siap" },
-    { value: "SERVICE", label: "Service" },
+const CONDITION_OPTIONS = [
+    { value: "BARU", label: "Baru" },
+    { value: "BEKAS", label: "Bekas" },
 ];
 
-export default function AddUnitModal({
-    laptopId,
-    laptopName,
+export default function AddUnitModalAccessory({
+    accessoryId,
+    accessoryName,
     defaultSellingPrice,
     onClose,
     onCreated,
 }: {
-    laptopId: string;
-    laptopName: string;
+    accessoryId: string;
+    accessoryName: string;
     defaultSellingPrice: number;
     onClose: () => void;
-    onCreated: (unit: CreatedUnit) => void;
+    onCreated: (unit: CreatedAccessoryUnit) => void;
 }) {
-        const [form, setForm] = useState({
+    const [form, setForm] = useState({
         serial_number: "",
-        grade: "A",
-        condition_note: "",
-        source: "",
-        purchase_price: "",
-        sparepart_cost: "",
+        condition: "BARU",
+        buy_price: "",
         selling_price: String(defaultSellingPrice || ""),
-        status: "SIAP_JUAL",
         notes: "",
     });
     const [loading, setLoading] = useState(false);
@@ -55,24 +49,22 @@ export default function AddUnitModal({
         setError("");
         setLoading(true);
         try {
-            const res = await fetch(`/api/laptops/${laptopId}/units`, {
+            // Endpoint asli: POST /api/accessory-units (bukan nested per-accessory)
+            const res = await fetch(`/api/accessory-units`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
+                body: JSON.stringify({
+                    accessory_id: accessoryId,
                     serial_number: form.serial_number.trim(),
-                    grade: form.grade,
-                    condition_note: form.condition_note,
-                    source: form.source.trim() || null,
-                    purchase_price: Number(form.purchase_price) || 0,
+                    condition: form.condition,
+                    buy_price: Number(form.buy_price) || 0,
                     selling_price: Number(form.selling_price) || 0,
-                    sparepart_cost: Number(form.sparepart_cost) || 0,
-                    status: form.status,
                     notes: form.notes,
                 }),
             });
             const result = await res.json().catch(() => null);
             if (!res.ok || !result?.success) {
-                setError(result?.message || "Gagal menambahkan unit");
+                setError(result?.error || result?.message || "Gagal menambahkan unit");
                 return;
             }
             onCreated(result.data);
@@ -87,11 +79,11 @@ export default function AddUnitModal({
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 animate-fadeIn">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
             <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden animate-popIn max-h-[90dvh] flex flex-col">
-                <div className="h-1 w-full bg-gradient-to-r from-indigo-400 via-indigo-600 to-indigo-800 flex-shrink-0" />
+                <div className="h-1 w-full bg-gradient-to-r from-zinc-400 via-zinc-600 to-zinc-800 flex-shrink-0" />
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
                     <div>
                         <h2 className="font-bold text-gray-900 text-[15px]">Tambah Unit</h2>
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">{laptopName}</p>
+                        <p className="text-xs text-gray-400 mt-0.5 truncate">{accessoryName}</p>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 transition">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,40 +98,20 @@ export default function AddUnitModal({
                             placeholder="Contoh: SN-12345" className={inputCls} autoFocus />
                     </Field>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <Field label="Grade">
-                            <select name="grade" value={form.grade} onChange={handleChange} className={inputCls}>
-                                {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-                            </select>
-                        </Field>
-                                               <Field label="Status">
-                            <select name="status" value={form.status} onChange={handleChange} className={inputCls}>
-                                {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                            </select>
-                        </Field>
-                    </div>
-
-                    <Field label="Sumber">
-                        <input name="source" value={form.source} onChange={handleChange}
-                            placeholder="Supplier Jakarta, Tukar Tambah, Lelang..." className={inputCls} />
+                    <Field label="Kondisi">
+                        <select name="condition" value={form.condition} onChange={handleChange} className={inputCls}>
+                            {CONDITION_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                        </select>
                     </Field>
 
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Harga Modal">
-                            <input type="number" name="purchase_price" value={form.purchase_price} onChange={handleChange} className={inputCls} />
+                            <input type="number" name="buy_price" value={form.buy_price} onChange={handleChange} className={inputCls} />
                         </Field>
-                        <Field label="Modal Sparepart">
-                            <input type="number" name="sparepart_cost" value={form.sparepart_cost} onChange={handleChange} className={inputCls} />
+                        <Field label="Harga Jual">
+                            <input type="number" name="selling_price" value={form.selling_price} onChange={handleChange} className={inputCls} />
                         </Field>
                     </div>
-
-                    <Field label="Harga Jual">
-                        <input type="number" name="selling_price" value={form.selling_price} onChange={handleChange} className={inputCls} />
-                    </Field>
-
-                    <Field label="Kondisi">
-                        <input name="condition_note" value={form.condition_note} onChange={handleChange} className={inputCls} />
-                    </Field>
 
                     <Field label="Catatan">
                         <textarea name="notes" value={form.notes} onChange={handleChange} rows={2} className={inputCls} />
@@ -157,7 +129,7 @@ export default function AddUnitModal({
                             Batal
                         </button>
                         <button type="submit" disabled={loading}
-                            className="flex-1 h-11 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-sm font-semibold hover:from-indigo-700 hover:to-indigo-800 transition disabled:opacity-50">
+                            className="flex-1 h-11 bg-gradient-to-r from-zinc-700 to-zinc-900 text-white rounded-xl text-sm font-semibold hover:from-zinc-800 hover:to-black transition disabled:opacity-50">
                             {loading ? "Menyimpan..." : "Tambah Unit"}
                         </button>
                     </div>
@@ -167,7 +139,7 @@ export default function AddUnitModal({
     );
 }
 
-const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition";
+const inputCls = "w-full h-10 border border-gray-200 rounded-xl px-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-400 focus:bg-white transition";
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
     return (
