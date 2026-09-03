@@ -700,6 +700,13 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
                 { status: 400 }
             );
 
+        const pm = (body.payment_method as string | undefined) ?? "CASH";
+        if (!["CASH", "SALDO"].includes(pm))
+            return NextResponse.json(
+                { success: false, message: "Metode pembayaran harus CASH atau SALDO" },
+                { status: 400 }
+            );
+
         const { data, error } = await supabase
             .from("cashflow_entries")
             .insert({
@@ -711,7 +718,7 @@ export const POST = withAuth(async (req, _ctx, user: any) => {
                 keterangan: keterangan?.trim() || null,
                 tanggal: tanggal || jakartaToday,
                 source_type: "MANUAL",
-                payment_method: null,
+                payment_method: pm,
                 created_by: user.id,
             })
             .select(`*, created_by_user:users!cashflow_entries_created_by_fkey(id, name)`)

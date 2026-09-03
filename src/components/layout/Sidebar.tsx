@@ -16,6 +16,9 @@ import { useNotificationSettings } from "@/hooks/useNotificationSound";
 import { useEscalationBadge } from "@/hooks/useEscalationBadge";
 import { invalidateAuthCache } from "@/hooks/useAuthUser";
 import { YOGA_ADMIN_ID, REINALDY_ADMIN_ID } from "@/lib/contractSigners";
+import SolitBorder from "@/components/solit-coins/SolitBorder";
+import CoinBalanceChip from "@/components/solit-coins/CoinBalanceChip";
+import type { BorderStyle } from "@/lib/solit-coins/types";
 
 const CACHE_KEY = "solit_sidebar_userit";
 const RAIL_KEY = "solit_sidebar_rail";
@@ -1154,24 +1157,41 @@ function SidebarContent({
           </div>
         ) : rail ? (
           <Link href="/dashboard/profile" className="flex justify-center" title="Profil saya">
-            <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden" title={user?.name || ""}>
-              {user?.profile_photo_url
-                ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
-                : initials}
-            </div>
+            {(() => {
+              const avatar = (
+                <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden" title={user?.name || ""}>
+                  {user?.profile_photo_url
+                    ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
+                    : initials}
+                </div>
+              );
+              return user?.equipped_border
+                ? <SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2}>{avatar}</SolitBorder>
+                : avatar;
+            })()}
           </Link>
         ) : (
-          <Link href="/dashboard/profile" className="flex items-center gap-3 group/profile" title="Profil saya">
-            <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
-              {user?.profile_photo_url
-                ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
-                : initials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900 tracking-tight truncate group-hover/profile:underline">{user?.name || "—"}</p>
-              <RoleBadges user={user} />
-            </div>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/profile" className="flex items-center gap-3 group/profile min-w-0 flex-1" title="Profil saya">
+              {(() => {
+                const avatar = (
+                  <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+                    {user?.profile_photo_url
+                      ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
+                      : initials}
+                  </div>
+                );
+                return user?.equipped_border
+                  ? <SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2}>{avatar}</SolitBorder>
+                  : avatar;
+              })()}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900 tracking-tight truncate group-hover/profile:underline">{user?.name || "—"}</p>
+                <RoleBadges user={user} />
+              </div>
+            </Link>
+            <CoinBalanceChip className="flex-shrink-0" />
+          </div>
         )}      </div>
 
       <div className={`h-px bg-slate-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
@@ -1480,6 +1500,7 @@ export default function Sidebar() {
           roles: authUser.roles,
           shift: authUser.shift,
           profile_photo_url: authUser.profile_photo_url,
+          equipped_border: authUser.equipped_border ?? null,
         };
         setUser(fresh);
         setCachedUser(fresh);

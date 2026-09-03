@@ -600,6 +600,10 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/api/achievements": [...ALL_ROLES],
   "/dashboard/lencana": [...ALL_ROLES],
   "/api/attendance/quality-rank": [...ALL_ROLES],
+
+  // Solit Coins (gamifikasi) — semua role. UI berupa popup di halaman profil,
+  // jadi tidak ada route halaman terpisah; cukup gate endpoint API-nya.
+  "/api/coins": [...ALL_ROLES],
 };
 
 export const PERMISSIONS = {
