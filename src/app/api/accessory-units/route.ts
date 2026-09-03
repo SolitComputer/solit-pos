@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { UserRole, BARANG_PRIVATE_VIEW_ROLES, hasAnyRole } from "@/lib/permissions";
+import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
 
 const VIEW_ROLES: UserRole[] = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -109,6 +110,10 @@ export const POST = withAuth(async (req: NextRequest) => {
         console.error("[POST /api/accessory-units]", error);
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
+
+    // ✅ FIX: dulu accessories.stock tidak pernah di-sync setelah unit baru
+    // ditambahkan lewat endpoint ini — stok di tabel utama jadi ketinggalan.
+    await recalcAccessoryParentStock(supabaseAdmin, accessory_id);
 
     return NextResponse.json({ success: true, data }, { status: 201 });
 }, CREATE_ROLES);
