@@ -1520,7 +1520,7 @@ export default function LencanaPage() {
                     </div>
                     <div className="min-w-0">
                         <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">Lencana</h1>
-                        <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5">Penghargaan bulanan untuk performa terbaik — juara 1-3 tampil di halaman profil</p>
+                        <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5">Penghargaan bulanan untuk performa terbaik — juara 1-3 Tampil di halaman profil</p>
                     </div>
                 </div>
 
