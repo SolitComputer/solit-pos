@@ -1,260 +1,260 @@
-"use client";
+  "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import { UserRole, hasAnyRole, ITEM_OUTFLOW_ROLES, DATA_BARANG_LAPTOP_ROLES } from "@/lib/permissions";
-import UnifiedBarangContent from "./UnifiedBarangContent";
-import OutflowsContent from "./OutflowsContent";
-import CategoriesContent from "./CategoriesContent";
-import PriceListPedagangTab from "@/components/inventory/price-list-pedagang/page";
-import { PRICELIST_PEDAGANG_ROLES } from "@/lib/pricelistPedagang";
+  import { useEffect, useMemo, useRef, useState } from "react";
+  import DashboardLayout from "@/components/layout/DashboardLayout";
+  import { UserRole, hasAnyRole, ITEM_OUTFLOW_ROLES, DATA_BARANG_LAPTOP_ROLES } from "@/lib/permissions";
+  import UnifiedBarangContent from "./UnifiedBarangContent";
+  import OutflowsContent from "./OutflowsContent";
+  import CategoriesContent from "./CategoriesContent";
+  import PriceListPedagangTab from "@/components/inventory/price-list-pedagang/page";
+  import { PRICELIST_PEDAGANG_ROLES } from "@/lib/pricelistPedagang";
 
 
-type TabKey = "barang" | "outflows" | "pedagang" | "kategori";
+  type TabKey = "barang" | "outflows" | "pedagang" | "kategori";
 
-interface TabDef {
-  key: TabKey;
-  label: string;
-  roles: UserRole[];
-  icon: string;
-}
-
-const TABS: TabDef[] = [
-  {
-    key: "barang",
-    label: "Data Barang",
-    roles: DATA_BARANG_LAPTOP_ROLES,
-    icon: "ti-device-laptop",
-  },
-  {
-    key: "outflows",
-    label: "Pengambilan Barang",
-    roles: ITEM_OUTFLOW_ROLES,
-    icon: "ti-history",
-  },
-  {
-    key: "pedagang",
-    label: "Price List Pedagang",
-    roles: PRICELIST_PEDAGANG_ROLES,
-    icon: "ti-tag",
-  },
-  {
-    key: "kategori",
-    label: "Kategori",
-    roles: DATA_BARANG_LAPTOP_ROLES,
-    icon: "ti-category",
-  },
-];
-
-function getTabIcon(icon: string, className: string) {
-  switch (icon) {
-    case "ti-device-laptop":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2" />
-          <line x1="8" y1="21" x2="16" y2="21" />
-          <line x1="12" y1="17" x2="12" y2="21" />
-        </svg>
-      );
-    case "ti-devices":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
-          <circle cx="8" cy="12" r="0.5" fill="currentColor" />
-          <circle cx="12" cy="12" r="0.5" fill="currentColor" />
-          <circle cx="16" cy="12" r="0.5" fill="currentColor" />
-        </svg>
-      );
-    case "ti-history":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 12 16 14" />
-        </svg>
-      );
-    case "ti-tag":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.17L4 3a1 1 0 0 0-1 1l.17 5.59a2 2 0 0 0 .66 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83Z" />
-          <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
-        </svg>
-      );
-    case "ti-category":
-      return (
-        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1.5" />
-          <rect x="14" y="3" width="7" height="7" rx="1.5" />
-          <rect x="3" y="14" width="7" height="7" rx="1.5" />
-          <rect x="14" y="14" width="7" height="7" rx="1.5" />
-        </svg>
-      );
-    default:
-      return null;
+  interface TabDef {
+    key: TabKey;
+    label: string;
+    roles: UserRole[];
+    icon: string;
   }
-}
 
-export default function DataBarangPage() {
-  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
-  const [rolesLoaded, setRolesLoaded] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>("barang");
-  const topRef = useRef<HTMLDivElement>(null);
-  // ── Load roles
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { getAuthUser } = await import("@/hooks/useAuthUser");
-        const user = await getAuthUser();
-        if (cancelled) return;
-        const roles: string[] =
-          Array.isArray(user?.roles) && user.roles.length > 0
-            ? (user.roles as string[])
-            : user?.role
-              ? [user.role as string]
-              : [];
-        setUserRoles(roles as UserRole[]);
-      } catch {
-        setUserRoles([]);
-      } finally {
-        setRolesLoaded(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const TABS: TabDef[] = [
+    {
+      key: "barang",
+      label: "Data Barang",
+      roles: DATA_BARANG_LAPTOP_ROLES,
+      icon: "ti-device-laptop",
+    },
+    {
+      key: "outflows",
+      label: "Pengambilan Barang",
+      roles: ITEM_OUTFLOW_ROLES,
+      icon: "ti-history",
+    },
+    {
+      key: "pedagang",
+      label: "Price List Pedagang",
+      roles: PRICELIST_PEDAGANG_ROLES,
+      icon: "ti-tag",
+    },
+    {
+      key: "kategori",
+      label: "Kategori",
+      roles: DATA_BARANG_LAPTOP_ROLES,
+      icon: "ti-category",
+    },
+  ];
 
-  // ── Reset posisi scroll ke atas tiap kali halaman ini mount
-  // (fix: header hilang saat kembali dari halaman Units)
-  useEffect(() => {
-    topRef.current?.scrollIntoView({ block: "start" });
-  }, []);
-
-  // ── Deep-link: baca ?tab= dari URL
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get(
-      "tab"
-    ) as TabKey | null;
-    if (t && TABS.some((tab) => tab.key === t)) setActiveTab(t);
-  }, []);
-
-  const visibleTabs = useMemo(
-    () =>
-      TABS.filter(
-        (t) => rolesLoaded && hasAnyRole(userRoles, t.roles)
-      ),
-    [userRoles, rolesLoaded]
-  );
-
-  // ── Fallback ke tab pertama kalau tab aktif tidak visible
-  useEffect(() => {
-    if (!rolesLoaded || visibleTabs.length === 0) return;
-    if (!visibleTabs.some((t) => t.key === activeTab)) {
-      setActiveTab(visibleTabs[0].key);
+  function getTabIcon(icon: string, className: string) {
+    switch (icon) {
+      case "ti-device-laptop":
+        return (
+          <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+        );
+      case "ti-devices":
+        return (
+          <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
+            <circle cx="8" cy="12" r="0.5" fill="currentColor" />
+            <circle cx="12" cy="12" r="0.5" fill="currentColor" />
+            <circle cx="16" cy="12" r="0.5" fill="currentColor" />
+          </svg>
+        );
+      case "ti-history":
+        return (
+          <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        );
+      case "ti-tag":
+        return (
+          <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.17L4 3a1 1 0 0 0-1 1l.17 5.59a2 2 0 0 0 .66 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83Z" />
+            <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" />
+          </svg>
+        );
+      case "ti-category":
+        return (
+          <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+            <rect x="14" y="14" width="7" height="7" rx="1.5" />
+          </svg>
+        );
+      default:
+        return null;
     }
-  }, [rolesLoaded, visibleTabs, activeTab]);
+  }
 
-  const changeTab = (key: TabKey) => {
-    setActiveTab(key);
-    const url = new URL(window.location.href);
-    url.searchParams.set("tab", key);
-    window.history.replaceState(null, "", url.toString());
-  };
+  export default function DataBarangPage() {
+    const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    const [rolesLoaded, setRolesLoaded] = useState(false);
+    const [activeTab, setActiveTab] = useState<TabKey>("barang");
+    const topRef = useRef<HTMLDivElement>(null);
+    // ── Load roles
+    useEffect(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const { getAuthUser } = await import("@/hooks/useAuthUser");
+          const user = await getAuthUser();
+          if (cancelled) return;
+          const roles: string[] =
+            Array.isArray(user?.roles) && user.roles.length > 0
+              ? (user.roles as string[])
+              : user?.role
+                ? [user.role as string]
+                : [];
+          setUserRoles(roles as UserRole[]);
+        } catch {
+          setUserRoles([]);
+        } finally {
+          setRolesLoaded(true);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, []);
 
-  return (
-    <DashboardLayout>
-      {/* ── PAGE HEADER — scrolls away normally ───────────────── */}
-      <div ref={topRef} className="bg-white border border-gray-200/80 rounded-2xl shadow-sm overflow-hidden mb-0">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 gap-3 sm:gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 sm:w-9 sm:h-9 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-[10px] flex items-center justify-center flex-shrink-0 shadow-md shadow-zinc-900/25">
-              <svg
-                className="w-[18px] h-[18px] sm:w-[17px] sm:h-[17px]"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                <line x1="12" y1="22.08" x2="12" y2="12" />
-              </svg>
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="text-[15px] sm:text-[14.5px] font-bold text-gray-900 tracking-tight leading-tight truncate">
-                Data Barang
-              </h1>
-              <p className="text-[11.5px] text-gray-400 mt-1 font-normal truncate">
-                Laptop &amp; aksesoris dalam satu tempat
-              </p>
-            </div>
-          </div>
-          <span className="inline-flex self-start sm:self-auto text-[11px] text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-full px-3 py-1 font-semibold tabular-nums">
-            {visibleTabs.length} kategori
-          </span>
-        </div>
-      </div>
+    // ── Reset posisi scroll ke atas tiap kali halaman ini mount
+    // (fix: header hilang saat kembali dari halaman Units)
+    useEffect(() => {
+      topRef.current?.scrollIntoView({ block: "start" });
+    }, []);
 
-      {/* ── STICKY TAB STRIP — nempel di atas saat scroll ─────── */}
-      {/*
-        Mobile  : top-12 (di bawah topbar 48px dari DashboardLayout)
-        Desktop : top-0  (gak ada topbar)
-        Negative margin + padding trick supaya sticky full-width
-      */}
-      <div className="-mx-4 lg:-mx-5 px-4 lg:px-5">
-        <div className="bg-white/95 backdrop-blur-md border border-gray-200/80 border-t-0 rounded-b-2xl shadow-sm overflow-hidden">
-          <div className="flex overflow-x-auto scrollbar-hide px-4 sm:px-6">
-            {visibleTabs.map((tab) => {
-              const isActive = tab.key === activeTab;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => changeTab(tab.key)}
-                  className={[
-                    "flex-shrink-0 flex items-center gap-2 h-11 px-1 mr-6",
-                    "text-[13px] border-b-2 -mb-px transition-all duration-150 select-none",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-1 rounded-sm",
-                    isActive
-                      ? "border-zinc-900 text-zinc-900 font-semibold" 
-                      : "border-transparent text-gray-500 font-normal hover:text-gray-800 hover:border-gray-300",
-                  ].join(" ")}
+    // ── Deep-link: baca ?tab= dari URL
+    useEffect(() => {
+      const t = new URLSearchParams(window.location.search).get(
+        "tab"
+      ) as TabKey | null;
+      if (t && TABS.some((tab) => tab.key === t)) setActiveTab(t);
+    }, []);
+
+    const visibleTabs = useMemo(
+      () =>
+        TABS.filter(
+          (t) => rolesLoaded && hasAnyRole(userRoles, t.roles)
+        ),
+      [userRoles, rolesLoaded]
+    );
+
+    // ── Fallback ke tab pertama kalau tab aktif tidak visible
+    useEffect(() => {
+      if (!rolesLoaded || visibleTabs.length === 0) return;
+      if (!visibleTabs.some((t) => t.key === activeTab)) {
+        setActiveTab(visibleTabs[0].key);
+      }
+    }, [rolesLoaded, visibleTabs, activeTab]);
+
+    const changeTab = (key: TabKey) => {
+      setActiveTab(key);
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", key);
+      window.history.replaceState(null, "", url.toString());
+    };
+
+    return (
+      <DashboardLayout>
+        {/* ── PAGE HEADER — scrolls away normally ───────────────── */}
+        <div ref={topRef} className="bg-white border border-gray-200/80 rounded-2xl shadow-sm overflow-hidden mb-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 sm:w-9 sm:h-9 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-[10px] flex items-center justify-center flex-shrink-0 shadow-md shadow-zinc-900/25">
+                <svg
+                  className="w-[18px] h-[18px] sm:w-[17px] sm:h-[17px]"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  {getTabIcon(tab.icon, `w-4 h-4 ${isActive ? "opacity-100" : "opacity-40"}`)}
-                  {tab.label}
-                </button>
-              );
-            })}
+                  <path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                  <line x1="12" y1="22.08" x2="12" y2="12" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-[15px] sm:text-[14.5px] font-bold text-gray-900 tracking-tight leading-tight truncate">
+                  Data Barang
+                </h1>
+                <p className="text-[11.5px] text-gray-400 mt-1 font-normal truncate">
+                  Laptop &amp; aksesoris dalam satu tempat
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex self-start sm:self-auto text-[11px] text-zinc-700 bg-zinc-100 border border-zinc-200 rounded-full px-3 py-1 font-semibold tabular-nums">
+              {visibleTabs.length} kategori
+            </span>
           </div>
         </div>
-      </div>
 
-      {/* ── KONTEN TAB ────────────────────────────────────────── */}
-      <div className="mt-5">
-        {!rolesLoaded ? (
-          <div className="p-8 text-center text-sm text-gray-400">Memuat data...</div>
-        ) : visibleTabs.length === 0 ? (
-          <div className="p-12 text-center bg-white rounded-2xl border border-gray-200 shadow-sm">
-            <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-3 ring-1 ring-rose-100">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+        {/* ── STICKY TAB STRIP — nempel di atas saat scroll ─────── */}
+        {/*
+          Mobile  : top-12 (di bawah topbar 48px dari DashboardLayout)
+          Desktop : top-0  (gak ada topbar)
+          Negative margin + padding trick supaya sticky full-width
+        */}
+        <div className="-mx-4 lg:-mx-5 px-4 lg:px-5">
+          <div className="bg-white/95 backdrop-blur-md border border-gray-200/80 border-t-0 rounded-b-2xl shadow-sm overflow-hidden">
+            <div className="flex overflow-x-auto scrollbar-hide px-4 sm:px-6">
+              {visibleTabs.map((tab) => {
+                const isActive = tab.key === activeTab;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => changeTab(tab.key)}
+                    className={[
+                      "flex-shrink-0 flex items-center gap-2 h-11 px-1 mr-6",
+                      "text-[13px] border-b-2 -mb-px transition-all duration-150 select-none",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-1 rounded-sm",
+                      isActive
+                        ? "border-zinc-900 text-zinc-900 font-semibold" 
+                        : "border-transparent text-gray-500 font-normal hover:text-gray-800 hover:border-gray-300",
+                    ].join(" ")}
+                  >
+                    {getTabIcon(tab.icon, `w-4 h-4 ${isActive ? "opacity-100" : "opacity-40"}`)}
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
-            <h3 className="text-sm font-semibold text-gray-900">Akses Dibatasii</h3>
-            <p className="text-xs text-gray-500 mt-1">Anda tidak memiliki akses untuk melihat data di halaman ini.</p>
           </div>
-        ) : (
-          <>
-            {activeTab === "barang" && visibleTabs.some((t) => t.key === "barang") && <UnifiedBarangContent />}
-            {activeTab === "outflows" && visibleTabs.some((t) => t.key === "outflows") && <OutflowsContent />}
-            {activeTab === "pedagang" && visibleTabs.some((t) => t.key === "pedagang") && <PriceListPedagangTab />}
-            {activeTab === "kategori" && visibleTabs.some((t) => t.key === "kategori") && <CategoriesContent />}          </>
-        )}
-      </div>
+        </div>
 
-      <style jsx global>{`  
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
-    </DashboardLayout>
-  );
-}
+        {/* ── KONTEN TAB ────────────────────────────────────────── */}
+        <div className="mt-5">
+          {!rolesLoaded ? (
+            <div className="p-8 text-center text-sm text-gray-400">Memuat data...</div>
+          ) : visibleTabs.length === 0 ? (
+            <div className="p-12 text-center bg-white rounded-2xl border border-gray-200 shadow-sm">
+              <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-3 ring-1 ring-rose-100">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-semibold text-gray-900">Akses Dibatasii</h3>
+              <p className="text-xs text-gray-500 mt-1">Anda tidak memiliki akses untuk melihat data di halaman ini.</p>
+            </div>
+          ) : (
+            <>
+              {activeTab === "barang" && visibleTabs.some((t) => t.key === "barang") && <UnifiedBarangContent />}
+              {activeTab === "outflows" && visibleTabs.some((t) => t.key === "outflows") && <OutflowsContent />}
+              {activeTab === "pedagang" && visibleTabs.some((t) => t.key === "pedagang") && <PriceListPedagangTab />}
+              {activeTab === "kategori" && visibleTabs.some((t) => t.key === "kategori") && <CategoriesContent />}          </>
+          )}
+        </div>
+
+        <style jsx global>{`  
+          .scrollbar-hide::-webkit-scrollbar { display: none; }
+          .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
+      </DashboardLayout>
+    );
+  }
