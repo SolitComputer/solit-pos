@@ -50,7 +50,7 @@ function LevelBadge({ level, isPermanent }: { level: number; isPermanent: boolea
 }
 
 
-type SubTab = "absensi" | "kerja" | "pengantaran" | "penyedia" | "sales" | "teknisi" | "konten";
+type SubTab = "absensi" | "kerja" | "pengantaran" | "penyedia" | "sales" | "teknisi" | "konten" | "lemburan" | "pengelolabarang";
 
 function QualityBadgeIcon({ rank }: { rank: number }) {
     const tier: "gold" | "silver" | "bronze" = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
@@ -370,6 +370,379 @@ function KerjaLeaderboard({ isAdmin }: { isAdmin: boolean }) {
                         <div className="px-6 py-3 border-t border-gray-50 flex justify-end">
                             <button onClick={generate} disabled={generating} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-violet-600 transition-all disabled:opacity-50">
                                 <RefreshCw className={`w-3 h-3 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Refresh Skor Bulan Ini"}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+type LemburanRow = {
+    user_id: string;
+    name: string;
+    role: string;
+    total_points: number;
+    total_overtime_minutes: number;
+    rank: number;
+    level: number;
+    isPermanent: boolean;
+    isTemporary: boolean;
+    streakMonths: number;
+};
+
+function formatOvertimeHoursShort(mins: number): string {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m > 0 ? `${h}j ${m}m` : `${h} jam`;
+}
+
+function LemburanLeaderboard({ isAdmin }: { isAdmin: boolean }) {
+    const today = new Date();
+    const [calYear, setCalYear] = useState(today.getFullYear());
+    const [calMonth, setCalMonth] = useState(today.getMonth());
+    const [board, setBoard] = useState<LemburanRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [generating, setGenerating] = useState(false);
+    const [isOngoingMonth, setIsOngoingMonth] = useState(false);
+
+    const load = useCallback(async (y: number, m: number) => {
+        setLoading(true);
+        try {
+            const r = await fetch(`/api/attendance/overtime-points?year=${y}&month=${m + 1}&list=true`);
+            const d = await r.json();
+            if (d.success) { setBoard(d.data || []); setIsOngoingMonth(!!d.isOngoingMonth); }
+        } catch {
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(calYear, calMonth); }, [calYear, calMonth, load]);
+
+    const changeMonth = (delta: number) => {
+        let m = calMonth + delta;
+        let y = calYear;
+        if (m < 0) { m = 11; y -= 1; }
+        if (m > 11) { m = 0; y += 1; }
+        setCalMonth(m);
+        setCalYear(y);
+    };
+
+    const generate = async () => {
+        setGenerating(true);
+        try {
+            const r = await fetch("/api/attendance/overtime-points", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ year: calYear, month: calMonth + 1 }),
+            });
+            const d = await r.json();
+            if (d.success) {
+                await load(calYear, calMonth);
+                // ✅ NEW — kasih tau kalau berhasil generate TAPI hasilnya
+                // 0 orang, supaya jelas ini bukan bug tapi memang belum ada
+                // lembur ter-audit di bulan ini.
+                if ((d.data?.totalRanked ?? 0) === 0) {
+                    alert("Generate berhasil, tapi belum ada lembur ber-status AUDITED di bulan ini — jadi leaderboard-nya masih kosong.");
+                }
+            } else {
+                // ✅ NEW — sebelumnya kegagalan generate (mis. tabel belum
+                // dibuat, atau error Supabase lainnya) ditelan diam-diam
+                // sehingga UI kelihatan "tidak terjadi apa-apa". Sekarang
+                // pesan error asli ditampilkan supaya akar masalahnya kelihatan.
+                alert(d.message || "Gagal generate leaderboard lembur.");
+            }
+        } catch (err: any) {
+            alert(`Gagal generate: ${err?.message ?? "kesalahan jaringan"}`);
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const maxPoints = Math.max(...board.map((u) => u.total_points), 1);
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-orange-50 flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <p className="text-base font-bold text-gray-800">Lencana Lemburan</p>
+                    <p className="text-[11px] text-gray-500 mt-1 max-w-xl">
+                        Poin dihitung dari lembur yang sudah <strong>diaudit</strong>: tiap <strong>2 jam penuh</strong> lembur dalam 1 hari yang sama = <strong>2 poin</strong> (3 jam tetap 2 poin, sisa di bawah 2 jam seperti 1 jam atau 1 jam 30 menit tidak dapat poin). Juara Top 3 setiap bulan naik 1 level (bulan pertama Level 1, bulan kedua Level 2, dst — maksimal Level 10). Level 1-2 masih <strong>sementara</strong>: kalau bulan depan gak lanjut Top 3, levelnya reset. Begitu tembus <strong>Level 3</strong> (3 bulan Top 3 berturut-turut), lencananya jadi <strong>permanen</strong>.
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => changeMonth(-1)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all shadow-sm">
+                        <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <div className="px-4 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl font-bold text-xs min-w-[130px] text-center">
+                        {MONTH_NAMES[calMonth]} {calYear}
+                    </div>
+                    <button onClick={() => changeMonth(1)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all shadow-sm">
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            {!loading && isOngoingMonth && board.length > 0 && (
+                <div className="px-6 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                    <p className="text-[11px] font-semibold text-amber-700">Bulan ini masih berjalan — urutan &amp; level di bawah masih bisa berubah sampai akhir bulan.</p>
+                </div>
+            )}
+
+            {loading ? (
+                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+            ) : board.length === 0 ? (
+                <div className="py-16 text-center px-6">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                        <Trophy className="w-7 h-7 text-gray-300" />
+                    </div>
+                    <p className="text-sm text-gray-400 font-medium">Belum ada leaderboard untuk bulan ini</p>
+                    <p className="text-xs text-gray-300 mt-1 mb-4">Generate dulu snapshot poin lembur bulan ini</p>
+                    {isAdmin && (
+                        <button
+                            onClick={generate}
+                            disabled={generating}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Generate Leaderboard Bulan Ini"}
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-gray-100 bg-gray-50/60">
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-14">Rank</th>
+                                <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Level</th>
+                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Jam Lembur</th>
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[160px]">Poin Lembur</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {board.map((u) => {
+                                const isTop3 = u.rank <= 3;
+                                const tierBg = u.rank === 1 ? "bg-amber-50" : u.rank === 2 ? "bg-gray-50" : u.rank === 3 ? "bg-orange-50/60" : "";
+                                return (
+                                    <tr key={u.user_id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${tierBg}`}>
+                                        <td className="px-6 py-4">
+                                            {isTop3 ? <QualityBadgeIcon rank={u.rank} /> : <span className="text-sm font-bold text-gray-400">{u.rank}</span>}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">{initials(u.name)}</div>
+                                                <div>
+                                                    <span className="font-bold text-gray-800 block">{u.name}</span>
+                                                    <span className="text-[10px] text-gray-400">{(u.role || "").replace(/_/g, " ")}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-4 text-center"><LevelBadge level={u.level} isPermanent={u.isPermanent} /></td>
+                                        <td className="px-4 py-4 text-center text-gray-600 font-semibold">{formatOvertimeHoursShort(u.total_overtime_minutes)}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
+                                                    <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-700" style={{ width: `${Math.max((u.total_points / maxPoints) * 100, 4)}%` }} />
+                                                </div>
+                                                <span className="text-sm font-black w-16 text-right flex-shrink-0 text-orange-600">{u.total_points.toLocaleString()}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    {isAdmin && (
+                        <div className="px-6 py-3 border-t border-gray-50 flex justify-end">
+                            <button onClick={generate} disabled={generating} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-violet-600 transition-all disabled:opacity-50">
+                                <RefreshCw className={`w-3 h-3 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Refresh Poin Bulan Ini"}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+type PengelolaBarangRow = {
+    user_id: string;
+    name: string;
+    role: string;
+    total_points: number;
+    units_added: number;
+    units_solved: number;
+    so_count: number;
+    rank: number;
+    level: number;
+    isPermanent: boolean;
+    isTemporary: boolean;
+    streakMonths: number;
+};
+
+function PengelolaBarangLeaderboard({ isAdmin }: { isAdmin: boolean }) {
+    const today = new Date();
+    const [calYear, setCalYear] = useState(today.getFullYear());
+    const [calMonth, setCalMonth] = useState(today.getMonth());
+    const [board, setBoard] = useState<PengelolaBarangRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [generating, setGenerating] = useState(false);
+    const [isOngoingMonth, setIsOngoingMonth] = useState(false);
+
+    const load = useCallback(async (y: number, m: number) => {
+        setLoading(true);
+        try {
+            const r = await fetch(`/api/laptops/pengelola-points?year=${y}&month=${m + 1}&list=true`);
+            const d = await r.json();
+            if (d.success) { setBoard(d.data || []); setIsOngoingMonth(!!d.isOngoingMonth); }
+        } catch {
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(calYear, calMonth); }, [calYear, calMonth, load]);
+
+    const changeMonth = (delta: number) => {
+        let m = calMonth + delta;
+        let y = calYear;
+        if (m < 0) { m = 11; y -= 1; }
+        if (m > 11) { m = 0; y += 1; }
+        setCalMonth(m);
+        setCalYear(y);
+    };
+
+    const generate = async () => {
+        setGenerating(true);
+        try {
+            const r = await fetch("/api/laptops/pengelola-points", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ year: calYear, month: calMonth + 1 }),
+            });
+            const d = await r.json();
+            if (d.success) {
+                await load(calYear, calMonth);
+                if ((d.data?.totalRanked ?? 0) === 0) {
+                    alert("Generate berhasil, tapi belum ada aktivitas Pengelola Barang di bulan ini — jadi leaderboard-nya masih kosong.");
+                }
+            } else {
+                alert(d.message || "Gagal generate leaderboard Pengelola Barang.");
+            }
+        } catch (err: any) {
+            alert(`Gagal generate: ${err?.message ?? "kesalahan jaringan"}`);
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const maxPoints = Math.max(...board.map((u) => u.total_points), 1);
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-teal-50 to-cyan-50 flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <p className="text-base font-bold text-gray-800">Lencana Pengelola Barang</p>
+                    <p className="text-[11px] text-gray-500 mt-1 max-w-xl">
+                        Poin dihitung dari 3 aktivitas: <strong>tambah unit</strong> barang baru = 1 poin/unit, unit yang berhasil dipindah dari <strong>Minus ke Siap Jual ("Solved")</strong> = 5 poin/unit, dan <strong>SO (Stock Opname)</strong> laptop = 0,3 poin (SO/UNSO berulang di laptop & hari yang sama cuma dihitung 1x). Juara Top 3 setiap bulan naik 1 level (bulan pertama Level 1, bulan kedua Level 2, dst — maksimal Level 10). Level 1-2 masih <strong>sementara</strong>: kalau bulan depan gak lanjut Top 3, levelnya reset. Begitu tembus <strong>Level 3</strong> (3 bulan Top 3 berturut-turut), lencananya jadi <strong>permanen</strong>.
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => changeMonth(-1)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all shadow-sm">
+                        <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <div className="px-4 py-2 bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white rounded-xl font-bold text-xs min-w-[130px] text-center">
+                        {MONTH_NAMES[calMonth]} {calYear}
+                    </div>
+                    <button onClick={() => changeMonth(1)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all shadow-sm">
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            {!loading && isOngoingMonth && board.length > 0 && (
+                <div className="px-6 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                    <p className="text-[11px] font-semibold text-amber-700">Bulan ini masih berjalan — urutan &amp; level di bawah masih bisa berubah sampai akhir bulan.</p>
+                </div>
+            )}
+
+            {loading ? (
+                <div className="p-6 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-14 bg-gray-50 rounded-2xl animate-pulse" />)}</div>
+            ) : board.length === 0 ? (
+                <div className="py-16 text-center px-6">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                        <Trophy className="w-7 h-7 text-gray-300" />
+                    </div>
+                    <p className="text-sm text-gray-400 font-medium">Belum ada leaderboard untuk bulan ini</p>
+                    <p className="text-xs text-gray-300 mt-1 mb-4">Generate dulu snapshot poin Pengelola Barang bulan ini</p>
+                    {isAdmin && (
+                        <button
+                            onClick={generate}
+                            disabled={generating}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Generate Leaderboard Bulan Ini"}
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-gray-100 bg-gray-50/60">
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-14">Rank</th>
+                                <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Level</th>
+                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tambah Unit</th>
+                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Solved</th>
+                                <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">SO</th>
+                                <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[160px]">Skor Pengelola Barang</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {board.map((u) => {
+                                const isTop3 = u.rank <= 3;
+                                const tierBg = u.rank === 1 ? "bg-amber-50" : u.rank === 2 ? "bg-gray-50" : u.rank === 3 ? "bg-orange-50/60" : "";
+                                return (
+                                    <tr key={u.user_id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${tierBg}`}>
+                                        <td className="px-6 py-4">
+                                            {isTop3 ? <QualityBadgeIcon rank={u.rank} /> : <span className="text-sm font-bold text-gray-400">{u.rank}</span>}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] flex items-center justify-center text-white text-[10px] font-black flex-shrink-0">{initials(u.name)}</div>
+                                                <div>
+                                                    <span className="font-bold text-gray-800 block">{u.name}</span>
+                                                    <span className="text-[10px] text-gray-400">{(u.role || "").replace(/_/g, " ")}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-4 text-center"><LevelBadge level={u.level} isPermanent={u.isPermanent} /></td>
+                                        <td className="px-4 py-4 text-center text-gray-600 font-semibold">{u.units_added}</td>
+                                        <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-black border border-emerald-200">{u.units_solved}</span></td>
+                                        <td className="px-4 py-4 text-center text-gray-600 font-semibold">{u.so_count}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden min-w-[100px]">
+                                                    <div className="h-full rounded-full bg-gradient-to-r from-teal-400 to-cyan-500 transition-all duration-700" style={{ width: `${Math.max((u.total_points / maxPoints) * 100, 4)}%` }} />
+                                                </div>
+                                                <span className="text-sm font-black w-16 text-right flex-shrink-0 text-teal-600">{u.total_points.toFixed(1)}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    {isAdmin && (
+                        <div className="px-6 py-3 border-t border-gray-50 flex justify-end">
+                            <button onClick={generate} disabled={generating} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-violet-600 transition-all disabled:opacity-50">
+                                <RefreshCw className={`w-3 h-3 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Refresh Poin Bulan Ini"}
                             </button>
                         </div>
                     )}
@@ -968,6 +1341,18 @@ export default function LencanaPage() {
                     >
                         Konten Kreator
                     </button>
+                    <button
+                        onClick={() => setSubTab("lemburan")}
+                        className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 ${subTab === "lemburan" ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+                    >
+                        Lemburan
+                    </button>
+                    <button
+                        onClick={() => setSubTab("pengelolabarang")}
+                        className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 ${subTab === "pengelolabarang" ? "bg-gradient-to-r from-[#1a1a2e] to-[#16213e] text-white shadow-md" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+                    >
+                        Pengelola Barang
+                    </button>
                 </div>
 
                 {subTab === "absensi" && <AbsensiLeaderboard isAdmin={isAdminUser(currentUser)} />}
@@ -977,6 +1362,8 @@ export default function LencanaPage() {
                 {subTab === "sales" && <SalesLeaderboard />}
                 {subTab === "teknisi" && <TeknisiLeaderboard />}
                 {subTab === "konten" && <KontenKreatorLeaderboard />}
+                {subTab === "lemburan" && <LemburanLeaderboard isAdmin={isAdminUser(currentUser)} />}
+                {subTab === "pengelolabarang" && <PengelolaBarangLeaderboard isAdmin={isAdminUser(currentUser)} />}
             </div>
         </DashboardLayout>
 
