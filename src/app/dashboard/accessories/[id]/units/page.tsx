@@ -6,6 +6,8 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import { getAuthUser } from "@/hooks/useAuthUser";
+import { UserRole, hasAnyRole, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES } from "@/lib/permissions";
 import {
     HardDrive, MemoryStick, Plug, BatteryFull, Keyboard, Monitor,
     Package, CircuitBoard, Cpu, Gamepad2, Fan, Droplet, Cable, Wrench,
@@ -656,8 +658,23 @@ export default function AccessoryUnitsPage() {
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
 
-    // Confirm
+       // Confirm
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
+
+    // ✅ FIX: sebelumnya halaman ini tidak punya pengecekan role sama sekali —
+    // siapapun yang login bisa lihat Harga Modal/Margin dan bisa Tambah/Edit/
+    // Hapus unit. Disamakan dengan pola di halaman Units laptop & UnifiedBarangContent.tsx.
+    const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
+    const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
+
+    useEffect(() => {
+        getAuthUser().then(u => {
+            const roles: string[] = Array.isArray((u as any)?.roles) && (u as any).roles.length > 0
+                ? (u as any).roles : u?.role ? [u.role] : [];
+            setUserRoles(roles as UserRole[]);
+        }).catch(() => setUserRoles([]));
+    }, []);
 
     useEffect(() => { setSelectedIds(new Set()); }, [filterStatus, filterCondition, searchSN]);
 
@@ -879,27 +896,29 @@ export default function AccessoryUnitsPage() {
                                     .filter(Boolean).join(" · ") || "Detail aksesori"}
                             </p>
                         </div>
-                        {/* ── CHANGED: 2 buttons — Tambah Unit + Tambah Banyak ── */}
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={openCreate}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-800 rounded-lg text-sm font-medium text-white hover:bg-gray-900 transition shadow-sm"
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Tambah Unit
-                            </button>
-                            <button
-                                onClick={() => setShowBulkModal(true)}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-600 rounded-lg text-sm font-medium text-white hover:bg-gray-700 transition shadow-sm"
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                Tambah Banyak
-                            </button>
-                        </div>
+                                                {/* ── CHANGED: 2 buttons — Tambah Unit + Tambah Banyak ── */}
+                        {canManageUnits && (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={openCreate}
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-800 rounded-lg text-sm font-medium text-white hover:bg-gray-900 transition shadow-sm"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Tambah Unit
+                                </button>
+                                <button
+                                    onClick={() => setShowBulkModal(true)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-600 rounded-lg text-sm font-medium text-white hover:bg-gray-700 transition shadow-sm"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Tambah Banyak
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Stats Cards */}
@@ -1074,12 +1093,12 @@ export default function AccessoryUnitsPage() {
                                                     )}
                                                 </button>
                                             </th>
-                                            <Th>Serial Number</Th>
+                                                                                       <Th>Serial Number</Th>
                                             <Th>Kondisi</Th>
                                             <Th>Tgl Masuk</Th>
-                                            <Th right>Harga Modal</Th>
+                                            {canSeePrivate && <Th right>Harga Modal</Th>}
                                             <Th right>Harga Jual</Th>
-                                            <Th right>Margin</Th>
+                                            {canSeePrivate && <Th right>Margin</Th>}
                                             <Th>Status</Th>
                                             <Th right>Aksi</Th>
                                         </tr>
@@ -1111,20 +1130,24 @@ export default function AccessoryUnitsPage() {
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
                                                     </td>
-                                                    <td className="px-4 py-3 text-right text-xs text-gray-500 whitespace-nowrap tabular-nums">
-                                                        {unit.buy_price > 0 ? fmt(unit.buy_price) : <span className="text-gray-300">—</span>}
-                                                    </td>
+                                                                                                        {canSeePrivate && (
+                                                        <td className="px-4 py-3 text-right text-xs text-gray-500 whitespace-nowrap tabular-nums">
+                                                            {unit.buy_price > 0 ? fmt(unit.buy_price) : <span className="text-gray-300">—</span>}
+                                                        </td>
+                                                    )}
                                                     <td className="px-4 py-3 text-right font-semibold text-gray-800 whitespace-nowrap tabular-nums">
                                                         {fmt(unit.selling_price)}
                                                     </td>
-                                                    <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
-                                                        {unit.buy_price > 0
-                                                            ? <span className={`text-xs font-semibold ${margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                                                                {margin >= 0 ? "+" : ""}{fmt(Math.abs(margin))}
-                                                            </span>
-                                                            : <span className="text-gray-300 text-xs">—</span>
-                                                        }
-                                                    </td>
+                                                    {canSeePrivate && (
+                                                        <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
+                                                            {unit.buy_price > 0
+                                                                ? <span className={`text-xs font-semibold ${margin >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                                                    {margin >= 0 ? "+" : ""}{fmt(Math.abs(margin))}
+                                                                </span>
+                                                                : <span className="text-gray-300 text-xs">—</span>
+                                                            }
+                                                        </td>
+                                                    )}
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         {s && (
                                                             <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
@@ -1135,13 +1158,13 @@ export default function AccessoryUnitsPage() {
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center justify-end gap-1">
-                                                            {unit.status !== "TERJUAL" && (
+                                                                                                                        {unit.status !== "TERJUAL" && canManageUnits && (
                                                                 <button onClick={() => openEdit(unit)}
                                                                     className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
                                                                     Edit
                                                                 </button>
                                                             )}
-                                                            {unit.status !== "TERJUAL" && (
+                                                            {unit.status !== "TERJUAL" && canManageUnits && (
                                                                 <button onClick={() => handleDelete(unit)}
                                                                     className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50 transition flex items-center justify-center" title="Hapus Unit">
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1255,14 +1278,16 @@ export default function AccessoryUnitsPage() {
                                     )}
                                 </div>
 
-                                {/* Harga */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <PriceInput label="Harga Modal" value={buyInput} onChange={setBuyInput} />
+                                                               {/* Harga */}
+                                <div className={canSeePrivate ? "grid grid-cols-2 gap-3" : ""}>
+                                    {canSeePrivate && (
+                                        <PriceInput label="Harga Modal" value={buyInput} onChange={setBuyInput} />
+                                    )}
                                     <PriceInput label="Harga Jual" value={sellInput} onChange={setSellInput} required />
                                 </div>
 
-                                {/* Margin Preview */}
-                                {buyVal > 0 && sellVal > 0 && (
+                                {/* Margin Preview — hanya role yang boleh lihat Harga Modal */}
+                                {canSeePrivate && buyVal > 0 && sellVal > 0 && (
                                     <div className="bg-gray-50 rounded-xl px-3.5 py-2.5 border border-gray-100">
                                         <div className="flex items-center justify-between">
                                             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Estimasi Margin</span>

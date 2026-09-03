@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth, AuthUser } from "@/lib/auth";
 import { UserRole } from "@/lib/permissions";
 import { recordOutflow } from "@/lib/accessoryOutflow";
+import { recalcAccessoryParentStock } from "@/lib/accessoryStock";
 
 const EDIT_ROLES: UserRole[] = [
     "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
@@ -23,6 +24,12 @@ export const PATCH = withAuth(async (
     catch { return NextResponse.json({ success: false, error: "Body tidak valid" }, { status: 400 }); }
 
     const { serial_number, condition, status, selling_price, buy_price, notes } = body as Record<string, unknown>;
+    // ✅ FIX: field "source" DIHAPUS dari endpoint ini — kolom itu kemungkinan
+    // besar tidak pernah benar-benar ada di tabel accessory_units (tidak
+    // disebut di manapun file-file "asli" kamu), jadi kalau tetap dikirim ke
+    // .update() bisa memicu error Postgres "column does not exist". Kalau
+    // kamu memang sudah menjalankan migration ADD COLUMN source, kabari saya
+    // supaya ditambahkan lagi secara konsisten ke semua endpoint sekaligus.
 
     const updates: Record<string, unknown> = {};
 
@@ -67,6 +74,12 @@ export const PATCH = withAuth(async (
 
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
 
+    // Recalc penuh untuk KEDUA ARAH perubahan status (TERSEDIA→TERJUAL DAN
+    // sebaliknya, mis. dibatalkan/retur) — bukan cuma decrement 1 arah.
+    if (updates.status && oldData && updates.status !== oldData.status && oldData.accessory_id) {
+        await recalcAccessoryParentStock(supabaseAdmin, oldData.accessory_id);
+    }
+
     if (updates.status === "TERJUAL" && oldData && oldData.status !== "TERJUAL") {
         await recordOutflow({
             accessory_id: oldData.accessory_id,
@@ -74,13 +87,8 @@ export const PATCH = withAuth(async (
             source_type: "manual",
             qty: 1,
             notes: "Status diubah menjadi TERJUAL via edit unit",
-            taken_by_role: "PENGELOLA_BARANG", // default assumption for manual edit
+            taken_by_role: "PENGELOLA_BARANG",
             created_by: user.id
-        });
-        
-        await supabaseAdmin.rpc("decrement_accessory_stock", {
-            p_accessory_id: oldData.accessory_id,
-            p_qty: 1
         });
     }
 
@@ -95,7 +103,7 @@ export const DELETE = withAuth(async (
 
     const { data: unit } = await supabaseAdmin
         .from("accessory_units")
-        .select("status")
+        .select("status, accessory_id")
         .eq("id", id)
         .maybeSingle();
 
@@ -112,6 +120,10 @@ export const DELETE = withAuth(async (
         .eq("id", id);
 
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+
+    if (unit?.accessory_id) {
+        await recalcAccessoryParentStock(supabaseAdmin, unit.accessory_id);
+    }
 
     return NextResponse.json({ success: true });
 }, EDIT_ROLES);
