@@ -771,71 +771,135 @@ export default function ProfileView({ userId }: { userId: string }) {
                 />
             )}
 
-            <div className="bg-white rounded-3xl overflow-hidden border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                <div className="relative h-32 sm:h-44 lg:h-56 overflow-hidden"
+            <div className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xl shadow-slate-200/40 relative">
+                {/* ── BANNER HERO ── */}
+                <div className="relative h-36 sm:h-48 lg:h-60 overflow-hidden rounded-t-3xl"
                     style={{
                         background: profile.banner_url
                             ? undefined
-                            : "radial-gradient(140% 100% at 12% -20%, rgba(139,92,246,0.38), transparent 60%), radial-gradient(120% 100% at 100% 0%, rgba(29,185,84,0.20), transparent 55%), radial-gradient(circle at 1px 1px, rgba(255,255,255,0.09) 1px, transparent 0) 0 0/22px 22px, linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)",
+                            : "radial-gradient(140% 100% at 12% -20%, rgba(139,92,246,0.45), transparent 60%), radial-gradient(120% 100% at 100% 0%, rgba(29,185,84,0.25), transparent 55%), radial-gradient(circle at 1px 1px, rgba(255,255,255,0.12) 1px, transparent 0) 0 0/22px 22px, linear-gradient(135deg, #0b0920 0%, #1a1545 100%)",
                     }}>
                     {profile.banner_url && (
                         <img src={profile.banner_url} alt="Banner" className="absolute inset-0 w-full h-full object-cover" />
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-black/0 to-transparent pointer-events-none" />
+                    {/* Gradient overlay for depth & text/control contrast */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none" />
+
+                    {/* Cosmetic Banner Frame (4 sisi lengkap dengan laser beam mengalir + 4 ornamen sudut) */}
                     {profile.equipped_banner && (
-                        <SolitBanner style={profile.equipped_banner.style} thickness={6} openBottom className="absolute inset-0 z-[2] rounded-t-3xl" />
+                        <SolitBanner style={profile.equipped_banner.style} thickness={3} className="absolute inset-0 z-10" />
                     )}
+
+                    {/* Ganti Banner Action Pill (Digeser agar tidak menabrak ornamen sudut kanan-bawah) */}
                     {(isSelf || isAdmin) && (
                         <button onClick={() => bannerInputRef.current?.click()} disabled={uploadingBanner} title="Ganti banner"
-                            className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/30 hover:bg-black/45 backdrop-blur-sm flex items-center justify-center transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
-                            {uploadingBanner ? <Loader2 className="w-3.5 h-3.5 animate-spin text-white" /> : <Camera className="w-3.5 h-3.5 text-white" />}
+                            className="absolute z-20 bottom-3 right-14 sm:bottom-3.5 sm:right-16 h-8 px-3 sm:h-9 sm:px-3.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-semibold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                            {uploadingBanner ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                            <span className="hidden sm:inline text-[11.5px]">Ganti Banner</span>
                         </button>
                     )}
                     <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBannerFileSelected} />
                 </div>
 
-                <div className="px-5 sm:px-7 lg:px-8 pb-6 lg:pb-8">
+                {/* ── CARD CONTENT BODY ── */}
+                <div className="px-5 sm:px-8 pb-7 sm:pb-9 relative z-20">
+                    {/* AVATAR + FLOATING CAPSULE + ACTIONS ROW */}
                     <div className="flex items-end justify-between -mt-14 sm:-mt-16 lg:-mt-20">
-                        <div className="relative">
+                        <div className="relative z-30">
+                            {/* FLOATING SONIC CAPSULE (MUSIC & STATUS NOTE) */}
                             {hasStatusBubble && (
-                                <button onClick={() => setShowInfoPopup(true)}
-                                    className={`absolute left-1/2 -translate-x-1/2 -translate-y-full w-max max-w-[180px] px-3 py-2 rounded-2xl shadow-lg text-center z-30 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
-                                        profile.equipped_border ? "-top-3.5 sm:-top-4" : "-top-2"
+                                <div onClick={() => setShowInfoPopup(true)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setShowInfoPopup(true); }}
+                                    className={`group/capsule absolute left-1/2 -translate-x-1/2 -translate-y-full w-max max-w-[220px] sm:max-w-[270px] p-2 sm:p-2.5 rounded-2xl shadow-2xl z-30 border border-white/20 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
+                                        profile.equipped_border ? "-top-4 sm:-top-5" : "-top-2.5 sm:-top-3"
                                     }`}
-                                    style={{ background: "rgba(15,12,41,0.92)", backdropFilter: "blur(10px)" }}>
+                                    style={{
+                                        background: "linear-gradient(135deg, rgba(15, 12, 41, 0.95) 0%, rgba(26, 21, 69, 0.95) 100%)",
+                                        backdropFilter: "blur(14px)",
+                                        boxShadow: "0 14px 34px -4px rgba(0, 0, 0, 0.45), 0 0 20px -2px rgba(99, 102, 241, 0.25)"
+                                    }}>
+                                    {/* Song section */}
                                     {profile.song_title && (
-                                        <div className="flex items-center justify-center gap-1">
-                                            <Music className="w-3 h-3 flex-shrink-0" style={{ color: "#1db954" }} />
-                                            <p className="text-[11px] font-bold text-white truncate max-w-[150px]">{profile.song_title}</p>
+                                        <div className="flex items-center gap-2">
+                                            {/* Mini artwork / disk */}
+                                            <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-emerald-500/20 flex items-center justify-center border border-white/10"
+                                                style={{ animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none" }}>
+                                                {profile.song_artwork_url ? (
+                                                    <img src={profile.song_artwork_url} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Music className="w-3.5 h-3.5 text-emerald-400" />
+                                                )}
+                                            </div>
+
+                                            {/* Song title & artist */}
+                                            <div className="min-w-0 flex-1 text-left">
+                                                <div className="flex items-center gap-1">
+                                                    <p className="text-[11px] font-bold text-white truncate max-w-[110px] sm:max-w-[140px] leading-tight">
+                                                        {profile.song_title}
+                                                    </p>
+                                                    {playingPreview && (
+                                                        <span className="flex items-end gap-[1.5px] h-3 px-1">
+                                                            <span className="w-[2px] bg-emerald-400 rounded-full animate-[solitSoundWave_0.8s_ease-in-out_infinite]" />
+                                                            <span className="w-[2px] bg-emerald-400 rounded-full animate-[solitSoundWave_0.8s_ease-in-out_0.2s_infinite]" />
+                                                            <span className="w-[2px] bg-emerald-400 rounded-full animate-[solitSoundWave_0.8s_ease-in-out_0.4s_infinite]" />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {profile.song_artist && (
+                                                    <p className="text-[9.5px] text-white/60 truncate max-w-[110px] sm:max-w-[140px] leading-tight">
+                                                        {profile.song_artist}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Quick Play/Pause mini button */}
+                                            {profile.song_preview_url && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); togglePreview(); }}
+                                                    title={playingPreview ? "Pause" : "Putar"}
+                                                    className="w-6 h-6 rounded-full bg-white/15 hover:bg-emerald-500 text-white flex items-center justify-center flex-shrink-0 transition-colors shadow-xs">
+                                                    {playingPreview ? <Pause className="w-2.5 h-2.5" /> : <Play className="w-2.5 h-2.5 ml-0.5" />}
+                                                </button>
+                                            )}
                                         </div>
                                     )}
-                                    {profile.song_artist && <p className="text-[9.5px] truncate" style={{ color: "rgba(255,255,255,0.6)" }}>{profile.song_artist}</p>}
+
+                                    {/* Status note section */}
                                     {profile.status_note && (
-                                        <div className={`flex items-center justify-center gap-1 ${profile.song_title ? "mt-1.5 pt-1.5 border-t border-white/10" : ""}`}>
-                                            <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: "#c4b5fd" }} />
-                                            <p className="text-[10.5px] font-semibold text-white truncate max-w-[150px]">{profile.status_note}</p>
+                                        <div className={`flex items-center gap-1.5 text-left ${profile.song_title ? "mt-1.5 pt-1.5 border-t border-white/10" : ""}`}>
+                                            <MessageCircle className="w-3 h-3 flex-shrink-0 text-violet-300" />
+                                            <p className="text-[10px] font-medium text-violet-100 truncate max-w-[160px] sm:max-w-[200px] leading-tight">
+                                                {profile.status_note}
+                                            </p>
                                         </div>
                                     )}
-                                    <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 rotate-45 border-r border-b border-white/10" style={{ background: "rgba(15,12,41,0.92)" }} />
-                                </button>
+
+                                    {/* Diamond pointer arrow */}
+                                    <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 rotate-45 border-r border-b border-white/20"
+                                        style={{ background: "#1a1545" }} />
+                                </div>
                             )}
 
+                            {/* AVATAR IMAGE & BORDER */}
                             {(() => {
                                 const hasBorder = !!profile.equipped_border;
                                 const avatarContent = (
                                     <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
-                                        className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${
-                                            hasBorder ? "" : "border-4 border-white"
+                                        className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden bg-slate-900 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${
+                                            hasBorder ? "" : "border-4 border-white shadow-md"
                                         } ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
-                                        style={{ background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)", animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none" }}>
+                                        style={{
+                                            background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                                            animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none"
+                                        }}>
                                         {profile.profile_photo_url
                                             ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
                                             : getInitials(profile.name)}
                                     </div>
                                 );
 
-                                // Jika terpasang cosmetic border: jangan tumpuk ring status bubble & border putih,
-                                // biarkan cosmetic border membingkai langsung foto profil secara seamless.
                                 if (hasBorder) {
                                     return (
                                         <SolitBorder style={profile.equipped_border!.style} thickness={4} ornamentSize={30}>
@@ -844,7 +908,6 @@ export default function ProfileView({ userId }: { userId: string }) {
                                     );
                                 }
 
-                                // Jika tanpa cosmetic border: gunakan frame default dengan ring gradien status bubble
                                 return (
                                     <div className="rounded-full p-[3px]"
                                         style={{
@@ -856,12 +919,13 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 );
                             })()}
 
+                            {/* Camera Action Button */}
                             {(isSelf || isAdmin) && (
                                 <button onClick={() => setShowPhotoActions(true)} disabled={uploading} title="Opsi foto profil"
-                                    className={`absolute z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center hover:scale-110 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 ${
-                                        profile.equipped_border ? "-bottom-2 -right-2" : "-bottom-1 -right-1"
+                                    className={`absolute z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-lg border border-slate-200 flex items-center justify-center hover:scale-110 active:scale-95 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 ${
+                                        profile.equipped_border ? "-bottom-1 -right-1 sm:-bottom-1.5 sm:-right-1.5" : "-bottom-0.5 -right-0.5"
                                     }`}>
-                                    {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> : <Camera className="w-3.5 h-3.5 text-slate-600" />}
+                                    {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> : <Camera className="w-3.5 h-3.5 text-slate-700" />}
                                 </button>
                             )}
                             <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileSelected} />
@@ -869,10 +933,11 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 <audio ref={audioRef} src={profile.song_preview_url} onEnded={() => setPlayingPreview(false)} onTimeUpdate={handleMainTimeUpdate} />
                             )}
                         </div>
+
+                        {/* Admin delete photo button (for others) */}
                         {isAdmin && !isSelf && profile.profile_photo_url && (
                             <button onClick={() => setConfirmDelete(true)}
-                                className="mb-1 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
-                                style={{ background: "#fff1f2", color: "#dc2626", border: "1px solid #fecdd3" }}>
+                                className="mb-1 flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 shadow-xs">
                                 <Trash2 className="w-3.5 h-3.5" /> Hapus Foto
                             </button>
                         )}
@@ -882,6 +947,10 @@ export default function ProfileView({ userId }: { userId: string }) {
                         @keyframes solitAvatarSpin {
                             from { transform: rotate(0deg); }
                             to   { transform: rotate(360deg); }
+                        }
+                        @keyframes solitSoundWave {
+                            0%, 100% { height: 3px; }
+                            50%      { height: 12px; }
                         }
                         @keyframes solitShimmerSweep {
                             0%   { transform: translateX(-120%) skewX(-20deg); opacity: 0; }
@@ -894,148 +963,192 @@ export default function ProfileView({ userId }: { userId: string }) {
                         }
                     `}</style>
 
-                    <div className="mt-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5 sm:gap-3">
+                    {/* ── USER IDENTITY & ROLES ROW ── */}
+                    <div className="mt-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                         <div className="min-w-0">
-                            <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900">{profile.name}</h1>
-                            <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-1.5">
+                            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
+                                {profile.name}
+                            </h1>
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2">
                                 {roles.map((r) => (
-                                    <span key={r} className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
-                                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }} />
+                                    <span key={r} className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-slate-100/80 hover:bg-slate-200/80 text-slate-700 border border-slate-200/60 shadow-xs transition-colors">
+                                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }} />
                                         {humanizeRoleKey(r)}
                                     </span>
                                 ))}
                             </div>
                         </div>
-                        {achievements && <AchievementTitles achievements={achievements} qualityRank={qualityRank} kerjaRank={kerjaRank} deliveryBadge={deliveryBadge} providerBadge={providerBadge} salesBadge={salesBadge} teknisiBadge={teknisiBadge} kontenBadge={kontenBadge} lemburanRank={lemburanRank} pengelolaBarangRank={pengelolaBarangRank} />}
+                        {achievements && (
+                            <AchievementTitles
+                                achievements={achievements}
+                                qualityRank={qualityRank}
+                                kerjaRank={kerjaRank}
+                                deliveryBadge={deliveryBadge}
+                                providerBadge={providerBadge}
+                                salesBadge={salesBadge}
+                                teknisiBadge={teknisiBadge}
+                                kontenBadge={kontenBadge}
+                                lemburanRank={lemburanRank}
+                                pengelolaBarangRank={pengelolaBarangRank}
+                            />
+                        )}
                     </div>
 
+                    {/* ── SOLIT COINS SHOWCASE ── */}
                     {isSelf && (
-                        <div className="mt-4">
+                        <div className="mt-5">
                             <SolitCoinsWidget onOpen={() => setShowCoins(true)} />
                         </div>
                     )}
-
                     {isSelf && <SolitCoinsModal open={showCoins} onClose={() => setShowCoins(false)} />}
 
+                    {/* ── STATUS NOTE BAR (Inline Editor & Quick Add) ── */}
                     <div className="mt-3">
                         {editingNote ? (
-                            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs">
                                 <input value={noteDraft} onChange={(e) => setNoteDraft(e.target.value.slice(0, 60))}
                                     placeholder="Tulis catatan singkat... (hilang dalam 24 jam)"
                                     autoFocus
                                     onKeyDown={(e) => { if (e.key === "Enter") handleSaveNote(); if (e.key === "Escape") setEditingNote(false); }}
-                                    className="flex-1 min-w-[140px] h-9 rounded-full px-3.5 text-xs font-medium border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                                    style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#334155" }} />
-                                <span className="text-[9px] text-slate-300 flex-shrink-0">{noteDraft.length}/60</span>
+                                    className="flex-1 min-w-[140px] h-9 rounded-xl px-3.5 text-xs font-medium bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-400/30 text-slate-700 placeholder:text-slate-400" />
+                                <span className="text-[10px] font-semibold text-slate-400 px-1 flex-shrink-0">{noteDraft.length}/60</span>
                                 <button onClick={handleSaveNote} disabled={savingNote}
-                                    className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
+                                    className="h-9 px-3 rounded-xl flex items-center gap-1 font-bold text-xs text-white flex-shrink-0 shadow-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                                     style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
                                     {savingNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                    <span>Simpan</span>
                                 </button>
                                 <button onClick={() => setEditingNote(false)}
-                                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                                    style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                    className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-white hover:bg-slate-100 text-slate-500 border border-slate-200 transition-colors">
                                     <X className="w-3.5 h-3.5" />
                                 </button>
                             </div>
                         ) : isSelf && !profile.status_note ? (
                             <button onClick={() => { setEditingNote(true); setNoteDraft(""); }}
-                                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
-                                style={{ background: "#f8fafc", color: "#94a3b8", border: "1px dashed #cbd5e1" }}>
-                                <MessageCircle className="w-3.5 h-3.5" /> Tulis catatan
+                                className="inline-flex items-center gap-2 text-xs font-semibold px-3.5 py-1.5 rounded-full bg-slate-50 hover:bg-violet-50 text-slate-500 hover:text-violet-600 border border-dashed border-slate-300 hover:border-violet-300 transition-all duration-200">
+                                <MessageCircle className="w-3.5 h-3.5 text-violet-400" /> Tulis catatan 24 jam
                             </button>
                         ) : null}
                     </div>
 
-                    {/* ── Lagu Favorit — hanya tampil kalau BELUM ada lagu; kalau sudah ada, tampil sebagai bubble di atas card ─────── */}
-                    {!profile.song_title && (
-                        <div className="mt-4 rounded-3xl overflow-hidden border border-slate-100">
-                            <div className="h-1" style={{ background: "linear-gradient(90deg, #1db954, #6366f1, #8b5cf6)" }} />
-                            <div className="p-3.5 sm:p-4" style={{ background: "#f8fafc" }}>
-                                <div className="flex items-center gap-1.5 mb-3">
-                                    <Music className="w-4 h-4" style={{ color: "#1db954" }} />
-                                    <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>
-                                        {isSelf ? "Lagu Favorit" : `Lagu Favorit ${profile.name.split(" ")[0]}`}
-                                    </p>
-                                </div>
-
-                                {isSelf ? (
-                                    <SongPickerPanel picker={songPicker} />
-                                ) : (
-                                    <p className="text-xs italic" style={{ color: "#cbd5e1" }}>Belum ada lagu favorit</p>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="mt-4">
-                        {editingBio ? (
-                            <div className="space-y-2">
-                                <textarea value={bioDraft} onChange={(e) => setBioDraft(e.target.value.slice(0, 280))} rows={3}
-                                    placeholder="Tulis bio singkat tentang dirimu..."
-                                    className="w-full rounded-xl px-3.5 py-2.5 text-sm border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                                    style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#334155" }} />
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <span className="text-[10px] text-slate-400">{bioDraft.length}/280</span>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => { setEditingBio(false); setBioDraft(profile.bio ?? ""); }}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300" style={{ background: "#f1f5f9", color: "#64748b" }}>
-                                            <X className="w-3 h-3 inline mr-1" /> Batal
-                                        </button>
-                                        <button onClick={handleSaveBio} disabled={savingBio}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                                            {savingBio ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Simpan
-                                        </button>
+                    {/* ── BENTO CARDS SECTION (TENTANG & KONTRAK) ── */}
+                    <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+                        {/* BENTO CARD 1: TENTANG (BIO) */}
+                        <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-slate-50/80 to-white border border-slate-200/70 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300">
+                            <div>
+                                <div className="flex items-center justify-between gap-2 mb-2.5">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-6 h-6 rounded-lg bg-violet-100 flex items-center justify-center text-violet-600">
+                                            <Pencil className="w-3 h-3" />
+                                        </div>
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tentang</p>
                                     </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="pt-3 border-t border-slate-50">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Tentang</p>
-                                <div className="flex items-start justify-between gap-2">
-                                    <p className="text-sm text-slate-500 leading-relaxed line-clamp-4 break-words" title={profile.bio || undefined}>
-                                        {profile.bio || <span className="italic text-slate-300">Belum ada bio</span>}
-                                    </p>
-                                    {isSelf && (
-                                        <button onClick={() => setEditingBio(true)} className="flex-shrink-0 p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
+                                    {isSelf && !editingBio && (
+                                        <button onClick={() => setEditingBio(true)}
+                                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-violet-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+                                            title="Edit bio">
                                             <Pencil className="w-3.5 h-3.5" />
                                         </button>
                                     )}
                                 </div>
-                                {profile.bio && profile.bio_created_at && (
-                                    <p className="text-[10px] text-slate-300 mt-1">Dibuat pada {formatBioDate(profile.bio_created_at)}</p>
+
+                                {editingBio ? (
+                                    <div className="space-y-2">
+                                        <textarea value={bioDraft} onChange={(e) => setBioDraft(e.target.value.slice(0, 280))} rows={3}
+                                            placeholder="Tulis bio singkat tentang dirimu..."
+                                            className="w-full rounded-xl px-3.5 py-2.5 text-xs font-medium border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/30 text-slate-700" />
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[10px] font-semibold text-slate-400">{bioDraft.length}/280</span>
+                                            <div className="flex gap-1.5">
+                                                <button onClick={() => { setEditingBio(false); setBioDraft(profile.bio ?? ""); }}
+                                                    className="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">
+                                                    Batal
+                                                </button>
+                                                <button onClick={handleSaveBio} disabled={savingBio}
+                                                    className="px-3 py-1 rounded-lg text-xs font-bold text-white flex items-center gap-1 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                                                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                                                    {savingBio ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Simpan
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed break-words whitespace-pre-wrap">
+                                        {profile.bio || <span className="italic text-slate-400">Belum ada bio</span>}
+                                    </p>
                                 )}
+                            </div>
+
+                            {profile.bio && profile.bio_created_at && !editingBio && (
+                                <p className="text-[10px] text-slate-400 mt-3 pt-2.5 border-t border-slate-100">
+                                    Dibuat pada {formatBioDate(profile.bio_created_at)}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* BENTO CARD 2: STATUS KONTRAK KERJA */}
+                        {contractInfo && (isSelf ? contractInfo.status !== "NONE" : true) && (
+                            <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-slate-50/80 to-white border border-slate-200/70 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300">
+                                <div>
+                                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                                <CheckCircle2 className="w-3 h-3" />
+                                            </div>
+                                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                                {isSelf ? "Status Kontrak Kerja" : "Masa Aktif Kontrak"}
+                                            </p>
+                                        </div>
+                                        {contractInfo.id && (
+                                            <button onClick={() => setShowContractModal(true)}
+                                                className="text-xs font-bold text-violet-600 hover:text-violet-700 transition-colors flex items-center gap-0.5">
+                                                Lihat Detail &rarr;
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2 mt-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <ContractBadge status={contractInfo.status} validUntil={contractInfo.valid_until} />
+                                            {contractInfo.status === "APPROVED" && contractInfo.career_level && (
+                                                <CareerLevelBadge level={contractInfo.career_level} />
+                                            )}
+                                        </div>
+                                        {contractInfo.status === "APPROVED" && contractInfo.valid_until && (
+                                            <p className="text-xs font-medium text-slate-500">
+                                                s/d {contractInfo.valid_until}
+                                                {daysUntilDate(contractInfo.valid_until) >= 0 && (
+                                                    <span className="ml-1.5 px-2 py-0.5 rounded-full bg-slate-100 text-[10.5px] font-bold text-slate-600 border border-slate-200/60">
+                                                        {daysUntilDate(contractInfo.valid_until)} hari lagi
+                                                    </span>
+                                                )}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {contractInfo && (isSelf ? contractInfo.status !== "NONE" : true) && (
-                        <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between gap-3 flex-wrap">
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                                    {isSelf ? "Status Kontrak Kerja" : "Masa Aktif Kontrak"}
-                                </p>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <ContractBadge status={contractInfo.status} validUntil={contractInfo.valid_until} />
-                                    {contractInfo.status === "APPROVED" && contractInfo.valid_until && (
-                                        <span className="text-xs text-slate-400">
-                                            s/d {contractInfo.valid_until}
-                                            {daysUntilDate(contractInfo.valid_until) >= 0 && ` · ${daysUntilDate(contractInfo.valid_until)} hari lagi`}
-                                        </span>
-                                    )}
-                                    {contractInfo.status === "APPROVED" && contractInfo.career_level && (
-                                        <CareerLevelBadge level={contractInfo.career_level} />
-                                    )}
+                    {/* BENTO CARD 3: LAGU FAVORIT (Jika belum ada lagu) */}
+                    {!profile.song_title && (
+                        <div className="mt-4 rounded-2xl overflow-hidden border border-emerald-100 bg-gradient-to-r from-emerald-50/60 via-slate-50 to-indigo-50/50 p-4 shadow-xs">
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center text-white shadow-xs">
+                                    <Music className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-800">
+                                        {isSelf ? "Pilih Lagu Favorit Profil" : `Lagu Favorit ${profile.name.split(" ")[0]}`}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500">Lagu akan berputar otomatis saat pengunjung membuka profilmu</p>
                                 </div>
                             </div>
-                            {contractInfo.id && (
-                                <button
-                                    onClick={() => setShowContractModal(true)}
-                                    className="text-xs font-semibold text-violet-500 hover:text-violet-600"
-                                >
-                                    Lihat Detail
-                                </button>
+
+                            {isSelf ? (
+                                <SongPickerPanel picker={songPicker} />
+                            ) : (
+                                <p className="text-xs italic text-slate-400">Belum ada lagu favorit</p>
                             )}
                         </div>
                     )}

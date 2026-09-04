@@ -97,7 +97,7 @@ export default function BannerShop() {
           style={{ background: "linear-gradient(135deg,#334155,#0f172a)" }}
         >
           <span className="text-[11px] text-white/60 font-medium">area foto banner</span>
-          {preview && <SolitBanner style={preview.style} thickness={7} className="absolute inset-0" />}
+          {preview && <SolitBanner style={preview.style} thickness={3.5} className="absolute inset-0" />}
         </div>
         <p className="text-center text-sm font-bold text-slate-700 py-2">
           {preview ? preview.name : "Tanpa Banner"}
@@ -130,7 +130,7 @@ export default function BannerShop() {
                     }`}
                   >
                     <div className="relative h-14" style={{ background: "linear-gradient(135deg,#334155,#0f172a)" }}>
-                      <SolitBanner style={b.style} thickness={5} className="absolute inset-0" />
+                      <SolitBanner style={b.style} thickness={2} compact className="absolute inset-0" />
                     </div>
                     <div className="p-2.5 flex items-center justify-between gap-2">
                       <p className="text-[11px] font-bold text-slate-700 truncate">{b.name}</p>
