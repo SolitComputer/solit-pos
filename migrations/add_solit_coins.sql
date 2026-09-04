@@ -163,14 +163,14 @@ $$;
 -- Seed katalog border. Idempoten via ON CONFLICT (code).
 -- ═══════════════════════════════════════════════════════════════════════════
 INSERT INTO border_catalog (code, name, tier, price_sc, style, is_purchasable, sort_order) VALUES
-  -- Common (gradient statis)
-  ('emerald-minimal',  'Emerald Minimal',   'COMMON',    100, '{"kind":"gradient","colors":["#10b981","#34d399"]}'::jsonb, true, 10),
-  ('royal-blue',       'Royal Blue',        'COMMON',    175, '{"kind":"gradient","colors":["#1d4ed8","#3b82f6"]}'::jsonb, true, 20),
-  ('obsidian-black',   'Obsidian Black',    'COMMON',    250, '{"kind":"gradient","colors":["#0f172a","#334155"]}'::jsonb, true, 30),
-  -- Rare (gradient statis)
-  ('cyber-neon',       'Cyber Neon Cyan',   'RARE',      500, '{"kind":"gradient","colors":["#06b6d4","#22d3ee"]}'::jsonb, true, 40),
-  ('amber-flame',      'Amber Flame',       'RARE',      650, '{"kind":"gradient","colors":["#f59e0b","#f97316"]}'::jsonb, true, 50),
-  ('amethyst-violet',  'Amethyst Violet',   'RARE',      800, '{"kind":"gradient","colors":["#7c3aed","#a855f7"]}'::jsonb, true, 60),
+  -- Common (animasi halus)
+  ('emerald-minimal',  'Emerald Minimal',   'COMMON',    100, '{"kind":"animated","preset":"emerald-minimal"}'::jsonb, true, 10),
+  ('royal-blue',       'Royal Blue',        'COMMON',    175, '{"kind":"animated","preset":"royal-blue"}'::jsonb, true, 20),
+  ('obsidian-black',   'Obsidian Black',    'COMMON',    250, '{"kind":"animated","preset":"obsidian-black"}'::jsonb, true, 30),
+  -- Rare (animasi neon)
+  ('cyber-neon',       'Cyber Neon Cyan',   'RARE',      500, '{"kind":"animated","preset":"cyber-neon"}'::jsonb, true, 40),
+  ('amber-flame',      'Amber Flame',       'RARE',      650, '{"kind":"animated","preset":"amber-flame"}'::jsonb, true, 50),
+  ('amethyst-violet',  'Amethyst Violet',   'RARE',      800, '{"kind":"animated","preset":"amethyst-violet"}'::jsonb, true, 60),
   -- Epic (animasi)
   ('rgb-spin',         'RGB Rainbow Spin',  'EPIC',     1200, '{"kind":"animated","preset":"rgb-spin"}'::jsonb, true, 70),
   ('aurora-wave',      'Aurora Wave',       'EPIC',     1500, '{"kind":"animated","preset":"aurora-wave"}'::jsonb, true, 80),
