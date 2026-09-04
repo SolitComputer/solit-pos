@@ -799,7 +799,9 @@ export default function ProfileView({ userId }: { userId: string }) {
                         <div className="relative">
                             {hasStatusBubble && (
                                 <button onClick={() => setShowInfoPopup(true)}
-                                    className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full w-max max-w-[180px] px-3 py-2 rounded-2xl shadow-lg text-center z-20 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                    className={`absolute left-1/2 -translate-x-1/2 -translate-y-full w-max max-w-[180px] px-3 py-2 rounded-2xl shadow-lg text-center z-30 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+                                        profile.equipped_border ? "-top-3.5 sm:-top-4" : "-top-2"
+                                    }`}
                                     style={{ background: "rgba(15,12,41,0.92)", backdropFilter: "blur(10px)" }}>
                                     {profile.song_title && (
                                         <div className="flex items-center justify-center gap-1">
@@ -819,30 +821,46 @@ export default function ProfileView({ userId }: { userId: string }) {
                             )}
 
                             {(() => {
-                                const avatarInner = (
+                                const hasBorder = !!profile.equipped_border;
+                                const avatarContent = (
+                                    <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
+                                        className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${
+                                            hasBorder ? "" : "border-4 border-white"
+                                        } ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
+                                        style={{ background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)", animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none" }}>
+                                        {profile.profile_photo_url
+                                            ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
+                                            : getInitials(profile.name)}
+                                    </div>
+                                );
+
+                                // Jika terpasang cosmetic border: jangan tumpuk ring status bubble & border putih,
+                                // biarkan cosmetic border membingkai langsung foto profil secara seamless.
+                                if (hasBorder) {
+                                    return (
+                                        <SolitBorder style={profile.equipped_border!.style} thickness={4} ornamentSize={30}>
+                                            {avatarContent}
+                                        </SolitBorder>
+                                    );
+                                }
+
+                                // Jika tanpa cosmetic border: gunakan frame default dengan ring gradien status bubble
+                                return (
                                     <div className="rounded-full p-[3px]"
                                         style={{
                                             background: hasStatusBubble ? "linear-gradient(135deg, #1db954, #6366f1, #8b5cf6)" : "transparent",
                                             boxShadow: hasStatusBubble ? "0 8px 22px -6px rgba(99,102,241,0.45)" : "0 4px 14px rgba(15,12,41,0.10)",
                                         }}>
-                                        <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
-                                            className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
-                                            style={{ background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)", animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none" }}>
-                                            {profile.profile_photo_url
-                                                ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
-                                                : getInitials(profile.name)}
-                                        </div>
+                                        {avatarContent}
                                     </div>
                                 );
-                                // Border Solit Coins ter-equip: tampilkan cincin hanya bila ada border.
-                                return profile.equipped_border
-                                    ? <SolitBorder style={profile.equipped_border.style} thickness={4} ornamentSize={30}>{avatarInner}</SolitBorder>
-                                    : avatarInner;
                             })()}
 
                             {(isSelf || isAdmin) && (
                                 <button onClick={() => setShowPhotoActions(true)} disabled={uploading} title="Opsi foto profil"
-                                    className="absolute -bottom-1 -right-1 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center hover:scale-110 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
+                                    className={`absolute z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center hover:scale-110 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 ${
+                                        profile.equipped_border ? "-bottom-2 -right-2" : "-bottom-1 -right-1"
+                                    }`}>
                                     {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> : <Camera className="w-3.5 h-3.5 text-slate-600" />}
                                 </button>
                             )}

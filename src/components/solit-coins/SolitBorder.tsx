@@ -78,6 +78,24 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
   "cosmic-starfield": (s) => Sparkle(s, "#e0e7ff"),
 };
 
+// Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
+// Rasionya disesuaikan dari ukuran lubang transparan asli tiap PNG (500x500).
+const ASSET_SCALE: Record<string, number> = {
+  "dragon-flame": 1.34,
+  "royal-blue": 1.42,
+  "anniversary-2026": 1.45,
+  "amethyst-violet": 1.48,
+  "amber-flame": 1.50,
+  "emerald-minimal": 1.50,
+  "obsidian-black": 1.50,
+  "cyber-neon": 1.50,
+  "golden-crown": 1.52,
+  "rgb-spin": 1.52,
+  "aurora-wave": 1.52,
+  "cosmic-starfield": 1.50,
+  "galaxy-pulse": 1.50,
+};
+
 function gradientCss(colors: string[]): string {
   const c = colors && colors.length ? colors : ["#6366f1", "#8b5cf6"];
   return `linear-gradient(135deg, ${c.join(", ")})`;
@@ -101,11 +119,485 @@ export function SolitBorder({
   children: React.ReactNode;
 }) {
   const isAnimated = style?.kind === "animated";
+  const asset = style?.kind === "asset" ? style : null;
   const preset = isAnimated ? (style as { preset: string }).preset : null;
   const orn = preset ? ORNAMENTS[preset] : null;
 
+  // Jika tidak ada border sama sekali
+  if (!style) {
+    return (
+      <span className={`sb-ring sb-none ${className}`}>
+        <span className="sb-inner">{children}</span>
+        <style jsx global>{`
+          .sb-ring {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+          }
+          .sb-ring > .sb-inner {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
+            border-radius: 9999px;
+          }
+        `}</style>
+      </span>
+    );
+  }
+
+  // ══ ASSET (PNG frame AI-generated, overlay di atas avatar) ══════
+  if (asset) {
+    const code = asset.ringImage.split("/").pop()?.replace(/\.[^/.]+$/, "") || "";
+    const scale = ASSET_SCALE[code] ?? 1.50;
+    const filterClass = code ? `sb-asset-${code}` : "";
+    const auraClass = code ? `sb-aura-${code}` : "";
+    const sweepClass = code ? `sb-sweep-${code}` : "";
+    const sparkleClass = code ? `sb-sparkle-${code}` : "";
+
+    return (
+      <span className={`sb-ring sb-ring-asset ${className}`}>
+        {/* Layer 1: Atmospheric Ambient Aura (cahaya magis/energi di belakang avatar) */}
+        <span
+          className={`sb-asset-aura ${auraClass}`}
+          style={{ width: `${scale * 102}%`, height: `${scale * 102}%` }}
+          aria-hidden="true"
+        />
+
+        {/* Layer 2: Avatar User */}
+        <span className="sb-inner">{children}</span>
+
+        {/* Layer 3: Frame PNG Ring 3D */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className={`sb-asset-frame ${filterClass}`}
+          style={{ width: `${scale * 100}%`, height: `${scale * 100}%` }}
+          src={asset.ringImage}
+          alt=""
+          aria-hidden="true"
+        />
+
+        {/* Layer 4: Dynamic Specular Shine (sapuan kilap metalik mengikuti kontur frame PNG) */}
+        <span
+          className="sb-asset-shine"
+          style={{
+            width: `${scale * 100}%`,
+            height: `${scale * 100}%`,
+            WebkitMaskImage: `url(${asset.ringImage})`,
+            maskImage: `url(${asset.ringImage})`,
+          }}
+          aria-hidden="true"
+        >
+          <span className={`sb-shine-sweep ${sweepClass}`} />
+        </span>
+
+        {/* Layer 5: Ethereal Sparkle Glints (bintang kelap-kelip tematik di ornamen frame) */}
+        <span
+          className={`sb-asset-sparkles ${sparkleClass}`}
+          style={{ width: `${scale * 100}%`, height: `${scale * 100}%` }}
+          aria-hidden="true"
+        >
+          <span className="sb-sp sb-sp-1">✦</span>
+          <span className="sb-sp sb-sp-2">✦</span>
+        </span>
+
+        {asset.overlayVideo && (
+          <video
+            className="sb-asset-frame sb-asset-video"
+            style={{ width: `${scale * 100}%`, height: `${scale * 100}%` }}
+            src={asset.overlayVideo}
+            autoPlay
+            loop
+            muted
+            playsInline
+            aria-hidden="true"
+          />
+        )}
+        {asset.medallionImage && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="sb-medallion" src={asset.medallionImage} alt="" aria-hidden="true" />
+        )}
+        <style jsx global>{`
+          .sb-ring {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+          }
+          .sb-ring > .sb-inner {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
+            border-radius: 9999px;
+          }
+
+          /* ── 1. ATMOSPHERIC AMBIENT AURA ────────────────────────── */
+          .sb-asset-aura {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 9999px;
+            pointer-events: none;
+            z-index: 0;
+            will-change: transform, opacity;
+          }
+          .sb-aura-cosmic-starfield {
+            background: conic-gradient(from 0deg, rgba(59,130,246,0.4), rgba(147,51,234,0.45), rgba(236,72,153,0.35), rgba(59,130,246,0.4));
+            filter: blur(12px);
+            animation: sb-spin 10s linear infinite, sb-aura-breath 3.5s ease-in-out infinite alternate;
+          }
+          .sb-aura-dragon-flame {
+            background: radial-gradient(circle, rgba(249,115,22,0.55) 25%, rgba(239,68,68,0.3) 55%, transparent 75%);
+            filter: blur(10px);
+            animation: sb-aura-flame 1.8s ease-in-out infinite alternate;
+          }
+          .sb-aura-golden-crown {
+            background: radial-gradient(circle, rgba(251,191,36,0.5) 30%, rgba(217,119,6,0.3) 60%, transparent 75%);
+            filter: blur(11px);
+            animation: sb-aura-gold 2.6s ease-in-out infinite alternate;
+          }
+          .sb-aura-cyber-neon {
+            background: radial-gradient(circle, rgba(34,211,238,0.55) 30%, rgba(6,182,212,0.25) 60%, transparent 75%);
+            filter: blur(10px);
+            animation: sb-aura-neon 2s ease-in-out infinite alternate;
+          }
+          .sb-aura-rgb-spin {
+            background: conic-gradient(from 0deg, #ff0080, #ff8c00, #ffed00, #00ff8c, #00b3ff, #8b5cf6, #ff0080);
+            filter: blur(12px);
+            opacity: 0.65;
+            animation: sb-spin 3.5s linear infinite;
+          }
+          .sb-aura-aurora-wave {
+            background: conic-gradient(from 0deg, rgba(34,211,238,0.45), rgba(52,211,153,0.5), rgba(168,85,247,0.45), rgba(34,211,238,0.45));
+            filter: blur(11px);
+            animation: sb-spin 6s linear infinite, sb-aura-breath 3s ease-in-out infinite alternate;
+          }
+          .sb-aura-galaxy-pulse {
+            background: conic-gradient(from 0deg, rgba(99,102,241,0.45), rgba(236,72,153,0.4), rgba(139,92,246,0.5), rgba(99,102,241,0.4));
+            filter: blur(11px);
+            animation: sb-spin 8s linear infinite, sb-aura-breath 2.8s ease-in-out infinite alternate;
+          }
+          .sb-aura-amber-flame {
+            background: radial-gradient(circle, rgba(245,158,11,0.45) 30%, rgba(234,88,12,0.25) 60%, transparent 75%);
+            filter: blur(10px);
+            animation: sb-aura-flame 2s ease-in-out infinite alternate;
+          }
+          .sb-aura-amethyst-violet {
+            background: radial-gradient(circle, rgba(168,85,247,0.5) 30%, rgba(126,34,206,0.25) 60%, transparent 75%);
+            filter: blur(10px);
+            animation: sb-aura-breath 2.8s ease-in-out infinite alternate;
+          }
+          .sb-aura-emerald-minimal {
+            background: radial-gradient(circle, rgba(16,185,129,0.45) 30%, rgba(5,150,105,0.2) 60%, transparent 75%);
+            filter: blur(9px);
+            animation: sb-aura-breath 3.2s ease-in-out infinite alternate;
+          }
+          .sb-aura-royal-blue {
+            background: radial-gradient(circle, rgba(59,130,246,0.5) 30%, rgba(29,78,216,0.25) 60%, transparent 75%);
+            filter: blur(10px);
+            animation: sb-aura-breath 3s ease-in-out infinite alternate;
+          }
+          .sb-aura-obsidian-black {
+            background: radial-gradient(circle, rgba(148,163,184,0.35) 30%, rgba(30,41,59,0.45) 60%, transparent 75%);
+            filter: blur(9px);
+            animation: sb-aura-breath 3.2s ease-in-out infinite alternate;
+          }
+          .sb-aura-anniversary-2026 {
+            background: conic-gradient(from 0deg, rgba(244,63,94,0.45), rgba(251,191,36,0.5), rgba(168,85,247,0.45), rgba(244,63,94,0.45));
+            filter: blur(11px);
+            animation: sb-spin 6.5s linear infinite;
+          }
+
+          @keyframes sb-aura-breath {
+            0% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.7; }
+            100% { transform: translate(-50%, -50%) scale(1.06); opacity: 1; }
+          }
+          @keyframes sb-aura-flame {
+            0% { transform: translate(-50%, -50%) scale(0.94); opacity: 0.65; }
+            50% { transform: translate(-50%, -52%) scale(1.08); opacity: 1; }
+            100% { transform: translate(-50%, -49%) scale(1.02); opacity: 0.8; }
+          }
+          @keyframes sb-aura-gold {
+            0% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.7; filter: blur(9px); }
+            100% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; filter: blur(13px); }
+          }
+          @keyframes sb-aura-neon {
+            0% { transform: translate(-50%, -50%) scale(0.96); opacity: 0.65; }
+            100% { transform: translate(-50%, -50%) scale(1.07); opacity: 1; }
+          }
+
+          /* ── 2. FRAME PNG OVERLAY ──────────────────────────────── */
+          .sb-asset-frame {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            max-width: none !important;
+            max-height: none !important;
+            object-fit: contain;
+            pointer-events: none;
+            z-index: 10;
+            user-select: none;
+            will-change: transform, filter;
+            animation: sb-frame-breathe 4s ease-in-out infinite alternate;
+          }
+          @keyframes sb-frame-breathe {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            100% { transform: translate(-50%, -50%) scale(1.018); }
+          }
+          .sb-asset-video {
+            z-index: 11;
+            mix-blend-mode: screen;
+          }
+          .sb-ring > .sb-medallion {
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            z-index: 12;
+            width: 34%;
+            line-height: 1;
+            pointer-events: none;
+            transform: translate(-50%, 35%);
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          }
+
+          /* ── 3. METALLIC SPECULAR LIGHT SWEEP ──────────────────── */
+          .sb-asset-shine {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 12;
+            -webkit-mask-size: contain;
+            mask-size: contain;
+            -webkit-mask-position: center;
+            mask-position: center;
+            -webkit-mask-repeat: no-repeat;
+            overflow: hidden;
+            border-radius: 9999px;
+            mix-blend-mode: screen;
+          }
+          .sb-shine-sweep {
+            position: absolute;
+            inset: -60%;
+            border-radius: 9999px;
+            background: conic-gradient(
+              from 0deg,
+              transparent 0deg,
+              transparent 70deg,
+              rgba(255, 255, 255, 0.2) 85deg,
+              rgba(255, 255, 255, 0.85) 90deg,
+              rgba(255, 255, 255, 0.2) 95deg,
+              transparent 110deg,
+              transparent 360deg
+            );
+            animation: sb-spin 4.5s linear infinite;
+          }
+          .sb-sweep-dragon-flame {
+            background: conic-gradient(
+              from 0deg,
+              transparent 0deg,
+              transparent 65deg,
+              rgba(254, 215, 170, 0.25) 80deg,
+              rgba(254, 240, 138, 0.95) 90deg,
+              rgba(251, 146, 60, 0.35) 100deg,
+              transparent 115deg,
+              transparent 360deg
+            );
+            animation: sb-spin 3.2s linear infinite;
+          }
+          .sb-sweep-golden-crown {
+            background: conic-gradient(
+              from 0deg,
+              transparent 0deg,
+              transparent 65deg,
+              rgba(253, 230, 138, 0.3) 80deg,
+              rgba(255, 255, 255, 0.98) 90deg,
+              rgba(251, 191, 36, 0.45) 100deg,
+              transparent 115deg,
+              transparent 360deg
+            );
+            animation: sb-spin 3.8s linear infinite;
+          }
+          .sb-sweep-cyber-neon {
+            background: conic-gradient(
+              from 0deg,
+              transparent 0deg,
+              transparent 65deg,
+              rgba(34, 211, 238, 0.35) 80deg,
+              rgba(255, 255, 255, 0.98) 90deg,
+              rgba(6, 182, 212, 0.45) 100deg,
+              transparent 115deg,
+              transparent 360deg
+            );
+            animation: sb-spin 2.8s linear infinite;
+          }
+          .sb-sweep-rgb-spin {
+            animation: sb-spin 2.2s linear infinite;
+          }
+
+          /* ── 4. ETHEREAL SPARKLE GLINTS ────────────────────────── */
+          .sb-asset-sparkles {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 14;
+          }
+          .sb-sp {
+            position: absolute;
+            font-size: 13px;
+            line-height: 1;
+            color: #fff;
+            user-select: none;
+            filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 8px currentColor);
+            animation: sb-sparkle-twinkle 2.6s ease-in-out infinite;
+          }
+          .sb-sp-1 {
+            top: 4%;
+            right: 12%;
+            animation-delay: 0s;
+          }
+          .sb-sp-2 {
+            bottom: 8%;
+            left: 10%;
+            animation-delay: 1.3s;
+            font-size: 10px;
+          }
+
+          @keyframes sb-sparkle-twinkle {
+            0%, 100% {
+              opacity: 0;
+              transform: scale(0.2) rotate(0deg);
+            }
+            50% {
+              opacity: 1;
+              transform: scale(1.15) rotate(45deg);
+            }
+          }
+
+          .sb-sparkle-cosmic-starfield .sb-sp { color: #a5b4fc; }
+          .sb-sparkle-dragon-flame .sb-sp { color: #fde047; }
+          .sb-sparkle-golden-crown .sb-sp { color: #fef08a; }
+          .sb-sparkle-cyber-neon .sb-sp { color: #67e8f9; }
+          .sb-sparkle-aurora-wave .sb-sp { color: #6ee7b7; }
+          .sb-sparkle-rgb-spin .sb-sp { color: #f472b6; }
+          .sb-sparkle-galaxy-pulse .sb-sp { color: #c084fc; }
+          .sb-sparkle-emerald-minimal .sb-sp { color: #6ee7b7; }
+          .sb-sparkle-amethyst-violet .sb-sp { color: #d8b4fe; }
+          .sb-sparkle-amber-flame .sb-sp { color: #fde68a; }
+          .sb-sparkle-royal-blue .sb-sp { color: #93c5fd; }
+          .sb-sparkle-obsidian-black .sb-sp { color: #e2e8f0; }
+          .sb-sparkle-anniversary-2026 .sb-sp { color: #fbcfe8; }
+
+          /* ── 5. THEMATIC GLOW & DROP-SHADOW ────────────────────── */
+          .sb-asset-emerald-minimal {
+            filter: drop-shadow(0 2px 7px rgba(16, 185, 129, 0.5));
+          }
+          .sb-asset-royal-blue {
+            filter: drop-shadow(0 2px 8px rgba(59, 130, 246, 0.55));
+          }
+          .sb-asset-obsidian-black {
+            filter: drop-shadow(0 2px 8px rgba(15, 23, 42, 0.6));
+          }
+          .sb-asset-cyber-neon {
+            filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.75));
+            animation: sb-asset-neon-glow 2.5s ease-in-out infinite alternate, sb-frame-breathe 4s ease-in-out infinite alternate;
+          }
+          .sb-asset-amber-flame {
+            filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.7));
+            animation: sb-asset-flame-glow 2s ease-in-out infinite alternate, sb-frame-breathe 4s ease-in-out infinite alternate;
+          }
+          .sb-asset-amethyst-violet {
+            filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.7));
+          }
+          .sb-asset-rgb-spin {
+            filter: drop-shadow(0 0 11px rgba(236, 72, 153, 0.65));
+            animation: sb-asset-rgb-glow 4s linear infinite, sb-frame-breathe 4s ease-in-out infinite alternate;
+          }
+          .sb-asset-aurora-wave {
+            filter: drop-shadow(0 0 11px rgba(52, 211, 153, 0.7));
+            animation: sb-asset-aurora 3.5s ease-in-out infinite alternate, sb-frame-breathe 4s ease-in-out infinite alternate;
+          }
+          .sb-asset-galaxy-pulse {
+            filter: drop-shadow(0 0 13px rgba(124, 58, 237, 0.75));
+            animation: sb-asset-pulse 3s ease-in-out infinite alternate, sb-frame-breathe 4s ease-in-out infinite alternate;
+          }
+          .sb-asset-golden-crown {
+            filter: drop-shadow(0 0 13px rgba(245, 158, 11, 0.8));
+            animation: sb-asset-gold-shimmer 3s ease-in-out infinite alternate, sb-frame-breathe 4s ease-in-out infinite alternate;
+          }
+          .sb-asset-dragon-flame {
+            filter: drop-shadow(0 0 13px rgba(239, 68, 68, 0.8));
+            animation: sb-asset-dragon 2s ease-in-out infinite alternate, sb-frame-breathe 4s ease-in-out infinite alternate;
+          }
+          .sb-asset-cosmic-starfield {
+            filter: drop-shadow(0 0 13px rgba(129, 140, 248, 0.8));
+            animation: sb-asset-cosmic 3.5s ease-in-out infinite alternate, sb-frame-breathe 4s ease-in-out infinite alternate;
+          }
+          .sb-asset-anniversary-2026 {
+            filter: drop-shadow(0 0 13px rgba(244, 63, 94, 0.75));
+            animation: sb-asset-anniv 3s ease-in-out infinite alternate, sb-frame-breathe 4s ease-in-out infinite alternate;
+          }
+
+          @keyframes sb-asset-neon-glow {
+            0% { filter: drop-shadow(0 0 7px rgba(34, 211, 238, 0.65)); }
+            100% { filter: drop-shadow(0 0 15px rgba(34, 211, 238, 1)) brightness(1.1); }
+          }
+          @keyframes sb-asset-flame-glow {
+            0% { filter: drop-shadow(0 0 7px rgba(245, 158, 11, 0.65)); }
+            100% { filter: drop-shadow(0 0 16px rgba(249, 115, 22, 0.95)) brightness(1.12); }
+          }
+          @keyframes sb-asset-rgb-glow {
+            0% { filter: drop-shadow(0 0 9px rgba(255, 0, 128, 0.65)) hue-rotate(0deg); }
+            100% { filter: drop-shadow(0 0 9px rgba(255, 0, 128, 0.65)) hue-rotate(360deg); }
+          }
+          @keyframes sb-asset-aurora {
+            0% { filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.65)) hue-rotate(0deg); }
+            100% { filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.85)) hue-rotate(30deg); }
+          }
+          @keyframes sb-asset-pulse {
+            0% { filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.65)) brightness(1); }
+            100% { filter: drop-shadow(0 0 16px rgba(236, 72, 153, 0.9)) brightness(1.18); }
+          }
+          @keyframes sb-asset-gold-shimmer {
+            0% { filter: drop-shadow(0 0 9px rgba(245, 158, 11, 0.7)) brightness(1); }
+            100% { filter: drop-shadow(0 0 18px rgba(253, 230, 138, 1)) brightness(1.18); }
+          }
+          @keyframes sb-asset-dragon {
+            0% { filter: drop-shadow(0 0 9px rgba(239, 68, 68, 0.75)) brightness(1); }
+            100% { filter: drop-shadow(0 0 17px rgba(249, 115, 22, 1)) brightness(1.2); }
+          }
+          @keyframes sb-asset-cosmic {
+            0% { filter: drop-shadow(0 0 8px rgba(129, 140, 248, 0.7)) brightness(1); }
+            100% { filter: drop-shadow(0 0 16px rgba(224, 231, 255, 1)) brightness(1.15); }
+          }
+          @keyframes sb-asset-anniv {
+            0% { filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.65)); }
+            100% { filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.9)) brightness(1.15); }
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .sb-asset-frame,
+            .sb-asset-aura,
+            .sb-shine-sweep,
+            .sb-sp {
+              animation: none !important;
+            }
+          }
+        `}</style>
+      </span>
+    );
+  }
+
+  // ══ ANIMATED & GRADIENT FALLBACK ════════════════════════════════
   const bgStyle: React.CSSProperties =
-    style?.kind === "gradient"
+    style.kind === "gradient"
       ? { background: gradientCss(style.colors) }
       : isAnimated
         ? {}
