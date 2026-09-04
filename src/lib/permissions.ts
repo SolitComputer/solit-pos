@@ -476,9 +476,11 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     ...FULL_ACCESS,
     "KEPALA_SALES",
     "KEPALA_ZENITH",
+    "CREW_SALES",
     "KEPALA_SOTECH",
     "SOTECH",
     "KEPALA_ONPOINT",
+    "ONPOINT",
   ],
 
   "/api/users": [...FULL_ACCESS],
