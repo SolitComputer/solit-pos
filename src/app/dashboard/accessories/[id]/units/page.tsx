@@ -7,12 +7,12 @@ import Link from "next/link";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { getAuthUser } from "@/hooks/useAuthUser";
-import { UserRole, hasAnyRole, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES } from "@/lib/permissions";
+import { UserRole, hasAnyRole, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS } from "@/lib/permissions";
 import {
     HardDrive, MemoryStick, Plug, BatteryFull, Keyboard, Monitor,
     Package, CircuitBoard, Cpu, Gamepad2, Fan, Droplet, Cable, Wrench,
     Hash, Pencil, BarChart3, Download, CheckCircle2, Sparkles, RefreshCw, Lock, Wallet,
-    ListChecks,
+    ListChecks, History,
     type LucideIcon,
 } from "lucide-react";
 
@@ -25,6 +25,8 @@ interface AccessoryUnit {
     status: "TERSEDIA" | "TERJUAL" | "RESERVED";
     buy_price: number;
     selling_price: number;
+    so_at?: string | null;
+    so_by?: string | null;
     notes: string | null;
     created_at: string;
 }
@@ -43,6 +45,12 @@ interface Accessory {
 }
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
+
+// SO dianggap aktif kalau ditandai pada TANGGAL KALENDER yang sama (WIB),
+// bukan hitung mundur 24 jam — persis logika di UnifiedBarangContent.tsx.
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
 
 function fmtInput(val: number): string {
     if (!val) return "";
@@ -973,6 +981,168 @@ function BulkEditSNModal({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// SO HISTORY MODAL — riwayat siapa yang menandai SO untuk 1 unit, kapan
+// (hari/tanggal/jam). Dipakai lewat ikon jam di sebelah badge SO.
+// ═══════════════════════════════════════════════════════════════════════════
+interface SoHistoryEntry {
+    id: string;
+    action: string;
+    so_by: string | null;
+    so_at: string;
+    notes?: string | null;
+}
+
+function SoHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose: () => void }) {
+    const [loading, setLoading] = useState(true);
+    const [history, setHistory] = useState<SoHistoryEntry[]>([]);
+
+    useEffect(() => {
+        if (!unit) return;
+        let alive = true; // guard biar tidak setState setelah modal ditutup
+        setLoading(true);
+        (async () => {
+            try {
+                const res = await fetch(`/api/accessory-units/${unit.id}/so`);
+                const json = await res.json();
+                if (alive && json.success) setHistory(json.data?.history ?? []);
+            } finally {
+                if (alive) setLoading(false);
+            }
+        })();
+        return () => { alive = false; };
+    }, [unit]);
+
+    useEffect(() => {
+        if (!unit) return;
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [unit, onClose]);
+
+    if (!unit) return null;
+    const active = isSoActive(unit.so_at);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center px-0 sm:px-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] sm:mx-4 overflow-hidden">
+                <div className="h-1 w-full bg-gradient-to-r from-gray-400 via-gray-600 to-gray-800 flex-shrink-0" />
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div>
+                        <p className="text-sm font-bold text-gray-900">Riwayat SO</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5 font-mono truncate max-w-[240px]">{unit.serial_number}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
+                        {active ? `Sudah di SO — ${unit.so_by ?? "—"}` : "Belum di SO hari ini"}
+                    </span>
+                    {active && unit.so_at && (
+                        <p className="text-[11px] text-gray-400 mt-1.5">
+                            Terakhir: {new Date(unit.so_at).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB · reset tiap jam 00:00
+                        </p>
+                    )}
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    {loading ? (
+                        <div className="space-y-2">
+                            {[1, 2, 3].map(i => <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />)}
+                        </div>
+                    ) : history.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Belum ada riwayat SO untuk unit ini</p>
+                    ) : (
+                        <ol className="space-y-2">
+                            {history.map(h => (
+                                <li key={h.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0">
+                                        <CheckCircle2 size={16} />
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">Ditandai SO oleh {h.so_by ?? "—"}</p>
+                                        <p className="text-[11px] text-gray-400 mt-0.5">
+                                            {new Date(h.so_at).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB
+                                        </p>
+                                        {h.notes && <p className="text-[11px] text-gray-500 italic mt-1">&quot;{h.notes}&quot;</p>}
+                                    </div>
+                                </li>
+                            ))}
+                        </ol>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SO CONFIRM MODAL — pengganti window.prompt(). Cancel benar-benar membatalkan
+// (tidak memanggil API sama sekali), beda dari bug window.prompt sebelumnya.
+// ═══════════════════════════════════════════════════════════════════════════
+function SoConfirmModal({
+    unit, notes, onNotesChange, onConfirm, onCancel, loading,
+}: {
+    unit: AccessoryUnit; notes: string; onNotesChange: (v: string) => void;
+    onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel, loading]);
+
+    const isActive = isSoActive(unit.so_at);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !loading && onCancel()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+                <div className="h-1 w-full bg-gradient-to-r from-emerald-400 via-emerald-600 to-emerald-800" />
+                <div className="bg-emerald-600 px-5 py-4 flex items-center gap-3">
+                    <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center ring-1 ring-white/20 flex-shrink-0">
+                        <CheckCircle2 size={18} className="text-white" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-bold text-white">{isActive ? "Tandai Ulang SO" : "Tandai Sudah SO"}</p>
+                        <p className="text-[11px] text-white/70 mt-0.5 font-mono truncate max-w-[220px]">{unit.serial_number}</p>
+                    </div>
+                </div>
+                <div className="p-5">
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                        Catatan SO <span className="text-gray-400 font-normal">(opsional)</span>
+                    </label>
+                    <textarea
+                        autoFocus
+                        rows={3}
+                        placeholder="Kondisi barang, lokasi, dll"
+                        value={notes}
+                        onChange={e => onNotesChange(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 focus:bg-white transition resize-none"
+                    />
+                    <div className="flex gap-2 mt-5">
+                        <button onClick={onCancel} disabled={loading}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                            Batal
+                        </button>
+                        <button onClick={onConfirm} disabled={loading}
+                            className="flex-1 h-10 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25">
+                            {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle2 size={15} />}
+                            Konfirmasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════
 export default function AccessoryUnitsPage() {
@@ -1007,6 +1177,10 @@ export default function AccessoryUnitsPage() {
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+    const [soingId, setSoingId] = useState<string | null>(null);
+    const [soHistoryTarget, setSoHistoryTarget] = useState<AccessoryUnit | null>(null);
+    const [soConfirmTarget, setSoConfirmTarget] = useState<AccessoryUnit | null>(null);
+    const [soConfirmNotes, setSoConfirmNotes] = useState("");
 
     // Confirm
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -1015,14 +1189,17 @@ export default function AccessoryUnitsPage() {
     // siapapun yang login bisa lihat Harga Modal/Margin dan bisa Tambah/Edit/
     // Hapus unit. Disamakan dengan pola di halaman Units laptop & UnifiedBarangContent.tsx.
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    const [userId, setUserId] = useState<string | null>(null);
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
+    const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
 
     useEffect(() => {
         getAuthUser().then(u => {
             const roles: string[] = Array.isArray((u as any)?.roles) && (u as any).roles.length > 0
                 ? (u as any).roles : u?.role ? [u.role] : [];
             setUserRoles(roles as UserRole[]);
+            setUserId((u as any)?.id ?? null);
         }).catch(() => setUserRoles([]));
     }, []);
 
@@ -1261,6 +1438,28 @@ export default function AccessoryUnitsPage() {
         });
     };
 
+    // ── SO toggle (per-unit) ────────────────────────────────────────────────
+    // Catatan diambil dari SoConfirmModal (bukan window.prompt lagi) — fungsi
+    // ini HANYA dipanggil setelah user menekan "Konfirmasi" di modal, jadi
+    // tidak ada lagi kasus Cancel yang ketukar jadi OK.
+    const toggleSo = async (unit: AccessoryUnit, note: string) => {
+        if (!canManageSo) return;
+        setSoingId(unit.id);
+        try {
+            const res = await fetch(`/api/accessory-units/${unit.id}/so`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal update SO");
+            setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, so_at: json.data.so_at, so_by: json.data.so_by } : u));
+            toast.success("Status SO diperbarui");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal update SO");
+        } finally {
+            setSoingId(null);
+        }
+    };
+
     const buyVal = parseRupiah(buyInput);
     const sellVal = parseRupiah(sellInput);
     const marginPreview = sellVal - buyVal;
@@ -1273,7 +1472,7 @@ export default function AccessoryUnitsPage() {
 
                     {/* Breadcrumb */}
                     <div className="flex items-center gap-2 text-sm">
-                        <Link href="/dashboard/accessories" className="text-gray-400 hover:text-gray-600 transition">
+                        <Link href="/dashboard/data-barang?tab=barang&tipe=AKSESORIS" className="text-gray-400 hover:text-gray-600 transition">
                             Data Aksesori
                         </Link>
                         <svg className="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1529,6 +1728,7 @@ export default function AccessoryUnitsPage() {
                                             <Th right>Harga Jual</Th>
                                             {canSeePrivate && <Th right>Margin</Th>}
                                             <Th>Status</Th>
+                                            <Th center>SO</Th>
                                             <Th right>Aksi</Th>
                                         </tr>
                                     </thead>
@@ -1582,18 +1782,41 @@ export default function AccessoryUnitsPage() {
                                                             }
                                                         </td>
                                                     )}
-                                                    <td className="px-4 py-3 whitespace-nowrap">
-                                                        {s && (
-                                                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                                                                {s.label}
+                                                                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                {s && (
+                                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                                                        {s.label}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                {unit.status !== "TERJUAL" ? (
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        {canManageSo ? (
+                                                            <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(unit); }} disabled={soingId === unit.id}
+                                                                title={isSoActive(unit.so_at) ? `Di-SO oleh ${unit.so_by ?? "—"} · klik untuk tandai ulang` : "Tandai sudah SO hari ini"}
+                                                                className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
+                                                                {isSoActive(unit.so_at) ? "Sudah di SO" : "Tandai SO"}
+                                                            </button>
+                                                        ) : (
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
+                                                                {isSoActive(unit.so_at) ? "Sudah di SO" : "Belum SO"}
                                                             </span>
                                                         )}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            {unit.status !== "TERJUAL" && canManageUnits && (
-                                                                <button onClick={() => openEdit(unit)}
+                                                        <button onClick={() => setSoHistoryTarget(unit)} title="Riwayat SO"
+                                                            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition flex-shrink-0">
+                                                            <History size={13} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-300 text-xs">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {unit.status !== "TERJUAL" && canManageUnits && (
+                                                        <button onClick={() => openEdit(unit)}
                                                                     className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
                                                                     Edit
                                                                 </button>
@@ -1790,6 +2013,24 @@ export default function AccessoryUnitsPage() {
                     message={confirmModal.message}
                     onConfirm={confirmModal.onConfirm}
                     onCancel={() => setConfirmModal(null)}
+                />
+            )}
+
+            {soHistoryTarget && (
+                <SoHistoryModal unit={soHistoryTarget} onClose={() => setSoHistoryTarget(null)} />
+            )}
+
+            {soConfirmTarget && (
+                <SoConfirmModal
+                    unit={soConfirmTarget}
+                    notes={soConfirmNotes}
+                    onNotesChange={setSoConfirmNotes}
+                    loading={soingId === soConfirmTarget.id}
+                    onCancel={() => { if (soingId !== soConfirmTarget.id) setSoConfirmTarget(null); }}
+                    onConfirm={async () => {
+                        await toggleSo(soConfirmTarget, soConfirmNotes);
+                        setSoConfirmTarget(null);
+                    }}
                 />
             )}
         </DashboardLayout>
