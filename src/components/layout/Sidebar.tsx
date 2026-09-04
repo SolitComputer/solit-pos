@@ -1166,7 +1166,7 @@ function SidebarContent({
                 </div>
               );
               return user?.equipped_border
-                ? <SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2} ornament={false}>{avatar}</SolitBorder>
+                ? <span className="flex-shrink-0 relative flex items-center justify-center my-0.5"><SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2} ornament={false}>{avatar}</SolitBorder></span>
                 : avatar;
             })()}
           </Link>
@@ -1182,7 +1182,7 @@ function SidebarContent({
                   </div>
                 );
                 return user?.equipped_border
-                  ? <SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2} ornament={false}>{avatar}</SolitBorder>
+                  ? <span className="flex-shrink-0 relative flex items-center justify-center mx-0.5"><SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2} ornament={false}>{avatar}</SolitBorder></span>
                   : avatar;
               })()}
               <div className="min-w-0 flex-1">

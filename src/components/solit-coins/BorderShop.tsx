@@ -84,8 +84,12 @@ export default function BorderShop() {
   const preview = borders.find((b) => b.id === previewId) ?? null;
 
   const avatarInner = (
-    <span className="w-24 h-24 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-2xl font-black"
-      style={{ background: me.photo ? undefined : "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+    <span
+      className={`w-24 h-24 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center text-white text-2xl font-black shadow-sm ${
+        preview ? "ring-2 ring-white/50" : "border-4 border-white shadow-md"
+      }`}
+      style={{ background: me.photo ? undefined : "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
+    >
       {me.photo ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={me.photo} alt={me.name} className="w-full h-full object-cover" />
@@ -113,12 +117,24 @@ export default function BorderShop() {
 
       {/* Preview + saldo */}
       <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50 border border-slate-100 flex flex-col items-center gap-3">
-        <SolitBorder style={preview?.style ?? null} thickness={4} ornamentSize={26}>
-          {avatarInner}
-        </SolitBorder>
-        <p className="text-sm font-bold text-slate-700">
-          {preview ? preview.name : "Tanpa Border"}
-        </p>
+        <div className="py-2.5 flex items-center justify-center">
+          <SolitBorder style={preview?.style ?? null} thickness={4} ornamentSize={26}>
+            {avatarInner}
+          </SolitBorder>
+        </div>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-bold text-slate-700">
+            {preview ? preview.name : "Tanpa Border"}
+          </p>
+          {preview && (
+            <button
+              onClick={() => setPreviewId(null)}
+              className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 underline"
+            >
+              Reset
+            </button>
+          )}
+        </div>
         <p className="text-xs text-slate-500">Preview di foto profil kamu</p>
       </div>
 
@@ -144,19 +160,21 @@ export default function BorderShop() {
                     key={b.id}
                     onClick={() => setPreviewId(b.id)}
                     className={`p-3 rounded-2xl bg-white border shadow-sm flex flex-col items-center gap-2 cursor-pointer transition-all ${
-                      previewId === b.id ? "border-indigo-300 ring-2 ring-indigo-100" : "border-slate-100 hover:border-slate-200"
+                      previewId === b.id ? "border-indigo-300 ring-2 ring-indigo-100 shadow-indigo-100/50" : "border-slate-100 hover:border-slate-200"
                     }`}
                   >
-                    <SolitBorder style={b.style} thickness={3} ornamentSize={16}>
-                      <span className="w-12 h-12 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 overflow-hidden">
-                        {me.photo ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={me.photo} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          getInitials(me.name || "?")
-                        )}
-                      </span>
-                    </SolitBorder>
+                    <div className="py-2.5 flex items-center justify-center">
+                      <SolitBorder style={b.style} thickness={3} ornamentSize={16}>
+                        <span className="w-12 h-12 rounded-full ring-1 ring-white/50 bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 overflow-hidden shadow-sm">
+                          {me.photo ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={me.photo} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            getInitials(me.name || "?")
+                          )}
+                        </span>
+                      </SolitBorder>
+                    </div>
                     <p className="text-[11px] font-bold text-slate-700 text-center leading-tight">{b.name}</p>
 
                     {b.equipped ? (

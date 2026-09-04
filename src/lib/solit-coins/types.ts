@@ -17,7 +17,16 @@ export interface QuestState {
 
 export type BorderStyle =
   | { kind: "gradient"; colors: string[] }
-  | { kind: "animated"; preset: string };
+  | { kind: "animated"; preset: string }
+  | {
+      kind: "asset";
+      /** PNG statis 512x512 transparan, ring dasar (dari asset AI-generated). */
+      ringImage: string;
+      /** WebM transparan (particle/glow animasi), opsional — kalau kosong ring statis saja. */
+      overlayVideo?: string;
+      /** Slot logo/medali (khusus border LIMITED/event, mis. anniversary-2026). */
+      medallionImage?: string;
+    };
 
 export type BorderTier = "COMMON" | "RARE" | "EPIC" | "LEGENDARY" | "LIMITED";
 
