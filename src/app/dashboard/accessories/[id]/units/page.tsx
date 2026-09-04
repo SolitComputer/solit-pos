@@ -7,11 +7,12 @@ import Link from "next/link";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { getAuthUser } from "@/hooks/useAuthUser";
-import { UserRole, hasAnyRole, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES } from "@/lib/permissions";
+import { UserRole, hasAnyRole, PERMISSIONS, BARANG_PRIVATE_VIEW_ROLES, SO_ROLES, SO_LIMITED_USER_IDS } from "@/lib/permissions";
 import {
     HardDrive, MemoryStick, Plug, BatteryFull, Keyboard, Monitor,
     Package, CircuitBoard, Cpu, Gamepad2, Fan, Droplet, Cable, Wrench,
     Hash, Pencil, BarChart3, Download, CheckCircle2, Sparkles, RefreshCw, Lock, Wallet,
+    ListChecks, History,
     type LucideIcon,
 } from "lucide-react";
 
@@ -24,6 +25,8 @@ interface AccessoryUnit {
     status: "TERSEDIA" | "TERJUAL" | "RESERVED";
     buy_price: number;
     selling_price: number;
+    so_at?: string | null;
+    so_by?: string | null;
     notes: string | null;
     created_at: string;
 }
@@ -35,11 +38,19 @@ interface Accessory {
     brand: string | null;
     spec: string | null;
     sell_price: number;
+    buy_price?: number; // harga modal di level parent (aksesori lama sebelum ada SN) — dicopy ke unit auto-generate
+    stock?: number;     // stok manual legacy — dipakai untuk auto-migrasi ke unit ber-SN
     notes: string | null;
     created_at: string;
 }
 
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
+
+// SO dianggap aktif kalau ditandai pada TANGGAL KALENDER yang sama (WIB),
+// bukan hitung mundur 24 jam — persis logika di UnifiedBarangContent.tsx.
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+const toWibDateStr = (d: Date) => new Date(d.getTime() + WIB_OFFSET_MS).toISOString().slice(0, 10);
+const isSoActive = (soAt?: string | null) => !!soAt && toWibDateStr(new Date(soAt)) === toWibDateStr(new Date());
 
 function fmtInput(val: number): string {
     if (!val) return "";
@@ -626,6 +637,511 @@ function BulkAddModal({
     );
 }
 
+// Generate daftar SN dari "SN Awal" ke "SN Akhir" — mendukung awalan huruf
+// (mis. "SN-HDD-001" → "SN-HDD-013"), bukan cuma angka polos. Caranya: cari
+// bagian yang SAMA di depan kedua SN (jadi awalan), sisanya (di belakang
+// awalan) harus sama-sama angka murni supaya bisa di-increment berurutan.
+function generateSNRange(from: string, to: string): { list: string[]; error?: string } {
+    const f = from.trim().toUpperCase();
+    const t = to.trim().toUpperCase();
+    if (!f || !t) return { list: [] };
+
+    let prefixLen = 0;
+    while (prefixLen < f.length && prefixLen < t.length && f[prefixLen] === t[prefixLen]) prefixLen++;
+    const fRest = f.slice(prefixLen);
+    const tRest = t.slice(prefixLen);
+
+    if (!/^\d+$/.test(fRest) || !/^\d+$/.test(tRest)) {
+        return { list: [], error: "Bagian SN Awal & SN Akhir yang beda harus berupa angka. Contoh: SN-HDD-001 → SN-HDD-013" };
+    }
+    const fNum = parseInt(fRest, 10);
+    const tNum = parseInt(tRest, 10);
+    if (fNum > tNum) return { list: [], error: "SN Akhir harus lebih besar atau sama dengan SN Awal." };
+
+    const padLen = Math.max(fRest.length, tRest.length);
+    const prefix = f.slice(0, prefixLen);
+    const result: string[] = [];
+    for (let i = fNum; i <= tNum; i++) result.push(`${prefix}${String(i).padStart(padLen, "0")}`);
+    return { list: result };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BULK EDIT SN MODAL — ubah banyak Serial Number sekaligus, tanpa buka form
+// Edit satu-satu. Dipakai terutama untuk unit hasil auto-generate ("ISI-SN-…")
+// yang perlu diisi SN aslinya.
+// ═══════════════════════════════════════════════════════════════════════════
+function BulkEditSNModal({
+    units,
+    onClose,
+    onSuccess,
+}: {
+    units: AccessoryUnit[];
+    onClose: () => void;
+    onSuccess: () => void;
+}) {
+    const [onlyPlaceholder, setOnlyPlaceholder] = useState(true);
+    const activeUnits = units.filter(u => u.status !== "TERJUAL");
+    const visibleUnits = onlyPlaceholder
+        ? activeUnits.filter(u => u.serial_number.startsWith("ISI-SN-"))
+        : activeUnits;
+
+    // Map unit.id -> nilai input SN saat ini (prefill dengan SN yang sudah ada,
+    // termasuk placeholder — user tinggal timpa, bukan mulai dari kosong).
+    const [values, setValues] = useState<Record<string, string>>(() =>
+        Object.fromEntries(visibleUnits.map(u => [u.id, u.serial_number]))
+    );
+    const [pasteText, setPasteText] = useState("");
+    const [mode, setMode] = useState<"range" | "paste">("range");
+    const [rangeFrom, setRangeFrom] = useState("");
+    const [rangeTo, setRangeTo] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    // Kalau toggle "Hanya yang belum diisi" berubah, sinkronkan ulang daftar
+    // input yang tampil (baris yang baru muncul diisi default SN-nya sendiri).
+    useEffect(() => {
+        setValues(prev => {
+            const next: Record<string, string> = {};
+            visibleUnits.forEach(u => { next[u.id] = prev[u.id] ?? u.serial_number; });
+            return next;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [onlyPlaceholder]);
+
+    const setValue = (id: string, v: string) => setValues(prev => ({ ...prev, [id]: v.toUpperCase() }));
+
+    // "Terapkan" — paste banyak SN (satu per baris), dipetakan berurutan
+    // ke baris yang TAMPIL saat ini (urutan sama seperti daftar di bawah).
+    const applyPasteList = () => {
+        const list = pasteText.split(/[\n,；,、]/).map(s => s.trim().toUpperCase()).filter(Boolean);
+        if (list.length === 0) return;
+        setValues(prev => {
+            const next = { ...prev };
+            visibleUnits.forEach((u, i) => {
+                if (list[i] !== undefined) next[u.id] = list[i];
+            });
+            return next;
+        });
+        setError("");
+    };
+
+    // "Range SN" — masukkan SN Awal & SN Akhir (SN utuh, boleh ada awalan
+    // huruf), sistem otomatis generate semua SN di antaranya untuk SEMUA
+    // baris yang tampil, urut sesuai posisi baris di bawah.
+    const applyRange = () => {
+        const { list, error: rangeError } = generateSNRange(rangeFrom, rangeTo);
+        if (rangeError) { setError(rangeError); return; }
+        if (list.length === 0) { setError("Isi SN Awal & SN Akhir terlebih dahulu."); return; }
+        if (list.length !== visibleUnits.length) {
+            setError(`Range ini menghasilkan ${list.length} SN, tapi ada ${visibleUnits.length} baris di bawah. Sesuaikan SN Awal/Akhir dulu.`);
+            return;
+        }
+        setValues(prev => {
+            const next = { ...prev };
+            visibleUnits.forEach((u, i) => { next[u.id] = list[i]; });
+            return next;
+        });
+        setError("");
+    };
+
+    const handleSubmit = async () => {  
+        setError("");
+        // Cuma unit yang nilainya benar-benar berubah yang perlu di-PATCH.
+        const changed = visibleUnits
+            .map(u => ({ unit: u, newSn: (values[u.id] ?? "").trim() }))
+            .filter(({ unit, newSn }) => newSn && newSn !== unit.serial_number);
+
+        if (changed.length === 0) {
+            setError("Belum ada SN yang diubah.");
+            return;
+        }
+        const emptyCount = visibleUnits.filter(u => !(values[u.id] ?? "").trim()).length;
+        if (emptyCount > 0) {
+            setError(`Ada ${emptyCount} SN yang masih kosong — isi dulu, atau matikan filter untuk melewatinya.`);
+            return;
+        }
+        // Cegah duplikat DI DALAM batch yang mau disubmit.
+        const seen = new Set<string>();
+        for (const { newSn } of changed) {
+            if (seen.has(newSn)) {
+                setError(`SN "${newSn}" dipakai lebih dari sekali dalam daftar ini.`);
+                return;
+            }
+            seen.add(newSn);
+        }
+
+        setLoading(true);
+        try {
+            const results = await Promise.all(changed.map(async ({ unit, newSn }) => {
+                try {
+                    const res = await fetch(`/api/accessory-units/${unit.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            serial_number: newSn,
+                            condition: unit.condition,
+                            status: unit.status,
+                            buy_price: unit.buy_price,
+                            selling_price: unit.selling_price,
+                            notes: unit.notes,
+                        }),
+                    });
+                    const json = await res.json().catch(() => null);
+                    return { ok: res.ok && json?.success !== false, sn: newSn, message: json?.error ?? json?.message };
+                } catch {
+                    return { ok: false, sn: newSn, message: "Koneksi gagal" };
+                }
+            }));
+            const failed = results.filter(r => !r.ok);
+            if (failed.length > 0) {
+                toast.error(`${failed.length} dari ${results.length} SN gagal disimpan (mis. ${failed[0].sn}: ${failed[0].message ?? "gagal"})`);
+            } else {
+                toast.success(`${results.length} SN berhasil diperbarui`);
+            }
+            onSuccess();
+            if (failed.length === 0) onClose();
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[88vh] sm:mx-4 overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div>
+                        <h2 className="font-bold text-gray-800 text-base">Edit Banyak SN</h2>
+                        <p className="text-xs text-gray-400 mt-0.5">Ubah beberapa serial number sekaligus, tanpa buka form satu-satu</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="px-5 pt-4 flex-shrink-0">
+                    <label className="inline-flex items-center gap-2 text-xs font-medium text-gray-600">
+                        <input
+                            type="checkbox"
+                            checked={onlyPlaceholder}
+                            onChange={e => setOnlyPlaceholder(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded border-gray-300"
+                        />
+                        Hanya tampilkan yang belum diisi (SN &quot;ISI-SN-...&quot;)
+                    </label>
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4 overscroll-contain">
+                    {visibleUnits.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-6">
+                            {onlyPlaceholder ? "Tidak ada unit dengan SN placeholder." : "Tidak ada unit aktif."}
+                        </p>
+                    ) : (
+                        <>
+                            {/* Cara isi SN: Range SN (default, seperti modal "Tambah Banyak Unit") atau Tempel Daftar Manual */}
+                            <div className="border border-gray-200 rounded-xl overflow-hidden">
+                                <div className="flex border-b border-gray-100">
+                                    <button
+                                        type="button"
+                                        onClick={() => setMode("range")}
+                                        className={`flex-1 py-2 text-xs font-semibold transition ${mode === "range" ? "bg-gray-800 text-white" : "bg-white text-gray-500 hover:bg-gray-50"}`}
+                                    >
+                                        Range SN
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setMode("paste")}
+                                        className={`flex-1 py-2 text-xs font-semibold transition ${mode === "paste" ? "bg-gray-800 text-white" : "bg-white text-gray-500 hover:bg-gray-50"}`}
+                                    >
+                                        Manual
+                                    </button>
+                                </div>
+
+                                {mode === "range" ? (
+                                    <div className="p-3 space-y-3">
+                                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                                            <p className="text-xs text-blue-700">
+                                                Masukkan SN awal dan SN akhir. Sistem akan otomatis generate semua SN di antaranya untuk {visibleUnits.length} baris di bawah.
+                                                Contoh: dari <code className="font-mono bg-blue-100 px-1 rounded">SN-HDD-001</code> ke <code className="font-mono bg-blue-100 px-1 rounded">SN-HDD-013</code> → {visibleUnits.length} unit.
+                                            </p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 mb-1.5">SN Awal</label>
+                                                <input
+                                                    value={rangeFrom}
+                                                    onChange={e => setRangeFrom(e.target.value)}
+                                                    placeholder="SN-HDD-001"
+                                                    className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm font-mono uppercase bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-500 mb-1.5">SN Akhir</label>
+                                                <input
+                                                    value={rangeTo}
+                                                    onChange={e => setRangeTo(e.target.value)}
+                                                    placeholder="SN-HDD-013"
+                                                    className="w-full h-10 border border-gray-200 rounded-xl px-3 text-sm font-mono uppercase bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition"
+                                                />
+                                            </div>
+                                        </div>
+                                        {rangeFrom && rangeTo && (() => {
+                                            const preview = generateSNRange(rangeFrom, rangeTo);
+                                            return preview.error ? (
+                                                <p className="text-xs text-red-500">{preview.error}</p>
+                                            ) : (
+                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                                    <p className="text-xs text-gray-500 mb-1">Total: <span className="font-bold text-gray-800">{preview.list.length} SN</span> (baris di bawah: {visibleUnits.length})</p>
+                                                    <p className="text-xs text-gray-400 font-mono">
+                                                        {preview.list.slice(0, 5).join(", ")}
+                                                        {preview.list.length > 5 && ` … +${preview.list.length - 5} lagi`}
+                                                    </p>
+                                                </div>
+                                            );
+                                        })()}
+                                        <button
+                                            type="button"
+                                            onClick={applyRange}
+                                            className="px-3 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-semibold hover:bg-gray-900 transition"
+                                        >
+                                            Terapkan ke {visibleUnits.length} Baris di Bawah
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="bg-blue-50 p-3 space-y-2">
+                                        <p className="text-xs text-blue-700">
+                                            Tempel daftar SN (satu per baris), sesuai urutan baris di bawah, lalu klik &quot;Terapkan&quot;.
+                                        </p>
+                                        <textarea
+                                            rows={3}
+                                            placeholder={"SN-HDD-001\nSN-HDD-002\nSN-HDD-003"}
+                                            value={pasteText}
+                                            onChange={e => setPasteText(e.target.value)}
+                                            className="w-full border border-blue-200 rounded-lg px-3 py-2 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 transition resize-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={applyPasteList}
+                                            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition"
+                                        >
+                                            Terapkan ke {visibleUnits.length} Baris di Bawah
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Daftar input per unit */}
+                            <div className="space-y-2">
+                                {visibleUnits.map((u, i) => (
+                                    <div key={u.id} className="flex items-center gap-2">
+                                        <span className="w-6 text-right text-[11px] text-gray-300 tabular-nums flex-shrink-0">{i + 1}.</span>
+                                        <input
+                                            value={values[u.id] ?? ""}
+                                            onChange={e => setValue(u.id, e.target.value)}
+                                            className="flex-1 h-9 border border-gray-200 rounded-lg px-3 text-sm font-mono uppercase bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700/20 focus:border-gray-700 focus:bg-white transition"
+                                        />
+                                        {u.serial_number.startsWith("ISI-SN-") && (
+                                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex-shrink-0">Placeholder</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+
+                    {error && (
+                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                            <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <p className="text-xs text-red-700">{error}</p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                    <button onClick={onClose} disabled={loading}
+                        className="flex-1 h-11 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium active:bg-gray-200 transition disabled:opacity-50">
+                        Batal
+                    </button>
+                    <button onClick={handleSubmit} disabled={loading || visibleUnits.length === 0}
+                        className="flex-1 h-11 bg-gray-800 text-white rounded-xl text-sm font-semibold active:bg-gray-900 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-gray-800/20">
+                        {loading ? (
+                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
+                        ) : (
+                            <>Simpan Semua Perubahan</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SO HISTORY MODAL — riwayat siapa yang menandai SO untuk 1 unit, kapan
+// (hari/tanggal/jam). Dipakai lewat ikon jam di sebelah badge SO.
+// ═══════════════════════════════════════════════════════════════════════════
+interface SoHistoryEntry {
+    id: string;
+    action: string;
+    so_by: string | null;
+    so_at: string;
+    notes?: string | null;
+}
+
+function SoHistoryModal({ unit, onClose }: { unit: AccessoryUnit | null; onClose: () => void }) {
+    const [loading, setLoading] = useState(true);
+    const [history, setHistory] = useState<SoHistoryEntry[]>([]);
+
+    useEffect(() => {
+        if (!unit) return;
+        let alive = true; // guard biar tidak setState setelah modal ditutup
+        setLoading(true);
+        (async () => {
+            try {
+                const res = await fetch(`/api/accessory-units/${unit.id}/so`);
+                const json = await res.json();
+                if (alive && json.success) setHistory(json.data?.history ?? []);
+            } finally {
+                if (alive) setLoading(false);
+            }
+        })();
+        return () => { alive = false; };
+    }, [unit]);
+
+    useEffect(() => {
+        if (!unit) return;
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [unit, onClose]);
+
+    if (!unit) return null;
+    const active = isSoActive(unit.so_at);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center px-0 sm:px-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85dvh] sm:mx-4 overflow-hidden">
+                <div className="h-1 w-full bg-gradient-to-r from-gray-400 via-gray-600 to-gray-800 flex-shrink-0" />
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div>
+                        <p className="text-sm font-bold text-gray-900">Riwayat SO</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5 font-mono truncate max-w-[240px]">{unit.serial_number}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${active ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
+                        {active ? `Sudah di SO — ${unit.so_by ?? "—"}` : "Belum di SO hari ini"}
+                    </span>
+                    {active && unit.so_at && (
+                        <p className="text-[11px] text-gray-400 mt-1.5">
+                            Terakhir: {new Date(unit.so_at).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB · reset tiap jam 00:00
+                        </p>
+                    )}
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-5 py-4">
+                    {loading ? (
+                        <div className="space-y-2">
+                            {[1, 2, 3].map(i => <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />)}
+                        </div>
+                    ) : history.length === 0 ? (
+                        <p className="text-sm text-gray-400 text-center py-8">Belum ada riwayat SO untuk unit ini</p>
+                    ) : (
+                        <ol className="space-y-2">
+                            {history.map(h => (
+                                <li key={h.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0">
+                                        <CheckCircle2 size={16} />
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800">Ditandai SO oleh {h.so_by ?? "—"}</p>
+                                        <p className="text-[11px] text-gray-400 mt-0.5">
+                                            {new Date(h.so_at).toLocaleString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB
+                                        </p>
+                                        {h.notes && <p className="text-[11px] text-gray-500 italic mt-1">&quot;{h.notes}&quot;</p>}
+                                    </div>
+                                </li>
+                            ))}
+                        </ol>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SO CONFIRM MODAL — pengganti window.prompt(). Cancel benar-benar membatalkan
+// (tidak memanggil API sama sekali), beda dari bug window.prompt sebelumnya.
+// ═══════════════════════════════════════════════════════════════════════════
+function SoConfirmModal({
+    unit, notes, onNotesChange, onConfirm, onCancel, loading,
+}: {
+    unit: AccessoryUnit; notes: string; onNotesChange: (v: string) => void;
+    onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel, loading]);
+
+    const isActive = isSoActive(unit.so_at);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !loading && onCancel()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+                <div className="h-1 w-full bg-gradient-to-r from-emerald-400 via-emerald-600 to-emerald-800" />
+                <div className="bg-emerald-600 px-5 py-4 flex items-center gap-3">
+                    <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center ring-1 ring-white/20 flex-shrink-0">
+                        <CheckCircle2 size={18} className="text-white" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-bold text-white">{isActive ? "Tandai Ulang SO" : "Tandai Sudah SO"}</p>
+                        <p className="text-[11px] text-white/70 mt-0.5 font-mono truncate max-w-[220px]">{unit.serial_number}</p>
+                    </div>
+                </div>
+                <div className="p-5">
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                        Catatan SO <span className="text-gray-400 font-normal">(opsional)</span>
+                    </label>
+                    <textarea
+                        autoFocus
+                        rows={3}
+                        placeholder="Kondisi barang, lokasi, dll"
+                        value={notes}
+                        onChange={e => onNotesChange(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 focus:bg-white transition resize-none"
+                    />
+                    <div className="flex gap-2 mt-5">
+                        <button onClick={onCancel} disabled={loading}
+                            className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">
+                            Batal
+                        </button>
+                        <button onClick={onConfirm} disabled={loading}
+                            className="flex-1 h-10 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25">
+                            {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <CheckCircle2 size={15} />}
+                            Konfirmasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════
@@ -636,6 +1152,9 @@ export default function AccessoryUnitsPage() {
     const [accessory, setAccessory] = useState<Accessory | null>(null);
     const [units, setUnits] = useState<AccessoryUnit[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [autoGenerating, setAutoGenerating] = useState(false);
+    const [autoGenFailed, setAutoGenFailed] = useState(false);
+    const autoGenAttempted = useRef(false); // guard biar auto-migrasi cuma jalan 1x per buka halaman
 
     // Form
     const [showForm, setShowForm] = useState(false);
@@ -657,22 +1176,30 @@ export default function AccessoryUnitsPage() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
+    const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+    const [soingId, setSoingId] = useState<string | null>(null);
+    const [soHistoryTarget, setSoHistoryTarget] = useState<AccessoryUnit | null>(null);
+    const [soConfirmTarget, setSoConfirmTarget] = useState<AccessoryUnit | null>(null);
+    const [soConfirmNotes, setSoConfirmNotes] = useState("");
 
-       // Confirm
+    // Confirm
     const [confirmModal, setConfirmModal] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
     // ✅ FIX: sebelumnya halaman ini tidak punya pengecekan role sama sekali —
     // siapapun yang login bisa lihat Harga Modal/Margin dan bisa Tambah/Edit/
     // Hapus unit. Disamakan dengan pola di halaman Units laptop & UnifiedBarangContent.tsx.
     const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+    const [userId, setUserId] = useState<string | null>(null);
     const canManageUnits = hasAnyRole(userRoles, PERMISSIONS.EDIT_UNITS);
     const canSeePrivate = hasAnyRole(userRoles, BARANG_PRIVATE_VIEW_ROLES);
+    const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
 
     useEffect(() => {
         getAuthUser().then(u => {
             const roles: string[] = Array.isArray((u as any)?.roles) && (u as any).roles.length > 0
                 ? (u as any).roles : u?.role ? [u.role] : [];
             setUserRoles(roles as UserRole[]);
+            setUserId((u as any)?.id ?? null);
         }).catch(() => setUserRoles([]));
     }, []);
 
@@ -700,6 +1227,58 @@ export default function AccessoryUnitsPage() {
     }, [accessoryId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+
+    //  Auto-migrasi stok lama → unit ber-SN. Kalau aksesori ini masih pakai
+    //  kolom stock manual (belum ada SN sama sekali) dan yang buka halaman ini
+    //  boleh kelola unit, generate otomatis N unit (N = stock lama) dengan SN
+    //  placeholder "ISI-SN-...". User tinggal klik Edit per baris buat ganti
+    //  SN placeholder itu dengan SN asli — nama/harga TIDAK perlu diisi ulang
+    //  karena sudah dicopy dari data aksesori induk.
+    const autoGenerateUnitsFromLegacyStock = async (count: number) => {
+        if (count <= 0) return;
+        setAutoGenerating(true);
+        setAutoGenFailed(false);
+        try {
+            const stamp = Date.now().toString().slice(-6); // biar SN placeholder unik antar percobaan
+            const unitsToCreate = Array.from({ length: count }, (_, i) => ({
+                serial_number: `ISI-SN-${stamp}-${i + 1}`,
+                condition: "BARU" as const,
+                status: "TERSEDIA" as const,
+                buy_price: accessory?.buy_price ?? 0,
+                selling_price: accessory?.sell_price ?? 0,
+                notes: "",
+            }));
+            const res = await fetch(`/api/accessory-units/bulk`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ accessory_id: accessoryId, units: unitsToCreate }),
+            });
+            const json = await res.json();
+            if (!json.success) {
+                setAutoGenFailed(true);
+                toast.error(json.message || "Gagal migrasi otomatis stok lama");
+                return;
+            }
+            toast.success(`${json.count} unit otomatis dibuat dari stok lama — klik "Edit" tiap unit untuk isi SN aslinya`);
+            fetchData();
+        } catch {
+            setAutoGenFailed(true);
+            toast.error("Gagal migrasi otomatis stok lama");
+        } finally {
+            setAutoGenerating(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isLoading) return;                       // tunggu fetch awal selesai
+        if (autoGenAttempted.current) return;         // jangan retry otomatis berulang (mis. React StrictMode double-effect)
+        if (units.length > 0) return;                 // sudah ada unit → tidak perlu migrasi
+        if (!canManageUnits) return;                  // role view-only tidak boleh trigger write
+        const legacyStock = accessory?.stock ?? 0;
+        if (legacyStock <= 0) return;                 // memang belum ada stok sama sekali, bukan kasus migrasi
+        autoGenAttempted.current = true;
+        autoGenerateUnitsFromLegacyStock(legacyStock);
+    }, [isLoading, units, accessory, canManageUnits]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fmtDate = (iso: string) => {
         if (!iso) return "—";
@@ -859,6 +1438,28 @@ export default function AccessoryUnitsPage() {
         });
     };
 
+    // ── SO toggle (per-unit) ────────────────────────────────────────────────
+    // Catatan diambil dari SoConfirmModal (bukan window.prompt lagi) — fungsi
+    // ini HANYA dipanggil setelah user menekan "Konfirmasi" di modal, jadi
+    // tidak ada lagi kasus Cancel yang ketukar jadi OK.
+    const toggleSo = async (unit: AccessoryUnit, note: string) => {
+        if (!canManageSo) return;
+        setSoingId(unit.id);
+        try {
+            const res = await fetch(`/api/accessory-units/${unit.id}/so`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.message || "Gagal update SO");
+            setUnits(prev => prev.map(u => u.id === unit.id ? { ...u, so_at: json.data.so_at, so_by: json.data.so_by } : u));
+            toast.success("Status SO diperbarui");
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Gagal update SO");
+        } finally {
+            setSoingId(null);
+        }
+    };
+
     const buyVal = parseRupiah(buyInput);
     const sellVal = parseRupiah(sellInput);
     const marginPreview = sellVal - buyVal;
@@ -871,7 +1472,7 @@ export default function AccessoryUnitsPage() {
 
                     {/* Breadcrumb */}
                     <div className="flex items-center gap-2 text-sm">
-                        <Link href="/dashboard/accessories" className="text-gray-400 hover:text-gray-600 transition">
+                        <Link href="/dashboard/data-barang?tab=barang&tipe=AKSESORIS" className="text-gray-400 hover:text-gray-600 transition">
                             Data Aksesori
                         </Link>
                         <svg className="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -896,7 +1497,7 @@ export default function AccessoryUnitsPage() {
                                     .filter(Boolean).join(" · ") || "Detail aksesori"}
                             </p>
                         </div>
-                                                {/* ── CHANGED: 2 buttons — Tambah Unit + Tambah Banyak ── */}
+                        {/* ── CHANGED: 2 buttons — Tambah Unit + Tambah Banyak ── */}
                         {canManageUnits && (
                             <div className="flex items-center gap-2">
                                 <button
@@ -917,6 +1518,15 @@ export default function AccessoryUnitsPage() {
                                     </svg>
                                     Tambah Banyak
                                 </button>
+                                {units.some(u => u.serial_number.startsWith("ISI-SN-")) && (
+                                    <button
+                                        onClick={() => setShowBulkEditModal(true)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 rounded-lg text-sm font-medium text-white hover:bg-amber-600 transition shadow-sm"
+                                    >
+                                        <ListChecks size={14} />
+                                        Edit Banyak SN
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1059,18 +1669,36 @@ export default function AccessoryUnitsPage() {
                         </div>
                     )}
 
-                    {/* Table */}
-                    {isLoading ? (
+                                       {/* Table */}
+                    {isLoading || autoGenerating ? (
                         <SkeletonUnits />
                     ) : filteredUnits.length === 0 ? (
                         <div className="bg-white rounded-xl border border-gray-100 shadow-sm py-12 text-center">
                             <div className="mb-2 opacity-50 flex justify-center"><Package size={30} className="text-gray-400" /></div>
                             <p className="text-gray-500 text-sm font-medium">Tidak ada unit ditemukan</p>
-                            <p className="text-gray-400 text-xs mt-1">
-                                {hasActiveFilter || filterStatus !== "ALL" || filterCondition !== "ALL"
-                                    ? "Coba ubah filter pencarian"
-                                    : "Klik 'Tambah Unit' untuk mendaftarkan SN"}
-                            </p>
+                            {hasActiveFilter || filterStatus !== "ALL" || filterCondition !== "ALL" ? (
+                                <p className="text-gray-400 text-xs mt-1">Coba ubah filter pencarian</p>
+                            ) : units.length === 0 && (accessory?.stock ?? 0) > 0 && autoGenFailed ? (
+                                <>
+                                    <p className="text-amber-600 text-xs mt-1.5 max-w-sm mx-auto leading-relaxed">
+                                        Gagal membuat otomatis {accessory?.stock} unit dari stok lama.
+                                    </p>
+                                    {canManageUnits && (
+                                        <button
+                                            onClick={() => { autoGenAttempted.current = false; autoGenerateUnitsFromLegacyStock(accessory?.stock ?? 0); }}
+                                            className="mt-3 px-4 py-1.5 bg-gray-800 text-white rounded-lg text-xs font-medium hover:bg-gray-900 transition"
+                                        >
+                                            Coba Lagi
+                                        </button>
+                                    )}
+                                </>
+                            ) : units.length === 0 && (accessory?.stock ?? 0) > 0 && !canManageUnits ? (
+                                <p className="text-gray-400 text-xs mt-1 max-w-sm mx-auto leading-relaxed">
+                                    Aksesori ini masih pakai stok manual ({accessory?.stock} unit), belum dikonversi ke SN. Hubungi staff yang berwenang.
+                                </p>
+                            ) : (
+                                <p className="text-gray-400 text-xs mt-1">Klik &apos;Tambah Unit&apos; untuk mendaftarkan SN</p>
+                            )}
                             {(hasActiveFilter || filterStatus !== "ALL" || filterCondition !== "ALL") && (
                                 <button onClick={resetFilters} className="mt-3 px-4 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition">
                                     Reset semua filter
@@ -1093,13 +1721,14 @@ export default function AccessoryUnitsPage() {
                                                     )}
                                                 </button>
                                             </th>
-                                                                                       <Th>Serial Number</Th>
+                                            <Th>Serial Number</Th>
                                             <Th>Kondisi</Th>
                                             <Th>Tgl Masuk</Th>
                                             {canSeePrivate && <Th right>Harga Modal</Th>}
                                             <Th right>Harga Jual</Th>
                                             {canSeePrivate && <Th right>Margin</Th>}
                                             <Th>Status</Th>
+                                            <Th center>SO</Th>
                                             <Th right>Aksi</Th>
                                         </tr>
                                     </thead>
@@ -1122,7 +1751,12 @@ export default function AccessoryUnitsPage() {
                                                         </button>
                                                     </td>
                                                     <td className="px-4 py-3">
-                                                        <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">{unit.serial_number}</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">{unit.serial_number}</span>
+                                                            {unit.serial_number.startsWith("ISI-SN-") && (
+                                                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Isi SN</span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         {c && <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${c.badge}`}>{c.label}</span>}
@@ -1130,7 +1764,7 @@ export default function AccessoryUnitsPage() {
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         <span className="text-xs text-gray-500">{fmtDate(unit.created_at)}</span>
                                                     </td>
-                                                                                                        {canSeePrivate && (
+                                                    {canSeePrivate && (
                                                         <td className="px-4 py-3 text-right text-xs text-gray-500 whitespace-nowrap tabular-nums">
                                                             {unit.buy_price > 0 ? fmt(unit.buy_price) : <span className="text-gray-300">—</span>}
                                                         </td>
@@ -1148,18 +1782,41 @@ export default function AccessoryUnitsPage() {
                                                             }
                                                         </td>
                                                     )}
-                                                    <td className="px-4 py-3 whitespace-nowrap">
-                                                        {s && (
-                                                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                                                                {s.label}
+                                                                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                {s && (
+                                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${s.badge}`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                                                        {s.label}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                {unit.status !== "TERJUAL" ? (
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        {canManageSo ? (
+                                                            <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(unit); }} disabled={soingId === unit.id}
+                                                                title={isSoActive(unit.so_at) ? `Di-SO oleh ${unit.so_by ?? "—"} · klik untuk tandai ulang` : "Tandai sudah SO hari ini"}
+                                                                className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
+                                                                {isSoActive(unit.so_at) ? "Sudah di SO" : "Tandai SO"}
+                                                            </button>
+                                                        ) : (
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${isSoActive(unit.so_at) ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
+                                                                {isSoActive(unit.so_at) ? "Sudah di SO" : "Belum SO"}
                                                             </span>
                                                         )}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <div className="flex items-center justify-end gap-1">
-                                                                                                                        {unit.status !== "TERJUAL" && canManageUnits && (
-                                                                <button onClick={() => openEdit(unit)}
+                                                        <button onClick={() => setSoHistoryTarget(unit)} title="Riwayat SO"
+                                                            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition flex-shrink-0">
+                                                            <History size={13} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-300 text-xs">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {unit.status !== "TERJUAL" && canManageUnits && (
+                                                        <button onClick={() => openEdit(unit)}
                                                                     className="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
                                                                     Edit
                                                                 </button>
@@ -1199,7 +1856,6 @@ export default function AccessoryUnitsPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeForm} />
                     <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-                        {/* Header */}
                         <div className="h-0.5 w-full bg-gradient-to-r from-gray-300 via-gray-700 to-gray-900 flex-shrink-0" />
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
                             <div>
@@ -1217,8 +1873,6 @@ export default function AccessoryUnitsPage() {
 
                         <div className="overflow-y-auto flex-1 px-6 py-5">
                             <form onSubmit={handleSubmit} className="space-y-4">
-
-                                {/* Serial Number */}
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">
                                         Serial Number <span className="text-red-400">*</span>
@@ -1232,7 +1886,6 @@ export default function AccessoryUnitsPage() {
                                     />
                                 </div>
 
-                                {/* Kondisi */}
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Kondisi</label>
                                     <div className="grid grid-cols-2 gap-2">
@@ -1246,7 +1899,6 @@ export default function AccessoryUnitsPage() {
                                     </div>
                                 </div>
 
-                                {/* Status (edit only untuk TERSEDIA/RESERVED) */}
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Status</label>
                                     {formData.status === "TERJUAL" ? (
@@ -1278,7 +1930,6 @@ export default function AccessoryUnitsPage() {
                                     )}
                                 </div>
 
-                                                               {/* Harga */}
                                 <div className={canSeePrivate ? "grid grid-cols-2 gap-3" : ""}>
                                     {canSeePrivate && (
                                         <PriceInput label="Harga Modal" value={buyInput} onChange={setBuyInput} />
@@ -1286,7 +1937,6 @@ export default function AccessoryUnitsPage() {
                                     <PriceInput label="Harga Jual" value={sellInput} onChange={setSellInput} required />
                                 </div>
 
-                                {/* Margin Preview — hanya role yang boleh lihat Harga Modal */}
                                 {canSeePrivate && buyVal > 0 && sellVal > 0 && (
                                     <div className="bg-gray-50 rounded-xl px-3.5 py-2.5 border border-gray-100">
                                         <div className="flex items-center justify-between">
@@ -1305,7 +1955,6 @@ export default function AccessoryUnitsPage() {
                                     </div>
                                 )}
 
-                                {/* Notes */}
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1.5">
                                         Catatan <span className="text-gray-400 font-normal">(opsional)</span>
@@ -1350,11 +1999,38 @@ export default function AccessoryUnitsPage() {
                 />
             )}
 
+            {/* ── Bulk Edit SN Modal ── */}
+            {showBulkEditModal && (
+                <BulkEditSNModal
+                    units={units}
+                    onClose={() => setShowBulkEditModal(false)}
+                    onSuccess={fetchData}
+                />
+            )}
+
             {confirmModal && (
                 <ConfirmModal
                     message={confirmModal.message}
                     onConfirm={confirmModal.onConfirm}
                     onCancel={() => setConfirmModal(null)}
+                />
+            )}
+
+            {soHistoryTarget && (
+                <SoHistoryModal unit={soHistoryTarget} onClose={() => setSoHistoryTarget(null)} />
+            )}
+
+            {soConfirmTarget && (
+                <SoConfirmModal
+                    unit={soConfirmTarget}
+                    notes={soConfirmNotes}
+                    onNotesChange={setSoConfirmNotes}
+                    loading={soingId === soConfirmTarget.id}
+                    onCancel={() => { if (soingId !== soConfirmTarget.id) setSoConfirmTarget(null); }}
+                    onConfirm={async () => {
+                        await toggleSo(soConfirmTarget, soConfirmNotes);
+                        setSoConfirmTarget(null);
+                    }}
                 />
             )}
         </DashboardLayout>

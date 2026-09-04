@@ -47,8 +47,9 @@ interface JournalEntry {
     source_type: "TRANSACTION" | "SERVICE" | "CASHFLOW" | "MANUAL";
     source_id: string | null;
     total: number;
-    is_edited: boolean;
+      is_edited: boolean;
     sync_available?: boolean;
+    sync_preview?: { keterangan: string; lines: SyncSnapshotLine[] } | null; // ⬅️ BARU: draft hasil sync, buat preview before/after
     lines: JournalLine[];
     created_by_user?: { id: string; name: string } | null;
     updated_by_user?: { id: string; name: string } | null;
@@ -134,9 +135,30 @@ function computeLineDiff(beforeLines: SyncSnapshotLine[], afterLines: SyncSnapsh
         map.set(k, row);
     }
 
-    return Array.from(map.values())
+           return Array.from(map.values())
         .map((r) => ({ ...r, changed: r.before !== r.after }))
         .sort((a, b) => (a.side === b.side ? a.account_code.localeCompare(b.account_code) : a.side === "DEBIT" ? -1 : 1));
+}
+
+// ⬅️ BARU: total nominal per sisi (Debit/Kredit) — dipakai buat ringkasan total sebelum/sesudah di SyncPreviewModal
+function sumLinesBySide(lines: { side: string; nominal: number | string }[], side: "DEBIT" | "KREDIT"): number {
+    return lines.filter((l) => l.side === side).reduce((s, l) => s + Number(l.nominal || 0), 0);
+}
+
+// ⬅️ BARU: computeLineDiff + status per baris (Baru/Dihapus/Berubah/Tetap) — dipakai SyncPreviewModal
+type SyncDiffRow = ReturnType<typeof computeLineDiff>[number] & {
+    delta: number;
+    status: "new" | "removed" | "changed" | "same";
+};
+
+function computeSyncDiffRows(beforeLines: SyncSnapshotLine[], afterLines: SyncSnapshotLine[]): SyncDiffRow[] {
+    return computeLineDiff(beforeLines, afterLines).map((d) => {
+        let status: SyncDiffRow["status"] = "same";
+        if (d.before === 0 && d.after > 0) status = "new";
+        else if (d.before > 0 && d.after === 0) status = "removed";
+        else if (d.changed) status = "changed";
+        return { ...d, delta: d.after - d.before, status };
+    });
 }
 
 // Daftar baris jurnal apa adanya — dipakai buat rincian CREATE/DELETE/CONFIRM di History Perubahan
@@ -189,8 +211,63 @@ function AuditLineDiffTable({ diff }: { diff: ReturnType<typeof computeLineDiff>
                             <span className="text-gray-400">{rp(d.after)}</span>
                         )}
                     </span>
-                </div>
+                                </div>
             ))}
+        </div>
+    );
+}
+
+// ⬅️ BARU: tabel diff lengkap (semua baris, bukan cuma yang berubah) — dipakai SyncPreviewModal
+function SyncDiffDetailTable({ rows }: { rows: SyncDiffRow[] }) {
+    if (rows.length === 0) return <p className="text-xs text-gray-400 italic">Tidak ada baris akun.</p>;
+
+    const STATUS_LABEL: Record<SyncDiffRow["status"], { label: string; color: string }> = {
+        new: { label: "Baris Baru", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+        removed: { label: "Baris Dihapus", color: "bg-red-50 text-red-700 border-red-200" },
+        changed: { label: "Berubah", color: "bg-amber-50 text-amber-700 border-amber-200" },
+        same: { label: "Tetap", color: "bg-gray-50 text-gray-400 border-gray-200" },
+    };
+
+    return (
+        <div className="rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
+            <table className="w-full text-xs min-w-[560px]">
+                <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="px-3 py-2 text-left font-bold text-gray-500 uppercase tracking-wide text-[10px]">Akun</th>
+                        <th className="px-3 py-2 text-center font-bold text-gray-500 uppercase tracking-wide text-[10px]">Sisi</th>
+                        <th className="px-3 py-2 text-right font-bold text-gray-500 uppercase tracking-wide text-[10px]">Sebelum</th>
+                        <th className="px-3 py-2 text-right font-bold text-gray-500 uppercase tracking-wide text-[10px]">Sesudah</th>
+                        <th className="px-3 py-2 text-right font-bold text-gray-500 uppercase tracking-wide text-[10px]">Selisih</th>
+                        <th className="px-3 py-2 text-center font-bold text-gray-500 uppercase tracking-wide text-[10px]">Status</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                    {rows.map((r) => {
+                        const st = STATUS_LABEL[r.status];
+                        return (
+                            <tr key={`${r.account_code}-${r.side}`} className={r.status === "same" ? "opacity-50" : ""}>
+                                <td className="px-3 py-2">
+                                    <span className="font-mono font-bold text-gray-400 mr-1.5">{r.account_code}</span>
+                                    <span className="text-gray-700">{r.account_name}</span>
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                    <span className={`text-[9px] font-bold ${r.side === "DEBIT" ? "text-blue-600" : "text-emerald-600"}`}>
+                                        {r.side === "DEBIT" ? "DEBIT" : "KREDIT"}
+                                    </span>
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono text-gray-500">{rp(r.before)}</td>
+                                <td className="px-3 py-2 text-right font-mono font-bold text-gray-900">{rp(r.after)}</td>
+                                <td className={`px-3 py-2 text-right font-mono font-bold ${r.delta > 0 ? "text-emerald-600" : r.delta < 0 ? "text-red-600" : "text-gray-300"}`}>
+                                    {r.delta > 0 ? "+" : ""}{rp(r.delta)}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border whitespace-nowrap ${st.color}`}>{st.label}</span>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
         </div>
     );
 }
@@ -1824,6 +1901,7 @@ function SyncHistoryToggle({
     const [loadingLogs, setLoadingLogs] = useState(false);
     const [confirming, setConfirming] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false); // ⬅️ BARU: modal detail lengkap preview sync
 
     const computePos = () => {
         const btn = btnRef.current;
@@ -1835,7 +1913,7 @@ function SyncHistoryToggle({
             spaceBelow < POPOVER_HEIGHT
                 ? Math.max(8, rect.top - POPOVER_HEIGHT - 6)
                 : rect.bottom + 6;
-        setPopPos({ top, left: Math.max(8, rect.right - 288) });
+                setPopPos({ top, left: Math.max(8, rect.right - 320) });
     };
 
     useEffect(() => {
@@ -1881,9 +1959,10 @@ function SyncHistoryToggle({
                 setToast(json.message ?? "Gagal sinkronisasi");
                 return;
             }
-            setToast("Nominal jurnal disinkronkan");
+                       setToast("Nominal jurnal disinkronkan");
             setShowPopover(false);
             setConfirming(false);
+            setShowDetailModal(false); // ⬅️ BARU
             onUpdated();
         } catch {
             setToast("Koneksi bermasalah saat sinkronisasi");
@@ -1906,17 +1985,40 @@ function SyncHistoryToggle({
                 <RefreshCw className="w-4 h-4 text-blue-600" />
             </button>
             {showPopover && popPos && (
-                <div
-                    className="fixed z-[95] w-72 max-h-[80vh] overflow-y-auto bg-white border border-blue-200 rounded-xl shadow-xl p-3 text-left"
+                               <div
+                    className="fixed z-[95] w-80 max-h-[80vh] overflow-y-auto bg-white border border-blue-200 rounded-xl shadow-xl p-3 text-left"
                     style={{ top: popPos.top, left: popPos.left }}
                 >
                     <p className="text-[10.5px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1 mb-2 pb-1.5 border-b border-gray-100">
                         <RefreshCw className="w-3.5 h-3.5" /> Nominal Berubah
                     </p>
 
-                    <p className="text-[11px] text-gray-500 mb-2">
+                                       <p className="text-[11px] text-gray-500 mb-2">
                         Nominal dan/atau keterangan jurnal ini belum sama dengan data sumber (Transaksi/Cashflow/Service) terbaru.
                     </p>
+
+                                        {/* ⬅️ BARU: ringkasan cepat + tombol buka detail lengkap */}
+                    {entry.sync_preview && (
+                        <div className="mb-3 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                                    Preview Perubahan
+                                </p>
+                                <span className="text-[10px] font-bold text-blue-600 whitespace-nowrap">
+                                    {computeLineDiff(entry.lines, entry.sync_preview.lines).filter((d) => d.changed).length} akun berubah
+                                </span>
+                            </div>
+                            {entry.keterangan !== entry.sync_preview.keterangan && (
+                                <p className="text-[10px] text-gray-500 mb-1.5">Keterangan ikut berubah.</p>
+                            )}
+                            <button
+                                onClick={() => setShowDetailModal(true)}
+                                className="w-full h-7 rounded-lg bg-white border border-blue-200 text-blue-700 text-[11px] font-bold hover:bg-blue-50 active:scale-95 transition-all"
+                            >
+                                Lihat Detail Lengkap →
+                            </button>
+                        </div>
+                    )}
 
                     {!confirming ? (
                         <button
@@ -1944,7 +2046,7 @@ function SyncHistoryToggle({
                         </div>
                     )}
 
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Riwayat Sinkronisasi</p>
+                                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Riwayat Sinkronisasi</p>
                     <div className="space-y-2 max-h-40 overflow-y-auto">
                         {loadingLogs ? (
                             <p className="text-[11px] text-gray-400">Memuat...</p>
@@ -1979,6 +2081,145 @@ function SyncHistoryToggle({
                     </div>
                 </div>
             )}
+            {showDetailModal && entry.sync_preview && (
+                <SyncPreviewModal
+                    entry={entry}
+                    busy={busy}
+                    onClose={() => setShowDetailModal(false)}
+                    onSync={doSync}
+                />
+            )}
+        </div>
+    );
+}
+
+// ⬅️ BARU: modal detail lengkap perbandingan sebelum/sesudah sync
+function SyncPreviewModal({
+    entry,
+    busy,
+    onClose,
+    onSync,
+}: {
+    entry: JournalEntry;
+    busy: boolean;
+    onClose: () => void;
+    onSync: () => void;
+}) {
+    const [confirming, setConfirming] = useState(false);
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    if (!entry.sync_preview) return null;
+
+    const rows = computeSyncDiffRows(entry.lines, entry.sync_preview.lines);
+    const changedRows = rows.filter((r) => r.status !== "same");
+    const keteranganChanged = entry.keterangan !== entry.sync_preview.keterangan;
+
+    const totalDebitBefore = sumLinesBySide(entry.lines, "DEBIT");
+    const totalKreditBefore = sumLinesBySide(entry.lines, "KREDIT");
+    const totalDebitAfter = sumLinesBySide(entry.sync_preview.lines, "DEBIT");
+    const totalKreditAfter = sumLinesBySide(entry.sync_preview.lines, "KREDIT");
+
+    const badge = SOURCE_BADGE[entry.source_type];
+
+    return (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={onClose} />
+            <div className="relative bg-white w-full max-w-2xl rounded-2xl shadow-2xl max-h-[90dvh] flex flex-col overflow-hidden">
+                <div className="h-1 bg-gradient-to-r from-blue-500 to-blue-700 shrink-0" />
+                <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between shrink-0">
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badge.color}`}>{badge.label}</span>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-600 inline-flex items-center gap-1">
+                                <RefreshCw className="w-2.5 h-2.5" /> Preview Sinkronisasi
+                            </span>
+                        </div>
+                        <h3 className="font-bold text-gray-900 text-sm truncate">{entry.keterangan}</h3>
+                        <p className="text-[11px] text-gray-400">{fmtTgl(entry.tanggal)}{entry.ref ? ` · Ref: ${entry.ref}` : ""}</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 active:scale-90 transition-all duration-150 flex items-center justify-center shrink-0">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto flex-1 p-5 space-y-4">
+                    {/* Ringkasan total */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-xl border border-gray-200 p-3">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Total Debit</p>
+                            <p className="text-xs text-gray-400 line-through">{rp(totalDebitBefore)}</p>
+                            <p className="text-base font-black text-gray-900 font-mono">{rp(totalDebitAfter)}</p>
+                            {totalDebitAfter !== totalDebitBefore && (
+                                <p className={`text-[11px] font-bold mt-0.5 ${totalDebitAfter > totalDebitBefore ? "text-emerald-600" : "text-red-600"}`}>
+                                    {totalDebitAfter > totalDebitBefore ? "+" : ""}{rp(totalDebitAfter - totalDebitBefore)}
+                                </p>
+                            )}
+                        </div>
+                        <div className="rounded-xl border border-gray-200 p-3">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Total Kredit</p>
+                            <p className="text-xs text-gray-400 line-through">{rp(totalKreditBefore)}</p>
+                            <p className="text-base font-black text-gray-900 font-mono">{rp(totalKreditAfter)}</p>
+                            {totalKreditAfter !== totalKreditBefore && (
+                                <p className={`text-[11px] font-bold mt-0.5 ${totalKreditAfter > totalKreditBefore ? "text-emerald-600" : "text-red-600"}`}>
+                                    {totalKreditAfter > totalKreditBefore ? "+" : ""}{rp(totalKreditAfter - totalKreditBefore)}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${totalDebitAfter === totalKreditAfter ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+                            {totalDebitAfter === totalKreditAfter ? "Balance Setelah Sync" : "Tidak Balance Setelah Sync"}
+                        </span>
+                        <span className="text-[11px] font-semibold text-gray-500">
+                            {changedRows.length} dari {rows.length} baris akun berubah
+                        </span>
+                    </div>
+
+                    {/* Diff keterangan */}
+                    {keteranganChanged && (
+                        <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Keterangan</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                                <div className="bg-red-50 border border-red-100 rounded-lg p-2.5">
+                                    <p className="text-red-500 font-bold mb-0.5">Sebelum</p>
+                                    <p className="text-gray-700">{entry.keterangan}</p>
+                                </div>
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-2.5">
+                                    <p className="text-emerald-600 font-bold mb-0.5">Sesudah</p>
+                                    <p className="text-gray-700">{entry.sync_preview.keterangan}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tabel rincian per akun */}
+                    <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Rincian Per Akun</p>
+                        <SyncDiffDetailTable rows={rows} />
+                    </div>
+                </div>
+
+                <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50 shrink-0">
+                    <button onClick={onClose} disabled={busy} className="flex-1 h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 active:scale-[0.97] transition-all duration-150 disabled:opacity-50">
+                        Tutup
+                    </button>
+                    {!confirming ? (
+                        <button onClick={() => setConfirming(true)} disabled={busy} className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold active:scale-[0.97] transition-all duration-150 disabled:opacity-40">
+                            Sinkronkan Sekarang
+                        </button>
+                    ) : (
+                        <button onClick={onSync} disabled={busy} className="flex-1 h-10 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-sm font-bold active:scale-[0.97] transition-all duration-150 disabled:opacity-40">
+                            {busy ? "Menyinkronkan..." : "Ya, Konfirmasi Sinkronkan"}
+                        </button>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

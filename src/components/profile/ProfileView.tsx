@@ -105,6 +105,8 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [achievements, setAchievements] = useState<AchievementsData | null>(null);
     const [qualityRank, setQualityRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
     const [kerjaRank, setKerjaRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
+    const [lemburanRank, setLemburanRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
+    const [pengelolaBarangRank, setPengelolaBarangRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
     const [deliveryBadge, setDeliveryBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [providerBadge, setProviderBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [salesBadge, setSalesBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
@@ -187,7 +189,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes] = await Promise.all([
+            const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes, lemburanRes, pengelolaBarangRes] = await Promise.all([
                 getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
                 fetch(`/api/profile?userId=${userId}`),
                 fetch(`/api/achievements?userId=${userId}`),
@@ -198,6 +200,8 @@ export default function ProfileView({ userId }: { userId: string }) {
                 fetch(`/api/transaction/sales-milestones?userId=${userId}`),
                 fetch(`/api/service/teknisi-milestones?userId=${userId}`),
                 fetch(`/api/cc-reports/konten-milestones?userId=${userId}`),
+                fetch(`/api/attendance/overtime-points?userId=${userId}`),
+                fetch(`/api/laptops/pengelola-points?userId=${userId}`),
             ]);
             const meData = await meRes.json();
             const profileData = await profileRes.json();
@@ -209,6 +213,8 @@ export default function ProfileView({ userId }: { userId: string }) {
             const salesData = await salesRes.json();
             const teknisiData = await teknisiRes.json();
             const kontenData = await kontenRes.json();
+            const lemburanData = await lemburanRes.json();
+            const pengelolaBarangData = await pengelolaBarangRes.json();
             if (meData.user) setCurrentUser(meData.user);
             if (profileData.success) { setProfile(profileData.data); setBioDraft(profileData.data.bio ?? ""); }
             if (achData.success) setAchievements(achData.data);
@@ -219,6 +225,8 @@ export default function ProfileView({ userId }: { userId: string }) {
             if (salesData.success) setSalesBadge(salesData.data);
             if (teknisiData.success) setTeknisiBadge(teknisiData.data);
             if (kontenData.success) setKontenBadge(kontenData.data);
+            if (lemburanData.success) setLemburanRank(lemburanData.data);
+            if (pengelolaBarangData.success) setPengelolaBarangRank(pengelolaBarangData.data);
         } catch {
             showToast("Gagal memuat profil", "err");
         } finally {
@@ -880,7 +888,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 ))}
                             </div>
                         </div>
-                                                {achievements && <AchievementTitles achievements={achievements} qualityRank={qualityRank} kerjaRank={kerjaRank} deliveryBadge={deliveryBadge} providerBadge={providerBadge} salesBadge={salesBadge} teknisiBadge={teknisiBadge} kontenBadge={kontenBadge} />}
+                        {achievements && <AchievementTitles achievements={achievements} qualityRank={qualityRank} kerjaRank={kerjaRank} deliveryBadge={deliveryBadge} providerBadge={providerBadge} salesBadge={salesBadge} teknisiBadge={teknisiBadge} kontenBadge={kontenBadge} lemburanRank={lemburanRank} pengelolaBarangRank={pengelolaBarangRank} />}
                     </div>
 
                     {isSelf && (
@@ -1132,7 +1140,7 @@ function RankBadge({ rank }: { rank: number }) {
     );
 }
 
-function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge, providerBadge, salesBadge, teknisiBadge, kontenBadge }: {
+function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge, providerBadge, salesBadge, teknisiBadge, kontenBadge, lemburanRank, pengelolaBarangRank }: {
     achievements: AchievementsData;
     qualityRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
     kerjaRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
@@ -1141,6 +1149,8 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     salesBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
     teknisiBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
     kontenBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+    lemburanRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
+    pengelolaBarangRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
 }) {
     const titles: { rank: number; label: string }[] = [];
     if (achievements.attendance.rankThisMonth !== null && achievements.attendance.rankThisMonth <= 10) {
@@ -1156,6 +1166,14 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     // ✅ NEW — Lencana Kualitas Pekerjaan (tab "Pekerjaan" di /dashboard/lencana),
     // polanya sama dengan Kualitas Absensi, cuma sumbernya leaderboard-kerja.
     const hasKerjaBadge = !!(kerjaRank && kerjaRank.level > 0);
+    // ✅ NEW — Lencana Lemburan (tab "Lemburan" di /dashboard/lencana): pola
+    // LEVEL bulanan sama seperti Absensi/Kerja (bukan milestone), sumber
+    // poinnya dari blok 2 jam lembur audited per hari.
+    const hasLemburanBadge = !!(lemburanRank && lemburanRank.level > 0);
+    // ✅ NEW — Lencana Pengelola Barang (tab "Pengelola Barang" di
+    // /dashboard/lencana): pola LEVEL bulanan sama seperti Absensi/Kerja/
+    // Lemburan, sumber poinnya dari tambah unit (1) + solved (5) + SO (0,3).
+    const hasPengelolaBarangBadge = !!(pengelolaBarangRank && pengelolaBarangRank.level > 0);
     // ✅ NEW — Lencana Pengantaran (tab "Pengantaran" di /dashboard/lencana):
     // BUKAN level bulanan, tapi milestone total pengantaran (50/100/.../1000),
     // dan cuma tampil kalau server sudah menandai hasBadge (artinya Top 3).
@@ -1179,7 +1197,7 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     // diselesaikan (100/200/.../1000), bersifat all-time & tidak dibatasi
     // Top 3 — sama polanya dengan Penyedia Barang/Sales/Teknisi.
     const hasKontenBadge = !!(kontenBadge && kontenBadge.hasBadge);
-    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge && !hasProviderBadge && !hasSalesBadge && !hasTeknisiBadge && !hasKontenBadge) return null;
+    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge && !hasProviderBadge && !hasSalesBadge && !hasTeknisiBadge && !hasKontenBadge && !hasLemburanBadge && !hasPengelolaBarangBadge) return null;
     titles.sort((a, b) => a.rank - b.rank);
 
     return (
@@ -1189,6 +1207,12 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
             )}
             {hasKerjaBadge && (
                 <LevelBadgeDisplay level={kerjaRank!.level} isPermanent={kerjaRank!.isPermanent} isOngoingMonth={kerjaRank!.isOngoingMonth} label="Kualitas Pekerjaan" colorScheme="indigo" />
+            )}
+            {hasLemburanBadge && (
+                <LevelBadgeDisplay level={lemburanRank!.level} isPermanent={lemburanRank!.isPermanent} isOngoingMonth={lemburanRank!.isOngoingMonth} label="Lemburan" colorScheme="amber" />
+            )}
+            {hasPengelolaBarangBadge && (
+                <LevelBadgeDisplay level={pengelolaBarangRank!.level} isPermanent={pengelolaBarangRank!.isPermanent} isOngoingMonth={pengelolaBarangRank!.isOngoingMonth} label="Pengelola Barang" colorScheme="teal" />
             )}
             {hasDeliveryBadge && (
                 <DeliveryMilestoneBadge rank={deliveryBadge!.rank} milestone={deliveryBadge!.milestone} />
@@ -1404,10 +1428,10 @@ function LevelBadgeDisplay({
     level, isPermanent, isOngoingMonth, label = "Kualitas Absensi", colorScheme = "emerald",
 }: {
     level: number; isPermanent: boolean; isOngoingMonth: boolean;
-    label?: string; colorScheme?: "emerald" | "indigo";
+    label?: string; colorScheme?: "emerald" | "indigo" | "amber" | "teal";
 }) {
     const tier: "gold" | "silver" | "bronze" = isPermanent ? "gold" : level >= 2 ? "silver" : "bronze";
-    const gradientsByScheme: Record<"emerald" | "indigo", Record<typeof tier, string>> = {
+    const gradientsByScheme: Record<"emerald" | "indigo" | "amber" | "teal", Record<typeof tier, string>> = {
         emerald: {
             gold: "linear-gradient(135deg, #34d399, #059669, #047857)",
             silver: "linear-gradient(135deg, #fde68a, #f59e0b, #b45309)",
@@ -1418,8 +1442,18 @@ function LevelBadgeDisplay({
             silver: "linear-gradient(135deg, #93c5fd, #2563eb, #1e3a8a)",
             bronze: "linear-gradient(135deg, #a5b4fc, #6366f1, #4338ca)",
         },
+        amber: {
+            gold: "linear-gradient(135deg, #fb923c, #ea580c, #9a3412)",
+            silver: "linear-gradient(135deg, #fdba74, #f97316, #c2410c)",
+            bronze: "linear-gradient(135deg, #fed7aa, #fb923c, #ea580c)",
+        },
+        teal: {
+            gold: "linear-gradient(135deg, #2dd4bf, #0d9488, #115e59)",
+            silver: "linear-gradient(135deg, #5eead4, #14b8a6, #0f766e)",
+            bronze: "linear-gradient(135deg, #99f6e4, #2dd4bf, #14b8a6)",
+        },
     };
-    const glowByScheme: Record<"emerald" | "indigo", Record<typeof tier, string>> = {
+    const glowByScheme: Record<"emerald" | "indigo" | "amber" | "teal", Record<typeof tier, string>> = {
         emerald: {
             gold: "rgba(5,150,105,0.35)",
             silver: "rgba(245,158,11,0.35)",
@@ -1429,6 +1463,16 @@ function LevelBadgeDisplay({
             gold: "rgba(79,70,229,0.35)",
             silver: "rgba(37,99,235,0.35)",
             bronze: "rgba(99,102,241,0.35)",
+        },
+        amber: {
+            gold: "rgba(234,88,12,0.35)",
+            silver: "rgba(249,115,22,0.35)",
+            bronze: "rgba(251,146,60,0.35)",
+        },
+        teal: {
+            gold: "rgba(13,148,136,0.35)",
+            silver: "rgba(20,184,166,0.35)",
+            bronze: "rgba(45,212,191,0.35)",
         },
     };
     const gradients = gradientsByScheme[colorScheme];
