@@ -828,7 +828,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 );
                                 // Border Solit Coins ter-equip: tampilkan cincin hanya bila ada border.
                                 return profile.equipped_border
-                                    ? <SolitBorder style={profile.equipped_border.style} thickness={4}>{avatarInner}</SolitBorder>
+                                    ? <SolitBorder style={profile.equipped_border.style} thickness={4} ornamentSize={30}>{avatarInner}</SolitBorder>
                                     : avatarInner;
                             })()}
 

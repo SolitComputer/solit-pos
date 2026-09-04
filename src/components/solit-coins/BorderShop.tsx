@@ -113,7 +113,7 @@ export default function BorderShop() {
 
       {/* Preview + saldo */}
       <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50 border border-slate-100 flex flex-col items-center gap-3">
-        <SolitBorder style={preview?.style ?? null} thickness={4}>
+        <SolitBorder style={preview?.style ?? null} thickness={4} ornamentSize={26}>
           {avatarInner}
         </SolitBorder>
         <p className="text-sm font-bold text-slate-700">
@@ -147,7 +147,7 @@ export default function BorderShop() {
                       previewId === b.id ? "border-indigo-300 ring-2 ring-indigo-100" : "border-slate-100 hover:border-slate-200"
                     }`}
                   >
-                    <SolitBorder style={b.style} thickness={3}>
+                    <SolitBorder style={b.style} thickness={3} ornamentSize={16}>
                       <span className="w-12 h-12 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 overflow-hidden">
                         {me.photo ? (
                           // eslint-disable-next-line @next/next/no-img-element
