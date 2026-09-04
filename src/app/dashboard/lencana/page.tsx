@@ -20,6 +20,7 @@ import {
     ShoppingCart,
     Wrench,
     Video,
+    Boxes,
     type LucideIcon,
 } from "lucide-react";
 
@@ -63,6 +64,8 @@ const ACCENTS: Record<string, Accent> = {
     rose: { bar: "from-rose-400 to-pink-500", chip: "bg-rose-100 text-rose-600" },
     emerald: { bar: "from-emerald-400 to-green-500", chip: "bg-emerald-100 text-emerald-600" },
     cyan: { bar: "from-cyan-400 to-blue-500", chip: "bg-cyan-100 text-cyan-600" },
+    amber: { bar: "from-amber-400 to-orange-500", chip: "bg-amber-100 text-amber-600" },
+    sky: { bar: "from-sky-400 to-blue-500", chip: "bg-sky-100 text-sky-600" },
 };
 
 /* ============================================================
@@ -720,6 +723,412 @@ function KerjaLeaderboard({ isAdmin }: { isAdmin: boolean }) {
     );
 }
 
+type LemburanRow = {
+    user_id: string;
+    name: string;
+    role: string;
+    total_points: number;
+    total_overtime_minutes: number;
+    rank: number;
+    level: number;
+    isPermanent: boolean;
+    isTemporary: boolean;
+    streakMonths: number;
+};
+
+function formatOvertimeHoursShort(mins: number): string {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m > 0 ? `${h}j ${m}m` : `${h} jam`;
+}
+
+function LemburanLeaderboard({ isAdmin }: { isAdmin: boolean }) {
+    const today = new Date();
+    const [calYear, setCalYear] = useState(today.getFullYear());
+    const [calMonth, setCalMonth] = useState(today.getMonth());
+    const [board, setBoard] = useState<LemburanRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [generating, setGenerating] = useState(false);
+    const [isOngoingMonth, setIsOngoingMonth] = useState(false);
+
+    const load = useCallback(async (y: number, m: number) => {
+        setLoading(true);
+        try {
+            const r = await fetch(`/api/attendance/overtime-points?year=${y}&month=${m + 1}&list=true`);
+            const d = await r.json();
+            if (d.success) { setBoard(d.data || []); setIsOngoingMonth(!!d.isOngoingMonth); }
+        } catch {
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(calYear, calMonth); }, [calYear, calMonth, load]);
+
+    const changeMonth = (delta: number) => {
+        let m = calMonth + delta;
+        let y = calYear;
+        if (m < 0) { m = 11; y -= 1; }
+        if (m > 11) { m = 0; y += 1; }
+        setCalMonth(m);
+        setCalYear(y);
+    };
+
+    const generate = async () => {
+        setGenerating(true);
+        try {
+            const r = await fetch("/api/attendance/overtime-points", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ year: calYear, month: calMonth + 1 }),
+            });
+            const d = await r.json();
+            if (d.success) {
+                await load(calYear, calMonth);
+                if ((d.data?.totalRanked ?? 0) === 0) {
+                    alert("Generate berhasil, tapi belum ada lembur ber-status AUDITED di bulan ini — jadi leaderboard-nya masih kosong.");
+                }
+            } else {
+                alert(d.message || "Gagal generate leaderboard lembur.");
+            }
+        } catch (err: any) {
+            alert(`Gagal generate: ${err?.message ?? "kesalahan jaringan"}`);
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const maxPoints = Math.max(...board.map((u) => u.total_points), 1);
+
+    const podiumEntries: PodiumEntry[] = board
+        .filter((u) => u.rank <= 3)
+        .map((u) => ({
+            user_id: u.user_id,
+            name: u.name,
+            role: u.role,
+            rank: u.rank,
+            metricLabel: `${u.total_points} pts`,
+            extra: <LevelBadge level={u.level} isPermanent={u.isPermanent} />,
+        }));
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <SectionHeader
+                icon={Clock}
+                accent={ACCENTS.amber}
+                title="Lencana Lemburan"
+                description={
+                    <>
+                        Poin dihitung dari lembur yang sudah <strong>diaudit</strong>: tiap <strong>2 jam penuh</strong> lembur dalam 1 hari yang sama = <strong>2 poin</strong> (3 jam tetap 2 poin, sisa di bawah 2 jam seperti 1 jam atau 1 jam 30 menit tidak dapat poin). Juara Top 3 setiap bulan naik 1 level (bulan pertama Level 1, bulan kedua Level 2, dst — maksimal Level 10). Level 1-2 masih <strong>sementara</strong>: kalau bulan depan gak lanjut Top 3, levelnya reset. Begitu tembus <strong>Level 3</strong> (3 bulan Top 3 berturut-turut), lencananya jadi <strong>permanen</strong>.
+                    </>
+                }
+            >
+                <MonthNavigator month={calMonth} year={calYear} onChange={changeMonth} />
+            </SectionHeader>
+
+            {!loading && board.length > 0 && <Podium entries={podiumEntries} />}
+            {!loading && isOngoingMonth && board.length > 0 && <OngoingMonthBanner />}
+
+            {loading ? (
+                <LoadingSkeleton />
+            ) : board.length === 0 ? (
+                <EmptyState
+                    message="Belum ada leaderboard untuk bulan ini"
+                    hint="Generate dulu snapshot poin lembur bulan ini"
+                    action={
+                        isAdmin && (
+                            <button
+                                onClick={generate}
+                                disabled={generating}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-3.5 h-3.5 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Generate Leaderboard Bulan Ini"}
+                            </button>
+                        )
+                    }
+                />
+            ) : (
+                <>
+                    <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-gray-100 bg-gray-50/60">
+                                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-14">Rank</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Level</th>
+                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Jam Lembur</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[160px]">Poin Lembur</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {board.map((u) => (
+                                    <tr key={u.user_id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${tierBgFor(u.rank)}`}>
+                                        <td className="px-6 py-4"><RankSlot rank={u.rank} /></td>
+                                        <td className="px-4 py-4"><KaryawanCell name={u.name} role={u.role} /></td>
+                                        <td className="px-4 py-4 text-center"><LevelBadge level={u.level} isPermanent={u.isPermanent} /></td>
+                                        <td className="px-4 py-4 text-center text-gray-600 font-semibold">{formatOvertimeHoursShort(u.total_overtime_minutes)}</td>
+                                        <td className="px-6 py-4">
+                                            <ProgressBar
+                                                pct={(u.total_points / maxPoints) * 100}
+                                                floor={4}
+                                                gradient="from-amber-400 to-orange-500"
+                                                valueLabel={u.total_points.toLocaleString()}
+                                                valueColorClass="text-orange-600"
+                                                valueWidthClass="w-16"
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {isAdmin && (
+                            <div className="px-6 py-3 border-t border-gray-50 flex justify-end">
+                                <button onClick={generate} disabled={generating} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-violet-600 transition-all disabled:opacity-50">
+                                    <RefreshCw className={`w-3 h-3 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Refresh Poin Bulan Ini"}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="md:hidden divide-y divide-gray-50">
+                        {board.map((u) => (
+                            <div key={u.user_id} className={`p-4 space-y-3 ${tierBgFor(u.rank)}`}>
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <RankSlot rank={u.rank} />
+                                        <KaryawanCell name={u.name} role={u.role} />
+                                    </div>
+                                    <LevelBadge level={u.level} isPermanent={u.isPermanent} />
+                                </div>
+                                <p className="text-[11px] text-gray-400">Total Jam Lembur: <span className="font-semibold text-gray-600">{formatOvertimeHoursShort(u.total_overtime_minutes)}</span></p>
+                                <ProgressBar
+                                    pct={(u.total_points / maxPoints) * 100}
+                                    floor={4}
+                                    gradient="from-amber-400 to-orange-500"
+                                    valueLabel={`Poin: ${u.total_points.toLocaleString()}`}
+                                    valueColorClass="text-orange-600"
+                                />
+                            </div>
+                        ))}
+                        {isAdmin && (
+                            <div className="px-4 py-3 flex justify-center">
+                                <button onClick={generate} disabled={generating} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-violet-600 transition-all disabled:opacity-50">
+                                    <RefreshCw className={`w-3 h-3 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Refresh Poin Bulan Ini"}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+type PengelolaBarangRow = {
+    user_id: string;
+    name: string;
+    role: string;
+    total_points: number;
+    units_added: number;
+    units_solved: number;
+    so_count: number;
+    rank: number;
+    level: number;
+    isPermanent: boolean;
+    isTemporary: boolean;
+    streakMonths: number;
+};
+
+function PengelolaBarangLeaderboard({ isAdmin }: { isAdmin: boolean }) {
+    const today = new Date();
+    const [calYear, setCalYear] = useState(today.getFullYear());
+    const [calMonth, setCalMonth] = useState(today.getMonth());
+    const [board, setBoard] = useState<PengelolaBarangRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [generating, setGenerating] = useState(false);
+    const [isOngoingMonth, setIsOngoingMonth] = useState(false);
+
+    const load = useCallback(async (y: number, m: number) => {
+        setLoading(true);
+        try {
+            const r = await fetch(`/api/laptops/pengelola-points?year=${y}&month=${m + 1}&list=true`);
+            const d = await r.json();
+            if (d.success) { setBoard(d.data || []); setIsOngoingMonth(!!d.isOngoingMonth); }
+        } catch {
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(calYear, calMonth); }, [calYear, calMonth, load]);
+
+    const changeMonth = (delta: number) => {
+        let m = calMonth + delta;
+        let y = calYear;
+        if (m < 0) { m = 11; y -= 1; }
+        if (m > 11) { m = 0; y += 1; }
+        setCalMonth(m);
+        setCalYear(y);
+    };
+
+    const generate = async () => {
+        setGenerating(true);
+        try {
+            const r = await fetch("/api/laptops/pengelola-points", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ year: calYear, month: calMonth + 1 }),
+            });
+            const d = await r.json();
+            if (d.success) {
+                await load(calYear, calMonth);
+                if ((d.data?.totalRanked ?? 0) === 0) {
+                    alert("Generate berhasil, tapi belum ada aktivitas Pengelola Barang di bulan ini — jadi leaderboard-nya masih kosong.");
+                }
+            } else {
+                alert(d.message || "Gagal generate leaderboard Pengelola Barang.");
+            }
+        } catch (err: any) {
+            alert(`Gagal generate: ${err?.message ?? "kesalahan jaringan"}`);
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const maxPoints = Math.max(...board.map((u) => u.total_points), 1);
+
+    const podiumEntries: PodiumEntry[] = board
+        .filter((u) => u.rank <= 3)
+        .map((u) => ({
+            user_id: u.user_id,
+            name: u.name,
+            role: u.role,
+            rank: u.rank,
+            metricLabel: u.total_points.toFixed(1),
+            extra: <LevelBadge level={u.level} isPermanent={u.isPermanent} />,
+        }));
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <SectionHeader
+                icon={Boxes}
+                accent={ACCENTS.sky}
+                title="Lencana Pengelola Barang"
+                description={
+                    <>
+                        Poin dihitung dari 3 aktivitas: <strong>tambah unit</strong> barang baru = 1 poin/unit, unit yang berhasil dipindah dari <strong>Minus ke Siap Jual ("Solved")</strong> = 5 poin/unit, dan <strong>SO (Stock Opname)</strong> laptop = 0,3 poin (SO/UNSO berulang di laptop &amp; hari yang sama cuma dihitung 1x). Juara Top 3 setiap bulan naik 1 level (bulan pertama Level 1, bulan kedua Level 2, dst — maksimal Level 10). Level 1-2 masih <strong>sementara</strong>: kalau bulan depan gak lanjut Top 3, levelnya reset. Begitu tembus <strong>Level 3</strong> (3 bulan Top 3 berturut-turut), lencananya jadi <strong>permanen</strong>.
+                    </>
+                }
+            >
+                <MonthNavigator month={calMonth} year={calYear} onChange={changeMonth} />
+            </SectionHeader>
+
+            {!loading && board.length > 0 && <Podium entries={podiumEntries} />}
+            {!loading && isOngoingMonth && board.length > 0 && <OngoingMonthBanner />}
+
+            {loading ? (
+                <LoadingSkeleton />
+            ) : board.length === 0 ? (
+                <EmptyState
+                    message="Belum ada leaderboard untuk bulan ini"
+                    hint="Generate dulu snapshot poin Pengelola Barang bulan ini"
+                    action={
+                        isAdmin && (
+                            <button
+                                onClick={generate}
+                                disabled={generating}
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-600 bg-violet-50 border border-violet-200 px-4 py-2 rounded-xl hover:bg-violet-100 transition-all disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-3.5 h-3.5 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Generate Leaderboard Bulan Ini"}
+                            </button>
+                        )
+                    }
+                />
+            ) : (
+                <>
+                    <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-gray-100 bg-gray-50/60">
+                                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest w-14">Rank</th>
+                                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Karyawan</th>
+                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Level</th>
+                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Tambah Unit</th>
+                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Solved</th>
+                                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">SO</th>
+                                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[160px]">Skor Pengelola Barang</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {board.map((u) => (
+                                    <tr key={u.user_id} className={`hover:bg-gray-50/60 transition-colors duration-200 ${tierBgFor(u.rank)}`}>
+                                        <td className="px-6 py-4"><RankSlot rank={u.rank} /></td>
+                                        <td className="px-4 py-4"><KaryawanCell name={u.name} role={u.role} /></td>
+                                        <td className="px-4 py-4 text-center"><LevelBadge level={u.level} isPermanent={u.isPermanent} /></td>
+                                        <td className="px-4 py-4 text-center text-gray-600 font-semibold">{u.units_added}</td>
+                                        <td className="px-4 py-4 text-center"><span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-black border border-emerald-200">{u.units_solved}</span></td>
+                                        <td className="px-4 py-4 text-center text-gray-600 font-semibold">{u.so_count}</td>
+                                        <td className="px-6 py-4">
+                                            <ProgressBar
+                                                pct={(u.total_points / maxPoints) * 100}
+                                                floor={4}
+                                                gradient="from-sky-400 to-blue-500"
+                                                valueLabel={u.total_points.toFixed(1)}
+                                                valueColorClass="text-sky-600"
+                                                valueWidthClass="w-16"
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {isAdmin && (
+                            <div className="px-6 py-3 border-t border-gray-50 flex justify-end">
+                                <button onClick={generate} disabled={generating} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-violet-600 transition-all disabled:opacity-50">
+                                    <RefreshCw className={`w-3 h-3 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Refresh Poin Bulan Ini"}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="md:hidden divide-y divide-gray-50">
+                        {board.map((u) => (
+                            <div key={u.user_id} className={`p-4 space-y-3 ${tierBgFor(u.rank)}`}>
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <RankSlot rank={u.rank} />
+                                        <KaryawanCell name={u.name} role={u.role} />
+                                    </div>
+                                    <LevelBadge level={u.level} isPermanent={u.isPermanent} />
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <AbsensiStatChip label="Tambah Unit" value={u.units_added} tone="text-gray-700" />
+                                    <AbsensiStatChip label="Solved" value={u.units_solved} tone="text-emerald-600" />
+                                    <AbsensiStatChip label="SO" value={u.so_count} tone="text-sky-600" />
+                                </div>
+                                <ProgressBar
+                                    pct={(u.total_points / maxPoints) * 100}
+                                    floor={4}
+                                    gradient="from-sky-400 to-blue-500"
+                                    valueLabel={`Skor: ${u.total_points.toFixed(1)}`}
+                                    valueColorClass="text-sky-600"
+                                />
+                            </div>
+                        ))}
+                        {isAdmin && (
+                            <div className="px-4 py-3 flex justify-center">
+                                <button onClick={generate} disabled={generating} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-violet-600 transition-all disabled:opacity-50">
+                                    <RefreshCw className={`w-3 h-3 ${generating ? "animate-spin" : ""}`} /> {generating ? "Menghitung..." : "Refresh Poin Bulan Ini"}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 /* ============================================================
    Board berbasis "milestone" — dipakai bareng oleh Pengantaran,
    Penyedia Barang, Sales, Teknisi, dan Konten Kreator karena
@@ -1080,7 +1489,7 @@ function KontenKreatorLeaderboard() {
    Halaman utama
    ============================================================ */
 
-type SubTab = "absensi" | "kerja" | "pengantaran" | "penyedia" | "sales" | "teknisi" | "konten";
+type SubTab = "absensi" | "kerja" | "pengantaran" | "penyedia" | "sales" | "teknisi" | "konten" | "lemburan" | "pengelolabarang";
 
 const TABS: { id: SubTab; label: string; icon: LucideIcon }[] = [
     { id: "absensi", label: "Absensi", icon: UserCheck },
@@ -1090,6 +1499,8 @@ const TABS: { id: SubTab; label: string; icon: LucideIcon }[] = [
     { id: "sales", label: "Sales", icon: ShoppingCart },
     { id: "teknisi", label: "Teknisi", icon: Wrench },
     { id: "konten", label: "Konten Kreator", icon: Video },
+    { id: "lemburan", label: "Lemburan", icon: Clock },
+    { id: "pengelolabarang", label: "Pengelola Barang", icon: Boxes },
 ];
 
 export default function LencanaPage() {
@@ -1109,7 +1520,7 @@ export default function LencanaPage() {
                     </div>
                     <div className="min-w-0">
                         <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">Lencana</h1>
-                        <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5">Penghargaan bulanan untuk performa terbaik — juara 1-3 tampil di halaman profil</p>
+                        <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5">Penghargaan bulanan untuk performa terbaik — juara 1-3 Tampil di halaman profil</p>
                     </div>
                 </div>
 
@@ -1141,7 +1552,9 @@ export default function LencanaPage() {
                 {subTab === "sales" && <SalesLeaderboard />}
                 {subTab === "teknisi" && <TeknisiLeaderboard />}
                 {subTab === "konten" && <KontenKreatorLeaderboard />}
+                {subTab === "lemburan" && <LemburanLeaderboard isAdmin={isAdminUser(currentUser)} />}
+                {subTab === "pengelolabarang" && <PengelolaBarangLeaderboard isAdmin={isAdminUser(currentUser)} />}
             </div>
-        </DashboardLayout>
+        </DashboardLayout >
     );
 }
