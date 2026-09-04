@@ -111,7 +111,8 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [providerBadge, setProviderBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [salesBadge, setSalesBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [teknisiBadge, setTeknisiBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
-    const [kontenBadge, setKontenBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+       const [kontenBadge, setKontenBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+    const [auditMarketingBadge, setAuditMarketingBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -189,7 +190,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes, lemburanRes, pengelolaBarangRes] = await Promise.all([
+                        const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes, lemburanRes, pengelolaBarangRes, auditMarketingRes] = await Promise.all([
                 getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
                 fetch(`/api/profile?userId=${userId}`),
                 fetch(`/api/achievements?userId=${userId}`),
@@ -202,6 +203,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 fetch(`/api/cc-reports/konten-milestones?userId=${userId}`),
                 fetch(`/api/attendance/overtime-points?userId=${userId}`),
                 fetch(`/api/laptops/pengelola-points?userId=${userId}`),
+                fetch(`/api/sales-reports/audit-milestones?userId=${userId}`),
             ]);
             const meData = await meRes.json();
             const profileData = await profileRes.json();
@@ -215,6 +217,7 @@ export default function ProfileView({ userId }: { userId: string }) {
             const kontenData = await kontenRes.json();
             const lemburanData = await lemburanRes.json();
             const pengelolaBarangData = await pengelolaBarangRes.json();
+            const auditMarketingData = await auditMarketingRes.json();
             if (meData.user) setCurrentUser(meData.user);
             if (profileData.success) { setProfile(profileData.data); setBioDraft(profileData.data.bio ?? ""); }
             if (achData.success) setAchievements(achData.data);
@@ -227,6 +230,7 @@ export default function ProfileView({ userId }: { userId: string }) {
             if (kontenData.success) setKontenBadge(kontenData.data);
             if (lemburanData.success) setLemburanRank(lemburanData.data);
             if (pengelolaBarangData.success) setPengelolaBarangRank(pengelolaBarangData.data);
+            if (auditMarketingData.success) setAuditMarketingBadge(auditMarketingData.data);
         } catch {
             showToast("Gagal memuat profil", "err");
         } finally {
@@ -979,7 +983,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                             </div>
                         </div>
                         {achievements && (
-                            <AchievementTitles
+                                                        <AchievementTitles
                                 achievements={achievements}
                                 qualityRank={qualityRank}
                                 kerjaRank={kerjaRank}
@@ -990,6 +994,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 kontenBadge={kontenBadge}
                                 lemburanRank={lemburanRank}
                                 pengelolaBarangRank={pengelolaBarangRank}
+                                auditMarketingBadge={auditMarketingBadge}
                             />
                         )}
                     </div>
@@ -1271,7 +1276,7 @@ function RankBadge({ rank }: { rank: number }) {
     );
 }
 
-function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge, providerBadge, salesBadge, teknisiBadge, kontenBadge, lemburanRank, pengelolaBarangRank }: {
+function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge, providerBadge, salesBadge, teknisiBadge, kontenBadge, lemburanRank, pengelolaBarangRank, auditMarketingBadge }: {
     achievements: AchievementsData;
     qualityRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
     kerjaRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
@@ -1282,6 +1287,7 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     kontenBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
     lemburanRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
     pengelolaBarangRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
+    auditMarketingBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
 }) {
     const titles: { rank: number; label: string }[] = [];
     if (achievements.attendance.rankThisMonth !== null && achievements.attendance.rankThisMonth <= 10) {
@@ -1327,8 +1333,12 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     // MILESTONE kumulatif total tahap Take+Edit video yang berhasil
     // diselesaikan (100/200/.../1000), bersifat all-time & tidak dibatasi
     // Top 3 — sama polanya dengan Penyedia Barang/Sales/Teknisi.
-    const hasKontenBadge = !!(kontenBadge && kontenBadge.hasBadge);
-    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge && !hasProviderBadge && !hasSalesBadge && !hasTeknisiBadge && !hasKontenBadge && !hasLemburanBadge && !hasPengelolaBarangBadge) return null;
+        const hasKontenBadge = !!(kontenBadge && kontenBadge.hasBadge);
+    // ✅ NEW — Lencana Audit Marketing (tab "Audit Marketing" di /dashboard/lencana):
+    // MILESTONE kumulatif poin audit (0,5 poin per laporan yang diaudit), bersifat
+    // all-time & tidak dibatasi Top 3 — sama polanya dengan milestone lainnya.
+    const hasAuditMarketingBadge = !!(auditMarketingBadge && auditMarketingBadge.hasBadge);
+    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge && !hasProviderBadge && !hasSalesBadge && !hasTeknisiBadge && !hasKontenBadge && !hasLemburanBadge && !hasPengelolaBarangBadge && !hasAuditMarketingBadge) return null;
     titles.sort((a, b) => a.rank - b.rank);
 
     return (
@@ -1357,8 +1367,11 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
             {hasTeknisiBadge && (
                 <TeknisiMilestoneBadge rank={teknisiBadge!.rank} milestone={teknisiBadge!.milestone} />
             )}
-            {hasKontenBadge && (
+                        {hasKontenBadge && (
                 <KontenMilestoneBadge rank={kontenBadge!.rank} milestone={kontenBadge!.milestone} />
+            )}
+            {hasAuditMarketingBadge && (
+                <AuditMarketingMilestoneBadge rank={auditMarketingBadge!.rank} milestone={auditMarketingBadge!.milestone} />
             )}
             {titles.map((t) => (
                 <AchievementTitleBadge key={t.label} rank={t.rank} label={t.label} />
@@ -1543,8 +1556,45 @@ function KontenMilestoneBadge({ rank, milestone }: { rank: number; milestone: nu
             </div>
             <div className="relative leading-tight">
                 <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">{milestone}+ VIDEO</p>
-                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
+                                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
                     Konten Kreator
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ✅ NEW — badge lencana Audit Marketing: pola sama persis dengan
+// ProviderMilestoneBadge/SalesMilestoneBadge/TeknisiMilestoneBadge/KontenMilestoneBadge
+// (MILESTONE kumulatif all-time, TIDAK dibatasi Top 3) tapi satuannya total POIN
+// audit (0,5 poin per laporan Leads yang diverifikasi tim Marketing).
+function AuditMarketingMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = milestone >= 200 ? "gold" : milestone >= 50 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #f0abfc, #c026d3, #86198f)",
+        silver: "linear-gradient(135deg, #f5d0fe, #d946ef, #a21caf)",
+        bronze: "linear-gradient(135deg, #fae8ff, #f0abfc, #d946ef)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(192,38,211,0.35)",
+        silver: "rgba(217,70,239,0.35)",
+        bronze: "rgba(240,171,252,0.35)",
+    };
+
+    return (
+        <div
+            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
+            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
+            title={`Peringkat #${rank} · ${milestone}+ poin audit`}
+        >
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
+            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            </div>
+            <div className="relative leading-tight">
+                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">{milestone}+ POIN</p>
+                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
+                    Audit Marketing
                 </p>
             </div>
         </div>
