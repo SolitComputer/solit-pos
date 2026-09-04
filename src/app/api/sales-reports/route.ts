@@ -1,87 +1,94 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
-import { withAuth } from "@/lib/auth";
-import { hasAnyRole, SALES_REPORT_ROLES, SALES_REPORT_DELETE_ROLES } from "@/lib/permissions";
+import { withAuth, AuthUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+const TABLE = "sales_online_reports";
+const NO_PHONE_CHANNELS = ["MITRA", "RESELLER"];
+const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta = UTC+7
+
+// Hitung batas awal periode ("today" | "week" | "month") dalam waktu WIB,
+// lalu kembalikan sebagai ISO string UTC untuk query `.gte("created_at", ...)`.
+function getPeriodStartUtc(period: string): string {
+  const nowWib = new Date(Date.now() + WIB_OFFSET_MS);
+  const startOfDayWib = new Date(
+    Date.UTC(nowWib.getUTCFullYear(), nowWib.getUTCMonth(), nowWib.getUTCDate())
+  );
+
+  let startWib = startOfDayWib;
+  if (period === "week") {
+    const day = startOfDayWib.getUTCDay(); // 0 = Minggu
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    startWib = new Date(startOfDayWib);
+    startWib.setUTCDate(startWib.getUTCDate() - diffToMonday);
+  } else if (period === "month") {
+    startWib = new Date(Date.UTC(nowWib.getUTCFullYear(), nowWib.getUTCMonth(), 1));
+  }
+
+  return new Date(startWib.getTime() - WIB_OFFSET_MS).toISOString();
+}
+
+// Validasi + normalisasi body form Tambah/Edit — dipakai bareng oleh POST & PATCH.
+function validateAndNormalize(body: any) {
+  const channel = (body.channel ?? "").toString();
+  const phone_number = (body.phone_number ?? "").toString().trim();
+  const partner_name = (body.partner_name ?? "").toString().trim();
+  const interest = (body.interest ?? "").toString().trim();
+  const keterangan = (body.keterangan ?? "").toString().trim();
+  const purchased = Boolean(body.purchased);
+  const isNoPhone = NO_PHONE_CHANNELS.includes(channel);
+
+  if (!interest) return { error: "Minat wajib diisi" as const };
+  if (isNoPhone && !partner_name) return { error: "Nama mitra/reseller wajib diisi" as const };
+  if (!isNoPhone && !phone_number) return { error: "Nomor telepon wajib diisi" as const };
+
+  return {
+    value: {
+      channel,
+      phone_number: isNoPhone ? null : phone_number,
+      partner_name: isNoPhone ? partner_name : null,
+      interest,
+      keterangan: keterangan || null,
+      purchased,
+    },
+  };
+}
+
 // GET /api/sales-reports?period=today|week|month
-export const GET = withAuth(async (req, _ctx, user) => {
+async function getHandler(req: NextRequest) {
   try {
-    const userRoles: string[] = user.roles?.length > 0 ? user.roles : [user.role];
-    if (!hasAnyRole(userRoles, SALES_REPORT_ROLES)) {
-      return NextResponse.json({ success: false, message: "Tidak punya akses" }, { status: 403 });
-    }
-
-    const url = new URL(req.url);
-    const period = url.searchParams.get("period") ?? "today";
-
-    const now = new Date();
-    now.setHours(now.getHours() + 7); // Jakarta timezone, sama seperti leaderboard-kerja
-    let startDate = new Date(now);
-    let endDate = new Date(now);
-
-    if (period === "today") {
-      startDate.setUTCHours(0, 0, 0, 0);
-      endDate.setUTCHours(23, 59, 59, 999);
-    } else if (period === "week") {
-      const day = startDate.getUTCDay();
-      const diff = startDate.getUTCDate() - day + (day === 0 ? -6 : 1);
-      startDate.setUTCDate(diff);
-      startDate.setUTCHours(0, 0, 0, 0);
-      endDate.setUTCHours(23, 59, 59, 999);
-    } else if (period === "month") {
-      startDate.setUTCDate(1);
-      startDate.setUTCHours(0, 0, 0, 0);
-      endDate.setUTCMonth(endDate.getUTCMonth() + 1, 0);
-      endDate.setUTCHours(23, 59, 59, 999);
-    }
+    const { searchParams } = new URL(req.url);
+    const period = searchParams.get("period") || "today";
+    const startUtc = getPeriodStartUtc(period);
 
     const { data, error } = await supabaseAdmin
-      .from("sales_online_reports")
-      .select("id, phone_number, interest, purchased, filled_by, filled_by_name, created_at")
-      .gte("created_at", startDate.toISOString())
-      .lte("created_at", endDate.toISOString())
+      .from(TABLE)
+      .select("*")
+      .gte("created_at", startUtc)
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
 
-    return NextResponse.json({ success: true, data: data ?? [] });
+    return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error("Sales report GET error:", error);
+    console.error("Sales report list error:", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
-});
+}
 
-// POST /api/sales-reports
-export const POST = withAuth(async (req, _ctx, user) => {
+// POST /api/sales-reports  { channel, phone_number, partner_name, interest, keterangan, purchased }
+async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
-    const userRoles: string[] = user.roles?.length > 0 ? user.roles : [user.role];
-    if (!hasAnyRole(userRoles, SALES_REPORT_ROLES)) {
-      return NextResponse.json({ success: false, message: "Tidak punya akses" }, { status: 403 });
-    }
-
     const body = await req.json();
-    const phoneNumber = (body.phone_number ?? "").toString().trim();
-    const interest = (body.interest ?? "").toString().trim();
-    const purchased = Boolean(body.purchased);
-
-    if (!phoneNumber) {
-      return NextResponse.json({ success: false, message: "Nomor telepon wajib diisi" }, { status: 400 });
-    }
-    if (!interest) {
-      return NextResponse.json({ success: false, message: "Minat wajib diisi" }, { status: 400 });
+    const { error: validationError, value } = validateAndNormalize(body);
+    if (validationError) {
+      return NextResponse.json({ success: false, message: validationError }, { status: 400 });
     }
 
     const { data, error } = await supabaseAdmin
-      .from("sales_online_reports")
-      .insert({
-        phone_number: phoneNumber,
-        interest,
-        purchased,
-        filled_by: user.id,
-        filled_by_name: user.name,
-      })
+      .from(TABLE)
+      .insert({ ...value, filled_by: user.id, filled_by_name: user.name, audited: false })
       .select()
       .single();
 
@@ -89,107 +96,94 @@ export const POST = withAuth(async (req, _ctx, user) => {
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error("Sales report POST error:", error);
+    console.error("Sales report create error:", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
-});
+}
 
-// DELETE /api/sales-reports?id=xxx
-// Boleh dihapus oleh: pembuatnya sendiri (masih di hari yang sama, untuk
-// perbaiki salah input) ATAU role full-access (Admin/Programmer/Asisten CEO).
-export const DELETE = withAuth(async (req, _ctx, user) => {
+// PATCH /api/sales-reports?id=xxx  { channel, phone_number, partner_name, interest, keterangan, purchased }
+async function patchHandler(req: NextRequest) {
   try {
-    const url = new URL(req.url);
-    const id = url.searchParams.get("id");
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
     if (!id) {
       return NextResponse.json({ success: false, message: "id wajib diisi" }, { status: 400 });
     }
 
-    const userRoles: string[] = user.roles?.length > 0 ? user.roles : [user.role];
+    const body = await req.json();
+    const { error: validationError, value } = validateAndNormalize(body);
+    if (validationError) {
+      return NextResponse.json({ success: false, message: validationError }, { status: 400 });
+    }
 
     const { data: existing, error: fetchError } = await supabaseAdmin
-      .from("sales_online_reports")
-      .select("id, filled_by, created_at")
+      .from(TABLE)
+      .select("id, audited")
       .eq("id", id)
       .single();
 
     if (fetchError || !existing) {
       return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
     }
-
-    const isOwner = existing.filled_by === user.id;
-    const isSameDay = new Date(existing.created_at).toDateString() === new Date().toDateString();
-    const canDelete = hasAnyRole(userRoles, SALES_REPORT_DELETE_ROLES) || (isOwner && isSameDay);
-
-    if (!canDelete) {
-      return NextResponse.json({ success: false, message: "Tidak punya akses hapus" }, { status: 403 });
+    if (existing.audited) {
+      return NextResponse.json(
+        { success: false, message: "Laporan yang sudah diaudit tidak bisa diedit" },
+        { status: 409 }
+      );
     }
 
-    const { error } = await supabaseAdmin.from("sales_online_reports").delete().eq("id", id);
+    const { data, error } = await supabaseAdmin
+      .from(TABLE)
+      .update(value)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    return NextResponse.json({ success: true, data });
+  } catch (error: any) {
+    console.error("Sales report update error:", error);
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+}
+
+// DELETE /api/sales-reports?id=xxx
+async function deleteHandler(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ success: false, message: "id wajib diisi" }, { status: 400 });
+    }
+
+    const { data: existing, error: fetchError } = await supabaseAdmin
+      .from(TABLE)
+      .select("id, audited")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !existing) {
+      return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+    }
+    if (existing.audited) {
+      return NextResponse.json(
+        { success: false, message: "Laporan yang sudah diaudit tidak bisa dihapus" },
+        { status: 409 }
+      );
+    }
+
+    const { error } = await supabaseAdmin.from(TABLE).delete().eq("id", id);
     if (error) throw new Error(error.message);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Sales report DELETE error:", error);
+    console.error("Sales report delete error:", error);
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
-});
+}
 
-// PATCH /api/sales-reports?id=xxx
-// Boleh diedit oleh: pembuatnya sendiri (masih di hari yang sama) ATAU
-// role full-access (Admin/Programmer/Asisten CEO) — aturan sama seperti DELETE.
-export const PATCH = withAuth(async (req, _ctx, user) => {
-  try {
-    const url = new URL(req.url);
-    const id = url.searchParams.get("id");
-    if (!id) {
-      return NextResponse.json({ success: false, message: "id wajib diisi" }, { status: 400 });
-    }
-
-    const body = await req.json();
-    const phoneNumber = (body.phone_number ?? "").toString().trim();
-    const interest = (body.interest ?? "").toString().trim();
-    const purchased = Boolean(body.purchased);
-
-    if (!phoneNumber) {
-      return NextResponse.json({ success: false, message: "Nomor telepon wajib diisi" }, { status: 400 });
-    }
-    if (!interest) {
-      return NextResponse.json({ success: false, message: "Minat wajib diisi" }, { status: 400 });
-    }
-
-    const userRoles: string[] = user.roles?.length > 0 ? user.roles : [user.role];
-
-    const { data: existing, error: fetchError } = await supabaseAdmin
-      .from("sales_online_reports")
-      .select("id, filled_by, created_at")
-      .eq("id", id)
-      .single();
-
-    if (fetchError || !existing) {
-      return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
-    }
-
-    const isOwner = existing.filled_by === user.id;
-    const isSameDay = new Date(existing.created_at).toDateString() === new Date().toDateString();
-    const canEdit = hasAnyRole(userRoles, SALES_REPORT_DELETE_ROLES) || (isOwner && isSameDay);
-
-    if (!canEdit) {
-      return NextResponse.json({ success: false, message: "Tidak punya akses edit" }, { status: 403 });
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from("sales_online_reports")
-      .update({ phone_number: phoneNumber, interest, purchased })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    return NextResponse.json({ success: true, data });
-  } catch (error: any) {
-    console.error("Sales report PATCH error:", error);
-    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-  }
-});
+export const GET = withAuth(getHandler);
+export const POST = withAuth(postHandler);
+export const PATCH = withAuth(patchHandler);
+export const DELETE = withAuth(deleteHandler);

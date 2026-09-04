@@ -21,6 +21,7 @@ import {
     Wrench,
     Video,
     Boxes,
+    Megaphone,
     type LucideIcon,
 } from "lucide-react";
 
@@ -64,8 +65,9 @@ const ACCENTS: Record<string, Accent> = {
     rose: { bar: "from-rose-400 to-pink-500", chip: "bg-rose-100 text-rose-600" },
     emerald: { bar: "from-emerald-400 to-green-500", chip: "bg-emerald-100 text-emerald-600" },
     cyan: { bar: "from-cyan-400 to-blue-500", chip: "bg-cyan-100 text-cyan-600" },
-    amber: { bar: "from-amber-400 to-orange-500", chip: "bg-amber-100 text-amber-600" },
+        amber: { bar: "from-amber-400 to-orange-500", chip: "bg-amber-100 text-amber-600" },
     sky: { bar: "from-sky-400 to-blue-500", chip: "bg-sky-100 text-sky-600" },
+    fuchsia: { bar: "from-fuchsia-400 to-pink-500", chip: "bg-fuchsia-100 text-fuchsia-600" },
 };
 
 /* ============================================================
@@ -1485,11 +1487,52 @@ function KontenKreatorLeaderboard() {
     );
 }
 
+/* ---------- Audit Marketing ---------- */
+
+function AuditMarketingLeaderboard() {
+    const [board, setBoard] = useState<MilestoneRow[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const r = await fetch(`/api/sales-reports/audit-milestones?list=true`);
+            const d = await r.json();
+            if (d.success) setBoard(d.data || []);
+        } catch {
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    return (
+        <MilestoneBoardView
+            icon={Megaphone}
+            accent={ACCENTS.fuchsia}
+            title="Lencana Audit Marketing"
+            description={
+                <>
+                    Dihitung dari <strong>total laporan Leads yang berhasil diaudit/diverifikasi</strong> oleh tim Marketing (Kepala Marketing, Marketing, PKL Marketing) di halaman Laporan Harian Sales — setiap laporan yang diaudit bernilai <strong>0,5 poin</strong>. Lencana didapat berdasarkan MILESTONE total poin yang sudah dicapai: 5, 10, 25, 50, 100, 150, 200, 300, sampai 500 poin — bersifat kumulatif &amp; permanen begitu tercapai, ditampilkan untuk semua yang sudah meraihnya (tidak dibatasi Top 3).
+                </>
+            }
+            board={board}
+            loading={loading}
+            emptyMessage="Belum ada laporan yang diaudit"
+            alwaysShowMilestone={true}
+            totalLabel="Total Poin Audit"
+            rowGradient="from-fuchsia-400 to-pink-500"
+            valueColorClass="text-fuchsia-600"
+        />
+    );
+}
+
 /* ============================================================
    Halaman utama
    ============================================================ */
 
-type SubTab = "absensi" | "kerja" | "pengantaran" | "penyedia" | "sales" | "teknisi" | "konten" | "lemburan" | "pengelolabarang";
+type SubTab = "absensi" | "kerja" | "pengantaran" | "penyedia" | "sales" | "teknisi" | "konten" | "lemburan" | "pengelolabarang" | "auditmarketing";
 
 const TABS: { id: SubTab; label: string; icon: LucideIcon }[] = [
     { id: "absensi", label: "Absensi", icon: UserCheck },
@@ -1500,7 +1543,8 @@ const TABS: { id: SubTab; label: string; icon: LucideIcon }[] = [
     { id: "teknisi", label: "Teknisi", icon: Wrench },
     { id: "konten", label: "Konten Kreator", icon: Video },
     { id: "lemburan", label: "Lemburan", icon: Clock },
-    { id: "pengelolabarang", label: "Pengelola Barang", icon: Boxes },
+        { id: "pengelolabarang", label: "Pengelola Barang", icon: Boxes },
+    { id: "auditmarketing", label: "Audit Marketing", icon: Megaphone },
 ];
 
 export default function LencanaPage() {
@@ -1553,7 +1597,8 @@ export default function LencanaPage() {
                 {subTab === "teknisi" && <TeknisiLeaderboard />}
                 {subTab === "konten" && <KontenKreatorLeaderboard />}
                 {subTab === "lemburan" && <LemburanLeaderboard isAdmin={isAdminUser(currentUser)} />}
-                {subTab === "pengelolabarang" && <PengelolaBarangLeaderboard isAdmin={isAdminUser(currentUser)} />}
+                                {subTab === "pengelolabarang" && <PengelolaBarangLeaderboard isAdmin={isAdminUser(currentUser)} />}
+                {subTab === "auditmarketing" && <AuditMarketingLeaderboard />}
             </div>
         </DashboardLayout >
     );

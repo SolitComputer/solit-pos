@@ -218,6 +218,21 @@ const ITEM_LAPORAN_KEUANGAN: MenuItem = { name: "Laporan Keuangan", href: "/dash
 const ITEM_MONITOR_CHAT: MenuItem = { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat };
 const ITEM_LEADS_CHAT: MenuItem = { name: "Leads Chat Masuk", href: "/dashboard/leads-chat", icon: Icons.leadsChat };
 const ITEM_LAPORAN_SALES_HARIAN: MenuItem = { name: "Laporan Harian Sales", href: "/dashboard/laporan-harian-sales", icon: Icons.salesReport };
+// Sub-menu per channel leads (WA/FB/OLX/Carousell/Mitra/Reseller) — link ke
+// halaman yang sama dengan query ?channel=... supaya tab channel di halaman
+// Laporan Harian Sales otomatis ke-preselect saat diklik dari sidebar.
+const LAPORAN_SALES_MENU: MenuGroup = {
+  label: "Laporan Sales",
+  items: [
+    ITEM_LAPORAN_SALES_HARIAN,
+    { name: "WhatsApp", href: "/dashboard/laporan-harian-sales?channel=WA", icon: Icons.salesReport },
+    { name: "Facebook", href: "/dashboard/laporan-harian-sales?channel=FB", icon: Icons.salesReport },
+    { name: "OLX", href: "/dashboard/laporan-harian-sales?channel=OLX", icon: Icons.salesReport },
+    { name: "Carousell", href: "/dashboard/laporan-harian-sales?channel=CAROUSEL", icon: Icons.salesReport },
+    { name: "Mitra", href: "/dashboard/laporan-harian-sales?channel=MITRA", icon: Icons.salesReport },
+    { name: "Reseller", href: "/dashboard/laporan-harian-sales?channel=RESELLER", icon: Icons.salesReport },
+  ],
+};
 const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashboard/hasil-penjualan", icon: Icons.salesResult };
 const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboard/employee-birthdays", icon: Icons.employeeBirthday };
 
@@ -385,7 +400,6 @@ const ADMIN_TRANSAKSI: MenuGroup = {
     { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
-    ITEM_LAPORAN_SALES_HARIAN,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -423,7 +437,6 @@ const SALES_TRANSAKSI: MenuGroup = {
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     ITEM_MANAGEMENT_SELLER,
-    ITEM_LAPORAN_SALES_HARIAN,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -719,8 +732,24 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_PENGANTARAN: [...PKL_MENU],
   PKL_CUSTOMER_SERVICE: [...PKL_MENU],
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
-  PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
+    PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
 };
+
+// ── Laporan Sales: grup sidebar tersendiri (WA/FB/OLX/Carousell/Mitra/
+// Reseller), BUKAN flat item lagi di dalam "Transaksi". Ditambahkan di sini —
+// SEBELUM loop PKL_MENU_INHERIT & sortGroupsByCanonicalOrder di bawah —
+// supaya PKL_SALES/PKL_ZENITH/PKL_MARKETING otomatis ikut mewarisi grup ini
+// dari role induknya (CREW_SALES/MARKETING), dan grupnya ke-sort ke posisi
+// yang benar (tepat di bawah "Transaksi") oleh GROUP_ORDER di bawah.
+const LAPORAN_SALES_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "KEPALA_MARKETING", "MARKETING",
+];
+LAPORAN_SALES_ROLES.forEach((role) => {
+  ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: LAPORAN_SALES_MENU.label, items: [...LAPORAN_SALES_MENU.items] }];
+});
 
 const MISSION_HREFS = new Set([...MISSIONS_MENU.items.map((i) => i.href), ITEM_MISSION_ALL.href]);
 
@@ -798,6 +827,7 @@ const GROUP_ORDER: string[] = [
   "Keuangan",
   "Inventaris",
   "Transaksi",
+  "Laporan Sales",
   "Penyedia Barang",
   "Penyiapan Barang",
   "Pengantaran",

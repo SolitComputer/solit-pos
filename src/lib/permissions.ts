@@ -331,6 +331,17 @@ export const SALES_REPORT_ROLES: UserRole[] = [
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
   "PKL_SALES",
 ];
+// ── Marketing: boleh input leads channel FB/OLX/Carousel/Mitra/Reseller, dan
+// HANYA role-role ini (+ FULL_ACCESS) yang boleh melakukan audit laporan.
+export const SALES_REPORT_MARKETING_ROLES: UserRole[] = [
+  "KEPALA_MARKETING", "MARKETING", "PKL_MARKETING",
+];
+export const SALES_REPORT_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...SALES_REPORT_ROLES, ...SALES_REPORT_MARKETING_ROLES,
+]));
+export const SALES_REPORT_AUDIT_ROLES: UserRole[] = [
+  ...FULL_ACCESS, ...SALES_REPORT_MARKETING_ROLES,
+];
 export const SALES_REPORT_DELETE_ROLES: UserRole[] = [...FULL_ACCESS];
 
 export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
@@ -564,8 +575,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/leads-chat": [...LEADS_CHAT_ROLES],
   "/api/leads-chat": [...LEADS_CHAT_ROLES],
 
-  "/dashboard/laporan-harian-sales": [...SALES_REPORT_ROLES],
-  "/api/sales-reports": [...SALES_REPORT_ROLES],
+    "/dashboard/laporan-harian-sales": [...SALES_REPORT_VIEW_ROLES],
+  "/api/sales-reports": [...SALES_REPORT_VIEW_ROLES],
+  "/api/sales-reports/audit": [...SALES_REPORT_AUDIT_ROLES],
 
   "/dashboard/todos": [...TODO_ROLES],
   "/api/todos": [...TODO_ROLES],
