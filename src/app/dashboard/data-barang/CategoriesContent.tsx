@@ -290,18 +290,7 @@ function CategoryFormModal({
 }) {
     const isEdit = !!category;
     const [name, setName] = useState(category?.name ?? "");
-    const [description, setDescription] = useState(category?.description ?? "");
-    const [type, setType] = useState<string>(
-        category?.type ? category.type : "ALL"
-    );
     const [submitting, setSubmitting] = useState(false);
-
-    const typeOptions = [
-        { value: "ALL", label: "Semua / Umum", desc: "Bisa untuk Laptop, Aksesoris & Sparepart" },
-        { value: "LAPTOP", label: "Laptop / Unit", desc: "Khusus untuk unit laptop" },
-        { value: "AKSESORIS", label: "Aksesoris", desc: "Charger, Tas, Kabel, Mouse, dll" },
-        { value: "SPAREPART", label: "Sparepart / Part", desc: "RAM, SSD, HDD, Fan, LCD, dll" },
-    ];
 
     const handleSubmit = async () => {
         if (!name.trim()) return toast.error("Nama kategori wajib diisi");
@@ -315,8 +304,6 @@ function CategoryFormModal({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     name: name.trim(),
-                    description: description.trim() || null,
-                    type: type === "ALL" ? null : type,
                 }),
             });
             const json = await res.json();
@@ -346,7 +333,7 @@ function CategoryFormModal({
                     </button>
                 </div>
 
-                <div className="p-5 space-y-4">
+                                <div className="p-5 space-y-4">
                     <div>
                         <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Nama Kategori</label>
                         <input
@@ -355,38 +342,6 @@ function CategoryFormModal({
                             placeholder="Contoh: RAM PC4, SSD NVMe, Adapter Charger, Fan, dll..."
                             className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
                             autoFocus
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Tipe / Pengelompokan Kategori</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {typeOptions.map(t => (
-                                <button
-                                    key={t.value}
-                                    type="button"
-                                    onClick={() => setType(t.value)}
-                                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
-                                        type === t.value
-                                            ? "border-zinc-900 bg-zinc-900 text-white shadow-sm"
-                                            : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                                    }`}
-                                >
-                                    <div className="text-xs font-bold">{t.label}</div>
-                                    <div className={`text-[10px] mt-0.5 line-clamp-1 ${type === t.value ? "text-zinc-300" : "text-gray-400"}`}>
-                                        {t.desc}
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-[12px] font-semibold text-gray-600 mb-1.5">Deskripsi (Opsional)</label>
-                        <textarea
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
-                            rows={3}
-                            placeholder="Keterangan singkat tentang kategori ini…"
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-zinc-400"
                         />
                     </div>
                 </div>
