@@ -26,6 +26,8 @@ export type BorderStyle =
       overlayVideo?: string;
       /** Slot logo/medali (khusus border LIMITED/event, mis. anniversary-2026). */
       medallionImage?: string;
+      /** Khusus banner: preset garis penghubung antar-sudut (CSS animated line), lihat SolitBanner.tsx. */
+      linePreset?: string;
     };
 
 export type BorderTier = "COMMON" | "RARE" | "EPIC" | "LEGENDARY" | "LIMITED";
