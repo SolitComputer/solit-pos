@@ -13,7 +13,7 @@ import { getAuthUser } from "@/hooks/useAuthUser";
 import { usePagePermission } from "@/hooks/usePagePermission";
 import * as XLSX from "xlsx";
 import {
-      UserRole, hasAnyRole, PERMISSIONS,
+    UserRole, hasAnyRole, PERMISSIONS,
     LAPTOP_DELETE_ROLES, ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES, ACCESSORY_DELETE_ROLES,
     BARANG_PRIVATE_VIEW_ROLES, BARANG_FULL_ACCESS_ROLES, SO_ROLES, SO_LIMITED_USER_IDS, canSoLaptop,
 } from "@/lib/permissions";
@@ -44,6 +44,7 @@ interface AccessoryRaw {
     id: string; name: string; category: string; brand: string | null; spec: string | null;
     buy_price?: number; sell_price: number; stock: number; notes: string | null; created_at: string;
     audited_at?: string | null; audited_by?: string | null;
+    so_at?: string | null; so_by?: string | null;
     accessory_units?: AccessoryUnitLite[];
 }
 
@@ -154,7 +155,7 @@ function normalizeAccessory(a: AccessoryRaw): UnifiedRow {
         sn_note: one ? undefined : (aktif.length > 1 ? `${aktif.length} SN` : undefined),
         stok_tersedia: null, siap_jual: null, minus: null,
         stok: units.length > 0 ? aktif.length : (a.stock ?? 0),
-        so_at: null, so_by: null,
+        so_at: a.so_at ?? null, so_by: a.so_by ?? null,
         audited_at: a.audited_at ?? null, audited_by: a.audited_by ?? null,
         unit_id: one ? one.id : undefined, unit_count: aktif.length,
         raw: a,
@@ -283,6 +284,58 @@ function writeBarangCache(rows: UnifiedRow[]) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// MODAL: Konfirmasi SO — pengganti window.prompt(). Cancel = benar-benar batal.
+// ═══════════════════════════════════════════════════════════════════════════
+function SoConfirmModal({
+    row, notes, onNotesChange, onConfirm, onCancel, loading,
+}: {
+    row: UnifiedRow; notes: string; onNotesChange: (v: string) => void;
+    onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !loading) onCancel(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onCancel, loading]);
+
+    const isActive = isSoActive(row.so_at);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => !loading && onCancel()} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-popIn">
+                <div className={`h-1 w-full bg-gradient-to-r ${isActive ? "from-emerald-400 via-emerald-600 to-emerald-800" : "from-red-400 via-red-600 to-red-800"}`} />
+                <div className={`px-5 py-4 ${isActive ? "bg-emerald-600" : "bg-red-600"}`}>
+                    <p className="font-bold text-white text-sm">{isActive ? "Tandai Ulang SO" : "Tandai Sudah SO"}</p>
+                    <p className="text-xs text-white/70 mt-0.5 truncate">{row.nama}</p>
+                </div>
+                <div className="p-5">
+                    <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-widest mb-1.5">
+                        Catatan SO (opsional)
+                    </label>
+                    <textarea
+                        autoFocus
+                        rows={3}
+                        placeholder="Kondisi barang, lokasi, dll"
+                        value={notes}
+                        onChange={e => onNotesChange(e.target.value)}
+                        className={`w-full border border-zinc-200 rounded-xl px-3 py-2.5 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:bg-white transition resize-none ${isActive ? "focus:ring-emerald-500/20 focus:border-emerald-400" : "focus:ring-red-500/20 focus:border-red-400"}`}
+                    />
+                    <div className="flex gap-3 mt-5">
+                        <button onClick={onCancel} disabled={loading} className="flex-1 h-10 bg-zinc-100 text-zinc-600 rounded-xl text-sm font-medium hover:bg-zinc-200 transition disabled:opacity-50">Batal</button>
+                        <button onClick={onConfirm} disabled={loading}
+                            className={`flex-1 h-10 text-white rounded-xl text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 ${isActive ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}`}>
+                            {loading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                            Konfirmasi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════════════════════════════════
 export default function UnifiedBarangContent() {
@@ -317,6 +370,8 @@ export default function UnifiedBarangContent() {
 
     const [auditingId, setAuditingId] = useState<string | null>(null);
     const [soingId, setSoingId] = useState<string | null>(null);
+    const [soConfirmTarget, setSoConfirmTarget] = useState<UnifiedRow | null>(null);
+    const [soConfirmNotes, setSoConfirmNotes] = useState("");
     const [pedagangSavingId, setPedagangSavingId] = useState<string | null>(null);
 
     const [historyTarget, setHistoryTarget] = useState<{ row: UnifiedRow; kind: "audit" | "so" } | null>(null);
@@ -365,9 +420,21 @@ export default function UnifiedBarangContent() {
     //  "+ Tambah Unit" & "Edit Data" di dalam pop-up detail unit (stok 1).
     const canFullAccessBarang = hasAnyRole(userRoles, BARANG_FULL_ACCESS_ROLES);
     const canManageSo = hasAnyRole(userRoles, SO_ROLES) || SO_LIMITED_USER_IDS.includes(userId ?? "");
+    // SO untuk AKSESORIS belum punya aturan role khusus seperti canSoLaptop
+    // (yang mempertimbangkan siap_jual) — sementara pakai gate stok > 0.
+    // Sesuaikan di sini kalau nanti ada aturan role spesifik untuk aksesoris.
+    const canDoSo = (row: UnifiedRow) => {
+        if (!canManageSo) return false;
+        if (row.tipe === "LAPTOP") return canSoLaptop(userRoles, userId, row.siap_jual ?? 0);
+        // Aksesoris: SO di tabel utama HANYA untuk stok ≤ 1 (0 atau 1 unit).
+        // Stok > 1 → SO dipindah ke dalam halaman Kelola Unit, per-SN.
+        const stok = row.stok ?? 0;
+        if (stok > 1) return false;
+        return stok > 0;
+    };
     const canCreateAcc = hasAnyRole(userRoles, ACCESSORY_CREATE_ROLES) || matrixCanBarang.create;
     const canEditAcc = hasAnyRole(userRoles, ACCESSORY_EDIT_ROLES) || matrixCanBarang.edit;
-        const canDeleteAcc = hasAnyRole(userRoles, ACCESSORY_DELETE_ROLES) || matrixCanBarang.delete;
+    const canDeleteAcc = hasAnyRole(userRoles, ACCESSORY_DELETE_ROLES) || matrixCanBarang.delete;
 
     // ── Aturan toggle audit: LAPTOP butuh canSeePrivate, AKSESORIS butuh ADMIN.
     // Ini persis aturan yang sudah ada masing-masing di komponen asli — sengaja
@@ -434,6 +501,14 @@ export default function UnifiedBarangContent() {
     // Reset filter kategori tiap ganti tipe (opsi kategori beda antar tipe)
     useEffect(() => { setKategoriFilter(""); }, [tipeFilter]);
 
+    // Deep-link: baca ?tipe= dari URL sekali saat mount — dipakai tombol
+    // breadcrumb "Data Aksesori" di halaman Kelola Unit, supaya begitu balik
+    // ke sini tab langsung terisi Aksesoris, bukan "Semua" default.
+    useEffect(() => {
+        const t = new URLSearchParams(window.location.search).get("tipe");
+        if (t === "LAPTOP" || t === "AKSESORIS") setTipeFilter(t);
+    }, []);
+
     // Kategori dipisah per tipe supaya dropdown laptop tidak menampilkan kategori
     // aksesoris & sebaliknya. Transition-safe: kategori tanpa `type` (mis. migrasi
     // belum jalan) tetap ikut muncul di kedua tipe — persis perilaku lama.
@@ -448,7 +523,7 @@ export default function UnifiedBarangContent() {
     // Opsi yang tampil di dropdown filter, mengikuti tipe yang sedang dipilih.
     const filterCategories = tipeFilter === "LAPTOP" ? laptopCategories
         : tipeFilter === "AKSESORIS" ? accessoryCategories
-        : categories;
+            : categories;
 
     // Daftar Brand unik yang ada di data
     const availableBrands = useMemo(() => {
@@ -513,7 +588,7 @@ export default function UnifiedBarangContent() {
         if (statusAuditSoFilter !== "ALL") {
             list = list.filter(r => {
                 if (statusAuditSoFilter === "SO_TODAY") return isSoActive(r.so_at);
-                if (statusAuditSoFilter === "SO_NEED") return r.tipe === "LAPTOP" && !isSoActive(r.so_at);
+                if (statusAuditSoFilter === "SO_NEED") return !isSoActive(r.so_at);
                 if (statusAuditSoFilter === "AUDIT_ACTIVE") return isAuditActive(r);
                 return true;
             });
@@ -571,7 +646,7 @@ export default function UnifiedBarangContent() {
         });
     }, [rows, tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, search, categories, sortBy]);
 
-        const counts = useMemo(() => ({
+    const counts = useMemo(() => ({
         total: rows.length,
         laptop: rows.filter(r => r.tipe === "LAPTOP").length,
         aksesoris: rows.filter(r => r.tipe === "AKSESORIS").length,
@@ -679,12 +754,14 @@ export default function UnifiedBarangContent() {
         }
     };
 
-    // ── SO toggle (laptop only) ─────────────────────────────────────────────
-    const toggleSo = async (row: UnifiedRow) => {
-        const note = window.prompt("Catatan SO (opsional):", "") ?? "";
+    // ── SO toggle (laptop & aksesoris) ──────────────────────────────────────
+    // Catatan diambil dari SoConfirmModal, bukan window.prompt — Cancel di
+    // modal benar-benar tidak memanggil fungsi ini sama sekali.
+    const toggleSo = async (row: UnifiedRow, note: string) => {
         setSoingId(row.id);
         try {
-            const res = await fetch(`/api/laptops/${row.id}/so`, {
+            const url = row.tipe === "LAPTOP" ? `/api/laptops/${row.id}/so` : `/api/accessories/${row.id}/so`;
+            const res = await fetch(url, {
                 method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: note }),
             });
             const json = await res.json();
@@ -743,7 +820,7 @@ export default function UnifiedBarangContent() {
         }
     };
 
-        //  Versi AKSESORIS dari openUnitDetail — fetch ke endpoint asli
+    //  Versi AKSESORIS dari openUnitDetail — fetch ke endpoint asli
     //  (GET /api/accessory-units?accessory_id=X), bukan endpoint nested
     //  yang sudah dihapus karena duplikat & tidak konsisten dengan yang asli.
     const openAccessoryUnitDetail = async (row: UnifiedRow) => {
@@ -805,7 +882,9 @@ export default function UnifiedBarangContent() {
         (async () => {
             try {
                 const { row, kind } = historyTarget;
-                const url = kind === "so" ? `/api/laptops/${row.id}/so` : row.tipe === "LAPTOP" ? `/api/laptops/${row.id}/audit` : `/api/accessories/${row.id}/audit`;
+                const url = kind === "so"
+                    ? (row.tipe === "LAPTOP" ? `/api/laptops/${row.id}/so` : `/api/accessories/${row.id}/so`)
+                    : (row.tipe === "LAPTOP" ? `/api/laptops/${row.id}/audit` : `/api/accessories/${row.id}/audit`);
                 const res = await fetch(url);
                 const json = await res.json();
                 const raw = json.data?.history ?? [];
@@ -960,7 +1039,7 @@ export default function UnifiedBarangContent() {
                                 {label}
                             </button>
                         ))}
-                                                <div className="flex-1" />
+                        <div className="flex-1" />
                         <button onClick={handleExportExcel} disabled={filteredRows.length === 0}
                             className="h-9 px-4 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 transition">
                             Export Excel
@@ -1017,11 +1096,10 @@ export default function UnifiedBarangContent() {
                             <div className="lg:col-span-3 flex items-center gap-2">
                                 <button
                                     onClick={() => setShowAdvancedFilter(!showAdvancedFilter)}
-                                    className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition border ${
-                                        showAdvancedFilter || activeFilterCount > (tipeFilter !== "ALL" || kategoriFilter || brandFilter || search ? 1 : 0)
-                                            ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
-                                            : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
-                                    }`}
+                                    className={`flex-1 h-9 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition border ${showAdvancedFilter || activeFilterCount > (tipeFilter !== "ALL" || kategoriFilter || brandFilter || search ? 1 : 0)
+                                        ? "bg-zinc-900 text-white border-zinc-900 shadow-sm"
+                                        : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+                                        }`}
                                 >
                                     <SlidersHorizontal className="w-3.5 h-3.5" />
                                     <span>Filter Lanjutan</span>
@@ -1074,7 +1152,7 @@ export default function UnifiedBarangContent() {
                                     >
                                         <option value="ALL">Semua Status Audit &amp; SO</option>
                                         <option value="SO_TODAY">Sudah SO Hari Ini</option>
-                                        <option value="SO_NEED">Belum SO Hari Ini (Laptop)</option>
+                                        <option value="SO_NEED">Belum SO Hari Ini</option>
                                         <option value="AUDIT_ACTIVE">Audit Aktif</option>
                                     </select>
                                 </div>
@@ -1264,11 +1342,16 @@ export default function UnifiedBarangContent() {
                                                     className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
                                                     <HistoryIcon size={13} />
                                                 </button>
-                                                {row.tipe === "LAPTOP" && canManageSo && canSoLaptop(userRoles, userId, row.siap_jual ?? 0) && (
-                                                    <button onClick={() => toggleSo(row)} disabled={soingId === row.id}
-                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border ${soActive ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
-                                                        {soActive ? "SO" : "Tandai SO"}
-                                                    </button>
+                                                {canDoSo(row) && (
+                                                    <>
+                                                        <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
+                                                            className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${soActive ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
+                                                            {soActive ? "Sudah SO" : "SO"}
+                                                        </button>
+                                                        <button onClick={() => setHistoryTarget({ row, kind: "so" })} title="Riwayat SO" className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
+                                                            <HistoryIcon size={13} />
+                                                        </button>
+                                                    </>
                                                 )}
                                                 {row.tipe === "LAPTOP" && row.unit_id && (
                                                     <button onClick={() => togglePedagang(row, false)} disabled={pedagangSavingId === row.unit_id}
@@ -1390,11 +1473,16 @@ export default function UnifiedBarangContent() {
                                                             <span className={(row.stok ?? -1) === 0 ? "text-red-500 font-bold" : ""}>{row.stok ?? <Dash />}</span>
                                                         </td>
                                                         <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                                            {row.tipe === "LAPTOP" && canManageSo && canSoLaptop(userRoles, userId, row.siap_jual ?? 0) ? (
-                                                                <button onClick={() => toggleSo(row)} disabled={soingId === row.id}
-                                                                    className={`h-7 px-2 rounded-lg text-[11px] font-semibold border ${soActive ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-zinc-50 text-zinc-400 border-zinc-200"}`}>
-                                                                    {soActive ? "SO" : "-"}
-                                                                </button>
+                                                            {canDoSo(row) ? (
+                                                                <div className="flex items-center justify-center gap-1">
+                                                                    <button onClick={() => { setSoConfirmNotes(""); setSoConfirmTarget(row); }} disabled={soingId === row.id}
+                                                                        className={`h-7 px-2 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40 ${soActive ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"}`}>
+                                                                        {soActive ? "Sudah SO" : "SO"}
+                                                                    </button>
+                                                                    <button onClick={() => setHistoryTarget({ row, kind: "so" })} title="Riwayat SO" className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition">
+                                                                        <HistoryIcon size={13} />
+                                                                    </button>
+                                                                </div>
                                                             ) : <Dash />}
                                                         </td>
                                                         <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
@@ -1558,6 +1646,20 @@ export default function UnifiedBarangContent() {
 
             {barcodeTarget && (
                 <BarcodeModal laptopId={barcodeTarget.id} laptopName={barcodeTarget.name} onClose={() => setBarcodeTarget(null)} />
+            )}
+
+            {soConfirmTarget && (
+                <SoConfirmModal
+                    row={soConfirmTarget}
+                    notes={soConfirmNotes}
+                    onNotesChange={setSoConfirmNotes}
+                    loading={soingId === soConfirmTarget.id}
+                    onCancel={() => { if (soingId !== soConfirmTarget.id) setSoConfirmTarget(null); }}
+                    onConfirm={async () => {
+                        await toggleSo(soConfirmTarget, soConfirmNotes);
+                        setSoConfirmTarget(null);
+                    }}
+                />
             )}
 
             {addUnitTarget && (
