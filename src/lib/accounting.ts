@@ -194,6 +194,7 @@ export const CASHFLOW_OUT_ACCOUNT: Record<string, string> = {
   KEUNTUNGAN_MITRA: AKUN.KEUNTUNGAN_MITRA,
   BIAYA_PRINTILAN: AKUN.BIAYA_PRINTILAN,
   BIAYA_LAIN: AKUN.BIAYA_LAIN,
+  DOMPET_LAIN_LAIN: AKUN.DOMPET_LAIN,
 };
 
 export function expenseAccountForCashflow(category: string): string {
