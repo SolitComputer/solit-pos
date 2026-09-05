@@ -17,9 +17,10 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
         const { invoice } = await props.params;
         const body = await req.json().catch(() => ({}));
         const reason = typeof body.reason === "string" ? body.reason.trim() : "";
-        const unitIdsToCancel: string[] = Array.isArray(body.unit_ids)
-            ? [...new Set(body.unit_ids.filter((id: any) => typeof id === "string" && id))]
-            : [];
+        const rawUnitIds: unknown[] = Array.isArray(body.unit_ids) ? body.unit_ids : [];
+        const unitIdsToCancel: string[] = [
+            ...new Set(rawUnitIds.filter((id): id is string => typeof id === "string" && id.length > 0)),
+        ];
 
         if (!reason) {
             return NextResponse.json({ success: false, message: "Alasan wajib diisi" }, { status: 400 });
@@ -169,10 +170,10 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
             userId: user.id,
             userName: user.name,
             userRole: user.role,
-            action: "PARTIAL_CANCEL",
+            action: "RESTORE",
             entity: "transaction",
             entityId: transaction.id,
-            entityLabel: `${invoice} — ${transaction.customer_name} (batal sebagian: ${cancelledSNsLabel})`,
+            entityLabel: `[PARTIAL_CANCEL] ${invoice} — ${transaction.customer_name} (batal sebagian: ${cancelledSNsLabel})`,
             reason,
             beforeData: transaction,
         });
