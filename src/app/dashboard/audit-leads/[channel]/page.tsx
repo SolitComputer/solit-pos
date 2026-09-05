@@ -21,6 +21,7 @@ interface LeadRow {
   id: string; channel: Channel; nama: string; minat: string; keterangan: string | null;
   transaksi: boolean; ads: boolean; audited: boolean; audited_by_name: string | null;
   created_by: string; created_by_name: string; created_at: string;
+  source: "manual" | "sales_report";
 }
 
 const PAGE_SIZE = 10;
@@ -77,9 +78,11 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
   const paginated = useMemo(() => rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [rows, page]);
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
 
-  async function handleAudit(id: string) {
+    async function handleAudit(id: string) {
     try {
-      const res = await fetch("/api/audit-leads/audit", {
+      const target = rows.find((r) => r.id === id);
+      const endpoint = target?.source === "sales_report" ? "/api/sales-reports/audit" : "/api/audit-leads/audit";
+      const res = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
       });
       const json = await parseApiResponse(res);
@@ -144,11 +147,16 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                 paginated.map((row, i) => (
                   <tr key={row.id} className="border-t border-violet-50">
                     <td className="px-3 py-2">{(page - 1) * PAGE_SIZE + i + 1}</td>
-                    <td className="px-3 py-2">{row.nama}</td>
+                    <td className="px-3 py-2">
+                      {row.nama}
+                      {row.source === "sales_report" && (
+                        <div className="text-[10px] text-gray-400 mt-0.5">via Laporan Sales</div>
+                      )}
+                    </td>
                     <td className="px-3 py-2">{row.minat}</td>
                     <td className="px-3 py-2 text-gray-500">{row.keterangan || "-"}</td>
                     <td className="px-3 py-2 text-center">{row.transaksi ? "✅" : "❌"}</td>
-                    <td className="px-3 py-2 text-center">{row.ads ? "✅" : "❌"}</td>
+                                        <td className="px-3 py-2 text-center">{row.source === "sales_report" ? "–" : row.ads ? "✅" : "❌"}</td>
                     <td className="px-3 py-2 text-center">
                       {row.audited ? (
                         <span className="inline-flex items-center gap-1 text-emerald-600 text-xs"><ShieldCheck className="h-4 w-4" /> {row.audited_by_name}</span>
@@ -158,8 +166,8 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                         <span className="text-xs text-gray-400">Belum</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-center">
-                      {!row.audited && (
+                                        <td className="px-3 py-2 text-center">
+                      {!row.audited && row.source === "manual" && (
                         <div className="flex items-center justify-center gap-2">
                           <button onClick={() => { setEditingRow(row); setShowForm(true); }}><Pencil className="h-4 w-4 text-gray-500 hover:text-violet-600" /></button>
                           <button onClick={() => setConfirmDeleteId(row.id)}><Trash2 className="h-4 w-4 text-gray-500 hover:text-red-600" /></button>
