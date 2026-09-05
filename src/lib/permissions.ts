@@ -344,6 +344,23 @@ export const SALES_REPORT_AUDIT_ROLES: UserRole[] = [
 ];
 export const SALES_REPORT_DELETE_ROLES: UserRole[] = [...FULL_ACCESS];
 
+// ─── Audit Marketing (Leads Sales per channel WA/FB/OLX/Carousell/Mitra/Reseller) ──
+// Sengaja reuse role list yang sama persis dengan SALES_REPORT_* di atas — tim
+// yang input & audit di kedua fitur ini orangnya sama, biar tidak dobel-maintain
+// 2 daftar role yang isinya identik.
+export const AUDIT_LEADS_INPUT_ROLES: UserRole[] = [...SALES_REPORT_ROLES];
+export const AUDIT_LEADS_AUDIT_ROLES: UserRole[] = [...SALES_REPORT_MARKETING_ROLES];
+export const AUDIT_LEADS_FULL_ACCESS_ROLES: UserRole[] = [...FULL_ACCESS];
+export const AUDIT_LEADS_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...AUDIT_LEADS_INPUT_ROLES, ...AUDIT_LEADS_AUDIT_ROLES, ...AUDIT_LEADS_FULL_ACCESS_ROLES,
+]));
+// Dipakai di withAuth(handler, roles) untuk PATCH/DELETE — gerbang KASAR di
+// level route (siapa boleh sentuh endpoint sama sekali). Cek halus "pemilik
+// hari ini vs sudah diaudit" tetap dilakukan manual di dalam handler (findOwned()).
+export const AUDIT_LEADS_EDIT_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...AUDIT_LEADS_INPUT_ROLES, ...AUDIT_LEADS_FULL_ACCESS_ROLES,
+]));
+
 export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 
@@ -577,9 +594,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/leads-chat": [...LEADS_CHAT_ROLES],
   "/api/leads-chat": [...LEADS_CHAT_ROLES],
 
-    "/dashboard/laporan-harian-sales": [...SALES_REPORT_VIEW_ROLES],
+      "/dashboard/laporan-harian-sales": [...SALES_REPORT_VIEW_ROLES],
   "/api/sales-reports": [...SALES_REPORT_VIEW_ROLES],
   "/api/sales-reports/audit": [...SALES_REPORT_AUDIT_ROLES],
+
+  "/dashboard/audit-leads": [...AUDIT_LEADS_VIEW_ROLES],
+  "/api/audit-leads": [...AUDIT_LEADS_VIEW_ROLES],
+  "/api/audit-leads/audit": [...AUDIT_LEADS_AUDIT_ROLES],
 
   "/dashboard/todos": [...TODO_ROLES],
   "/api/todos": [...TODO_ROLES],

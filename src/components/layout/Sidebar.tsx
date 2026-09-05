@@ -223,14 +223,22 @@ const ITEM_LAPORAN_SALES_HARIAN: MenuItem = { name: "Laporan Harian Sales", href
 // Laporan Harian Sales otomatis ke-preselect saat diklik dari sidebar.
 const LAPORAN_SALES_MENU: MenuGroup = {
   label: "Laporan Sales",
-  items: [
+  items: [ 
     ITEM_LAPORAN_SALES_HARIAN,
-    { name: "WhatsApp", href: "/dashboard/laporan-harian-sales?channel=WA", icon: Icons.salesReport },
-    { name: "Facebook", href: "/dashboard/laporan-harian-sales?channel=FB", icon: Icons.salesReport },
-    { name: "OLX", href: "/dashboard/laporan-harian-sales?channel=OLX", icon: Icons.salesReport },
-    { name: "Carousell", href: "/dashboard/laporan-harian-sales?channel=CAROUSEL", icon: Icons.salesReport },
-    { name: "Mitra", href: "/dashboard/laporan-harian-sales?channel=MITRA", icon: Icons.salesReport },
-    { name: "Reseller", href: "/dashboard/laporan-harian-sales?channel=RESELLER", icon: Icons.salesReport },
+  ],
+};
+
+// BARU: fitur "Audit Marketing" — beda dari LAPORAN_SALES_MENU di atas, tiap
+// channel di sini adalah HALAMAN SENDIRI (route [channel]), bukan 1 halaman + tab.
+const AUDIT_LEADS_MENU: MenuGroup = {
+  label: "Audit Marketing",
+  items: [
+    { name: "WhatsApp", href: "/dashboard/audit-leads/wa", icon: Icons.salesReport },
+    { name: "Facebook", href: "/dashboard/audit-leads/fb", icon: Icons.salesReport },
+    { name: "OLX", href: "/dashboard/audit-leads/olx", icon: Icons.salesReport },
+    { name: "Carousell", href: "/dashboard/audit-leads/carousell", icon: Icons.salesReport },
+    { name: "Mitra", href: "/dashboard/audit-leads/mitra", icon: Icons.salesReport },
+    { name: "Reseller", href: "/dashboard/audit-leads/reseller", icon: Icons.salesReport },
   ],
 };
 const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashboard/hasil-penjualan", icon: Icons.salesResult };
@@ -751,6 +759,19 @@ LAPORAN_SALES_ROLES.forEach((role) => {
   ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: LAPORAN_SALES_MENU.label, items: [...LAPORAN_SALES_MENU.items] }];
 });
 
+// Sama polanya kayak LAPORAN_SALES_ROLES di atas — role list yang sama persis,
+// jadi PKL_SALES/PKL_ZENITH/PKL_MARKETING otomatis ikut mewarisi grup ini juga
+// lewat PKL_MENU_INHERIT di bawah.
+const AUDIT_LEADS_MENU_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "KEPALA_MARKETING", "MARKETING",
+];
+AUDIT_LEADS_MENU_ROLES.forEach((role) => {
+  ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: AUDIT_LEADS_MENU.label, items: [...AUDIT_LEADS_MENU.items] }];
+});
+
 const MISSION_HREFS = new Set([...MISSIONS_MENU.items.map((i) => i.href), ITEM_MISSION_ALL.href]);
 
 (Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
@@ -828,6 +849,7 @@ const GROUP_ORDER: string[] = [
   "Inventaris",
   "Transaksi",
   "Laporan Sales",
+  "Audit Marketing",
   "Penyedia Barang",
   "Penyiapan Barang",
   "Pengantaran",
