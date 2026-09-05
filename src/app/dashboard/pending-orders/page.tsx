@@ -29,6 +29,16 @@ interface PendingTransaction {
     paid_at: string | null;
 }
 
+// ── REVISI: item per-unit laptop dalam 1 transaksi, dipakai checklist
+// "Tidak Jadi" di CancelModal — sumbernya tabel transaction_items ──
+interface TxLaptopItem {
+    id: string;
+    unit_id: string;
+    serial_number: string;
+    laptop_name: string;
+    deal_price: number;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) => "Rp " + (n || 0).toLocaleString("id-ID");
 
@@ -483,18 +493,66 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     );
 }
 
-// ─── CancelModal (Tidak Jadi) ─────────────────────────────────────────────────
+// ─── CancelModal (Tidak Jadi) — sekarang bisa pilih unit sebagian ──────────────
 function CancelModal({ tx, cancelling, onConfirm, onClose }: {
-    tx: PendingTransaction; cancelling: boolean; onConfirm: (reason: string) => void; onClose: () => void;
+    tx: PendingTransaction; cancelling: boolean; onConfirm: (reason: string, unitIds: string[] | null) => void; onClose: () => void;
 }) {
     const [reason, setReason] = useState("");
     const [reasonError, setReasonError] = useState("");
+
+    const [items, setItems] = useState<TxLaptopItem[]>([]);
+    const [loadingItems, setLoadingItems] = useState(true);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
         window.addEventListener("keydown", h);
         return () => window.removeEventListener("keydown", h);
     }, [onClose]);
+
+    // ── REVISI: ambil daftar unit laptop di transaksi ini dari transaction_items
+    // supaya user bisa pilih unit mana yang tidak jadi, bukan seluruh transaksi ──
+    useEffect(() => {
+        let active = true;
+        setLoadingItems(true);
+        fetch(`/api/transaction/${tx.invoice_number}/items`)
+            .then(res => res.json())
+            .then(r => {
+                if (!active) return;
+                const list: TxLaptopItem[] = r.success ? (r.data || []) : [];
+                setItems(list);
+                // Default semua ke-select — kalau user tidak ubah apa-apa,
+                // hasilnya sama persis kayak "Tidak Jadi" versi lama
+                setSelectedIds(list.map((it) => it.unit_id));
+            })
+            .catch(() => { if (active) setItems([]); })
+            .finally(() => { if (active) setLoadingItems(false); });
+        return () => { active = false; };
+    }, [tx.invoice_number]);
+
+    const toggleUnit = (unitId: string) => {
+        setSelectedIds(prev =>
+            prev.includes(unitId) ? prev.filter(id => id !== unitId) : [...prev, unitId]
+        );
+    };
+
+    const showChecklist = !loadingItems && items.length > 1;
+    const allSelected = items.length > 0 && selectedIds.length === items.length;
+    const noneSelected = selectedIds.length === 0;
+
+    const handleSubmit = () => {
+        if (!reason.trim()) { setReasonError("Alasan wajib diisi"); return; }
+        if (showChecklist && noneSelected) { setReasonError("Pilih minimal 1 unit yang tidak jadi"); return; }
+
+        // Tidak ada checklist (≤1 unit) ATAU semua unit ke-select →
+        // batalkan SELURUH transaksi (perilaku lama, endpoint restore)
+        if (!showChecklist || allSelected) {
+            onConfirm(reason.trim(), null);
+        } else {
+            // Sebagian dipilih → batalkan HANYA unit itu (endpoint baru)
+            onConfirm(reason.trim(), selectedIds);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center anim-fade">
@@ -524,12 +582,68 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
                             Batalkan pesanan untuk <span className="underline">{tx.customer_name}</span>?
                         </p>
                     </div>
+
+                    {/* ── REVISI: checklist pilih unit — cuma muncul kalau tx ini >1 laptop ── */}
+                    {loadingItems ? (
+                        <div className="flex items-center justify-center py-6 text-gray-400 text-xs gap-2">
+                            <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                            Memuat daftar unit...
+                        </div>
+                    ) : showChecklist ? (
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                                    Pilih Unit yang Tidak Jadi
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedIds(allSelected ? [] : items.map(it => it.unit_id))}
+                                    className="text-[11px] font-bold text-red-600 hover:text-red-700"
+                                >
+                                    {allSelected ? "Kosongkan" : "Pilih Semua"}
+                                </button>
+                            </div>
+                            <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden">
+                                {items.map((it) => (
+                                    <label key={it.unit_id} className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.includes(it.unit_id)}
+                                            onChange={() => toggleUnit(it.unit_id)}
+                                            className="w-4 h-4 accent-red-600 shrink-0"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-xs font-semibold text-gray-800 truncate">{it.laptop_name}</p>
+                                            <p className="text-[10px] font-mono text-gray-400">SN: {it.serial_number}</p>
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-700 shrink-0">{fmt(it.deal_price)}</span>
+                                    </label>
+                                ))}
+                            </div>
+                            <p className="text-[11px] text-gray-400">
+                                {allSelected
+                                    ? "Semua unit dipilih — seluruh transaksi akan dibatalkan."
+                                    : `${selectedIds.length} dari ${items.length} unit akan dibatalkan, sisanya tetap jalan di transaksi ini.`}
+                            </p>
+                        </div>
+                    ) : null}
+
                     <div className="space-y-1.5 text-xs text-gray-600 bg-gray-50 rounded-xl p-3.5 border border-gray-200">
                         <p className="font-semibold text-gray-700 mb-2">Yang akan terjadi:</p>
-                        <p>• Status → <span className="font-bold text-red-600">BATAL (Tidak Jadi)</span></p>
-                        <p>• Unit <span className="font-semibold">{tx.laptop_name}</span> kembali ke stok <span className="font-bold text-emerald-700">Siap Jual</span> di Data Barang</p>
-                        <p>• Otomatis hilang dari daftar DP &amp; Ambil Dulu</p>
-                        <p>• Tercatat di Riwayat Transaksi dengan status <span className="font-bold text-red-600">Batal</span></p>
+                        {showChecklist && !allSelected ? (
+                            <>
+                                <p>• {selectedIds.length} unit terpilih kembali ke stok <span className="font-bold text-emerald-700">Siap Jual</span> di Data Barang</p>
+                                <p>• Sisa unit di transaksi ini <span className="font-semibold">tetap lanjut</span> dengan status yang sama</p>
+                                <p>• Total harga transaksi otomatis dikurangi sesuai unit yang dibatalkan</p>
+                            </>
+                        ) : (
+                            <>
+                                <p>• Status → <span className="font-bold text-red-600">BATAL (Tidak Jadi)</span></p>
+                                <p>• Unit <span className="font-semibold">{tx.laptop_name}</span> kembali ke stok <span className="font-bold text-emerald-700">Siap Jual</span> di Data Barang</p>
+                                <p>• Otomatis hilang dari daftar DP &amp; Ambil Dulu</p>
+                                <p>• Tercatat di Riwayat Transaksi dengan status <span className="font-bold text-red-600">Batal</span></p>
+                            </>
+                        )}
                         {tx.status === "RESERVED" && (
                             <p className="text-amber-700 font-semibold pt-1"> DP yang sudah dibayar diurus manual (tidak otomatis dikembalikan sistem)</p>
                         )}
@@ -552,11 +666,8 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
                 <div className="px-5 py-3 border-t border-gray-100 flex gap-2.5 shrink-0">
                     <button onClick={onClose} disabled={cancelling} className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50">Batal</button>
                     <button
-                        onClick={() => {
-                            if (!reason.trim()) { setReasonError("Alasan wajib diisi"); return; }
-                            onConfirm(reason.trim());
-                        }}
-                        disabled={cancelling}
+                        onClick={handleSubmit}
+                        disabled={cancelling || loadingItems}
                         className="flex-1 h-10 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60">
                         {cancelling ? "Memproses..." : "Ya, Tidak Jadi"}
                     </button>
@@ -972,22 +1083,35 @@ export default function PendingOrdersPage() {
         }
     }, [activeTab]);
 
-    const handleCancelConfirm = async (reason: string) => {
+    const handleCancelConfirm = async (reason: string, unitIds: string[] | null) => {
         if (!cancelTx) return;
         setCancelling(true);
         try {
-            // Endpoint sama persis dengan tombol "Restore/Batal" di halaman Riwayat Transaksi
-            const res = await fetch(`/api/transaction/${cancelTx.invoice_number}/restore`, {
+            // ── REVISI: unitIds === null → batalkan SELURUH transaksi (endpoint
+            // restore lama, tidak berubah). unitIds berisi array → batalkan
+            // SEBAGIAN unit saja (endpoint baru cancel-units) ──
+            const endpoint = unitIds === null
+                ? `/api/transaction/${cancelTx.invoice_number}/restore`
+                : `/api/transaction/${cancelTx.invoice_number}/cancel-units`;
+            const payload = unitIds === null
+                ? { reason }
+                : { reason, unit_ids: unitIds };
+
+            const res = await fetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ reason }), // ⚠️ ganti key "reason" kalau backend pakai nama field lain
+                body: JSON.stringify(payload),
             });
             const result = await res.json();
             if (!result.success) {
                 setAlertModal("Gagal membatalkan: " + (result.message || "Terjadi kesalahan"));
                 return;
             }
-            setAlertModal(`Pesanan ${cancelTx.invoice_number} berhasil ditandai Tidak Jadi. Unit sudah kembali ke stok Siap Jual.`);
+            setAlertModal(
+                unitIds === null
+                    ? `Pesanan ${cancelTx.invoice_number} berhasil ditandai Tidak Jadi. Unit sudah kembali ke stok Siap Jual.`
+                    : (result.message || `${unitIds.length} unit berhasil dibatalkan & dikembalikan ke stok.`)
+            );
             setCancelTx(null);
             fetchData();
         } catch {
