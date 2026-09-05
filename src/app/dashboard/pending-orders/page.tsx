@@ -603,6 +603,11 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
                                     {allSelected ? "Kosongkan" : "Pilih Semua"}
                                 </button>
                             </div>
+                            {/* ── REVISI: note penjelas biar gak ketuker — dicentang
+                                = batal, kosong = tetap lanjut ── */}
+                            <p className="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
+                                ✅ <span className="font-semibold text-red-600">Dicentang</span> = unit ini <span className="font-semibold">TIDAK JADI</span> (batal, balik ke stok). ⬜ <span className="font-semibold">Kosong</span> = unit tetap lanjut/jadi.
+                            </p>
                             <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden">
                                 {items.map((it) => (
                                     <label key={it.unit_id} className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition">
