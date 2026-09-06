@@ -39,18 +39,20 @@ export function StatPill({
 }: {
   label: string;
   count: number;
-  tone: "emerald" | "zinc" | "amber";
+    tone: "emerald" | "zinc" | "amber" | "red";
   icon?: React.ReactNode;
 }) {
   const dot: Record<string, string> = {
     emerald: "bg-emerald-400",
     zinc: "bg-zinc-400",
     amber: "bg-amber-400",
+    red: "bg-red-500",
   };
   const iconTone: Record<string, string> = {
     emerald: "text-emerald-300",
     zinc: "text-zinc-300",
     amber: "text-amber-300",
+    red: "text-red-400",
   };
   return (
     <span className="inline-flex items-center gap-1.5 bg-white/[0.06] border border-white/10 rounded-full pl-2 pr-3 py-1.5 text-[11px] font-semibold text-zinc-200 backdrop-blur-sm transition-colors hover:bg-white/10">
