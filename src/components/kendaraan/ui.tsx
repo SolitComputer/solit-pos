@@ -254,12 +254,12 @@ export function formatDateTime(iso: string | null | undefined): string {
 export function VehicleStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     TERSEDIA: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    DIPAKAI: "bg-zinc-100 text-zinc-600 border-zinc-200",
+    DIPAKAI: "bg-red-600 text-white border-red-600",
     MAINTENANCE: "bg-amber-50 text-amber-700 border-amber-100",
   };
   const dot: Record<string, string> = {
     TERSEDIA: "bg-emerald-500",
-    DIPAKAI: "bg-zinc-400",
+    DIPAKAI: "bg-white",
     MAINTENANCE: "bg-amber-500",
   };
   const label: Record<string, string> = { TERSEDIA: "Tersedia", DIPAKAI: "Dipakai", MAINTENANCE: "Maintenance" };
@@ -269,7 +269,7 @@ export function VehicleStatusBadge({ status }: { status: string }) {
         map[status] ?? "bg-gray-50 text-gray-600 border-gray-200"
       }`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${dot[status] ?? "bg-gray-400"}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${dot[status] ?? "bg-gray-400"} ${status === "DIPAKAI" ? "animate-pulse" : ""}`} />
       {label[status] ?? status}
     </span>
   );
