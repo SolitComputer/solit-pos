@@ -119,8 +119,8 @@ async function patchHandler(req: NextRequest) {
 
     const body = await req.json();
     const { error: validationError, value } = validateAndNormalize(body);
-    if (validationError) {
-      return NextResponse.json({ success: false, message: validationError }, { status: 400 });
+    if (validationError || !value) {
+      return NextResponse.json({ success: false, message: validationError || "Data tidak valid" }, { status: 400 });
     }
 
     const { data: existing, error: fetchError } = await supabaseAdmin
