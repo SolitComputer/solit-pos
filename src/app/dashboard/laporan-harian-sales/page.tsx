@@ -19,7 +19,8 @@ import {
   Inbox,
   ShieldCheck,
   ClipboardCheck,
-  Building2,
+   Building2,
+  AtSign,
   MessageSquareText,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -67,8 +68,23 @@ const channelBorderClass: Record<Channel, string> = {
   RESELLER: "border-l-amber-400",
 };
 
-// Mitra & Reseller cukup dicatat nama mitranya saja, tanpa nomor telepon.
-const NO_PHONE_CHANNELS: Channel[] = ["MITRA", "RESELLER"];
+// FB/OLX/Carousell -> input Username. Mitra/Reseller -> input Nama Mitra/Reseller.
+// Keduanya disimpan di field `partnerName` yang sama, cuma beda label & placeholder.
+type ContactMode = "phone" | "username" | "partner";
+
+const CHANNEL_CONTACT_MODE: Record<Channel, ContactMode> = {
+  WA: "phone",
+  FB: "username",
+  OLX: "username",
+  CAROUSEL: "username",
+  MITRA: "partner",
+  RESELLER: "partner",
+};
+
+const contactFieldConfig: Record<"username" | "partner", { label: string; placeholder: string }> = {
+  username: { label: "Username", placeholder: "Contoh: @nama_akun" },
+  partner: { label: "Nama Mitra/Reseller", placeholder: "Contoh: Toko Jaya Komputer" },
+};
 
 // Role yang boleh audit — HARUS disamakan dengan SALES_REPORT_AUDIT_ROLES di
 // src/lib/permissions.ts (server-side, sumber kebenaran sesungguhnya). Ini
@@ -271,7 +287,8 @@ export default function LaporanHarianSalesPage() {
     resetForm();
   };
 
-  const isNoPhoneChannel = NO_PHONE_CHANNELS.includes(channel);
+    const contactMode = CHANNEL_CONTACT_MODE[channel];
+  const isNoPhoneChannel = contactMode !== "phone";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,8 +298,8 @@ export default function LaporanHarianSalesPage() {
       setFormError("Minat wajib diisi");
       return;
     }
-    if (isNoPhoneChannel && !partnerName.trim()) {
-      setFormError("Nama mitra/reseller wajib diisi");
+       if (isNoPhoneChannel && !partnerName.trim()) {
+      setFormError(contactMode === "username" ? "Username wajib diisi" : "Nama mitra/reseller wajib diisi");
       return;
     }
     if (!isNoPhoneChannel && !phoneNumber.trim()) {
@@ -550,15 +567,21 @@ export default function LaporanHarianSalesPage() {
                   </div>
                 </div>
 
-                {isNoPhoneChannel ? (
+                                {isNoPhoneChannel ? (
                   <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Nama Mitra/Reseller</label>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">
+                      {contactFieldConfig[contactMode as "username" | "partner"].label}
+                    </label>
                     <div className="relative">
-                      <Building2 className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      {contactMode === "username" ? (
+                        <AtSign className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      ) : (
+                        <Building2 className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      )}
                       <input
                         value={partnerName}
                         onChange={(e) => setPartnerName(e.target.value)}
-                        placeholder="Contoh: Toko Jaya Komputer"
+                        placeholder={contactFieldConfig[contactMode as "username" | "partner"].placeholder}
                         className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
                       />
                     </div>

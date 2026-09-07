@@ -5,7 +5,11 @@ import { withAuth, AuthUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 const TABLE = "sales_online_reports";
-const NO_PHONE_CHANNELS = ["MITRA", "RESELLER"];
+// FB/OLX/CAROUSEL pakai username (bukan nomor telepon), MITRA/RESELLER pakai nama mitra.
+// Keduanya sama-sama disimpan di kolom `partner_name` — tidak perlu migrasi tabel.
+const USERNAME_CHANNELS = ["FB", "OLX", "CAROUSEL"];
+const PARTNER_CHANNELS = ["MITRA", "RESELLER"];
+const NO_PHONE_CHANNELS = [...USERNAME_CHANNELS, ...PARTNER_CHANNELS];
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta = UTC+7
 
 // Hitung batas awal periode ("today" | "week" | "month") dalam waktu WIB,
@@ -40,7 +44,10 @@ function validateAndNormalize(body: any) {
   const isNoPhone = NO_PHONE_CHANNELS.includes(channel);
 
   if (!interest) return { error: "Minat wajib diisi" as const };
-  if (isNoPhone && !partner_name) return { error: "Nama mitra/reseller wajib diisi" as const };
+   if (isNoPhone && !partner_name) {
+    const message = USERNAME_CHANNELS.includes(channel) ? "Username wajib diisi" : "Nama mitra/reseller wajib diisi";
+    return { error: message };
+  }
   if (!isNoPhone && !phone_number) return { error: "Nomor telepon wajib diisi" as const };
 
   return {
