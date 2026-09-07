@@ -946,7 +946,7 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                     <DetailRow label="Kategori">
                         <span className="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">{categoryLabel(entry.direction, entry.category)}</span>
                     </DetailRow>
-                    {isOut && entry.source_type === "MANUAL" && (
+                    {entry.source_type === "MANUAL" && (
                         <DetailRow label="Metode">
                             {entry.payment_method === "SALDO"
                                 ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={12} /> Saldo</span>
@@ -1152,10 +1152,8 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                 nominal: parsed,
                 keterangan: keterangan.trim() || null,
                 tanggal,
+                payment_method: paymentMethod,
             };
-            if (isOut) {
-                body.payment_method = paymentMethod;
-            }
 
             const res = await fetch(`/api/cashflow/${entry.id}`, {
                 method: "PUT",
@@ -1216,18 +1214,16 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                     <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
-                    {isOut && (
-                        <div>
-                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
-                            <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
-                                {(["CASH", "SALDO"] as const).map((m) => (
-                                    <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === m ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
-                                        <span>{m === "CASH" ? <Banknote size={16} /> : <Landmark size={16} />}</span> {m === "CASH" ? "Cash" : "Saldo"}
-                                    </button>
-                                ))}
-                            </div>
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
+                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
+                            {(["CASH", "SALDO"] as const).map((m) => (
+                                <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === m ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
+                                    <span>{m === "CASH" ? <Banknote size={16} /> : <Landmark size={16} />}</span> {m === "CASH" ? "Cash" : "Saldo"}
+                                </button>
+                            ))}
                         </div>
-                    )}
+                    </div>
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
                         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
@@ -1283,6 +1279,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
     const [nominal, setNominal] = useState("");
     const [keterangan, setKeterangan] = useState("");
     const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
+    const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -1306,6 +1303,7 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                     nominal: Number(nominal),
                     keterangan: keterangan.trim() || null,
                     tanggal,
+                    payment_method: paymentMethod,
                 }),
             });
             const json = await res.json();
@@ -1333,6 +1331,16 @@ function IncomeModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
                     <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+                    <div>
+                        <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
+                        <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
+                            {(["CASH", "SALDO"] as const).map((m) => (
+                                <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === m ? "bg-white text-gray-900 shadow-sm border border-gray-200" : "text-gray-400 hover:text-gray-600"}`}>
+                                    <span>{m === "CASH" ? <Banknote size={16} /> : <Landmark size={16} />}</span> {m === "CASH" ? "Cash" : "Saldo"}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Kategori</label>
                         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
@@ -2050,7 +2058,7 @@ export default function CashflowPage() {
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap"><SourceBadge sourceType={e.source_type} /></td>
                                                 <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                    {e.direction === "OUT" && e.source_type === "MANUAL" ? (
+                                                    {e.source_type === "MANUAL" ? (
                                                         e.payment_method === "SALDO"
                                                             ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={11} /> Saldo</span>
                                                             : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={11} /> Cash</span>

@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth";
 import { createClient } from "@supabase/supabase-js";
+import type { EquippedBorder } from "@/lib/solit-coins/types";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,11 +28,17 @@ export async function GET() {
         ? raw.roles
         : [raw.role].filter(Boolean);
 
-    const { data: dbUser } = await supabase
-      .from("users")
-      .select("profile_photo_url")
-      .eq("id", raw.id)
-      .maybeSingle();
+    const [{ data: dbUser }, { data: eb }] = await Promise.all([
+      supabase.from("users").select("profile_photo_url").eq("id", raw.id).maybeSingle(),
+      supabase
+        .from("user_equipped_border")
+        .select("border_catalog!inner(id, code, name, tier, style)")
+        .eq("user_id", raw.id)
+        .maybeSingle(),
+    ]);
+
+    const bcRaw = (eb as { border_catalog?: EquippedBorder | EquippedBorder[] } | null)?.border_catalog ?? null;
+    const bc = Array.isArray(bcRaw) ? (bcRaw[0] ?? null) : bcRaw;
 
     const res = NextResponse.json({
       success: true,
@@ -42,6 +49,7 @@ export async function GET() {
         roles,                          // ✅ semua roles — NEW
         shift: raw.shift ?? "PAGI",
         profile_photo_url: dbUser?.profile_photo_url ?? null,
+        equipped_border: bc,            // ✅ border Solit Coins ter-equip (bisa null)
         iat: raw.iat,
         exp: raw.exp,
       },

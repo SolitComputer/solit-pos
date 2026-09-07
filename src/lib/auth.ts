@@ -11,14 +11,21 @@ const SHIFT_CONFIG_TIMEOUT_MS = 5000;
 // ✅ NEW — pergantian "hari absensi" jam 04:00 WIB (bukan 00:00 WIB), dipakai
 // konsisten di seluruh fungsi terkait absensi pada file ini
 // (resolveShiftConfigFromDB, getAttendanceExpiry, attendanceDayKeyWIB).
-function toAttendanceDateKey(iso: string): string {
+export function toAttendanceDateKey(iso: string): string {
   return new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
-function addDaysToDateStr(dateStr: string, days: number): string {
+export function addDaysToDateStr(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+// ✅ Instant reset "hari absensi" untuk sebuah day-key: jam 04:00 WIB besoknya.
+// Dipakai fitur lain (mis. reset quest harian Solit Coins) agar konsisten dgn
+// pergantian hari absensi, tanpa menduplikasi logic tanggal.
+export function getAttendanceDayExpiry(attendanceDateKey: string): Date {
+  return new Date(`${addDaysToDateStr(attendanceDateKey, 1)}T04:00:00+07:00`);
 }
 
 export type { UserRole } from "@/lib/permissions";

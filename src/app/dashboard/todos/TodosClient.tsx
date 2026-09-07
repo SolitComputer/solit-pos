@@ -8,6 +8,8 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 
 type Priority = "low" | "medium" | "high";
 type FilterType = "all" | "active" | "done";
+type AssigneeFilterType = "all" | "to_me" | "unassigned";
+type SortType = "default" | "deadline" | "priority" | "newest" | "oldest";
 
 interface TodoItem {
     id: string;
@@ -31,8 +33,17 @@ interface Todo {
     updated_at: string;
     author_name: string | null;
     is_own: boolean;
+    assigned_to: string | null;
+    assignee_name: string | null;
+    is_assignee: boolean;
+    assignee_read: boolean;
     items?: TodoItem[];
     items_loaded?: boolean;
+}
+
+interface TeamMember {
+    id: string;
+    name: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -67,6 +78,9 @@ const PRIORITY_CONFIG: Record<
     },
 };
 
+// Dipakai untuk sort by priority (tinggi -> rendah)
+const PRIORITY_RANK: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
+
 // Class util dipakai berulang → dijadikan konstanta biar konsisten & mudah dirawat
 const FIELD_CLASS =
     "w-full px-3.5 sm:px-4 py-2.5 sm:py-3 text-sm border border-gray-200 rounded-xl sm:rounded-2xl bg-gray-50/60 " +
@@ -74,6 +88,9 @@ const FIELD_CLASS =
 
 const LABEL_CLASS =
     "block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 sm:mb-2";
+
+const SELECT_CLASS =
+    "px-3 py-2.5 sm:py-2 text-xs font-semibold border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/15 focus:border-[#1a1a2e] transition-all bg-white text-gray-600 cursor-pointer";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -137,16 +154,19 @@ interface TodoFormModalProps {
         description: string;
         priority: Priority;
         due_date: string;
+        assigned_to: string;
     }) => Promise<void>;
     initial?: Todo | null;
     loading: boolean;
+    teamMembers: TeamMember[];
 }
 
-function TodoFormModal({ open, onClose, onSubmit, initial, loading }: TodoFormModalProps) {
+function TodoFormModal({ open, onClose, onSubmit, initial, loading, teamMembers }: TodoFormModalProps) {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [priority, setPriority] = useState<Priority>("medium");
     const [dueDate, setDueDate] = useState("");
+    const [assignedTo, setAssignedTo] = useState("");
     const titleRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -155,6 +175,7 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading }: TodoFormMo
             setDescription(initial?.description ?? "");
             setPriority(initial?.priority ?? "medium");
             setDueDate(initial?.due_date ?? "");
+            setAssignedTo(initial?.assigned_to ?? "");
             setTimeout(() => titleRef.current?.focus(), 80);
         }
     }, [open, initial]);
@@ -162,7 +183,7 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading }: TodoFormMo
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!title.trim()) return;
-        await onSubmit({ title, description, priority, due_date: dueDate });
+        await onSubmit({ title, description, priority, due_date: dueDate, assigned_to: assignedTo });
     };
 
     if (!open) return null;
@@ -257,6 +278,22 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading }: TodoFormMo
                                 className={FIELD_CLASS}
                             />
                         </div>
+                    </div>
+
+                    <div>
+                        <label className={LABEL_CLASS}>
+                            Ditugaskan ke <span className="text-gray-300 font-normal normal-case tracking-normal">(opsional)</span>
+                        </label>
+                        <select
+                            value={assignedTo}
+                            onChange={(e) => setAssignedTo(e.target.value)}
+                            className={`${FIELD_CLASS} cursor-pointer`}
+                        >
+                            <option value="">Tidak ditugaskan</option>
+                            {teamMembers.map((m) => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2 pb-[max(0px,env(safe-area-inset-bottom))]">
@@ -589,13 +626,16 @@ function TodoItemCard({
     const isToggling = toggling === todo.id;
     const progress = getItemProgress(todo.items);
     const hasItems = (todo.items?.length ?? 0) > 0;
+    const isUnreadAssignment = todo.is_assignee && !todo.assignee_read && !todo.is_done;
 
     return (
         <div
-            className={`group relative overflow-hidden rounded-2xl border transition-all duration-200
+            className={`group relative overflow-hidden rounded-2xl border transition-all duration-200 h-full
                 ${todo.is_done
                     ? "bg-gray-50/80 border-gray-100 opacity-70"
-                    : "bg-white border-gray-100 hover:border-gray-200 hover:shadow-[0_2px_14px_rgba(16,24,40,0.06)]"
+                    : isUnreadAssignment
+                        ? "bg-white border-blue-200 ring-2 ring-blue-400/30 hover:shadow-[0_2px_14px_rgba(37,99,235,0.12)]"
+                        : "bg-white border-gray-100 hover:border-gray-200 hover:shadow-[0_2px_14px_rgba(16,24,40,0.06)]"
                 }`}
         >
             {/* Priority Bar */}
@@ -734,6 +774,21 @@ function TodoItemCard({
                                     <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
                                 </svg>
                                 {todo.items!.filter(i => i.is_done).length}/{todo.items!.length}
+                            </span>
+                        )}
+                        {/* Assignee badge */}
+                        {todo.assignee_name && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg border bg-blue-50 text-blue-700 border-blue-200 whitespace-nowrap">
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
+                                </svg>
+                                {todo.is_assignee ? "Untukmu" : todo.assignee_name}
+                            </span>
+                        )}
+                        {isUnreadAssignment && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600 text-white animate-pulse">
+                                Baru
                             </span>
                         )}
                     </div>
@@ -952,6 +1007,8 @@ export default function TodosClient() {
     const [todos, setTodos] = useState<Todo[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
     const [formOpen, setFormOpen] = useState(false);
     const [editTarget, setEditTarget] = useState<Todo | null>(null);
@@ -966,6 +1023,8 @@ export default function TodosClient() {
     const [filter, setFilter] = useState<FilterType>("all");
     const [search, setSearch] = useState("");
     const [priorityFilter, setPriorityFilter] = useState<Priority | "all">("all");
+    const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilterType>("all");
+    const [sort, setSort] = useState<SortType>("default");
 
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
     const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -984,6 +1043,7 @@ export default function TodosClient() {
             if (!res.ok) throw new Error("Gagal memuat tugas");
             const data = await res.json();
             setTodos(data.todos ?? []);
+            if (data.current_user_id) setCurrentUserId(data.current_user_id);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Terjadi kesalahan");
         } finally {
@@ -991,7 +1051,41 @@ export default function TodosClient() {
         }
     }, []);
 
+    // Daftar anggota tim untuk dropdown "Ditugaskan ke".
+    // NOTE: asumsi bentuk response /api/users adalah { users: [{ id, name }] } —
+    // sesuaikan mapping di bawah kalau ternyata beda struktur.
+    const fetchTeamMembers = useCallback(async () => {
+        try {
+            const res = await fetch("/api/users");
+            if (!res.ok) return;
+            const data = await res.json();
+            const list = Array.isArray(data) ? data : (data.users ?? data.data ?? []);
+            setTeamMembers(
+                (list as any[])
+                    .filter((u) => u?.id)
+                    .map((u) => ({ id: u.id, name: u.name ?? u.full_name ?? "Tanpa nama" }))
+            );
+        } catch {
+            // Diamkan — dropdown assignee cuma gak keisi, gak fatal buat halaman
+        }
+    }, []);
+
     useEffect(() => { fetchTodos(); }, [fetchTodos]);
+    useEffect(() => { fetchTeamMembers(); }, [fetchTeamMembers]);
+
+    // Tandai tugas sebagai "sudah dibaca" oleh assignee (menghilangkan badge "Baru")
+    const markAssigneeRead = useCallback(async (todoId: string) => {
+        setTodos((prev) => prev.map((t) => (t.id === todoId ? { ...t, assignee_read: true } : t)));
+        try {
+            await fetch(`/api/todos/${todoId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ assignee_read: true }),
+            });
+        } catch {
+            // Silent — kalau gagal, badge "Baru" bakal muncul lagi pas refresh, gak fatal
+        }
+    }, []);
 
     const handleExpand = useCallback(async (todoId: string) => {
         const isExpanded = expandedIds.has(todoId);
@@ -1006,6 +1100,10 @@ export default function TodosClient() {
         }
 
         const todo = todos.find((t) => t.id === todoId);
+        if (todo?.is_assignee && !todo.assignee_read) {
+            markAssigneeRead(todoId);
+        }
+
         if (todo?.items_loaded) {
             setExpandedIds((prev) => new Set(prev).add(todoId));
             return;
@@ -1032,7 +1130,7 @@ export default function TodosClient() {
                 return next;
             });
         }
-    }, [expandedIds, todos, showToast]);
+    }, [expandedIds, todos, showToast, markAssigneeRead]);
 
     const handleItemsChange = useCallback((todoId: string, items: TodoItem[]) => {
         setTodos((prev) =>
@@ -1040,28 +1138,51 @@ export default function TodosClient() {
         );
     }, []);
 
+    const unreadAssignedCount = useMemo(
+        () => todos.filter((t) => t.is_assignee && !t.assignee_read && !t.is_done).length,
+        [todos]
+    );
+
     const filteredTodos = useMemo(() => {
         let list = todos;
         if (filter === "active") list = list.filter((t) => !t.is_done);
         if (filter === "done") list = list.filter((t) => t.is_done);
         if (priorityFilter !== "all") list = list.filter((t) => t.priority === priorityFilter);
+        if (assigneeFilter === "to_me") list = list.filter((t) => t.is_assignee);
+        if (assigneeFilter === "unassigned") list = list.filter((t) => !t.assigned_to);
         if (search.trim()) {
             const q = search.toLowerCase();
             list = list.filter((t) =>
                 t.title.toLowerCase().includes(q) ||
-                (t.description ?? "").toLowerCase().includes(q)
+                (t.description ?? "").toLowerCase().includes(q) ||
+                (t.author_name ?? "").toLowerCase().includes(q) ||
+                (t.assignee_name ?? "").toLowerCase().includes(q)
             );
         }
+        if (sort === "deadline") {
+            list = [...list].sort((a, b) => {
+                if (!a.due_date && !b.due_date) return 0;
+                if (!a.due_date) return 1;
+                if (!b.due_date) return -1;
+                return a.due_date.localeCompare(b.due_date);
+            });
+        } else if (sort === "priority") {
+            list = [...list].sort((a, b) => PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority]);
+        } else if (sort === "newest") {
+            list = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at));
+        } else if (sort === "oldest") {
+            list = [...list].sort((a, b) => a.created_at.localeCompare(b.created_at));
+        }
         return list;
-    }, [todos, filter, priorityFilter, search]);
+    }, [todos, filter, priorityFilter, assigneeFilter, search, sort]);
 
-    const handleCreate = async (data: { title: string; description: string; priority: Priority; due_date: string }) => {
+    const handleCreate = async (data: { title: string; description: string; priority: Priority; due_date: string; assigned_to: string }) => {
         setFormLoading(true);
         try {
             const res = await fetch("/api/todos", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
+                body: JSON.stringify({ ...data, assigned_to: data.assigned_to || null }),
             });
             const result = await res.json();
             if (!res.ok) throw new Error(result.error ?? "Gagal membuat tugas");
@@ -1075,21 +1196,40 @@ export default function TodosClient() {
         }
     };
 
-    const handleEdit = async (data: { title: string; description: string; priority: Priority; due_date: string }) => {
+    const handleEdit = async (data: { title: string; description: string; priority: Priority; due_date: string; assigned_to: string }) => {
         if (!editTarget) return;
         setFormLoading(true);
         try {
             const res = await fetch(`/api/todos/${editTarget.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
+                body: JSON.stringify({ ...data, assigned_to: data.assigned_to || null }),
             });
             const result = await res.json();
             if (!res.ok) throw new Error(result.error ?? "Gagal mengedit tugas");
+
+            // Hitung ulang info assignee di sisi client (fallback selama
+            // api/todos/[id]/route.ts belum tentu ikut join nama assignee).
+            const newAssignedTo: string | null = result.todo.assigned_to ?? null;
+            const assigneeChanged = newAssignedTo !== editTarget.assigned_to;
+            const assigneeName = newAssignedTo
+                ? (teamMembers.find((m) => m.id === newAssignedTo)?.name ?? editTarget.assignee_name)
+                : null;
+            const isAssignee = !!currentUserId && newAssignedTo === currentUserId;
+
             setTodos((prev) =>
                 prev.map((t) =>
                     t.id === editTarget.id
-                        ? { ...result.todo, items: t.items, items_loaded: t.items_loaded, author_name: t.author_name, is_own: t.is_own }
+                        ? {
+                              ...result.todo,
+                              items: t.items,
+                              items_loaded: t.items_loaded,
+                              author_name: t.author_name,
+                              is_own: t.is_own,
+                              assignee_name: assigneeName,
+                              is_assignee: isAssignee,
+                              assignee_read: assigneeChanged ? (newAssignedTo ? false : true) : t.assignee_read,
+                          }
                         : t
                 )
             );
@@ -1103,6 +1243,11 @@ export default function TodosClient() {
     };
 
     const handleToggle = async (id: string, is_done: boolean) => {
+        const target = todos.find((t) => t.id === id);
+        if (target?.is_assignee && !target.assignee_read) {
+            markAssigneeRead(id);
+        }
+
         setToggling(id);
         setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, is_done } : t)));
         try {
@@ -1229,6 +1374,7 @@ export default function TodosClient() {
                 onSubmit={editTarget ? handleEdit : handleCreate}
                 initial={editTarget}
                 loading={formLoading}
+                teamMembers={teamMembers}
             />
             <DeleteConfirmModal
                 open={deleteTarget !== null}
@@ -1237,7 +1383,7 @@ export default function TodosClient() {
                 loading={deleteLoading}
             />
 
-            <div className="w-full max-w-3xl mx-auto">
+            <div className="w-full max-w-5xl mx-auto">
                 {/* Header — stack di mobile, sejajar di laptop */}
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-5 sm:mb-7">
                     <div className="min-w-0">
@@ -1251,16 +1397,34 @@ export default function TodosClient() {
                         </div>
                         <p className="text-[13px] sm:text-sm text-gray-400 ml-9">Catat dan kelola tugas harianmu</p>
                     </div>
-                    <button
-                        onClick={() => { setEditTarget(null); setFormOpen(true); }}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 bg-[#1a1a2e] hover:bg-[#252540] text-white text-sm font-semibold rounded-2xl transition-all shadow-lg shadow-[#1a1a2e]/20 flex-shrink-0 active:scale-[0.98]"
-                    >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                        Tambah Tugas
-                    </button>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        {unreadAssignedCount > 0 && (
+                            <button
+                                onClick={() => setAssigneeFilter("to_me")}
+                                className="relative w-11 h-11 sm:w-10 sm:h-10 flex-shrink-0 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 active:scale-95 transition-all"
+                                aria-label={`${unreadAssignedCount} tugas baru ditugaskan untukmu`}
+                                title="Tugas baru ditugaskan untukmu"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                                    <path d="M13.73 21a2 2 0 01-3.46 0" />
+                                </svg>
+                                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">
+                                    {unreadAssignedCount}
+                                </span>
+                            </button>
+                        )}
+                        <button
+                            onClick={() => { setEditTarget(null); setFormOpen(true); }}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 bg-[#1a1a2e] hover:bg-[#252540] text-white text-sm font-semibold rounded-2xl transition-all shadow-lg shadow-[#1a1a2e]/20 active:scale-[0.98]"
+                        >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            Tambah Tugas
+                        </button>
+                    </div>
                 </div>
 
                 {!loading && todos.length > 0 && <StatsBar todos={todos} />}
@@ -1276,7 +1440,7 @@ export default function TodosClient() {
                         </div>
                         <input
                             type="text"
-                            placeholder="Cari tugas..."
+                            placeholder="Cari tugas, deskripsi, atau nama orang..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/15 focus:border-[#1a1a2e] transition-all bg-gray-50/60 placeholder:text-gray-300"
@@ -1331,7 +1495,7 @@ export default function TodosClient() {
                                 value={priorityFilter}
                                 onChange={(e) => setPriorityFilter(e.target.value as Priority | "all")}
                                 aria-label="Filter prioritas"
-                                className="flex-1 sm:flex-none px-3 py-2.5 sm:py-2 text-xs font-semibold border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/15 focus:border-[#1a1a2e] transition-all bg-white text-gray-600 cursor-pointer"
+                                className={`flex-1 sm:flex-none ${SELECT_CLASS}`}
                             >
                                 <option value="all">Semua Prioritas</option>
                                 <option value="high">Tinggi</option>
@@ -1352,41 +1516,67 @@ export default function TodosClient() {
                             )}
                         </div>
                     </div>
+
+                    {/* Baris filter tambahan: penugasan & urutan */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <select
+                            value={assigneeFilter}
+                            onChange={(e) => setAssigneeFilter(e.target.value as AssigneeFilterType)}
+                            aria-label="Filter penugasan"
+                            className={`flex-1 sm:flex-none min-w-[140px] ${SELECT_CLASS}`}
+                        >
+                            <option value="all">Semua Penugasan</option>
+                            <option value="to_me">Ditugaskan Untukku</option>
+                            <option value="unassigned">Belum Ditugaskan</option>
+                        </select>
+                        <select
+                            value={sort}
+                            onChange={(e) => setSort(e.target.value as SortType)}
+                            aria-label="Urutkan"
+                            className={`flex-1 sm:flex-none min-w-[140px] ${SELECT_CLASS}`}
+                        >
+                            <option value="default">Urutan Default</option>
+                            <option value="deadline">Deadline Terdekat</option>
+                            <option value="priority">Prioritas Tertinggi</option>
+                            <option value="newest">Terbaru Dibuat</option>
+                            <option value="oldest">Terlama Dibuat</option>
+                        </select>
+                    </div>
                 </div>
 
                 {/* List */}
-                <div className="space-y-2">
-                    {loading ? (
-                        <div className="space-y-2">
-                            {[1, 2, 3].map((i) => (
-                                <div
-                                    key={i}
-                                    className="h-[84px] sm:h-[76px] bg-white border border-gray-100 rounded-2xl"
-                                    style={{ animation: `todoPulse 1.5s ease-in-out ${i * 150}ms infinite` }}
-                                />
-                            ))}
+                {loading ? (
+                    <div className="space-y-2">
+                        {[1, 2, 3].map((i) => (
+                            <div
+                                key={i}
+                                className="h-[84px] sm:h-[76px] bg-white border border-gray-100 rounded-2xl"
+                                style={{ animation: `todoPulse 1.5s ease-in-out ${i * 150}ms infinite` }}
+                            />
+                        ))}
+                    </div>
+                ) : error ? (
+                    <div className="bg-red-50 border border-red-100 rounded-2xl p-5 sm:p-6 text-center">
+                        <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
                         </div>
-                    ) : error ? (
-                        <div className="bg-red-50 border border-red-100 rounded-2xl p-5 sm:p-6 text-center">
-                            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center mx-auto mb-3">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
-                                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                                </svg>
-                            </div>
-                            <p className="text-sm text-red-600 font-semibold mb-3">{error}</p>
-                            <button
-                                onClick={fetchTodos}
-                                className="px-4 py-2 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-all shadow-sm active:scale-95"
-                            >
-                                Coba Lagi
-                            </button>
-                        </div>
-                    ) : filteredTodos.length === 0 ? (
-                        <div className="bg-white border border-gray-100 rounded-2xl">
-                            <EmptyState filter={filter} />
-                        </div>
-                    ) : (
-                        filteredTodos.map((todo, i) => (
+                        <p className="text-sm text-red-600 font-semibold mb-3">{error}</p>
+                        <button
+                            onClick={fetchTodos}
+                            className="px-4 py-2 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-all shadow-sm active:scale-95"
+                        >
+                            Coba Lagi
+                        </button>
+                    </div>
+                ) : filteredTodos.length === 0 ? (
+                    <div className="bg-white border border-gray-100 rounded-2xl">
+                        <EmptyState filter={filter} />
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
+                        {filteredTodos.map((todo, i) => (
                             <div
                                 key={todo.id}
                                 style={{ animation: `todoItemIn 0.2s ease-out ${i * 30}ms both` }}
@@ -1404,9 +1594,9 @@ export default function TodosClient() {
                                     showToast={showToast}
                                 />
                             </div>
-                        ))
-                    )}
-                </div>
+                        ))}
+                    </div>
+                )}
 
                 {!loading && filteredTodos.length > 0 && (
                     <div className="flex items-center justify-center gap-2 mt-5 sm:mt-6 pb-2">

@@ -2,6 +2,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import type { UserRole } from "@/lib/permissions";
+import type { EquippedBorder } from "@/lib/solit-coins/types";
 
 export interface AuthUser {
   id: string;
@@ -10,6 +11,7 @@ export interface AuthUser {
   roles: UserRole[];
   shift?: "PAGI" | "SORE";
   profile_photo_url?: string | null;
+  equipped_border?: EquippedBorder | null;
 }
 
 // Module-level cache — shared & persistent across components

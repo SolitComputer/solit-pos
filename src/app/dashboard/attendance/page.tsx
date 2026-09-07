@@ -255,6 +255,14 @@ function isLate(t: string, shift: "PAGI" | "SORE" = "PAGI"): boolean {
     return total > SHIFT_LATE[shift];
 }
 
+// ✅ FIXED — untuk leaderboard Kualitas Absensi: konversi ISO ke menit-dalam-hari
+// WIB, PRESISI SAMPAI DETIK & MILIDETIK (sebelumnya cuma menit bulat) — dua orang
+// yang absen di menit yang sama tetap bisa dibedakan siapa yang lebih dulu.
+function preciseMinutesOfDayWIB(iso: string): number {
+    const wib = new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000);
+    return wib.getUTCHours() * 60 + wib.getUTCMinutes() + wib.getUTCSeconds() / 60 + wib.getUTCMilliseconds() / 60000;
+}
+
 function getDisplayStatus(a: Attendance): "PRESENT" | "LATE" | "SKIP" {
     if (a.method === "FORCE") return "PRESENT";
     if (a.method === "SKIP" || a.status === "SKIPPED_MANUAL") return "SKIP";
@@ -3456,8 +3464,8 @@ export default function AttendanceDashboardPage() {
     const [contractDetailUser, setContractDetailUser] = useState<UserInfo | null>(null);
     const [shiftSchedules, setShiftSchedules] = useState<ShiftScheduleRow[]>([]);
     const [shiftConfigs, setShiftConfigs] = useState<any[]>([]);
-    const [myOvertimeDirections, setMyOvertimeDirections] = useState<Record<string, Set<string>>>({}); // ✅ NEW
-    const [dismissedPastOvertimeDates, setDismissedPastOvertimeDates] = useState<Set<string>>(new Set()); // ✅ NEW
+    const [myOvertimeDirections, setMyOvertimeDirections] = useState<Record<string, Set<string>>>({});
+    const [dismissedPastOvertimeDates, setDismissedPastOvertimeDates] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         if (!currentUser?.id) return;
@@ -4145,7 +4153,9 @@ export default function AttendanceDashboardPage() {
             remainingDays: number; userId: string;
             absences: AbsenceItem[]; offDates: string[];
             holidayWorkDates: string[];
-            pending: number; pendingDates: string[]; // ✅ NEW — belum absen pulang (belum "tepat waktu", bukan "tidak hadir")
+            pending: number; pendingDates: string[];
+            manualDays: number; perfectDays: number; violations: number;
+            earlyDaysCount: number; avgEarlyMinutes: number;
         };
 
         const todayWIB = getWIBToday();
@@ -4158,10 +4168,9 @@ export default function AttendanceDashboardPage() {
             effByName[name][date] = status;
         };
 
-        // ✅ NEW — tanggal yang kena penalti "tidak absen pulang" dicatat terpisah,
-        // supaya reason di `absences` nanti bisa dibedakan jadi "NO_CHECKOUT"
-        // (bukan "ALPHA"/Tanpa Keterangan yang generik).
         const noCheckoutByName: Record<string, Set<string>> = {};
+
+        const checkinIsoByName: Record<string, Record<string, string>> = {};
 
         thisMonthAtt.forEach(a => {
             if (a.source !== "AUTO") return;
@@ -4181,6 +4190,8 @@ export default function AttendanceDashboardPage() {
                 if (!noCheckoutByName[a.user_name]) noCheckoutByName[a.user_name] = new Set();
                 noCheckoutByName[a.user_name].add(dk);
             }
+            if (!checkinIsoByName[a.user_name]) checkinIsoByName[a.user_name] = {};
+            checkinIsoByName[a.user_name][dk] = a.check_in_time || a.created_at;
             setEff(a.user_name, dk,
                 noCheckoutPenalty ? "ABSENT"
                     : isPendingToday ? "PENDING"
@@ -4262,6 +4273,8 @@ export default function AttendanceDashboardPage() {
             });
 
             let present = 0, late = 0, score = 0, leave = 0, pending = 0;
+            let manualDays = 0, perfectDays = 0, autoLateDays = 0;
+            let earlyMinutesSum = 0, earlyDaysCount = 0;
             const absences: AbsenceItem[] = [];
             const offDates: string[] = [];
             const leaveDates: string[] = [];
@@ -4309,7 +4322,7 @@ export default function AttendanceDashboardPage() {
                     continue;
                 }
 
-                 const eff = effByName[name]?.[dk];
+                const eff = effByName[name]?.[dk];
 
                 // ✅ NEW — HARI INI yang masih pending (belum absen pulang) BELUM
                 // dihitung sebagai hari kerja sama sekali dulu (totalWorkdays TIDAK
@@ -4328,8 +4341,35 @@ export default function AttendanceDashboardPage() {
                 if (!isPastOrToday) continue;
 
                 pastWorkdays++;
-                if (eff === "PRESENT") { present++; score += 1; }
-                else if (eff === "LATE") { late++; score += 0.5; }
+                const isManualDay = !!manualByName[name]?.[dk];
+                if (eff === "PRESENT" || eff === "LATE") {
+                    if (eff === "PRESENT") { present++; score += 1; }
+                    else { late++; score += 0.5; }
+
+                    if (isManualDay) {
+                        manualDays++;
+                    } else {
+                        const arrivalIso = checkinIsoByName[name]?.[dk];
+                        const eff2 = effectiveShiftFor(userId, dk);
+                        const arrivalMin = arrivalIso ? preciseMinutesOfDayWIB(arrivalIso) : null;
+                        if (arrivalMin !== null && arrivalMin <= eff2.late) {
+                            perfectDays++;
+                            // ✅ FIXED — sebelumnya pakai selisih BERTANDA (arrival - open),
+                            // jadi orang yang absen JAUH sebelum jam buka (mis. jam 06:37
+                            // untuk shift SORE yang buka siang — sah karena sistem absensi
+                            // memang tidak punya batas paling pagi, cuma batas telat) malah
+                            // "menang" telak lawan orang yang absen pas/dekat jam buka.
+                            // Sekarang pakai JARAK MUTLAK ke jam buka: absen PAS jam buka
+                            // = jarak 0 (terbaik). Makin jauh ke arah manapun (kepagian
+                            // ekstrem ATAU mepet telat) = makin rendah rank-nya.
+                            const distanceFromScheduleOpen = Math.abs(arrivalMin - eff2.open);
+                            earlyMinutesSum += distanceFromScheduleOpen;
+                            earlyDaysCount++;
+                        } else {
+                            autoLateDays++;
+                        }
+                    }
+                }
                 else {
                     // ✅ FIX: kembali ke perilaku semula — hari lampau yang tidak
                     // absen pulang (sampai cutoff 04:00 WIB) masuk "Tidak Hadir"
@@ -4346,7 +4386,10 @@ export default function AttendanceDashboardPage() {
             }
 
             const pct = totalWorkdays > 0 ? Math.min(100, (score / totalWorkdays) * 100) : 0;
-
+            const violations = manualDays + autoLateDays + absences.length; // ✅ NEW — untuk leaderboard Kualitas Absensi
+            // ✅ FIXED — presisi dinaikkan ke 4 desimal (sebelumnya 2), makin kecil
+            // makin bagus (gap makin dekat ke jam buka jadwal masing-masing)
+            const avgEarlyMinutes = earlyDaysCount > 0 ? Math.round((earlyMinutesSum / earlyDaysCount) * 10000) / 10000 : 0;
             const resolvedUserId = userIdByName[name] ??
                 Object.entries(manualByName[name] || {})
                     .map(([_, rec]) => rec.user_id)
@@ -4360,11 +4403,54 @@ export default function AttendanceDashboardPage() {
                 absences, offDates,
                 holidayWorkDates,
                 pending, pendingDates, // ✅ NEW
+                manualDays, perfectDays, violations, // ✅ NEW — untuk leaderboard Kualitas Absensi
+                earlyDaysCount, avgEarlyMinutes, // ✅ NEW — rata-rata menit lebih cepat dari jadwal
             });
         });
 
         return result.sort((a, b) => a.name.localeCompare(b.name, "id"));
-    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, monthlyOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser, allDateWorks, leaveData, checkoutTimes]);
+    }, [thisMonthAtt, manualRecords, dayOffByName, dateOffByName, monthlyOffByName, calYear, calMonth, allUsers, thisMonthKey, currentUser, allDateWorks, leaveData, checkoutTimes, effectiveShiftFor]);
+
+    // ✅ NEW — Sinkronisasi otomatis leaderboard "Kualitas Absensi" (ditampilkan
+    // di halaman terpisah /dashboard/lencana, BUKAN di sini) ke server, tiap
+    // kali Admin/Programmer/Asisten CEO membuka halaman Absensi ini. Sengaja
+    // HANYA full-access yang memicu — role lain (kepala divisi dkk.) datanya
+    // cuma anak buah sendiri (scope terbatas), kalau ikut mengirim leaderboard
+    // lintas perusahaan akan tertimpa data yang tidak lengkap. Tidak ada UI
+    // apa pun untuk ini di halaman ini.
+    const qualitySyncedRef = useRef<string | null>(null);
+    useEffect(() => {
+        const isAdminUser = userIsAdmin(currentUser);
+        if (!isAdminUser || loading) return;
+        const scores = userSummary.filter(u => u.userId);
+        if (scores.length === 0) return;
+        const sig = `${calYear}-${calMonth}-${scores.map(u => `${u.userId}:${u.perfectDays}:${u.violations}`).join("|")}`;
+        if (qualitySyncedRef.current === sig) return;
+        qualitySyncedRef.current = sig;
+        fetch("/api/attendance/quality-rank", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                year: calYear,
+                month: calMonth + 1,
+                scores: scores.map(u => ({
+                    user_id: u.userId,
+                    perfect_days: u.perfectDays,
+                    manual_days: u.manualDays,
+                    late_days: Math.max(0, u.violations - u.manualDays - u.absences.length),
+                    absent_days: u.absences.length,
+                    total_workdays: u.totalWorkdays,
+                    avg_early_minutes: u.avgEarlyMinutes, // ✅ NEW
+                })),
+            }),
+        })
+            .then(async (r) => {
+                const d = await r.json();
+                if (!d.success) console.error("[quality-rank sync] server menolak:", d.message);
+                else console.log("[quality-rank sync] berhasil untuk", calYear, calMonth + 1);
+            })
+            .catch((err) => { console.error("[quality-rank sync] gagal fetch:", err); });
+    }, [loading, userSummary, calYear, calMonth, currentUser]);
 
     const thisMonthPresent = thisMonthAtt.filter(a => a.displayStatus === "PRESENT" && !isDayOffForUser(a.user_name, toWIBDateKey(a.check_in_time || a.created_at))).length;
     const thisMonthLate = thisMonthAtt.filter(a => a.displayStatus === "LATE" && !isDayOffForUser(a.user_name, toWIBDateKey(a.check_in_time || a.created_at))).length;

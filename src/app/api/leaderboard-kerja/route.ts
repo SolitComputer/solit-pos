@@ -1,3 +1,7 @@
+// ⚠️ DUPLIKAT LOGIC: salinan scoring di file ini JUGA ada di
+// src/lib/kerja-scoring.ts (dipakai endpoint snapshot bulanan
+// /api/leaderboard-kerja/quality-rank untuk Lencana). Kalau ubah rumus
+// poin di sini, WAJIB ubah juga di kerja-scoring.ts biar konsisten.
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/services/supabaseAdmin";
 import { withAuth } from "@/lib/auth";

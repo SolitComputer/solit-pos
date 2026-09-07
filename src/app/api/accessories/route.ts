@@ -22,9 +22,9 @@ export const GET = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthUs
     const limit = Math.min(10000, parseInt(searchParams.get("limit") ?? "20", 10));
     const offset = (page - 1) * limit;
 
-    let query = supabaseAdmin
+        let query = supabaseAdmin
         .from("accessories")
-        .select("*", { count: "exact" })
+        .select("*, accessory_units(*)", { count: "exact" })
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -41,15 +41,31 @@ export const GET = withAuth(async (req: NextRequest, _ctx: unknown, user: AuthUs
     // ✅ SECURITY FIX: ACCESSORY_VIEW_ROLES mencakup role sales (CREW_SALES,
     // CUSTOMER_SERVICE) yang tidak boleh lihat buy_price — dulu select("*")
     // dikirim mentah tanpa masking sama sekali.
-    const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
+       const canSeePrivate = hasAnyRole(user.roles ?? [user.role], BARANG_PRIVATE_VIEW_ROLES);
     const enriched = (data ?? []).map(acc => {
+        const units = (acc as any).accessory_units ?? [];
+        // Aksesori yang SUDAH punya unit ber-SN: stock dihitung dari jumlah unit
+        // berstatus TERSEDIA (bukan kolom accessories.stock manual lagi) — biar
+        // konsisten dgn recalcAccessoryParentStock() di endpoint unit baru.
+        // Aksesori yang BELUM pakai SN tetap pakai kolom stock manual seperti
+        // biasa — backward compatible, tidak mengubah aksesori yang sudah ada.
+        const derivedStock = units.length > 0
+            ? units.filter((u: any) => u.status !== "TERJUAL").length
+            : Number(acc.stock) || 0;
         const base: Record<string, any> = {
             ...acc,
-            stock: Number(acc.stock) || 0,
-            stock_tersedia: Number(acc.stock) || 0,
-            stock_total: Number(acc.stock) || 0,
+            accessory_units: units,
+            stock: derivedStock,
+            stock_tersedia: derivedStock,
+            stock_total: derivedStock,
         };
-        if (!canSeePrivate) delete base.buy_price;
+        if (!canSeePrivate) {
+            delete base.buy_price;
+            base.accessory_units = units.map((u: any) => {
+                const { buy_price, ...rest } = u;
+                return rest;
+            });
+        }
         return base;
     });
 

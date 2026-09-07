@@ -50,6 +50,7 @@ export const EXPENSE_CATEGORIES = {
   KEUNTUNGAN_MITRA: "Keuntungan Mitra Reseller",
   BIAYA_PRINTILAN: "Biaya Printilan Barang",
   BIAYA_LAIN: "Biaya Lain-lain",
+  DOMPET_LAIN_LAIN: "Dompet Lain Lain",
 } as const;
 
 export type IncomeCategory = keyof typeof INCOME_CATEGORIES;
