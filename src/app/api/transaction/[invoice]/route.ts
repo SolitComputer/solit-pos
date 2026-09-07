@@ -678,7 +678,13 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
 
     const allowedFields: Record<string, any> = {};
     if (body.amount !== undefined) allowedFields.amount = Number(body.amount);
-    if (body.deal_price !== undefined) allowedFields.deal_price = Number(body.deal_price);
+    if (body.deal_price !== undefined) {
+      allowedFields.deal_price = Number(body.deal_price);
+      if (body.amount === undefined) {
+        allowedFields.amount = Number(body.deal_price);
+      }
+    }
+    if (body.dp_amount !== undefined) allowedFields.dp_amount = Math.max(0, Number(body.dp_amount));
     if (body.payment_method !== undefined) allowedFields.payment_method = body.payment_method;
     if (body.customer_name !== undefined) allowedFields.customer_name = body.customer_name;
     if (body.customer_phone !== undefined) allowedFields.customer_phone = body.customer_phone;
@@ -850,6 +856,19 @@ async function putHandler(req: NextRequest, props: Props, user: AuthUser) {
           (s, p) => s + Math.round(Number(p.deal_price) || 0),
           0
         );
+      }
+    } else if (body.deal_price !== undefined) {
+      // Jika tidak kirim deal_prices_per_unit tapi ada 1 item laptop di transaction_items, sinkronkan deal_price-nya
+      const { data: txItems } = await supabase
+        .from("transaction_items")
+        .select("id, item_type")
+        .eq("invoice_number", invoice)
+        .eq("item_type", "laptop");
+      if (txItems && txItems.length === 1) {
+        await supabase
+          .from("transaction_items")
+          .update({ deal_price: Math.round(Number(body.deal_price)) })
+          .eq("id", txItems[0].id);
       }
     }
 
