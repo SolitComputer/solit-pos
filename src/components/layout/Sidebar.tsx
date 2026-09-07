@@ -16,6 +16,9 @@ import { useNotificationSettings } from "@/hooks/useNotificationSound";
 import { useEscalationBadge } from "@/hooks/useEscalationBadge";
 import { invalidateAuthCache } from "@/hooks/useAuthUser";
 import { YOGA_ADMIN_ID, REINALDY_ADMIN_ID } from "@/lib/contractSigners";
+import SolitBorder from "@/components/solit-coins/SolitBorder";
+import CoinBalanceChip from "@/components/solit-coins/CoinBalanceChip";
+import type { BorderStyle } from "@/lib/solit-coins/types";
 
 const CACHE_KEY = "solit_sidebar_userit";
 const RAIL_KEY = "solit_sidebar_rail";
@@ -143,6 +146,7 @@ const Icons = {
   pendingOrders: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l2 3h6l2-3h4" /><path d="M5.5 5h13l2.5 7v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6z" /></svg>),
   users: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" /><circle cx="9" cy="8" r="4" /><path d="M22.5 21v-2a4 4 0 00-3-3.87" /><path d="M16.5 3.2a4 4 0 010 7.6" /></svg>),
   leaderboard: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4h10v5a5 5 0 01-10 0z" /><path d="M7 5H4.5a2 2 0 000 4H7M17 5h2.5a2 2 0 010 4H17" /><path d="M12 14v3" /><path d="M8 21h8" /></svg>),
+  lencana: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5" /><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5" /></svg>),
   code: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l-6-6 6-6" /><path d="M15 6l6 6-6 6" /></svg>),
   serviceQueue: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.7 2.7-2-2z" /></svg>),
   serviceDone: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>),
@@ -200,6 +204,7 @@ const ITEM_AI_CEO: MenuItem = { name: "AI CEO", href: "/dashboard/ai-ceo", icon:
 const ITEM_TANYA_CEO: MenuItem = { name: "Tanya CEO", href: "/dashboard/tanya-ceo", icon: Icons.tanyaCeo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
 const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
+const ITEM_LENCANA: MenuItem = { name: "Lencana", href: "/dashboard/lencana", icon: Icons.lencana };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
 const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract", icon: Icons.log };
@@ -213,6 +218,29 @@ const ITEM_LAPORAN_KEUANGAN: MenuItem = { name: "Laporan Keuangan", href: "/dash
 const ITEM_MONITOR_CHAT: MenuItem = { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat };
 const ITEM_LEADS_CHAT: MenuItem = { name: "Leads Chat Masuk", href: "/dashboard/leads-chat", icon: Icons.leadsChat };
 const ITEM_LAPORAN_SALES_HARIAN: MenuItem = { name: "Laporan Harian Sales", href: "/dashboard/laporan-harian-sales", icon: Icons.salesReport };
+// Sub-menu per channel leads (WA/FB/OLX/Carousell/Mitra/Reseller) — link ke
+// halaman yang sama dengan query ?channel=... supaya tab channel di halaman
+// Laporan Harian Sales otomatis ke-preselect saat diklik dari sidebar.
+const LAPORAN_SALES_MENU: MenuGroup = {
+  label: "Laporan Sales",
+  items: [ 
+    ITEM_LAPORAN_SALES_HARIAN,
+  ],
+};
+
+// BARU: fitur "Audit Marketing" — beda dari LAPORAN_SALES_MENU di atas, tiap
+// channel di sini adalah HALAMAN SENDIRI (route [channel]), bukan 1 halaman + tab.
+const AUDIT_LEADS_MENU: MenuGroup = {
+  label: "Audit Marketing",
+  items: [
+    { name: "WhatsApp", href: "/dashboard/audit-leads/wa", icon: Icons.salesReport },
+    { name: "Facebook", href: "/dashboard/audit-leads/fb", icon: Icons.salesReport },
+    { name: "OLX", href: "/dashboard/audit-leads/olx", icon: Icons.salesReport },
+    { name: "Carousell", href: "/dashboard/audit-leads/carousell", icon: Icons.salesReport },
+    { name: "Mitra", href: "/dashboard/audit-leads/mitra", icon: Icons.salesReport },
+    { name: "Reseller", href: "/dashboard/audit-leads/reseller", icon: Icons.salesReport },
+  ],
+};
 const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashboard/hasil-penjualan", icon: Icons.salesResult };
 const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboard/employee-birthdays", icon: Icons.employeeBirthday };
 
@@ -380,7 +408,6 @@ const ADMIN_TRANSAKSI: MenuGroup = {
     { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
-    ITEM_LAPORAN_SALES_HARIAN,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -418,7 +445,6 @@ const SALES_TRANSAKSI: MenuGroup = {
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     ITEM_MANAGEMENT_SELLER,
-    ITEM_LAPORAN_SALES_HARIAN,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -714,8 +740,37 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_PENGANTARAN: [...PKL_MENU],
   PKL_CUSTOMER_SERVICE: [...PKL_MENU],
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
-  PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
+    PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
 };
+
+// ── Laporan Sales: grup sidebar tersendiri (WA/FB/OLX/Carousell/Mitra/
+// Reseller), BUKAN flat item lagi di dalam "Transaksi". Ditambahkan di sini —
+// SEBELUM loop PKL_MENU_INHERIT & sortGroupsByCanonicalOrder di bawah —
+// supaya PKL_SALES/PKL_ZENITH/PKL_MARKETING otomatis ikut mewarisi grup ini
+// dari role induknya (CREW_SALES/MARKETING), dan grupnya ke-sort ke posisi
+// yang benar (tepat di bawah "Transaksi") oleh GROUP_ORDER di bawah.
+const LAPORAN_SALES_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "KEPALA_MARKETING", "MARKETING",
+];
+LAPORAN_SALES_ROLES.forEach((role) => {
+  ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: LAPORAN_SALES_MENU.label, items: [...LAPORAN_SALES_MENU.items] }];
+});
+
+// Sama polanya kayak LAPORAN_SALES_ROLES di atas — role list yang sama persis,
+// jadi PKL_SALES/PKL_ZENITH/PKL_MARKETING otomatis ikut mewarisi grup ini juga
+// lewat PKL_MENU_INHERIT di bawah.
+const AUDIT_LEADS_MENU_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "KEPALA_MARKETING", "MARKETING",
+];
+AUDIT_LEADS_MENU_ROLES.forEach((role) => {
+  ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: AUDIT_LEADS_MENU.label, items: [...AUDIT_LEADS_MENU.items] }];
+});
 
 const MISSION_HREFS = new Set([...MISSIONS_MENU.items.map((i) => i.href), ITEM_MISSION_ALL.href]);
 
@@ -793,6 +848,8 @@ const GROUP_ORDER: string[] = [
   "Keuangan",
   "Inventaris",
   "Transaksi",
+  "Laporan Sales",
+  "Audit Marketing",
   "Penyedia Barang",
   "Penyiapan Barang",
   "Pengantaran",
@@ -931,11 +988,13 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
     if (!utama.items.some((it) => it.href === ITEM_PROFILE.href)) {
       utama.items.push(ITEM_PROFILE);
     }
+    if (!utama.items.some((it) => it.href === ITEM_LENCANA.href)) {
+      utama.items.push(ITEM_LENCANA);
+    }
   } else {
-    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE] }, ...ROLE_MENUS[role]];
+    ROLE_MENUS[role] = [{ label: "Utama", items: [ITEM_SOCIAL, ITEM_PROFILE, ITEM_LENCANA] }, ...ROLE_MENUS[role]];
   }
 });
-
 // Kendaraan: grup sendiri (collapsible) berisi Dashboard + Management Kendaraan.
 // Disuntik di level groups final (BUKAN per-role static), supaya muncul untuk SEMUA
 // user — termasuk yang pakai role dinamis (menu dari DB) yang tidak lewat ROLE_MENUS.
@@ -1150,24 +1209,41 @@ function SidebarContent({
           </div>
         ) : rail ? (
           <Link href="/dashboard/profile" className="flex justify-center" title="Profil saya">
-            <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden" title={user?.name || ""}>
-              {user?.profile_photo_url
-                ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
-                : initials}
-            </div>
+            {(() => {
+              const avatar = (
+                <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden" title={user?.name || ""}>
+                  {user?.profile_photo_url
+                    ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
+                    : initials}
+                </div>
+              );
+              return user?.equipped_border
+                ? <span className="flex-shrink-0 relative flex items-center justify-center my-0.5"><SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2} ornament={false}>{avatar}</SolitBorder></span>
+                : avatar;
+            })()}
           </Link>
         ) : (
-          <Link href="/dashboard/profile" className="flex items-center gap-3 group/profile" title="Profil saya">
-            <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
-              {user?.profile_photo_url
-                ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
-                : initials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900 tracking-tight truncate group-hover/profile:underline">{user?.name || "—"}</p>
-              <RoleBadges user={user} />
-            </div>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/profile" className="flex items-center gap-3 group/profile min-w-0 flex-1" title="Profil saya">
+              {(() => {
+                const avatar = (
+                  <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+                    {user?.profile_photo_url
+                      ? <img src={user.profile_photo_url} alt={user?.name || ""} className="w-full h-full object-cover" />
+                      : initials}
+                  </div>
+                );
+                return user?.equipped_border
+                  ? <span className="flex-shrink-0 relative flex items-center justify-center mx-0.5"><SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2} ornament={false}>{avatar}</SolitBorder></span>
+                  : avatar;
+              })()}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900 tracking-tight truncate group-hover/profile:underline">{user?.name || "—"}</p>
+                <RoleBadges user={user} />
+              </div>
+            </Link>
+            <CoinBalanceChip className="flex-shrink-0" />
+          </div>
         )}      </div>
 
       <div className={`h-px bg-slate-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
@@ -1476,6 +1552,7 @@ export default function Sidebar() {
           roles: authUser.roles,
           shift: authUser.shift,
           profile_photo_url: authUser.profile_photo_url,
+          equipped_border: authUser.equipped_border ?? null,
         };
         setUser(fresh);
         setCachedUser(fresh);

@@ -10,10 +10,16 @@ import { getAuthUser } from "@/hooks/useAuthUser";
 import { ContractBadge } from "@/components/contracts/ContractBadge";
 import { CareerLevelBadge } from "@/components/contracts/CareerLevelBadge";
 import ContractInfoModal from "@/components/contracts/ContractInfoModal";
+import SolitBorder from "@/components/solit-coins/SolitBorder";
+import SolitBanner from "@/components/solit-coins/SolitBanner";
+import SolitCoinsWidget from "@/components/solit-coins/SolitCoinsWidget";
+import SolitCoinsModal from "@/components/solit-coins/SolitCoinsModal";
+import type { EquippedBorder } from "@/lib/solit-coins/types";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
     Loader2, Pencil, Check, X, Music, Play, Pause,
-    MessageCircle, Eye, CheckCircle2, AlertCircle,
+    MessageCircle, Eye, CheckCircle2, AlertCircle, Sparkles,
+    Zap, Truck, Package, ShoppingCart, Wrench, Video, Boxes, Megaphone, UserCheck,
 } from "lucide-react";
 
 interface ProfileData {
@@ -33,6 +39,8 @@ interface ProfileData {
     song_preview_url: string | null;
     song_clip_start: number;
     song_expires_at: string | null;
+    equipped_border?: EquippedBorder | null;
+    equipped_banner?: EquippedBorder | null;
 }
 
 interface AchievementBlock {
@@ -96,6 +104,16 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [currentUser, setCurrentUser] = useState<{ id: string; role: string; roles?: string[] } | null>(null);
     const [profile, setProfile] = useState<ProfileData | null>(null);
     const [achievements, setAchievements] = useState<AchievementsData | null>(null);
+    const [qualityRank, setQualityRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
+    const [kerjaRank, setKerjaRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
+    const [lemburanRank, setLemburanRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
+    const [pengelolaBarangRank, setPengelolaBarangRank] = useState<{ level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null>(null);
+    const [deliveryBadge, setDeliveryBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+    const [providerBadge, setProviderBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+    const [salesBadge, setSalesBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+    const [teknisiBadge, setTeknisiBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+       const [kontenBadge, setKontenBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+    const [auditMarketingBadge, setAuditMarketingBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -132,12 +150,25 @@ export default function ProfileView({ userId }: { userId: string }) {
         admin?: { name: string } | null;
     } | null>(null);
     const [showContractModal, setShowContractModal] = useState(false);
+    const [showCoins, setShowCoins] = useState(false);
 
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
     const callerRoles = currentUser?.roles?.length ? currentUser.roles : [currentUser?.role].filter(Boolean) as string[];
     const isAdmin = callerRoles.some((r) => ADMIN_ROLES.includes(r));
     const canViewOthersContract = callerRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
+
+    // Popup Solit Coins: buka via ?solitcoins=1 (dari chip lintas-halaman) atau
+    // event "solit:open-coins" (chip saat sudah di halaman profil).
+    useEffect(() => {
+        if (!isSelf) return;
+        try {
+            if (new URLSearchParams(window.location.search).get("solitcoins") === "1") setShowCoins(true);
+        } catch { /* ignore */ }
+        const openCoins = () => setShowCoins(true);
+        window.addEventListener("solit:open-coins", openCoins);
+        return () => window.removeEventListener("solit:open-coins", openCoins);
+    }, [isSelf]);
 
     const songPicker = useSongPicker(
         (song: SavedSong) => {
@@ -160,17 +191,47 @@ export default function ProfileView({ userId }: { userId: string }) {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [meRes, profileRes, achRes] = await Promise.all([
+                        const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes, lemburanRes, pengelolaBarangRes, auditMarketingRes] = await Promise.all([
                 getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
                 fetch(`/api/profile?userId=${userId}`),
                 fetch(`/api/achievements?userId=${userId}`),
+                fetch(`/api/attendance/quality-rank?userId=${userId}`),
+                fetch(`/api/leaderboard-kerja/quality-rank?userId=${userId}`),
+                fetch(`/api/preparation/delivery-milestones?userId=${userId}`),
+                fetch(`/api/preparation/provider-milestones?userId=${userId}`),
+                fetch(`/api/transaction/sales-milestones?userId=${userId}`),
+                fetch(`/api/service/teknisi-milestones?userId=${userId}`),
+                fetch(`/api/cc-reports/konten-milestones?userId=${userId}`),
+                fetch(`/api/attendance/overtime-points?userId=${userId}`),
+                fetch(`/api/laptops/pengelola-points?userId=${userId}`),
+                fetch(`/api/sales-reports/audit-milestones?userId=${userId}`),
             ]);
             const meData = await meRes.json();
             const profileData = await profileRes.json();
             const achData = await achRes.json();
+            const qualityData = await qualityRes.json();
+            const kerjaData = await kerjaRes.json();
+            const deliveryData = await deliveryRes.json();
+            const providerData = await providerRes.json();
+            const salesData = await salesRes.json();
+            const teknisiData = await teknisiRes.json();
+            const kontenData = await kontenRes.json();
+            const lemburanData = await lemburanRes.json();
+            const pengelolaBarangData = await pengelolaBarangRes.json();
+            const auditMarketingData = await auditMarketingRes.json();
             if (meData.user) setCurrentUser(meData.user);
             if (profileData.success) { setProfile(profileData.data); setBioDraft(profileData.data.bio ?? ""); }
             if (achData.success) setAchievements(achData.data);
+            if (qualityData.success) setQualityRank(qualityData.data);
+            if (kerjaData.success) setKerjaRank(kerjaData.data);
+            if (deliveryData.success) setDeliveryBadge(deliveryData.data);
+            if (providerData.success) setProviderBadge(providerData.data);
+            if (salesData.success) setSalesBadge(salesData.data);
+            if (teknisiData.success) setTeknisiBadge(teknisiData.data);
+            if (kontenData.success) setKontenBadge(kontenData.data);
+            if (lemburanData.success) setLemburanRank(lemburanData.data);
+            if (pengelolaBarangData.success) setPengelolaBarangRank(pengelolaBarangData.data);
+            if (auditMarketingData.success) setAuditMarketingBadge(auditMarketingData.data);
         } catch {
             showToast("Gagal memuat profil", "err");
         } finally {
@@ -715,68 +776,161 @@ export default function ProfileView({ userId }: { userId: string }) {
                 />
             )}
 
-            <div className="bg-white rounded-3xl overflow-hidden border border-slate-100" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                <div className="relative h-32 sm:h-44 lg:h-56 overflow-hidden"
+            <div className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xl shadow-slate-200/40 relative">
+                {/* ── BANNER HERO ── */}
+                <div className="relative h-36 sm:h-48 lg:h-60 overflow-hidden rounded-t-3xl"
                     style={{
                         background: profile.banner_url
                             ? undefined
-                            : "radial-gradient(140% 100% at 12% -20%, rgba(139,92,246,0.38), transparent 60%), radial-gradient(120% 100% at 100% 0%, rgba(29,185,84,0.20), transparent 55%), radial-gradient(circle at 1px 1px, rgba(255,255,255,0.09) 1px, transparent 0) 0 0/22px 22px, linear-gradient(135deg, #0f0c29 0%, #1a1545 100%)",
+                            : "radial-gradient(140% 100% at 12% -20%, rgba(139,92,246,0.45), transparent 60%), radial-gradient(120% 100% at 100% 0%, rgba(29,185,84,0.25), transparent 55%), radial-gradient(circle at 1px 1px, rgba(255,255,255,0.12) 1px, transparent 0) 0 0/22px 22px, linear-gradient(135deg, #0b0920 0%, #1a1545 100%)",
                     }}>
                     {profile.banner_url && (
                         <img src={profile.banner_url} alt="Banner" className="absolute inset-0 w-full h-full object-cover" />
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-black/0 to-transparent pointer-events-none" />
+                    {/* Gradient overlay for depth & text/control contrast */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none" />
+
+                    {/* Cosmetic Banner Frame (4 sisi lengkap dengan laser beam mengalir + 4 ornamen sudut) */}
+                    {profile.equipped_banner && (
+                        <SolitBanner style={profile.equipped_banner.style} thickness={3} className="absolute inset-0 z-10" />
+                    )}
+
+                    {/* Ganti Banner Action Pill (Digeser agar tidak menabrak ornamen sudut kanan-bawah) */}
                     {(isSelf || isAdmin) && (
                         <button onClick={() => bannerInputRef.current?.click()} disabled={uploadingBanner} title="Ganti banner"
-                            className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/30 hover:bg-black/45 backdrop-blur-sm flex items-center justify-center transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
-                            {uploadingBanner ? <Loader2 className="w-3.5 h-3.5 animate-spin text-white" /> : <Camera className="w-3.5 h-3.5 text-white" />}
+                            className="absolute z-20 bottom-3 right-14 sm:bottom-3.5 sm:right-16 h-8 px-3 sm:h-9 sm:px-3.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-semibold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                            {uploadingBanner ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                            <span className="hidden sm:inline text-[11.5px]">Ganti Banner</span>
                         </button>
                     )}
                     <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBannerFileSelected} />
                 </div>
 
-                <div className="px-5 sm:px-7 lg:px-8 pb-6 lg:pb-8">
+                {/* ── CARD CONTENT BODY ── */}
+                <div className="px-5 sm:px-8 pb-7 sm:pb-9 relative z-20">
+                    {/* AVATAR + FLOATING CAPSULE + ACTIONS ROW */}
                     <div className="flex items-end justify-between -mt-14 sm:-mt-16 lg:-mt-20">
-                        <div className="relative">
+                        <div className="relative z-30">
+                            {/* FLOATING SONIC CAPSULE (MUSIC & STATUS NOTE) */}
                             {hasStatusBubble && (
-                                <button onClick={() => setShowInfoPopup(true)}
-                                    className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full w-max max-w-[180px] px-3 py-2 rounded-2xl shadow-lg text-center z-20 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                                    style={{ background: "rgba(15,12,41,0.92)", backdropFilter: "blur(10px)" }}>
+                                <div onClick={() => setShowInfoPopup(true)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setShowInfoPopup(true); }}
+                                    className={`group/capsule absolute left-1/2 -translate-x-1/2 -translate-y-full w-max max-w-[220px] sm:max-w-[270px] p-2 sm:p-2.5 rounded-2xl shadow-2xl z-30 border border-white/20 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
+                                        profile.equipped_border ? "-top-4 sm:-top-5" : "-top-2.5 sm:-top-3"
+                                    }`}
+                                    style={{
+                                        background: "linear-gradient(135deg, rgba(15, 12, 41, 0.95) 0%, rgba(26, 21, 69, 0.95) 100%)",
+                                        backdropFilter: "blur(14px)",
+                                        boxShadow: "0 14px 34px -4px rgba(0, 0, 0, 0.45), 0 0 20px -2px rgba(99, 102, 241, 0.25)"
+                                    }}>
+                                    {/* Song section */}
                                     {profile.song_title && (
-                                        <div className="flex items-center justify-center gap-1">
-                                            <Music className="w-3 h-3 flex-shrink-0" style={{ color: "#1db954" }} />
-                                            <p className="text-[11px] font-bold text-white truncate max-w-[150px]">{profile.song_title}</p>
+                                        <div className="flex items-center gap-2">
+                                            {/* Mini artwork / disk */}
+                                            <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-emerald-500/20 flex items-center justify-center border border-white/10"
+                                                style={{ animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none" }}>
+                                                {profile.song_artwork_url ? (
+                                                    <img src={profile.song_artwork_url} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <Music className="w-3.5 h-3.5 text-emerald-400" />
+                                                )}
+                                            </div>
+
+                                            {/* Song title & artist */}
+                                            <div className="min-w-0 flex-1 text-left">
+                                                <div className="flex items-center gap-1">
+                                                    <p className="text-[11px] font-bold text-white truncate max-w-[110px] sm:max-w-[140px] leading-tight">
+                                                        {profile.song_title}
+                                                    </p>
+                                                    {playingPreview && (
+                                                        <span className="flex items-end gap-[1.5px] h-3 px-1">
+                                                            <span className="w-[2px] bg-emerald-400 rounded-full animate-[solitSoundWave_0.8s_ease-in-out_infinite]" />
+                                                            <span className="w-[2px] bg-emerald-400 rounded-full animate-[solitSoundWave_0.8s_ease-in-out_0.2s_infinite]" />
+                                                            <span className="w-[2px] bg-emerald-400 rounded-full animate-[solitSoundWave_0.8s_ease-in-out_0.4s_infinite]" />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {profile.song_artist && (
+                                                    <p className="text-[9.5px] text-white/60 truncate max-w-[110px] sm:max-w-[140px] leading-tight">
+                                                        {profile.song_artist}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Quick Play/Pause mini button */}
+                                            {profile.song_preview_url && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); togglePreview(); }}
+                                                    title={playingPreview ? "Pause" : "Putar"}
+                                                    className="w-6 h-6 rounded-full bg-white/15 hover:bg-emerald-500 text-white flex items-center justify-center flex-shrink-0 transition-colors shadow-xs">
+                                                    {playingPreview ? <Pause className="w-2.5 h-2.5" /> : <Play className="w-2.5 h-2.5 ml-0.5" />}
+                                                </button>
+                                            )}
                                         </div>
                                     )}
-                                    {profile.song_artist && <p className="text-[9.5px] truncate" style={{ color: "rgba(255,255,255,0.6)" }}>{profile.song_artist}</p>}
+
+                                    {/* Status note section */}
                                     {profile.status_note && (
-                                        <div className={`flex items-center justify-center gap-1 ${profile.song_title ? "mt-1.5 pt-1.5 border-t border-white/10" : ""}`}>
-                                            <MessageCircle className="w-3 h-3 flex-shrink-0" style={{ color: "#c4b5fd" }} />
-                                            <p className="text-[10.5px] font-semibold text-white truncate max-w-[150px]">{profile.status_note}</p>
+                                        <div className={`flex items-center gap-1.5 text-left ${profile.song_title ? "mt-1.5 pt-1.5 border-t border-white/10" : ""}`}>
+                                            <MessageCircle className="w-3 h-3 flex-shrink-0 text-violet-300" />
+                                            <p className="text-[10px] font-medium text-violet-100 truncate max-w-[160px] sm:max-w-[200px] leading-tight">
+                                                {profile.status_note}
+                                            </p>
                                         </div>
                                     )}
-                                    <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 rotate-45 border-r border-b border-white/10" style={{ background: "rgba(15,12,41,0.92)" }} />
-                                </button>
+
+                                    {/* Diamond pointer arrow */}
+                                    <div className="absolute left-1/2 -bottom-1.5 -translate-x-1/2 w-3 h-3 rotate-45 border-r border-b border-white/20"
+                                        style={{ background: "#1a1545" }} />
+                                </div>
                             )}
 
-                            <div className="rounded-full p-[3px]"
-                                style={{
-                                    background: hasStatusBubble ? "linear-gradient(135deg, #1db954, #6366f1, #8b5cf6)" : "transparent",
-                                    boxShadow: hasStatusBubble ? "0 8px 22px -6px rgba(99,102,241,0.45)" : "0 4px 14px rgba(15,12,41,0.10)",
-                                }}>
-                                <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
-                                    className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full border-4 border-white overflow-hidden bg-slate-100 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
-                                    style={{ background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)", animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none" }}>
-                                    {profile.profile_photo_url
-                                        ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
-                                        : getInitials(profile.name)}
-                                </div>
-                            </div>
+                            {/* AVATAR IMAGE & BORDER */}
+                            {(() => {
+                                const hasBorder = !!profile.equipped_border;
+                                const avatarContent = (
+                                    <div onClick={() => profile.profile_photo_url && setShowPhotoModal(true)}
+                                        className={`relative w-24 h-24 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden bg-slate-900 flex items-center justify-center text-white text-3xl lg:text-4xl font-black ${
+                                            hasBorder ? "" : "border-4 border-white shadow-md"
+                                        } ${profile.profile_photo_url ? "cursor-pointer" : ""}`}
+                                        style={{
+                                            background: profile.profile_photo_url ? undefined : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                                            animation: playingPreview ? "solitAvatarSpin 6s linear infinite" : "none"
+                                        }}>
+                                        {profile.profile_photo_url
+                                            ? <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
+                                            : getInitials(profile.name)}
+                                    </div>
+                                );
 
+                                if (hasBorder) {
+                                    return (
+                                        <SolitBorder style={profile.equipped_border!.style} thickness={4} ornamentSize={30}>
+                                            {avatarContent}
+                                        </SolitBorder>
+                                    );
+                                }
+
+                                return (
+                                    <div className="rounded-full p-[3px]"
+                                        style={{
+                                            background: hasStatusBubble ? "linear-gradient(135deg, #1db954, #6366f1, #8b5cf6)" : "transparent",
+                                            boxShadow: hasStatusBubble ? "0 8px 22px -6px rgba(99,102,241,0.45)" : "0 4px 14px rgba(15,12,41,0.10)",
+                                        }}>
+                                        {avatarContent}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Camera Action Button */}
                             {(isSelf || isAdmin) && (
                                 <button onClick={() => setShowPhotoActions(true)} disabled={uploading} title="Opsi foto profil"
-                                    className="absolute -bottom-1 -right-1 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center hover:scale-110 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40">
-                                    {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> : <Camera className="w-3.5 h-3.5 text-slate-600" />}
+                                    className={`absolute z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white shadow-lg border border-slate-200 flex items-center justify-center hover:scale-110 active:scale-95 transition-all disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40 ${
+                                        profile.equipped_border ? "-bottom-1 -right-1 sm:-bottom-1.5 sm:-right-1.5" : "-bottom-0.5 -right-0.5"
+                                    }`}>
+                                    {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> : <Camera className="w-3.5 h-3.5 text-slate-700" />}
                                 </button>
                             )}
                             <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileSelected} />
@@ -784,10 +938,11 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 <audio ref={audioRef} src={profile.song_preview_url} onEnded={() => setPlayingPreview(false)} onTimeUpdate={handleMainTimeUpdate} />
                             )}
                         </div>
+
+                        {/* Admin delete photo button (for others) */}
                         {isAdmin && !isSelf && profile.profile_photo_url && (
                             <button onClick={() => setConfirmDelete(true)}
-                                className="mb-1 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
-                                style={{ background: "#fff1f2", color: "#dc2626", border: "1px solid #fecdd3" }}>
+                                className="mb-1 flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 shadow-xs">
                                 <Trash2 className="w-3.5 h-3.5" /> Hapus Foto
                             </button>
                         )}
@@ -798,151 +953,212 @@ export default function ProfileView({ userId }: { userId: string }) {
                             from { transform: rotate(0deg); }
                             to   { transform: rotate(360deg); }
                         }
+                        @keyframes solitSoundWave {
+                            0%, 100% { height: 3px; }
+                            50%      { height: 12px; }
+                        }
                         @keyframes solitShimmerSweep {
                             0%   { transform: translateX(-120%) skewX(-20deg); opacity: 0; }
                             15%  { opacity: 0.6; }
                             55%  { opacity: 0; }
                             100% { transform: translateX(220%) skewX(-20deg); opacity: 0; }
                         }
+                        @keyframes solitBadgeTwinkle {
+                            0%, 100% { opacity: 0; transform: scale(0.4); }
+                            50%      { opacity: 1; transform: scale(1); }
+                        }
                         @media (prefers-reduced-motion: reduce) {
                             * { animation: none !important; }
                         }
                     `}</style>
 
-                    <div className="mt-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5 sm:gap-3">
+                    {/* ── USER IDENTITY & ROLES ROW ── */}
+                    <div className="mt-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                         <div className="min-w-0">
-                            <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900">{profile.name}</h1>
-                            <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-1.5">
+                            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
+                                {profile.name}
+                            </h1>
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2">
                                 {roles.map((r) => (
-                                    <span key={r} className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-50 text-slate-600 border border-slate-200">
-                                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }} />
+                                    <span key={r} className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-slate-100/80 hover:bg-slate-200/80 text-slate-700 border border-slate-200/60 shadow-xs transition-colors">
+                                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }} />
                                         {humanizeRoleKey(r)}
                                     </span>
                                 ))}
                             </div>
                         </div>
-                        {achievements && <AchievementTitles achievements={achievements} />}
+                        {achievements && (
+                                                        <AchievementTitles
+                                achievements={achievements}
+                                qualityRank={qualityRank}
+                                kerjaRank={kerjaRank}
+                                deliveryBadge={deliveryBadge}
+                                providerBadge={providerBadge}
+                                salesBadge={salesBadge}
+                                teknisiBadge={teknisiBadge}
+                                kontenBadge={kontenBadge}
+                                lemburanRank={lemburanRank}
+                                pengelolaBarangRank={pengelolaBarangRank}
+                                auditMarketingBadge={auditMarketingBadge}
+                            />
+                        )}
                     </div>
 
+                    {/* ── SOLIT COINS SHOWCASE ── */}
+                    {isSelf && (
+                        <div className="mt-5">
+                            <SolitCoinsWidget onOpen={() => setShowCoins(true)} />
+                        </div>
+                    )}
+                    {isSelf && <SolitCoinsModal open={showCoins} onClose={() => setShowCoins(false)} />}
+
+                    {/* ── STATUS NOTE BAR (Inline Editor & Quick Add) ── */}
                     <div className="mt-3">
                         {editingNote ? (
-                            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-200/80 shadow-xs">
                                 <input value={noteDraft} onChange={(e) => setNoteDraft(e.target.value.slice(0, 60))}
                                     placeholder="Tulis catatan singkat... (hilang dalam 24 jam)"
                                     autoFocus
                                     onKeyDown={(e) => { if (e.key === "Enter") handleSaveNote(); if (e.key === "Escape") setEditingNote(false); }}
-                                    className="flex-1 min-w-[140px] h-9 rounded-full px-3.5 text-xs font-medium border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                                    style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#334155" }} />
-                                <span className="text-[9px] text-slate-300 flex-shrink-0">{noteDraft.length}/60</span>
+                                    className="flex-1 min-w-[140px] h-9 rounded-xl px-3.5 text-xs font-medium bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-400/30 text-slate-700 placeholder:text-slate-400" />
+                                <span className="text-[10px] font-semibold text-slate-400 px-1 flex-shrink-0">{noteDraft.length}/60</span>
                                 <button onClick={handleSaveNote} disabled={savingNote}
-                                    className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
+                                    className="h-9 px-3 rounded-xl flex items-center gap-1 font-bold text-xs text-white flex-shrink-0 shadow-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                                     style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
                                     {savingNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                    <span>Simpan</span>
                                 </button>
                                 <button onClick={() => setEditingNote(false)}
-                                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                                    style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                    className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-white hover:bg-slate-100 text-slate-500 border border-slate-200 transition-colors">
                                     <X className="w-3.5 h-3.5" />
                                 </button>
                             </div>
                         ) : isSelf && !profile.status_note ? (
                             <button onClick={() => { setEditingNote(true); setNoteDraft(""); }}
-                                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
-                                style={{ background: "#f8fafc", color: "#94a3b8", border: "1px dashed #cbd5e1" }}>
-                                <MessageCircle className="w-3.5 h-3.5" /> Tulis catatan
+                                className="inline-flex items-center gap-2 text-xs font-semibold px-3.5 py-1.5 rounded-full bg-slate-50 hover:bg-violet-50 text-slate-500 hover:text-violet-600 border border-dashed border-slate-300 hover:border-violet-300 transition-all duration-200">
+                                <MessageCircle className="w-3.5 h-3.5 text-violet-400" /> Tulis catatan 24 jam
                             </button>
                         ) : null}
                     </div>
 
-                    {/* ── Lagu Favorit — hanya tampil kalau BELUM ada lagu; kalau sudah ada, tampil sebagai bubble di atas card ─────── */}
-                    {!profile.song_title && (
-                        <div className="mt-4 rounded-3xl overflow-hidden border border-slate-100">
-                            <div className="h-1" style={{ background: "linear-gradient(90deg, #1db954, #6366f1, #8b5cf6)" }} />
-                            <div className="p-3.5 sm:p-4" style={{ background: "#f8fafc" }}>
-                                <div className="flex items-center gap-1.5 mb-3">
-                                    <Music className="w-4 h-4" style={{ color: "#1db954" }} />
-                                    <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#94a3b8" }}>
-                                        {isSelf ? "Lagu Favorit" : `Lagu Favorit ${profile.name.split(" ")[0]}`}
-                                    </p>
-                                </div>
-
-                                {isSelf ? (
-                                    <SongPickerPanel picker={songPicker} />
-                                ) : (
-                                    <p className="text-xs italic" style={{ color: "#cbd5e1" }}>Belum ada lagu favorit</p>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="mt-4">
-                        {editingBio ? (
-                            <div className="space-y-2">
-                                <textarea value={bioDraft} onChange={(e) => setBioDraft(e.target.value.slice(0, 280))} rows={3}
-                                    placeholder="Tulis bio singkat tentang dirimu..."
-                                    className="w-full rounded-xl px-3.5 py-2.5 text-sm border focus:outline-none focus:ring-2 focus:ring-violet-400/30"
-                                    style={{ borderColor: "#e2e8f0", background: "#f8fafc", color: "#334155" }} />
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <span className="text-[10px] text-slate-400">{bioDraft.length}/280</span>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => { setEditingBio(false); setBioDraft(profile.bio ?? ""); }}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300" style={{ background: "#f1f5f9", color: "#64748b" }}>
-                                            <X className="w-3 h-3 inline mr-1" /> Batal
-                                        </button>
-                                        <button onClick={handleSaveBio} disabled={savingBio}
-                                            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40"
-                                            style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
-                                            {savingBio ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Simpan
-                                        </button>
+                    {/* ── BENTO CARDS SECTION (TENTANG & KONTRAK) ── */}
+                    <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+                        {/* BENTO CARD 1: TENTANG (BIO) */}
+                        <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-slate-50/80 to-white border border-slate-200/70 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300">
+                            <div>
+                                <div className="flex items-center justify-between gap-2 mb-2.5">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-6 h-6 rounded-lg bg-violet-100 flex items-center justify-center text-violet-600">
+                                            <Pencil className="w-3 h-3" />
+                                        </div>
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tentang</p>
                                     </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="pt-3 border-t border-slate-50">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Tentang</p>
-                                <div className="flex items-start justify-between gap-2">
-                                    <p className="text-sm text-slate-500 leading-relaxed line-clamp-4 break-words" title={profile.bio || undefined}>
-                                        {profile.bio || <span className="italic text-slate-300">Belum ada bio</span>}
-                                    </p>
-                                    {isSelf && (
-                                        <button onClick={() => setEditingBio(true)} className="flex-shrink-0 p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
+                                    {isSelf && !editingBio && (
+                                        <button onClick={() => setEditingBio(true)}
+                                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-violet-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200"
+                                            title="Edit bio">
                                             <Pencil className="w-3.5 h-3.5" />
                                         </button>
                                     )}
                                 </div>
-                                {profile.bio && profile.bio_created_at && (
-                                    <p className="text-[10px] text-slate-300 mt-1">Dibuat pada {formatBioDate(profile.bio_created_at)}</p>
+
+                                {editingBio ? (
+                                    <div className="space-y-2">
+                                        <textarea value={bioDraft} onChange={(e) => setBioDraft(e.target.value.slice(0, 280))} rows={3}
+                                            placeholder="Tulis bio singkat tentang dirimu..."
+                                            className="w-full rounded-xl px-3.5 py-2.5 text-xs font-medium border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400/30 text-slate-700" />
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[10px] font-semibold text-slate-400">{bioDraft.length}/280</span>
+                                            <div className="flex gap-1.5">
+                                                <button onClick={() => { setEditingBio(false); setBioDraft(profile.bio ?? ""); }}
+                                                    className="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">
+                                                    Batal
+                                                </button>
+                                                <button onClick={handleSaveBio} disabled={savingBio}
+                                                    className="px-3 py-1 rounded-lg text-xs font-bold text-white flex items-center gap-1 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                                                    style={{ background: "linear-gradient(135deg, #0f0c29, #1a1545)" }}>
+                                                    {savingBio ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Simpan
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed break-words whitespace-pre-wrap">
+                                        {profile.bio || <span className="italic text-slate-400">Belum ada bio</span>}
+                                    </p>
                                 )}
+                            </div>
+
+                            {profile.bio && profile.bio_created_at && !editingBio && (
+                                <p className="text-[10px] text-slate-400 mt-3 pt-2.5 border-t border-slate-100">
+                                    Dibuat pada {formatBioDate(profile.bio_created_at)}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* BENTO CARD 2: STATUS KONTRAK KERJA */}
+                        {contractInfo && (isSelf ? contractInfo.status !== "NONE" : true) && (
+                            <div className="rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-slate-50/80 to-white border border-slate-200/70 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300">
+                                <div>
+                                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
+                                                <CheckCircle2 className="w-3 h-3" />
+                                            </div>
+                                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                                {isSelf ? "Status Kontrak Kerja" : "Masa Aktif Kontrak"}
+                                            </p>
+                                        </div>
+                                        {contractInfo.id && (
+                                            <button onClick={() => setShowContractModal(true)}
+                                                className="text-xs font-bold text-violet-600 hover:text-violet-700 transition-colors flex items-center gap-0.5">
+                                                Lihat Detail &rarr;
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2 mt-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <ContractBadge status={contractInfo.status} validUntil={contractInfo.valid_until} />
+                                            {contractInfo.status === "APPROVED" && contractInfo.career_level && (
+                                                <CareerLevelBadge level={contractInfo.career_level} />
+                                            )}
+                                        </div>
+                                        {contractInfo.status === "APPROVED" && contractInfo.valid_until && (
+                                            <p className="text-xs font-medium text-slate-500">
+                                                s/d {contractInfo.valid_until}
+                                                {daysUntilDate(contractInfo.valid_until) >= 0 && (
+                                                    <span className="ml-1.5 px-2 py-0.5 rounded-full bg-slate-100 text-[10.5px] font-bold text-slate-600 border border-slate-200/60">
+                                                        {daysUntilDate(contractInfo.valid_until)} hari lagi
+                                                    </span>
+                                                )}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {contractInfo && (isSelf ? contractInfo.status !== "NONE" : true) && (
-                        <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between gap-3 flex-wrap">
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                                    {isSelf ? "Status Kontrak Kerja" : "Masa Aktif Kontrak"}
-                                </p>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <ContractBadge status={contractInfo.status} validUntil={contractInfo.valid_until} />
-                                    {contractInfo.status === "APPROVED" && contractInfo.valid_until && (
-                                        <span className="text-xs text-slate-400">
-                                            s/d {contractInfo.valid_until}
-                                            {daysUntilDate(contractInfo.valid_until) >= 0 && ` · ${daysUntilDate(contractInfo.valid_until)} hari lagi`}
-                                        </span>
-                                    )}
-                                    {contractInfo.status === "APPROVED" && contractInfo.career_level && (
-                                        <CareerLevelBadge level={contractInfo.career_level} />
-                                    )}
+                    {/* BENTO CARD 3: LAGU FAVORIT (Jika belum ada lagu) */}
+                    {!profile.song_title && (
+                        <div className="mt-4 rounded-2xl overflow-hidden border border-emerald-100 bg-gradient-to-r from-emerald-50/60 via-slate-50 to-indigo-50/50 p-4 shadow-xs">
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center text-white shadow-xs">
+                                    <Music className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-800">
+                                        {isSelf ? "Pilih Lagu Favorit Profil" : `Lagu Favorit ${profile.name.split(" ")[0]}`}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500">Lagu akan berputar otomatis saat pengunjung membuka profilmu</p>
                                 </div>
                             </div>
-                            {contractInfo.id && (
-                                <button
-                                    onClick={() => setShowContractModal(true)}
-                                    className="text-xs font-semibold text-violet-500 hover:text-violet-600"
-                                >
-                                    Lihat Detail
-                                </button>
+
+                            {isSelf ? (
+                                <SongPickerPanel picker={songPicker} />
+                            ) : (
+                                <p className="text-xs italic text-slate-400">Belum ada lagu favorit</p>
                             )}
                         </div>
                     )}
@@ -1065,8 +1281,19 @@ function RankBadge({ rank }: { rank: number }) {
     );
 }
 
-// ── Title achievement ala Mobile Legends: menampilkan "TOP {rank}" untuk kategori yang masuk 5 besar ───
-function AchievementTitles({ achievements }: { achievements: AchievementsData }) {
+function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge, providerBadge, salesBadge, teknisiBadge, kontenBadge, lemburanRank, pengelolaBarangRank, auditMarketingBadge }: {
+    achievements: AchievementsData;
+    qualityRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
+    kerjaRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
+    deliveryBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+    providerBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+    salesBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+    teknisiBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+    kontenBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+    lemburanRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
+    pengelolaBarangRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
+    auditMarketingBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+}) {
     const titles: { rank: number; label: string }[] = [];
     if (achievements.attendance.rankThisMonth !== null && achievements.attendance.rankThisMonth <= 10) {
         titles.push({ rank: achievements.attendance.rankThisMonth, label: "Kehadiran" });
@@ -1074,15 +1301,400 @@ function AchievementTitles({ achievements }: { achievements: AchievementsData })
     if (achievements.overtime.rankThisMonth !== null && achievements.overtime.rankThisMonth <= 10) {
         titles.push({ rank: achievements.overtime.rankThisMonth, label: "Lembur" });
     }
-    if (titles.length === 0) return null;
+    // ✅ NEW — Kualitas Absensi sekarang berbasis LEVEL berjenjang (lihat
+    // /dashboard/lencana), bukan cuma rank bulan ini — jadi ditampilkan
+    // terpisah dari 2 kategori TOP di atas.
+    const hasQualityBadge = !!(qualityRank && qualityRank.level > 0);
+    // ✅ NEW — Lencana Kualitas Pekerjaan (tab "Pekerjaan" di /dashboard/lencana),
+    // polanya sama dengan Kualitas Absensi, cuma sumbernya leaderboard-kerja.
+    const hasKerjaBadge = !!(kerjaRank && kerjaRank.level > 0);
+    // ✅ NEW — Lencana Lemburan (tab "Lemburan" di /dashboard/lencana): pola
+    // LEVEL bulanan sama seperti Absensi/Kerja (bukan milestone), sumber
+    // poinnya dari blok 2 jam lembur audited per hari.
+    const hasLemburanBadge = !!(lemburanRank && lemburanRank.level > 0);
+    // ✅ NEW — Lencana Pengelola Barang (tab "Pengelola Barang" di
+    // /dashboard/lencana): pola LEVEL bulanan sama seperti Absensi/Kerja/
+    // Lemburan, sumber poinnya dari tambah unit (1) + solved (5) + SO (0,3).
+    const hasPengelolaBarangBadge = !!(pengelolaBarangRank && pengelolaBarangRank.level > 0);
+    // ✅ NEW — Lencana Pengantaran (tab "Pengantaran" di /dashboard/lencana):
+    // BUKAN level bulanan, tapi milestone total pengantaran (50/100/.../1000),
+    // dan cuma tampil kalau server sudah menandai hasBadge (artinya Top 3).
+    const hasDeliveryBadge = !!(deliveryBadge && deliveryBadge.hasBadge);
+    // ✅ NEW — Lencana Penyedia Barang (tab "Penyedia Barang" di /dashboard/lencana):
+    // MILESTONE kumulatif total unit laptop yang berhasil disiapkan
+    // (100/300/.../3000), bersifat all-time & tidak dibatasi Top 3 — tampil
+    // untuk siapa pun yang sudah meraih milestone-nya.
+    const hasProviderBadge = !!(providerBadge && providerBadge.hasBadge);
+    // ✅ NEW — Lencana Sales (tab "Sales" di /dashboard/lencana): MILESTONE
+    // kumulatif total transaksi Lunas (1000/2000/.../20000), bersifat
+    // all-time & tidak dibatasi Top 3 — sama polanya dengan Penyedia Barang.
+    const hasSalesBadge = !!(salesBadge && salesBadge.hasBadge);
+    // ✅ NEW — Lencana Teknisi (tab "Teknisi" di /dashboard/lencana): MILESTONE
+    // kumulatif total unit laptop servis yang berhasil diselesaikan
+    // (50/100/.../1000), bersifat all-time & tidak dibatasi Top 3 — sama
+    // polanya dengan Penyedia Barang & Sales.
+    const hasTeknisiBadge = !!(teknisiBadge && teknisiBadge.hasBadge);
+    // ✅ NEW — Lencana Konten Kreator (tab "Konten Kreator" di /dashboard/lencana):
+    // MILESTONE kumulatif total tahap Take+Edit video yang berhasil
+    // diselesaikan (100/200/.../1000), bersifat all-time & tidak dibatasi
+    // Top 3 — sama polanya dengan Penyedia Barang/Sales/Teknisi.
+        const hasKontenBadge = !!(kontenBadge && kontenBadge.hasBadge);
+    // ✅ NEW — Lencana Audit Marketing (tab "Audit Marketing" di /dashboard/lencana):
+    // MILESTONE kumulatif poin audit (0,5 poin per laporan yang diaudit), bersifat
+    // all-time & tidak dibatasi Top 3 — sama polanya dengan milestone lainnya.
+    const hasAuditMarketingBadge = !!(auditMarketingBadge && auditMarketingBadge.hasBadge);
+    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge && !hasProviderBadge && !hasSalesBadge && !hasTeknisiBadge && !hasKontenBadge && !hasLemburanBadge && !hasPengelolaBarangBadge && !hasAuditMarketingBadge) return null;
     titles.sort((a, b) => a.rank - b.rank);
 
     return (
         <div className="flex flex-row sm:flex-col flex-wrap justify-end sm:justify-start items-end gap-2 flex-shrink-0">
-            {titles.map((t) => (
+            {hasQualityBadge && (
+                <LevelBadgeDisplay level={qualityRank!.level} isPermanent={qualityRank!.isPermanent} isOngoingMonth={qualityRank!.isOngoingMonth} />
+            )}
+            {hasKerjaBadge && (
+                <LevelBadgeDisplay level={kerjaRank!.level} isPermanent={kerjaRank!.isPermanent} isOngoingMonth={kerjaRank!.isOngoingMonth} label="Kualitas Pekerjaan" colorScheme="indigo" icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />} />
+            )}
+            {hasLemburanBadge && (
+                <LevelBadgeDisplay level={lemburanRank!.level} isPermanent={lemburanRank!.isPermanent} isOngoingMonth={lemburanRank!.isOngoingMonth} label="Lemburan" colorScheme="amber" icon={<Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />} />
+            )}
+            {hasPengelolaBarangBadge && (
+                <LevelBadgeDisplay level={pengelolaBarangRank!.level} isPermanent={pengelolaBarangRank!.isPermanent} isOngoingMonth={pengelolaBarangRank!.isOngoingMonth} label="Pengelola Barang" colorScheme="teal" icon={<Boxes className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />} />
+            )}
+            {hasDeliveryBadge && (
+                <DeliveryMilestoneBadge rank={deliveryBadge!.rank} milestone={deliveryBadge!.milestone} />
+            )}
+            {hasProviderBadge && (
+                <ProviderMilestoneBadge rank={providerBadge!.rank} milestone={providerBadge!.milestone} />
+            )}
+            {hasSalesBadge && (
+                <SalesMilestoneBadge rank={salesBadge!.rank} milestone={salesBadge!.milestone} />
+            )}
+            {hasTeknisiBadge && (
+                <TeknisiMilestoneBadge rank={teknisiBadge!.rank} milestone={teknisiBadge!.milestone} />
+            )}
+                        {hasKontenBadge && (
+                <KontenMilestoneBadge rank={kontenBadge!.rank} milestone={kontenBadge!.milestone} />
+            )}
+            {hasAuditMarketingBadge && (
+                <AuditMarketingMilestoneBadge rank={auditMarketingBadge!.rank} milestone={auditMarketingBadge!.milestone} />
+            )}
+                        {titles.map((t) => (
                 <AchievementTitleBadge key={t.label} rank={t.rank} label={t.label} />
             ))}
         </div>
+    );
+}
+
+// ✅ NEW — shell visual bersama untuk semua pill "Lencana" (Level & Milestone).
+// Warna/gradient/isi teks tetap dikirim masing-masing badge di bawah — komponen
+// ini cuma menambah lapisan "mewah": bezel metalik tipis, kilau kaca di atas,
+// bayangan 3D di bawah, kilau berjalan periodik, ring emboss di ikon, dan
+// aksen sparkle untuk tier gold (premium).
+function BadgePill({
+    gradient, glow, icon, title, subtitle, note, tooltip, premium = false,
+}: {
+    gradient: string;
+    glow: string;
+    icon: React.ReactNode;
+    title: string;
+    subtitle: string;
+    note?: string;
+    tooltip: string;
+    premium?: boolean;
+}) {
+    return (
+        <div
+            className="relative rounded-full p-[1.5px]"
+            style={{
+                background: "linear-gradient(135deg, rgba(255,255,255,0.85), rgba(255,255,255,0.1) 45%, rgba(255,255,255,0.5))",
+                boxShadow: `0 6px 18px -3px ${glow}, 0 1px 3px rgba(0,0,0,0.2)`,
+            }}
+            title={tooltip}
+        >
+            <div className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden" style={{ background: gradient }}>
+                <div className="absolute inset-x-0 top-0 h-3/5 rounded-t-full pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.55), transparent)" }} />
+                <div className="absolute inset-x-0 bottom-0 h-1/3 pointer-events-none" style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.14), transparent)" }} />
+                <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.45), transparent 55%)" }} />
+                {/* Kilau berjalan — "mengkilat" utama, berulang periodik */}
+                <div className="absolute inset-y-0 w-7 pointer-events-none" style={{ background: "linear-gradient(100deg, transparent, rgba(255,255,255,0.85), transparent)", animation: "solitShimmerSweep 3.2s ease-in-out infinite" }} />
+                {/* Titik-titik glitter berkedip — kesan berkilauan/mewah */}
+                <span className="absolute w-[3px] h-[3px] rounded-full bg-white pointer-events-none" style={{ top: "22%", left: "58%", animation: "solitBadgeTwinkle 2.4s ease-in-out infinite", animationDelay: "0.2s" }} />
+                <span className="absolute w-[2px] h-[2px] rounded-full bg-white pointer-events-none" style={{ top: "62%", left: "72%", animation: "solitBadgeTwinkle 2.8s ease-in-out infinite", animationDelay: "1s" }} />
+                <span className="absolute w-[2px] h-[2px] rounded-full bg-white pointer-events-none" style={{ top: "38%", left: "85%", animation: "solitBadgeTwinkle 2.1s ease-in-out infinite", animationDelay: "1.6s" }} />
+                {premium && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-md ring-1 ring-black/5 z-10">
+                        <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                    </span>
+                )}
+                <div
+                    className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center flex-shrink-0 ring-1 ring-white/50 overflow-hidden"
+                    style={{
+                        background: "linear-gradient(160deg, rgba(255,255,255,0.5), rgba(255,255,255,0.14))",
+                        boxShadow: "inset 0 1px 2px rgba(255,255,255,0.7), inset 0 -1px 3px rgba(0,0,0,0.18)",
+                    }}
+                >
+                    <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-white/60 blur-[2px] pointer-events-none" />
+                    <span className="relative">{icon}</span>
+                </div>
+                <div className="relative leading-tight">
+                    <p className="text-[11px] sm:text-xs font-black text-white tracking-wide drop-shadow-sm">{title}</p>
+                    <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.9)" }}>{subtitle}</p>
+                    {note && <p className="text-[7px] sm:text-[7.5px] font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>{note}</p>}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ✅ NEW — badge lencana Pengantaran: TIDAK berbasis level/streak seperti
+// LevelBadgeDisplay, melainkan MILESTONE total pengantaran (50/100/.../1000)
+// dan rank Top 1-3 di periode yang sedang dipakai (default rolling 1 bulan).
+function DeliveryMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = rank === 1 ? "gold" : rank === 2 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #fb923c, #ea580c, #9a3412)",
+        silver: "linear-gradient(135deg, #fdba74, #f97316, #c2410c)",
+        bronze: "linear-gradient(135deg, #fed7aa, #fb923c, #ea580c)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(234,88,12,0.35)",
+        silver: "rgba(249,115,22,0.35)",
+        bronze: "rgba(251,146,60,0.35)",
+    };
+
+        return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`TOP ${rank}`}
+            subtitle={`Pengantaran · ${milestone}+`}
+            tooltip={`Top ${rank} Pengantaran · ${milestone}+ pengantaran`}
+        />
+    );
+}
+
+// ✅ NEW — badge lencana Penyedia Barang: TIDAK berbasis level/streak seperti
+// LevelBadgeDisplay, dan BEDA dari DeliveryMilestoneBadge — ini MILESTONE
+// kumulatif total unit laptop yang berhasil disiapkan (100/300/.../3000)
+// sepanjang waktu, bersifat permanen begitu tercapai & TIDAK dibatasi Top 3
+// (tier warna ditentukan besar milestone-nya, bukan rank).
+function ProviderMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = milestone >= 2000 ? "gold" : milestone >= 700 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #2dd4bf, #0d9488, #115e59)",
+        silver: "linear-gradient(135deg, #5eead4, #14b8a6, #0f766e)",
+        bronze: "linear-gradient(135deg, #99f6e4, #2dd4bf, #14b8a6)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(13,148,136,0.35)",
+        silver: "rgba(20,184,166,0.35)",
+        bronze: "rgba(45,212,191,0.35)",
+    };
+
+        return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`${milestone}+ UNIT`}
+            subtitle="Penyedia Barang"
+            tooltip={`Peringkat #${rank} · ${milestone}+ unit disiapkan`}
+        />
+    );
+}
+
+// ✅ NEW — badge lencana Sales: pola sama persis dengan ProviderMilestoneBadge
+// (MILESTONE kumulatif all-time, TIDAK dibatasi Top 3) tapi satuannya total
+// TRANSAKSI Lunas (1000/2000/.../20000), bukan unit laptop disiapkan.
+function SalesMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = milestone >= 10000 ? "gold" : milestone >= 4000 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #fb7185, #e11d48, #9f1239)",
+        silver: "linear-gradient(135deg, #fda4af, #f43f5e, #be123c)",
+        bronze: "linear-gradient(135deg, #fecdd3, #fb7185, #f43f5e)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(225,29,72,0.35)",
+        silver: "rgba(244,63,94,0.35)",
+        bronze: "rgba(251,113,133,0.35)",
+    };
+
+       return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`${milestone}+ TRX`}
+            subtitle="Sales"
+            tooltip={`Peringkat #${rank} · ${milestone}+ transaksi`}
+        />
+    );
+}
+
+// ✅ NEW — badge lencana Teknisi: pola sama persis dengan ProviderMilestoneBadge
+// / SalesMilestoneBadge (MILESTONE kumulatif all-time, TIDAK dibatasi Top 3)
+// tapi satuannya total unit laptop SERVIS yang berhasil diselesaikan.
+function TeknisiMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = milestone >= 700 ? "gold" : milestone >= 300 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #4ade80, #16a34a, #166534)",
+        silver: "linear-gradient(135deg, #86efac, #22c55e, #15803d)",
+        bronze: "linear-gradient(135deg, #bbf7d0, #4ade80, #22c55e)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(22,163,74,0.35)",
+        silver: "rgba(34,197,94,0.35)",
+        bronze: "rgba(74,222,128,0.35)",
+    };
+
+        return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<Wrench className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`${milestone}+ SERVIS`}
+            subtitle="Teknisi"
+            tooltip={`Peringkat #${rank} · ${milestone}+ servis`}
+        />
+    );
+}
+
+// ✅ NEW — badge lencana Konten Kreator: pola sama persis dengan
+// ProviderMilestoneBadge/SalesMilestoneBadge/TeknisiMilestoneBadge
+// (MILESTONE kumulatif all-time, TIDAK dibatasi Top 3) tapi satuannya total
+// tahap Take+Edit video yang berhasil diselesaikan.
+function KontenMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = milestone >= 700 ? "gold" : milestone >= 300 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #38bdf8, #0284c7, #075985)",
+        silver: "linear-gradient(135deg, #7dd3fc, #0ea5e9, #0369a1)",
+        bronze: "linear-gradient(135deg, #bae6fd, #38bdf8, #0ea5e9)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(2,132,199,0.35)",
+        silver: "rgba(14,165,233,0.35)",
+        bronze: "rgba(56,189,248,0.35)",
+    };
+
+       return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<Video className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`${milestone}+ VIDEO`}
+            subtitle="Konten Kreator"
+            tooltip={`Peringkat #${rank} · ${milestone}+ video`}
+        />
+    );
+}
+
+// ✅ NEW — badge lencana Audit Marketing: pola sama persis dengan
+// ProviderMilestoneBadge/SalesMilestoneBadge/TeknisiMilestoneBadge/KontenMilestoneBadge
+// (MILESTONE kumulatif all-time, TIDAK dibatasi Top 3) tapi satuannya total POIN
+// audit (0,5 poin per laporan Leads yang diverifikasi tim Marketing).
+function AuditMarketingMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = milestone >= 200 ? "gold" : milestone >= 50 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #f0abfc, #c026d3, #86198f)",
+        silver: "linear-gradient(135deg, #f5d0fe, #d946ef, #a21caf)",
+        bronze: "linear-gradient(135deg, #fae8ff, #f0abfc, #d946ef)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(192,38,211,0.35)",
+        silver: "rgba(217,70,239,0.35)",
+        bronze: "rgba(240,171,252,0.35)",
+    };
+
+       return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<Megaphone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`${milestone}+ POIN`}
+            subtitle="Audit Marketing"
+            tooltip={`Peringkat #${rank} · ${milestone}+ poin audit`}
+        />
+    );
+}
+
+// ✅ NEW — badge lencana berjenjang (Level 1-10) untuk Kualitas Absensi di
+// halaman profil. Beda dari AchievementTitleBadge (yang berbasis rank bulan
+// ini): ini berbasis level konsistensi, dan tetap tampil "Permanen" walau
+// bulan ini performanya turun (kalau sudah pernah tembus Level 3).
+function LevelBadgeDisplay({
+    level, isPermanent, isOngoingMonth, label = "Kualitas Absensi", colorScheme = "emerald", icon = <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />,
+}: {
+    level: number; isPermanent: boolean; isOngoingMonth: boolean;
+    label?: string; colorScheme?: "emerald" | "indigo" | "amber" | "teal"; icon?: React.ReactNode;
+}) {
+    const tier: "gold" | "silver" | "bronze" = isPermanent ? "gold" : level >= 2 ? "silver" : "bronze";
+    const gradientsByScheme: Record<"emerald" | "indigo" | "amber" | "teal", Record<typeof tier, string>> = {
+        emerald: {
+            gold: "linear-gradient(135deg, #34d399, #059669, #047857)",
+            silver: "linear-gradient(135deg, #fde68a, #f59e0b, #b45309)",
+            bronze: "linear-gradient(135deg, #fdba74, #c2410c, #7c2d12)",
+        },
+        indigo: {
+            gold: "linear-gradient(135deg, #818cf8, #4f46e5, #3730a3)",
+            silver: "linear-gradient(135deg, #93c5fd, #2563eb, #1e3a8a)",
+            bronze: "linear-gradient(135deg, #a5b4fc, #6366f1, #4338ca)",
+        },
+        amber: {
+            gold: "linear-gradient(135deg, #fb923c, #ea580c, #9a3412)",
+            silver: "linear-gradient(135deg, #fdba74, #f97316, #c2410c)",
+            bronze: "linear-gradient(135deg, #fed7aa, #fb923c, #ea580c)",
+        },
+        teal: {
+            gold: "linear-gradient(135deg, #2dd4bf, #0d9488, #115e59)",
+            silver: "linear-gradient(135deg, #5eead4, #14b8a6, #0f766e)",
+            bronze: "linear-gradient(135deg, #99f6e4, #2dd4bf, #14b8a6)",
+        },
+    };
+    const glowByScheme: Record<"emerald" | "indigo" | "amber" | "teal", Record<typeof tier, string>> = {
+        emerald: {
+            gold: "rgba(5,150,105,0.35)",
+            silver: "rgba(245,158,11,0.35)",
+            bronze: "rgba(194,65,12,0.35)",
+        },
+        indigo: {
+            gold: "rgba(79,70,229,0.35)",
+            silver: "rgba(37,99,235,0.35)",
+            bronze: "rgba(99,102,241,0.35)",
+        },
+        amber: {
+            gold: "rgba(234,88,12,0.35)",
+            silver: "rgba(249,115,22,0.35)",
+            bronze: "rgba(251,146,60,0.35)",
+        },
+        teal: {
+            gold: "rgba(13,148,136,0.35)",
+            silver: "rgba(20,184,166,0.35)",
+            bronze: "rgba(45,212,191,0.35)",
+        },
+    };
+    const gradients = gradientsByScheme[colorScheme];
+    const glow = glowByScheme[colorScheme];
+
+        const showProvisional = !isPermanent && isOngoingMonth;
+
+    return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={icon}
+            title={`LEVEL ${level}`}
+            subtitle={`${label}${isPermanent ? " · Permanen" : showProvisional ? " · Sementara" : ""}`}
+            note={showProvisional ? "Bulan berjalan, belum final" : undefined}
+            tooltip={isPermanent ? `Level ${level} · Lencana Permanen` : showProvisional ? `Level ${level} · Sementara, bulan berjalan belum final` : `Level ${level}`}
+        />
     );
 }
 
@@ -1098,22 +1710,21 @@ function AchievementTitleBadge({ rank, label }: { rank: number; label: string })
         silver: "rgba(148,163,184,0.35)",
         bronze: "rgba(194,65,12,0.35)",
     };
+    const icon = label === "Kehadiran"
+        ? <CalendarCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+        : label === "Lembur"
+            ? <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            : <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />;
 
-    return (
-        <div
-            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
-            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
-            title={`Top ${rank} ${label} bulan ini`}
-        >
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
-            <div className="absolute inset-y-0 w-8 pointer-events-none" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)", animation: "solitShimmerSweep 2.2s ease-out 0.4s 1 both" }} />
-            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
-                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            </div>
-            <div className="relative leading-tight">
-                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">TOP {rank}</p>
-                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>{label}</p>
-            </div>
-        </div>
+       return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={icon}
+            title={`TOP ${rank}`}
+            subtitle={label}
+            tooltip={`Top ${rank} ${label} bulan ini`}
+        />
     );
 }

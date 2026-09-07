@@ -12,6 +12,26 @@ const supabaseAdmin = createClient(
 
 const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"];
 
+function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dateObj = new Date(Date.UTC(y, m - 1, d));
+  dateObj.setUTCDate(dateObj.getUTCDate() + days);
+  return dateObj.toISOString().slice(0, 10);
+}
+
+// ✅ FIX — sama seperti edit-checkout/route.ts: hari absensi baru mulai jam
+// 04:00 WIB, jadi jam 00:00–03:59 yang dipilih di form sebenarnya kalender
+// HARI BERIKUTNYA dari `checkout_date` (mis. shift SORE checkout jam 01:00
+// untuk hari absensi Jumat = jam 01:00 dini hari Sabtu secara kalender).
+// Tanpa rollover ini, timestamp OUT jatuh SEBELUM timestamp IN di hari
+// kalender yang sama — itu sebabnya jam pulang < 04:00 gagal disimpan.
+function buildAttendanceTimestampISO(dateKey: string, timeStr: string): string {
+  const fmt = timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+  const hour = parseInt(fmt.split(":")[0], 10);
+  const calendarDate = hour < 4 ? addDaysToDateStr(dateKey, 1) : dateKey;
+  return new Date(`${calendarDate}T${fmt}+07:00`).toISOString();
+}
+
 // Poin 8: absen pulang manual — HANYA admin, untuk meminimalisir kesalahan
 // sistem yang gagal mencatat absen keluar (misal kamera error / sensor mati).
 export async function POST(request: Request) {
@@ -45,8 +65,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "User tidak ditemukan." }, { status: 404 });
     }
 
-    const fmtTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
-    const overrideNowISO = new Date(`${checkout_date}T${fmtTime(checkout_time)}+07:00`).toISOString();
+    const overrideNowISO = buildAttendanceTimestampISO(checkout_date, checkout_time);
 
     if (Number.isNaN(new Date(overrideNowISO).getTime())) {
       return NextResponse.json({ success: false, message: "Format tanggal/jam tidak valid." }, { status: 400 });

@@ -28,10 +28,11 @@ export default function AddUnitModal({
     onClose: () => void;
     onCreated: (unit: CreatedUnit) => void;
 }) {
-    const [form, setForm] = useState({
+        const [form, setForm] = useState({
         serial_number: "",
         grade: "A",
         condition_note: "",
+        source: "",
         purchase_price: "",
         sparepart_cost: "",
         selling_price: String(defaultSellingPrice || ""),
@@ -57,10 +58,11 @@ export default function AddUnitModal({
             const res = await fetch(`/api/laptops/${laptopId}/units`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+                                body: JSON.stringify({
                     serial_number: form.serial_number.trim(),
                     grade: form.grade,
                     condition_note: form.condition_note,
+                    source: form.source.trim() || null,
                     purchase_price: Number(form.purchase_price) || 0,
                     selling_price: Number(form.selling_price) || 0,
                     sparepart_cost: Number(form.sparepart_cost) || 0,
@@ -110,12 +112,17 @@ export default function AddUnitModal({
                                 {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
                             </select>
                         </Field>
-                        <Field label="Status">
+                                               <Field label="Status">
                             <select name="status" value={form.status} onChange={handleChange} className={inputCls}>
                                 {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                             </select>
                         </Field>
                     </div>
+
+                    <Field label="Sumber">
+                        <input name="source" value={form.source} onChange={handleChange}
+                            placeholder="Supplier Jakarta, Tukar Tambah, Lelang..." className={inputCls} />
+                    </Field>
 
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Harga Modal">
