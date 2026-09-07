@@ -19,6 +19,7 @@ import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
     Loader2, Pencil, Check, X, Music, Play, Pause,
     MessageCircle, Eye, CheckCircle2, AlertCircle, Sparkles,
+    Zap, Truck, Package, ShoppingCart, Wrench, Video, Boxes, Megaphone, UserCheck,
 } from "lucide-react";
 
 interface ProfileData {
@@ -962,6 +963,10 @@ export default function ProfileView({ userId }: { userId: string }) {
                             55%  { opacity: 0; }
                             100% { transform: translateX(220%) skewX(-20deg); opacity: 0; }
                         }
+                        @keyframes solitBadgeTwinkle {
+                            0%, 100% { opacity: 0; transform: scale(0.4); }
+                            50%      { opacity: 1; transform: scale(1); }
+                        }
                         @media (prefers-reduced-motion: reduce) {
                             * { animation: none !important; }
                         }
@@ -1347,13 +1352,13 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
                 <LevelBadgeDisplay level={qualityRank!.level} isPermanent={qualityRank!.isPermanent} isOngoingMonth={qualityRank!.isOngoingMonth} />
             )}
             {hasKerjaBadge && (
-                <LevelBadgeDisplay level={kerjaRank!.level} isPermanent={kerjaRank!.isPermanent} isOngoingMonth={kerjaRank!.isOngoingMonth} label="Kualitas Pekerjaan" colorScheme="indigo" />
+                <LevelBadgeDisplay level={kerjaRank!.level} isPermanent={kerjaRank!.isPermanent} isOngoingMonth={kerjaRank!.isOngoingMonth} label="Kualitas Pekerjaan" colorScheme="indigo" icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />} />
             )}
             {hasLemburanBadge && (
-                <LevelBadgeDisplay level={lemburanRank!.level} isPermanent={lemburanRank!.isPermanent} isOngoingMonth={lemburanRank!.isOngoingMonth} label="Lemburan" colorScheme="amber" />
+                <LevelBadgeDisplay level={lemburanRank!.level} isPermanent={lemburanRank!.isPermanent} isOngoingMonth={lemburanRank!.isOngoingMonth} label="Lemburan" colorScheme="amber" icon={<Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />} />
             )}
             {hasPengelolaBarangBadge && (
-                <LevelBadgeDisplay level={pengelolaBarangRank!.level} isPermanent={pengelolaBarangRank!.isPermanent} isOngoingMonth={pengelolaBarangRank!.isOngoingMonth} label="Pengelola Barang" colorScheme="teal" />
+                <LevelBadgeDisplay level={pengelolaBarangRank!.level} isPermanent={pengelolaBarangRank!.isPermanent} isOngoingMonth={pengelolaBarangRank!.isOngoingMonth} label="Pengelola Barang" colorScheme="teal" icon={<Boxes className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />} />
             )}
             {hasDeliveryBadge && (
                 <DeliveryMilestoneBadge rank={deliveryBadge!.rank} milestone={deliveryBadge!.milestone} />
@@ -1407,23 +1412,29 @@ function BadgePill({
             title={tooltip}
         >
             <div className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden" style={{ background: gradient }}>
-                <div className="absolute inset-x-0 top-0 h-1/2 rounded-t-full pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.4), transparent)" }} />
-                <div className="absolute inset-x-0 bottom-0 h-1/3 pointer-events-none" style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.12), transparent)" }} />
-                <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.4), transparent 55%)" }} />
-                <div className="absolute inset-y-0 w-8 pointer-events-none" style={{ background: "linear-gradient(100deg, transparent, rgba(255,255,255,0.7), transparent)", animation: "solitShimmerSweep 3.4s ease-in-out infinite" }} />
+                <div className="absolute inset-x-0 top-0 h-3/5 rounded-t-full pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.55), transparent)" }} />
+                <div className="absolute inset-x-0 bottom-0 h-1/3 pointer-events-none" style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.14), transparent)" }} />
+                <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.45), transparent 55%)" }} />
+                {/* Kilau berjalan — "mengkilat" utama, berulang periodik */}
+                <div className="absolute inset-y-0 w-7 pointer-events-none" style={{ background: "linear-gradient(100deg, transparent, rgba(255,255,255,0.85), transparent)", animation: "solitShimmerSweep 3.2s ease-in-out infinite" }} />
+                {/* Titik-titik glitter berkedip — kesan berkilauan/mewah */}
+                <span className="absolute w-[3px] h-[3px] rounded-full bg-white pointer-events-none" style={{ top: "22%", left: "58%", animation: "solitBadgeTwinkle 2.4s ease-in-out infinite", animationDelay: "0.2s" }} />
+                <span className="absolute w-[2px] h-[2px] rounded-full bg-white pointer-events-none" style={{ top: "62%", left: "72%", animation: "solitBadgeTwinkle 2.8s ease-in-out infinite", animationDelay: "1s" }} />
+                <span className="absolute w-[2px] h-[2px] rounded-full bg-white pointer-events-none" style={{ top: "38%", left: "85%", animation: "solitBadgeTwinkle 2.1s ease-in-out infinite", animationDelay: "1.6s" }} />
                 {premium && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-md ring-1 ring-black/5 z-10">
                         <Sparkles className="w-2.5 h-2.5 text-amber-500" />
                     </span>
                 )}
                 <div
-                    className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center flex-shrink-0 ring-1 ring-white/50"
+                    className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center flex-shrink-0 ring-1 ring-white/50 overflow-hidden"
                     style={{
                         background: "linear-gradient(160deg, rgba(255,255,255,0.5), rgba(255,255,255,0.14))",
                         boxShadow: "inset 0 1px 2px rgba(255,255,255,0.7), inset 0 -1px 3px rgba(0,0,0,0.18)",
                     }}
                 >
-                    {icon}
+                    <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-white/60 blur-[2px] pointer-events-none" />
+                    <span className="relative">{icon}</span>
                 </div>
                 <div className="relative leading-tight">
                     <p className="text-[11px] sm:text-xs font-black text-white tracking-wide drop-shadow-sm">{title}</p>
@@ -1456,7 +1467,7 @@ function DeliveryMilestoneBadge({ rank, milestone }: { rank: number; milestone: 
             gradient={gradients[tier]}
             glow={glow[tier]}
             premium={tier === "gold"}
-            icon={<Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            icon={<Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
             title={`TOP ${rank}`}
             subtitle={`Pengantaran · ${milestone}+`}
             tooltip={`Top ${rank} Pengantaran · ${milestone}+ pengantaran`}
@@ -1487,7 +1498,7 @@ function ProviderMilestoneBadge({ rank, milestone }: { rank: number; milestone: 
             gradient={gradients[tier]}
             glow={glow[tier]}
             premium={tier === "gold"}
-            icon={<Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            icon={<Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
             title={`${milestone}+ UNIT`}
             subtitle="Penyedia Barang"
             tooltip={`Peringkat #${rank} · ${milestone}+ unit disiapkan`}
@@ -1516,7 +1527,7 @@ function SalesMilestoneBadge({ rank, milestone }: { rank: number; milestone: num
             gradient={gradients[tier]}
             glow={glow[tier]}
             premium={tier === "gold"}
-            icon={<Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            icon={<ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
             title={`${milestone}+ TRX`}
             subtitle="Sales"
             tooltip={`Peringkat #${rank} · ${milestone}+ transaksi`}
@@ -1545,7 +1556,7 @@ function TeknisiMilestoneBadge({ rank, milestone }: { rank: number; milestone: n
             gradient={gradients[tier]}
             glow={glow[tier]}
             premium={tier === "gold"}
-            icon={<Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            icon={<Wrench className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
             title={`${milestone}+ SERVIS`}
             subtitle="Teknisi"
             tooltip={`Peringkat #${rank} · ${milestone}+ servis`}
@@ -1575,7 +1586,7 @@ function KontenMilestoneBadge({ rank, milestone }: { rank: number; milestone: nu
             gradient={gradients[tier]}
             glow={glow[tier]}
             premium={tier === "gold"}
-            icon={<Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            icon={<Video className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
             title={`${milestone}+ VIDEO`}
             subtitle="Konten Kreator"
             tooltip={`Peringkat #${rank} · ${milestone}+ video`}
@@ -1605,7 +1616,7 @@ function AuditMarketingMilestoneBadge({ rank, milestone }: { rank: number; miles
             gradient={gradients[tier]}
             glow={glow[tier]}
             premium={tier === "gold"}
-            icon={<Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            icon={<Megaphone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
             title={`${milestone}+ POIN`}
             subtitle="Audit Marketing"
             tooltip={`Peringkat #${rank} · ${milestone}+ poin audit`}
@@ -1618,10 +1629,10 @@ function AuditMarketingMilestoneBadge({ rank, milestone }: { rank: number; miles
 // ini): ini berbasis level konsistensi, dan tetap tampil "Permanen" walau
 // bulan ini performanya turun (kalau sudah pernah tembus Level 3).
 function LevelBadgeDisplay({
-    level, isPermanent, isOngoingMonth, label = "Kualitas Absensi", colorScheme = "emerald",
+    level, isPermanent, isOngoingMonth, label = "Kualitas Absensi", colorScheme = "emerald", icon = <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />,
 }: {
     level: number; isPermanent: boolean; isOngoingMonth: boolean;
-    label?: string; colorScheme?: "emerald" | "indigo" | "amber" | "teal";
+    label?: string; colorScheme?: "emerald" | "indigo" | "amber" | "teal"; icon?: React.ReactNode;
 }) {
     const tier: "gold" | "silver" | "bronze" = isPermanent ? "gold" : level >= 2 ? "silver" : "bronze";
     const gradientsByScheme: Record<"emerald" | "indigo" | "amber" | "teal", Record<typeof tier, string>> = {
@@ -1678,7 +1689,7 @@ function LevelBadgeDisplay({
             gradient={gradients[tier]}
             glow={glow[tier]}
             premium={tier === "gold"}
-            icon={<Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            icon={icon}
             title={`LEVEL ${level}`}
             subtitle={`${label}${isPermanent ? " · Permanen" : showProvisional ? " · Sementara" : ""}`}
             note={showProvisional ? "Bulan berjalan, belum final" : undefined}
@@ -1699,13 +1710,18 @@ function AchievementTitleBadge({ rank, label }: { rank: number; label: string })
         silver: "rgba(148,163,184,0.35)",
         bronze: "rgba(194,65,12,0.35)",
     };
+    const icon = label === "Kehadiran"
+        ? <CalendarCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+        : label === "Lembur"
+            ? <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            : <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />;
 
        return (
         <BadgePill
             gradient={gradients[tier]}
             glow={glow[tier]}
             premium={tier === "gold"}
-            icon={<Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            icon={icon}
             title={`TOP ${rank}`}
             subtitle={label}
             tooltip={`Top ${rank} ${label} bulan ini`}
