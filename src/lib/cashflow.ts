@@ -14,57 +14,87 @@ export function isModalAwalActive(): boolean {
   return new Date() <= new Date(MODAL_AWAL_DEADLINE_ISO);
 }
 
-export const INCOME_CATEGORIES = {
-  PENJUALAN_LAPTOP: "Penjualan Laptop",
-  SERVICE: "Service",
-  PIUTANG: "Piutang",
-  AKSESORIS: "Aksesoris",
-  BIAYA_LAIN: "Biaya Lain-lain",
+// ── Kategori Cashflow — Uang Keluar & Uang Masuk pakai daftar yang SAMA ───────
+// Sesuai daftar akun dari divisi accounting. Key LAMA (mis. UTANG, MODAL_SERVICE,
+// OPERASIONAL_SOTECH) sengaja TIDAK dihapus — lihat LEGACY_CATEGORY_LABEL & alias
+// akun di CASHFLOW_ACCOUNT (lib/accounting.ts) — supaya entry lama di database
+// tetap tampil & tetap ke-posting ke akun yang benar. Dropdown baru cuma
+// menawarkan 16 key di bawah ini.
+export const CASHFLOW_CATEGORIES = {
+  BELANJA_LAPTOP: "Belanja Laptop",                  // 130
+  PIUTANG: "Piutang",                                // 140
+  INVEST: "Invest",                                  // 150
+  ASET_TETAP: "Beli Aset Tetap",                     // 160
+  AKSESORIS: "Belanja Aksesoris",                    // 170
+  SPAREPART_SERVICE: "Sparepart Service",            // 171
+  DANA_MARKETING: "Dana Marketing",                  // 181
+  DOMPET_LAIN_LAIN: "Dompet Lain-lain",              // 190
+  HUTANG: "Hutang",                                  // 210
+  MODAL_LAPTOP_KELUAR: "Modal Laptop Keluar",        // 440
+  BIAYA_PRINTILAN: "Biaya Printilan Barang",         // 450
+  MODAL_SERVICE_KELUAR: "Modal Service Keluar",      // 460
+  OPERASIONAL_HARIAN: "Operasional Harian/Mingguan", // 510
+  OPERASIONAL_BULANAN: "Operasional Bulanan",        // 520
+  BIAYA_LAIN: "Biaya Lain-lain",                     // 530
+  KEUNTUNGAN_MITRA: "Keuntungan Mitra/Reseller",     // 540
 } as const;
 
-// ── Kategori yang OTOMATIS dari sistem — tidak boleh diinput manual ───────────
-export const AUTO_INCOME_CATEGORIES = ["PENJUALAN_LAPTOP", "SERVICE"] as const;
+// Label kategori AUTO dari sistem (auto-sync dari Transaksi/Service) — tidak
+// pernah ditawarkan di dropdown manual, tapi tetap butuh label buat ditampilkan.
+const AUTO_CATEGORY_LABEL: Record<string, string> = {
+  PENJUALAN_LAPTOP: "Penjualan Laptop",
+  SERVICE: "Service",
+};
 
-/** true = kategori ini boleh diinput manual oleh user */
-export function isManualIncomeCategory(category: string): boolean {
-  return (
-    Object.prototype.hasOwnProperty.call(INCOME_CATEGORIES, category) &&
-    !(AUTO_INCOME_CATEGORIES as readonly string[]).includes(category)
-  );
-}
-
-// ── Kategori Uang Keluar ─────────────────────────────────────────────────────
-export const EXPENSE_CATEGORIES = {
-  OPERASIONAL_HARIAN: "Operasional Harian",
-  OPERASIONAL_BULANAN: "Operasional Bulanan",
-  OPERASIONAL_MARKETING: "Operasional Marketing",
+// Label kategori LAMA — cuma dipakai supaya entry lama tampil dengan nama enak
+// dibaca (bukan raw key). Tidak ditawarkan di dropdown baru.
+const LEGACY_CATEGORY_LABEL: Record<string, string> = {
   OPERASIONAL_SOTECH: "Operasional Sotech",
   OPERASIONAL_ONPOINT: "Operasional Onpoint",
   OPERASIONAL_DAVID: "Operasional David",
   OPERASIONAL_KONTEN_KREATOR: "Operasional Konten Kreator",
-  BELANJA_LAPTOP: "Belanja Laptop",
-  AKSESORIS: "Aksesoris",
-  MODAL_SERVICE: "Modal Service",
-  UTANG: "Utang",
-  PIUTANG: "Piutang",
-  KEUNTUNGAN_MITRA: "Keuntungan Mitra Reseller",
-  BIAYA_PRINTILAN: "Biaya Printilan Barang",
-  BIAYA_LAIN: "Biaya Lain-lain",
-  DOMPET_LAIN_LAIN: "Dompet Lain Lain",
-} as const;
+  OPERASIONAL_MARKETING: "Dana Marketing",
+  MODAL_SERVICE: "Sparepart Service",
+  UTANG: "Hutang",
+};
 
-export type IncomeCategory = keyof typeof INCOME_CATEGORIES;
-export type ExpenseCategory = keyof typeof EXPENSE_CATEGORIES;
+// ── Kategori yang OTOMATIS dari sistem — tidak boleh diinput manual ───────────
+export const AUTO_INCOME_CATEGORIES = ["PENJUALAN_LAPTOP", "SERVICE"] as const;
 
-export function categoryLabel(direction: CashflowDirection, category: string): string {
-  if (category === "MODAL_AWAL") return "Modal Awal";
-  const map = direction === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  return (map as Record<string, string>)[category] ?? category;
+/** true = kategori ini boleh diinput manual oleh user (berlaku sama utk Uang Masuk & Uang Keluar) */
+export function isManualIncomeCategory(category: string): boolean {
+  return (
+    Object.prototype.hasOwnProperty.call(CASHFLOW_CATEGORIES, category) ||
+    Object.prototype.hasOwnProperty.call(LEGACY_CATEGORY_LABEL, category)
+  );
 }
 
-export function isValidCategory(direction: CashflowDirection, category: string): boolean {
-  const map = direction === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  return Object.prototype.hasOwnProperty.call(map, category);
+// Alias nama lama — dipertahankan supaya file lain yang masih import
+// INCOME_CATEGORIES / EXPENSE_CATEGORIES tidak perlu diubah sama sekali.
+// Keduanya sekarang menunjuk ke objek yang SAMA (CASHFLOW_CATEGORIES), jadi
+// dropdown Uang Keluar & Uang Masuk otomatis menampilkan daftar identik —
+// ASALKAN halaman UI-nya me-render dari konstanta ini, bukan hardcode sendiri.
+export const INCOME_CATEGORIES = CASHFLOW_CATEGORIES;
+export const EXPENSE_CATEGORIES = CASHFLOW_CATEGORIES;
+
+export type IncomeCategory = keyof typeof CASHFLOW_CATEGORIES;
+export type ExpenseCategory = keyof typeof CASHFLOW_CATEGORIES;
+
+export function categoryLabel(_direction: CashflowDirection, category: string): string {
+  if (category === "MODAL_AWAL") return "Modal Awal";
+  return (
+    (CASHFLOW_CATEGORIES as Record<string, string>)[category] ??
+    AUTO_CATEGORY_LABEL[category] ??
+    LEGACY_CATEGORY_LABEL[category] ??
+    category
+  );
+}
+
+export function isValidCategory(_direction: CashflowDirection, category: string): boolean {
+  return (
+    Object.prototype.hasOwnProperty.call(CASHFLOW_CATEGORIES, category) ||
+    Object.prototype.hasOwnProperty.call(LEGACY_CATEGORY_LABEL, category)
+  );
 }
 
 export function isAutoIncomeCategory(category: string): boolean {
