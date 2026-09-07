@@ -12,6 +12,23 @@ const PARTNER_CHANNELS = ["MITRA", "RESELLER"];
 const NO_PHONE_CHANNELS = [...USERNAME_CHANNELS, ...PARTNER_CHANNELS];
 const WIB_OFFSET_MS = 7 * 60 * 60 * 1000; // Asia/Jakarta = UTC+7
 
+// Bentuk data yang sudah divalidasi & siap insert/update ke tabel.
+interface NormalizedReport {
+  channel: string;
+  phone_number: string | null;
+  partner_name: string | null;
+  interest: string;
+  keterangan: string | null;
+  purchased: boolean;
+}
+
+// Discriminated union (pakai flag `success`) supaya TypeScript bisa menyempitkan
+// (narrow) tipe `value` menjadi PASTI ada begitu `success === true` dicek —
+// ini yang tadinya bikin error TS2345 karena `value` kebaca `... | undefined`.
+type ValidationResult =
+  | { success: true; value: NormalizedReport }
+  | { success: false; error: string };
+
 // Hitung batas awal periode ("today" | "week" | "month") dalam waktu WIB,
 // lalu kembalikan sebagai ISO string UTC untuk query `.gte("created_at", ...)`.
 function getPeriodStartUtc(period: string): string {
@@ -34,7 +51,7 @@ function getPeriodStartUtc(period: string): string {
 }
 
 // Validasi + normalisasi body form Tambah/Edit — dipakai bareng oleh POST & PATCH.
-function validateAndNormalize(body: any) {
+function validateAndNormalize(body: any): ValidationResult {
   const channel = (body.channel ?? "").toString();
   const phone_number = (body.phone_number ?? "").toString().trim();
   const partner_name = (body.partner_name ?? "").toString().trim();
@@ -43,14 +60,15 @@ function validateAndNormalize(body: any) {
   const purchased = Boolean(body.purchased);
   const isNoPhone = NO_PHONE_CHANNELS.includes(channel);
 
-  if (!interest) return { error: "Minat wajib diisi" as const };
-   if (isNoPhone && !partner_name) {
+  if (!interest) return { success: false, error: "Minat wajib diisi" };
+  if (isNoPhone && !partner_name) {
     const message = USERNAME_CHANNELS.includes(channel) ? "Username wajib diisi" : "Nama mitra/reseller wajib diisi";
-    return { error: message };
+    return { success: false, error: message };
   }
-  if (!isNoPhone && !phone_number) return { error: "Nomor telepon wajib diisi" as const };
+  if (!isNoPhone && !phone_number) return { success: false, error: "Nomor telepon wajib diisi" };
 
   return {
+    success: true,
     value: {
       channel,
       phone_number: isNoPhone ? null : phone_number,
@@ -88,10 +106,11 @@ async function getHandler(req: NextRequest) {
 async function postHandler(req: NextRequest, _ctx: any, user: AuthUser) {
   try {
     const body = await req.json();
-    const { error: validationError, value } = validateAndNormalize(body);
-    if (validationError) {
-      return NextResponse.json({ success: false, message: validationError }, { status: 400 });
+    const result = validateAndNormalize(body);
+    if (!result.success) {
+      return NextResponse.json({ success: false, message: result.error }, { status: 400 });
     }
+    const { value } = result;
 
     const { data, error } = await supabaseAdmin
       .from(TABLE)
@@ -118,10 +137,11 @@ async function patchHandler(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { error: validationError, value } = validateAndNormalize(body);
-    if (validationError) {
-      return NextResponse.json({ success: false, message: validationError }, { status: 400 });
+    const result = validateAndNormalize(body);
+    if (!result.success) {
+      return NextResponse.json({ success: false, message: result.error }, { status: 400 });
     }
+    const { value } = result;
 
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from(TABLE)
