@@ -11,7 +11,7 @@ import { supabase } from "@/services/supabase";
 import {
   ImageIcon, Pencil, CheckCircle2, Receipt, Inbox,
   Store, Building2, User, Landmark, Banknote, QrCode, CreditCard,
-  AlertTriangle,
+  AlertTriangle, Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -611,7 +611,7 @@ function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm
 }
 
 // ─── TRANSACTION CARD (Mobile) ────────────────────────────────────────
-function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick }: any) {
+function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick, onEdit }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
@@ -923,9 +923,13 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
             </button>
           )}
           {canEditTransaction && (
-            <a href={`/payment/${item.invoice_number}`} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition text-[10px] font-semibold">
+            <button
+              type="button"
+              onClick={() => onEdit?.(item)}
+              className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 transition text-[10px] font-semibold"
+            >
               <Pencil className="w-3.5 h-3.5" />Edit
-            </a>
+            </button>
           )}
           {isPending && canEditTransaction && (
             <button onClick={() => { setConfirmSN(item.serial_number || ""); setPayMode("LUNAS"); setCicilanAmount(""); setConfirmPhoto(null); setShowConfirmModal(true); }} className="flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition text-[10px] font-semibold">
@@ -1034,7 +1038,7 @@ function SortableTh({ label, sortKey, sortBy, sortDir, onSort, className = "", a
 }
 
 // ─── TRANSACTION TABLE (Desktop) ─────────────────────────────────────
-function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortDir, onSort, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onPhotoClick, onRestored, onRowClick }: any) {
+function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortDir, onSort, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onPhotoClick, onRestored, onRowClick, onEdit }: any) {
   const HEAD = "px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap sticky top-0 bg-gray-50/95 backdrop-blur-sm z-10 border-b border-gray-100";
 
   return (
@@ -1076,6 +1080,7 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
                 canSeeModal={canSeeModal}
                 onRestored={onRestored}
                 onRowClick={onRowClick}
+                onEdit={onEdit}
               />
             ))}
           </tbody>
@@ -1089,7 +1094,7 @@ function TransactionTable({ paginatedTransactions, startIndex = 0, sortBy, sortD
 }
 
 // ─── TRANSACTION TABLE ROW (Desktop) ─────────────────────────────────
-function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick }: any) {
+function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction, canRestoreTransaction, canSeeFinancials, canSeeModal, onRestored, onRowClick, onEdit }: any) {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [alertModal, setAlertModal] = useState<string | null>(null);
@@ -1412,9 +1417,14 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
               </button>
             )}
             {canEditTransaction && (
-              <a href={`/payment/${item.invoice_number}`} className="p-1.5 text-gray-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition group-hover:text-gray-400" title="Edit">
+              <button
+                type="button"
+                onClick={() => onEdit?.(item)}
+                className="p-1.5 text-gray-300 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition group-hover:text-gray-400"
+                title="Edit Harga Deal"
+              >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-              </a>
+              </button>
             )}
             {isPending && canEditTransaction && (
               <button onClick={() => { setConfirmSN(item.serial_number || ""); setPayMode("LUNAS"); setCicilanAmount(""); setConfirmPhoto(null); setShowConfirmModal(true); }} className="p-1.5 text-gray-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition group-hover:text-gray-400" title="Bayar">
@@ -1448,7 +1458,23 @@ const MODAL_VISIBLE_ROLES = [
   "KEPALA_PENGELOLA_BARANG",
 ];
 
-function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, canViewActivityLog }: { item: any; onClose: () => void; canSeeFinancials: boolean; canSeeModal: boolean; canViewActivityLog: boolean }) {
+function TransactionDetailModal({
+  item,
+  onClose,
+  canSeeFinancials,
+  canSeeModal,
+  canViewActivityLog,
+  canEditTransaction,
+  onEdit,
+}: {
+  item: any;
+  onClose: () => void;
+  canSeeFinancials: boolean;
+  canSeeModal: boolean;
+  canViewActivityLog: boolean;
+  canEditTransaction?: boolean;
+  onEdit?: (item: any) => void;
+}) {
   const [fullItem, setFullItem] = useState<any>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
@@ -1806,7 +1832,424 @@ function TransactionDetailModal({ item, onClose, canSeeFinancials, canSeeModal, 
         {/* Footer */}
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-2.5 flex-shrink-0">
           <a href={`/receipt/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"> Receipt</a>
-          <a href={`/payment/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0f0c29] text-white rounded-xl hover:bg-[#1a1545] transition"> Edit</a>
+          {canEditTransaction && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onEdit?.(activeItem);
+              }}
+              className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition shadow-sm"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Edit Harga Deal
+            </button>
+          )}
+          <a href={`/payment/${activeItem.invoice_number}`} className="flex-1 h-11 sm:h-10 flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0f0c29] text-white rounded-xl hover:bg-[#1a1545] transition"> Halaman Pembayaran</a>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(modalContent, document.body);
+}
+
+// ─── EDIT TRANSACTION MODAL ───────────────────────────────────────────
+interface TxLaptopItem {
+  id: string;
+  unit_id: string;
+  serial_number: string;
+  laptop_name: string;
+  deal_price: number;
+}
+
+function EditTransactionModal({
+  item,
+  onClose,
+  onSuccess,
+}: {
+  item: any;
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+}) {
+  const [items, setItems] = useState<TxLaptopItem[]>([]);
+  const [loadingItems, setLoadingItems] = useState(true);
+  const [singleDealPrice, setSingleDealPrice] = useState<string>(() =>
+    String(item.deal_price ?? item.amount ?? "")
+  );
+  const [unitDealPrices, setUnitDealPrices] = useState<Record<string, string>>({});
+  const [dpAmount, setDpAmount] = useState<string>(() => String(item.dp_amount || 0));
+  const [customerName, setCustomerName] = useState(item.customer_name || "");
+  const [customerPhone, setCustomerPhone] = useState(item.customer_phone || "");
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", h);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", h);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingItems(true);
+    fetch(`/api/transaction/${item.invoice_number}/items`)
+      .then((res) => res.json())
+      .then((r) => {
+        if (!active) return;
+        const list: TxLaptopItem[] = r.success ? (r.data || []) : [];
+        setItems(list);
+        if (list.length > 1) {
+          const map: Record<string, string> = {};
+          for (const it of list) {
+            map[it.unit_id] = String(it.deal_price || "");
+          }
+          setUnitDealPrices(map);
+        }
+      })
+      .catch(() => {
+        if (active) setItems([]);
+      })
+      .finally(() => {
+        if (active) setLoadingItems(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [item.invoice_number]);
+
+  const isMultiItem = !loadingItems && items.length > 1;
+  const computedTotalDeal = isMultiItem
+    ? items.reduce((sum, it) => sum + (Number(unitDealPrices[it.unit_id]) || 0), 0)
+    : (Number(singleDealPrice) || 0);
+
+  const originalTotalDeal = Number(item.deal_price ?? item.amount ?? 0);
+  const diffDeal = computedTotalDeal - originalTotalDeal;
+
+  const isDP = item.status === "RESERVED" || Number(item.dp_amount || 0) > 0;
+  const currentDP = Number(dpAmount) || 0;
+  const remainingAfterDP = Math.max(0, computedTotalDeal - currentDP);
+
+  const fmtRupiah = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
+
+  const handleSave = async () => {
+    if (!reason.trim()) {
+      setError("Alasan edit wajib diisi untuk catatan audit");
+      return;
+    }
+    if (computedTotalDeal <= 0) {
+      setError("Harga deal harus lebih besar dari Rp 0");
+      return;
+    }
+    if (isDP && currentDP > computedTotalDeal) {
+      setError("Nominal DP tidak boleh melebihi total harga deal");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      const payload: any = {
+        deal_price: computedTotalDeal,
+        amount: computedTotalDeal,
+        customer_name: customerName.trim() || item.customer_name,
+        customer_phone: customerPhone.trim() || null,
+        edit_reason: reason.trim(),
+      };
+
+      if (isDP) {
+        payload.dp_amount = currentDP;
+      }
+
+      if (isMultiItem) {
+        payload.deal_prices_per_unit = items.map((it) => ({
+          unit_id: it.unit_id,
+          serial_number: it.serial_number,
+          deal_price: Number(unitDealPrices[it.unit_id]) || 0,
+        }));
+      }
+
+      const res = await fetch(`/api/transaction/${item.invoice_number}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+      if (!result.success) {
+        setError(result.message || "Gagal memperbarui transaksi");
+        return;
+      }
+
+      onSuccess(`Harga deal invoice ${item.invoice_number} berhasil diperbarui menjadi ${fmtRupiah(computedTotalDeal)}!`);
+      onClose();
+    } catch {
+      setError("Terjadi kesalahan jaringan saat menyimpan perubahan");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 anim-fade">
+      <div className="absolute inset-0 bg-[#0f0c29]/60 backdrop-blur-md" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden ring-1 ring-black/5">
+        {/* Header */}
+        <div className="bg-[#0f0c29] px-5 py-4 shrink-0 relative">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-amber-500/20 rounded-xl flex items-center justify-center ring-1 ring-amber-500/30">
+                <Pencil size={16} className="text-amber-400" />
+              </div>
+              <div>
+                <h2 className="font-bold text-white text-sm tracking-tight">Edit Harga Deal Transaksi</h2>
+                <p className="text-xs text-white/40 font-mono mt-0.5">{item.invoice_number}</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-amber-500/60 via-amber-400/20 to-transparent" />
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+          {/* Ringkasan Singkat */}
+          <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100 overflow-hidden">
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Customer</span>
+              <span className="text-xs font-bold text-gray-800">{item.customer_name}</span>
+            </div>
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Status</span>
+              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${statusDot[item.status] ?? "bg-gray-400"}`} />
+                {STATUS_LABEL[item.status] ?? item.status}
+              </span>
+            </div>
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Barang</span>
+              <span className="text-xs font-semibold text-gray-800 truncate max-w-[220px] text-right" title={item.laptop_name || "Aksesoris"}>
+                {item.laptop_name || "Aksesoris / Non-Laptop"}
+              </span>
+            </div>
+            {item.sales_name && (
+              <div className="flex items-center justify-between px-3.5 py-2">
+                <span className="text-[11px] text-gray-400 font-semibold uppercase">Sales</span>
+                <span className="text-xs text-gray-600 font-medium">{item.sales_name}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Section Harga Deal */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
+                <Wallet size={14} className="text-amber-600" />
+                Harga Deal {isMultiItem ? "Per Unit" : ""} <span className="text-red-500">*</span>
+              </label>
+              {diffDeal !== 0 && (
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${diffDeal > 0 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-600 border border-red-200"}`}>
+                  {diffDeal > 0 ? `+${fmtRupiah(diffDeal)}` : `-${fmtRupiah(Math.abs(diffDeal))}`}
+                </span>
+              )}
+            </div>
+
+            {loadingItems ? (
+              <div className="flex items-center justify-center py-6 text-gray-400 text-xs gap-2">
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-amber-600 rounded-full animate-spin" />
+                Memuat rincian harga unit...
+              </div>
+            ) : isMultiItem ? (
+              <div className="space-y-2.5">
+                <p className="text-[11px] text-gray-500">
+                  Transaksi ini memiliki <strong>{items.length} unit laptop</strong>. Masukkan harga deal untuk tiap unit:
+                </p>
+                <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-gray-50/50">
+                  {items.map((it, i) => (
+                    <div key={it.unit_id} className="p-3 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-gray-800 truncate">{it.laptop_name}</p>
+                          <p className="text-[10px] font-mono text-gray-400">SN: {it.serial_number}</p>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-semibold uppercase">Unit {i + 1}</span>
+                      </div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                        <input
+                          type="number"
+                          value={unitDealPrices[it.unit_id] ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setUnitDealPrices((prev) => ({ ...prev, [it.unit_id]: val }));
+                            setError("");
+                          }}
+                          placeholder="0"
+                          className="w-full h-10 border border-gray-300 rounded-lg pl-9 pr-3 text-xs font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-900">Total Harga Deal</span>
+                  <span className="text-sm font-black text-amber-900 font-mono">{fmtRupiah(computedTotalDeal)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">Rp</span>
+                  <input
+                    type="number"
+                    value={singleDealPrice}
+                    onChange={(e) => {
+                      setSingleDealPrice(e.target.value);
+                      setError("");
+                    }}
+                    placeholder="0"
+                    className="w-full h-11 border border-gray-300 rounded-xl pl-10 pr-4 text-sm font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
+                  <span>Format: <strong className="text-gray-700">{fmtRupiah(Number(singleDealPrice) || 0)}</strong></span>
+                  <span>Sebelumnya: {fmtRupiah(originalTotalDeal)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Section DP (jika ada DP atau status RESERVED) */}
+          {isDP && (
+            <div className="space-y-2 bg-blue-50/50 border border-blue-100 rounded-xl p-3.5">
+              <label className="text-xs font-bold text-blue-900 uppercase tracking-wide flex items-center gap-1.5">
+                <CreditCard size={14} className="text-blue-600" />
+                Nominal DP (Uang Muka)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                <input
+                  type="number"
+                  value={dpAmount}
+                  onChange={(e) => {
+                    setDpAmount(e.target.value);
+                    setError("");
+                  }}
+                  placeholder="0"
+                  className="w-full h-10 border border-blue-200 rounded-lg pl-9 pr-3 text-xs font-mono font-bold text-blue-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs pt-1 text-blue-800">
+                <span>Sisa Tagihan:</span>
+                <span className="font-bold text-sm text-red-600 font-mono">{fmtRupiah(remainingAfterDP)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Form Customer */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                Nama Customer
+              </label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="w-full h-9 border border-gray-300 rounded-xl px-3 text-xs text-gray-800 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                Nomor Telepon
+              </label>
+              <input
+                type="text"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="08..."
+                className="w-full h-9 border border-gray-300 rounded-xl px-3 text-xs text-gray-800 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 transition"
+              />
+            </div>
+          </div>
+
+          {/* Alasan Edit (Wajib untuk audit log) */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+              Alasan Edit <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+                setError("");
+              }}
+              placeholder="Contoh: Koreksi harga disetujui Kepala Sales, penyesuaian diskon, dll..."
+              rows={2}
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 focus:bg-white transition resize-none"
+            />
+          </div>
+
+          {/* Link ke halaman edit lengkap */}
+          <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-3 flex items-center justify-between gap-3 text-xs">
+            <span className="text-amber-800 text-[11px] leading-snug">
+              Ingin ubah metode bayar, garansi, atau tukar tambah?
+            </span>
+            <a
+              href={`/payment/${item.invoice_number}`}
+              className="font-bold text-amber-700 hover:text-amber-900 underline whitespace-nowrap text-[11px]"
+            >
+              Halaman Lengkap →
+            </a>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5 text-xs text-red-700 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-gray-100 flex gap-2.5 shrink-0 bg-gray-50/50">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || loadingItems || computedTotalDeal <= 0 || !reason.trim()}
+            className="flex-1 h-10 bg-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:bg-[#1a1545] transition disabled:opacity-40 flex items-center justify-center gap-2 shadow-sm"
+          >
+            {saving ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Menyimpan...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={16} />
+                <span>Simpan Perubahan</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
@@ -1853,8 +2296,16 @@ export default function Page() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [detailItem, setDetailItem] = useState<any | null>(null);
+  const [editItem, setEditItem] = useState<any | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
   const [paymentMethodOptions, setPaymentMethodOptions] = useState<string[]>([]);
   const [sourcePlatformOptions, setSourcePlatformOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!successToast) return;
+    const timer = setTimeout(() => setSuccessToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [successToast]);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1879,7 +2330,20 @@ export default function Page() {
     }).catch(() => { setUserRole(null); setUserRoles([]); });
   }, []);
 
-  const canEditTransaction = userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false;
+  const canEditTransaction =
+    hasAnyRole(userRoles, PERMISSIONS.EDIT_TRANSACTION) ||
+    userRoles.some((r) =>
+      [
+        "ADMIN",
+        "PROGRAMMER",
+        "ASISTEN_CEO",
+        "KEPALA_SALES",
+        "KEPALA_ZENITH",
+        "KEPALA_ONPOINT",
+        "KEPALA_SOTECH",
+      ].includes(r)
+    ) ||
+    (userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false);
   const canSeeFinancials = hasAnyRole(userRoles, PERMISSIONS.VIEW_FINANCIALS);
   const canRestoreTransaction = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
   // ── Hanya ADMIN dan KEPALA_PENGELOLA_BARANG yang bisa lihat Margin ──
@@ -2197,8 +2661,35 @@ export default function Page() {
         }
       `}</style>
       {photoModal && <PhotoModal url={photoModal} onClose={() => setPhotoModal(null)} />}
-      {detailItem && <TransactionDetailModal item={detailItem} onClose={() => setDetailItem(null)} canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} canViewActivityLog={canViewActivityLog} />}
+      {detailItem && (
+        <TransactionDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+          canSeeFinancials={canSeeFinancials}
+          canSeeModal={canSeeModal}
+          canViewActivityLog={canViewActivityLog}
+          canEditTransaction={canEditTransaction}
+          onEdit={setEditItem}
+        />
+      )}
+      {editItem && (
+        <EditTransactionModal
+          item={editItem}
+          onClose={() => setEditItem(null)}
+          onSuccess={(msg) => {
+            fetchTransactions();
+            setSuccessToast(msg);
+          }}
+        />
+      )}
       {isExporting && <ExportProgressModal progress={exportProgress} label={exportLabel} />}
+      {successToast && (
+        <div className="fixed bottom-5 right-5 z-[9999] bg-emerald-700 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 anim-slide-up border border-emerald-600">
+          <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+          <span>{successToast}</span>
+          <button onClick={() => setSuccessToast(null)} className="ml-2 text-white/60 hover:text-white text-sm leading-none">&times;</button>
+        </div>
+      )}
 
       <div className={`${isMobile ? "px-4 py-4" : "max-w-[1920px] mx-auto px-6 py-4"} space-y-3`}>
 
@@ -2491,6 +2982,7 @@ export default function Page() {
                 canSeeModal={canSeeModal}
                 canRestoreTransaction={canRestoreTransaction}
                 onRestored={() => fetchTransactions()} onRowClick={setDetailItem}
+                onEdit={setEditItem}
               />
             ))}
           </div>
@@ -2502,6 +2994,7 @@ export default function Page() {
             canEditTransaction={canEditTransaction} canRestoreTransaction={canRestoreTransaction}
             canSeeFinancials={canSeeFinancials} canSeeModal={canSeeModal} onPhotoClick={setPhotoModal}
             onRestored={() => fetchTransactions()} onRowClick={setDetailItem}
+            onEdit={setEditItem}
           />
         )}
 
