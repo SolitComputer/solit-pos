@@ -818,7 +818,10 @@ export default function Page() {
               </div>
 
               {/* Donut Chart Container */}
-              <div className="relative my-4 h-44 flex items-center justify-center">
+              <div
+                className="relative my-4 h-44 flex items-center justify-center"
+                onMouseLeave={() => setIsDonutHovered(false)}
+              >
                 {isLoading ? (
                   <Shimmer className="w-36 h-36 rounded-full" />
                 ) : (
