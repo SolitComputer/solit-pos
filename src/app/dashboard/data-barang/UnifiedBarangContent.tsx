@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Filter, RotateCcw, SlidersHorizontal, ArrowUpDown, Search, X, ChevronDown, ChevronUp, Tag } from "lucide-react";
+import { Laptop as LaptopIcon, Wrench, History as HistoryIcon, Filter, RotateCcw, SlidersHorizontal, ArrowUpDown, Search, X, ChevronDown, ChevronUp, Tag, Maximize2, Minimize2 } from "lucide-react";
 import BarcodeModal from "@/components/ui/BarcodeModal";
 import AddUnitModal, { CreatedUnit } from "@/components/inventory/AddUnitModal";
 import UnitDetailModal, { UnitDetailData } from "@/components/inventory/UnitDetailModal";
@@ -420,6 +420,7 @@ export default function UnifiedBarangContent() {
     const [sortBy, setSortBy] = useState<"NAMA_ASC" | "NAMA_DESC" | "HARGA_DESC" | "HARGA_ASC" | "STOK_DESC" | "STOK_ASC" | "NEWEST">("NAMA_ASC");
     const [search, setSearch] = useState("");
     const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
+    const [isMaximized, setIsMaximized] = useState(false);
 
     // tipe: null HANYA dipakai sementara di mode "create" SEBELUM user pilih
     // Kategori dari dropdown Master Kategori (baru) — begitu kategori dipilih,
@@ -581,6 +582,22 @@ export default function UnifiedBarangContent() {
         const t = new URLSearchParams(window.location.search).get("tipe");
         if (t === "LAPTOP" || t === "AKSESORIS") setTipeFilter(t);
     }, []);
+
+    // Mode layar penuh: kunci scroll body (biar gak dobel-scroll) + tombol
+    // Escape buat keluar, konsisten sama pola modal lain di halaman ini.
+    useEffect(() => {
+        if (!isMaximized) return;
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setIsMaximized(false);
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            document.body.style.overflow = prevOverflow;
+            window.removeEventListener("keydown", onKeyDown);
+        };
+    }, [isMaximized]);
 
     // Kategori dipisah per tipe supaya dropdown laptop tidak menampilkan kategori
     // aksesoris & sebaliknya. Transition-safe: kategori tanpa `type` (mis. migrasi
@@ -1197,7 +1214,13 @@ export default function UnifiedBarangContent() {
                 .table-scroll::-webkit-scrollbar-track { background: #fafafa; border-radius: 99px; }
             `}</style>
 
-            <main className="min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8">
+            <main
+                className={
+                    isMaximized
+                        ? "fixed inset-0 z-[45] bg-zinc-50 p-4 sm:p-6 lg:p-8 overflow-auto"
+                        : "min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8"
+                }
+            >
                 <div className="max-w-full mx-auto space-y-5">
 
                     {/* ── FILTER SUB KATEGORI — dipisah 2 baris: header (judul + aksi) SELALU
@@ -1207,6 +1230,13 @@ export default function UnifiedBarangContent() {
                         <div className="flex items-center justify-between gap-3">
                             <h3 className="text-[13px] font-bold text-zinc-700">Kategori</h3>
                             <div className="flex items-center gap-2 flex-shrink-0">
+                                <button
+                                    onClick={() => setIsMaximized(v => !v)}
+                                    title={isMaximized ? "Kembalikan ukuran normal (Esc)" : "Perbesar layar penuh"}
+                                    className="h-9 w-9 flex items-center justify-center rounded-xl text-zinc-500 bg-zinc-100 border border-zinc-200 hover:bg-zinc-200 hover:text-zinc-700 transition"
+                                >
+                                    {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                                </button>
                                 <button onClick={handleExportExcel} disabled={filteredRows.length === 0}
                                     className="h-9 px-4 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 transition">
                                     Export Excel
