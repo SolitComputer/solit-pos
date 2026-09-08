@@ -178,37 +178,54 @@ export function kasAccountFromCashflow(pm?: string | null): string {
   return pm === "CASH" ? AKUN.KAS_CASH : AKUN.KAS_SALDO;
 }
 
-export const CASHFLOW_OUT_ACCOUNT: Record<string, string> = {
-  OPERASIONAL_HARIAN: AKUN.OPS_MINGGUAN,
-  OPERASIONAL_BULANAN: AKUN.OPS_BULANAN,
-  OPERASIONAL_MARKETING: AKUN.DOMPET_MARKETING,
+// ─── Mapping Kategori Cashflow → Akun ────────────────────────────────────────
+// SATU peta akun dipakai bareng untuk Uang Keluar & Uang Masuk (permintaan
+// divisi accounting: kategori & akun harus sama persis di kedua arah).
+// Key lama (OPERASIONAL_SOTECH, UTANG, MODAL_SERVICE, dst) sengaja tetap
+// dipertahankan sebagai alias — supaya cashflow_entries LAMA di database yang
+// category-nya masih pakai nama lama tetap ke-resolve ke akun yang benar.
+// Dropdown baru cuma menawarkan 16 key utama (lihat CASHFLOW_CATEGORIES di
+// lib/cashflow.ts).
+export const CASHFLOW_ACCOUNT: Record<string, string> = {
+  // ── 16 kategori baru sesuai daftar divisi accounting ──
+  BELANJA_LAPTOP: AKUN.HPP,                        // 130
+  PIUTANG: AKUN.PIUTANG,                           // 140
+  INVEST: AKUN.INVEST,                             // 150
+  ASET_TETAP: AKUN.ASET_TETAP,                     // 160
+  AKSESORIS: AKUN.AKSESORIS,                       // 170
+  SPAREPART_SERVICE: AKUN.AKSESORIS_SERVICE,       // 171
+  DANA_MARKETING: AKUN.DOMPET_MARKETING,           // 181
+  DOMPET_LAIN_LAIN: AKUN.DOMPET_LAIN,              // 190
+  HUTANG: AKUN.HUTANG_SUPPLIER,                    // 210
+  MODAL_LAPTOP_KELUAR: AKUN.MODAL_KELUAR,          // 440
+  BIAYA_PRINTILAN: AKUN.BIAYA_PRINTILAN,           // 450
+  MODAL_SERVICE_KELUAR: AKUN.MODAL_SERVICE_KELUAR, // 460
+  OPERASIONAL_HARIAN: AKUN.OPS_MINGGUAN,           // 510
+  OPERASIONAL_BULANAN: AKUN.OPS_BULANAN,           // 520
+  BIAYA_LAIN: AKUN.BIAYA_LAIN,                     // 530
+  KEUNTUNGAN_MITRA: AKUN.KEUNTUNGAN_MITRA,         // 540
+
+  // ── Alias key LAMA — JANGAN dihapus, cuma tidak ditawarkan lagi di dropdown ──
   OPERASIONAL_SOTECH: AKUN.OPS_MINGGUAN,
   OPERASIONAL_ONPOINT: AKUN.OPS_MINGGUAN,
   OPERASIONAL_DAVID: AKUN.OPS_MINGGUAN,
   OPERASIONAL_KONTEN_KREATOR: AKUN.OPS_MINGGUAN,
-  BELANJA_LAPTOP: AKUN.HPP,
-  AKSESORIS: AKUN.AKSESORIS,
+  OPERASIONAL_MARKETING: AKUN.DOMPET_MARKETING,
   MODAL_SERVICE: AKUN.AKSESORIS_SERVICE,
   UTANG: AKUN.HUTANG_SUPPLIER,
-  PIUTANG: AKUN.PIUTANG,
-  KEUNTUNGAN_MITRA: AKUN.KEUNTUNGAN_MITRA,
-  BIAYA_PRINTILAN: AKUN.BIAYA_PRINTILAN,
-  BIAYA_LAIN: AKUN.BIAYA_LAIN,
-  DOMPET_LAIN_LAIN: AKUN.DOMPET_LAIN,
 };
+
+/** @deprecated pakai CASHFLOW_ACCOUNT — nama lama dipertahankan biar import lain tidak pecah */
+export const CASHFLOW_OUT_ACCOUNT = CASHFLOW_ACCOUNT;
+/** @deprecated pakai CASHFLOW_ACCOUNT — nama lama dipertahankan biar import lain tidak pecah */
+export const CASHFLOW_IN_ACCOUNT = CASHFLOW_ACCOUNT;
 
 export function expenseAccountForCashflow(category: string): string {
-  return CASHFLOW_OUT_ACCOUNT[category] ?? AKUN.BIAYA_LAIN;
+  return CASHFLOW_ACCOUNT[category] ?? AKUN.BIAYA_LAIN;
 }
 
-export const CASHFLOW_IN_ACCOUNT: Record<string, string> = {
-  PIUTANG: AKUN.PIUTANG,
-  AKSESORIS: AKUN.PENJUALAN_AKSESORIS,
-  BIAYA_LAIN: AKUN.BIAYA_LAIN,
-};
-
 export function incomeAccountForCashflow(category: string): string {
-  return CASHFLOW_IN_ACCOUNT[category] ?? AKUN.PEMASUKAN_LAIN;
+  return CASHFLOW_ACCOUNT[category] ?? AKUN.PEMASUKAN_LAIN;
 }
 
 export function cashflowKeterangan(e: {

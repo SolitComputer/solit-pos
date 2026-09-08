@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasPermission, PERMISSIONS } from "@/lib/permissions";
-import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban, Wallet, Receipt, Download } from "lucide-react";
+import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban, Wallet, Receipt, Download, Pencil, ExternalLink } from "lucide-react";
 import { getAuthUser } from "@/hooks/useAuthUser";
 
 interface PendingTransaction {
@@ -682,6 +682,369 @@ function CancelModal({ tx, cancelling, onConfirm, onClose }: {
     );
 }
 
+// ─── EditPendingModal ─────────────────────────────────────────────────────────
+function EditPendingModal({ tx, onClose, onSuccess }: {
+    tx: PendingTransaction;
+    onClose: () => void;
+    onSuccess: (message: string) => void;
+}) {
+    const [items, setItems] = useState<TxLaptopItem[]>([]);
+    const [loadingItems, setLoadingItems] = useState(true);
+    const [singleDealPrice, setSingleDealPrice] = useState<string>(() => String(tx.deal_price || tx.amount || ""));
+    const [unitDealPrices, setUnitDealPrices] = useState<Record<string, string>>({});
+    const [dpAmount, setDpAmount] = useState<string>(() => String(tx.dp_amount || 0));
+    const [customerName, setCustomerName] = useState(tx.customer_name || "");
+    const [customerPhone, setCustomerPhone] = useState(tx.customer_phone || "");
+    const [notes, setNotes] = useState(tx.notes || "");
+    const [reason, setReason] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+        window.addEventListener("keydown", h);
+        return () => window.removeEventListener("keydown", h);
+    }, [onClose]);
+
+    useEffect(() => {
+        let active = true;
+        setLoadingItems(true);
+        fetch(`/api/transaction/${tx.invoice_number}/items`)
+            .then(res => res.json())
+            .then(r => {
+                if (!active) return;
+                const list: TxLaptopItem[] = r.success ? (r.data || []) : [];
+                setItems(list);
+                if (list.length > 1) {
+                    const map: Record<string, string> = {};
+                    for (const it of list) {
+                        map[it.unit_id] = String(it.deal_price || "");
+                    }
+                    setUnitDealPrices(map);
+                }
+            })
+            .catch(() => { if (active) setItems([]); })
+            .finally(() => { if (active) setLoadingItems(false); });
+        return () => { active = false; };
+    }, [tx.invoice_number]);
+
+    const isMultiItem = !loadingItems && items.length > 1;
+    const computedTotalDeal = isMultiItem
+        ? items.reduce((sum, it) => sum + (Number(unitDealPrices[it.unit_id]) || 0), 0)
+        : (Number(singleDealPrice) || 0);
+
+    const originalTotalDeal = Number(tx.deal_price || tx.amount || 0);
+    const diffDeal = computedTotalDeal - originalTotalDeal;
+
+    const isDP = tx.status === "RESERVED" || Number(tx.dp_amount || 0) > 0;
+    const currentDP = Number(dpAmount) || 0;
+    const remainingAfterDP = Math.max(0, computedTotalDeal - currentDP);
+
+    const handleSave = async () => {
+        if (!reason.trim()) {
+            setError("Alasan edit wajib diisi untuk catatan audit");
+            return;
+        }
+        if (computedTotalDeal <= 0) {
+            setError("Harga deal harus lebih besar dari Rp 0");
+            return;
+        }
+        if (isDP && currentDP > computedTotalDeal) {
+            setError("Nominal DP tidak boleh melebihi total harga deal");
+            return;
+        }
+
+        setSaving(true);
+        setError("");
+        try {
+            const payload: any = {
+                deal_price: computedTotalDeal,
+                amount: computedTotalDeal,
+                customer_name: customerName.trim() || tx.customer_name,
+                customer_phone: customerPhone.trim() || null,
+                notes: notes.trim() || null,
+                edit_reason: reason.trim(),
+            };
+
+            if (isDP) {
+                payload.dp_amount = currentDP;
+            }
+
+            if (isMultiItem) {
+                payload.deal_prices_per_unit = items.map((it) => ({
+                    unit_id: it.unit_id,
+                    serial_number: it.serial_number,
+                    deal_price: Number(unitDealPrices[it.unit_id]) || 0,
+                }));
+            }
+
+            const res = await fetch(`/api/transaction/${tx.invoice_number}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await res.json();
+            if (!result.success) {
+                setError(result.message || "Gagal memperbarui transaksi");
+                return;
+            }
+
+            onSuccess(`Harga deal pesanan ${tx.invoice_number} berhasil diperbarui menjadi ${fmt(computedTotalDeal)}!`);
+            onClose();
+        } catch {
+            setError("Terjadi kesalahan jaringan saat menyimpan perubahan");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center anim-fade">
+            <div className="absolute inset-0 bg-[#0f0c29]/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92dvh] sm:mx-4 overflow-hidden anim-slide-up">
+                {/* Header */}
+                <div className="bg-[#0f0c29] px-5 py-4 shrink-0 relative">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-amber-500/20 rounded-xl flex items-center justify-center ring-1 ring-amber-500/30">
+                                <Pencil size={16} className="text-amber-400" />
+                            </div>
+                            <div>
+                                <h2 className="font-bold text-white text-sm tracking-tight">Edit Transaksi / Harga Deal</h2>
+                                <p className="text-xs text-white/40 font-mono mt-0.5">{tx.invoice_number}</p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-white/50 hover:text-white hover:bg-white/10 transition">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-amber-500/60 via-amber-400/20 to-transparent" />
+                </div>
+
+                <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+                    {/* Ringkasan Transaksi */}
+                    <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100 overflow-hidden">
+                        <div className="flex items-center justify-between px-3.5 py-2">
+                            <span className="text-[11px] text-gray-400 font-semibold uppercase">Status</span>
+                            <StatusBadge status={tx.status as "RESERVED" | "HELD" | "PENDING" | "PACKING"} />
+                        </div>
+                        <div className="flex items-center justify-between px-3.5 py-2">
+                            <span className="text-[11px] text-gray-400 font-semibold uppercase">Laptop</span>
+                            <span className="text-xs font-semibold text-gray-800 truncate max-w-[220px] text-right" title={tx.laptop_name}>
+                                {tx.laptop_name}
+                            </span>
+                        </div>
+                        {tx.serial_number && (
+                            <div className="flex items-center justify-between px-3.5 py-2">
+                                <span className="text-[11px] text-gray-400 font-semibold uppercase">Serial Number</span>
+                                <code className="text-[11px] font-mono font-bold text-gray-700 bg-white px-2 py-0.5 rounded border border-gray-200">
+                                    {tx.serial_number}
+                                </code>
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between px-3.5 py-2">
+                            <span className="text-[11px] text-gray-400 font-semibold uppercase">Sales</span>
+                            <span className="text-xs text-gray-600 font-medium">{tx.sales_name}</span>
+                        </div>
+                    </div>
+
+                    {/* Section Harga Deal */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
+                                <Wallet size={14} className="text-amber-600" />
+                                Harga Deal {isMultiItem ? "Per Unit" : ""} <span className="text-red-500">*</span>
+                            </label>
+                            {diffDeal !== 0 && (
+                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${diffDeal > 0 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-600 border border-red-200"}`}>
+                                    {diffDeal > 0 ? `+${fmt(diffDeal)}` : `-${fmt(Math.abs(diffDeal))}`}
+                                </span>
+                            )}
+                        </div>
+
+                        {loadingItems ? (
+                            <div className="flex items-center justify-center py-6 text-gray-400 text-xs gap-2">
+                                <div className="w-4 h-4 border-2 border-gray-300 border-t-amber-600 rounded-full animate-spin" />
+                                Memuat rincian harga unit...
+                            </div>
+                        ) : isMultiItem ? (
+                            <div className="space-y-2.5">
+                                <p className="text-[11px] text-gray-500">
+                                    Transaksi ini memiliki <strong>{items.length} unit laptop</strong>. Masukkan harga deal untuk tiap unit:
+                                </p>
+                                <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-gray-50/50">
+                                    {items.map((it, i) => (
+                                        <div key={it.unit_id} className="p-3 space-y-1.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-xs font-bold text-gray-800 truncate">{it.laptop_name}</p>
+                                                    <p className="text-[10px] font-mono text-gray-400">SN: {it.serial_number}</p>
+                                                </div>
+                                                <span className="text-[10px] text-gray-400 font-semibold uppercase">Unit {i + 1}</span>
+                                            </div>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                                                <input
+                                                    type="number"
+                                                    value={unitDealPrices[it.unit_id] ?? ""}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setUnitDealPrices(prev => ({ ...prev, [it.unit_id]: val }));
+                                                        setError("");
+                                                    }}
+                                                    placeholder="0"
+                                                    className="w-full h-10 border border-gray-300 rounded-lg pl-9 pr-3 text-xs font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                                    <span className="text-xs font-bold text-amber-900">Total Harga Deal</span>
+                                    <span className="text-sm font-black text-amber-900 font-mono">{fmt(computedTotalDeal)}</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-1.5">
+                                <div className="relative">
+                                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">Rp</span>
+                                    <input
+                                        type="number"
+                                        value={singleDealPrice}
+                                        onChange={(e) => { setSingleDealPrice(e.target.value); setError(""); }}
+                                        placeholder="0"
+                                        className="w-full h-11 border border-gray-300 rounded-xl pl-10 pr-4 text-sm font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                                    />
+                                </div>
+                                <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
+                                    <span>Format: <strong className="text-gray-700">{fmt(Number(singleDealPrice) || 0)}</strong></span>
+                                    <span>Harga Sebelumnya: {fmt(originalTotalDeal)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Section DP (hanya jika ada DP atau RESERVED) */}
+                    {isDP && (
+                        <div className="space-y-2 bg-blue-50/50 border border-blue-100 rounded-xl p-3.5">
+                            <label className="text-xs font-bold text-blue-900 uppercase tracking-wide flex items-center gap-1.5">
+                                <CreditCard size={14} className="text-blue-600" />
+                                Nominal DP (Uang Muka)
+                            </label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                                <input
+                                    type="number"
+                                    value={dpAmount}
+                                    onChange={(e) => { setDpAmount(e.target.value); setError(""); }}
+                                    placeholder="0"
+                                    className="w-full h-10 border border-blue-200 rounded-lg pl-9 pr-3 text-xs font-mono font-bold text-blue-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                                />
+                            </div>
+                            <div className="flex items-center justify-between text-xs pt-1 text-blue-800">
+                                <span>Sisa Tagihan:</span>
+                                <span className="font-bold text-sm text-red-600 font-mono">{fmt(remainingAfterDP)}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Form Customer & Catatan */}
+                    <div className="space-y-2.5 pt-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-500 uppercase">Nama Customer</label>
+                                <input
+                                    type="text"
+                                    value={customerName}
+                                    onChange={(e) => setCustomerName(e.target.value)}
+                                    className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/15 focus:border-amber-400 transition"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-500 uppercase">No. WhatsApp</label>
+                                <input
+                                    type="text"
+                                    value={customerPhone}
+                                    onChange={(e) => setCustomerPhone(e.target.value)}
+                                    className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/15 focus:border-amber-400 transition"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[11px] font-bold text-gray-500 uppercase">Catatan</label>
+                            <input
+                                type="text"
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                placeholder="Tambahkan catatan khusus..."
+                                className="w-full h-9 border border-gray-200 rounded-lg px-3 text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/15 focus:border-amber-400 transition"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Alasan Edit — Wajib */}
+                    <div className="space-y-1.5 pt-1">
+                        <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wide">
+                            Alasan Edit <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                            value={reason}
+                            onChange={(e) => { setReason(e.target.value); setError(""); }}
+                            placeholder="Contoh: Kesepakatan harga baru dengan customer / ACC Kepala Sales"
+                            rows={2}
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition resize-none placeholder:text-gray-400"
+                        />
+                    </div>
+
+                    {/* Pintasan ke form edit lengkap */}
+                    <a
+                        href={`/payment/${tx.invoice_number}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between px-3.5 py-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-600 font-medium transition group"
+                    >
+                        <span>Butuh ganti unit SN atau tambah aksesori?</span>
+                        <span className="inline-flex items-center gap-1 font-bold text-blue-600 group-hover:text-blue-700">
+                            Edit Lengkap <ExternalLink size={12} />
+                        </span>
+                    </a>
+
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 rounded-xl px-3.5 py-2.5 text-xs text-red-700 anim-shake">
+                            {error}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-3 border-t border-gray-100 flex gap-2.5 shrink-0 bg-white">
+                    <button
+                        onClick={onClose}
+                        disabled={saving}
+                        className="flex-1 h-10 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition disabled:opacity-50"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving || loadingItems || !reason.trim() || computedTotalDeal <= 0}
+                        className="flex-1 h-10 bg-[#0f0c29] text-white rounded-xl text-sm font-semibold hover:bg-[#1a1545] transition-colors disabled:opacity-40 flex items-center justify-center gap-2 shadow-sm"
+                    >
+                        {saving ? (
+                            <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Menyimpan...</>
+                        ) : (
+                            <><CheckCircle2 size={16} /> Simpan Perubahan</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function StatusBadge({ status }: { status: "RESERVED" | "HELD" | "PENDING" | "PACKING" }) {
     if (status === "RESERVED") {
         return (
@@ -712,13 +1075,15 @@ function StatusBadge({ status }: { status: "RESERVED" | "HELD" | "PENDING" | "PA
 }
 
 // ─── Table row for PENDING ────────────────────────────────────────────────────
-function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, onWhatsApp, onDownload, downloadingInvoice, idx }: {
+function PendingRow({ tx, canConfirm, canCancel, canEdit, onConfirm, onCancel, onDetail, onEdit, onWhatsApp, onDownload, downloadingInvoice, idx }: {
     tx: PendingTransaction;
     canConfirm: boolean;
     canCancel: boolean;
+    canEdit: boolean;
     onConfirm: (tx: PendingTransaction) => void;
     onCancel: (tx: PendingTransaction) => void;
     onDetail: (tx: PendingTransaction) => void;
+    onEdit: (tx: PendingTransaction) => void;
     onWhatsApp: (tx: PendingTransaction) => void;
     onDownload: (tx: PendingTransaction) => void;
     downloadingInvoice: string | null;
@@ -786,6 +1151,14 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
                     </button>
+                    {canEdit && (
+                        <button onClick={() => onEdit(tx)}
+                            title="Edit Transaksi / Harga Deal"
+                            className="h-7 px-2.5 flex items-center gap-1 rounded-lg text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-all shadow-sm">
+                            <Pencil size={12} />
+                            Edit
+                        </button>
+                    )}
                     {tx.customer_phone && (
                         <button onClick={() => onWhatsApp(tx)}
                             title="WhatsApp"
@@ -839,9 +1212,11 @@ function PendingRow({ tx, canConfirm, canCancel, onConfirm, onCancel, onDetail, 
     );
 }
 // ─── Table row for HISTORY ────────────────────────────────────────────────────
-function HistoryRow({ tx, onDetail, onWhatsApp, idx }: {
+function HistoryRow({ tx, canEdit, onDetail, onEdit, onWhatsApp, idx }: {
     tx: PendingTransaction;
+    canEdit?: boolean;
     onDetail: (tx: PendingTransaction) => void;
+    onEdit?: (tx: PendingTransaction) => void;
     onWhatsApp: (tx: PendingTransaction) => void;
     idx: number;
 }) {
@@ -908,6 +1283,13 @@ function HistoryRow({ tx, onDetail, onWhatsApp, idx }: {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
                     </button>
+                    {canEdit && onEdit && (
+                        <button onClick={() => onEdit(tx)} title="Edit Transaksi / Harga Deal"
+                            className="h-7 px-2 flex items-center gap-1 rounded-lg text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-all">
+                            <Pencil size={12} />
+                            Edit
+                        </button>
+                    )}
                     {tx.customer_phone && (
                         <button onClick={() => onWhatsApp(tx)} title="WhatsApp"
                             className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-all">
@@ -1019,10 +1401,17 @@ export default function PendingOrdersPage() {
     const [confirmPaymentTx, setConfirmPaymentTx] = useState<PendingTransaction | null>(null);
     const [detailTx, setDetailTx] = useState<PendingTransaction | null>(null);
     const [cancelTx, setCancelTx] = useState<PendingTransaction | null>(null);
+    const [editTx, setEditTx] = useState<PendingTransaction | null>(null);
     const [cancelling, setCancelling] = useState(false);
 
-     const [userId, setUserId] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
     const canCancel = userRole ? hasPermission(userRole, PERMISSIONS.RESTORE_TRANSACTION) : false;
+    const canEdit = (
+        userRoles.some((r) =>
+            ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_ONPOINT", "KEPALA_SOTECH"].includes(r)
+        ) ||
+        (userRole ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION) : false)
+    );
     const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
 
     const CONFIRM_PAYMENT_ROLES = [
@@ -1441,8 +1830,10 @@ export default function PendingOrdersPage() {
                                                 <PendingRow key={tx.id} tx={tx} idx={idx}
                                                     canConfirm={canConfirmTx(tx)}
                                                     canCancel={canCancel}
+                                                    canEdit={canEdit}
                                                     onConfirm={setConfirmPaymentTx}
                                                     onCancel={setCancelTx}
+                                                    onEdit={setEditTx}
                                                     onDetail={setDetailTx}
                                                     onWhatsApp={handleWhatsApp}
                                                     onDownload={handleDownloadInvoice}
@@ -1478,6 +1869,8 @@ export default function PendingOrdersPage() {
                                         ) : (
                                             historyTransactions.map((tx, idx) => (
                                                 <HistoryRow key={tx.id} tx={tx} idx={idx}
+                                                    canEdit={canEdit}
+                                                    onEdit={setEditTx}
                                                     onDetail={setDetailTx}
                                                     onWhatsApp={handleWhatsApp} />
                                             ))
@@ -1525,6 +1918,17 @@ export default function PendingOrdersPage() {
                 />
             )}
             {detailTx && <DetailModal tx={detailTx} onClose={() => setDetailTx(null)} />}
+            {editTx && (
+                <EditPendingModal
+                    tx={editTx}
+                    onClose={() => setEditTx(null)}
+                    onSuccess={(msg) => {
+                        setAlertModal(msg);
+                        fetchData();
+                        if (activeTab === "history") fetchHistory();
+                    }}
+                />
+            )}
             {cancelTx && (
                 <CancelModal
                     tx={cancelTx}
