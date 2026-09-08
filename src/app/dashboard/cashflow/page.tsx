@@ -859,6 +859,39 @@ function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
     );
 }
 
+// ── Kompresi foto sebelum upload ────────────────────────────────────────────
+// Foto langsung dari kamera HP modern sering 5–15MB. Vercel Functions punya
+// batas ukuran request body ~4.5MB di level platform (di luar kendali kode
+// kita, terpisah dari MAX_SIZE_BYTES 8MB di upload/route.ts). Kalau melebihi,
+// request ditolak Vercel SEBELUM sampai ke handler kita, responsnya bukan
+// JSON, dan itu muncul di UI sebagai "Terjadi kesalahan koneksi" — padahal
+// bukan soal internet. Jadi foto dikecilkan dulu di browser sebelum upload.
+async function compressImageFile(file: File, maxDimension = 1600, quality = 0.75): Promise<File> {
+    try {
+        const bitmap = await createImageBitmap(file);
+        let { width, height } = bitmap;
+        if (width > maxDimension || height > maxDimension) {
+            const scale = maxDimension / Math.max(width, height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return file; // fallback: browser tidak dukung canvas 2d context
+        ctx.drawImage(bitmap, 0, 0, width, height);
+        const blob: Blob | null = await new Promise((resolve) =>
+            canvas.toBlob((b) => resolve(b), "image/jpeg", quality)
+        );
+        if (!blob) return file; // fallback: kompres gagal, upload file asli
+        const newName = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+        return new File([blob], newName || "photo.jpg", { type: "image/jpeg" });
+    } catch {
+        return file; // fallback: device tidak dukung createImageBitmap
+    }
+}
+
 // ── Photo Picker ──────────────────────────────────────────────────────────────
 function PhotoPicker({ value, onChange }: { value: File | null; onChange: (f: File | null) => void }) {
     const fileRef = useRef<HTMLInputElement>(null);
@@ -1038,8 +1071,9 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             let photoUrl: string | null = null;
             if (photoFile) {
                 setUploadProgress("uploading");
+                const compressedPhoto = await compressImageFile(photoFile); // ⬅️ BARU: kecilkan dulu sebelum upload
                 const fd = new FormData();
-                fd.append("file", photoFile);
+                fd.append("file", compressedPhoto);
                 const upRes = await fetch("/api/cashflow/upload", { method: "POST", body: fd });
                 const upJson = await upRes.json();
                 if (!upJson.success) { setError(upJson.message || "Gagal upload foto"); setSaving(false); setUploadProgress("idle"); return; }

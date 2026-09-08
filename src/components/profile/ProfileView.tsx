@@ -18,7 +18,8 @@ import type { EquippedBorder } from "@/lib/solit-coins/types";
 import {
     Camera, Trash2, Trophy, Flame, Clock, CalendarCheck,
     Loader2, Pencil, Check, X, Music, Play, Pause,
-    MessageCircle, Eye, CheckCircle2, AlertCircle,
+    MessageCircle, Eye, CheckCircle2, AlertCircle, Sparkles,
+    Zap, Truck, Package, ShoppingCart, Wrench, Video, Boxes, Megaphone, UserCheck,
 } from "lucide-react";
 
 interface ProfileData {
@@ -111,7 +112,8 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [providerBadge, setProviderBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [salesBadge, setSalesBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [teknisiBadge, setTeknisiBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
-    const [kontenBadge, setKontenBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+       const [kontenBadge, setKontenBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+    const [auditMarketingBadge, setAuditMarketingBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -189,7 +191,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes, lemburanRes, pengelolaBarangRes] = await Promise.all([
+                        const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes, lemburanRes, pengelolaBarangRes, auditMarketingRes] = await Promise.all([
                 getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
                 fetch(`/api/profile?userId=${userId}`),
                 fetch(`/api/achievements?userId=${userId}`),
@@ -202,6 +204,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 fetch(`/api/cc-reports/konten-milestones?userId=${userId}`),
                 fetch(`/api/attendance/overtime-points?userId=${userId}`),
                 fetch(`/api/laptops/pengelola-points?userId=${userId}`),
+                fetch(`/api/sales-reports/audit-milestones?userId=${userId}`),
             ]);
             const meData = await meRes.json();
             const profileData = await profileRes.json();
@@ -215,6 +218,7 @@ export default function ProfileView({ userId }: { userId: string }) {
             const kontenData = await kontenRes.json();
             const lemburanData = await lemburanRes.json();
             const pengelolaBarangData = await pengelolaBarangRes.json();
+            const auditMarketingData = await auditMarketingRes.json();
             if (meData.user) setCurrentUser(meData.user);
             if (profileData.success) { setProfile(profileData.data); setBioDraft(profileData.data.bio ?? ""); }
             if (achData.success) setAchievements(achData.data);
@@ -227,6 +231,7 @@ export default function ProfileView({ userId }: { userId: string }) {
             if (kontenData.success) setKontenBadge(kontenData.data);
             if (lemburanData.success) setLemburanRank(lemburanData.data);
             if (pengelolaBarangData.success) setPengelolaBarangRank(pengelolaBarangData.data);
+            if (auditMarketingData.success) setAuditMarketingBadge(auditMarketingData.data);
         } catch {
             showToast("Gagal memuat profil", "err");
         } finally {
@@ -958,6 +963,10 @@ export default function ProfileView({ userId }: { userId: string }) {
                             55%  { opacity: 0; }
                             100% { transform: translateX(220%) skewX(-20deg); opacity: 0; }
                         }
+                        @keyframes solitBadgeTwinkle {
+                            0%, 100% { opacity: 0; transform: scale(0.4); }
+                            50%      { opacity: 1; transform: scale(1); }
+                        }
                         @media (prefers-reduced-motion: reduce) {
                             * { animation: none !important; }
                         }
@@ -979,7 +988,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                             </div>
                         </div>
                         {achievements && (
-                            <AchievementTitles
+                                                        <AchievementTitles
                                 achievements={achievements}
                                 qualityRank={qualityRank}
                                 kerjaRank={kerjaRank}
@@ -990,6 +999,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 kontenBadge={kontenBadge}
                                 lemburanRank={lemburanRank}
                                 pengelolaBarangRank={pengelolaBarangRank}
+                                auditMarketingBadge={auditMarketingBadge}
                             />
                         )}
                     </div>
@@ -1271,7 +1281,7 @@ function RankBadge({ rank }: { rank: number }) {
     );
 }
 
-function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge, providerBadge, salesBadge, teknisiBadge, kontenBadge, lemburanRank, pengelolaBarangRank }: {
+function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge, providerBadge, salesBadge, teknisiBadge, kontenBadge, lemburanRank, pengelolaBarangRank, auditMarketingBadge }: {
     achievements: AchievementsData;
     qualityRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
     kerjaRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
@@ -1282,6 +1292,7 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     kontenBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
     lemburanRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
     pengelolaBarangRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
+    auditMarketingBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
 }) {
     const titles: { rank: number; label: string }[] = [];
     if (achievements.attendance.rankThisMonth !== null && achievements.attendance.rankThisMonth <= 10) {
@@ -1327,8 +1338,12 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     // MILESTONE kumulatif total tahap Take+Edit video yang berhasil
     // diselesaikan (100/200/.../1000), bersifat all-time & tidak dibatasi
     // Top 3 — sama polanya dengan Penyedia Barang/Sales/Teknisi.
-    const hasKontenBadge = !!(kontenBadge && kontenBadge.hasBadge);
-    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge && !hasProviderBadge && !hasSalesBadge && !hasTeknisiBadge && !hasKontenBadge && !hasLemburanBadge && !hasPengelolaBarangBadge) return null;
+        const hasKontenBadge = !!(kontenBadge && kontenBadge.hasBadge);
+    // ✅ NEW — Lencana Audit Marketing (tab "Audit Marketing" di /dashboard/lencana):
+    // MILESTONE kumulatif poin audit (0,5 poin per laporan yang diaudit), bersifat
+    // all-time & tidak dibatasi Top 3 — sama polanya dengan milestone lainnya.
+    const hasAuditMarketingBadge = !!(auditMarketingBadge && auditMarketingBadge.hasBadge);
+    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge && !hasProviderBadge && !hasSalesBadge && !hasTeknisiBadge && !hasKontenBadge && !hasLemburanBadge && !hasPengelolaBarangBadge && !hasAuditMarketingBadge) return null;
     titles.sort((a, b) => a.rank - b.rank);
 
     return (
@@ -1337,13 +1352,13 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
                 <LevelBadgeDisplay level={qualityRank!.level} isPermanent={qualityRank!.isPermanent} isOngoingMonth={qualityRank!.isOngoingMonth} />
             )}
             {hasKerjaBadge && (
-                <LevelBadgeDisplay level={kerjaRank!.level} isPermanent={kerjaRank!.isPermanent} isOngoingMonth={kerjaRank!.isOngoingMonth} label="Kualitas Pekerjaan" colorScheme="indigo" />
+                <LevelBadgeDisplay level={kerjaRank!.level} isPermanent={kerjaRank!.isPermanent} isOngoingMonth={kerjaRank!.isOngoingMonth} label="Kualitas Pekerjaan" colorScheme="indigo" icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />} />
             )}
             {hasLemburanBadge && (
-                <LevelBadgeDisplay level={lemburanRank!.level} isPermanent={lemburanRank!.isPermanent} isOngoingMonth={lemburanRank!.isOngoingMonth} label="Lemburan" colorScheme="amber" />
+                <LevelBadgeDisplay level={lemburanRank!.level} isPermanent={lemburanRank!.isPermanent} isOngoingMonth={lemburanRank!.isOngoingMonth} label="Lemburan" colorScheme="amber" icon={<Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />} />
             )}
             {hasPengelolaBarangBadge && (
-                <LevelBadgeDisplay level={pengelolaBarangRank!.level} isPermanent={pengelolaBarangRank!.isPermanent} isOngoingMonth={pengelolaBarangRank!.isOngoingMonth} label="Pengelola Barang" colorScheme="teal" />
+                <LevelBadgeDisplay level={pengelolaBarangRank!.level} isPermanent={pengelolaBarangRank!.isPermanent} isOngoingMonth={pengelolaBarangRank!.isOngoingMonth} label="Pengelola Barang" colorScheme="teal" icon={<Boxes className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />} />
             )}
             {hasDeliveryBadge && (
                 <DeliveryMilestoneBadge rank={deliveryBadge!.rank} milestone={deliveryBadge!.milestone} />
@@ -1357,16 +1372,79 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
             {hasTeknisiBadge && (
                 <TeknisiMilestoneBadge rank={teknisiBadge!.rank} milestone={teknisiBadge!.milestone} />
             )}
-            {hasKontenBadge && (
+                        {hasKontenBadge && (
                 <KontenMilestoneBadge rank={kontenBadge!.rank} milestone={kontenBadge!.milestone} />
             )}
-            {titles.map((t) => (
+            {hasAuditMarketingBadge && (
+                <AuditMarketingMilestoneBadge rank={auditMarketingBadge!.rank} milestone={auditMarketingBadge!.milestone} />
+            )}
+                        {titles.map((t) => (
                 <AchievementTitleBadge key={t.label} rank={t.rank} label={t.label} />
             ))}
         </div>
     );
 }
 
+// ✅ NEW — shell visual bersama untuk semua pill "Lencana" (Level & Milestone).
+// Warna/gradient/isi teks tetap dikirim masing-masing badge di bawah — komponen
+// ini cuma menambah lapisan "mewah": bezel metalik tipis, kilau kaca di atas,
+// bayangan 3D di bawah, kilau berjalan periodik, ring emboss di ikon, dan
+// aksen sparkle untuk tier gold (premium).
+function BadgePill({
+    gradient, glow, icon, title, subtitle, note, tooltip, premium = false,
+}: {
+    gradient: string;
+    glow: string;
+    icon: React.ReactNode;
+    title: string;
+    subtitle: string;
+    note?: string;
+    tooltip: string;
+    premium?: boolean;
+}) {
+    return (
+        <div
+            className="relative rounded-full p-[1.5px]"
+            style={{
+                background: "linear-gradient(135deg, rgba(255,255,255,0.85), rgba(255,255,255,0.1) 45%, rgba(255,255,255,0.5))",
+                boxShadow: `0 6px 18px -3px ${glow}, 0 1px 3px rgba(0,0,0,0.2)`,
+            }}
+            title={tooltip}
+        >
+            <div className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden" style={{ background: gradient }}>
+                <div className="absolute inset-x-0 top-0 h-3/5 rounded-t-full pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.55), transparent)" }} />
+                <div className="absolute inset-x-0 bottom-0 h-1/3 pointer-events-none" style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.14), transparent)" }} />
+                <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.45), transparent 55%)" }} />
+                {/* Kilau berjalan — "mengkilat" utama, berulang periodik */}
+                <div className="absolute inset-y-0 w-7 pointer-events-none" style={{ background: "linear-gradient(100deg, transparent, rgba(255,255,255,0.85), transparent)", animation: "solitShimmerSweep 3.2s ease-in-out infinite" }} />
+                {/* Titik-titik glitter berkedip — kesan berkilauan/mewah */}
+                <span className="absolute w-[3px] h-[3px] rounded-full bg-white pointer-events-none" style={{ top: "22%", left: "58%", animation: "solitBadgeTwinkle 2.4s ease-in-out infinite", animationDelay: "0.2s" }} />
+                <span className="absolute w-[2px] h-[2px] rounded-full bg-white pointer-events-none" style={{ top: "62%", left: "72%", animation: "solitBadgeTwinkle 2.8s ease-in-out infinite", animationDelay: "1s" }} />
+                <span className="absolute w-[2px] h-[2px] rounded-full bg-white pointer-events-none" style={{ top: "38%", left: "85%", animation: "solitBadgeTwinkle 2.1s ease-in-out infinite", animationDelay: "1.6s" }} />
+                {premium && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center shadow-md ring-1 ring-black/5 z-10">
+                        <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                    </span>
+                )}
+                <div
+                    className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center flex-shrink-0 ring-1 ring-white/50 overflow-hidden"
+                    style={{
+                        background: "linear-gradient(160deg, rgba(255,255,255,0.5), rgba(255,255,255,0.14))",
+                        boxShadow: "inset 0 1px 2px rgba(255,255,255,0.7), inset 0 -1px 3px rgba(0,0,0,0.18)",
+                    }}
+                >
+                    <span className="absolute -top-1 -left-1 w-3 h-3 rounded-full bg-white/60 blur-[2px] pointer-events-none" />
+                    <span className="relative">{icon}</span>
+                </div>
+                <div className="relative leading-tight">
+                    <p className="text-[11px] sm:text-xs font-black text-white tracking-wide drop-shadow-sm">{title}</p>
+                    <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.9)" }}>{subtitle}</p>
+                    {note && <p className="text-[7px] sm:text-[7.5px] font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>{note}</p>}
+                </div>
+            </div>
+        </div>
+    );
+}
 
 // ✅ NEW — badge lencana Pengantaran: TIDAK berbasis level/streak seperti
 // LevelBadgeDisplay, melainkan MILESTONE total pengantaran (50/100/.../1000)
@@ -1384,23 +1462,16 @@ function DeliveryMilestoneBadge({ rank, milestone }: { rank: number; milestone: 
         bronze: "rgba(251,146,60,0.35)",
     };
 
-    return (
-        <div
-            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
-            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
-            title={`Top ${rank} Pengantaran · ${milestone}+ pengantaran`}
-        >
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
-            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
-                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            </div>
-            <div className="relative leading-tight">
-                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">TOP {rank}</p>
-                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
-                    Pengantaran · {milestone}+
-                </p>
-            </div>
-        </div>
+        return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<Truck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`TOP ${rank}`}
+            subtitle={`Pengantaran · ${milestone}+`}
+            tooltip={`Top ${rank} Pengantaran · ${milestone}+ pengantaran`}
+        />
     );
 }
 
@@ -1422,23 +1493,16 @@ function ProviderMilestoneBadge({ rank, milestone }: { rank: number; milestone: 
         bronze: "rgba(45,212,191,0.35)",
     };
 
-    return (
-        <div
-            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
-            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
-            title={`Peringkat #${rank} · ${milestone}+ unit disiapkan`}
-        >
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
-            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
-                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            </div>
-            <div className="relative leading-tight">
-                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">{milestone}+ UNIT</p>
-                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
-                    Penyedia Barang
-                </p>
-            </div>
-        </div>
+        return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`${milestone}+ UNIT`}
+            subtitle="Penyedia Barang"
+            tooltip={`Peringkat #${rank} · ${milestone}+ unit disiapkan`}
+        />
     );
 }
 
@@ -1458,23 +1522,16 @@ function SalesMilestoneBadge({ rank, milestone }: { rank: number; milestone: num
         bronze: "rgba(251,113,133,0.35)",
     };
 
-    return (
-        <div
-            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
-            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
-            title={`Peringkat #${rank} · ${milestone}+ transaksi`}
-        >
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
-            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
-                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            </div>
-            <div className="relative leading-tight">
-                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">{milestone}+ TRX</p>
-                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
-                    Sales
-                </p>
-            </div>
-        </div>
+       return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`${milestone}+ TRX`}
+            subtitle="Sales"
+            tooltip={`Peringkat #${rank} · ${milestone}+ transaksi`}
+        />
     );
 }
 
@@ -1494,23 +1551,16 @@ function TeknisiMilestoneBadge({ rank, milestone }: { rank: number; milestone: n
         bronze: "rgba(74,222,128,0.35)",
     };
 
-    return (
-        <div
-            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
-            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
-            title={`Peringkat #${rank} · ${milestone}+ servis`}
-        >
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
-            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
-                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            </div>
-            <div className="relative leading-tight">
-                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">{milestone}+ SERVIS</p>
-                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
-                    Teknisi
-                </p>
-            </div>
-        </div>
+        return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<Wrench className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`${milestone}+ SERVIS`}
+            subtitle="Teknisi"
+            tooltip={`Peringkat #${rank} · ${milestone}+ servis`}
+        />
     );
 }
 
@@ -1531,23 +1581,46 @@ function KontenMilestoneBadge({ rank, milestone }: { rank: number; milestone: nu
         bronze: "rgba(56,189,248,0.35)",
     };
 
-    return (
-        <div
-            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
-            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
-            title={`Peringkat #${rank} · ${milestone}+ video`}
-        >
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
-            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
-                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            </div>
-            <div className="relative leading-tight">
-                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">{milestone}+ VIDEO</p>
-                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
-                    Konten Kreator
-                </p>
-            </div>
-        </div>
+       return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<Video className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`${milestone}+ VIDEO`}
+            subtitle="Konten Kreator"
+            tooltip={`Peringkat #${rank} · ${milestone}+ video`}
+        />
+    );
+}
+
+// ✅ NEW — badge lencana Audit Marketing: pola sama persis dengan
+// ProviderMilestoneBadge/SalesMilestoneBadge/TeknisiMilestoneBadge/KontenMilestoneBadge
+// (MILESTONE kumulatif all-time, TIDAK dibatasi Top 3) tapi satuannya total POIN
+// audit (0,5 poin per laporan Leads yang diverifikasi tim Marketing).
+function AuditMarketingMilestoneBadge({ rank, milestone }: { rank: number; milestone: number }) {
+    const tier: "gold" | "silver" | "bronze" = milestone >= 200 ? "gold" : milestone >= 50 ? "silver" : "bronze";
+    const gradients: Record<typeof tier, string> = {
+        gold: "linear-gradient(135deg, #f0abfc, #c026d3, #86198f)",
+        silver: "linear-gradient(135deg, #f5d0fe, #d946ef, #a21caf)",
+        bronze: "linear-gradient(135deg, #fae8ff, #f0abfc, #d946ef)",
+    };
+    const glow: Record<typeof tier, string> = {
+        gold: "rgba(192,38,211,0.35)",
+        silver: "rgba(217,70,239,0.35)",
+        bronze: "rgba(240,171,252,0.35)",
+    };
+
+       return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={<Megaphone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={`${milestone}+ POIN`}
+            subtitle="Audit Marketing"
+            tooltip={`Peringkat #${rank} · ${milestone}+ poin audit`}
+        />
     );
 }
 
@@ -1556,10 +1629,10 @@ function KontenMilestoneBadge({ rank, milestone }: { rank: number; milestone: nu
 // ini): ini berbasis level konsistensi, dan tetap tampil "Permanen" walau
 // bulan ini performanya turun (kalau sudah pernah tembus Level 3).
 function LevelBadgeDisplay({
-    level, isPermanent, isOngoingMonth, label = "Kualitas Absensi", colorScheme = "emerald",
+    level, isPermanent, isOngoingMonth, label = "Kualitas Absensi", colorScheme = "emerald", icon = <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />,
 }: {
     level: number; isPermanent: boolean; isOngoingMonth: boolean;
-    label?: string; colorScheme?: "emerald" | "indigo" | "amber" | "teal";
+    label?: string; colorScheme?: "emerald" | "indigo" | "amber" | "teal"; icon?: React.ReactNode;
 }) {
     const tier: "gold" | "silver" | "bronze" = isPermanent ? "gold" : level >= 2 ? "silver" : "bronze";
     const gradientsByScheme: Record<"emerald" | "indigo" | "amber" | "teal", Record<typeof tier, string>> = {
@@ -1609,28 +1682,19 @@ function LevelBadgeDisplay({
     const gradients = gradientsByScheme[colorScheme];
     const glow = glowByScheme[colorScheme];
 
-    const showProvisional = !isPermanent && isOngoingMonth;
+        const showProvisional = !isPermanent && isOngoingMonth;
 
     return (
-        <div
-            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
-            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
-            title={isPermanent ? `Level ${level} · Lencana Permanen` : showProvisional ? `Level ${level} · Sementara, bulan berjalan belum final` : `Level ${level}`}
-        >
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
-            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
-                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            </div>
-            <div className="relative leading-tight">
-                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">LEVEL {level}</p>
-                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>
-                    {label}{isPermanent ? " · Permanen" : showProvisional ? " · Sementara" : ""}
-                </p>
-                {showProvisional && (
-                    <p className="text-[7px] sm:text-[7.5px] font-semibold" style={{ color: "rgba(255,255,255,0.7)" }}>Bulan berjalan, belum final</p>
-                )}
-            </div>
-        </div>
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={icon}
+            title={`LEVEL ${level}`}
+            subtitle={`${label}${isPermanent ? " · Permanen" : showProvisional ? " · Sementara" : ""}`}
+            note={showProvisional ? "Bulan berjalan, belum final" : undefined}
+            tooltip={isPermanent ? `Level ${level} · Lencana Permanen` : showProvisional ? `Level ${level} · Sementara, bulan berjalan belum final` : `Level ${level}`}
+        />
     );
 }
 
@@ -1646,22 +1710,21 @@ function AchievementTitleBadge({ rank, label }: { rank: number; label: string })
         silver: "rgba(148,163,184,0.35)",
         bronze: "rgba(194,65,12,0.35)",
     };
+    const icon = label === "Kehadiran"
+        ? <CalendarCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+        : label === "Lembur"
+            ? <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+            : <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />;
 
-    return (
-        <div
-            className="relative flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-3 sm:pr-3.5 py-1.5 rounded-full overflow-hidden"
-            style={{ background: gradients[tier], boxShadow: `0 4px 14px ${glow[tier]}` }}
-            title={`Top ${rank} ${label} bulan ini`}
-        >
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.35), transparent 55%)" }} />
-            <div className="absolute inset-y-0 w-8 pointer-events-none" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)", animation: "solitShimmerSweep 2.2s ease-out 0.4s 1 both" }} />
-            <div className="relative w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/25 flex items-center justify-center flex-shrink-0">
-                <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-            </div>
-            <div className="relative leading-tight">
-                <p className="text-[11px] sm:text-xs font-black text-white tracking-wide">TOP {rank}</p>
-                <p className="text-[8.5px] sm:text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.85)" }}>{label}</p>
-            </div>
-        </div>
+       return (
+        <BadgePill
+            gradient={gradients[tier]}
+            glow={glow[tier]}
+            premium={tier === "gold"}
+            icon={icon}
+            title={`TOP ${rank}`}
+            subtitle={label}
+            tooltip={`Top ${rank} ${label} bulan ini`}
+        />
     );
 }

@@ -2243,7 +2243,11 @@ function EntryFormModal({
     const modalMissing =
         isEdit && entry!.source_type === "TRANSACTION" && entry!.trx_meta?.modal_missing === true;
 
-    const [tanggal, setTanggal] = useState(entry?.tanggal ?? `${period}-01`);
+    const [tanggal, setTanggal] = useState(() => {
+        if (entry?.tanggal) return entry.tanggal;
+        const today = jakartaDate(new Date().toISOString());
+        return today.startsWith(period) ? today : `${period}-01`;
+    });
     const [keterangan, setKeterangan] = useState(entry?.keterangan ?? "");
     const [ref, setRef] = useState(entry?.ref ?? "");
     const [template, setTemplate] = useState("CUSTOM");

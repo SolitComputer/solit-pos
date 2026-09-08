@@ -11,7 +11,7 @@ import AddUnitModalAccessory from "@/components/inventory/AddUnitModalAccessory"
 import AccessoryUnitDetailModal, { AccessoryUnitDetailData } from "@/components/inventory/AccessoryUnitDetailModal";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { usePagePermission } from "@/hooks/usePagePermission";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import {
     UserRole, hasAnyRole, PERMISSIONS,
     LAPTOP_DELETE_ROLES, ACCESSORY_CREATE_ROLES, ACCESSORY_EDIT_ROLES, ACCESSORY_DELETE_ROLES,
@@ -805,6 +805,36 @@ export default function UnifiedBarangContent() {
                 { wch: 12 }, { wch: 13 }, { wch: 13 }, { wch: 13 }, { wch: 12 },
                 { wch: 12 }, { wch: 6 }, { wch: 11 }, { wch: 10 },
             ];
+
+            // ── Styling tabel: header tebal + background gelap, border tipis
+            // di semua sel, baris genap dikasih shading (banded rows, mirip
+            // "Format as Table" bawaan Excel), + dropdown filter di header.
+            const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+            const borderTipis = { style: "thin", color: { rgb: "D4D4D8" } } as const;
+
+            for (let R = range.s.r; R <= range.e.r; R++) {
+                const isHeader = R === 0;
+                const isBanded = !isHeader && R % 2 === 0;
+                for (let C = range.s.c; C <= range.e.c; C++) {
+                    const addr = XLSX.utils.encode_cell({ r: R, c: C });
+                    if (!ws[addr]) continue;
+                    ws[addr].s = {
+                        font: isHeader
+                            ? { bold: true, sz: 10, color: { rgb: "FFFFFF" } }
+                            : { sz: 10, color: { rgb: "27272A" } },
+                        fill: isHeader
+                            ? { fgColor: { rgb: "18181B" } }
+                            : isBanded ? { fgColor: { rgb: "F4F4F5" } } : undefined,
+                        alignment: { vertical: "center", horizontal: isHeader ? "center" : "left" },
+                        border: { top: borderTipis, bottom: borderTipis, left: borderTipis, right: borderTipis },
+                    };
+                }
+            }
+
+            // Dropdown filter di baris header
+            ws["!autofilter"] = {
+                ref: XLSX.utils.encode_range({ s: { r: 0, c: range.s.c }, e: { r: 0, c: range.e.c } }),
+            };
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Data Barang");
