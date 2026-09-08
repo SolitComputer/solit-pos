@@ -27,7 +27,7 @@ const PROGRAMMER_USER_IDS = [
 ];
 // HRD — Yoga Adi Prakoso. Role sistemnya ADMIN, disatukan ke Divisi HRD
 // lewat ID (pola sama dengan Rayhan Accounting & Programmer di atas).
-const YOGA_HRD_USER_ID = "GANTI_DENGAN_ID_YOGA";
+const YOGA_HRD_USER_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
 // Sales Online — role yang dapat poin dari Laporan Harian Sales (chat leads),
 // role-based (bukan per akun). Harus disamakan manual dengan
 // SALES_REPORT_ROLES di src/lib/permissions.ts.
