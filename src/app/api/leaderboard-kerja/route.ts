@@ -63,8 +63,14 @@ export const GET = withAuth(async (req, _ctx, user) => {
       endDate.setUTCHours(23, 59, 59, 999);
     }
 
-    const startIso = startDate.toISOString();
-    const endIso = endDate.toISOString();
+    // ✅ FIX: startDate/endDate di atas disimpan dalam representasi "WIB
+    // dipalsukan sebagai UTC" (trik +7 jam). toISOString() polos di sini
+    // membaca angka itu sebagai UTC ASLI (bukan WIB), jadi query ke
+    // Supabase jadi telat 7 jam dari batas WIB yang seharusnya — bikin
+    // aktivitas jam 00:00–06:59 WIB di awal periode "hilang" dari hitungan.
+    // Perlu dikurangi 7 jam lagi di sini biar balik jadi UTC yang benar.
+    const startIso = new Date(startDate.getTime() - 7 * 60 * 60 * 1000).toISOString();
+    const endIso = new Date(endDate.getTime() - 7 * 60 * 60 * 1000).toISOString();
 
     // 1. Fetch all non-admin users
     const { data: rawUsers, error } = await supabaseAdmin

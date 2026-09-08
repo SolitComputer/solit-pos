@@ -140,8 +140,13 @@ async function postHandler(req: NextRequest, _ctx: any, _user: AuthUser) {
 
   // Rentang 1 bulan penuh untuk tahun-bulan yang diminta — BUKAN relatif ke
   // hari ini, supaya bisa generate snapshot bulan lalu juga.
-  const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-  const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+  // ✅ FIX: Date.UTC(...) di bawah membaca year/month sebagai kalender UTC,
+  // padahal maksudnya kalender WIB — jadi window-nya kegeser +7 jam
+  // (kehilangan jam 00:00–06:59 WIB awal bulan, sekaligus kebablasan
+  // nyerempet jam 00:00–06:59 WIB awal bulan berikutnya). Dikurangi 7 jam
+  // di sini biar batasnya balik jadi representasi WIB yang benar.
+  const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0) - 7 * 60 * 60 * 1000);
+  const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999) - 7 * 60 * 60 * 1000);
 
   const scores = await computeKerjaScores(startDate, endDate);
 
