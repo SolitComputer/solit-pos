@@ -25,12 +25,23 @@ const MAX_SIZE_BYTES = 8 * 1024 * 1024; // 8MB — foto kamera HP modern sering 
 function resolveContentType(fileType: string, ext: string): string | null {
     const normalized = fileType === "image/jpg" ? "image/jpeg" : fileType;
     if (ALLOWED_TYPES.includes(normalized)) return normalized;
-    if (!ALLOWED_EXTENSIONS.includes(ext)) return null;
+
     const extToMime: Record<string, string> = {
         jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
         webp: "image/webp", heic: "image/heic", heif: "image/heif",
     };
-    return extToMime[ext];
+    if (ALLOWED_EXTENSIONS.includes(ext)) return extToMime[ext];
+
+    // ⬅️ FIX BARU: sebagian browser/WebView (terutama saat foto diambil LANGSUNG
+    // dari kamera) mengirim file tanpa MIME type ("") DAN tanpa nama file yang
+    // punya ekstensi sama sekali (mis. "image", "blob", timestamp mentah tanpa
+    // titik). Fix lama di atas cuma menutup celah MIME kosong, belum menutup
+    // celah nama file tanpa ekstensi ini — jadi foto valid dari kamera masih
+    // bisa ke-reject. Kalau MIME type kosong atau minimal masih "image/*",
+    // anggap saja JPEG (hampir semua kamera HP/browser default JPEG).
+    if (!fileType || fileType.startsWith("image/")) return "image/jpeg";
+
+    return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -52,7 +63,13 @@ export async function POST(req: NextRequest) {
 
         if (!file) return NextResponse.json({ success: false, message: "File tidak ditemukan" }, { status: 400 });
 
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    // ⬅️ FIX: dulu `file.name.split(".").pop()` dianggap ekstensi apa adanya —
+    // kalau nama file TIDAK punya titik sama sekali (umum utk foto kamera dari
+    // WebView), hasilnya adalah SELURUH nama file, bukan string kosong, jadi
+    // fallback `|| "jpg"` di baris lama tidak pernah kepakai. Sekarang dicek
+    // dulu apakah ada titiknya; kalau tidak ada, langsung anggap tanpa ekstensi.
+    const rawExt = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : "";
+    const ext = rawExt || "jpg";
     const contentType = resolveContentType(file.type, ext);
     if (!contentType)
         return NextResponse.json({ success: false, message: "Format file tidak didukung (JPG/PNG/WEBP)" }, { status: 400 });

@@ -39,18 +39,20 @@ export function StatPill({
 }: {
   label: string;
   count: number;
-  tone: "emerald" | "zinc" | "amber";
+    tone: "emerald" | "zinc" | "amber" | "red";
   icon?: React.ReactNode;
 }) {
   const dot: Record<string, string> = {
     emerald: "bg-emerald-400",
     zinc: "bg-zinc-400",
     amber: "bg-amber-400",
+    red: "bg-red-500",
   };
   const iconTone: Record<string, string> = {
     emerald: "text-emerald-300",
     zinc: "text-zinc-300",
     amber: "text-amber-300",
+    red: "text-red-400",
   };
   return (
     <span className="inline-flex items-center gap-1.5 bg-white/[0.06] border border-white/10 rounded-full pl-2 pr-3 py-1.5 text-[11px] font-semibold text-zinc-200 backdrop-blur-sm transition-colors hover:bg-white/10">
@@ -254,12 +256,12 @@ export function formatDateTime(iso: string | null | undefined): string {
 export function VehicleStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     TERSEDIA: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    DIPAKAI: "bg-zinc-100 text-zinc-600 border-zinc-200",
+    DIPAKAI: "bg-red-600 text-white border-red-600",
     MAINTENANCE: "bg-amber-50 text-amber-700 border-amber-100",
   };
   const dot: Record<string, string> = {
     TERSEDIA: "bg-emerald-500",
-    DIPAKAI: "bg-zinc-400",
+    DIPAKAI: "bg-white",
     MAINTENANCE: "bg-amber-500",
   };
   const label: Record<string, string> = { TERSEDIA: "Tersedia", DIPAKAI: "Dipakai", MAINTENANCE: "Maintenance" };
@@ -269,7 +271,7 @@ export function VehicleStatusBadge({ status }: { status: string }) {
         map[status] ?? "bg-gray-50 text-gray-600 border-gray-200"
       }`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${dot[status] ?? "bg-gray-400"}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${dot[status] ?? "bg-gray-400"} ${status === "DIPAKAI" ? "animate-pulse" : ""}`} />
       {label[status] ?? status}
     </span>
   );

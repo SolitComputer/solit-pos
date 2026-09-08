@@ -30,4 +30,5 @@ async function handler(req: NextRequest, props: Props, user: AuthUser) {
     }
 }
 
-export const GET = withAuth(handler, PERMISSIONS.RESTORE_TRANSACTION);
+const ALLOWED_ROLES = Array.from(new Set([...PERMISSIONS.EDIT_TRANSACTION, ...PERMISSIONS.RESTORE_TRANSACTION]));
+export const GET = withAuth(handler, ALLOWED_ROLES);

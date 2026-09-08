@@ -331,7 +331,35 @@ export const SALES_REPORT_ROLES: UserRole[] = [
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
   "PKL_SALES",
 ];
+// ── Marketing: boleh input leads channel FB/OLX/Carousel/Mitra/Reseller, dan
+// HANYA role-role ini (+ FULL_ACCESS) yang boleh melakukan audit laporan.
+export const SALES_REPORT_MARKETING_ROLES: UserRole[] = [
+  "KEPALA_MARKETING", "MARKETING", "PKL_MARKETING",
+];
+export const SALES_REPORT_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...SALES_REPORT_ROLES, ...SALES_REPORT_MARKETING_ROLES,
+]));
+export const SALES_REPORT_AUDIT_ROLES: UserRole[] = [
+  ...FULL_ACCESS, ...SALES_REPORT_MARKETING_ROLES,
+];
 export const SALES_REPORT_DELETE_ROLES: UserRole[] = [...FULL_ACCESS];
+
+// ─── Audit Marketing (Leads Sales per channel WA/FB/OLX/Carousell/Mitra/Reseller) ──
+// Sengaja reuse role list yang sama persis dengan SALES_REPORT_* di atas — tim
+// yang input & audit di kedua fitur ini orangnya sama, biar tidak dobel-maintain
+// 2 daftar role yang isinya identik.
+export const AUDIT_LEADS_INPUT_ROLES: UserRole[] = [...SALES_REPORT_ROLES];
+export const AUDIT_LEADS_AUDIT_ROLES: UserRole[] = [...SALES_REPORT_MARKETING_ROLES];
+export const AUDIT_LEADS_FULL_ACCESS_ROLES: UserRole[] = [...FULL_ACCESS];
+export const AUDIT_LEADS_VIEW_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...AUDIT_LEADS_INPUT_ROLES, ...AUDIT_LEADS_AUDIT_ROLES, ...AUDIT_LEADS_FULL_ACCESS_ROLES,
+]));
+// Dipakai di withAuth(handler, roles) untuk PATCH/DELETE — gerbang KASAR di
+// level route (siapa boleh sentuh endpoint sama sekali). Cek halus "pemilik
+// hari ini vs sudah diaudit" tetap dilakukan manual di dalam handler (findOwned()).
+export const AUDIT_LEADS_EDIT_ROLES: UserRole[] = Array.from(new Set<UserRole>([
+  ...AUDIT_LEADS_INPUT_ROLES, ...AUDIT_LEADS_FULL_ACCESS_ROLES,
+]));
 
 export const TODO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
 export const MONITORING_CEO_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER"];
@@ -566,8 +594,13 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/leads-chat": [...LEADS_CHAT_ROLES],
   "/api/leads-chat": [...LEADS_CHAT_ROLES],
 
-  "/dashboard/laporan-harian-sales": [...SALES_REPORT_ROLES],
-  "/api/sales-reports": [...SALES_REPORT_ROLES],
+      "/dashboard/laporan-harian-sales": [...SALES_REPORT_VIEW_ROLES],
+  "/api/sales-reports": [...SALES_REPORT_VIEW_ROLES],
+  "/api/sales-reports/audit": [...SALES_REPORT_AUDIT_ROLES],
+
+  "/dashboard/audit-leads": [...AUDIT_LEADS_VIEW_ROLES],
+  "/api/audit-leads": [...AUDIT_LEADS_VIEW_ROLES],
+  "/api/audit-leads/audit": [...AUDIT_LEADS_AUDIT_ROLES],
 
   "/dashboard/todos": [...TODO_ROLES],
   "/api/todos": [...TODO_ROLES],
@@ -842,7 +875,7 @@ export const DIVISION_MAP: Record<string, UserRole[]> = {
   ],
   KEPALA_SALES: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN"],
   KEPALA_ZENITH: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN", "PKL_ZENITH"],
-  KEPALA_MARKETING: ["KONTEN", "PKL_MARKETING", "PKL_KONTEN"],
+    KEPALA_MARKETING: ["MARKETING", "KONTEN", "PKL_MARKETING", "PKL_KONTEN"],
   KEPALA_ONPOINT: ["ONPOINT", "PKL_ONPOINT"],
   KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG"],
   KEPALA_SOTECH: ["SOTECH", "PKL_SOTECH"],
