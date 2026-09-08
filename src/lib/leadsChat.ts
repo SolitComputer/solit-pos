@@ -42,6 +42,36 @@ export async function findOrCreateConversation(params: {
   return created;
 }
 
+export async function findOrCreateFacebookConversation(params: {
+  facebookAccountId: string;
+  customerPsid: string;
+  customerName?: string | null;
+}) {
+  const { data: existing, error: findErr } = await supabaseAdmin
+    .from("chat_conversations")
+    .select("*")
+    .eq("facebook_account_id", params.facebookAccountId)
+    .eq("customer_identifier", params.customerPsid)
+    .maybeSingle();
+  if (findErr) throw findErr;
+  if (existing) return existing;
+
+  const { data: created, error: createErr } = await supabaseAdmin
+    .from("chat_conversations")
+    .insert({
+      channel_type: "FACEBOOK",
+      facebook_account_id: params.facebookAccountId,
+      customer_identifier: params.customerPsid,
+      customer_name: params.customerName ?? null,
+      is_group: false,
+      status: "OPEN",
+    })
+    .select("*")
+    .single();
+  if (createErr) throw createErr;
+  return created;
+}
+
 /** Kalau customer ganti nama profil WA-nya, ikutin di percakapan yang udah ada. */
 export async function refreshCustomerName(conversationId: string, newName?: string | null) {
   if (!newName) return;
@@ -66,6 +96,7 @@ export async function saveIncomingMessage(params: {
   mediaUrl?: string | null;
   mediaType?: string | null;
   fonnteMessageId?: string | null;
+  facebookMessageId?: string | null;
   fromMember?: string | null;
   fromMemberName?: string | null;
 }) {
@@ -76,6 +107,7 @@ export async function saveIncomingMessage(params: {
     media_url: params.mediaUrl ?? null,
     media_type: params.mediaType ?? null,
     fonnte_message_id: params.fonnteMessageId ?? null,
+    facebook_message_id: params.facebookMessageId ?? null,
     from_member: params.fromMember ?? null,
     from_member_name: params.fromMemberName ?? null,
   });
