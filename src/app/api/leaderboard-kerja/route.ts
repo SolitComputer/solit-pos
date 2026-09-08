@@ -25,6 +25,9 @@ const PROGRAMMER_USER_IDS = [
   "a106053f-8168-4574-9586-6049300bb614",
   "a136bb0a-d6de-4439-946c-c17a85b11a67",
 ];
+// HRD — Yoga Adi Prakoso. Role sistemnya ADMIN, disatukan ke Divisi HRD
+// lewat ID (pola sama dengan Rayhan Accounting & Programmer di atas).
+const YOGA_HRD_USER_ID = "GANTI_DENGAN_ID_YOGA";
 // Sales Online — role yang dapat poin dari Laporan Harian Sales (chat leads),
 // role-based (bukan per akun). Harus disamakan manual dengan
 // SALES_REPORT_ROLES di src/lib/permissions.ts.
@@ -89,7 +92,9 @@ export const GET = withAuth(async (req, _ctx, user) => {
       { data: todos },
       { data: todoItems },
       { data: missions },
-      { data: salesOnlineReports }
+      { data: salesOnlineReports },
+      { data: manualAttendanceEntries },
+      { data: overtimeAudits }
     ] = await Promise.all([
       // Sales Offline: transactions — kolom SEBELUMNYA salah nama
       // (created_by/invoice/total_amount TIDAK ADA di tabel ini; nama
@@ -195,7 +200,28 @@ export const GET = withAuth(async (req, _ctx, user) => {
         .from("sales_online_reports")
         .select("id, filled_by")
         .gte("created_at", startIso)
-        .lte("created_at", endIso)
+        .lte("created_at", endIso),
+
+      // HRD: absen manual yang diinput (PKL maupun karyawan tetap, tidak
+      // dibedakan) — 1 baris attendance_manual = 1 kali "Absenin manual",
+      // dihitung dari created_by (siapa yang input), BUKAN attendance_date
+      // (tanggal absen yang diinput bisa tanggal lampau).
+      supabaseAdmin
+        .from("attendance_manual")
+        .select("id, created_by, created_at")
+        .gte("created_at", startIso)
+        .lte("created_at", endIso),
+
+      // HRD: lemburan yang sudah diaudit (action AUDIT di PATCH
+      // /api/attendance/overtime) — dihitung dari audited_by & audited_at,
+      // mencakup keputusan APPROVE maupun REJECT (dua-duanya tetap kerja
+      // audit yang sama).
+      supabaseAdmin
+        .from("overtime_requests")
+        .select("id, audited_by, audited_at, audit_status")
+        .not("audited_by", "is", null)
+        .gte("audited_at", startIso)
+        .lte("audited_at", endIso)
     ]);
 
     // Programmer: peta jumlah sub-task per tugas — dipakai buat nentuin
@@ -408,6 +434,21 @@ export const GET = withAuth(async (req, _ctx, user) => {
       if (hasRole("PROGRAMMER") || PROGRAMMER_USER_IDS.includes(uid)) {
         score += uTodoUnits * 3;
         metrics.push({ label: "Tugas Selesai", value: uTodoUnits, unit: "item" });
+      }
+
+      // HRD — Yoga Adi Prakoso. Absen Manual = 1 poin per absen yang
+      // diinput (PKL/karyawan tetap tidak dibedakan). Audit Lemburan = 1
+      // poin per lemburan yang diaudit (approve/reject dihitung sama).
+      const uManualAttendance = (manualAttendanceEntries ?? []).filter(
+        (m: any) => m.created_by === uid
+      );
+      const uOvertimeAudits = (overtimeAudits ?? []).filter(
+        (o: any) => o.audited_by === uid
+      );
+      if (uid === YOGA_HRD_USER_ID) {
+        score += uManualAttendance.length * 1 + uOvertimeAudits.length * 1;
+        metrics.push({ label: "Absen Manual", value: uManualAttendance.length, unit: "absen" });
+        metrics.push({ label: "Audit Lemburan", value: uOvertimeAudits.length, unit: "lembur" });
       }
 
       // MISSIONS — DINONAKTIFKAN SEMENTARA (biar leaderboard "Pekerjaan" fokus Purchasing dulu).
