@@ -113,6 +113,7 @@ export default function EditTransactionPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const [formData, setFormData] = useState<Partial<Transaction>>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -130,8 +131,16 @@ export default function EditTransactionPage() {
 
   useEffect(() => {
     getAuthUser().then(u => ({ success: true, user: u }))
-      .then((r) => setUserRole(r.user?.role ?? null))
-      .catch(() => setUserRole(null));
+      .then((r) => {
+        const role = r.user?.role ?? null;
+        const roles: string[] = Array.isArray(r.user?.roles) && r.user.roles.length > 0 ? r.user.roles : role ? [role] : [];
+        setUserRole(role);
+        setUserRoles(roles);
+      })
+      .catch(() => {
+        setUserRole(null);
+        setUserRoles([]);
+      });
   }, []);
 
   useEffect(() => {
@@ -298,9 +307,9 @@ export default function EditTransactionPage() {
     }
   }
 
-  const canEdit = userRole
-    ? hasPermission(userRole, PERMISSIONS.EDIT_TRANSACTION)
-    : false;
+  const canEdit = (userRoles.length > 0 ? userRoles : userRole ? [userRole] : []).some(
+    (r) => hasPermission(r as UserRole, PERMISSIONS.EDIT_TRANSACTION)
+  );
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -1299,14 +1308,33 @@ export default function EditTransactionPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <Field label="Total Harga Deal (Rp)">
-                <input
-                  name="deal_price"
-                  type="text"
-                  value={fmt(dealPrice)}
-                  readOnly
-                  className={`${inputCls} bg-gray-50 text-gray-500 cursor-not-allowed shadow-none`}
-                  placeholder="Otomatis dari harga tiap unit"
-                />
+                {activeUnits.length <= 1 ? (
+                  <input
+                    name="deal_price"
+                    type="number"
+                    value={activeUnits.length === 1 ? (activeUnits[0]?.deal_price || "") : (formData.deal_price || "")}
+                    onChange={(e) => {
+                      const val = Number(e.target.value) || 0;
+                      if (activeUnits.length === 1) {
+                        handleUpdateDealPrice(0, val);
+                      } else {
+                        setFormData((prev) => ({ ...prev, deal_price: val, amount: val }));
+                        setHasChanges(true);
+                      }
+                    }}
+                    className={inputCls}
+                    placeholder="Masukkan harga deal"
+                  />
+                ) : (
+                  <input
+                    name="deal_price"
+                    type="text"
+                    value={fmt(dealPrice)}
+                    readOnly
+                    className={`${inputCls} bg-gray-50 text-gray-500 cursor-not-allowed shadow-none`}
+                    placeholder="Otomatis dari harga tiap unit"
+                  />
+                )}
               </Field>
               <Field label="Metode Pembayaran">
                 <select
