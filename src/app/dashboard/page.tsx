@@ -200,7 +200,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
             <span className="font-mono text-slate-400 text-[10px]">{item.invoice_number}</span>
           </p>
 
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             {item.sales_name && (
               <span className="text-[10px] text-slate-400 font-medium">
                 Sales: <strong className="text-slate-600 font-semibold">{item.sales_name}</strong>
