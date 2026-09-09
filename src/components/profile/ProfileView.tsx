@@ -20,6 +20,7 @@ import {
     Loader2, Pencil, Check, X, Music, Play, Pause,
     MessageCircle, Eye, CheckCircle2, AlertCircle, Sparkles,
     Zap, Truck, Package, ShoppingCart, Wrench, Video, Boxes, Megaphone, UserCheck,
+    Palette, ImageIcon,
 } from "lucide-react";
 
 interface ProfileData {
@@ -112,7 +113,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [providerBadge, setProviderBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [salesBadge, setSalesBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [teknisiBadge, setTeknisiBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
-       const [kontenBadge, setKontenBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+    const [kontenBadge, setKontenBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [auditMarketingBadge, setAuditMarketingBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -124,6 +125,10 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadingBanner, setUploadingBanner] = useState(false);
+    const [deletingBanner, setDeletingBanner] = useState(false);
+    const [confirmDeleteBanner, setConfirmDeleteBanner] = useState(false);
+    const [showBannerModal, setShowBannerModal] = useState(false);
+    const [showBannerActions, setShowBannerActions] = useState(false);
     const bannerInputRef = useRef<HTMLInputElement>(null);
     const [showPhotoModal, setShowPhotoModal] = useState(false);
     const [showPhotoActions, setShowPhotoActions] = useState(false);
@@ -169,6 +174,26 @@ export default function ProfileView({ userId }: { userId: string }) {
         window.addEventListener("solit:open-coins", openCoins);
         return () => window.removeEventListener("solit:open-coins", openCoins);
     }, [isSelf]);
+
+    // Sinkronisasi border & banner saat user mengganti / membeli dari Solit Coins Modal
+    useEffect(() => {
+        const handleBorderUpdate = () => {
+            fetch(`/api/profile?userId=${userId}`)
+                .then((r) => r.json())
+                .then((d) => {
+                    if (d.success && d.data) {
+                        setProfile((p) => p ? {
+                            ...p,
+                            equipped_border: d.data.equipped_border,
+                            equipped_banner: d.data.equipped_banner,
+                        } : p);
+                    }
+                })
+                .catch(() => {});
+        };
+        window.addEventListener("solit:border-updated", handleBorderUpdate);
+        return () => window.removeEventListener("solit:border-updated", handleBorderUpdate);
+    }, [userId]);
 
     const songPicker = useSongPicker(
         (song: SavedSong) => {
@@ -437,9 +462,15 @@ export default function ProfileView({ userId }: { userId: string }) {
         } else {
             setUploadingBanner(true);
             try {
-                const compressed = await imageCompression(croppedFile, { maxSizeMB: 1, maxWidthOrHeight: 1600, useWebWorker: true });
+                let fileToUpload: File = croppedFile;
+                try {
+                    const compressed = await imageCompression(croppedFile, { maxSizeMB: 1, maxWidthOrHeight: 1600, useWebWorker: true });
+                    fileToUpload = new File([compressed], fileName || "banner.jpg", { type: compressed.type || "image/jpeg" });
+                } catch {
+                    fileToUpload = croppedFile;
+                }
                 const form = new FormData();
-                form.append("file", compressed, compressed.name || "banner.jpg");
+                form.append("file", fileToUpload, fileToUpload.name || "banner.jpg");
                 form.append("type", "banner");
                 if (!isSelf) form.append("user_id", userId);
                 const res = await fetch("/api/profile/photo", { method: "POST", body: form });
@@ -455,6 +486,29 @@ export default function ProfileView({ userId }: { userId: string }) {
             } finally {
                 setUploadingBanner(false);
             }
+        }
+    };
+
+    const handleDeleteBanner = async () => {
+        setDeletingBanner(true);
+        try {
+            const res = await fetch("/api/profile/photo", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: userId, type: "banner" }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setProfile((p) => (p ? { ...p, banner_url: null } : p));
+                showToast("Foto banner berhasil dihapus", "ok");
+            } else {
+                showToast(data.message ?? "Gagal menghapus foto banner", "err");
+            }
+        } catch {
+            showToast("Terjadi kesalahan", "err");
+        } finally {
+            setDeletingBanner(false);
+            setConfirmDeleteBanner(false);
         }
     };
 
@@ -656,6 +710,27 @@ export default function ProfileView({ userId }: { userId: string }) {
                 </div>
             )}
 
+            {showBannerModal && profile.banner_url && (
+                <div className="fixed inset-0 z-[9998] flex items-center justify-center p-4" onClick={() => setShowBannerModal(false)}>
+                    <div className="absolute inset-0 bg-black/80" style={{ backdropFilter: "blur(4px)" }} />
+                    <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 flex items-center gap-2">
+                        {(isSelf || isAdmin) && (
+                            <button onClick={(e) => { e.stopPropagation(); setShowBannerModal(false); setConfirmDeleteBanner(true); }}
+                                title="Hapus foto banner"
+                                className="w-10 h-10 rounded-full bg-white/10 hover:bg-red-500/80 flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                                <Trash2 className="w-5 h-5 text-white" />
+                            </button>
+                        )}
+                        <button onClick={() => setShowBannerModal(false)}
+                            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                            <X className="w-5 h-5 text-white" />
+                        </button>
+                    </div>
+                    <img src={profile.banner_url} alt="Banner" onClick={(e) => e.stopPropagation()}
+                        className="relative max-w-full max-h-[85vh] rounded-2xl object-contain" />
+                </div>
+            )}
+
             {showPhotoActions && (
                 <div className="fixed inset-0 z-[9996] flex items-end sm:items-center justify-center" onClick={() => setShowPhotoActions(false)}>
                     <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(4px)" }} />
@@ -696,6 +771,88 @@ export default function ProfileView({ userId }: { userId: string }) {
                             className="w-full mt-1 py-3 rounded-2xl text-sm font-bold text-slate-500 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
                             Batal
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {showBannerActions && (
+                <div className="fixed inset-0 z-[9996] flex items-end sm:items-center justify-center" onClick={() => setShowBannerActions(false)}>
+                    <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(4px)" }} />
+                    <div className="relative w-full sm:w-80 bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-2 pb-6 sm:pb-2"
+                        onClick={(e) => e.stopPropagation()}>
+                        <div className="sm:hidden w-10 h-1 rounded-full bg-slate-200 mx-auto my-2" />
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400 px-4 pt-1 pb-2">Opsi Banner</p>
+
+                        {profile.banner_url && (
+                            <button onClick={() => { setShowBannerActions(false); setShowBannerModal(true); }}
+                                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-slate-50 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
+                                <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(99,102,241,0.10)", color: "#6366f1" }}>
+                                    <Eye className="w-4 h-4" />
+                                </span>
+                                <span className="text-sm font-semibold text-slate-700">Lihat Foto Banner</span>
+                            </button>
+                        )}
+
+                        <button onClick={() => { setShowBannerActions(false); bannerInputRef.current?.click(); }}
+                            className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-slate-50 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
+                            <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(99,102,241,0.10)", color: "#6366f1" }}>
+                                <Camera className="w-4 h-4" />
+                            </span>
+                            <span className="text-sm font-semibold text-slate-700">{profile.banner_url ? "Ganti Foto Banner" : "Upload Foto Banner"}</span>
+                        </button>
+
+                        {isSelf && (
+                            <button onClick={() => { setShowBannerActions(false); setShowCoins(true); }}
+                                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-slate-50 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-200">
+                                <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b" }}>
+                                    <Palette className="w-4 h-4" />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                    <span className="text-sm font-semibold text-slate-700 block">Bingkai Banner (Solit Coins)</span>
+                                    <span className="text-[11px] text-slate-400 block">Pilih animasi & efek banner</span>
+                                </div>
+                            </button>
+                        )}
+
+                        {profile.banner_url && (
+                            <button onClick={() => { setShowBannerActions(false); setConfirmDeleteBanner(true); }}
+                                className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-red-50 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200">
+                                <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#fff1f2", color: "#dc2626" }}>
+                                    <Trash2 className="w-4 h-4" />
+                                </span>
+                                <span className="text-sm font-semibold text-red-600">Hapus Foto Banner</span>
+                            </button>
+                        )}
+
+                        <button onClick={() => setShowBannerActions(false)}
+                            className="w-full mt-1 py-3 rounded-2xl text-sm font-bold text-slate-500 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
+                            Batal
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {confirmDeleteBanner && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => setConfirmDeleteBanner(false)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 lg:p-8">
+                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "#fff1f2", border: "1px solid #fecaca" }}>
+                            <Trash2 className="w-8 h-8" style={{ color: "#dc2626" }} />
+                        </div>
+                        <h3 className="font-black text-slate-800 text-center text-base mb-1">Hapus Banner Foto?</h3>
+                        <p className="text-sm text-slate-400 text-center mb-6">Banner foto akan dihapus dan kembali ke tampilan default.</p>
+                        <div className="flex gap-2.5">
+                            <button onClick={() => setConfirmDeleteBanner(false)} disabled={deletingBanner}
+                                className="flex-1 h-10 rounded-xl text-sm font-semibold disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                                style={{ background: "#f1f5f9", color: "#64748b" }}>
+                                Batal
+                            </button>
+                            <button onClick={handleDeleteBanner} disabled={deletingBanner}
+                                className="flex-1 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                                style={{ background: "linear-gradient(135deg, #dc2626, #991b1b)" }}>
+                                {deletingBanner ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" /> Ya, Hapus</>}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -795,12 +952,12 @@ export default function ProfileView({ userId }: { userId: string }) {
                         <SolitBanner style={profile.equipped_banner.style} thickness={3} className="absolute inset-0 z-10" />
                     )}
 
-                    {/* Ganti Banner Action Pill (Digeser agar tidak menabrak ornamen sudut kanan-bawah) */}
+                    {/* Ganti Banner Action Pill */}
                     {(isSelf || isAdmin) && (
-                        <button onClick={() => bannerInputRef.current?.click()} disabled={uploadingBanner} title="Ganti banner"
-                            className="absolute z-20 bottom-3 right-14 sm:bottom-3.5 sm:right-16 h-8 px-3 sm:h-9 sm:px-3.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-semibold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                        <button onClick={() => setShowBannerActions(true)} disabled={uploadingBanner} title="Opsi banner"
+                            className="absolute z-30 top-3 right-3 sm:top-3.5 sm:right-3.5 h-8 px-3 sm:h-9 sm:px-3.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-semibold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
                             {uploadingBanner ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-                            <span className="hidden sm:inline text-[11.5px]">Ganti Banner</span>
+                            <span className="text-[11.5px] font-semibold">Ganti Banner</span>
                         </button>
                     )}
                     <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBannerFileSelected} />
