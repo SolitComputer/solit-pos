@@ -386,10 +386,61 @@ function MessageBubble({ m, isOpen, onToggleMenu, onCopy, onDelete, onCopyToInpu
   );
 }
 
+function ImportFacebookTokenModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [label, setLabel] = useState("");
+  const [pageId, setPageId] = useState("");
+  const [token, setToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
+
+  const submit = async () => {
+    if (!label.trim() || !pageId.trim() || !token.trim()) { setError("Semua field wajib diisi"); return; }
+    setSaving(true); setError(""); setWarning("");
+    try {
+      const res = await fetch("/api/leads-chat/facebook-accounts/import", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label, pageId, pageAccessToken: token }),
+      });
+      const data = await res.json();
+      if (!data.success) { setError(data.message ?? "Gagal import"); return; }
+      if (data.subscribeWarning) { setWarning(data.subscribeWarning); onImported(); return; }
+      onImported(); onClose();
+    } catch { setError("Terjadi kesalahan jaringan"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X className="w-4 h-4" /></button>
+        <h3 className="font-black text-lg text-[#1a1a2e] mb-1">Sambungkan Page Pakai Token</h3>
+        <p className="text-[11px] text-gray-400 mb-4">Generate Page Access Token dari Graph API Explorer, lalu paste di sini.</p>
+        <div className="space-y-3">
+          {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
+          {warning && <p className="text-xs text-amber-600 font-semibold">Tersimpan, tapi: {warning}</p>}
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, mis. Solit Computer FB"
+            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
+          <input value={pageId} onChange={(e) => setPageId(e.target.value)} placeholder="Page ID"
+            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm font-mono" />
+          <textarea value={token} onChange={(e) => setToken(e.target.value)} placeholder="Page Access Token"
+            className="w-full h-24 rounded-xl border border-gray-200 px-3.5 py-2 text-sm font-mono resize-none" />
+          <button onClick={submit} disabled={saving}
+            className="w-full h-11 rounded-xl bg-[#1a1a2e] text-white font-bold text-sm disabled:opacity-50">
+            {saving ? "Menyambungkan..." : "Sambungkan Page"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FacebookPanel({ onClose }: { onClose: () => void }) {
   const [accounts, setAccounts] = useState<FacebookAccount[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<FacebookAccount | null>(null);
   const [deleteError, setDeleteError] = useState("");
+  const [showImport, setShowImport] = useState(false);
 
   const fetchAccounts = useCallback(async () => {
     const res = await fetch("/api/leads-chat/facebook-accounts");
@@ -418,9 +469,13 @@ function FacebookPanel({ onClose }: { onClose: () => void }) {
           <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
         </div>
         <a href="/api/leads-chat/facebook-accounts/connect"
-          className="w-full h-10 rounded-xl bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center gap-1.5 mb-4">
+          className="w-full h-10 rounded-xl bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center gap-1.5 mb-1">
           <FacebookIcon className="w-3.5 h-3.5" /> Connect with Facebook
         </a>
+        <button onClick={() => setShowImport(true)}
+          className="w-full text-center text-[11px] font-semibold text-violet-600 hover:underline mb-4">
+          Atau sambungkan Page pakai Token →
+        </button>
         <div className="space-y-2">
           {accounts.map((acc) => (
             <div key={acc.id} className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-gray-100">
@@ -438,6 +493,7 @@ function FacebookPanel({ onClose }: { onClose: () => void }) {
           ))}
           {accounts.length === 0 && <p className="text-xs text-gray-400 text-center py-6">Belum ada Page tersambung</p>}
         </div>
+        {showImport && <ImportFacebookTokenModal onClose={() => setShowImport(false)} onImported={fetchAccounts} />}
         {confirmDelete && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmDelete(null)} />
