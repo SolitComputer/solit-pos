@@ -10,20 +10,8 @@ import BannerShop from "@/components/solit-coins/BannerShop";
 
 type Tab = "misi" | "border" | "banner";
 
-export default function SolitCoinsModal({
-  open,
-  onClose,
-  initialTab = "misi",
-}: { open: boolean; onClose: () => void; initialTab?: Tab }) {
-  const [tab, setTab] = useState<Tab>(initialTab);
-
-  // Reset tab setiap kali modal dibuka. Wajib, karena komponen ini TIDAK
-  // unmount saat ditutup (cuma `if (!open) return null` di bawah), jadi
-  // initializer useState hanya jalan sekali di mount pertama.
-  useEffect(() => {
-    if (open) setTab(initialTab);
-  }, [open, initialTab]);
-  
+export default function SolitCoinsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [tab, setTab] = useState<Tab>("misi");
   const [balance, setBalance] = useState<number | null>(null);
   const [unlimited, setUnlimited] = useState(false);
 

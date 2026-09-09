@@ -151,7 +151,6 @@ export default function ProfileView({ userId }: { userId: string }) {
     } | null>(null);
     const [showContractModal, setShowContractModal] = useState(false);
     const [showCoins, setShowCoins] = useState(false);
-    const [coinsTab, setCoinsTab] = useState<"misi" | "border" | "banner">("misi");
 
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
@@ -769,15 +768,14 @@ export default function ProfileView({ userId }: { userId: string }) {
                 />
             )}
 
-            {isSelf && <SolitCoinsModal key={coinsTab} open={showCoins} initialTab={coinsTab} onClose={() => setShowCoins(false)} />}
-
+            {isSelf && <SolitCoinsModal open={showCoins} onClose={() => setShowCoins(false)} />}
             {showContractModal && contractInfo && (
                 <ContractInfoModal
                     contract={contractInfo}
                     userName={profile.name}
                     onClose={() => setShowContractModal(false)}
                 />
-            )}
+            )}  
 
             <div className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xl shadow-slate-200/40 relative z-0">
                 {/* ── BANNER HERO ── */}
@@ -799,14 +797,14 @@ export default function ProfileView({ userId }: { userId: string }) {
                     )}
 
                     {/* Ganti Banner Action Pill (Digeser agar tidak menabrak ornamen sudut kanan-bawah) */}
-                    {(isSelf || isAdmin) && (
-                                                <button onClick={() => { if (!isSelf) { bannerInputRef.current?.click(); return; } setCoinsTab("banner"); setShowCoins(true); }} disabled={uploadingBanner} title="Ganti banner"
-                            className="absolute z-40 bottom-3 right-14 sm:bottom-3.5 sm:right-16 h-8 px-3 sm:h-9 sm:px-3.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-semibold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                     {(isSelf || isAdmin) && (
+                        <label title="Ganti banner"
+                            className={`absolute z-40 bottom-3 right-14 sm:bottom-3.5 sm:right-16 h-8 px-3 sm:h-9 sm:px-3.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-semibold transition-all shadow-lg hover:scale-105 active:scale-95 focus-within:ring-2 focus-within:ring-white/60 ${uploadingBanner ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}>
                             {uploadingBanner ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
                             <span className="hidden sm:inline text-[11.5px]">Ganti Banner</span>
-                        </button>
+                            <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBannerFileSelected} disabled={uploadingBanner} />
+                        </label>
                     )}
-                    <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBannerFileSelected} />
                 </div>
 
                 {/* ── CARD CONTENT BODY ── */}
@@ -1010,7 +1008,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                     {/* ── SOLIT COINS SHOWCASE ── */}
                     {isSelf && (
                         <div className="mt-5">
-                        <SolitCoinsWidget onOpen={() => { setCoinsTab("misi"); setShowCoins(true); }} />
+                        <SolitCoinsWidget onOpen={() => setShowCoins(true)} />
                         </div>
                     )}
 
