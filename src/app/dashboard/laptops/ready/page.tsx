@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
-import { Laptop, CheckCircle2, Lock, Trophy, ThumbsUp, AlertTriangle, Camera, Wrench } from "lucide-react";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import { compressImage } from "@/lib/imageCompression";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface LaptopUnit {
@@ -1089,19 +1089,27 @@ function ConfirmPaymentModal({ unit, onClose, onSuccess }: {
     }, [onClose]);
 
     const handleProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const rawFile = e.target.files?.[0];
+        if (!rawFile) return;
         setUploadingProof(true);
+        setError("");
         try {
+            const file = await compressImage(rawFile, { maxSizeMB: 1, maxWidthOrHeight: 1600 });
             const formData = new FormData();
             formData.append("file", file);
             formData.append("invoice", unit.reserved_invoice || "proof");
             const res = await fetch("/api/receipt/upload-image", { method: "POST", body: formData });
             const result = await res.json();
-            if (result.url) setPaymentProof(result.url);
-            else throw new Error("URL tidak ditemukan");
-        } catch { setError("Gagal upload foto"); }
-        finally { setUploadingProof(false); }
+            if (res.ok && result.url) {
+                setPaymentProof(result.url);
+            } else {
+                setError(result.error || result.message || "Gagal upload foto");
+            }
+        } catch (err: any) {
+            setError(err?.message || "Gagal upload foto");
+        } finally {
+            setUploadingProof(false);
+        }
     };
 
     const handleConfirm = async () => {
