@@ -151,6 +151,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     } | null>(null);
     const [showContractModal, setShowContractModal] = useState(false);
     const [showCoins, setShowCoins] = useState(false);
+    const [coinsTab, setCoinsTab] = useState<"misi" | "border" | "banner">("misi");
 
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
@@ -768,6 +769,8 @@ export default function ProfileView({ userId }: { userId: string }) {
                 />
             )}
 
+            {isSelf && <SolitCoinsModal key={coinsTab} open={showCoins} initialTab={coinsTab} onClose={() => setShowCoins(false)} />}
+
             {showContractModal && contractInfo && (
                 <ContractInfoModal
                     contract={contractInfo}
@@ -776,7 +779,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 />
             )}
 
-            <div className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xl shadow-slate-200/40 relative">
+            <div className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xl shadow-slate-200/40 relative z-0">
                 {/* ── BANNER HERO ── */}
                 <div className="relative h-36 sm:h-48 lg:h-60 overflow-hidden rounded-t-3xl"
                     style={{
@@ -792,13 +795,13 @@ export default function ProfileView({ userId }: { userId: string }) {
 
                     {/* Cosmetic Banner Frame (4 sisi lengkap dengan laser beam mengalir + 4 ornamen sudut) */}
                     {profile.equipped_banner && (
-                        <SolitBanner style={profile.equipped_banner.style} thickness={3} className="absolute inset-0 z-10" />
+                        <SolitBanner style={profile.equipped_banner.style} thickness={3} className="absolute inset-0 z-10 pointer-events-none" />
                     )}
 
                     {/* Ganti Banner Action Pill (Digeser agar tidak menabrak ornamen sudut kanan-bawah) */}
                     {(isSelf || isAdmin) && (
-                        <button onClick={() => bannerInputRef.current?.click()} disabled={uploadingBanner} title="Ganti banner"
-                            className="absolute z-20 bottom-3 right-14 sm:bottom-3.5 sm:right-16 h-8 px-3 sm:h-9 sm:px-3.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-semibold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+                                                <button onClick={() => { if (!isSelf) { bannerInputRef.current?.click(); return; } setCoinsTab("banner"); setShowCoins(true); }} disabled={uploadingBanner} title="Ganti banner"
+                            className="absolute z-40 bottom-3 right-14 sm:bottom-3.5 sm:right-16 h-8 px-3 sm:h-9 sm:px-3.5 rounded-xl bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-semibold transition-all shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
                             {uploadingBanner ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
                             <span className="hidden sm:inline text-[11.5px]">Ganti Banner</span>
                         </button>
@@ -1007,10 +1010,9 @@ export default function ProfileView({ userId }: { userId: string }) {
                     {/* ── SOLIT COINS SHOWCASE ── */}
                     {isSelf && (
                         <div className="mt-5">
-                            <SolitCoinsWidget onOpen={() => setShowCoins(true)} />
+                        <SolitCoinsWidget onOpen={() => { setCoinsTab("misi"); setShowCoins(true); }} />
                         </div>
                     )}
-                    {isSelf && <SolitCoinsModal open={showCoins} onClose={() => setShowCoins(false)} />}
 
                     {/* ── STATUS NOTE BAR (Inline Editor & Quick Add) ── */}
                     <div className="mt-3">
