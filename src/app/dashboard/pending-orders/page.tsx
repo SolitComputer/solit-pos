@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { UserRole, hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { CreditCard, Package, AlertTriangle, CheckCircle2, Clock, Search, PartyPopper, Inbox, RefreshCw, Ban, Wallet, Receipt, Download, Pencil, ExternalLink } from "lucide-react";
 import { getAuthUser } from "@/hooks/useAuthUser";
+import { compressImage } from "@/lib/imageCompression";
 
 interface PendingTransaction {
     id: string;
@@ -246,19 +247,27 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     }, [onClose]);
 
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const rawFile = e.target.files?.[0];
+        if (!rawFile) return;
         setUploadingPhoto(true);
+        setError("");
         try {
+            const file = await compressImage(rawFile, { maxSizeMB: 1, maxWidthOrHeight: 1600 });
             const fd = new FormData();
             fd.append("file", file);
             fd.append("invoice", tx.invoice_number);
             const res = await fetch("/api/receipt/upload-image", { method: "POST", body: fd });
             const r = await res.json();
-            if (r.url) setPaymentPhoto(r.url);
-            else throw new Error();
-        } catch { setError("Gagal mengupload foto bukti"); }
-        finally { setUploadingPhoto(false); }
+            if (res.ok && r.url) {
+                setPaymentPhoto(r.url);
+            } else {
+                setError(r.error || r.message || "Gagal mengupload foto bukti");
+            }
+        } catch (err: any) {
+            setError(err?.message || "Gagal mengupload foto bukti");
+        } finally {
+            setUploadingPhoto(false);
+        }
     };
 
     const handleConfirm = async () => {
