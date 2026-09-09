@@ -200,7 +200,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
             <span className="font-mono text-slate-400 text-[10px]">{item.invoice_number}</span>
           </p>
 
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             {item.sales_name && (
               <span className="text-[10px] text-slate-400 font-medium">
                 Sales: <strong className="text-slate-600 font-semibold">{item.sales_name}</strong>
@@ -818,7 +818,10 @@ export default function Page() {
               </div>
 
               {/* Donut Chart Container */}
-              <div className="relative my-4 h-44 flex items-center justify-center">
+              <div
+                className="relative my-4 h-44 flex items-center justify-center"
+                onMouseLeave={() => setIsDonutHovered(false)}
+              >
                 {isLoading ? (
                   <Shimmer className="w-36 h-36 rounded-full" />
                 ) : (

@@ -17,6 +17,10 @@ const PROGRAMMER_USER_IDS = [
   "a106053f-8168-4574-9586-6049300bb614",
   "a136bb0a-d6de-4439-946c-c17a85b11a67",
 ];
+// HRD — Yoga Adi Prakoso. Role sistemnya ADMIN, disatukan ke Divisi HRD
+// lewat ID. HARUS SAMA PERSIS dengan YOGA_HRD_USER_ID di
+// api/leaderboard-kerja/route.ts & dashboard/missions/leaderboard/page.tsx.
+const YOGA_HRD_USER_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
 // Sales Online — role yang dapat poin dari Laporan Harian Sales (chat leads),
 // role-based (bukan per akun). Harus disamakan manual dengan
 // SALES_REPORT_ROLES di src/lib/permissions.ts.
@@ -66,7 +70,9 @@ export async function computeKerjaScores(startDate: Date, endDate: Date): Promis
     { data: todos },
     { data: todoItems },
     { data: missions },
-    { data: salesOnlineReports }
+    { data: salesOnlineReports },
+    { data: manualAttendanceEntries },
+    { data: overtimeAudits }
   ] = await Promise.all([
     supabaseAdmin
       .from("transactions")
@@ -147,7 +153,20 @@ export async function computeKerjaScores(startDate: Date, endDate: Date): Promis
       .from("sales_online_reports")
       .select("id, filled_by")
       .gte("created_at", startIso)
-      .lte("created_at", endIso)
+      .lte("created_at", endIso),
+
+    supabaseAdmin
+      .from("attendance_manual")
+      .select("id, created_by, created_at")
+      .gte("created_at", startIso)
+      .lte("created_at", endIso),
+
+    supabaseAdmin
+      .from("overtime_requests")
+      .select("id, audited_by, audited_at, audit_status")
+      .not("audited_by", "is", null)
+      .gte("audited_at", startIso)
+      .lte("audited_at", endIso)
   ]);
 
   const itemCountByTodoId = new Map<string, number>();
@@ -293,6 +312,18 @@ export async function computeKerjaScores(startDate: Date, endDate: Date): Promis
     if (hasRole("PROGRAMMER") || PROGRAMMER_USER_IDS.includes(uid)) {
       score += uTodoUnits * 3;
       metrics.push({ label: "Tugas Selesai", value: uTodoUnits, unit: "item" });
+    }
+
+    const uManualAttendance = (manualAttendanceEntries ?? []).filter(
+      (m: any) => m.created_by === uid
+    );
+    const uOvertimeAudits = (overtimeAudits ?? []).filter(
+      (o: any) => o.audited_by === uid
+    );
+    if (uid === YOGA_HRD_USER_ID) {
+      score += uManualAttendance.length * 1 + uOvertimeAudits.length * 1;
+      metrics.push({ label: "Absen Manual", value: uManualAttendance.length, unit: "absen" });
+      metrics.push({ label: "Audit Lemburan", value: uOvertimeAudits.length, unit: "lembur" });
     }
 
     return {

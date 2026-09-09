@@ -1,7 +1,7 @@
 "use client";
 // src/components/akutansi/BukuBesar.tsx
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ACCOUNTS, ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER } from "@/lib/accounting";
 import { Lock, Pencil, BookOpen, Check, X, AlertTriangle, DollarSign, Search } from "lucide-react";
 
@@ -91,7 +91,10 @@ export default function BukuBesar({ period }: { period: string }) {
     const [data, setData] = useState<LedgerData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [showOpeningModal, setShowOpeningModal] = useState(false);
+      const [showOpeningModal, setShowOpeningModal] = useState(false);
+    // (fix) baris id yang lagi proses centang (PATCH belum selesai) — dipakai load()
+    // supaya auto-refresh nggak nimpa optimistic update yang belum ke-confirm server.
+    const pendingChecksRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         fetch("/api/akutansi/accounts")
@@ -115,7 +118,21 @@ export default function BukuBesar({ period }: { period: string }) {
                 }
                 return;
             }
-            setData(json.data);
+                        setData((prev) => {
+                // (fix) kalau ada centang yang masih pending, pertahankan nilai checked
+                // lokal untuk baris itu — jangan biarkan snapshot GET yang datang telat
+                // (diambil sebelum PATCH commit) menimpa balik jadi unchecked.
+                if (pendingChecksRef.current.size === 0 || !prev) return json.data;
+                const prevById = new Map(prev.lines.map((l) => [l.id, l]));
+                const mergedLines = json.data.lines.map((l: LedgerLine) => {
+                    if (!pendingChecksRef.current.has(l.id)) return l;
+                    const local = prevById.get(l.id);
+                    return local
+                        ? { ...l, checked: local.checked, checked_at: local.checked_at, checked_by_name: local.checked_by_name }
+                        : l;
+                });
+                return { ...json.data, lines: mergedLines };
+            });
         } catch {
             if (!silent) {
                 setError("Koneksi bermasalah");
@@ -129,7 +146,8 @@ export default function BukuBesar({ period }: { period: string }) {
     // Toggle status "sudah dicek" per baris jurnal.
     // Optimistic update dulu (UI langsung berubah), lalu simpan ke server;
     // kalau gagal, rollback ke nilai sebelumnya supaya tidak beda dengan DB.
-    const toggleChecked = useCallback(async (lineId: string, next: boolean) => {
+       const toggleChecked = useCallback(async (lineId: string, next: boolean) => {
+        pendingChecksRef.current.add(lineId);
         setData((prev) =>
             prev
                 ? {
@@ -164,7 +182,7 @@ export default function BukuBesar({ period }: { period: string }) {
                         : prev
                 );
             }
-        } catch {
+               } catch {
             setData((prev) =>
                 prev
                     ? {
@@ -175,6 +193,8 @@ export default function BukuBesar({ period }: { period: string }) {
                     }
                     : prev
             );
+        } finally {
+            pendingChecksRef.current.delete(lineId);
         }
     }, []);
 
