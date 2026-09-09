@@ -15,8 +15,10 @@ const supabaseAdmin = createClient(
 const supabase = supabaseAdmin;
 
 // ── Kolom yang diambil dari DB ────────────────────────────────────────────────
+// is_active WAJIB ikut di-select — tanpa ini user.is_active selalu undefined
+// dan gate akun nonaktif di bawah tidak akan pernah jalan.
 const USER_SELECT_FIELDS =
-    "id, name, phone_number, email, role, roles, shift, password, password_set, face_embedding";
+    "id, name, phone_number, email, role, roles, shift, password, password_set, face_embedding, is_active";
 
 function parseDevice(ua: string): string {
     if (!ua) return "Unknown Device";
@@ -209,6 +211,22 @@ export async function POST(request: Request) {
                         : "Email tidak ditemukan",
                 },
                 { status: 400 }
+            );
+        }
+
+        // ── Gate akun nonaktif ────────────────────────────────────────────────────
+        // Dicek SEBELUM password_set & verifikasi password, supaya akun yang
+        // dimatikan admin tidak bisa masuk lewat jalur manapun (termasuk alur
+        // "set password pertama kali"). Sengaja TIDAK dicatat sebagai FAILED,
+        // karena ini bukan percobaan tebak password — biar tidak ikut memicu
+        // lockout 15 menit.
+        if (user.is_active === false) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: "Akun Anda dinonaktifkan. Hubungi admin untuk mengaktifkan kembali.",
+                },
+                { status: 403 }
             );
         }
 
