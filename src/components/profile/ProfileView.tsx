@@ -156,6 +156,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     } | null>(null);
     const [showContractModal, setShowContractModal] = useState(false);
     const [showCoins, setShowCoins] = useState(false);
+    const [coinsTab, setCoinsTab] = useState<"misi" | "border" | "banner">("misi");
 
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
@@ -925,6 +926,8 @@ export default function ProfileView({ userId }: { userId: string }) {
                 />
             )}
 
+            {isSelf && <SolitCoinsModal key={coinsTab} open={showCoins} initialTab={coinsTab} onClose={() => setShowCoins(false)} />}
+
             {showContractModal && contractInfo && (
                 <ContractInfoModal
                     contract={contractInfo}
@@ -933,7 +936,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 />
             )}
 
-            <div className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xl shadow-slate-200/40 relative">
+            <div className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xl shadow-slate-200/40 relative z-0">
                 {/* ── BANNER HERO ── */}
                 <div className="relative h-36 sm:h-48 lg:h-60 overflow-hidden rounded-t-3xl"
                     style={{
@@ -949,7 +952,7 @@ export default function ProfileView({ userId }: { userId: string }) {
 
                     {/* Cosmetic Banner Frame (4 sisi lengkap dengan laser beam mengalir + 4 ornamen sudut) */}
                     {profile.equipped_banner && (
-                        <SolitBanner style={profile.equipped_banner.style} thickness={3} className="absolute inset-0 z-10" />
+                        <SolitBanner style={profile.equipped_banner.style} thickness={3} className="absolute inset-0 z-10 pointer-events-none" />
                     )}
 
                     {/* Ganti Banner Action Pill */}
@@ -1164,10 +1167,9 @@ export default function ProfileView({ userId }: { userId: string }) {
                     {/* ── SOLIT COINS SHOWCASE ── */}
                     {isSelf && (
                         <div className="mt-5">
-                            <SolitCoinsWidget onOpen={() => setShowCoins(true)} />
+                        <SolitCoinsWidget onOpen={() => { setCoinsTab("misi"); setShowCoins(true); }} />
                         </div>
                     )}
-                    {isSelf && <SolitCoinsModal open={showCoins} onClose={() => setShowCoins(false)} />}
 
                     {/* ── STATUS NOTE BAR (Inline Editor & Quick Add) ── */}
                     <div className="mt-3">

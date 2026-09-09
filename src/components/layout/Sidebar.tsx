@@ -1063,7 +1063,7 @@ function RoleBadges({ user }: { user: any }) {
       {roles.map((role) => {
         const meta = ROLE_META[role as UserRole];
         return (
-          <span key={role} className={`inline-block text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-slate-50 text-slate-700"}`}>
+          <span key={role} className={`inline-block max-w-full truncate text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-slate-50 text-slate-700"}`}>
             {meta?.label ?? role}
           </span>
         );
@@ -1223,7 +1223,7 @@ function SidebarContent({
             })()}
           </Link>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Link href="/dashboard/profile" className="flex items-center gap-3 group/profile min-w-0 flex-1" title="Profil saya">
               {(() => {
                 const avatar = (
@@ -1242,7 +1242,7 @@ function SidebarContent({
                 <RoleBadges user={user} />
               </div>
             </Link>
-            <CoinBalanceChip className="flex-shrink-0" />
+            <CoinBalanceChip className="flex-shrink-0 ml-auto" />
           </div>
         )}      </div>
 

@@ -16,7 +16,7 @@ import {
   Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
   Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
   ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint, FileText,
-  Mars, Venus, Plus,
+  Mars, Venus, Plus, UserX, UserCheck,
 } from "lucide-react";
 
 interface User {
@@ -43,6 +43,8 @@ interface User {
   song_artwork_url: string | null;
   contract_status?: string | null;
   contract_valid_until?: string | null;
+  is_active: boolean;
+  deactivated_at?: string | null;
 }
 
 interface CustomRoleRow {
@@ -638,6 +640,12 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
           </div>
         )}
+        {user.is_active === false && (
+          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
+            style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", color: "#475569" }}>
+            <UserX className="w-3.5 h-3.5 flex-shrink-0" /> Akun ini sedang nonaktif — user tidak bisa login.
+          </div>
+        )}
         <Field label="Nama"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
         <Field label="Tanggal Lahir">
           <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
@@ -833,6 +841,65 @@ function ConfirmResetBiometricModal({ user, onClose, onConfirm, loading }: {
   );
 }
 
+// ── ConfirmToggleActiveModal ──────────────────────────────────────────────────
+// Satu modal untuk dua arah aksi (nonaktifkan / aktifkan kembali) — isi teks,
+// warna, dan ikonnya menyesuaikan status akun saat ini.
+function ConfirmToggleActiveModal({ user, onClose, onConfirm, loading }: {
+  user: User; onClose: () => void; onConfirm: () => void; loading: boolean;
+}) {
+  const isDeactivating = user.is_active !== false;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-7 animate-scaleIn"
+        style={{ boxShadow: "0 32px 64px rgba(0,0,0,0.15)" }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={isDeactivating
+            ? { background: "#f8fafc", border: "1px solid #cbd5e1" }
+            : { background: "#ecfdf5", border: "1px solid #a7f3d0" }}>
+          {isDeactivating
+            ? <UserX className="w-8 h-8" style={{ color: "#475569" }} />
+            : <UserCheck className="w-8 h-8" style={{ color: "#059669" }} />}
+        </div>
+        <h3 className="font-black text-slate-800 text-center text-base mb-1">
+          {isDeactivating ? `Nonaktifkan Akun ${user.name}?` : `Aktifkan Kembali ${user.name}?`}
+        </h3>
+        <p className="text-sm text-slate-400 text-center mb-2 leading-relaxed">
+          {isDeactivating
+            ? "User tidak bisa login lagi dan session aktifnya langsung diakhiri. Data & riwayatnya tetap tersimpan."
+            : "User bisa login kembali seperti biasa dengan password lamanya."}
+        </p>
+        <div className="px-3 py-2 rounded-xl mb-5 text-center text-xs font-semibold flex items-center justify-center gap-1.5"
+          style={isDeactivating
+            ? { background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }
+            : { background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0" }}>
+          <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" />
+          {isDeactivating ? "Bisa diaktifkan lagi kapan saja — bukan hapus akun" : "Status akun kembali normal"}
+        </div>
+        <div className="flex gap-2.5">
+          <button onClick={onClose} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-semibold disabled:opacity-50 transition-all hover:bg-slate-100"
+            style={{ background: "#f1f5f9", color: "#64748b" }}>
+            Batal
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 h-11 sm:h-10 rounded-full text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95"
+            style={isDeactivating
+              ? { background: "linear-gradient(135deg, #64748b, #334155)", boxShadow: "0 4px 14px rgba(51,65,85,0.3)" }
+              : { background: "linear-gradient(135deg, #10b981, #059669)", boxShadow: "0 4px 14px rgba(16,185,129,0.3)" }}>
+            {loading
+              ? <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
+              : isDeactivating
+                ? <><UserX className="w-4 h-4" /> Ya, Nonaktifkan</>
+                : <><UserCheck className="w-4 h-4" /> Ya, Aktifkan</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ActionBtn ─────────────────────────────────────────────────────────────────
 function ActionBtn({ onClick, title, bg, color, children }: {
   onClick: () => void; title: string; bg: string; color: string; children: React.ReactNode;
@@ -887,6 +954,8 @@ export default function UsersPage() {
   const [togglingBiometric, setTogglingBiometric] = useState<string | null>(null);
   const [confirmResetBiometricUser, setConfirmResetBiometricUser] = useState<User | null>(null);
   const [resettingBiometric, setResettingBiometric] = useState(false);
+  const [confirmToggleActiveUser, setConfirmToggleActiveUser] = useState<User | null>(null);
+  const [togglingActive, setTogglingActive] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRoleManager, setIsRoleManager] = useState(false);
   const [mainTab, setMainTab] = useState<"users" | "roles">("users");
@@ -1060,6 +1129,24 @@ export default function UsersPage() {
     finally { setResettingBiometric(false); setConfirmResetBiometricUser(null); }
   };
 
+  const handleToggleActive = async () => {
+    if (!confirmToggleActiveUser) return;
+    // Target status = kebalikan dari status sekarang
+    const nextActive = confirmToggleActiveUser.is_active === false;
+    setTogglingActive(true);
+    try {
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: confirmToggleActiveUser.id, _toggleActive: nextActive }),
+      });
+      const data = await res.json();
+      if (data.success) { showToast(data.message ?? "Status akun diperbarui", "ok"); fetchUsers(); }
+      else showToast(data.message ?? "Gagal memperbarui status akun", "err");
+    } catch { showToast("Terjadi kesalahan", "err"); }
+    finally { setTogglingActive(false); setConfirmToggleActiveUser(null); }
+  };
+
   const filtered = useMemo(() => {
     let result = users.filter(u => {
       const matchSearch = !search
@@ -1096,6 +1183,7 @@ export default function UsersPage() {
   const enrolled = users.filter(u => u.face_embedding).length;
   const pwNotSet = users.filter(u => !u.password_set).length;
   const fullAccess = users.filter(u => FULL_ACCESS_ROLES.has(u.role)).length;
+  const inactiveCount = users.filter(u => u.is_active === false).length;
   const totalKaryawan = users.filter(u => !isPKLRole(u.role)).length;
   const totalPKL = users.filter(u => isPKLRole(u.role)).length;
   const showOnlinePanel = isAdmin || isKepala;
@@ -1141,6 +1229,14 @@ export default function UsersPage() {
       )}
       {isAdmin && confirmResetBiometricUser && (
         <ConfirmResetBiometricModal user={confirmResetBiometricUser} onClose={() => setConfirmResetBiometricUser(null)} onConfirm={handleResetBiometric} loading={resettingBiometric} />
+      )}
+      {isAdmin && confirmToggleActiveUser && (
+        <ConfirmToggleActiveModal
+          user={confirmToggleActiveUser}
+          onClose={() => setConfirmToggleActiveUser(null)}
+          onConfirm={handleToggleActive}
+          loading={togglingActive}
+        />
       )}
       {isAdmin && showCreate && (
         <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { fetchUsers(); showToast("User berhasil dibuat", "ok"); }} />
@@ -1243,7 +1339,7 @@ export default function UsersPage() {
                     ))
                   ) : (
                     <>
-                      <StatCard icon={<Users className="w-5 h-5" />} value={users.length} label="Total User" sub="terdaftar" accent="linear-gradient(180deg, #94a3b8, #64748b)" />
+                      <StatCard icon={<Users className="w-5 h-5" />} value={users.length} label="Total User" sub={inactiveCount > 0 ? `${inactiveCount} nonaktif` : "semua aktif"} accent="linear-gradient(180deg, #94a3b8, #64748b)" />
                       <StatCard icon={<Crown className="w-5 h-5" />} value={fullAccess} label="Akses Penuh" sub="admin & programmer" accent="linear-gradient(180deg, #a78bfa, #7c3aed)" />
                       <StatCard icon={<ScanFace className="w-5 h-5" />} value={enrolled} label="Wajah Terdaftar" sub={`dari ${users.length} user`} accent="linear-gradient(180deg, #34d399, #059669)" />
                       <StatCard icon={<AlertTriangle className="w-5 h-5" />} value={pwNotSet} label="Belum Set PW" sub={pwNotSet > 0 ? "perlu perhatian" : "semua aman"}
@@ -1388,6 +1484,9 @@ export default function UsersPage() {
                           <span className="flex items-center gap-1.5">
                             <div className="w-2 h-2 rounded-full bg-violet-400" />Akses penuh
                           </span>
+                          <span className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-slate-300" />Nonaktif
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1425,10 +1524,11 @@ export default function UsersPage() {
                           const avatarColor = getAvatarColor(user.role);
                           const isFullAccess = FULL_ACCESS_ROLES.has(user.role);
                           const canChat = currentUserInfo && user.id !== currentUserInfo.id;
+                          const isInactive = user.is_active === false;
 
                           return (
                             <div key={user.id}
-                              className="px-3.5 sm:px-5 py-3 sm:py-3.5 hover:bg-slate-50/70 transition-colors duration-200 group rounded-2xl">
+                              className={`px-3.5 sm:px-5 py-3 sm:py-3.5 hover:bg-slate-50/70 transition-colors duration-200 group rounded-2xl ${isInactive ? "opacity-60 grayscale" : ""}`}>
                               <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
 
                                 <div
@@ -1484,6 +1584,12 @@ export default function UsersPage() {
                                         </span>
                                       );
                                     })}
+                                    {isAdmin && isInactive && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
+                                        style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1" }}>
+                                        <UserX className="w-2.5 h-2.5" /> Nonaktif
+                                      </span>
+                                    )}
                                     {isAdmin && !user.password_set && (
                                       <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0"
                                         style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>
@@ -1603,6 +1709,17 @@ export default function UsersPage() {
                                     </ActionBtn>
                                   )}
                                   {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
+                                    <ActionBtn
+                                      onClick={() => setConfirmToggleActiveUser(user)}
+                                      title={isInactive ? `Aktifkan kembali ${user.name}` : `Nonaktifkan akun ${user.name}`}
+                                      bg={isInactive ? "#ecfdf5" : "#f8fafc"}
+                                      color={isInactive ? "#059669" : "#64748b"}>
+                                      {isInactive
+                                        ? <UserCheck className="w-3.5 h-3.5" />
+                                        : <UserX className="w-3.5 h-3.5" />}
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
                                     <ActionBtn onClick={() => setConfirmDeleteUser(user)} title={`Hapus akun ${user.name}`} bg="#fff1f2" color="#dc2626">
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -1655,6 +1772,17 @@ export default function UsersPage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                           d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                       </svg>
+                                    </ActionBtn>
+                                  )}
+                                  {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
+                                    <ActionBtn
+                                      onClick={() => setConfirmToggleActiveUser(user)}
+                                      title={isInactive ? `Aktifkan kembali ${user.name}` : `Nonaktifkan akun ${user.name}`}
+                                      bg={isInactive ? "#ecfdf5" : "#f8fafc"}
+                                      color={isInactive ? "#059669" : "#64748b"}>
+                                      {isInactive
+                                        ? <UserCheck className="w-3.5 h-3.5" />
+                                        : <UserX className="w-3.5 h-3.5" />}
                                     </ActionBtn>
                                   )}
                                   {isAdmin && currentUserInfo && user.id !== currentUserInfo.id && (
