@@ -31,6 +31,7 @@ function MessageTicks({ status }: { status: string | null }) {
 }
 
 interface WhatsappAccount { id: string; label: string; phone_number: string; status: "connecting" | "connected" | "disconnected" }
+interface FacebookAccount { id: string; label: string; page_id: string; status: "connecting" | "connected" | "disconnected" }
 interface Conversation {
   id: string; channel_type: "WHATSAPP" | "FACEBOOK"; customer_identifier: string;
   customer_name: string | null; last_message_preview: string | null; unread_count: number;
@@ -385,6 +386,77 @@ function MessageBubble({ m, isOpen, onToggleMenu, onCopy, onDelete, onCopyToInpu
   );
 }
 
+function FacebookPanel({ onClose }: { onClose: () => void }) {
+  const [accounts, setAccounts] = useState<FacebookAccount[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState<FacebookAccount | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+
+  const fetchAccounts = useCallback(async () => {
+    const res = await fetch("/api/leads-chat/facebook-accounts");
+    const data = await res.json();
+    if (data.success) setAccounts(data.accounts);
+  }, []);
+  useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/leads-chat/facebook-accounts/${confirmDelete.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok && res.status !== 404) { setDeleteError(data?.message ?? `Gagal hapus (status ${res.status})`); return; }
+      setConfirmDelete(null); fetchAccounts();
+    } catch { setDeleteError("Terjadi kesalahan jaringan saat hapus"); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-black text-lg text-[#1a1a2e]">Page Facebook Tersambung</h3>
+          <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
+        </div>
+        <a href="/api/leads-chat/facebook-accounts/connect"
+          className="w-full h-10 rounded-xl bg-[#1877F2] text-white text-xs font-bold flex items-center justify-center gap-1.5 mb-4">
+          <FacebookIcon className="w-3.5 h-3.5" /> Connect with Facebook
+        </a>
+        <div className="space-y-2">
+          {accounts.map((acc) => (
+            <div key={acc.id} className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-gray-100">
+              <div>
+                <p className="text-sm font-bold text-gray-800">{acc.label}</p>
+                <p className="text-[11px] text-gray-400">Page ID: {acc.page_id}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${acc.status === "connected" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                  {acc.status === "connected" ? "Tersambung" : "Menunggu"}
+                </span>
+                <button onClick={() => { setConfirmDelete(acc); setDeleteError(""); }} className="text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+          ))}
+          {accounts.length === 0 && <p className="text-xs text-gray-400 text-center py-6">Belum ada Page tersambung</p>}
+        </div>
+        {confirmDelete && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmDelete(null)} />
+            <div className="relative bg-white rounded-2xl p-5 max-w-xs w-full">
+              <p className="text-sm font-bold text-gray-800 mb-1">Lepas {confirmDelete.label}?</p>
+              <p className="text-xs text-gray-400 mb-2">Chat yang sudah masuk tetap tersimpan, Page ini cuma berhenti nerima chat baru.</p>
+              {deleteError && <p className="text-xs text-red-600 font-semibold mb-2">{deleteError}</p>}
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmDelete(null)} className="flex-1 h-9 rounded-xl bg-gray-100 text-xs font-semibold">Batal</button>
+                <button onClick={handleDelete} className="flex-1 h-9 rounded-xl bg-red-600 text-white text-xs font-bold">Ya, Lepas</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function LeadsChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeChannel, setActiveChannel] = useState<"ALL" | "WHATSAPP" | "FACEBOOK">("ALL");
@@ -393,6 +465,7 @@ export default function LeadsChatPage() {
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [showAccounts, setShowAccounts] = useState(false);
+  const [showFacebook, setShowFacebook] = useState(false);
   const [loading, setLoading] = useState(true);
   const [messagesError, setMessagesError] = useState("");
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
@@ -426,7 +499,7 @@ export default function LeadsChatPage() {
     fetchConversations();
   };
 
-   const handlePickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const compressed = await compressImage(file, { maxSizeMB: 1, maxWidthOrHeight: 1600 });
@@ -500,10 +573,16 @@ export default function LeadsChatPage() {
               <h1 className="text-xl sm:text-2xl font-black text-[#1a1a2e]">Leads Chat Masuk</h1>
               <p className="text-xs text-gray-400 mt-0.5">Semua chat WhatsApp & Facebook customer, satu tempat</p>
             </div>
-            <button onClick={() => setShowAccounts(true)}
-              className="h-10 px-4 rounded-xl bg-[#1a1a2e] text-white text-xs font-bold flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5" /> Kelola Nomor
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => setShowFacebook(true)}
+                className="h-10 px-4 rounded-xl bg-[#1877F2] text-white text-xs font-bold flex items-center gap-1.5">
+                <FacebookIcon className="w-3.5 h-3.5" /> Kelola Page FB
+              </button>
+              <button onClick={() => setShowAccounts(true)}
+                className="h-10 px-4 rounded-xl bg-[#1a1a2e] text-white text-xs font-bold flex items-center gap-1.5">
+                <Plus className="w-3.5 h-3.5" /> Kelola Nomor
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex" style={{ height: "calc(100vh - 200px)" }}>
@@ -621,6 +700,7 @@ export default function LeadsChatPage() {
         </div>
       </div>
       {showAccounts && <AccountsPanel onClose={() => setShowAccounts(false)} />}
+      {showFacebook && <FacebookPanel onClose={() => setShowFacebook(false)} />}
     </DashboardLayout>
   );
 }
