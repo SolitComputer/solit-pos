@@ -1701,7 +1701,7 @@ export default function Sidebar() {
   usePrepAlarm(onSiapKirim || isSilentAdmin ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, !isSilentAdmin, 4000, notifSoundKey, notifCustomUrl);
   usePrepAlarm(isSilentAdmin ? [] : leadsChat.unreadUnacked.map((id) => ({ id })), ALARM_KEYS.LEADS_CHAT, !isSilentAdmin, 4000, notifSoundKey, notifCustomUrl);
 
-  const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
+  const deliveryBadge = useDeliveryBadge(user?.id, user?.role, userRoles);
   // isSilentAdmin → pass null agar hook tidak fetch & tidak bunyi playReminderBeep()
   const reminderUnread = useReminderBadge(isSilentAdmin ? null : user?.id);
   const onTanyaCeoPage = pathname.startsWith("/dashboard/tanya-ceo");
