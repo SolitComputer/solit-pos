@@ -30,6 +30,7 @@ const PUBLIC_API_ROUTES = [
   "/api/service/public",
   "/api/public/catalog",
   "/api/webhooks/whatsapp",
+  "/api/webhooks/facebook", // ✅ FIX: biar Meta bisa hit webhook tanpa cookie login
 ];
 const CRON_ROUTES = [
   "/api/cc-reports/sync",
