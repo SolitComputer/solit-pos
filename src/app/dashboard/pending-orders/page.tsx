@@ -224,6 +224,10 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     const [payMode, setPayMode] = useState<"LUNAS" | "CICILAN">("LUNAS");
     const [cicilanAmount, setCicilanAmount] = useState("");
     const [confirmSN, setConfirmSN] = useState(tx.serial_number || "");
+    const [items, setItems] = useState<TxLaptopItem[]>([]);
+    const [loadingItems, setLoadingItems] = useState(true);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
     // REVISI: nominal pembayaran mode Lunas — default = sisa tagihan, tapi
     // tetap bisa diedit. Wajib diisi manual kalau harga deal-nya Rp0
     // (transaksi E-Commerce Pending yang dibuat tanpa harga).
@@ -245,6 +249,53 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
         window.addEventListener("keydown", h);
         return () => window.removeEventListener("keydown", h);
     }, [onClose]);
+
+    // ── Ambil rincian unit dalam transaksi dari transaction_items ──
+    useEffect(() => {
+        let active = true;
+        setLoadingItems(true);
+        fetch(`/api/transaction/${tx.invoice_number}/items`)
+            .then(res => res.json())
+            .then(r => {
+                if (!active) return;
+                const list: TxLaptopItem[] = r.success ? (r.data || []) : [];
+                setItems(list);
+                const allIds = list.map((it) => it.unit_id);
+                setSelectedIds(allIds);
+            })
+            .catch(() => { if (active) setItems([]); })
+            .finally(() => { if (active) setLoadingItems(false); });
+        return () => { active = false; };
+    }, [tx.invoice_number]);
+
+    const isMultiItem = !loadingItems && items.length > 1;
+
+    const toggleUnit = (unitId: string) => {
+        setSelectedIds(prev => {
+            const next = prev.includes(unitId) ? prev.filter(id => id !== unitId) : [...prev, unitId];
+            const sumDeal = items.filter(it => next.includes(it.unit_id)).reduce((acc, it) => acc + (Number(it.deal_price) || 0), 0);
+            if (payMode === "LUNAS") {
+                setLunasAmount(sumDeal > 0 ? String(sumDeal) : "");
+            }
+            return next;
+        });
+    };
+
+    const selectAllUnits = () => {
+        const allIds = items.map(it => it.unit_id);
+        setSelectedIds(allIds);
+        const sumDeal = items.reduce((acc, it) => acc + (Number(it.deal_price) || 0), 0);
+        if (payMode === "LUNAS") {
+            setLunasAmount(sumDeal > 0 ? String(sumDeal) : "");
+        }
+    };
+
+    const clearAllUnits = () => {
+        setSelectedIds([]);
+        if (payMode === "LUNAS") {
+            setLunasAmount("");
+        }
+    };
 
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const rawFile = e.target.files?.[0];
@@ -273,6 +324,11 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
     const handleConfirm = async () => {
         // ── REVISI: foto bukti wajib diupload untuk kedua mode (Lunas & Cicilan) ──
         if (!paymentPhoto) { setError("Foto bukti pembayaran wajib diupload"); return; }
+
+        if (isMultiItem && selectedIds.length === 0) {
+            setError("Pilih minimal 1 unit yang akan dibayar");
+            return;
+        }
 
         if (showCicilanForm) {
             const amt = Number(cicilanAmount);
@@ -303,7 +359,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
         if (!lunasAmt || lunasAmt <= 0) { setError("Nominal pembayaran wajib diisi"); return; }
 
         // ── REVISI: SN wajib diisi kalau statusnya RESERVED dan belum ada SN ──
-        if (showSNForm && !confirmSN.trim()) { setError("Serial number wajib diisi"); return; }
+        if (showSNForm && !isMultiItem && !confirmSN.trim()) { setError("Serial number wajib diisi"); return; }
 
         setLoading(true); setError("");
         try {
@@ -315,6 +371,7 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                     serial_number: confirmSN.trim() || tx.serial_number || undefined,
                     payment_photo: paymentPhoto,
                     amount: lunasAmt,
+                    selected_unit_ids: isMultiItem ? selectedIds : undefined,
                 }),
             });
             const r = await res.json();
@@ -368,6 +425,57 @@ function ConfirmPaymentModal({ tx, onClose, onSuccess }: {
                             </div>
                         ))}
                     </div>
+
+                    {/* ── REVISI: Checklist Pilih Unit jika transaksi multi-unit (>1 laptop) ── */}
+                    {loadingItems ? (
+                        <div className="flex items-center justify-center py-4 text-gray-400 text-xs gap-2">
+                            <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                            Memuat daftar unit...
+                        </div>
+                    ) : isMultiItem ? (
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                                    Pilih Unit yang Dibayar ({selectedIds.length}/{items.length})
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={selectedIds.length === items.length ? clearAllUnits : selectAllUnits}
+                                    className="text-[11px] font-bold text-blue-600 hover:text-blue-700"
+                                >
+                                    {selectedIds.length === items.length ? "Kosongkan" : "Pilih Semua"}
+                                </button>
+                            </div>
+                            <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-white">
+                                {items.map((it) => {
+                                    const isChecked = selectedIds.includes(it.unit_id);
+                                    return (
+                                        <label key={it.unit_id} className={`flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer transition ${isChecked ? "bg-blue-50/40" : "hover:bg-gray-50 opacity-60"}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => toggleUnit(it.unit_id)}
+                                                className="w-4 h-4 accent-emerald-600 rounded shrink-0 cursor-pointer"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs font-bold text-gray-800 truncate">{it.laptop_name}</p>
+                                                <p className="text-[10px] font-mono text-gray-400">SN: {it.serial_number || "—"}</p>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <span className="text-[10px] text-gray-400 block font-medium">Harga Deal</span>
+                                                <span className="text-xs font-bold text-emerald-700 font-mono">{fmt(it.deal_price)}</span>
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-[11px] text-gray-500">
+                                {selectedIds.length === items.length
+                                    ? "Semua unit dipilih untuk dilunasi."
+                                    : `${selectedIds.length} dari ${items.length} unit dipilih. Unit yang tidak dipilih akan otomatis dipisah jadi invoice baru di Riwayat Pending.`}
+                            </p>
+                        </div>
+                    ) : null}
 
                     {paidSoFar > 0 && (
                         <div className="bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-2 gap-3 px-4 py-3">
