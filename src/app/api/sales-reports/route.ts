@@ -19,9 +19,9 @@ interface NormalizedReport {
   partner_name: string | null;
   interest: string;
   keterangan: string | null;
+  sumber: string | null;
   purchased: boolean;
 }
-
 // Discriminated union (pakai flag `success`) supaya TypeScript bisa menyempitkan
 // (narrow) tipe `value` menjadi PASTI ada begitu `success === true` dicek —
 // ini yang tadinya bikin error TS2345 karena `value` kebaca `... | undefined`.
@@ -57,6 +57,7 @@ function validateAndNormalize(body: any): ValidationResult {
   const partner_name = (body.partner_name ?? "").toString().trim();
   const interest = (body.interest ?? "").toString().trim();
   const keterangan = (body.keterangan ?? "").toString().trim();
+  const sumber = (body.sumber ?? "").toString().trim();
   const purchased = Boolean(body.purchased);
   const isNoPhone = NO_PHONE_CHANNELS.includes(channel);
 
@@ -75,6 +76,7 @@ function validateAndNormalize(body: any): ValidationResult {
       partner_name: isNoPhone ? partner_name : null,
       interest,
       keterangan: keterangan || null,
+      sumber: sumber || null,
       purchased,
     },
   };
