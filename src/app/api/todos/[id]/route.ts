@@ -59,12 +59,17 @@ export async function PATCH(
     const supabase = getSupabase();
 
     // Cek ownership dulu
-    const { data: existing } = await supabase
+    const { data: existing, error: existingErr } = await supabase
         .from("todos")
         .select("user_id, is_done, assigned_to")
         .eq("id", id)
         .single();
 
+    // Bedakan query-error (kolom hilang / DB error) vs baris memang tidak ada.
+    // PGRST116 = row not found → itu memang 404. Selain itu = 500 + pesan asli.
+    if (existingErr && existingErr.code !== "PGRST116") {
+        return NextResponse.json({ error: existingErr.message }, { status: 500 });
+    }
     if (!existing) return NextResponse.json({ error: "Todo tidak ditemukan" }, { status: 404 });
 
     // Hanya pemilik atau admin yang boleh edit
