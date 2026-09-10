@@ -168,6 +168,61 @@ function notifyBrowser(title: string, body: string) {
     }
 }
 
+// ── Kompres gambar di client sebelum upload ───────────────────────────────────
+// Vercel limit body ± 4.5MB. Foto HP sering 3–8MB → ketolak (413) & responsnya
+// BUKAN JSON → up.json() melempar error → "Terjadi kesalahan".
+// Solusi: resize + kompres ke JPEG (target < 1MB) sebelum dikirim.
+async function compressImage(file: File, maxDim = 1600, quality = 0.7): Promise<File> {
+    if (!file.type.startsWith("image/")) return file;
+    try {
+        const dataUrl: string = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error("Gagal membaca file"));
+            reader.readAsDataURL(file);
+        });
+        const img: HTMLImageElement = await new Promise((resolve, reject) => {
+            const el = new Image();
+            el.onload = () => resolve(el);
+            el.onerror = () => reject(new Error("Gagal memuat gambar"));
+            el.src = dataUrl;
+        });
+
+        let width = img.width, height = img.height;
+        if (width > maxDim || height > maxDim) {
+            const scale = Math.min(maxDim / width, maxDim / height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return file;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const blob: Blob | null = await new Promise(resolve =>
+            canvas.toBlob(b => resolve(b), "image/jpeg", quality)
+        );
+        if (!blob || blob.size >= file.size) return file; // kalau tidak lebih kecil, pakai asli
+        const baseName = file.name.replace(/\.[^.]+$/, "") || "bukti";
+        return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
+    } catch {
+        return file; // fallback aman: pakai file asli
+    }
+}
+
+// Baca response JSON dengan aman. Kalau server balikin non-JSON (HTML/413),
+// JSON.parse akan gagal — kita tangani biar pesan errornya jelas, bukan generic.
+async function safeJson(res: Response): Promise<any> {
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch {
+        if (res.status === 413) return { success: false, message: "Foto terlalu besar untuk diunggah. Coba ambil ulang fotonya." };
+        return { success: false, message: `Server error (${res.status || "koneksi"})` };
+    }
+}
+
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }: { msg: string; type: "ok" | "err"; onClose: () => void }) {
     useEffect(() => { const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [onClose]);
@@ -968,7 +1023,12 @@ function MissionDetailAssignee({ mission, onClose, onChanged, onMissionUpdated, 
     const [busy, setBusy] = useState(false);
     const [togglingId, setTogglingId] = useState<string | null>(null);
 
-    const onPickFile = (f: File | null) => { setFile(f); setPreview(f ? URL.createObjectURL(f) : ""); };
+      const onPickFile = async (f: File | null) => {
+        if (!f) { setFile(null); setPreview(""); return; }
+        const compressed = await compressImage(f);   // resize/kompres dulu sebelum disimpan ke state
+        setFile(compressed);
+        setPreview(URL.createObjectURL(compressed));
+    };
 
     const toggleItem = async (item: MissionItem) => {
         if (!canToggle || togglingId) return;
@@ -991,18 +1051,21 @@ function MissionDetailAssignee({ mission, onClose, onChanged, onMissionUpdated, 
         setBusy(true);
         try {
             const fd = new FormData(); fd.append("file", file);
-            const up = await fetch("/api/missions/upload", { method: "POST", body: fd });
-            const upData = await up.json();
-            if (!upData.success) { showToast(upData.message ?? "Upload gagal", "err"); return; }
+                       const up = await fetch("/api/missions/upload", { method: "POST", body: fd });
+            const upData = await safeJson(up);                       // ← tahan respons non-JSON (413/HTML)
+            if (!up.ok || !upData?.success) {
+                showToast(upData?.message ?? `Upload gagal (${up.status})`, "err");
+                return;
+            }
             const res = await fetch(`/api/missions/${mission.id}`, {
                 method: "PATCH", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "submit", proof_photo_url: upData.url, proof_note: note }),
             });
-            const data = await res.json();
-            if (!data.success) { showToast(data.message ?? "Gagal submit", "err"); return; }
-            showToast("Misi diselesaikan, menunggu ACC ", "ok");
+            const data = await safeJson(res);                        // ← tahan respons non-JSON
+            if (!res.ok || !data?.success) { showToast(data?.message ?? "Gagal submit", "err"); return; }
+            showToast("Misi diselesaikan, menunggu ACC", "ok");
             onChanged();
-        } catch { showToast("Terjadi kesalahan", "err"); }
+        } catch (e: any) { showToast(e?.message ?? "Terjadi kesalahan", "err"); }  // ← tampilkan error asli
         finally { setBusy(false); }
     };
 
