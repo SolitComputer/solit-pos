@@ -1257,8 +1257,9 @@ export default function TodosClient() {
                 body: JSON.stringify({ is_done }),
             });
             if (!res.ok) {
+                const result = await res.json().catch(() => ({}));
                 setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, is_done: !is_done } : t)));
-                showToast("Gagal mengupdate status", "error");
+                showToast(result.error ?? "Gagal mengupdate status", "error");
             } else {
                 showToast(is_done ? "Tugas selesai!" : "Tugas dibuka kembali");
             }
