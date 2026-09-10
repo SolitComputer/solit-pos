@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { buildWhatsappReceiptBlock, type ReceiptLineItem } from "@/lib/receiptItems";
 
 interface Props {
@@ -61,7 +62,7 @@ export default function ReceiptActions({
                 ? ` (${warrantyDaysLeft} hari lagi)`
                 : " (Kadaluarsa)"
             }`
-                     : null;
+            : null;
 
         const receiptItems: ReceiptLineItem[] =
             items && items.length > 0
@@ -218,16 +219,16 @@ export default function ReceiptActions({
                 )}
             </button>
 
-            {/* Cetak Struk termal (80mm) */}
-            <button
-                onClick={() => window.print()}
+            {/* Cetak Struk — buka halaman struk khusus (80mm) untuk di-print */}
+            <Link
+                href={`/receipt/${invoiceNumber}/struk`}
                 className="flex items-center justify-center gap-2 w-full bg-slate-800 hover:bg-slate-900 text-white rounded-2xl py-3 font-medium text-sm transition active:scale-[0.98]"
             >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                 </svg>
-                Cetak Struk
-            </button>
+                Buka & Cetak Struk
+            </Link>
         </div>
     );
 }
