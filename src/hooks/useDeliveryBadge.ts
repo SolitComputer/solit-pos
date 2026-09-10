@@ -12,9 +12,14 @@ const ELIGIBLE_ROLES = new Set<string>(["PENGANTARAN", "PKL_PENGANTARAN"]);
  * Jumlah tugas pengantaran aktif (status DIKIRIM, metode PENGANTARAN)
  * yang ditugaskan ke user saat ini. Live via Supabase Realtime.
  */
-export function useDeliveryBadge(userId?: string | null, role?: string | null): number {
+export function useDeliveryBadge(
+  userId?: string | null,
+  role?: string | null,
+  roles?: string[] | null
+): number {
   const [count, setCount] = useState(0);
-  const eligible = !!userId && !!role && ELIGIBLE_ROLES.has(role);
+  const allRoles = Array.isArray(roles) && roles.length > 0 ? roles : (role ? [role] : []);
+  const eligible = !!userId && allRoles.some((r) => ELIGIBLE_ROLES.has(r));
 
   const refresh = useCallback(async () => {
     if (!eligible) { setCount(0); return; }
