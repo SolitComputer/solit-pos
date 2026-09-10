@@ -4,6 +4,7 @@ import ReceiptActions from "./ReceiptActions";
 import { User, Package, Shield, FileText } from "lucide-react";
 import ItemsTable from "@/components/receipt/ItemsTable";
 import { buildLineItemsFromTxItems, sumLineItems, sumSavings } from "@/lib/receiptItems";
+import ThermalReceipt from "@/app/receipt/ThermalReceipt";
 interface Props {
   params: Promise<{ invoice: string }>;
 }
@@ -344,10 +345,36 @@ export default async function Page(props: Props) {
         </div>
       </div>
 
+      {/* ── STRUK TERMAL (khusus print, hidden di layar) ── */}
+      <ThermalReceipt
+        invoiceNumber={data.invoice_number}
+        dateLabel={new Date(data.paid_at || data.created_at).toLocaleString("id-ID", {
+          day: "2-digit", month: "long", year: "numeric",
+          hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta",
+        })}
+        customerName={data.customer_name || undefined}
+        items={lineItems}
+        total={data.amount || 0}
+        paymentMethod={data.payment_method || undefined}
+        statusLabel="LUNAS"
+        warrantyEndLabel={warrantyEndDate || undefined}
+      />
+
       <style>{`
+        /* Struk termal disembunyikan di layar; hanya muncul saat print */
+        .thermal-print-area { display: none; }
+
         @media print {
           body * { visibility: hidden; }
-          #receipt-card, #receipt-card * { visibility: visible; }
+          .thermal-print-area,
+          .thermal-print-area * { visibility: visible; }
+          .thermal-print-area {
+            display: block;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 80mm;
+          }
           .no-capture, .no-print { display: none !important; }
           @page { margin: 0; size: 80mm auto; }
         }
