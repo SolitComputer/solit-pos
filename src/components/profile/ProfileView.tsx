@@ -1322,32 +1322,6 @@ export default function ProfileView({ userId }: { userId: string }) {
                 </div>
             </div>
 
-            {achievements && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 lg:gap-5">
-                    <div>
-                        <AchievementCard
-                            icon={<CalendarCheck className="w-5 h-5" />} title="Kehadiran Bulan Ini" monthLabel={monthLabel(achievements.month)}
-                            value={`${achievements.attendance.daysThisMonth} hari`} sub={`${achievements.attendance.onTimeThisMonth} kali tepat waktu`}
-                            rank={achievements.attendance.rankThisMonth} totalRanked={achievements.attendance.totalRanked}
-                            isRecord={achievements.attendance.isCompanyRecordHolder}
-                            personalBest={achievements.attendance.personalBest ? `Rekor pribadi: ${achievements.attendance.personalBest.days} hari (${monthLabel(achievements.attendance.personalBest.month)})` : null}
-                            accentSolid="#059669" accentSoft="rgba(5,150,105,0.12)" accentBar="linear-gradient(90deg, #34d399, #059669)"
-                        />
-                    </div>
-                    <div>
-                        <AchievementCard
-                            icon={<Clock className="w-5 h-5" />} title="Lembur Bulan Ini" monthLabel={monthLabel(achievements.month)}
-                            value={`${achievements.overtime.hoursThisMonth} jam`} sub={`${achievements.overtime.sessionsThisMonth} sesi lembur`}
-                            rank={achievements.overtime.rankThisMonth} totalRanked={achievements.overtime.totalRanked}
-                            isRecord={achievements.overtime.isCompanyRecordHolder}
-                            personalBest={achievements.overtime.personalBest ? `Rekor pribadi: ${achievements.overtime.personalBest.hours} jam (${monthLabel(achievements.overtime.personalBest.month)})` : null}
-                            accentSolid="#d97706" accentSoft="rgba(217,119,6,0.12)" accentBar="linear-gradient(90deg, #fbbf24, #d97706)"
-                        />
-                    </div>
-                </div>
-            )}
-
-
             {showSongPicker && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/70" style={{ backdropFilter: "blur(6px)" }} onClick={() => { setShowSongPicker(false); songPicker.closeSearch(); songPicker.handleCancelCrop(); }} />

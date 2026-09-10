@@ -45,6 +45,8 @@ interface User {
   contract_valid_until?: string | null;
   is_active: boolean;
   deactivated_at?: string | null;
+    deactivated_by?: string | null;
+  deactivated_by_name?: string | null;
 }
 
 interface CustomRoleRow {
@@ -207,6 +209,15 @@ function formatBirthDate(birthDate: string | null): string {
   if (!birthDate) return "-";
   const d = new Date(birthDate + "T00:00:00");
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("id-ID", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+    timeZone: "Asia/Jakarta",
+  }) + " WIB";
 }
 
 function getAge(birthDate: string | null): number | null {
@@ -643,7 +654,15 @@ function EditUserModal({ user, onClose, onSaved }: { user: User; onClose: () => 
         {user.is_active === false && (
           <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-xs font-semibold"
             style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", color: "#475569" }}>
-            <UserX className="w-3.5 h-3.5 flex-shrink-0" /> Akun ini sedang nonaktif — user tidak bisa login.
+            <UserX className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>
+              Akun ini sedang nonaktif — user tidak bisa login.
+              {user.deactivated_by_name && (
+                <> Dinonaktifkan oleh <b>{user.deactivated_by_name}</b>
+                  {user.deactivated_at && <> pada {formatDateTime(user.deactivated_at)}</>}.
+                </>
+              )}
+            </span>
           </div>
         )}
         <Field label="Nama"><Input value={name} onChange={e => setName(e.target.value)} /></Field>
@@ -1627,6 +1646,18 @@ export default function UsersPage() {
                                         {user.song_title} · {user.song_artist}
                                       </p>
                                     </div>
+                                  )}
+                                  {isAdmin && isInactive && (
+                                    <p className="text-[10.5px] mt-0.5 inline-flex items-center gap-1 flex-wrap" style={{ color: "#64748b" }}>
+                                      <UserX className="w-3 h-3 flex-shrink-0" />
+                                                                            {/* 3 kondisi beda: nama ketemu / admin-nya dihapus / memang tidak pernah tercatat */}
+                                      Dinonaktifkan oleh{" "}
+                                      <span className="font-bold">
+                                        {user.deactivated_by_name
+                                          ?? (user.deactivated_by ? "akun yang sudah dihapus" : "— tidak tercatat")}
+                                      </span>
+                                      {user.deactivated_at && <span>· {formatDateTime(user.deactivated_at)}</span>}
+                                    </p>
                                   )}
                                   {user.bio && (
                                     <p className="text-[11px] text-gray-400 mt-0.5 truncate italic">"{user.bio}"</p>
