@@ -6,6 +6,7 @@ import { UserRole, PERMISSIONS, hasPermission } from "@/lib/permissions";
 import InventoryTable, { InventoryRow } from "@/components/inventory/InventoryTable";
 import { getAuthUser } from "@/hooks/useAuthUser";
 import { compressImage } from "@/lib/imageCompression";
+import { Trophy, ThumbsUp, AlertTriangle, Wrench, Laptop, CheckCircle2, Lock, Camera } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface LaptopUnit {

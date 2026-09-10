@@ -19,7 +19,7 @@ import {
   Inbox,
   ShieldCheck,
   ClipboardCheck,
-   Building2,
+  Building2,
   AtSign,
   MessageSquareText,
 } from "lucide-react";
@@ -66,6 +66,16 @@ const channelBorderClass: Record<Channel, string> = {
   CAROUSEL: "border-l-cyan-400",
   MITRA: "border-l-violet-400",
   RESELLER: "border-l-amber-400",
+};
+
+// Warna badge angka pada tab channel saat aktif (di-invert jadi soft-on-dark).
+const channelActiveCountClass: Record<Channel, string> = {
+  WA: "bg-emerald-400/25 text-emerald-100",
+  FB: "bg-blue-400/25 text-blue-100",
+  OLX: "bg-orange-400/25 text-orange-100",
+  CAROUSEL: "bg-cyan-400/25 text-cyan-100",
+  MITRA: "bg-violet-400/25 text-violet-100",
+  RESELLER: "bg-amber-400/25 text-amber-100",
 };
 
 // FB/OLX/Carousell -> input Username. Mitra/Reseller -> input Nama Mitra/Reseller.
@@ -146,7 +156,7 @@ function canAuditRole(user: any): boolean {
 }
 
 export default function LaporanHarianSalesPage() {
-   // --- User & permission ---
+  // --- User & permission ---
   const [currentUser, setCurrentUser] = useState<any>(null);
   useEffect(() => {
     getCurrentUserClient().then((u) => setCurrentUser(u));
@@ -234,6 +244,14 @@ export default function LaporanHarianSalesPage() {
     return { total, beli, tidak: total - beli, convRate };
   }, [entries]);
 
+  // Jumlah laporan per channel — dipakai untuk badge angka di tab filter.
+  const channelCounts = useMemo(() => {
+    const map = { ALL: entries.length } as Record<Channel | "ALL", number>;
+    for (const c of CHANNELS) map[c] = 0;
+    for (const e of entries) map[e.channel] = (map[e.channel] ?? 0) + 1;
+    return map;
+  }, [entries]);
+
   const filteredEntries = useMemo(() => {
     if (channelFilter === "ALL") return entries;
     return entries.filter((e) => e.channel === channelFilter);
@@ -287,7 +305,7 @@ export default function LaporanHarianSalesPage() {
     resetForm();
   };
 
-    const contactMode = CHANNEL_CONTACT_MODE[channel];
+  const contactMode = CHANNEL_CONTACT_MODE[channel];
   const isNoPhoneChannel = contactMode !== "phone";
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -298,7 +316,7 @@ export default function LaporanHarianSalesPage() {
       setFormError("Minat wajib diisi");
       return;
     }
-       if (isNoPhoneChannel && !partnerName.trim()) {
+    if (isNoPhoneChannel && !partnerName.trim()) {
       setFormError(contactMode === "username" ? "Username wajib diisi" : "Nama mitra/reseller wajib diisi");
       return;
     }
@@ -395,7 +413,7 @@ export default function LaporanHarianSalesPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-5xl mx-auto space-y-4 sm:space-y-5 p-3 sm:p-6 pb-16">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-5 p-3 sm:p-6 pb-16">
         {/* Animasi dekoratif blob di panel ringkasan — satu momen gerak yang halus,
             dimatikan otomatis kalau user mengaktifkan prefers-reduced-motion. */}
         <style>{`
@@ -411,7 +429,7 @@ export default function LaporanHarianSalesPage() {
         {/* Header halaman */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3.5">
           <div className="min-w-0 flex items-start gap-3">
-            <span className="mt-0.5 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-500 flex items-center justify-center shrink-0 shadow-sm shadow-violet-200">
+            <span className="mt-0.5 w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-500 flex items-center justify-center shrink-0 shadow-lg shadow-violet-300/40 ring-1 ring-white/40">
               <Send className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </span>
             <div className="min-w-0">
@@ -422,8 +440,11 @@ export default function LaporanHarianSalesPage() {
                 Catat setiap leads masuk dari semua channel: WA, FB, OLX, Carousell, Mitra & Reseller. Setiap laporan bernilai 1 poin di leaderboard, dan setiap audit oleh tim Marketing bernilai 0,5 poin lencana.
               </p>
               {lastUpdated && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] text-gray-400 bg-white border border-gray-100 px-2.5 py-1 rounded-full mt-2 shadow-sm shadow-gray-100">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-gray-500 bg-white border border-gray-100 px-2.5 py-1 rounded-full mt-2.5 shadow-sm shadow-gray-100">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                  </span>
                   Diperbarui {lastUpdated.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               )}
@@ -440,7 +461,7 @@ export default function LaporanHarianSalesPage() {
             </button>
             <button
               onClick={openAddModal}
-              className="flex items-center justify-center gap-1.5 h-10 px-3.5 sm:px-4 rounded-full text-xs sm:text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 active:scale-[0.97] transition-all shadow-sm shadow-violet-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+              className="flex items-center justify-center gap-1.5 h-10 px-3.5 sm:px-4 rounded-full text-xs sm:text-sm font-semibold bg-gradient-to-br from-violet-600 to-violet-500 text-white hover:from-violet-700 hover:to-violet-600 active:scale-[0.97] transition-all shadow-lg shadow-violet-300/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
             >
               <Plus className="w-4 h-4" />
               Tambah Laporan
@@ -449,7 +470,7 @@ export default function LaporanHarianSalesPage() {
         </div>
 
         {/* Panel ringkasan */}
-        <div className="relative overflow-hidden rounded-3xl bg-white border border-gray-100 shadow-sm px-4 py-5 sm:px-7 sm:py-6">
+        <div className="relative overflow-hidden rounded-3xl bg-white border border-gray-100 shadow-sm ring-1 ring-gray-50 px-4 py-5 sm:px-7 sm:py-6">
           <div className="pointer-events-none absolute -right-14 -top-24 h-72 w-72 rounded-full bg-violet-300/60 blur-2xl sp-blob-a" />
           <div className="pointer-events-none absolute right-24 -bottom-16 h-56 w-56 rounded-full bg-blue-300/50 blur-2xl sp-blob-b" style={{ animationDelay: "1.5s" }} />
           <div className="pointer-events-none absolute right-52 top-2 h-28 w-28 rounded-full bg-fuchsia-300/40 blur-2xl hidden sm:block sp-blob-a" style={{ animationDelay: "3s" }} />
@@ -464,9 +485,8 @@ export default function LaporanHarianSalesPage() {
                 <button
                   key={p}
                   onClick={() => setPeriod(p)}
-                  className={`px-3 py-1.5 text-[11px] font-medium rounded-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${
-                    period === p ? "bg-violet-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"
-                  }`}
+                  className={`px-3 py-1.5 text-[11px] font-medium rounded-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${period === p ? "bg-violet-600 text-white shadow-sm shadow-violet-300/50" : "text-gray-500 hover:text-gray-900"
+                    }`}
                 >
                   {periodLabels[p]}
                 </button>
@@ -495,6 +515,7 @@ export default function LaporanHarianSalesPage() {
                 caption={periodLabels[period]}
                 icon={Inbox}
                 iconClass="bg-violet-50 text-violet-600"
+                accentClass="from-violet-400 to-fuchsia-400"
               />
               <StatCard
                 label="Beli"
@@ -504,6 +525,7 @@ export default function LaporanHarianSalesPage() {
                 deltaClass="bg-emerald-50 text-emerald-600"
                 icon={CheckCircle2}
                 iconClass="bg-emerald-50 text-emerald-600"
+                accentClass="from-emerald-400 to-emerald-300"
               />
               <StatCard
                 label="Tidak Beli"
@@ -513,6 +535,7 @@ export default function LaporanHarianSalesPage() {
                 deltaClass="bg-gray-100 text-gray-500"
                 icon={XCircle}
                 iconClass="bg-gray-100 text-gray-500"
+                accentClass="from-gray-300 to-gray-200"
               />
             </div>
           </div>
@@ -529,16 +552,21 @@ export default function LaporanHarianSalesPage() {
               className="bg-white rounded-2xl border border-gray-200/70 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
-                <div className="w-9 h-9 rounded-full bg-violet-50 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-full bg-violet-50 flex items-center justify-center shrink-0 ring-1 ring-violet-100">
                   {editingEntry ? (
                     <Pencil className="w-4 h-4 text-violet-600" />
                   ) : (
                     <Plus className="w-4 h-4 text-violet-600" />
                   )}
                 </div>
-                <h2 className="text-sm font-semibold text-gray-900 flex-1">
-                  {editingEntry ? "Edit Laporan" : "Tambah Laporan"}
-                </h2>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-sm font-semibold text-gray-900">
+                    {editingEntry ? "Edit Laporan" : "Tambah Laporan"}
+                  </h2>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {editingEntry ? "Perbarui detail leads yang tercatat" : "Catat leads baru dari channel manapun"}
+                  </p>
+                </div>
                 <button
                   onClick={closeFormModal}
                   className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0"
@@ -556,9 +584,8 @@ export default function LaporanHarianSalesPage() {
                         key={c}
                         type="button"
                         onClick={() => setChannel(c)}
-                        className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${
-                          channel === c ? "bg-violet-600 border-violet-600 text-white shadow-sm shadow-violet-200" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
-                        }`}
+                        className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 ${channel === c ? "bg-violet-600 border-violet-600 text-white shadow-sm shadow-violet-200" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                          }`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${channel === c ? "bg-white/80" : channelDotClass[c]}`} />
                         {channelLabels[c]}
@@ -567,7 +594,7 @@ export default function LaporanHarianSalesPage() {
                   </div>
                 </div>
 
-                                {isNoPhoneChannel ? (
+                {isNoPhoneChannel ? (
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">
                       {contactFieldConfig[contactMode as "username" | "partner"].label}
@@ -634,18 +661,16 @@ export default function LaporanHarianSalesPage() {
                     <button
                       type="button"
                       onClick={() => setPurchased(true)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
-                        purchased ? "bg-emerald-600 border-emerald-600 text-white shadow-sm shadow-emerald-200" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
-                      }`}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${purchased ? "bg-emerald-600 border-emerald-600 text-white shadow-sm shadow-emerald-200" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                        }`}
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" /> Beli
                     </button>
                     <button
                       type="button"
                       onClick={() => setPurchased(false)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/30 ${
-                        !purchased ? "bg-gray-800 border-gray-800 text-white shadow-sm shadow-gray-200" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
-                      }`}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500/30 ${!purchased ? "bg-gray-800 border-gray-800 text-white shadow-sm shadow-gray-200" : "bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                        }`}
                     >
                       <XCircle className="w-3.5 h-3.5" /> Tidak
                     </button>
@@ -686,7 +711,7 @@ export default function LaporanHarianSalesPage() {
               onClick={(e) => e.stopPropagation()}
               className="bg-white rounded-2xl border border-gray-200/70 w-full max-w-sm shadow-2xl p-5 max-h-[85vh] overflow-y-auto"
             >
-              <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mb-3">
+              <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mb-3 ring-1 ring-red-100">
                 <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
               <h2 className="text-sm font-semibold text-gray-900">Hapus laporan ini?</h2>
@@ -730,12 +755,17 @@ export default function LaporanHarianSalesPage() {
               className="bg-white rounded-2xl border border-gray-200/70 w-full max-w-sm shadow-2xl p-5 max-h-[85vh] overflow-y-auto"
             >
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-11 h-11 rounded-full bg-fuchsia-50 flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-full bg-fuchsia-50 flex items-center justify-center shrink-0 ring-1 ring-fuchsia-100">
                   <ShieldCheck className="w-5 h-5 text-fuchsia-600" />
                 </div>
                 <span className="text-[11px] font-semibold text-fuchsia-600 bg-fuchsia-50 px-2 py-1 rounded-full">
                   Langkah {auditStep} / 2
                 </span>
+                {/* Progress dua langkah — penanda urutan verifikasi */}
+                <div className="flex items-center gap-1 ml-auto">
+                  <span className={`h-1.5 w-6 rounded-full transition-colors ${auditStep >= 1 ? "bg-fuchsia-500" : "bg-fuchsia-100"}`} />
+                  <span className={`h-1.5 w-6 rounded-full transition-colors ${auditStep >= 2 ? "bg-fuchsia-500" : "bg-fuchsia-100"}`} />
+                </div>
               </div>
 
               {auditStep === 1 ? (
@@ -806,10 +836,21 @@ export default function LaporanHarianSalesPage() {
         )}
 
         {/* List */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100">
-            <h2 className="text-sm font-bold text-gray-900">Riwayat Laporan</h2>
-            <p className="text-[11px] text-gray-500 mt-0.5">Daftar laporan pada periode {periodLabels[period].toLowerCase()}</p>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm ring-1 ring-gray-50 overflow-hidden">
+          <div className="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shrink-0 shadow-sm shadow-violet-200/60">
+                <ClipboardCheck className="w-4 h-4 text-white" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-gray-900">Riwayat Laporan</h2>
+                <p className="text-[11px] text-gray-500 mt-0.5 truncate">Daftar laporan pada periode {periodLabels[period].toLowerCase()}</p>
+              </div>
+            </div>
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-500 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded-full shrink-0">
+              <Inbox className="w-3 h-3 text-gray-400" />
+              {filteredEntries.length} laporan
+            </span>
           </div>
 
           {/* Tab channel — fade di kedua ujung sebagai penanda ada konten yang bisa di-scroll */}
@@ -820,22 +861,26 @@ export default function LaporanHarianSalesPage() {
             >
               <button
                 onClick={() => setChannelFilter("ALL")}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${
-                  channelFilter === "ALL" ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-                }`}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${channelFilter === "ALL" ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                  }`}
               >
                 Semua
+                <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold tabular-nums ${channelFilter === "ALL" ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-500"}`}>
+                  {channelCounts.ALL}
+                </span>
               </button>
               {CHANNELS.map((c) => (
                 <button
                   key={c}
                   onClick={() => setChannelFilter(c)}
-                  className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${
-                    channelFilter === c ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-                  }`}
+                  className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30 ${channelFilter === c ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                    }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${channelDotClass[c]}`} />
                   {channelLabels[c]}
+                  <span className={`inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full text-[10px] font-bold tabular-nums ${channelFilter === c ? channelActiveCountClass[c] : "bg-gray-200/70 text-gray-500"}`}>
+                    {channelCounts[c]}
+                  </span>
                 </button>
               ))}
             </div>
@@ -864,8 +909,8 @@ export default function LaporanHarianSalesPage() {
             </div>
           ) : filteredEntries.length === 0 ? (
             <div className="py-12 flex flex-col items-center text-center px-6">
-              <div className="w-11 h-11 rounded-full bg-violet-50 flex items-center justify-center mb-3">
-                <Inbox className="w-5 h-5 text-violet-300" />
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50 flex items-center justify-center mb-3 ring-1 ring-violet-100/60">
+                <Inbox className="w-6 h-6 text-violet-300" />
               </div>
               <p className="text-sm font-medium text-gray-700">Belum ada laporan untuk filter ini</p>
               <p className="text-xs text-gray-400 mt-1 max-w-[220px]">
@@ -873,9 +918,9 @@ export default function LaporanHarianSalesPage() {
               </p>
               <button
                 onClick={openAddModal}
-                className="mt-4 text-xs font-semibold text-violet-600 hover:underline focus:outline-none"
+                className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 hover:gap-2 transition-all focus:outline-none"
               >
-                Tambah laporan pertama →
+                <Plus className="w-3.5 h-3.5" /> Tambah laporan pertama
               </button>
             </div>
           ) : (
@@ -889,27 +934,35 @@ export default function LaporanHarianSalesPage() {
               <div className="overflow-x-auto hidden md:block">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50/80 border-b border-gray-100">
-                      <th className="px-4 sm:px-5 py-2.5 text-left text-[11px] font-medium text-gray-500 w-10">No</th>
+                    <tr className="bg-gradient-to-b from-gray-50 to-white border-b border-gray-100">
+                      <th className="px-4 sm:px-5 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider w-14">No</th>
                       {channelFilter === "ALL" && (
-                        <th className="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500">Channel</th>
+                        <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Channel</th>
                       )}
-                      <th className="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500">Nama / Kontak</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500">Minat</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500 hidden lg:table-cell">Keterangan</th>
-                      <th className="px-4 py-2.5 text-center text-[11px] font-medium text-gray-500">Transaksi</th>
-                      <th className="px-4 py-2.5 text-center text-[11px] font-medium text-gray-500">Audit</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500 hidden lg:table-cell">Diinput Oleh</th>
-                      <th className="px-4 sm:px-5 py-2.5 w-20 text-right text-[11px] font-medium text-gray-500">Aksi</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Nama / Kontak</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Minat</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Keterangan</th>
+                      <th className="px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Transaksi</th>
+                      <th className="px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Audit</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Diinput Oleh</th>
+                      <th className="px-4 sm:px-5 py-3 w-20 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-gray-100/70">
                     {paginatedEntries.map((entry, idx) => (
-                      <tr key={entry.id} className="hover:bg-gray-50/60 transition-colors">
-                        <td className={`pl-3 sm:pl-4 pr-4 py-3 text-gray-400 tabular-nums border-l-4 ${channelBorderClass[entry.channel]}`}>{pageStart + idx}</td>
+                      <tr
+                        key={entry.id}
+                        className={`group transition-colors ${entry.audited ? "bg-fuchsia-50/25 hover:bg-fuchsia-50/50" : "hover:bg-violet-50/40"}`}
+                      >
+                        <td className={`pl-3 sm:pl-4 pr-4 py-3.5 border-l-4 ${channelBorderClass[entry.channel]}`}>
+                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-[11px] font-bold tabular-nums ${channelBadgeClass[entry.channel]}`}>
+                            {pageStart + idx}
+                          </span>
+                        </td>
                         {channelFilter === "ALL" && (
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${channelBadgeClass[entry.channel]}`}>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${channelBadgeClass[entry.channel]}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${channelDotClass[entry.channel]}`} />
                               {channelLabels[entry.channel]}
                             </span>
                           </td>
@@ -920,15 +973,15 @@ export default function LaporanHarianSalesPage() {
                             {new Date(entry.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 max-w-[140px] truncate" title={entry.interest}>{entry.interest}</td>
-                        <td className="px-4 py-3 text-gray-500 max-w-[160px] truncate hidden lg:table-cell" title={entry.keterangan || undefined}>{entry.keterangan || "—"}</td>
+                        <td className="px-4 py-3 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={entry.interest}>{entry.interest}</td>
+                        <td className="px-4 py-3 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden md:table-cell" title={entry.keterangan || undefined}>{entry.keterangan || "—"}</td>
                         <td className="px-4 py-3 text-center">
                           <StatusBadge purchased={entry.purchased} />
                         </td>
                         <td className="px-4 py-3 text-center">
                           {entry.audited ? (
                             <span
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-fuchsia-50 text-fuchsia-600"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-fuchsia-50 text-fuchsia-600 ring-1 ring-inset ring-fuchsia-100"
                               title={`Diaudit oleh ${entry.audited_by_name ?? "-"}`}
                             >
                               <ShieldCheck className="w-3 h-3" /> Terverifikasi
@@ -936,7 +989,7 @@ export default function LaporanHarianSalesPage() {
                           ) : canAudit ? (
                             <button
                               onClick={() => openAuditModal(entry)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-fuchsia-600 text-white hover:bg-fuchsia-700 active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-fuchsia-600 text-white hover:bg-fuchsia-700 active:scale-95 transition-all shadow-sm shadow-fuchsia-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/40"
                             >
                               <ClipboardCheck className="w-3 h-3" /> Audit
                             </button>
@@ -1006,11 +1059,12 @@ export default function LaporanHarianSalesPage() {
                       <StatusBadge purchased={entry.purchased} />
                     </div>
                     <div className="flex items-center gap-1.5 pl-10 flex-wrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${channelBadgeClass[entry.channel]}`}>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${channelBadgeClass[entry.channel]}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${channelDotClass[entry.channel]}`} />
                         {channelLabels[entry.channel]}
                       </span>
                       {entry.audited && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-fuchsia-50 text-fuchsia-600">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-fuchsia-50 text-fuchsia-600 ring-1 ring-inset ring-fuchsia-100">
                           <ShieldCheck className="w-2.5 h-2.5" /> Terverifikasi
                         </span>
                       )}
@@ -1137,6 +1191,7 @@ function StatCard({
   deltaClass,
   icon: Icon,
   iconClass,
+  accentClass,
 }: {
   label: string;
   value: number;
@@ -1145,9 +1200,14 @@ function StatCard({
   deltaClass?: string;
   icon?: React.ComponentType<{ className?: string }>;
   iconClass?: string;
+  accentClass?: string;
 }) {
   return (
-    <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm px-3 py-3 sm:px-4 sm:py-3.5 hover:shadow-md transition-shadow">
+    <div className="relative bg-white rounded-2xl border border-gray-100 shadow-sm px-3 py-3 sm:px-4 sm:py-3.5 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+      {/* Aksen gradient tipis di sisi atas kartu — memakai keluarga warna metrik terkait */}
+      {accentClass && (
+        <span className={`pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${accentClass}`} />
+      )}
       <div className="flex items-center justify-between gap-1">
         <p className="text-[10px] font-semibold tracking-wide text-gray-500 uppercase truncate">{label}</p>
         {Icon && (

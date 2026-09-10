@@ -44,7 +44,7 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   // parsing tiap literalnya untuk infer bentuk hasil query. Untuk select-string
   // sepanjang ini, compiler jadi "meledak" — persis error build tadi.
   const selectFields: string = isAdmin
-    ? "id, name, phone_number, email, role, roles, shift, gender, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, biometric_enabled, contract_status, active_contract_id, contract_valid_until, is_active, deactivated_at"
+    ? "id, name, phone_number, email, role, roles, shift, gender, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, biometric_enabled, contract_status, active_contract_id, contract_valid_until, is_active, deactivated_at, deactivated_by"
     : isKepala
       ? "id, name, phone_number, role, roles, shift, gender, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, is_active"
       : "id, name, role, roles, gender, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, is_active";
@@ -75,6 +75,12 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     (data ?? []).map((u: any) => clearExpiredStoryFields(supabaseAdmin, u))
   );
 
+  // Lookup id → nama dari data yang SUDAH diambil di atas. Tidak perlu query
+  // tambahan ke DB cuma untuk tahu nama si penonaktif.
+  const nameById = new Map<string, string>(
+    (data ?? []).map((u: any) => [u.id, u.name])
+  );
+
   const users = (data ?? []).map((u: any, i: number) => {
     const { noteExpired, songExpired } = expiryResults[i];
     return {
@@ -95,8 +101,13 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
       birth_date: u.birth_date ?? null,
       gender: u.gender ?? null,
       // Default true — user lama sebelum migrasi tidak boleh tiba-tiba dianggap mati
-      is_active: u.is_active ?? true,
+           is_active: u.is_active ?? true,
       deactivated_at: isAdmin ? (u.deactivated_at ?? null) : null,
+      // null kalau admin yang menonaktifkan sudah dihapus akunnya (FK jadi NULL)
+            deactivated_by: isAdmin ? (u.deactivated_by ?? null) : null,
+      deactivated_by_name: isAdmin && u.deactivated_by
+        ? (nameById.get(u.deactivated_by) ?? null)
+        : null,
       status_note: noteExpired ? null : (u.status_note ?? null),
       status_note_expires_at: noteExpired ? null : (u.status_note_expires_at ?? null),
       song_title: songExpired ? null : (u.song_title ?? null),
@@ -247,10 +258,13 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
       );
     }
 
-    const nowIso = new Date().toISOString();
+        const nowIso = new Date().toISOString();
     const statusUpdates: Record<string, any> = {
       is_active: _toggleActive,
       deactivated_at: _toggleActive ? null : nowIso,
+      // Dibersihkan saat diaktifkan lagi — biar tidak menyisakan jejak lama
+      // yang menyesatkan kalau nanti dinonaktifkan orang lain.
+      deactivated_by: _toggleActive ? null : currentUser.id,
     };
 
     // Saat dinonaktifkan, session yang sedang aktif ikut diakhiri —
