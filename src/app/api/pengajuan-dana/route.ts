@@ -9,8 +9,8 @@ import {
 } from "@/lib/permissions";
 
 // ── Ganti placeholder ini dengan ID Yulfa (Purchasing) dari hasil query SQL ──
-export const FUND_EXECUTOR_IDS: string[] = ["157585d5-af25-4271-80c6-93160b3f8975"];
-export const FUND_APPROVER_IDS: string[] = [YOGA_ADMIN_ID, REINALDY_ADMIN_ID];
+const FUND_EXECUTOR_IDS: string[] = ["157585d5-af25-4271-80c6-93160b3f8975"];
+const FUND_APPROVER_IDS: string[] = [YOGA_ADMIN_ID, REINALDY_ADMIN_ID];
 
 function db() {
   return createClient(
