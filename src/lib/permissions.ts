@@ -149,8 +149,21 @@ export const AKUNTANSI_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING",
  *  dimasukkan, dia cuma boleh lihat, bukan konfirmasi/edit/hapus jurnal. */
 export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOUNTING"];
 
+// ─── Pengajuan Dana ───────────────────────────────────────────────────────────
+// View: Admin/Programmer/Asisten CEO + Accounting + Purchasing + semua Kepala Divisi.
+// Create: HANYA Kepala Divisi (mereka yang mengajukan dana).
+// Approve/Execute: dikontrol per USER ID di API, bukan per role.
+const KEPALA_DIVISI_ROLES: UserRole[] = [
+  "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
+  "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG",
+];
+export const FUND_REQUEST_VIEW_ROLES: UserRole[] = [
+  ...FULL_ACCESS, "ACCOUNTING", "PURCHASING", ...KEPALA_DIVISI_ROLES,
+];
+export const FUND_REQUEST_CREATE_ROLES: UserRole[] = [...FULL_ACCESS, ...KEPALA_DIVISI_ROLES];
+
 // ─── Data Aset Tetap (Fixed Assets) ───────────────────────────────────────────
-// Input manual murni (nama aset + nominal), tidak terhubung ke modul akutansi/inventaris lain.
+// // Input manual murni (nama aset + nominal), tidak terhubung ke modul akutansi/inventaris lain.
 // Hapus "PROGRAMMER" di bawah kalau mau strict cuma Admin + Accounting.
 export const FIXED_ASSET_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
 
@@ -594,7 +607,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/leads-chat": [...LEADS_CHAT_ROLES],
   "/api/leads-chat": [...LEADS_CHAT_ROLES],
 
-      "/dashboard/laporan-harian-sales": [...SALES_REPORT_VIEW_ROLES],
+  "/dashboard/laporan-harian-sales": [...SALES_REPORT_VIEW_ROLES],
   "/api/sales-reports": [...SALES_REPORT_VIEW_ROLES],
   "/api/sales-reports/audit": [...SALES_REPORT_AUDIT_ROLES],
 
@@ -609,6 +622,8 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/monitoring-ceo": [...MONITORING_CEO_ROLES],
   "/dashboard/admin/notifikasi-pengantaran": [...NOTIFICATION_SETTINGS_ROLES],
   "/api/akutansi": [...AKUNTANSI_ROLES],
+  "/dashboard/pengajuan-dana": [...FUND_REQUEST_VIEW_ROLES],
+  "/api/pengajuan-dana": [...FUND_REQUEST_VIEW_ROLES],
   "/dashboard/fixed-assets": [...FIXED_ASSET_ROLES],
   "/api/fixed-assets": [...FIXED_ASSET_ROLES],
   "/dashboard/fixed-assets/aset-matot": [...DEAD_ASSET_ROLES],
@@ -714,7 +729,7 @@ export const PERMISSIONS = {
     "CUSTOMER_SERVICE",
   ] as UserRole[],
   CREATE_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI"] as UserRole[],
-    EDIT_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING"] as UserRole[],
+  EDIT_UNITS: [...FULL_ACCESS, "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG", "KEPALA_TEKNISI", "ACCOUNTING"] as UserRole[],
 
   VIEW_ALL_UNITS: [...ALL_UNITS_ROLES] as UserRole[],
 
@@ -800,72 +815,72 @@ export function hasPermission(
   return (allowed as UserRole[]).includes(role);
 }
 
-  // ── Dashboard: tampilan per role ──────────────────────────────────────────
-  // Dashboard lengkap (semua card + chart + transaksi terbaru) HANYA untuk
-  // FULL_ACCESS (Admin, Programmer, Asisten CEO). Role lain dapat versi
-  // ringkas: Laptop Ready + widget "Top X Hari Ini" (beda per divisi) +
-  // Laptop Terlaris.
-  export const DASHBOARD_FULL_ROLES: UserRole[] = [...FULL_ACCESS];
+// ── Dashboard: tampilan per role ──────────────────────────────────────────
+// Dashboard lengkap (semua card + chart + transaksi terbaru) HANYA untuk
+// FULL_ACCESS (Admin, Programmer, Asisten CEO). Role lain dapat versi
+// ringkas: Laptop Ready + widget "Top X Hari Ini" (beda per divisi) +
+// Laptop Terlaris.
+export const DASHBOARD_FULL_ROLES: UserRole[] = [...FULL_ACCESS];
 
-  export function isDashboardLimited(role: string | null | undefined): boolean {
-    if (!role) return false;
-    return !(DASHBOARD_FULL_ROLES as string[]).includes(role);
+export function isDashboardLimited(role: string | null | undefined): boolean {
+  if (!role) return false;
+  return !(DASHBOARD_FULL_ROLES as string[]).includes(role);
+}
+
+export type DashboardTopWidgetSource = "sales" | "leaderboard" | "none";
+
+export interface DashboardTopWidgetConfig {
+  label: string;
+  source: DashboardTopWidgetSource;
+  /** substring yang dicocokkan ke field `role` hasil /api/leaderboard-kerja
+   *  — HARUS disamakan manual dengan hasRole() di api/leaderboard-kerja/route.ts.
+   *  Cuma dipakai kalau source === "leaderboard". */
+  matchRole?: string;
+}
+
+// Role sales & variannya (onpoint/sotech/zenith) tetap pakai widget "Top
+// Sales" existing — sumber datanya stats.topSales (hitung transaksi),
+// BUKAN /api/leaderboard-kerja.
+const DASHBOARD_SALES_LIKE_ROLES: UserRole[] = [
+  "CREW_SALES", "KEPALA_SALES", "SOTECH", "KEPALA_SOTECH",
+  "ONPOINT", "KEPALA_ONPOINT", "KEPALA_ZENITH",
+  "PKL_SALES", "PKL_ZENITH", "PKL_SOTECH", "PKL_ONPOINT",
+];
+
+export function getDashboardTopWidgetConfig(
+  role: string | null | undefined
+): DashboardTopWidgetConfig {
+  if (!role) return { label: "Top Hari Ini", source: "none" };
+
+  if ((DASHBOARD_SALES_LIKE_ROLES as string[]).includes(role)) {
+    return { label: "Top Sales Hari Ini", source: "sales" };
+  }
+  if (role.includes("TEKNISI")) {
+    return { label: "Top Teknisi Hari Ini", source: "leaderboard", matchRole: "TEKNISI" };
+  }
+  if (role.includes("KONTEN") || role === "MARKETING" || role === "KEPALA_MARKETING") {
+    return { label: "Top Konten Hari Ini", source: "leaderboard", matchRole: "KONTEN" };
+  }
+  if (role.includes("PENYEDIA")) {
+    return { label: "Top Penyedia Barang Hari Ini", source: "leaderboard", matchRole: "PENYEDIA" };
+  }
+  if (role.includes("PENGANTARAN")) {
+    return { label: "Top Pengantaran Hari Ini", source: "leaderboard", matchRole: "PENGANTARAN" };
+  }
+  if (role.includes("PENGELOLA")) {
+    return { label: "Top Pengelola Barang Hari Ini", source: "leaderboard", matchRole: "PENGELOLA" };
+  }
+  if (role === "PURCHASING") {
+    return { label: "Top Purchasing Hari Ini", source: "leaderboard", matchRole: "PURCHASING" };
+  }
+  if (role.includes("ACCOUNTING")) {
+    return { label: "Top Accounting Hari Ini", source: "leaderboard", matchRole: "ACCOUNTING" };
   }
 
-  export type DashboardTopWidgetSource = "sales" | "leaderboard" | "none";
-
-  export interface DashboardTopWidgetConfig {
-    label: string;
-    source: DashboardTopWidgetSource;
-    /** substring yang dicocokkan ke field `role` hasil /api/leaderboard-kerja
-     *  — HARUS disamakan manual dengan hasRole() di api/leaderboard-kerja/route.ts.
-     *  Cuma dipakai kalau source === "leaderboard". */
-    matchRole?: string;
-  }
-
-  // Role sales & variannya (onpoint/sotech/zenith) tetap pakai widget "Top
-  // Sales" existing — sumber datanya stats.topSales (hitung transaksi),
-  // BUKAN /api/leaderboard-kerja.
-  const DASHBOARD_SALES_LIKE_ROLES: UserRole[] = [
-    "CREW_SALES", "KEPALA_SALES", "SOTECH", "KEPALA_SOTECH",
-    "ONPOINT", "KEPALA_ONPOINT", "KEPALA_ZENITH",
-    "PKL_SALES", "PKL_ZENITH", "PKL_SOTECH", "PKL_ONPOINT",
-  ];
-
-  export function getDashboardTopWidgetConfig(
-    role: string | null | undefined
-  ): DashboardTopWidgetConfig {
-    if (!role) return { label: "Top Hari Ini", source: "none" };
-
-    if ((DASHBOARD_SALES_LIKE_ROLES as string[]).includes(role)) {
-      return { label: "Top Sales Hari Ini", source: "sales" };
-    }
-    if (role.includes("TEKNISI")) {
-      return { label: "Top Teknisi Hari Ini", source: "leaderboard", matchRole: "TEKNISI" };
-    }
-    if (role.includes("KONTEN") || role === "MARKETING" || role === "KEPALA_MARKETING") {
-      return { label: "Top Konten Hari Ini", source: "leaderboard", matchRole: "KONTEN" };
-    }
-    if (role.includes("PENYEDIA")) {
-      return { label: "Top Penyedia Barang Hari Ini", source: "leaderboard", matchRole: "PENYEDIA" };
-    }
-    if (role.includes("PENGANTARAN")) {
-      return { label: "Top Pengantaran Hari Ini", source: "leaderboard", matchRole: "PENGANTARAN" };
-    }
-    if (role.includes("PENGELOLA")) {
-      return { label: "Top Pengelola Barang Hari Ini", source: "leaderboard", matchRole: "PENGELOLA" };
-    }
-    if (role === "PURCHASING") {
-      return { label: "Top Purchasing Hari Ini", source: "leaderboard", matchRole: "PURCHASING" };
-    }
-    if (role.includes("ACCOUNTING")) {
-      return { label: "Top Accounting Hari Ini", source: "leaderboard", matchRole: "ACCOUNTING" };
-    }
-
-    // CUSTOMER_SERVICE, KEBERSIHAN, dll — belum ada skor di leaderboard-kerja,
-    // widget "Top X" disembunyikan (cuma tampil Laptop Ready + Laptop Terlaris).
-    return { label: "Top Hari Ini", source: "none" };
-  }
+  // CUSTOMER_SERVICE, KEBERSIHAN, dll — belum ada skor di leaderboard-kerja,
+  // widget "Top X" disembunyikan (cuma tampil Laptop Ready + Laptop Terlaris).
+  return { label: "Top Hari Ini", source: "none" };
+}
 
 export const DIVISION_MAP: Record<string, UserRole[]> = {
   KEPALA_TEKNISI: [
@@ -875,7 +890,7 @@ export const DIVISION_MAP: Record<string, UserRole[]> = {
   ],
   KEPALA_SALES: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN"],
   KEPALA_ZENITH: ["CREW_SALES", "PENGANTARAN", "PKL_SALES", "PKL_PENGANTARAN", "PKL_ZENITH"],
-    KEPALA_MARKETING: ["MARKETING", "KONTEN", "PKL_MARKETING", "PKL_KONTEN"],
+  KEPALA_MARKETING: ["MARKETING", "KONTEN", "PKL_MARKETING", "PKL_KONTEN"],
   KEPALA_ONPOINT: ["ONPOINT", "PKL_ONPOINT"],
   KEPALA_PENYEDIA_BARANG: ["PENYEDIA_BARANG", "PKL_PENYEDIA_BARANG"],
   KEPALA_SOTECH: ["SOTECH", "PKL_SOTECH"],
