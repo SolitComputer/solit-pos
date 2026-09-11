@@ -297,7 +297,7 @@ export default function PengajuanDanaPage() {
   const [submitting, setSubmitting] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<FundRequest | null>(null);
-  
+
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -366,7 +366,6 @@ export default function PengajuanDanaPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Yakin ingin menghapus pengajuan ini?")) return;
     setActionLoading((p) => ({ ...p, [id]: true }));
     try {
       const res = await fetch(`/api/pengajuan-dana/${id}`, { method: "DELETE" });
@@ -688,7 +687,7 @@ export default function PengajuanDanaPage() {
                         <td className="px-3 py-4">
                           {canDelete && (
                             <button
-                              onClick={() => handleDelete(row.id)}
+                              onClick={() => setDeleteTarget(row)}
                               disabled={busy}
                               title="Hapus pengajuan"
                               className="p-2 rounded-xl text-slate-300 opacity-0 group-hover:opacity-100 hover:text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-30"
@@ -706,6 +705,51 @@ export default function PengajuanDanaPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+          style={{ animation: "pdBackdropIn 0.15s ease-out both" }}
+        >
+          <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={() => setDeleteTarget(null)} />
+          <div
+            className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
+            style={{ animation: "pdModalIn 0.25s cubic-bezier(0.16,1,0.3,1) both" }}
+          >
+            <div className="p-6 text-center space-y-4">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-100 flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-rose-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">Hapus Pengajuan?</h3>
+                <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
+                  Pengajuan <span className="font-bold text-slate-700">"{deleteTarget.purpose}"</span> sebesar{" "}
+                  <span className="font-bold text-slate-700">{formatRupiah(deleteTarget.amount)}</span> akan dihapus permanen.
+                </p>
+              </div>
+            </div>
+            <div className="px-6 pb-6 flex items-center gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={async () => {
+                  const id = deleteTarget.id;
+                  setDeleteTarget(null);
+                  await handleDelete(id);
+                }}
+                className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 active:bg-rose-700 rounded-full shadow-md shadow-rose-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       <FormModal
