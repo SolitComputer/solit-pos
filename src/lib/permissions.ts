@@ -642,6 +642,9 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // saudaranya di atas untuk defense-in-depth.
   "/api/admin/roles": [...ROLE_ACCESS_MANAGER_ROLES],
 
+   "/dashboard/sop-divisi": [...ALL_ROLES],
+  "/api/sop": [...ALL_ROLES],
+
   "/dashboard/profile": [...ALL_ROLES],
   "/dashboard/social": [...ALL_ROLES],
   "/api/profile": [...ALL_ROLES],

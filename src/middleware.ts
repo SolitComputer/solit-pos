@@ -689,10 +689,7 @@ export const config = {
     "/api/leads-chat/:path*",
     "/api/webhooks/:path*",
     "/api/vehicles/:path*",
-<<<<<<< Updated upstream
     "/api/pengajuan-dana/:path*",
-=======
     "/api/sop/:path*",
->>>>>>> Stashed changes
   ],
 };
