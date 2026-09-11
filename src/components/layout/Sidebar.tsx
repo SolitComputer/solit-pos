@@ -9,7 +9,7 @@ import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES } from "@/lib/permissions";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
@@ -203,7 +203,18 @@ const ITEM_PATCH_NOTES: MenuItem = { name: "Patch Notes", href: "/dashboard/admi
 const ITEM_AI_CEO: MenuItem = { name: "AI CEO", href: "/dashboard/ai-ceo", icon: Icons.aiCeo };
 const ITEM_TANYA_CEO: MenuItem = { name: "Tanya CEO", href: "/dashboard/tanya-ceo", icon: Icons.tanyaCeo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
-const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
+const ITEM_PENGAJUAN_DANA: MenuItem = {
+  name: "Pengajuan Dana",
+  href: "/dashboard/pengajuan-dana",
+  icon: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="6" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M12 14v4" />
+      <path d="M10 16h4" />
+    </svg>
+  ),
+}; const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
 const ITEM_LENCANA: MenuItem = { name: "Lencana", href: "/dashboard/lencana", icon: Icons.lencana };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
@@ -223,7 +234,7 @@ const ITEM_LAPORAN_SALES_HARIAN: MenuItem = { name: "Laporan Harian Sales", href
 // Laporan Harian Sales otomatis ke-preselect saat diklik dari sidebar.
 const LAPORAN_SALES_MENU: MenuGroup = {
   label: "Laporan Sales",
-  items: [ 
+  items: [
     ITEM_LAPORAN_SALES_HARIAN,
   ],
 };
@@ -740,7 +751,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_PENGANTARAN: [...PKL_MENU],
   PKL_CUSTOMER_SERVICE: [...PKL_MENU],
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
-    PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
+  PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
 };
 
 // ── Laporan Sales: grup sidebar tersendiri (WA/FB/OLX/Carousell/Mitra/
@@ -953,8 +964,25 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   }
 });
 
+// ── Pengajuan Dana: inject ke grup "Keuangan" ────────────────────────────────
+// Untuk role yang sudah punya grup "Keuangan", item disisipkan di akhir.
+// Untuk Kepala Divisi yang belum punya, grup baru dibuat otomatis.
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (!(FUND_REQUEST_VIEW_ROLES as string[]).includes(role)) return;
+  let hasKeuangan = false;
+  ROLE_MENUS[role] = ROLE_MENUS[role].map((g) => {
+    if (g.label !== "Keuangan") return g;
+    hasKeuangan = true;
+    if (g.items.some((it) => it.href === ITEM_PENGAJUAN_DANA.href)) return g;
+    return { label: g.label, items: [...g.items, ITEM_PENGAJUAN_DANA] };
+  });
+  if (!hasKeuangan) {
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Keuangan", items: [ITEM_PENGAJUAN_DANA] }];
+  }
+});
+
 // Riwayat SO: HANYA untuk SO_HISTORY_VIEW_ROLES. Sengaja tidak ditaruh
-// langsung di const ADMIN_INVENTARIS — grup itu dipakai bareng oleh
+// // langsung di const ADMIN_INVENTARIS — grup itu dipakai bareng oleh
 // ASISTEN_CEO juga (lihat `ASISTEN_CEO: [..., ADMIN_INVENTARIS, ...]`), yang
 // sengaja TIDAK boleh lihat menu ini. Item disisipkan TEPAT SETELAH
 // "Monitoring Stok" via findIndex, jadi tidak tergantung urutan array.
@@ -1175,7 +1203,7 @@ function SidebarContent({
             <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-indigo-600">
               <img src="/assets/solit03.jpeg" alt="Solit" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
-                       {!rail && <span className="text-sm font-extrabold text-[#1a1a2e] tracking-[-0.01em]">Solit POS</span>}
+            {!rail && <span className="text-sm font-extrabold text-[#1a1a2e] tracking-[-0.01em]">Solit POS</span>}
           </div>
           <div className="flex items-center gap-1">
             {onToggleRail && (
@@ -1244,7 +1272,8 @@ function SidebarContent({
             </Link>
             <CoinBalanceChip className="flex-shrink-0 ml-auto" />
           </div>
-        )}      </div>
+        )}      
+      </div>
 
       <div className={`h-px bg-slate-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
       {!rail && (
@@ -1716,7 +1745,6 @@ export default function Sidebar() {
     "/dashboard/ai-ceo": aiCeoEscalationCount,
 
     "/dashboard/leads-chat": leadsChat.unreadCount,
-
   };
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
   const displayGroups: MenuGroup[] = groups.map((g) => ({
