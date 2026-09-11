@@ -1894,7 +1894,7 @@ export default function CashflowPage() {
                                 type="text"
                                 value={currentFilter.search}
                                 onChange={(e) => handleFilterChange({ ...currentFilter, search: e.target.value })}
-                                placeholder="Cari nama / keterangan…"
+                                placeholder="Cari nama / keterangan / nominal…"
                                 className={`h-9 w-full border border-gray-200 rounded-lg pl-9 pr-8 text-sm bg-gray-50/60 focus:bg-white focus:outline-none ${BRAND_FOCUS} transition-all placeholder:text-gray-400`}
                             />
                             {currentFilter.search && (
