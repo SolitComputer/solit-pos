@@ -689,5 +689,6 @@ export const config = {
     "/api/leads-chat/:path*",
     "/api/webhooks/:path*",
     "/api/vehicles/:path*",
+    "/api/pengajuan-dana/:path*",
   ],
 };
