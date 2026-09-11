@@ -12,6 +12,14 @@ function FacebookIcon({ className }: { className?: string }) {
   );
 }
 
+function InstagramIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M12 2.2c3.2 0 3.6 0 4.9.07 1.2.06 1.8.25 2.2.42.6.22 1 .48 1.4.9.4.4.7.8.9 1.4.17.4.36 1 .42 2.2.06 1.3.07 1.7.07 4.9s0 3.6-.07 4.9c-.06 1.2-.25 1.8-.42 2.2-.22.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.17-1 .36-2.2.42-1.3.06-1.7.07-4.9.07s-3.6 0-4.9-.07c-1.2-.06-1.8-.25-2.2-.42-.6-.22-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.17-.4-.36-1-.42-2.2-.06-1.3-.07-1.7-.07-4.9s0-3.6.07-4.9c.06-1.2.25-1.8.42-2.2.22-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.17 1-.36 2.2-.42C8.4 2.2 8.8 2.2 12 2.2zm0 3.5A6.3 6.3 0 1 0 18.3 12 6.3 6.3 0 0 0 12 5.7zm0 10.4A4.1 4.1 0 1 1 16.1 12 4.1 4.1 0 0 1 12 16.1zm6.5-10.9a1.5 1.5 0 1 0 1.5 1.5 1.5 1.5 0 0 0-1.5-1.5z" />
+    </svg>
+  );
+}
+
 function MessageTicks({ status }: { status: string | null }) {
   if (!status) {
     return (
@@ -32,10 +40,12 @@ function MessageTicks({ status }: { status: string | null }) {
 
 interface WhatsappAccount { id: string; label: string; phone_number: string; status: "connecting" | "connected" | "disconnected" }
 interface FacebookAccount { id: string; label: string; page_id: string; status: "connecting" | "connected" | "disconnected" }
+interface InstagramAccount { id: string; label: string; ig_user_id: string; page_id: string; status: "connecting" | "connected" | "disconnected" }
 interface Conversation {
-  id: string; channel_type: "WHATSAPP" | "FACEBOOK"; customer_identifier: string;
+  id: string; channel_type: "WHATSAPP" | "FACEBOOK" | "INSTAGRAM"; customer_identifier: string;
   customer_name: string | null; last_message_preview: string | null; unread_count: number;
   whatsapp_accounts: { label: string; phone_number: string } | null;
+  instagram_accounts: { label: string } | null;
   is_group: boolean;
 }
 interface Message {
@@ -513,16 +523,140 @@ function FacebookPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
+function ImportInstagramTokenModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [label, setLabel] = useState("");
+  const [pageId, setPageId] = useState("");
+  const [token, setToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
+
+  const submit = async () => {
+    if (!label.trim() || !pageId.trim() || !token.trim()) { setError("Semua field wajib diisi"); return; }
+    setSaving(true); setError(""); setWarning("");
+    try {
+      const res = await fetch("/api/leads-chat/instagram-accounts/import", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label, pageId, pageAccessToken: token }),
+      });
+      const data = await res.json();
+      if (!data.success) { setError(data.message ?? "Gagal import"); return; }
+      if (data.subscribeWarning) { setWarning(data.subscribeWarning); onImported(); return; }
+      onImported(); onClose();
+    } catch { setError("Terjadi kesalahan jaringan"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400"><X className="w-4 h-4" /></button>
+        <h3 className="font-black text-lg text-[#1a1a2e] mb-1">Sambungkan Instagram Pakai Token</h3>
+        <p className="text-[11px] text-gray-400 mb-4">Pakai Page ID FB yang tertaut ke akun IG Professional + Page Access Token dari Graph API Explorer.</p>
+        <div className="space-y-3">
+          {error && <p className="text-xs text-red-600 font-semibold">{error}</p>}
+          {warning && <p className="text-xs text-amber-600 font-semibold">Tersimpan, tapi: {warning}</p>}
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label, mis. IG Solit 03"
+            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm" />
+          <input value={pageId} onChange={(e) => setPageId(e.target.value)} placeholder="Facebook Page ID (yang tertaut ke IG)"
+            className="w-full h-11 rounded-xl border border-gray-200 px-3.5 text-sm font-mono" />
+          <textarea value={token} onChange={(e) => setToken(e.target.value)} placeholder="Page Access Token"
+            className="w-full h-24 rounded-xl border border-gray-200 px-3.5 py-2 text-sm font-mono resize-none" />
+          <button onClick={submit} disabled={saving}
+            className="w-full h-11 rounded-xl bg-[#1a1a2e] text-white font-bold text-sm disabled:opacity-50">
+            {saving ? "Menyambungkan..." : "Sambungkan Instagram"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InstagramPanel({ onClose }: { onClose: () => void }) {
+  const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState<InstagramAccount | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [showImport, setShowImport] = useState(false);
+
+  const fetchAccounts = useCallback(async () => {
+    const res = await fetch("/api/leads-chat/instagram-accounts");
+    const data = await res.json();
+    if (data.success) setAccounts(data.accounts);
+  }, []);
+  useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/leads-chat/instagram-accounts/${confirmDelete.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok && res.status !== 404) { setDeleteError(data?.message ?? `Gagal hapus (status ${res.status})`); return; }
+      setConfirmDelete(null); fetchAccounts();
+    } catch { setDeleteError("Terjadi kesalahan jaringan saat hapus"); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-black text-lg text-[#1a1a2e]">Akun Instagram Tersambung</h3>
+          <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
+        </div>
+        <button onClick={() => setShowImport(true)}
+          className="w-full h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 mb-4">
+          <InstagramIcon className="w-3.5 h-3.5" /> Sambungkan Akun IG Pakai Token
+        </button>
+        <div className="space-y-2">
+          {accounts.map((acc) => (
+            <div key={acc.id} className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-gray-100">
+              <div>
+                <p className="text-sm font-bold text-gray-800">{acc.label}</p>
+                <p className="text-[11px] text-gray-400">IG ID: {acc.ig_user_id}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${acc.status === "connected" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                  {acc.status === "connected" ? "Tersambung" : "Menunggu"}
+                </span>
+                <button onClick={() => { setConfirmDelete(acc); setDeleteError(""); }} className="text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+          ))}
+          {accounts.length === 0 && <p className="text-xs text-gray-400 text-center py-6">Belum ada akun IG tersambung</p>}
+        </div>
+        {showImport && <ImportInstagramTokenModal onClose={() => setShowImport(false)} onImported={fetchAccounts} />}
+        {confirmDelete && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setConfirmDelete(null)} />
+            <div className="relative bg-white rounded-2xl p-5 max-w-xs w-full">
+              <p className="text-sm font-bold text-gray-800 mb-1">Lepas {confirmDelete.label}?</p>
+              <p className="text-xs text-gray-400 mb-2">Chat yang sudah masuk tetap tersimpan, akun ini cuma berhenti nerima DM baru.</p>
+              {deleteError && <p className="text-xs text-red-600 font-semibold mb-2">{deleteError}</p>}
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmDelete(null)} className="flex-1 h-9 rounded-xl bg-gray-100 text-xs font-semibold">Batal</button>
+                <button onClick={handleDelete} className="flex-1 h-9 rounded-xl bg-red-600 text-white text-xs font-bold">Ya, Lepas</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function LeadsChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeChannel, setActiveChannel] = useState<"ALL" | "WHATSAPP" | "FACEBOOK">("ALL");
+   const [activeChannel, setActiveChannel] = useState<"ALL" | "WHATSAPP" | "FACEBOOK" | "INSTAGRAM">("ALL");
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [showAccounts, setShowAccounts] = useState(false);
   const [showFacebook, setShowFacebook] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [showInstagram, setShowInstagram] = useState(false);
+    const [loading, setLoading] = useState(true);
   const [messagesError, setMessagesError] = useState("");
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -634,6 +768,10 @@ export default function LeadsChatPage() {
                 className="h-10 px-4 rounded-xl bg-[#1877F2] text-white text-xs font-bold flex items-center gap-1.5">
                 <FacebookIcon className="w-3.5 h-3.5" /> Kelola Page FB
               </button>
+              <button onClick={() => setShowInstagram(true)}
+                className="h-10 px-4 rounded-xl bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600 text-white text-xs font-bold flex items-center gap-1.5">
+                <InstagramIcon className="w-3.5 h-3.5" /> Kelola IG
+              </button>
               <button onClick={() => setShowAccounts(true)}
                 className="h-10 px-4 rounded-xl bg-[#1a1a2e] text-white text-xs font-bold flex items-center gap-1.5">
                 <Plus className="w-3.5 h-3.5" /> Kelola Nomor
@@ -648,6 +786,7 @@ export default function LeadsChatPage() {
                   { key: "ALL", label: "Semua", icon: null },
                   { key: "WHATSAPP", label: "WhatsApp", icon: <MessageCircle className="w-3 h-3" /> },
                   { key: "FACEBOOK", label: "Facebook", icon: <FacebookIcon className="w-3 h-3" /> },
+                  { key: "INSTAGRAM", label: "Instagram", icon: <InstagramIcon className="w-3 h-3" /> },
                 ] as const).map((t) => (
                   <button key={t.key} onClick={() => setActiveChannel(t.key)}
                     className={`flex-1 h-8 rounded-lg text-[10.5px] font-bold flex items-center justify-center gap-1 ${activeChannel === t.key ? "bg-[#1a1a2e] text-white" : "bg-gray-50 text-gray-500"}`}>
@@ -757,6 +896,7 @@ export default function LeadsChatPage() {
       </div>
       {showAccounts && <AccountsPanel onClose={() => setShowAccounts(false)} />}
       {showFacebook && <FacebookPanel onClose={() => setShowFacebook(false)} />}
+      {showInstagram && <InstagramPanel onClose={() => setShowInstagram(false)} />}
     </DashboardLayout>
   );
 }

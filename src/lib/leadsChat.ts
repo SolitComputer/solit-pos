@@ -72,6 +72,36 @@ export async function findOrCreateFacebookConversation(params: {
   return created;
 }
 
+export async function findOrCreateInstagramConversation(params: {
+  instagramAccountId: string;   // id row di tabel instagram_accounts kita
+  customerIgsid: string;
+  customerName?: string | null;
+}) {
+  const { data: existing, error: findErr } = await supabaseAdmin
+    .from("chat_conversations")
+    .select("*")
+    .eq("instagram_account_id", params.instagramAccountId)
+    .eq("customer_identifier", params.customerIgsid)
+    .maybeSingle();
+  if (findErr) throw findErr;
+  if (existing) return existing;
+
+  const { data: created, error: createErr } = await supabaseAdmin
+    .from("chat_conversations")
+    .insert({
+      channel_type: "INSTAGRAM",
+      instagram_account_id: params.instagramAccountId,
+      customer_identifier: params.customerIgsid,
+      customer_name: params.customerName ?? null,
+      is_group: false,
+      status: "OPEN",
+    })
+    .select("*")
+    .single();
+  if (createErr) throw createErr;
+  return created;
+}
+
 /** Kalau customer ganti nama profil WA-nya, ikutin di percakapan yang udah ada. */
 export async function refreshCustomerName(conversationId: string, newName?: string | null) {
   if (!newName) return;
@@ -97,6 +127,7 @@ export async function saveIncomingMessage(params: {
   mediaType?: string | null;
   fonnteMessageId?: string | null;
   facebookMessageId?: string | null;
+  instagramMessageId?: string | null;
   fromMember?: string | null;
   fromMemberName?: string | null;
 }) {
@@ -108,6 +139,7 @@ export async function saveIncomingMessage(params: {
     media_type: params.mediaType ?? null,
     fonnte_message_id: params.fonnteMessageId ?? null,
     facebook_message_id: params.facebookMessageId ?? null,
+    instagram_message_id: params.instagramMessageId ?? null,
     from_member: params.fromMember ?? null,
     from_member_name: params.fromMemberName ?? null,
   });
@@ -136,6 +168,7 @@ export async function saveOutgoingMessage(params: {
   mediaUrl?: string | null;
   senderUserId: string;
   fonnteMessageId?: string | null;
+  instagramMessageId?: string | null;
 }) {
   const { error } = await supabaseAdmin.from("chat_messages").insert({
     conversation_id: params.conversationId,
@@ -144,6 +177,7 @@ export async function saveOutgoingMessage(params: {
     media_url: params.mediaUrl ?? null,
     sender_user_id: params.senderUserId,
     fonnte_message_id: params.fonnteMessageId ?? null,
+    instagram_message_id: params.instagramMessageId ?? null,
   });
   if (error) throw error;
 
