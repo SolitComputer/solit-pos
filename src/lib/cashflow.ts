@@ -229,8 +229,8 @@ export function applyFilters<T extends {
       const nominalMatch =
         looksNumeric &&
         qDigits.length > 0 &&
-        (String(e.nominal ?? "") === qDigits ||
-          (e.source_nominal != null && String(e.source_nominal) === qDigits));
+        (String(e.nominal ?? "").includes(qDigits) ||
+          (e.source_nominal != null && String(e.source_nominal).includes(qDigits)));
 
       if (!textMatch && !nominalMatch) return false;
     }
