@@ -191,6 +191,8 @@ export function applyFilters<T extends {
   nama?: string;
   keterangan?: string | null;
   created_by_user?: { name: string } | null; // ⬅️ BARU: buat filter Nama
+  nominal?: number | null; // ⬅️ BARU: buat search nominal
+  source_nominal?: number | null; // ⬅️ BARU: buat search nominal terkini (entry stale "Kini Rp…")
 }>(entries: T[], filter: CashflowFilter): T[] {
   const q = filter.search.trim().toLowerCase();
 
@@ -213,8 +215,24 @@ export function applyFilters<T extends {
     }
     if (filter.nama !== "ALL" && getEntryDisplayNama(e) !== filter.nama) return false; // ⬅️ BARU
    if (q) {
+      // Teks: cari di Nama & Keterangan seperti semula
       const haystack = `${e.nama || ""} ${e.keterangan || ""}`.toLowerCase();
-      if (!haystack.includes(q)) return false;
+      const textMatch = haystack.includes(q);
+
+      // Nominal: kalau query "berbau angka" (hanya digit + pemisah titik/koma/
+      // spasi, boleh diawali "rp"), buang semua non-digit lalu cek apakah nominal
+      // entry mengandung angka itu. Jadi "2850000", "2.850.000", & "Rp2.850.000"
+      // sama-sama ketemu. Query teks biasa (nama/keterangan) TIDAK dipaksa cocok
+      // ke nominal supaya nggak muncul false-positive.
+      const looksNumeric = /^[\s.,rp0-9]+$/i.test(q) && /\d/.test(q);
+      const qDigits = q.replace(/\D/g, "");
+      const nominalMatch =
+        looksNumeric &&
+        qDigits.length > 0 &&
+        (String(e.nominal ?? "") === qDigits ||
+          (e.source_nominal != null && String(e.source_nominal) === qDigits));
+
+      if (!textMatch && !nominalMatch) return false;
     }
     return true;
   });
