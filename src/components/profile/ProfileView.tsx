@@ -21,6 +21,7 @@ import {
     MessageCircle, Eye, CheckCircle2, AlertCircle, Sparkles,
     Zap, Truck, Package, ShoppingCart, Wrench, Video, Boxes, Megaphone, UserCheck,
     Palette, ImageIcon,
+    Crown, Medal, Award, Star,
 } from "lucide-react";
 
 interface ProfileData {
@@ -59,6 +60,17 @@ interface AchievementsData {
     month: string;
     attendance: AchievementBlock;
     overtime: AchievementBlock;
+}
+
+// ✅ NEW — Penghargaan Custom: dibuat manual oleh Admin di /dashboard/lencana
+// (tab "Penghargaan"), bukan hasil hitungan otomatis seperti badge lain.
+interface CustomAward {
+    id: string;
+    title: string;
+    period_label: string | null;
+    icon: string;
+    color_scheme: string;
+    note: string | null;
 }
 
 const ADMIN_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO", "ACCOUNTING"];
@@ -115,6 +127,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [teknisiBadge, setTeknisiBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [kontenBadge, setKontenBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
     const [auditMarketingBadge, setAuditMarketingBadge] = useState<{ total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null>(null);
+    const [customAwards, setCustomAwards] = useState<CustomAward[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -157,12 +170,65 @@ export default function ProfileView({ userId }: { userId: string }) {
     const [showContractModal, setShowContractModal] = useState(false);
     const [showCoins, setShowCoins] = useState(false);
 
+    // ✅ NEW — Popup "Penghargaan" (Penghargaan Custom) di halaman profil
+    const [showAwardModal, setShowAwardModal] = useState(false);
+    const [showCustomAwardForm, setShowCustomAwardForm] = useState(false);
+    const [customTitle, setCustomTitle] = useState("");
+    const [customPeriod, setCustomPeriod] = useState("");
+    const [awardSubmitting, setAwardSubmitting] = useState(false);
+    const [deletingAwardId, setDeletingAwardId] = useState<string | null>(null);
+
     const showToast = (msg: string, type: "ok" | "err") => setToast({ msg, type });
     const isSelf = currentUser?.id === userId;
     const callerRoles = currentUser?.roles?.length ? currentUser.roles : [currentUser?.role].filter(Boolean) as string[];
     const isAdmin = callerRoles.some((r) => ADMIN_ROLES.includes(r));
     const canViewOthersContract = callerRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
+    // Khusus kelola Penghargaan Custom: diminta "hanya role ADMIN" (lebih ketat
+    // dari ADMIN_ROLES di atas yang juga mengizinkan PROGRAMMER/ASISTEN_CEO/ACCOUNTING).
+    const isCustomAwardAdmin = callerRoles.includes("ADMIN");
+    const currentMonthLabel = new Date().toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 
+    const handleCreateAward = async (payload: { title: string; period_label: string | null; icon: string; color_scheme: string }) => {
+        if (!payload.title) return;
+        setAwardSubmitting(true);
+        try {
+            const r = await fetch("/api/custom-awards", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: userId, ...payload }),
+            });
+            const d = await r.json();
+            if (d.success) {
+                setCustomAwards((prev) => [d.data, ...prev]);
+                setShowCustomAwardForm(false);
+                setCustomTitle("");
+                setCustomPeriod("");
+            } else {
+                showToast(d.message || "Gagal membuat penghargaan", "err");
+            }
+        } catch {
+            showToast("Terjadi kesalahan jaringan", "err");
+        } finally {
+            setAwardSubmitting(false);
+        }
+    };
+
+    const handleDeleteAward = async (id: string) => {
+        setDeletingAwardId(id);
+        try {
+            const r = await fetch(`/api/custom-awards?id=${id}`, { method: "DELETE" });
+            const d = await r.json();
+            if (d.success) {
+                setCustomAwards((prev) => prev.filter((a) => a.id !== id));
+            } else {
+                showToast(d.message || "Gagal menghapus penghargaan", "err");
+            }
+        } catch {
+            showToast("Terjadi kesalahan jaringan", "err");
+        } finally {
+            setDeletingAwardId(null);
+        }
+    };
     // Popup Solit Coins: buka via ?solitcoins=1 (dari chip lintas-halaman) atau
     // event "solit:open-coins" (chip saat sudah di halaman profil).
     useEffect(() => {
@@ -216,7 +282,7 @@ export default function ProfileView({ userId }: { userId: string }) {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-                        const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes, lemburanRes, pengelolaBarangRes, auditMarketingRes] = await Promise.all([
+                        const [meRes, profileRes, achRes, qualityRes, kerjaRes, deliveryRes, providerRes, salesRes, teknisiRes, kontenRes, lemburanRes, pengelolaBarangRes, auditMarketingRes, customAwardsRes] = await Promise.all([
                 getAuthUser().then(u => ({ ok: true, json: () => Promise.resolve({ success: true, user: u }) })),
                 fetch(`/api/profile?userId=${userId}`),
                 fetch(`/api/achievements?userId=${userId}`),
@@ -230,6 +296,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                 fetch(`/api/attendance/overtime-points?userId=${userId}`),
                 fetch(`/api/laptops/pengelola-points?userId=${userId}`),
                 fetch(`/api/sales-reports/audit-milestones?userId=${userId}`),
+                fetch(`/api/custom-awards?userId=${userId}`),
             ]);
             const meData = await meRes.json();
             const profileData = await profileRes.json();
@@ -244,6 +311,7 @@ export default function ProfileView({ userId }: { userId: string }) {
             const lemburanData = await lemburanRes.json();
             const pengelolaBarangData = await pengelolaBarangRes.json();
             const auditMarketingData = await auditMarketingRes.json();
+            const customAwardsData = await customAwardsRes.json();
             if (meData.user) setCurrentUser(meData.user);
             if (profileData.success) { setProfile(profileData.data); setBioDraft(profileData.data.bio ?? ""); }
             if (achData.success) setAchievements(achData.data);
@@ -257,6 +325,7 @@ export default function ProfileView({ userId }: { userId: string }) {
             if (lemburanData.success) setLemburanRank(lemburanData.data);
             if (pengelolaBarangData.success) setPengelolaBarangRank(pengelolaBarangData.data);
             if (auditMarketingData.success) setAuditMarketingBadge(auditMarketingData.data);
+            if (customAwardsData.success) setCustomAwards(customAwardsData.data || []);
         } catch {
             showToast("Gagal memuat profil", "err");
         } finally {
@@ -913,6 +982,81 @@ export default function ProfileView({ userId }: { userId: string }) {
                 </div>
             )}
 
+            {showAwardModal && (
+                <div className="fixed inset-0 z-[9995] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: "blur(6px)" }} onClick={() => { setShowAwardModal(false); setShowCustomAwardForm(false); }} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-black text-gray-900">Penghargaan — {profile.name.split(" ")[0]}</h3>
+                            <button onClick={() => { setShowAwardModal(false); setShowCustomAwardForm(false); }} className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-100">
+                                <X className="w-4 h-4 text-gray-500" />
+                            </button>
+                        </div>
+
+                        {customAwards.length > 0 && (
+                            <div className="space-y-2">
+                                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Penghargaan Saat Ini</p>
+                                {customAwards.map((a) => (
+                                    <div key={a.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-800 truncate">{a.title}</p>
+                                            {a.period_label && <p className="text-[10px] text-slate-400">{a.period_label}</p>}
+                                        </div>
+                                        <button onClick={() => handleDeleteAward(a.id)} disabled={deletingAwardId === a.id}
+                                            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 flex-shrink-0">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Beri Penghargaan Cepat</p>
+                            <div className="grid grid-cols-1 gap-2">
+                                <button onClick={() => handleCreateAward({ title: "Karyawan Terbaik", period_label: currentMonthLabel, icon: "trophy", color_scheme: "gold" })}
+                                    disabled={awardSubmitting}
+                                    className="text-left px-3.5 py-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-xs font-bold text-amber-700 transition-colors disabled:opacity-50">
+                                    Karyawan Terbaik Bulan {currentMonthLabel}
+                                </button>
+                                <button onClick={() => handleCreateAward({ title: "Leader Pemimpin", period_label: null, icon: "crown", color_scheme: "violet" })}
+                                    disabled={awardSubmitting}
+                                    className="text-left px-3.5 py-2.5 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-xs font-bold text-violet-700 transition-colors disabled:opacity-50">
+                                    Leader Pemimpin
+                                </button>
+                                <button onClick={() => handleCreateAward({ title: "Sales Terbaik", period_label: currentMonthLabel, icon: "star", color_scheme: "emerald" })}
+                                    disabled={awardSubmitting}
+                                    className="text-left px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-700 transition-colors disabled:opacity-50">
+                                    Sales Terbaik Bulan {currentMonthLabel}
+                                </button>
+                            </div>
+                        </div>
+
+                        {!showCustomAwardForm ? (
+                            <button onClick={() => setShowCustomAwardForm(true)}
+                                className="w-full text-center py-2.5 rounded-xl text-xs font-bold text-violet-600 hover:bg-violet-50 border border-dashed border-violet-200 transition-colors">
+                                + Buat Judul Custom
+                            </button>
+                        ) : (
+                            <div className="space-y-2.5 pt-1 border-t border-slate-100">
+                                <input value={customTitle} onChange={(e) => setCustomTitle(e.target.value)}
+                                    placeholder="Judul penghargaan..."
+                                    className="w-full h-9 rounded-xl border border-gray-200 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-violet-200" />
+                                <input value={customPeriod} onChange={(e) => setCustomPeriod(e.target.value)}
+                                    placeholder="Periode (opsional, mis. Agustus 2026)"
+                                    className="w-full h-9 rounded-xl border border-gray-200 px-3 text-xs focus:outline-none focus:ring-2 focus:ring-violet-200" />
+                                <button
+                                    onClick={() => handleCreateAward({ title: customTitle.trim(), period_label: customPeriod.trim() || null, icon: "award", color_scheme: "sky" })}
+                                    disabled={awardSubmitting || !customTitle.trim()}
+                                    className="w-full h-9 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#1a1a2e] to-[#16213e] disabled:opacity-50 flex items-center justify-center gap-2">
+                                    {awardSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Simpan Penghargaan Custom"}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {cropTarget && (
                 <ImageCropModal
                     src={cropTarget.src}
@@ -1097,12 +1241,22 @@ export default function ProfileView({ userId }: { userId: string }) {
                             )}
                         </div>
 
-                        {/* Admin delete photo button (for others) */}
-                        {isAdmin && !isSelf && profile.profile_photo_url && (
-                            <button onClick={() => setConfirmDelete(true)}
-                                className="mb-1 flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 shadow-xs">
-                                <Trash2 className="w-3.5 h-3.5" /> Hapus Foto
-                            </button>
+                        {/* Admin action buttons (for others): Penghargaan & Hapus Foto */}
+                        {(isCustomAwardAdmin || (isAdmin && profile.profile_photo_url)) && (
+                            <div className="mb-1 flex items-center gap-2">
+                                 {isCustomAwardAdmin && (
+                                    <button onClick={() => setShowAwardModal(true)}
+                                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 shadow-xs">
+                                        <Award className="w-3.5 h-3.5" /> Penghargaan
+                                    </button>
+                                )}
+                                {isAdmin && profile.profile_photo_url && (
+                                    <button onClick={() => setConfirmDelete(true)}
+                                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 shadow-xs">
+                                        <Trash2 className="w-3.5 h-3.5" /> Hapus Foto
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </div>
 
@@ -1158,6 +1312,7 @@ export default function ProfileView({ userId }: { userId: string }) {
                                 lemburanRank={lemburanRank}
                                 pengelolaBarangRank={pengelolaBarangRank}
                                 auditMarketingBadge={auditMarketingBadge}
+                                customAwards={customAwards}
                             />
                         )}
                     </div>
@@ -1412,7 +1567,7 @@ function RankBadge({ rank }: { rank: number }) {
     );
 }
 
-function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge, providerBadge, salesBadge, teknisiBadge, kontenBadge, lemburanRank, pengelolaBarangRank, auditMarketingBadge }: {
+function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge, providerBadge, salesBadge, teknisiBadge, kontenBadge, lemburanRank, pengelolaBarangRank, auditMarketingBadge, customAwards }: {
     achievements: AchievementsData;
     qualityRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
     kerjaRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
@@ -1424,6 +1579,7 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     lemburanRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
     pengelolaBarangRank?: { level: number; isPermanent: boolean; isTemporary: boolean; streakMonths: number; isOngoingMonth: boolean } | null;
     auditMarketingBadge?: { total: number; rank: number; totalRanked: number; milestone: number; hasBadge: boolean } | null;
+    customAwards?: CustomAward[];
 }) {
     const titles: { rank: number; label: string }[] = [];
     if (achievements.attendance.rankThisMonth !== null && achievements.attendance.rankThisMonth <= 10) {
@@ -1474,7 +1630,11 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
     // MILESTONE kumulatif poin audit (0,5 poin per laporan yang diaudit), bersifat
     // all-time & tidak dibatasi Top 3 — sama polanya dengan milestone lainnya.
     const hasAuditMarketingBadge = !!(auditMarketingBadge && auditMarketingBadge.hasBadge);
-    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge && !hasProviderBadge && !hasSalesBadge && !hasTeknisiBadge && !hasKontenBadge && !hasLemburanBadge && !hasPengelolaBarangBadge && !hasAuditMarketingBadge) return null;
+    // ✅ NEW — Penghargaan Custom bisa lebih dari satu per orang sekaligus
+    // (admin bisa kasih beberapa gelar), makanya dicek panjang array-nya,
+    // bukan satu flag boolean seperti badge lain di atas.
+    const hasCustomAwards = !!(customAwards && customAwards.length > 0);
+    if (titles.length === 0 && !hasQualityBadge && !hasKerjaBadge && !hasDeliveryBadge && !hasProviderBadge && !hasSalesBadge && !hasTeknisiBadge && !hasKontenBadge && !hasLemburanBadge && !hasPengelolaBarangBadge && !hasAuditMarketingBadge && !hasCustomAwards) return null;
     titles.sort((a, b) => a.rank - b.rank);
 
     return (
@@ -1509,6 +1669,9 @@ function AchievementTitles({ achievements, qualityRank, kerjaRank, deliveryBadge
             {hasAuditMarketingBadge && (
                 <AuditMarketingMilestoneBadge rank={auditMarketingBadge!.rank} milestone={auditMarketingBadge!.milestone} />
             )}
+            {hasCustomAwards && customAwards!.map((a) => (
+                <CustomAwardBadge key={a.id} title={a.title} periodLabel={a.period_label} icon={a.icon} colorScheme={a.color_scheme} />
+            ))}
                         {titles.map((t) => (
                 <AchievementTitleBadge key={t.label} rank={t.rank} label={t.label} />
             ))}
@@ -1751,6 +1914,52 @@ function AuditMarketingMilestoneBadge({ rank, milestone }: { rank: number; miles
             title={`${milestone}+ POIN`}
             subtitle="Audit Marketing"
             tooltip={`Peringkat #${rank} · ${milestone}+ poin audit`}
+        />
+    );
+}
+
+// ✅ NEW — badge Penghargaan Custom: beda dari badge lain di atas (yang
+// warna/isinya sudah tetap per kategori), ini warnanya dinamis sesuai
+// color_scheme yang dipilih Admin, makanya butuh peta warna & ikon sendiri.
+const AWARD_COLOR_STYLES: Record<string, { gradient: string; glow: string }> = {
+    gold: { gradient: "linear-gradient(135deg, #fde047, #f59e0b, #b45309)", glow: "rgba(245,158,11,0.35)" },
+    amber: { gradient: "linear-gradient(135deg, #fde047, #f59e0b, #b45309)", glow: "rgba(245,158,11,0.35)" },
+    violet: { gradient: "linear-gradient(135deg, #c4b5fd, #7c3aed, #4c1d95)", glow: "rgba(124,58,237,0.35)" },
+    blue: { gradient: "linear-gradient(135deg, #93c5fd, #2563eb, #1e3a8a)", glow: "rgba(37,99,235,0.35)" },
+    orange: { gradient: "linear-gradient(135deg, #fb923c, #ea580c, #9a3412)", glow: "rgba(234,88,12,0.35)" },
+    teal: { gradient: "linear-gradient(135deg, #2dd4bf, #0d9488, #115e59)", glow: "rgba(13,148,136,0.35)" },
+    rose: { gradient: "linear-gradient(135deg, #fb7185, #e11d48, #9f1239)", glow: "rgba(225,29,72,0.35)" },
+    emerald: { gradient: "linear-gradient(135deg, #4ade80, #16a34a, #166534)", glow: "rgba(22,163,74,0.35)" },
+    cyan: { gradient: "linear-gradient(135deg, #38bdf8, #0284c7, #075985)", glow: "rgba(2,132,199,0.35)" },
+    sky: { gradient: "linear-gradient(135deg, #7dd3fc, #0ea5e9, #0369a1)", glow: "rgba(14,165,233,0.35)" },
+    fuchsia: { gradient: "linear-gradient(135deg, #f0abfc, #c026d3, #86198f)", glow: "rgba(192,38,211,0.35)" },
+};
+
+const AWARD_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+    trophy: Trophy,
+    crown: Crown,
+    medal: Medal,
+    award: Award,
+    star: Star,
+};
+
+function CustomAwardBadge({
+    title, periodLabel, icon, colorScheme,
+}: {
+    title: string; periodLabel: string | null; icon: string; colorScheme: string;
+}) {
+    const style = AWARD_COLOR_STYLES[colorScheme] ?? AWARD_COLOR_STYLES.gold;
+    const IconComp = AWARD_ICON_MAP[icon] ?? Trophy;
+
+    return (
+        <BadgePill
+            gradient={style.gradient}
+            glow={style.glow}
+            premium
+            icon={<IconComp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />}
+            title={title}
+            subtitle={periodLabel || "Penghargaan"}
+            tooltip={periodLabel ? `${title} · ${periodLabel}` : title}
         />
     );
 }
