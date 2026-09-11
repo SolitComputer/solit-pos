@@ -22,6 +22,7 @@ import {
   Building2,
   AtSign,
   MessageSquareText,
+  Megaphone,
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getCurrentUserClient } from "@/lib/auth-client";
@@ -108,6 +109,7 @@ interface SalesReportEntry {
   partner_name: string | null;
   interest: string;
   keterangan: string | null;
+  sumber: string | null;
   purchased: boolean;
   filled_by: string;
   filled_by_name: string;
@@ -183,6 +185,7 @@ export default function LaporanHarianSalesPage() {
   const [partnerName, setPartnerName] = useState("");
   const [interest, setInterest] = useState("");
   const [keterangan, setKeterangan] = useState("");
+  const [sumber, setSumber] = useState("");
   const [purchased, setPurchased] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
@@ -277,6 +280,7 @@ export default function LaporanHarianSalesPage() {
     setPartnerName("");
     setInterest("");
     setKeterangan("");
+    setSumber("");
     setPurchased(false);
     setFormError("");
   };
@@ -295,6 +299,7 @@ export default function LaporanHarianSalesPage() {
     setPartnerName(entry.partner_name ?? "");
     setInterest(entry.interest);
     setKeterangan(entry.keterangan ?? "");
+    setSumber(entry.sumber ?? "");
     setPurchased(entry.purchased);
     setShowModal(true);
   };
@@ -340,6 +345,7 @@ export default function LaporanHarianSalesPage() {
             partner_name: isNoPhoneChannel ? partnerName.trim() : "",
             interest: interest.trim(),
             keterangan: keterangan.trim(),
+            sumber: sumber.trim(),
             purchased,
           }),
         }
@@ -656,6 +662,19 @@ export default function LaporanHarianSalesPage() {
                 </div>
 
                 <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Sumber (opsional)</label>
+                  <div className="relative">
+                    <Megaphone className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      value={sumber}
+                      onChange={(e) => setSumber(e.target.value)}
+                      placeholder="Contoh: Iklan FB, Story WA, Referral..."
+                      className="w-full pl-8 pr-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10 focus:bg-white transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
                   <label className="text-xs font-medium text-gray-600 mb-1.5 block">Status</label>
                   <div className="flex gap-2">
                     <button
@@ -942,6 +961,7 @@ export default function LaporanHarianSalesPage() {
                       <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Nama / Kontak</th>
                       <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Minat</th>
                       <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Keterangan</th>
+                      <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Sumber</th>
                       <th className="px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Transaksi</th>
                       <th className="px-4 py-3 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Audit</th>
                       <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Diinput Oleh</th>
@@ -970,11 +990,12 @@ export default function LaporanHarianSalesPage() {
                         <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap tabular-nums">
                           {entry.phone_number || entry.partner_name}
                           <div className="text-[10px] font-normal text-gray-400 mt-0.5">
-                            {new Date(entry.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                            {new Date(entry.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })} · {new Date(entry.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={entry.interest}>{entry.interest}</td>
                         <td className="px-4 py-3 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden md:table-cell" title={entry.keterangan || undefined}>{entry.keterangan || "—"}</td>
+                        <td className="px-4 py-3 text-gray-500 max-w-[160px] truncate hidden lg:table-cell" title={entry.sumber || undefined}>{entry.sumber || "—"}</td>
                         <td className="px-4 py-3 text-center">
                           <StatusBadge purchased={entry.purchased} />
                         </td>
@@ -1052,6 +1073,7 @@ export default function LaporanHarianSalesPage() {
                           <p className="text-sm font-medium text-gray-900 tabular-nums truncate">{entry.phone_number || entry.partner_name}</p>
                           <p className="text-[11px] text-gray-400 mt-0.5 truncate">
                             {entry.filled_by_name} ·{" "}
+                            {new Date(entry.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })}{" "}
                             {new Date(entry.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
                           </p>
                         </div>
@@ -1071,6 +1093,7 @@ export default function LaporanHarianSalesPage() {
                     </div>
                     <p className="text-xs text-gray-600 pl-10">{entry.interest}</p>
                     {entry.keterangan && <p className="text-[11px] text-gray-400 pl-10">{entry.keterangan}</p>}
+                    {entry.sumber && <p className="text-[11px] text-gray-400 pl-10">Sumber: {entry.sumber}</p>}
                     <div className="flex items-center gap-2 pt-1">
                       {!entry.audited && canAudit && (
                         <button

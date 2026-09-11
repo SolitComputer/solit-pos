@@ -35,6 +35,7 @@ const channelLabels: Record<Channel, string> = {
 
 interface LeadRow {
   id: string; channel: Channel; nama: string; minat: string; keterangan: string | null;
+  sumber: string | null;
   transaksi: boolean; ads: boolean; audited: boolean; audited_by_name: string | null;
   created_by: string; created_by_name: string; created_at: string;
   source: "manual" | "sales_report";
@@ -49,6 +50,27 @@ const sourceBadge: Record<LeadRow["source"], { label: string; className: string 
   manual: { label: "Input Manual", className: "bg-violet-50 text-violet-600" },
   sales_report: { label: "Laporan Sales", className: "bg-blue-50 text-blue-600" },
 };
+
+// Palet avatar inisial kolom "Diinput Oleh" — warna dipilih deterministik dari
+// nama (pola sama seperti di halaman Laporan Harian Sales).
+const AVATAR_PALETTE = [
+  "bg-blue-50 text-blue-600",
+  "bg-emerald-50 text-emerald-600",
+  "bg-amber-50 text-amber-600",
+  "bg-violet-50 text-violet-600",
+  "bg-rose-50 text-rose-600",
+  "bg-cyan-50 text-cyan-600",
+];
+
+function avatarStyle(name: string) {
+  const sum = name.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  return AVATAR_PALETTE[sum % AVATAR_PALETTE.length];
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
+}
 
 async function parseApiResponse(res: Response) {
   const text = await res.text();
@@ -138,7 +160,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
 
   return (
     <DashboardLayout>
-      <div className="max-w-5xl mx-auto space-y-4 sm:space-y-5 p-3 sm:p-6 pb-16">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-5 p-3 sm:p-6 pb-16">
         {/* Animasi dekoratif blob di header — satu momen gerak halus,
             dimatikan otomatis kalau user aktifkan prefers-reduced-motion. */}
         <style>{`
@@ -217,20 +239,21 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
               <thead>
                 <tr className="bg-violet-50/70 border-b border-violet-100">
                   <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700 w-10">No</th>
-                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700">Nama</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700">Nama/No Telpon</th>
                   <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700">Minat</th>
                   <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700 hidden lg:table-cell">Keterangan</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700 hidden lg:table-cell">Sumber</th>
                   <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-violet-700">Transaksi</th>
                   <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-violet-700 hidden lg:table-cell">Ads</th>
                   <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-violet-700">Audit</th>
-                  <th className="px-4 py-2.5 text-center text-[11px] font-semibold text-violet-700 w-20">Aksi</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-violet-700 hidden lg:table-cell">Diinput Oleh</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {loading ? (
                   [1, 2, 3].map((i) => (
                     <tr key={i}>
-                      <td colSpan={8} className="px-4 py-3.5">
+                      <td colSpan={9} className="px-4 py-3.5">
                         <div className="flex items-center gap-3 animate-pulse">
                           <div className="h-3 w-5 bg-gray-100 rounded-full" />
                           <div className="h-3 flex-1 max-w-[160px] bg-gray-100 rounded-full" />
@@ -242,7 +265,7 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                   ))
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12">
+                    <td colSpan={9} className="px-4 py-12">
                       <div className="flex flex-col items-center text-center">
                         <div className="w-11 h-11 rounded-full bg-violet-50 flex items-center justify-center mb-3">
                           <Inbox className="w-5 h-5 text-violet-300" />
@@ -258,12 +281,16 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                       <td className="px-4 py-3 text-gray-400 tabular-nums">{(page - 1) * PAGE_SIZE + i + 1}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{row.nama}</p>
+                        <div className="text-[10px] font-normal text-gray-400 mt-0.5">
+                          {new Date(row.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })} · {new Date(row.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                        </div>
                         <span className={`inline-flex mt-1 items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${sourceBadge[row.source].className}`}>
                           {sourceBadge[row.source].label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 max-w-[140px] truncate" title={row.minat}>{row.minat}</td>
-                      <td className="px-4 py-3 text-gray-500 max-w-[160px] truncate hidden lg:table-cell" title={row.keterangan || undefined}>{row.keterangan || "—"}</td>
+                      <td className="px-4 py-3 text-gray-600 min-w-[160px] max-w-[240px] whitespace-normal break-words" title={row.minat}>{row.minat}</td>
+                      <td className="px-4 py-3 text-gray-500 min-w-[160px] max-w-[260px] whitespace-normal break-words hidden lg:table-cell" title={row.keterangan || undefined}>{row.keterangan || "—"}</td>
+                      <td className="px-4 py-3 text-gray-500 max-w-[140px] truncate hidden lg:table-cell" title={row.sumber || undefined}>{row.sumber || "—"}</td>
                       <td className="px-4 py-3 text-center">
                         <TransaksiBadge value={row.transaksi} />
                       </td>
@@ -293,23 +320,13 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                           <span className="text-[11px] text-gray-300 font-medium">Belum</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        {!row.audited && row.source === "manual" && (
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => { setEditingRow(row); setShowForm(true); }}
-                              className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/30"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(row.id)}
-                              className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/30"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        )}
+                      <td className="px-4 py-3 whitespace-nowrap hidden lg:table-cell">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 ${avatarStyle(row.created_by_name)}`}>
+                            {initials(row.created_by_name)}
+                          </span>
+                          <span className="text-gray-600">{row.created_by_name}</span>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -350,10 +367,19 @@ export default function AuditLeadsChannelPage({ params }: { params: Promise<{ ch
                         {sourceBadge[row.source].label}
                       </span>
                     </div>
-                    <TransaksiBadge value={row.transaksi} />
+                    <TransaksiBadge value={row.transaksi} /> 
                   </div>
                   <p className="text-xs text-gray-600">{row.minat}</p>
                   {row.keterangan && <p className="text-[11px] text-gray-400">{row.keterangan}</p>}
+                  {row.sumber && <p className="text-[11px] text-gray-400">Sumber: {row.sumber}</p>}
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 ${avatarStyle(row.created_by_name)}`}>
+                      {initials(row.created_by_name)}
+                    </span>
+                    <span className="text-[11px] text-gray-500 truncate">
+                      {row.created_by_name} · {new Date(row.created_at).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })} {new Date(row.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {row.source !== "sales_report" && <AdsBadge value={row.ads} />}
                     {row.audited ? (
