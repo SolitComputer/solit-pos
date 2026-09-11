@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { YOGA_ADMIN_ID, REINALDY_ADMIN_ID } from "@/lib/contractSigners";
 import {
   FUND_REQUEST_VIEW_ROLES,
   FUND_REQUEST_CREATE_ROLES,
   type UserRole,
 } from "@/lib/permissions";
 
-// ── Ganti placeholder ini dengan ID Yulfa (Purchasing) dari hasil query SQL ──
-const FUND_EXECUTOR_IDS: string[] = ["157585d5-af25-4271-80c6-93160b3f8975"];
-const FUND_APPROVER_IDS: string[] = [YOGA_ADMIN_ID, REINALDY_ADMIN_ID];
+// Import variabel dari file baru
+import { FUND_EXECUTOR_IDS, FUND_APPROVER_IDS } from "@/lib/fundConfig";
 
 function db() {
   return createClient(
