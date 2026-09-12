@@ -9,7 +9,8 @@ import { useLeadsChatNotify } from "@/hooks/useLeadsChatNotify";
 import { usePrepAlarm, ALARM_KEYS, isPrepSilent } from "@/lib/prepAlarm";
 import { unlockAudio } from "@/lib/preparationSound";
 import { UserRole } from "@/lib/auth";
-import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES } from "@/lib/permissions";
+import { mergeMenuGroups, isPKLRole, expandRolesWithParents, AI_CEO_ROLES, AI_ASSISTANT_ROLES, ITEM_OUTFLOW_ROLES, FIXED_ASSET_ROLES, DEAD_ASSET_ROLES, SO_HISTORY_VIEW_ROLES, FUND_REQUEST_VIEW_ROLES } from "@/lib/permissions";
+import { hasSopAccess } from "@/lib/sop";
 import { useReminderBadge } from "@/hooks/useReminderBadge";
 import { useDeliveryBadge } from "@/hooks/useDeliveryBadge";
 import { useNotificationSettings } from "@/hooks/useNotificationSound";
@@ -180,7 +181,8 @@ const Icons = {
   fingerprint: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 015 5v2" /><path d="M7 9V7a5 5 0 019.8-1.5" /><path d="M4.5 10.5V9a7.5 7.5 0 011-3.8" /><path d="M12 9v3.5a5.5 5.5 0 01-1.2 3.4" /><path d="M16 9v2.5c0 3-1 5.5-3 7" /><path d="M8.5 9v3c0 3.5-1 6-3 8" /><path d="M19.5 9v1.5c0 4.5-1.5 8-4 10.5" /></svg>),
   auditOutflow: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12l2 2 4-4" /></svg>),
   fixedAsset: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01" /></svg>),
-  assetMatot: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v8" /><path d="M18.36 6.64a9 9 0 11-12.73 0" /></svg>),
+    assetMatot: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v8" /><path d="M18.36 6.64a9 9 0 11-12.73 0" /></svg>),
+  sopDivisi: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6" /><path d="M9 16h6" /></svg>),
   kendaraan: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 11l1.5-4.5A2 2 0 018.4 5h7.2a2 2 0 011.9 1.5L19 11" /><path d="M3 11h18v5a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H6v1a1 1 0 01-1 1H4a1 1 0 01-1-1z" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></svg>),
   salesReport: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" /><path d="M9 12l2 2 4-4" /></svg>),
 };
@@ -203,7 +205,18 @@ const ITEM_PATCH_NOTES: MenuItem = { name: "Patch Notes", href: "/dashboard/admi
 const ITEM_AI_CEO: MenuItem = { name: "AI CEO", href: "/dashboard/ai-ceo", icon: Icons.aiCeo };
 const ITEM_TANYA_CEO: MenuItem = { name: "Tanya CEO", href: "/dashboard/tanya-ceo", icon: Icons.tanyaCeo };
 const ITEM_AKUNTANSI: MenuItem = { name: "Akuntansi", href: "/dashboard/akutansi", icon: Icons.accounting };
-const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
+const ITEM_PENGAJUAN_DANA: MenuItem = {
+  name: "Pengajuan Dana",
+  href: "/dashboard/pengajuan-dana",
+  icon: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="6" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M12 14v4" />
+      <path d="M10 16h4" />
+    </svg>
+  ),
+}; const ITEM_PROFILE: MenuItem = { name: "Profil Saya", href: "/dashboard/profile", icon: Icons.profile };
 const ITEM_LENCANA: MenuItem = { name: "Lencana", href: "/dashboard/lencana", icon: Icons.lencana };
 const ITEM_SOCIAL: MenuItem = { name: "Sosial", href: "/dashboard/social", icon: Icons.social };
 const ITEM_BIOMETRIC_ENROLL: MenuItem = { name: "Daftar Sidik Jari", href: "/biometric-enroll", icon: Icons.fingerprint };
@@ -211,6 +224,8 @@ const ITEM_CONTRACT: MenuItem = { name: "Perjanjian Kontrak", href: "/contract",
 const ITEM_CONTRACT_SIGN: MenuItem = { name: "Tanda Tangan Kontrak", href: "/contract/pending-signature", icon: Icons.pklReport };
 const ITEM_KENDARAAN: MenuItem = { name: "Management Kendaraan", href: "/dashboard/kendaraan", icon: Icons.kendaraan };
 const ITEM_KENDARAAN_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard/kendaraan/dashboard", icon: Icons.reports };
+
+const ITEM_SOP_DIVISI: MenuItem = { name: "SOP Divisi", href: "/dashboard/sop-divisi", icon: Icons.sopDivisi };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
@@ -223,7 +238,7 @@ const ITEM_LAPORAN_SALES_HARIAN: MenuItem = { name: "Laporan Harian Sales", href
 // Laporan Harian Sales otomatis ke-preselect saat diklik dari sidebar.
 const LAPORAN_SALES_MENU: MenuGroup = {
   label: "Laporan Sales",
-  items: [ 
+  items: [
     ITEM_LAPORAN_SALES_HARIAN,
   ],
 };
@@ -740,7 +755,7 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_PENGANTARAN: [...PKL_MENU],
   PKL_CUSTOMER_SERVICE: [...PKL_MENU],
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
-    PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
+  PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
 };
 
 // ── Laporan Sales: grup sidebar tersendiri (WA/FB/OLX/Carousell/Mitra/
@@ -764,7 +779,7 @@ LAPORAN_SALES_ROLES.forEach((role) => {
 // lewat PKL_MENU_INHERIT di bawah.
 const AUDIT_LEADS_MENU_ROLES: UserRole[] = [
   "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
-  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "SOTECH", "KEPALA_SOTECH",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
   "KEPALA_MARKETING", "MARKETING",
 ];
@@ -858,8 +873,9 @@ const GROUP_ORDER: string[] = [
   "Marketing",
   "Absensi",
   "Log",
-  "Ultah",
+   "Ultah",
   "Management",
+  "SOP Pekerjaan",
 ];
 
 function sortGroupsByCanonicalOrder(groups: MenuGroup[]): MenuGroup[] {
@@ -953,8 +969,25 @@ const DATA_BARANG_ALLOWED_ROLES = new Set<UserRole>([
   }
 });
 
+// ── Pengajuan Dana: inject ke grup "Keuangan" ────────────────────────────────
+// Untuk role yang sudah punya grup "Keuangan", item disisipkan di akhir.
+// Untuk Kepala Divisi yang belum punya, grup baru dibuat otomatis.
+(Object.keys(ROLE_MENUS) as UserRole[]).forEach((role) => {
+  if (!(FUND_REQUEST_VIEW_ROLES as string[]).includes(role)) return;
+  let hasKeuangan = false;
+  ROLE_MENUS[role] = ROLE_MENUS[role].map((g) => {
+    if (g.label !== "Keuangan") return g;
+    hasKeuangan = true;
+    if (g.items.some((it) => it.href === ITEM_PENGAJUAN_DANA.href)) return g;
+    return { label: g.label, items: [...g.items, ITEM_PENGAJUAN_DANA] };
+  });
+  if (!hasKeuangan) {
+    ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: "Keuangan", items: [ITEM_PENGAJUAN_DANA] }];
+  }
+});
+
 // Riwayat SO: HANYA untuk SO_HISTORY_VIEW_ROLES. Sengaja tidak ditaruh
-// langsung di const ADMIN_INVENTARIS — grup itu dipakai bareng oleh
+// // langsung di const ADMIN_INVENTARIS — grup itu dipakai bareng oleh
 // ASISTEN_CEO juga (lihat `ASISTEN_CEO: [..., ADMIN_INVENTARIS, ...]`), yang
 // sengaja TIDAK boleh lihat menu ini. Item disisipkan TEPAT SETELAH
 // "Monitoring Stok" via findIndex, jadi tidak tergantung urutan array.
@@ -1009,6 +1042,22 @@ function withKendaraanGroup(groups: MenuGroup[]): MenuGroup[] {
   const utamaIdx = rest.findIndex((g) => g.label === "Utama");
   const at = utamaIdx >= 0 ? utamaIdx + 1 : 0;
   return [...rest.slice(0, at), KENDARAAN_GROUP, ...rest.slice(at)];
+}
+
+// SOP Pekerjaan: grup sidebar berisi "SOP Divisi".
+// Ditambahkan kondisional — hanya muncul kalau user punya mapping divisi
+// SOP atau merupakan admin (lihat hasSopAccess di lib/sop.ts).
+const SOP_GROUP: MenuGroup = {
+  label: "SOP Pekerjaan",
+  items: [ITEM_SOP_DIVISI],
+};
+
+function withSopGroup(groups: MenuGroup[], userEffectiveRoles: string[]): MenuGroup[] {
+  if (!hasSopAccess(userEffectiveRoles)) return groups;
+  const rest = groups.filter((g) => g.label !== "SOP Pekerjaan");
+  const utamaIdx = rest.findIndex((g) => g.label === "Utama");
+  const at = utamaIdx >= 0 ? utamaIdx + 1 : 0;
+  return [...rest.slice(0, at), SOP_GROUP, ...rest.slice(at)];
 }
 
 const ROLE_META: Record<UserRole, { label: string; className: string }> = {
@@ -1175,7 +1224,7 @@ function SidebarContent({
             <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0 bg-indigo-600">
               <img src="/assets/solit03.jpeg" alt="Solit" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
-                       {!rail && <span className="text-sm font-extrabold text-[#1a1a2e] tracking-[-0.01em]">Solit POS</span>}
+            {!rail && <span className="text-sm font-extrabold text-[#1a1a2e] tracking-[-0.01em]">Solit POS</span>}
           </div>
           <div className="flex items-center gap-1">
             {onToggleRail && (
@@ -1244,7 +1293,8 @@ function SidebarContent({
             </Link>
             <CoinBalanceChip className="flex-shrink-0 ml-auto" />
           </div>
-        )}      </div>
+        )}      
+      </div>
 
       <div className={`h-px bg-slate-100 flex-shrink-0 ${rail ? "mx-2" : "mx-4"}`} />
       {!rail && (
@@ -1599,7 +1649,7 @@ export default function Sidebar() {
 
   const isContractSigner = user?.id === YOGA_ADMIN_ID || user?.id === REINALDY_ADMIN_ID;
 
-  const groups: MenuGroup[] = withKendaraanGroup(
+  const groups: MenuGroup[] = withSopGroup(withKendaraanGroup(
     dedupeGroups([
       ...(contractStatus && contractStatus !== "APPROVED" ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT] }] : []),
       ...(isContractSigner ? [{ label: "Kontrak Kerja", items: [ITEM_CONTRACT_SIGN] }] : []),
@@ -1610,7 +1660,7 @@ export default function Sidebar() {
         items: g.items.map((it) => ({ ...it, icon: Icons.dashboard })),
       })),
     ])
-  );
+  ), effectiveRoles);
 
   const groupsSig = groups.map((g) => g.label).join("|");
 
@@ -1716,7 +1766,6 @@ export default function Sidebar() {
     "/dashboard/ai-ceo": aiCeoEscalationCount,
 
     "/dashboard/leads-chat": leadsChat.unreadCount,
-
   };
   const isUserMgmtAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"].includes(r));
   const displayGroups: MenuGroup[] = groups.map((g) => ({

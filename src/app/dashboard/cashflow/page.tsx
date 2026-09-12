@@ -76,7 +76,7 @@ type Entry = {
     nominal: number;
     modal: number | null;
     keterangan: string | null;
-    source_type: "MANUAL" | "TRANSACTION" | "TRANSACTION_PAYMENT" | "TRANSACTION_DP" | "SERVICE" | "MODAL_AWAL";
+    source_type: "MANUAL" | "TRANSACTION" | "TRANSACTION_PAYMENT" | "TRANSACTION_DP" | "SERVICE" | "MODAL_AWAL" | "PENGAJUAN_DANA";
     source_id: string | null;
     invoice_number?: string | null;
     tanggal: string;
@@ -225,7 +225,7 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
     const fmtDateExcel = (d?: string) =>
         d ? new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
     const sourceLabel = (s: Entry["source_type"]) =>
-        ({ TRANSACTION: "Transaksi", TRANSACTION_PAYMENT: "Pembayaran", TRANSACTION_DP: "DP Transaksi", SERVICE: "Service", MODAL_AWAL: "Modal Awal", MANUAL: "Manual" }[s] ?? s);
+        ({ TRANSACTION: "Transaksi", TRANSACTION_PAYMENT: "Pembayaran", TRANSACTION_DP: "DP Transaksi", SERVICE: "Service", MODAL_AWAL: "Modal Awal", PENGAJUAN_DANA: "Manual", MANUAL: "Manual" }[s] ?? s);
     const methodLabel = (m: Entry["payment_method"]) =>
         m === "CASH" ? "Cash" : m === "SALDO" ? "Saldo" : "—";
     const auditLabel = (e: Entry) =>
@@ -1894,7 +1894,7 @@ export default function CashflowPage() {
                                 type="text"
                                 value={currentFilter.search}
                                 onChange={(e) => handleFilterChange({ ...currentFilter, search: e.target.value })}
-                                placeholder="Cari nama / keterangan…"
+                                placeholder="Cari nama / keterangan / nominal…"
                                 className={`h-9 w-full border border-gray-200 rounded-lg pl-9 pr-8 text-sm bg-gray-50/60 focus:bg-white focus:outline-none ${BRAND_FOCUS} transition-all placeholder:text-gray-400`}
                             />
                             {currentFilter.search && (
@@ -2092,7 +2092,7 @@ export default function CashflowPage() {
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap"><SourceBadge sourceType={e.source_type} /></td>
                                                 <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                    {e.source_type === "MANUAL" ? (
+                                                    {e.payment_method ? (
                                                         e.payment_method === "SALDO"
                                                             ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={11} /> Saldo</span>
                                                             : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={11} /> Cash</span>
