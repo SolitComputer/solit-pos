@@ -200,7 +200,7 @@ function TransactionRow({ item, onPhotoClick, canSeeFinancials }: {
             <span className="font-mono text-slate-400 text-[10px]">{item.invoice_number}</span>
           </p>
 
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             {item.sales_name && (
               <span className="text-[10px] text-slate-400 font-medium">
                 Sales: <strong className="text-slate-600 font-semibold">{item.sales_name}</strong>
@@ -286,6 +286,7 @@ export default function Page() {
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isDonutHovered, setIsDonutHovered] = useState(false);
   
   // Modals state
   const [showRevenueModal, setShowRevenueModal] = useState(false);
@@ -535,6 +536,9 @@ export default function Page() {
     responsive: true,
     maintainAspectRatio: false,
     cutout: "75%",
+    onHover: (_event: any, elements: any[]) => {
+      setIsDonutHovered(elements.length > 0);
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -814,18 +818,23 @@ export default function Page() {
               </div>
 
               {/* Donut Chart Container */}
-              <div className="relative my-4 h-44 flex items-center justify-center">
+              <div
+                className="relative my-4 h-44 flex items-center justify-center"
+                onMouseLeave={() => setIsDonutHovered(false)}
+              >
                 {isLoading ? (
                   <Shimmer className="w-36 h-36 rounded-full" />
                 ) : (
                   <>
                     <DoughnutChart data={donutData} options={doughnutOptions} />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Profit</span>
-                      <span className="text-base font-extrabold text-slate-900 tabular-nums">
-                        {fmtShort(stats?.todayProfit || 0)}
-                      </span>
-                    </div>
+                    {!isDonutHovered && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Profit</span>
+                        <span className="text-base font-extrabold text-slate-900 tabular-nums">
+                          {fmtShort(stats?.todayProfit || 0)}
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

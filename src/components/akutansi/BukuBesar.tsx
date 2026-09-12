@@ -1,7 +1,7 @@
 "use client";
 // src/components/akutansi/BukuBesar.tsx
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ACCOUNTS, ACCOUNT_TYPE_LABEL, ACCOUNT_TYPE_ORDER } from "@/lib/accounting";
 import { Lock, Pencil, BookOpen, Check, X, AlertTriangle, DollarSign, Search } from "lucide-react";
 
@@ -88,10 +88,15 @@ export default function BukuBesar({ period }: { period: string }) {
     const [allAccounts, setAllAccounts] = useState<{ code: string; name: string; type: string }[]>(ACCOUNTS);
     const [accountCode, setAccountCode] = useState<string>(ACCOUNTS[0]?.code ?? "");
     const [tableSearch, setTableSearch] = useState("");
+    // Filter status cek: "all" = semua, "checked" = sudah dicek, "unchecked" = belum dicek
+    const [checkFilter, setCheckFilter] = useState<"all" | "checked" | "unchecked">("all"); 
     const [data, setData] = useState<LedgerData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [showOpeningModal, setShowOpeningModal] = useState(false);
+      const [showOpeningModal, setShowOpeningModal] = useState(false);
+    // (fix) baris id yang lagi proses centang (PATCH belum selesai) — dipakai load()
+    // supaya auto-refresh nggak nimpa optimistic update yang belum ke-confirm server.
+    const pendingChecksRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         fetch("/api/akutansi/accounts")
@@ -115,7 +120,21 @@ export default function BukuBesar({ period }: { period: string }) {
                 }
                 return;
             }
-            setData(json.data);
+                        setData((prev) => {
+                // (fix) kalau ada centang yang masih pending, pertahankan nilai checked
+                // lokal untuk baris itu — jangan biarkan snapshot GET yang datang telat
+                // (diambil sebelum PATCH commit) menimpa balik jadi unchecked.
+                if (pendingChecksRef.current.size === 0 || !prev) return json.data;
+                const prevById = new Map(prev.lines.map((l) => [l.id, l]));
+                const mergedLines = json.data.lines.map((l: LedgerLine) => {
+                    if (!pendingChecksRef.current.has(l.id)) return l;
+                    const local = prevById.get(l.id);
+                    return local
+                        ? { ...l, checked: local.checked, checked_at: local.checked_at, checked_by_name: local.checked_by_name }
+                        : l;
+                });
+                return { ...json.data, lines: mergedLines };
+            });
         } catch {
             if (!silent) {
                 setError("Koneksi bermasalah");
@@ -129,7 +148,8 @@ export default function BukuBesar({ period }: { period: string }) {
     // Toggle status "sudah dicek" per baris jurnal.
     // Optimistic update dulu (UI langsung berubah), lalu simpan ke server;
     // kalau gagal, rollback ke nilai sebelumnya supaya tidak beda dengan DB.
-    const toggleChecked = useCallback(async (lineId: string, next: boolean) => {
+       const toggleChecked = useCallback(async (lineId: string, next: boolean) => {
+        pendingChecksRef.current.add(lineId);
         setData((prev) =>
             prev
                 ? {
@@ -164,7 +184,7 @@ export default function BukuBesar({ period }: { period: string }) {
                         : prev
                 );
             }
-        } catch {
+               } catch {
             setData((prev) =>
                 prev
                     ? {
@@ -175,6 +195,8 @@ export default function BukuBesar({ period }: { period: string }) {
                     }
                     : prev
             );
+        } finally {
+            pendingChecksRef.current.delete(lineId);
         }
     }, []);
 
@@ -200,14 +222,21 @@ export default function BukuBesar({ period }: { period: string }) {
     const filteredLines = useMemo(() => {
         if (!data) return [];
         const q = tableSearch.trim().toLowerCase();
-        if (!q) return data.lines;
         return data.lines.filter((l) => {
+            // 1) Filter status cek
+            //    - "checked": hanya baris yang sudah dicek
+            //    - "unchecked": belum dicek DAN bukan baris sintetis (sintetis nggak bisa dicek manual)
+            if (checkFilter === "checked" && !l.checked) return false;
+            if (checkFilter === "unchecked" && (l.checked || l.is_synthetic)) return false;
+
+            // 2) Filter pencarian teks (kalau kosong, lolos semua)
+            if (!q) return true;
             if (l.keterangan.toLowerCase().includes(q)) return true;
             if (l.debit > 0 && (String(l.debit).includes(q) || rp(l.debit).toLowerCase().includes(q))) return true;
             if (l.kredit > 0 && (String(l.kredit).includes(q) || rp(l.kredit).toLowerCase().includes(q))) return true;
             return false;
         });
-    }, [data, tableSearch]);
+    }, [data, tableSearch, checkFilter]);
 
     const normalSide = useMemo(() => getNormalSide(accountCode), [accountCode]);
 
@@ -322,6 +351,25 @@ export default function BukuBesar({ period }: { period: string }) {
                             </button>
                         </>
                     )}
+                </div>
+            )}
+
+            {/* ── Filter status cek ── */}
+            {data && data.lines.length > 0 && (
+                <div className="flex justify-end">
+                    <select
+                        value={checkFilter}
+                        onChange={(e) => setCheckFilter(e.target.value as "all" | "checked" | "unchecked")}
+                        className="h-9 border border-gray-200 rounded-lg px-3 pr-8 text-xs font-bold bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition cursor-pointer"
+                    >
+                        <option value="all">Semua ({data.lines.length})</option>
+                        <option value="checked">
+                            Sudah Dicek ({data.lines.filter((l) => l.checked).length})
+                        </option>
+                        <option value="unchecked">
+                            Belum Dicek ({data.lines.filter((l) => !l.checked && !l.is_synthetic).length})
+                        </option>
+                    </select>
                 </div>
             )}
             {/* ── Cari baris buku besar ── */}

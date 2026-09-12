@@ -38,6 +38,50 @@ function parseRupiah(s: string) {
   return parseInt(s.replace(/\D/g, ""), 10) || 0;
 }
 
+//  NEW — kompres & resize foto sebelum upload, biar foto kamera HP (bisa 5-10MB) gak nyangkut di limit server
+async function compressImage(file: File, maxDimension = 1600, quality = 0.75): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas context gagal dibuat"));
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error("Kompres gambar gagal"));
+          resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Gagal memuat gambar"));
+    };
+    img.src = objectUrl;
+  });
+} 
+
 export default function ServicePaymentModal({ open, order, onClose, onConfirm }: Props) {
   // Step 1: pilih tipe pickup. null = belum pilih (tampil screen pilihan)
   const [pickupType, setPickupType] = useState<PickupType | null>(null);
@@ -81,6 +125,7 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
   };
 
   //  NEW — upload foto bukti pembayaran ke storage
+  //  NEW — kompres dulu, baru upload foto bukti pembayaran ke storage
   const handleFileSelect = async (file: File | null) => {
     if (!file) return;
     setError("");
@@ -89,18 +134,20 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
       setError("Format foto harus JPG, PNG, atau WEBP");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Ukuran foto maksimal 5MB");
+    if (file.size > 20 * 1024 * 1024) { //  NEW — raw file boleh lebih besar, nanti dikompres
+      setError("Ukuran foto maksimal 20MB");
       return;
     }
 
-    setProofPreview(URL.createObjectURL(file));
     setProofUrl(null);
     setUploading(true);
 
     try {
+      const compressed = await compressImage(file); //  NEW
+      setProofPreview(URL.createObjectURL(compressed)); //  CHANGED — preview dari hasil kompres
+
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", compressed); //  CHANGED — upload file yang sudah dikompres
       fd.append("order_id", order.id);
       const res = await fetch("/api/service/upload-payment-proof", {
         method: "POST",
@@ -110,7 +157,7 @@ export default function ServicePaymentModal({ open, order, onClose, onConfirm }:
       if (!json.success) throw new Error(json.message || "Gagal upload bukti pembayaran");
       setProofUrl(json.data.url);
     } catch (e: any) {
-      setError(e.message || "Gagal upload bukti pembayaran");
+      setError(e.message || "Gagal memproses/upload bukti pembayaran");
       setProofPreview(null);
     } finally {
       setUploading(false);

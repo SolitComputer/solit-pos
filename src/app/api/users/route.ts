@@ -44,10 +44,10 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
   // parsing tiap literalnya untuk infer bentuk hasil query. Untuk select-string
   // sepanjang ini, compiler jadi "meledak" — persis error build tadi.
   const selectFields: string = isAdmin
-    ? "id, name, phone_number, email, role, roles, shift, gender, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, biometric_enabled, contract_status, active_contract_id, contract_valid_until"
+    ? "id, name, phone_number, email, role, roles, shift, gender, password_set, face_enrolled_at, face_embedding, force_logout_at, created_at, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, biometric_enabled, contract_status, active_contract_id, contract_valid_until, is_active, deactivated_at, deactivated_by"
     : isKepala
-      ? "id, name, phone_number, role, roles, shift, gender, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at"
-      : "id, name, role, roles, gender, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at";
+      ? "id, name, phone_number, role, roles, shift, gender, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, is_active"
+      : "id, name, role, roles, gender, birth_date, profile_photo_url, bio, status_note, status_note_expires_at, song_title, song_artist, song_artwork_url, song_preview_url, song_clip_start, song_expires_at, is_active";
 
   const { data, error } = await supabaseAdmin
     .from("users")
@@ -75,6 +75,12 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     (data ?? []).map((u: any) => clearExpiredStoryFields(supabaseAdmin, u))
   );
 
+  // Lookup id → nama dari data yang SUDAH diambil di atas. Tidak perlu query
+  // tambahan ke DB cuma untuk tahu nama si penonaktif.
+  const nameById = new Map<string, string>(
+    (data ?? []).map((u: any) => [u.id, u.name])
+  );
+
   const users = (data ?? []).map((u: any, i: number) => {
     const { noteExpired, songExpired } = expiryResults[i];
     return {
@@ -94,6 +100,14 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
       email: isAdmin ? (u.email ?? null) : null,
       birth_date: u.birth_date ?? null,
       gender: u.gender ?? null,
+      // Default true — user lama sebelum migrasi tidak boleh tiba-tiba dianggap mati
+           is_active: u.is_active ?? true,
+      deactivated_at: isAdmin ? (u.deactivated_at ?? null) : null,
+      // null kalau admin yang menonaktifkan sudah dihapus akunnya (FK jadi NULL)
+            deactivated_by: isAdmin ? (u.deactivated_by ?? null) : null,
+      deactivated_by_name: isAdmin && u.deactivated_by
+        ? (nameById.get(u.deactivated_by) ?? null)
+        : null,
       status_note: noteExpired ? null : (u.status_note ?? null),
       status_note_expires_at: noteExpired ? null : (u.status_note_expires_at ?? null),
       song_title: songExpired ? null : (u.song_title ?? null),
@@ -105,7 +119,11 @@ async function getHandler(req: NextRequest, ctx: any, user: AuthUser) {
     };
   });
 
-  return NextResponse.json({ success: true, users });
+  // User nonaktif hanya tampil untuk admin (biar bisa diaktifkan kembali).
+  // Role lain tidak perlu lihat akun yang sudah dimatikan.
+  const visibleUsers = isAdmin ? users : users.filter((u) => u.is_active !== false);
+
+  return NextResponse.json({ success: true, users: visibleUsers });
 }
 
 // ── POST — buat user baru ──────────────────────────────────────────────────
@@ -163,8 +181,9 @@ async function postHandler(req: NextRequest, ctx: any, user: AuthUser) {
       created_by: user.id,
       birth_date: birth_date || null,
       gender: gender || null,
+      is_active: true,
     })
-    .select("id, name, phone_number, role, roles, shift, password_set, birth_date, gender")
+    .select("id, name, phone_number, role, roles, shift, password_set, birth_date, gender, is_active")
     .single();
 
   if (error) {
@@ -201,6 +220,7 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     _forceLogout,
     _toggleBiometric,
     _resetBiometric,
+    _toggleActive,
   } = body;
 
   if (!id) {
@@ -226,6 +246,45 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     return NextResponse.json({
       success: true,
       message: "Session user berhasil di-logout.",
+    });
+  }
+
+  // ── Handle aktif / nonaktif akun ───────────────────────────────────────────
+  if (typeof _toggleActive === "boolean") {
+    if (id === currentUser.id) {
+      return NextResponse.json(
+        { success: false, message: "Tidak bisa menonaktifkan akun sendiri" },
+        { status: 400 }
+      );
+    }
+
+        const nowIso = new Date().toISOString();
+    const statusUpdates: Record<string, any> = {
+      is_active: _toggleActive,
+      deactivated_at: _toggleActive ? null : nowIso,
+      // Dibersihkan saat diaktifkan lagi — biar tidak menyisakan jejak lama
+      // yang menyesatkan kalau nanti dinonaktifkan orang lain.
+      deactivated_by: _toggleActive ? null : currentUser.id,
+    };
+
+    // Saat dinonaktifkan, session yang sedang aktif ikut diakhiri —
+    // kalau tidak, user masih bisa lanjut pakai app sampai token-nya habis.
+    if (!_toggleActive) statusUpdates.force_logout_at = nowIso;
+
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update(statusUpdates)
+      .eq("id", id);
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: _toggleActive
+        ? "Akun berhasil diaktifkan kembali"
+        : "Akun dinonaktifkan & session-nya diakhiri",
     });
   }
 
@@ -310,7 +369,7 @@ async function putHandler(req: NextRequest, ctx: any, currentUser: AuthUser) {
     .from("users")
     .update(updates)
     .eq("id", id)
-    .select("id, name, phone_number, role, roles, shift, birth_date, gender")
+    .select("id, name, phone_number, role, roles, shift, birth_date, gender, is_active")
     .single();
 
   if (error) {
