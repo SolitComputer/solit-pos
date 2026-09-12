@@ -3,10 +3,11 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
+import { EXPENSE_CATEGORIES } from "@/lib/cashflow";
 import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
   Plus, Trash2, X, CheckCheck, RotateCcw, Banknote,
-  ClipboardList, Clock, CircleDollarSign,
+  ClipboardList, Clock, CircleDollarSign, Camera, Image as ImageIcon,
 } from "lucide-react";
 
 interface FundRequest {
@@ -24,6 +25,11 @@ interface FundRequest {
   executed_by_name: string | null;
   executed_at: string | null;
   created_at: string;
+  realisasi_cashflow_id: string | null;
+  realisasi_nominal: number | null;
+  realisasi_by_id: string | null;
+  realisasi_by_name: string | null;
+  realisasi_at: string | null;
 }
 
 interface Meta {
@@ -100,16 +106,16 @@ function SummaryCard({
   color: "slate" | "indigo" | "emerald" | "blue";
 }) {
   const iconBg = {
-    slate:   "bg-slate-100 text-slate-500",
-    indigo:  "bg-indigo-100 text-indigo-600",
+    slate: "bg-slate-100 text-slate-500",
+    indigo: "bg-indigo-100 text-indigo-600",
     emerald: "bg-emerald-100 text-emerald-600",
-    blue:    "bg-blue-100 text-blue-600",
+    blue: "bg-blue-100 text-blue-600",
   };
   const valueColor = {
-    slate:   "text-slate-900",
-    indigo:  "text-indigo-700",
+    slate: "text-slate-900",
+    indigo: "text-indigo-700",
     emerald: "text-emerald-700",
-    blue:    "text-blue-700",
+    blue: "text-blue-700",
   };
   return (
     <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-sm border border-white/70 transition-all hover:-translate-y-1 hover:shadow-md flex flex-col justify-between h-full">
@@ -284,6 +290,201 @@ function FormModal({
   );
 }
 
+// ── Kompresi foto sebelum upload (sama seperti di halaman Cashflow) ──────────
+async function compressImageFile(file: File, maxDimension = 1600, quality = 0.75): Promise<File> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    let { width, height } = bitmap;
+    if (width > maxDimension || height > maxDimension) {
+      const scale = maxDimension / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/jpeg", quality)
+    );
+    if (!blob) return file;
+    const newName = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], newName || "photo.jpg", { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ *  PHOTO PICKER (sama seperti di halaman Cashflow)
+ * ════════════════════════════════════════════════════════════════════════════ */
+function PhotoPicker({ value, onChange }: { value: File | null; onChange: (f: File | null) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const handleFile = (f: File | null) => { onChange(f); setPreview(f ? URL.createObjectURL(f) : null); };
+  const remove = () => {
+    handleFile(null);
+    if (fileRef.current) fileRef.current.value = "";
+    if (cameraRef.current) cameraRef.current.value = "";
+  };
+
+  return (
+    <div>
+      <label className="block text-xs font-bold text-slate-700 mb-2">Foto Bukti <span className="text-slate-400 font-normal">(opsional)</span></label>
+      {preview ? (
+        <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+          <img src={preview} alt="Preview" className="w-full max-h-48 object-cover" />
+          <button type="button" onClick={remove} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          {[{ ref: cameraRef, icon: <Camera size={20} />, label: "Kamera" }, { ref: fileRef, icon: <ImageIcon size={20} />, label: "Galeri" }].map(({ ref, icon, label }) => (
+            <button key={label} type="button" onClick={() => (ref as React.RefObject<HTMLInputElement>).current?.click()} className="flex flex-col items-center justify-center gap-1.5 h-16 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 text-slate-400 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-600 transition">
+              {icon}
+              <span className="text-[11px] font-semibold">{label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(ev) => handleFile(ev.target.files?.[0] ?? null)} />
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(ev) => handleFile(ev.target.files?.[0] ?? null)} />
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ *  REALISASI MODAL — isi realisasi setelah pengajuan dieksekusi, otomatis
+ *  sinkron ke Cashflow (Uang Keluar) lewat /api/pengajuan-dana/[id]/realisasi
+ * ════════════════════════════════════════════════════════════════════════════ */
+function RealisasiModal({
+  fundRequest, onClose, onSaved,
+}: {
+  fundRequest: FundRequest;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const categories = Object.entries(EXPENSE_CATEGORIES);
+  const [category, setCategory] = useState(categories[0]?.[0] ?? "");
+  const [nominal, setNominal] = useState("");
+  const [keterangan, setKeterangan] = useState(fundRequest.purpose);
+  const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const submit = async () => {
+    const num = Number(nominal);
+    if (!nominal || !Number.isFinite(num) || num <= 0) { setError("Nominal harus lebih dari 0"); return; }
+    setSaving(true); setError("");
+    try {
+      let photoUrl: string | null = null;
+      if (photoFile) {
+        setUploadProgress("uploading");
+        const compressed = await compressImageFile(photoFile);
+        const fd = new FormData();
+        fd.append("file", compressed);
+        const upRes = await fetch("/api/cashflow/upload", { method: "POST", body: fd });
+        const upJson = await upRes.json();
+        if (!upJson.success) { setError(upJson.message || "Gagal upload foto"); setSaving(false); setUploadProgress("idle"); return; }
+        photoUrl = upJson.url;
+        setUploadProgress("done");
+      }
+      const res = await fetch(`/api/pengajuan-dana/${fundRequest.id}/realisasi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category,
+          nominal: num,
+          keterangan: keterangan.trim() || fundRequest.purpose,
+          tanggal,
+          payment_method: paymentMethod,
+          photo_url: photoUrl,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) { setError(json.message || "Gagal menyimpan realisasi"); return; }
+      toast.success("Realisasi tersimpan & tersinkron ke Cashflow");
+      onSaved();
+      onClose();
+    } catch { setError("Terjadi kesalahan koneksi"); }
+    finally { setSaving(false); setUploadProgress("idle"); }
+  };
+
+  const inputCls = "w-full h-10 border border-slate-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-400/30 focus:border-teal-400 transition";
+  const savingLabel = uploadProgress === "uploading" ? "Mengupload foto..." : saving ? "Menyimpan..." : "Simpan Realisasi";
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+        <div className="h-1 bg-gradient-to-r from-teal-400 to-emerald-500" />
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center"><Banknote size={16} /></div>
+            <div>
+              <p className="text-sm font-bold text-slate-900">Realisasi Pengajuan Dana</p>
+              <p className="text-[11px] text-slate-400 line-clamp-1 max-w-[220px]">{fundRequest.purpose}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2">Metode Pembayaran <span className="text-red-500">*</span></label>
+            <div className="inline-flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
+              {(["CASH", "SALDO"] as const).map((m) => (
+                <button key={m} type="button" onClick={() => setPaymentMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${paymentMethod === m ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-600"}`}>
+                  {m === "CASH" ? <Banknote size={16} /> : <Landmark className="w-4 h-4" />} {m === "CASH" ? "Cash" : "Saldo"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2">Kategori</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
+              {categories.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-2">Nominal <span className="text-red-500">*</span></label>
+              <input type="number" min={0} value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="0" className={`${inputCls} font-mono`} autoFocus />
+              {nominal && Number(nominal) > 0 && <p className="text-[11px] text-teal-600 mt-1 font-mono font-semibold">{formatRupiah(Number(nominal))}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-2">Tanggal</label>
+              <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2">Keterangan</label>
+            <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
+            <p className="text-[10px] text-slate-400 mt-1">Otomatis terisi dari Kebutuhan — boleh diubah.</p>
+          </div>
+          <PhotoPicker value={photoFile} onChange={setPhotoFile} />
+          {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
+        </div>
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 bg-slate-50/60">
+          <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition disabled:opacity-50">Batal</button>
+          <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition disabled:opacity-60">{savingLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
  *  MAIN PAGE
  * ════════════════════════════════════════════════════════════════════════════ */
@@ -297,6 +498,7 @@ export default function PengajuanDanaPage() {
   const [submitting, setSubmitting] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<FundRequest | null>(null);
+  const [realisasiTarget, setRealisasiTarget] = useState<FundRequest | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -307,7 +509,7 @@ export default function PengajuanDanaPage() {
           setUserRoles(d.user.roles ?? [d.user.role].filter(Boolean));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -326,7 +528,7 @@ export default function PengajuanDanaPage() {
 
   const canCreate = userRoles.some((r) => CREATE_ROLES.includes(r));
   const canApprove = userId ? meta.approverIds.includes(userId) : false;
-  const canExecute = userId ? meta.executorIds.includes(userId) : false;
+  const canExecute = userId ? (meta.executorIds.includes(userId) || userRoles.includes("ADMIN")) : false;
 
   const handleSubmit = async (purpose: string, amount: number) => {
     setSubmitting(true);
@@ -386,7 +588,8 @@ export default function PengajuanDanaPage() {
 
   return (
     <DashboardLayout>
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes pdBackdropIn { from { opacity: 0 } to { opacity: 1 } }
         @keyframes pdModalIn { from { opacity: 0; transform: scale(0.95) translateY(10px) } to { opacity: 1; transform: scale(1) translateY(0) } }
         @keyframes pdSlideUp { from { opacity: 0; transform: translateY(16px) } to { opacity: 1; transform: translateY(0) } }
@@ -556,6 +759,7 @@ export default function PengajuanDanaPage() {
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Persetujui</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Eksekusi</th>
+                    <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Realisasi</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tanggal</th>
                     <th className="px-3 py-3 w-10" />
                   </tr>
@@ -598,8 +802,7 @@ export default function PengajuanDanaPage() {
                         </td>
 
                         <td className="px-4 py-4 text-right">
-                          <span className="font-extrabold text-slate-900 tabular-nums text-sm">{fmtShort(row.amount)}</span>
-                          <p className="text-[10px] text-slate-400 mt-0.5 tabular-nums">{formatRupiah(row.amount)}</p>
+                          <span className="font-extrabold text-slate-900 tabular-nums text-sm">{formatRupiah(row.amount)}</span>
                         </td>
 
                         <td className="px-4 py-4 text-center">
@@ -614,11 +817,10 @@ export default function PengajuanDanaPage() {
                                 onClick={() => canApprove && !row.is_executed ? handleAction(row.id, "unapprove") : undefined}
                                 disabled={busy || !canApprove || row.is_executed}
                                 title={canApprove && !row.is_executed ? "Batalkan persetujuan" : `Oleh ${row.approved_by_name}`}
-                                className={`w-8 h-8 rounded-2xl flex items-center justify-center transition-all ${
-                                  canApprove && !row.is_executed
-                                    ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30 hover:bg-emerald-600 cursor-pointer active:scale-90"
-                                    : "bg-emerald-100 text-emerald-600 cursor-default"
-                                }`}
+                                className={`w-8 h-8 rounded-2xl flex items-center justify-center transition-all ${canApprove && !row.is_executed
+                                  ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30 hover:bg-emerald-600 cursor-pointer active:scale-90"
+                                  : "bg-emerald-100 text-emerald-600 cursor-default"
+                                  }`}
                               >
                                 <CheckCheck className="w-4 h-4" />
                               </button>
@@ -646,14 +848,13 @@ export default function PengajuanDanaPage() {
                           {row.is_executed ? (
                             <div className="inline-flex flex-col items-center gap-1">
                               <button
-                                onClick={() => canExecute ? handleAction(row.id, "unexecute") : undefined}
-                                disabled={busy || !canExecute}
-                                title={canExecute ? "Batalkan eksekusi" : `Oleh ${row.executed_by_name}`}
-                                className={`w-8 h-8 rounded-2xl flex items-center justify-center transition-all ${
-                                  canExecute
+                                onClick={() => canExecute && !row.realisasi_cashflow_id ? handleAction(row.id, "unexecute") : undefined}
+                                disabled={busy || !canExecute || !!row.realisasi_cashflow_id}
+                                title={row.realisasi_cashflow_id ? "Sudah direalisasi — tidak bisa dibatalkan" : canExecute ? "Batalkan eksekusi" : `Oleh ${row.executed_by_name}`}
+                                className={`w-8 h-8 rounded-2xl flex items-center justify-center transition-all ${canExecute && !row.realisasi_cashflow_id
                                     ? "bg-blue-500 text-white shadow-sm shadow-blue-500/30 hover:bg-blue-600 cursor-pointer active:scale-90"
                                     : "bg-blue-100 text-blue-600 cursor-default"
-                                }`}
+                                  }`}
                               >
                                 <Banknote className="w-4 h-4" />
                               </button>
@@ -664,11 +865,10 @@ export default function PengajuanDanaPage() {
                               onClick={() => row.is_approved ? handleAction(row.id, "execute") : toast.error("Harus disetujui dulu")}
                               disabled={busy || !row.is_approved}
                               title={row.is_approved ? "Tandai sudah dieksekusi" : "Harus disetujui dulu"}
-                              className={`w-8 h-8 rounded-2xl border-2 border-dashed flex items-center justify-center mx-auto transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-                                row.is_approved
-                                  ? "border-slate-200 hover:border-blue-400 hover:bg-blue-50 hover:scale-110 active:scale-90"
-                                  : "border-slate-100 bg-slate-50"
-                              }`}
+                              className={`w-8 h-8 rounded-2xl border-2 border-dashed flex items-center justify-center mx-auto transition-all disabled:opacity-30 disabled:cursor-not-allowed ${row.is_approved
+                                ? "border-slate-200 hover:border-blue-400 hover:bg-blue-50 hover:scale-110 active:scale-90"
+                                : "border-slate-100 bg-slate-50"
+                                }`}
                             >
                               {busy
                                 ? <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
@@ -677,6 +877,36 @@ export default function PengajuanDanaPage() {
                             </button>
                           ) : (
                             <div className={`w-8 h-8 rounded-2xl border-2 mx-auto ${row.is_approved ? "border-slate-200 bg-slate-50" : "border-slate-100 bg-slate-50"}`} />
+                          )}
+                        </td>
+
+                        {/* Realisasi */}
+                        <td className="px-4 py-4 text-center">
+                          {row.realisasi_cashflow_id ? (
+                            <div className="inline-flex flex-col items-center gap-1">
+                              <span
+                                title={`Direalisasi oleh ${row.realisasi_by_name ?? "-"}${row.realisasi_at ? ` · ${formatDate(row.realisasi_at)}` : ""}`}
+                                className="w-8 h-8 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-semibold max-w-[80px] truncate">{formatRupiah(row.realisasi_nominal ?? 0)}</span>
+                              <span className="text-[9px] text-slate-400 max-w-[80px] truncate">{row.realisasi_by_name}</span>
+                            </div>
+                          ) : row.is_executed ? (
+                            canExecute ? (
+                              <button
+                                onClick={() => setRealisasiTarget(row)}
+                                title="Isi realisasi pengeluaran"
+                                className="w-8 h-8 rounded-2xl border-2 border-dashed border-slate-200 hover:border-teal-400 hover:bg-teal-50 flex items-center justify-center mx-auto transition-all hover:scale-110 active:scale-90"
+                              >
+                                <Banknote className="w-4 h-4 text-slate-300 group-hover:text-teal-500" />
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-amber-500 font-semibold">Menunggu</span>
+                            )
+                          ) : (
+                            <div className="w-8 h-8 rounded-2xl border-2 border-slate-100 bg-slate-50 mx-auto" title="Harus dieksekusi dulu" />
                           )}
                         </td>
 
@@ -758,6 +988,14 @@ export default function PengajuanDanaPage() {
         onSubmit={handleSubmit}
         submitting={submitting}
       />
+
+      {realisasiTarget && (
+        <RealisasiModal
+          fundRequest={realisasiTarget}
+          onClose={() => setRealisasiTarget(null)}
+          onSaved={fetchData}
+        />
+      )}
     </DashboardLayout>
   );
 }
