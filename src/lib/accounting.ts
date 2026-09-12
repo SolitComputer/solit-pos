@@ -205,6 +205,11 @@ export const CASHFLOW_ACCOUNT: Record<string, string> = {
   BIAYA_LAIN: AKUN.BIAYA_LAIN,                     // 530
   KEUNTUNGAN_MITRA: AKUN.KEUNTUNGAN_MITRA,         // 540
 
+  // ── 3 kategori Uang Masuk manual (Penjualan Laptop/Aksesoris/Service) ──
+  PENJUALAN_LAPTOP_MANUAL: AKUN.PENJUALAN_LAPTOP,  // 410
+  PENJUALAN_AKSESORIS: AKUN.PENJUALAN_AKSESORIS,   // 420
+  SERVICE_MANUAL: AKUN.JASA_SERVICE,               // 430
+
   // ── Alias key LAMA — JANGAN dihapus, cuma tidak ditawarkan lagi di dropdown ──
   OPERASIONAL_SOTECH: AKUN.OPS_MINGGUAN,
   OPERASIONAL_ONPOINT: AKUN.OPS_MINGGUAN,
