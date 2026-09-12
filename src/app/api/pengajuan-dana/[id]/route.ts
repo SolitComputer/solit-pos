@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { FUND_APPROVER_IDS, FUND_EXECUTOR_IDS } from "../route";
+import { FUND_EXECUTOR_IDS, FUND_APPROVER_IDS } from "@/lib/fundConfig";
 
 function db() {
   return createClient(
