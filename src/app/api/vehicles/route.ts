@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   const { data: vehicles, error: vErr } = await supabaseVehicles
     .from("vehicles")
-    .select("id, name, type, status, battery_level, fuel_level")
+    .select("id, name, type, status, battery_level, fuel_level, plate_number")
     .order("type", { ascending: true })
     .order("name", { ascending: true });
 
@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const name = (body?.name ?? "").trim();
   const type = body?.type;
+  const plate_number = body?.plate_number?.trim() || null;
   const fuel_level = body?.fuel_level?.trim() || null;
 
   if (!name) return NextResponse.json({ success: false, message: "Nama kendaraan wajib diisi." }, { status: 400 });
@@ -126,10 +127,11 @@ export async function POST(request: NextRequest) {
       name,
       type,
       status: "TERSEDIA",
+      plate_number,
       // fuel_level = level bensin/baterai awal (mobil & motor)
       fuel_level,
     })
-    .select("id, name, type, status, battery_level, fuel_level")
+    .select("id, name, type, status, battery_level, fuel_level, plate_number")
     .single();
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });

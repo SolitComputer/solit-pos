@@ -29,6 +29,7 @@ type Vehicle = {
   status: "TERSEDIA" | "DIPAKAI" | "MAINTENANCE";
   battery_level: string | null;
   fuel_level: string | null;
+  plate_number: string | null;
   lastUsage?: LastUsage | null;
 };
 type UserLite = { id: string; name: string; role: string };
@@ -465,6 +466,11 @@ function VehicleCard({
             <FuelRing level={v.fuel_level} TypeIcon={TypeIcon} />
             <div className="min-w-0 pt-0.5">
               <p className="text-sm font-black text-gray-900 truncate tracking-tight">{v.name}</p>
+              {v.plate_number && (
+                <span className="inline-block mt-1 px-1.5 py-0.5 rounded-md bg-zinc-100 border border-zinc-200 text-zinc-600 text-[10px] font-mono font-bold tracking-wider">
+                  {v.plate_number}
+                </span>
+              )}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
                 <span className="text-[10px] text-gray-500 flex items-center gap-1">
                   <Fuel size={12} className="text-emerald-500" /> {v.fuel_level || "—"}
@@ -703,6 +709,7 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
   const isEdit = !!vehicle;
   const [name, setName] = useState(vehicle?.name ?? "");
   const [type, setType] = useState<"MOTOR" | "MOBIL">(vehicle?.type ?? "MOTOR");
+  const [plate, setPlate] = useState(vehicle?.plate_number ?? "");
   const [fuel, setFuel] = useState(vehicle?.fuel_level ?? "");
   const [status, setStatus] = useState(vehicle?.status ?? "TERSEDIA");
   const [busy, setBusy] = useState(false);
@@ -717,7 +724,7 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
     try {
       const url = isEdit ? `/api/vehicles/${vehicle!.id}` : "/api/vehicles";
       const method = isEdit ? "PUT" : "POST";
-      const payload: any = { name: name.trim(), type, fuel_level: fuel.trim() };
+      const payload: any = { name: name.trim(), type, plate_number: plate.trim(), fuel_level: fuel.trim() };
       if (isEdit) payload.status = status;
       const res = await fetch(url, {
         method,
@@ -743,6 +750,15 @@ function VehicleFormModal({ vehicle, onClose, onSaved }: { vehicle?: Vehicle; on
         <div>
           <label className={lbl}>Nama Kendaraan *</label>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="mis. Beat 2023" className={inp} />
+        </div>
+        <div>
+          <label className={lbl}>Nomor Plat</label>
+          <input
+            value={plate}
+            onChange={(e) => setPlate(e.target.value.toUpperCase())}
+            placeholder="mis. B 1234 ABC"
+            className={`${inp} font-mono tracking-wider`}
+          />
         </div>
         <div>
           <label className={lbl}>Tipe *</label>
