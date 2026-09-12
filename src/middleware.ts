@@ -690,5 +690,6 @@ export const config = {
     "/api/webhooks/:path*",
     "/api/vehicles/:path*",
     "/api/pengajuan-dana/:path*",
+    "/api/sop/:path*",
   ],
 };

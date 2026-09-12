@@ -50,31 +50,35 @@ interface TeamMember {
 
 const PRIORITY_CONFIG: Record<
     Priority,
-    { label: string; color: string; bg: string; dot: string; bar: string; badge: string }
+    { label: string; color: string; bg: string; dot: string; bar: string; badge: string; glow: string }
 > = {
     high: {
         label: "Tinggi",
         color: "text-red-700",
         bg: "bg-red-50 border-red-200",
         dot: "bg-red-500",
-        bar: "bg-red-500",
+        // Priority bar sekarang gradient biar lebih hidup
+        bar: "bg-gradient-to-b from-red-400 to-rose-600",
         badge: "bg-red-50 text-red-700 border-red-200",
+        glow: "bg-rose-400/20",
     },
     medium: {
         label: "Sedang",
         color: "text-amber-700",
         bg: "bg-amber-50 border-amber-200",
         dot: "bg-amber-400",
-        bar: "bg-amber-400",
+        bar: "bg-gradient-to-b from-amber-300 to-orange-500",
         badge: "bg-amber-50 text-amber-700 border-amber-200",
+        glow: "bg-amber-300/20",
     },
     low: {
         label: "Rendah",
         color: "text-sky-700",
         bg: "bg-sky-50 border-sky-200",
         dot: "bg-sky-400",
-        bar: "bg-sky-400",
+        bar: "bg-gradient-to-b from-sky-300 to-blue-500",
         badge: "bg-sky-50 text-sky-700 border-sky-200",
+        glow: "bg-sky-300/20",
     },
 };
 
@@ -84,13 +88,13 @@ const PRIORITY_RANK: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
 // Class util dipakai berulang → dijadikan konstanta biar konsisten & mudah dirawat
 const FIELD_CLASS =
     "w-full px-3.5 sm:px-4 py-2.5 sm:py-3 text-sm border border-gray-200 rounded-xl sm:rounded-2xl bg-gray-50/60 " +
-    "transition-all placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/15 focus:border-[#1a1a2e]";
+    "transition-all duration-200 placeholder:text-gray-300 focus:outline-none focus:ring-4 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] focus:bg-white";
 
 const LABEL_CLASS =
     "block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5 sm:mb-2";
 
 const SELECT_CLASS =
-    "px-3 py-2.5 sm:py-2 text-xs font-semibold border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/15 focus:border-[#1a1a2e] transition-all bg-white text-gray-600 cursor-pointer";
+    "px-3 py-2.5 sm:py-2 text-xs font-semibold border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] transition-all bg-white text-gray-600 cursor-pointer hover:border-gray-300";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -135,10 +139,13 @@ function EmptyState({ filter }: { filter: FilterType }) {
     const { icon: Icon, title, desc } = messages[filter];
     return (
         <div className="flex flex-col items-center justify-center px-6 py-14 sm:py-20 text-center">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#1a1a2e]/5 flex items-center justify-center mb-4">
-                <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[#1a1a2e]/40" strokeWidth={1.5} />
+            <div className="relative mb-4">
+                <div className="absolute inset-0 rounded-2xl bg-[#1a1a2e]/10 blur-xl" />
+                <div className="relative w-16 h-16 sm:w-[70px] sm:h-[70px] rounded-2xl bg-gradient-to-br from-[#1a1a2e]/8 to-[#1a1a2e]/[0.03] ring-1 ring-[#1a1a2e]/10 flex items-center justify-center">
+                    <Icon className="w-7 h-7 sm:w-8 sm:h-8 text-[#1a1a2e]/40" strokeWidth={1.5} />
+                </div>
             </div>
-            <p className="text-sm font-semibold text-gray-700">{title}</p>
+            <p className="text-sm font-bold text-gray-700">{title}</p>
             <p className="text-xs text-gray-400 mt-1">{desc}</p>
         </div>
     );
@@ -190,23 +197,34 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading, teamMembers 
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-md sm:p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#1a1a2e]/40 backdrop-blur-md sm:p-4"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
-            <div className="todo-sheet bg-white w-full sm:max-w-md max-h-[92dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-100">
+            <div className="todo-sheet bg-white w-full sm:max-w-md max-h-[92dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-[#1a1a2e]/30 ring-1 ring-gray-100">
                 {/* Grip bar — penanda bottom sheet, hanya di mobile */}
                 <div className="sm:hidden flex justify-center pt-3 pb-1">
                     <div className="w-10 h-1 rounded-full bg-gray-200" />
                 </div>
 
                 <div className="flex items-start justify-between gap-3 px-5 sm:px-6 pt-4 sm:pt-6 pb-4 sm:pb-5">
-                    <div className="min-w-0">
-                        <h2 className="text-base font-bold text-gray-900">
-                            {initial ? "Edit Tugas" : "Tambah Tugas Baru"}
-                        </h2>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                            {initial ? "Perbarui detail tugas ini" : "Isi detail tugas yang ingin ditambahkan"}
-                        </p>
+                    <div className="flex items-center gap-3 min-w-0">
+                        {/* Icon badge di header modal */}
+                        <div className="hidden sm:flex w-10 h-10 rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#2d2d54] items-center justify-center flex-shrink-0 shadow-lg shadow-[#1a1a2e]/25">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.4">
+                                {initial
+                                    ? <><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></>
+                                    : <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>
+                                }
+                            </svg>
+                        </div>
+                        <div className="min-w-0">
+                            <h2 className="text-base font-bold text-gray-900">
+                                {initial ? "Edit Tugas" : "Tambah Tugas Baru"}
+                            </h2>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                                {initial ? "Perbarui detail tugas ini" : "Isi detail tugas yang ingin ditambahkan"}
+                            </p>
+                        </div>
                     </div>
                     <button
                         type="button"
@@ -221,7 +239,7 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading, teamMembers 
                     </button>
                 </div>
 
-                <div className="h-px bg-gray-100 mx-5 sm:mx-6" />
+                <div className="h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent mx-5 sm:mx-6" />
 
                 <form onSubmit={handleSubmit} className="px-5 sm:px-6 py-5 space-y-4">
                     <div>
@@ -308,7 +326,7 @@ function TodoFormModal({ open, onClose, onSubmit, initial, loading, teamMembers 
                         <button
                             type="submit"
                             disabled={loading || !title.trim()}
-                            className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-[#1a1a2e] hover:bg-[#252540] rounded-2xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-[#1a1a2e]/20"
+                            className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-br from-[#1a1a2e] to-[#2d2d54] hover:from-[#252540] hover:to-[#35355f] rounded-2xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-[#1a1a2e]/25"
                         >
                             {loading ? (
                                 <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -437,12 +455,12 @@ function ChecklistPanel({ todo, onItemsChange, showToast }: ChecklistPanelProps)
             {/* Mini progress bar */}
             {items.length > 0 && (
                 <div className="flex items-center gap-2 mb-3">
-                    <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
                             className="h-full rounded-full transition-all duration-500"
                             style={{
                                 width: `${pct}%`,
-                                background: pct === 100 ? "#10b981" : "#1a1a2e",
+                                background: pct === 100 ? "linear-gradient(90deg,#34d399,#059669)" : "linear-gradient(90deg,#1a1a2e,#3a3a68)",
                             }}
                         />
                     </div>
@@ -471,7 +489,7 @@ function ChecklistPanel({ todo, onItemsChange, showToast }: ChecklistPanelProps)
                             disabled={togglingId === item.id}
                             className={`flex-shrink-0 w-[18px] h-[18px] sm:w-4 sm:h-4 rounded-[5px] border-[1.5px] flex items-center justify-center transition-all duration-150
                                 ${item.is_done
-                                    ? "bg-emerald-500 border-emerald-500"
+                                    ? "bg-gradient-to-br from-emerald-400 to-emerald-600 border-emerald-500 shadow-sm shadow-emerald-500/30"
                                     : "border-gray-300 hover:border-[#1a1a2e] active:scale-90"
                                 }
                                 ${togglingId === item.id ? "opacity-50 animate-pulse" : ""}
@@ -497,7 +515,7 @@ function ChecklistPanel({ todo, onItemsChange, showToast }: ChecklistPanelProps)
                                         if (e.key === "Enter") handleEditItem(item.id);
                                         if (e.key === "Escape") setEditingId(null);
                                     }}
-                                    className="flex-1 min-w-0 text-xs px-2 py-1.5 border border-[#1a1a2e]/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] bg-white"
+                                    className="flex-1 min-w-0 text-xs px-2 py-1.5 border border-[#1a1a2e]/30 rounded-lg focus:outline-none focus:ring-4 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] bg-white"
                                     maxLength={300}
                                 />
                                 <button
@@ -630,20 +648,25 @@ function TodoItemCard({
 
     return (
         <div
-            className={`group relative overflow-hidden rounded-2xl border transition-all duration-200 h-full
+            className={`group relative overflow-hidden rounded-2xl border transition-all duration-300 h-full
                 ${todo.is_done
                     ? "bg-gray-50/80 border-gray-100 opacity-70"
                     : isUnreadAssignment
-                        ? "bg-white border-blue-200 ring-2 ring-blue-400/30 hover:shadow-[0_2px_14px_rgba(37,99,235,0.12)]"
-                        : "bg-white border-gray-100 hover:border-gray-200 hover:shadow-[0_2px_14px_rgba(16,24,40,0.06)]"
+                        ? "bg-white border-blue-200 ring-2 ring-blue-400/30 hover:shadow-[0_6px_24px_-6px_rgba(37,99,235,0.2)] hover:-translate-y-[2px]"
+                        : "bg-white border-gray-100 hover:border-gray-200 hover:shadow-[0_6px_22px_-6px_rgba(16,24,40,0.12)] hover:-translate-y-[2px]"
                 }`}
         >
+            {/* Glow prioritas saat hover (dekoratif) */}
+            {!todo.is_done && (
+                <div className={`pointer-events-none absolute -left-6 top-1/2 -translate-y-1/2 w-16 h-16 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${cfg.glow}`} />
+            )}
+
             {/* Priority Bar */}
             <div
-                className={`absolute left-0 top-4 bottom-4 w-[3px] rounded-r-full transition-opacity ${cfg.bar} ${todo.is_done ? "opacity-20" : "opacity-80"}`}
+                className={`absolute left-0 top-4 bottom-4 w-[3px] rounded-r-full transition-opacity ${cfg.bar} ${todo.is_done ? "opacity-20" : "opacity-90"}`}
             />
 
-            <div className="flex items-start gap-2.5 sm:gap-4 pl-3.5 pr-3 sm:pl-5 sm:pr-4 py-3.5 sm:py-4">
+            <div className="relative flex items-start gap-2.5 sm:gap-4 pl-3.5 pr-3 sm:pl-5 sm:pr-4 py-3.5 sm:py-4">
                 {/* Expand toggle — chevron button */}
                 <button
                     onClick={() => onExpand(todo.id)}
@@ -673,7 +696,7 @@ function TodoItemCard({
                     disabled={isToggling}
                     className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200
                         ${todo.is_done
-                            ? "bg-emerald-500 border-emerald-500"
+                            ? "bg-gradient-to-br from-emerald-400 to-emerald-600 border-emerald-500 shadow-sm shadow-emerald-500/30"
                             : "border-gray-300 hover:border-[#1a1a2e] hover:bg-[#1a1a2e]/5 active:scale-90"
                         }
                         ${isToggling ? "opacity-50 animate-pulse" : ""}`}
@@ -693,8 +716,8 @@ function TodoItemCard({
                         <div className="flex items-center gap-1.5 mb-1.5">
                             {/* Avatar inisial */}
                             <div
-                                className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-white"
-                                style={{ background: todo.is_own ? "#10b981" : "#7c3aed", fontSize: "8px", fontWeight: 800 }}
+                                className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-white ring-2 ring-white shadow-sm"
+                                style={{ background: todo.is_own ? "linear-gradient(135deg,#34d399,#059669)" : "linear-gradient(135deg,#a78bfa,#7c3aed)", fontSize: "8px", fontWeight: 800 }}
                             >
                                 {todo.author_name.charAt(0).toUpperCase()}
                             </div>
@@ -715,12 +738,12 @@ function TodoItemCard({
                     {/* Item progress mini bar (collapsed state) */}
                     {hasItems && !expanded && progress !== null && (
                         <div className="flex items-center gap-2 mt-2">
-                            <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden max-w-[90px] sm:max-w-[120px]">
+                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[90px] sm:max-w-[120px]">
                                 <div
                                     className="h-full rounded-full transition-all duration-500"
                                     style={{
                                         width: `${progress}%`,
-                                        background: progress === 100 ? "#10b981" : "#1a1a2e",
+                                        background: progress === 100 ? "linear-gradient(90deg,#34d399,#059669)" : "linear-gradient(90deg,#1a1a2e,#3a3a68)",
                                     }}
                                 />
                             </div>
@@ -787,7 +810,7 @@ function TodoItemCard({
                             </span>
                         )}
                         {isUnreadAssignment && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-600 text-white animate-pulse">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm shadow-blue-500/30 animate-pulse">
                                 Baru
                             </span>
                         )}
@@ -826,7 +849,7 @@ function TodoItemCard({
 
             {/* Checklist panel (expandable) */}
             {expanded && (
-                <div className="px-3.5 sm:px-5 pb-4">
+                <div className="relative px-3.5 sm:px-5 pb-4">
                     <ChecklistPanel
                         todo={todo}
                         onItemsChange={onItemsChange}
@@ -856,9 +879,10 @@ function StatsBar({ todos }: { todos: Todo[] }) {
                     <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
                 </svg>
             ),
-            iconBg: "bg-[#1a1a2e]/8",
-            iconColor: "text-[#1a1a2e]",
+            iconBg: "bg-gradient-to-br from-[#1a1a2e] to-[#2d2d54] text-white shadow-md shadow-[#1a1a2e]/25",
+            iconColor: "",
             valueColor: "text-gray-900",
+            glow: "bg-[#1a1a2e]/10",
         },
         {
             label: "Selesai",
@@ -868,9 +892,10 @@ function StatsBar({ todos }: { todos: Todo[] }) {
                     <polyline points="20 6 9 17 4 12" />
                 </svg>
             ),
-            iconBg: "bg-emerald-50",
-            iconColor: "text-emerald-600",
+            iconBg: "bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-md shadow-emerald-500/25",
+            iconColor: "",
             valueColor: "text-emerald-600",
+            glow: "bg-emerald-300/25",
         },
         {
             label: "Jatuh Tempo",
@@ -880,9 +905,10 @@ function StatsBar({ todos }: { todos: Todo[] }) {
                     <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
                 </svg>
             ),
-            iconBg: "bg-orange-50",
-            iconColor: "text-orange-500",
+            iconBg: "bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-md shadow-orange-500/25",
+            iconColor: "",
             valueColor: "text-orange-600",
+            glow: "bg-orange-300/25",
         },
         {
             label: "Terlambat",
@@ -892,24 +918,27 @@ function StatsBar({ todos }: { todos: Todo[] }) {
                     <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
             ),
-            iconBg: "bg-red-50",
-            iconColor: "text-red-500",
+            iconBg: "bg-gradient-to-br from-red-400 to-rose-600 text-white shadow-md shadow-red-500/25",
+            iconColor: "",
             valueColor: "text-red-600",
+            glow: "bg-rose-300/25",
         },
     ];
 
     return (
         <div className="mb-4 sm:mb-6 space-y-3">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-                {stats.map(({ label, value, icon, iconBg, iconColor, valueColor }) => (
+                {stats.map(({ label, value, icon, iconBg, iconColor, valueColor, glow }) => (
                     <div
                         key={label}
-                        className="bg-white rounded-2xl border border-gray-100 px-3.5 sm:px-4 py-3 sm:py-3.5 flex items-center gap-2.5 sm:gap-3"
+                        className="group relative overflow-hidden bg-white rounded-2xl border border-gray-100 px-3.5 sm:px-4 py-3 sm:py-3.5 flex items-center gap-2.5 sm:gap-3 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_28px_-12px_rgba(16,24,40,0.18)] hover:border-gray-200"
                     >
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg} ${iconColor}`}>
+                        {/* Blob dekoratif muncul saat hover */}
+                        <div className={`pointer-events-none absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${glow}`} />
+                        <div className={`relative w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg} ${iconColor}`}>
                             {icon}
                         </div>
-                        <div className="min-w-0">
+                        <div className="relative min-w-0">
                             <p className={`text-lg sm:text-xl font-black leading-none tabular-nums ${valueColor}`}>{value}</p>
                             <p className="text-[10px] text-gray-400 font-medium mt-1 leading-tight truncate">{label}</p>
                         </div>
@@ -926,14 +955,17 @@ function StatsBar({ todos }: { todos: Todo[] }) {
                         </div>
                         <p className="text-xs font-black text-emerald-600 tabular-nums flex-shrink-0">{pct}%</p>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div
-                            className="h-full rounded-full transition-all duration-700 ease-out"
+                            className="relative h-full rounded-full transition-all duration-700 ease-out overflow-hidden"
                             style={{
                                 width: `${pct}%`,
                                 background: "linear-gradient(90deg, #10b981, #059669)",
                             }}
-                        />
+                        >
+                            {/* Shimmer bergerak di atas progress */}
+                            <div className="todo-shimmer absolute inset-0" />
+                        </div>
                     </div>
                     <p className="text-[10px] text-gray-400 mt-2 tabular-nums">{done} dari {total} tugas selesai</p>
                 </div>
@@ -955,20 +987,23 @@ function DeleteConfirmModal({
     if (!open) return null;
     return (
         <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-md sm:p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#1a1a2e]/40 backdrop-blur-md sm:p-4"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
-            <div className="todo-sheet bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl border border-gray-100 p-5 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <div className="todo-sheet bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-[#1a1a2e]/30 ring-1 ring-gray-100 p-5 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
                 <div className="sm:hidden flex justify-center -mt-2 mb-3">
                     <div className="w-10 h-1 rounded-full bg-gray-200" />
                 </div>
 
                 <div className="text-center mb-5 sm:mb-6">
-                    <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" />
-                        </svg>
+                    <div className="relative w-14 h-14 mx-auto mb-4">
+                        <div className="absolute inset-0 rounded-2xl bg-red-400/20 blur-lg" />
+                        <div className="relative w-14 h-14 bg-red-50 ring-1 ring-red-100 rounded-2xl flex items-center justify-center">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                            </svg>
+                        </div>
                     </div>
                     <h3 className="text-base font-bold text-gray-900">Hapus Tugas?</h3>
                     <p className="text-sm text-gray-400 mt-1.5 leading-relaxed">
@@ -986,7 +1021,7 @@ function DeleteConfirmModal({
                     <button
                         onClick={onConfirm}
                         disabled={loading}
-                        className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
+                        className="flex-1 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-br from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 rounded-2xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
                     >
                         {loading && (
                             <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1339,20 +1374,29 @@ export default function TodosClient() {
                     0%, 100% { opacity: 1; }
                     50% { opacity: 0.4; }
                 }
+                @keyframes todoShimmer {
+                    0%   { transform: translateX(-120%); }
+                    100% { transform: translateX(220%); }
+                }
+                /* Shimmer strip di progress bar keseluruhan */
+                .todo-shimmer {
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+                    animation: todoShimmer 2.4s ease-in-out infinite;
+                }
                 /* Mobile: modal naik dari bawah seperti bottom sheet */
                 .todo-sheet { animation: todoSheetIn 0.26s cubic-bezier(0.22,1,0.36,1) both; }
                 @media (min-width: 640px) {
                     .todo-sheet { animation: todoModalIn 0.22s cubic-bezier(0.34,1.56,0.64,1) both; }
                 }
                 @media (prefers-reduced-motion: reduce) {
-                    .todo-sheet, [style*="todoItemIn"], [style*="todoToastIn"] { animation: none !important; }
+                    .todo-sheet, .todo-shimmer, [style*="todoItemIn"], [style*="todoToastIn"] { animation: none !important; }
                 }
             `}</style>
 
             {toast && (
                 <div
-                    className={`fixed bottom-5 sm:bottom-6 left-1/2 z-[100] w-[calc(100%-2rem)] sm:w-auto max-w-sm flex items-center justify-center sm:justify-start gap-2.5 px-4 sm:px-5 py-3 rounded-2xl shadow-2xl text-[13px] sm:text-sm font-semibold text-white
-                        ${toast.type === "error" ? "bg-red-500" : "bg-[#1a1a2e]"}`}
+                    className={`fixed bottom-5 sm:bottom-6 left-1/2 z-[100] w-[calc(100%-2rem)] sm:w-auto max-w-sm flex items-center justify-center sm:justify-start gap-2.5 px-4 sm:px-5 py-3 rounded-2xl shadow-2xl text-[13px] sm:text-sm font-semibold text-white ring-1 ring-white/10
+                        ${toast.type === "error" ? "bg-gradient-to-r from-red-500 to-rose-600" : "bg-gradient-to-r from-[#1a1a2e] to-[#2d2d54]"}`}
                     style={{ animation: "todoToastIn 0.25s ease-out both", transform: "translateX(-50%)" }}
                     role="status"
                 >
@@ -1385,46 +1429,52 @@ export default function TodosClient() {
             />
 
             <div className="w-full max-w-5xl mx-auto">
-                {/* Header — stack di mobile, sejajar di laptop */}
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-5 sm:mb-7">
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2.5 mb-1">
-                            <div className="w-7 h-7 bg-[#1a1a2e] rounded-lg flex items-center justify-center flex-shrink-0">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2">
-                                    <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-                                </svg>
+                {/* Header — hero gradient, stack di mobile, sejajar di laptop */}
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1a1a2e] via-[#232342] to-[#1a1a2e] px-5 sm:px-7 py-5 sm:py-6 mb-5 sm:mb-7 shadow-xl shadow-[#1a1a2e]/20">
+                    {/* Ornamen glow dekoratif */}
+                    <div className="pointer-events-none absolute -top-16 -right-10 w-52 h-52 rounded-full bg-white/[0.06] blur-3xl" />
+                    <div className="pointer-events-none absolute -bottom-24 -left-10 w-56 h-56 rounded-full bg-indigo-400/10 blur-3xl" />
+
+                    <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2.5 mb-1.5">
+                                <div className="w-9 h-9 bg-white/10 backdrop-blur rounded-xl flex items-center justify-center flex-shrink-0 ring-1 ring-white/15">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2">
+                                        <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                                    </svg>
+                                </div>
+                                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">To-Do List</h1>
                             </div>
-                            <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">To-Do List</h1>
+                            <p className="text-[13px] sm:text-sm text-white/50 ml-[46px]">Catat dan kelola tugas harianmu</p>
                         </div>
-                        <p className="text-[13px] sm:text-sm text-gray-400 ml-9">Catat dan kelola tugas harianmu</p>
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                        {unreadAssignedCount > 0 && (
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            {unreadAssignedCount > 0 && (
+                                <button
+                                    onClick={() => setAssigneeFilter("to_me")}
+                                    className="relative w-11 h-11 sm:w-10 sm:h-10 flex-shrink-0 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 flex items-center justify-center text-white active:scale-95 transition-all"
+                                    aria-label={`${unreadAssignedCount} tugas baru ditugaskan untukmu`}
+                                    title="Tugas baru ditugaskan untukmu"
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                                        <path d="M13.73 21a2 2 0 01-3.46 0" />
+                                    </svg>
+                                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center ring-2 ring-[#1a1a2e]">
+                                        {unreadAssignedCount}
+                                    </span>
+                                </button>
+                            )}
                             <button
-                                onClick={() => setAssigneeFilter("to_me")}
-                                className="relative w-11 h-11 sm:w-10 sm:h-10 flex-shrink-0 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 active:scale-95 transition-all"
-                                aria-label={`${unreadAssignedCount} tugas baru ditugaskan untukmu`}
-                                title="Tugas baru ditugaskan untukmu"
+                                onClick={() => { setEditTarget(null); setFormOpen(true); }}
+                                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 bg-white hover:bg-gray-50 text-[#1a1a2e] text-sm font-bold rounded-2xl transition-all shadow-lg shadow-black/20 active:scale-[0.98]"
                             >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                                    <path d="M13.73 21a2 2 0 01-3.46 0" />
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
                                 </svg>
-                                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">
-                                    {unreadAssignedCount}
-                                </span>
+                                Tambah Tugas
                             </button>
-                        )}
-                        <button
-                            onClick={() => { setEditTarget(null); setFormOpen(true); }}
-                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 bg-[#1a1a2e] hover:bg-[#252540] text-white text-sm font-semibold rounded-2xl transition-all shadow-lg shadow-[#1a1a2e]/20 active:scale-[0.98]"
-                        >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8">
-                                <line x1="12" y1="5" x2="12" y2="19" />
-                                <line x1="5" y1="12" x2="19" y2="12" />
-                            </svg>
-                            Tambah Tugas
-                        </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1444,7 +1494,7 @@ export default function TodosClient() {
                             placeholder="Cari tugas, deskripsi, atau nama orang..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/15 focus:border-[#1a1a2e] transition-all bg-gray-50/60 placeholder:text-gray-300"
+                            className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-[#1a1a2e]/10 focus:border-[#1a1a2e] focus:bg-white transition-all bg-gray-50/60 placeholder:text-gray-300"
                         />
                         {search && (
                             <button
