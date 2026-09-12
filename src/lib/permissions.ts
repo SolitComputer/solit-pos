@@ -639,7 +639,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ✅ FIX: dulu tidak terdaftar di sini — middleware jadi default-allow
   // "siapa saja yang login" untuk rute admin roles ini (proteksi cuma
   // mengandalkan isRoleManager() internal). Disamakan dengan dua rute
-  // saudaranya di atas untuk defense-in-depth.
+  // saudaranya di atas untuk defense-in-depth.f
   "/api/admin/roles": [...ROLE_ACCESS_MANAGER_ROLES],
 
    "/dashboard/sop-divisi": [...ALL_ROLES],
