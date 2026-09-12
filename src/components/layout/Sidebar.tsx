@@ -218,6 +218,29 @@ const ITEM_LAPORAN_KEUANGAN: MenuItem = { name: "Laporan Keuangan", href: "/dash
 const ITEM_MONITOR_CHAT: MenuItem = { name: "Monitor Chat", href: "/dashboard/admin-chat", icon: Icons.monitorChat };
 const ITEM_LEADS_CHAT: MenuItem = { name: "Leads Chat Masuk", href: "/dashboard/leads-chat", icon: Icons.leadsChat };
 const ITEM_LAPORAN_SALES_HARIAN: MenuItem = { name: "Laporan Harian Sales", href: "/dashboard/laporan-harian-sales", icon: Icons.salesReport };
+// Sub-menu per channel leads (WA/FB/OLX/Carousell/Mitra/Reseller) — link ke
+// halaman yang sama dengan query ?channel=... supaya tab channel di halaman
+// Laporan Harian Sales otomatis ke-preselect saat diklik dari sidebar.
+const LAPORAN_SALES_MENU: MenuGroup = {
+  label: "Laporan Sales",
+  items: [ 
+    ITEM_LAPORAN_SALES_HARIAN,
+  ],
+};
+
+// BARU: fitur "Audit Marketing" — beda dari LAPORAN_SALES_MENU di atas, tiap
+// channel di sini adalah HALAMAN SENDIRI (route [channel]), bukan 1 halaman + tab.
+const AUDIT_LEADS_MENU: MenuGroup = {
+  label: "Audit Marketing",
+  items: [
+    { name: "WhatsApp", href: "/dashboard/audit-leads/wa", icon: Icons.salesReport },
+    { name: "Facebook", href: "/dashboard/audit-leads/fb", icon: Icons.salesReport },
+    { name: "OLX", href: "/dashboard/audit-leads/olx", icon: Icons.salesReport },
+    { name: "Carousell", href: "/dashboard/audit-leads/carousell", icon: Icons.salesReport },
+    { name: "Mitra", href: "/dashboard/audit-leads/mitra", icon: Icons.salesReport },
+    { name: "Reseller", href: "/dashboard/audit-leads/reseller", icon: Icons.salesReport },
+  ],
+};
 const ITEM_HASIL_PENJUALAN: MenuItem = { name: "Hasil Penjualan", href: "/dashboard/hasil-penjualan", icon: Icons.salesResult };
 const ITEM_ULTAH_KARYAWAN: MenuItem = { name: "Ultah Karyawan", href: "/dashboard/employee-birthdays", icon: Icons.employeeBirthday };
 
@@ -385,7 +408,6 @@ const ADMIN_TRANSAKSI: MenuGroup = {
     { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     { name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat },
     ITEM_MANAGEMENT_SELLER,
-    ITEM_LAPORAN_SALES_HARIAN,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -423,7 +445,6 @@ const SALES_TRANSAKSI: MenuGroup = {
     { name: "Buat Payment", href: "/payment/create", icon: Icons.payment },
     { name: "Riwayat Pending", href: "/dashboard/pending-orders", icon: Icons.pendingOrders },
     ITEM_MANAGEMENT_SELLER,
-    ITEM_LAPORAN_SALES_HARIAN,
     { name: "Scanner", href: "/scan", icon: Icons.scanner },
   ],
 };
@@ -719,8 +740,37 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
   PKL_PENGANTARAN: [...PKL_MENU],
   PKL_CUSTOMER_SERVICE: [...PKL_MENU],
   PKL_PENGELOLA_BARANG: [...PKL_MENU],
-  PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
+    PKL_ACCOUNTING: PKL_ACCOUNTING_MENU,
 };
+
+// ── Laporan Sales: grup sidebar tersendiri (WA/FB/OLX/Carousell/Mitra/
+// Reseller), BUKAN flat item lagi di dalam "Transaksi". Ditambahkan di sini —
+// SEBELUM loop PKL_MENU_INHERIT & sortGroupsByCanonicalOrder di bawah —
+// supaya PKL_SALES/PKL_ZENITH/PKL_MARKETING otomatis ikut mewarisi grup ini
+// dari role induknya (CREW_SALES/MARKETING), dan grupnya ke-sort ke posisi
+// yang benar (tepat di bawah "Transaksi") oleh GROUP_ORDER di bawah.
+const LAPORAN_SALES_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "KEPALA_MARKETING", "MARKETING",
+];
+LAPORAN_SALES_ROLES.forEach((role) => {
+  ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: LAPORAN_SALES_MENU.label, items: [...LAPORAN_SALES_MENU.items] }];
+});
+
+// Sama polanya kayak LAPORAN_SALES_ROLES di atas — role list yang sama persis,
+// jadi PKL_SALES/PKL_ZENITH/PKL_MARKETING otomatis ikut mewarisi grup ini juga
+// lewat PKL_MENU_INHERIT di bawah.
+const AUDIT_LEADS_MENU_ROLES: UserRole[] = [
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "KEPALA_SALES", "CREW_SALES", "SOTECH", "KEPALA_SOTECH",
+  "KEPALA_ONPOINT", "ONPOINT", "KEPALA_ZENITH",
+  "KEPALA_MARKETING", "MARKETING",
+];
+AUDIT_LEADS_MENU_ROLES.forEach((role) => {
+  ROLE_MENUS[role] = [...ROLE_MENUS[role], { label: AUDIT_LEADS_MENU.label, items: [...AUDIT_LEADS_MENU.items] }];
+});
 
 const MISSION_HREFS = new Set([...MISSIONS_MENU.items.map((i) => i.href), ITEM_MISSION_ALL.href]);
 
@@ -798,6 +848,8 @@ const GROUP_ORDER: string[] = [
   "Keuangan",
   "Inventaris",
   "Transaksi",
+  "Laporan Sales",
+  "Audit Marketing",
   "Penyedia Barang",
   "Penyiapan Barang",
   "Pengantaran",
@@ -1011,7 +1063,7 @@ function RoleBadges({ user }: { user: any }) {
       {roles.map((role) => {
         const meta = ROLE_META[role as UserRole];
         return (
-          <span key={role} className={`inline-block text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-slate-50 text-slate-700"}`}>
+          <span key={role} className={`inline-block max-w-full truncate text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded-md w-fit ${meta?.className ?? "bg-slate-50 text-slate-700"}`}>
             {meta?.label ?? role}
           </span>
         );
@@ -1166,12 +1218,12 @@ function SidebarContent({
                 </div>
               );
               return user?.equipped_border
-                ? <SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2}>{avatar}</SolitBorder>
+                ? <span className="flex-shrink-0 relative flex items-center justify-center my-0.5"><SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2} ornament={false}>{avatar}</SolitBorder></span>
                 : avatar;
             })()}
           </Link>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Link href="/dashboard/profile" className="flex items-center gap-3 group/profile min-w-0 flex-1" title="Profil saya">
               {(() => {
                 const avatar = (
@@ -1182,7 +1234,7 @@ function SidebarContent({
                   </div>
                 );
                 return user?.equipped_border
-                  ? <SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2}>{avatar}</SolitBorder>
+                  ? <span className="flex-shrink-0 relative flex items-center justify-center mx-0.5"><SolitBorder style={user.equipped_border.style as BorderStyle} thickness={2} ornament={false}>{avatar}</SolitBorder></span>
                   : avatar;
               })()}
               <div className="min-w-0 flex-1">
@@ -1190,7 +1242,7 @@ function SidebarContent({
                 <RoleBadges user={user} />
               </div>
             </Link>
-            <CoinBalanceChip className="flex-shrink-0" />
+            <CoinBalanceChip className="flex-shrink-0 ml-auto" />
           </div>
         )}      </div>
 
@@ -1649,7 +1701,7 @@ export default function Sidebar() {
   usePrepAlarm(onSiapKirim || isSilentAdmin ? [] : prep.siapKirimUnacked.map((id) => ({ id })), ALARM_KEYS.SIAP_KIRIM, !isSilentAdmin, 4000, notifSoundKey, notifCustomUrl);
   usePrepAlarm(isSilentAdmin ? [] : leadsChat.unreadUnacked.map((id) => ({ id })), ALARM_KEYS.LEADS_CHAT, !isSilentAdmin, 4000, notifSoundKey, notifCustomUrl);
 
-  const deliveryBadge = useDeliveryBadge(user?.id, user?.role);
+  const deliveryBadge = useDeliveryBadge(user?.id, user?.role, userRoles);
   // isSilentAdmin → pass null agar hook tidak fetch & tidak bunyi playReminderBeep()
   const reminderUnread = useReminderBadge(isSilentAdmin ? null : user?.id);
   const onTanyaCeoPage = pathname.startsWith("/dashboard/tanya-ceo");

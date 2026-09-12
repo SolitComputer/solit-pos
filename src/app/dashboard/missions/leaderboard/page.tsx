@@ -46,6 +46,10 @@ const PROGRAMMER_USER_IDS = [
   "a106053f-8168-4574-9586-6049300bb614",
   "a136bb0a-d6de-4439-946c-c17a85b11a67",
 ];
+// Yoga Adi Prakoso: role sistemnya ADMIN, dikelompokkan ke Divisi HRD
+// lewat ID — pola sama dengan Rayhan & Programmer di atas.
+// HARUS SAMA PERSIS dengan YOGA_HRD_USER_ID di api/leaderboard-kerja/route.ts
+const YOGA_HRD_USER_ID = "7b56de81-244e-42af-b2f6-0e29631c4114";
 
 const getDivision = (role: string, id?: string) => {
   // Rayhan: role sistemnya ADMIN, tapi dikelompokkan ke Divisi Accounting.
@@ -56,6 +60,8 @@ const getDivision = (role: string, id?: string) => {
   // 4 akun Programmer: role sistemnya ADMIN juga, dikelompokkan ke Divisi
   // Programmer lewat ID — pola sama dengan Rayhan di atas.
   if (id && PROGRAMMER_USER_IDS.includes(id)) return "Divisi Programmer";
+  // Yoga: role sistemnya ADMIN juga, dikelompokkan ke Divisi HRD lewat ID.
+  if (id === YOGA_HRD_USER_ID) return "Divisi HRD";
   const r = (role || "").toUpperCase();
   if (r.includes("KEPALA_SALES")) return "Kepala Sales";
   if (r.includes("SALES")) return "Crew Sales";
