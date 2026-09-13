@@ -1,7 +1,7 @@
 // src/app/api/sop/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { canManageSop, SOP_DIVISIONS, type SopDivision } from "@/lib/sop";
+import { canManageSop, SOP_DIVISIONS, SOP_CATEGORIES, type SopDivision, type SopCategory } from "@/lib/sop";
 
 function supabase() {
   return createClient(
@@ -36,7 +36,7 @@ export async function PUT(
     );
   }
 
-  let body: { sop_name?: string; description?: string; division?: string };
+  let body: { sop_name?: string; description?: string; division?: string; category?: string };
   try {
     body = await request.json();
   } catch {
@@ -46,11 +46,11 @@ export async function PUT(
     );
   }
 
-  const { sop_name, description, division } = body;
+  const { sop_name, description, division, category } = body;
 
-  if (!sop_name?.trim() || !description?.trim() || !division) {
+  if (!sop_name?.trim() || !description?.trim() || !division || !category) {
     return NextResponse.json(
-      { success: false, message: "Semua field wajib diisi" },
+      { success: false, message: "Semua field (termasuk kategori) wajib diisi" },
       { status: 400 }
     );
   }
@@ -62,6 +62,13 @@ export async function PUT(
     );
   }
 
+  if (!(SOP_CATEGORIES as readonly string[]).includes(category)) {
+    return NextResponse.json(
+      { success: false, message: "Kategori tidak valid" },
+      { status: 400 }
+    );
+  }
+
   const sb = supabase();
   const { data, error } = await sb
     .from("sop_entries")
@@ -69,6 +76,7 @@ export async function PUT(
       sop_name: sop_name.trim(),
       description: description.trim(),
       division: division as SopDivision,
+      category: category as SopCategory,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
