@@ -125,7 +125,7 @@ export function isAutoIncomeCategory(category: string): boolean {
 
 // ── Filter Types ──────────────────────────────────────────────────────────────
 export type AuditFilter = "ALL" | "AUDITED" | "NOT_AUDITED";
-export type SourceFilter = "ALL" | "MANUAL" | "AUTO";
+export type SourceFilter = "ALL" | "MANUAL" | "AUTO" | "PENGAJUAN_DANA";
 export type PaymentMethodFilter = "ALL" | "CASH" | "SALDO";
 export type StatusFilter = "ALL" | "ACTIVE" | "VOIDED";
 export type IncomeMethodFilter = "ALL" | "TUNAI" | "TRANSFER" | "TUNAI_TRANSFER"; // ⬅️ UPDATE: tambah opsi kombinasi Tunai+Transfer
@@ -188,7 +188,7 @@ export function activeFilterCount(f: CashflowFilter): number {
   return c;
 }
 
-/** Nama yang ditampilkan di tabel & dipakai untuk filter Nama — MANUAL/MODAL_AWAL
+/** Nama yang ditampilkan di tabel & dipakai untuk filter Nama — MANUAL/MODAL_AWAL/PENGAJUAN_DANA
  *  pakai nama pengisi (created_by_user), selain itu pakai field `nama` apa adanya
  *  (teknisi utk SERVICE, sales/nama transaksi utk TRANSACTION, dst). */
 export function getEntryDisplayNama(e: {
@@ -196,7 +196,7 @@ export function getEntryDisplayNama(e: {
   nama?: string;
   created_by_user?: { name: string } | null;
 }): string {
-  if ((e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL") && e.created_by_user?.name) {
+  if ((e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA") && e.created_by_user?.name) {
     return e.created_by_user.name;
   }
   return (e.nama || "").trim();
@@ -225,7 +225,8 @@ export function applyFilters<T extends {
     if (filter.audit === "AUDITED" && !e.is_audited) return false;
     if (filter.audit === "NOT_AUDITED" && e.is_audited) return false;
     if (filter.source === "MANUAL" && e.source_type !== "MANUAL") return false;
-    if (filter.source === "AUTO" && e.source_type === "MANUAL") return false;
+    if (filter.source === "PENGAJUAN_DANA" && e.source_type !== "PENGAJUAN_DANA") return false;
+    if (filter.source === "AUTO" && (e.source_type === "MANUAL" || e.source_type === "PENGAJUAN_DANA")) return false;
    if (filter.paymentMethod !== "ALL" && e.payment_method !== filter.paymentMethod) return false; // ⬅️ BARU
     if (filter.status === "ACTIVE" && e.is_voided) return false; // ⬅️ BARU
     if (filter.status === "VOIDED" && !e.is_voided) return false; // ⬅️ BARU
