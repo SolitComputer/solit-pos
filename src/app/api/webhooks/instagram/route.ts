@@ -28,8 +28,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   }
 
+  console.log("[IG webhook] payload masuk:", JSON.stringify(payload));
   try {
     if (payload.object !== "instagram") {
+      console.log("[IG webhook] object bukan instagram:", payload.object);
       return NextResponse.json({ received: true });
     }
 
@@ -40,7 +42,10 @@ export async function POST(req: NextRequest) {
         .select("id, page_access_token")
         .eq("ig_user_id", igAccountId)
         .maybeSingle();
-      if (!account) continue; // akun IG ini belum terdaftar di sistem
+           if (!account) {
+        console.log("[IG webhook] akun IG tidak match di DB, ig_user_id:", igAccountId);
+        continue;
+      }
 
       for (const event of entry.messaging ?? []) {
         // ⛔ Abaikan echo (pesan yang KITA kirim sendiri) supaya tidak dobel
