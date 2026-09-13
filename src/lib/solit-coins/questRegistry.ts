@@ -116,8 +116,11 @@ export const QUESTS: QuestDef[] = [
     periodType: "WEEKLY",
     target: 5,
     roles: "ALL",
-    // "Hadir tanpa telat" = late_weight === 0 pada baris IN (konsisten dgn
-    // leaderboard/achievements). Hitung jumlah hari absensi unik yg on-time.
+    // "Hadir tanpa telat" = late_weight >= 1 pada baris IN — konsisten dengan
+    // getDisplayStatus() di dashboard/attendance/page.tsx: late_weight >= 1
+    // berarti PRESENT/tepat waktu, 0 < late_weight < 1 berarti LATE, dan
+    // late_weight === 0 berarti SKIP (bukan kehadiran). Hitung jumlah hari
+    // absensi unik yg on-time.
     count: async ({ userId, weekKey }) => {
       const { start, end } = weekWindow(weekKey);
       const { data } = await supabase
@@ -128,9 +131,13 @@ export const QUESTS: QuestDef[] = [
         .eq("direction", "IN")
         .gte("created_at", start)
         .lte("created_at", end);
+      
       const onTimeDays = new Set<string>();
       for (const r of data ?? []) {
-        if (((r as { late_weight: number | null }).late_weight ?? 0) === 0) {
+        const lateWeight = Number(
+          (r as { late_weight: number | string | null }).late_weight ?? 0
+        );
+        if (lateWeight >= 1) {
           onTimeDays.add(toAttendanceDateKey((r as { created_at: string }).created_at));
         }
       }
