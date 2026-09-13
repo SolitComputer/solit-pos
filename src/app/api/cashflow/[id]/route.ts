@@ -164,18 +164,19 @@ export const PATCH = withAuth(async (req, ctx, user: any) => {
     return NextResponse.json({ success: true, data: updated });
 }, CASHFLOW_ROLES);
 
-// ── PUT /api/cashflow/[id] — edit uang keluar manual ─────────────────────────
+// ── PUT /api/cashflow/[id] — edit uang keluar manual / pengajuan dana ────────
 export const PUT = withAuth(async (req, ctx, _user: any) => {
     const { id } = await ctx.params;
     if (!id) return NextResponse.json({ success: false, message: "ID tidak valid" }, { status: 400 });
 
     const body = await req.json();
-    const { category, nominal, keterangan, tanggal, payment_method } = body as {
+    const { category, nominal, keterangan, tanggal, payment_method, photo_url } = body as {
         category: string;
         nominal: number | string;
         keterangan?: string;
         tanggal?: string;
         payment_method?: string;
+        photo_url?: string | null;
     };
 
     const nom = Math.round(Number(nominal));
@@ -190,18 +191,18 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
 
     const { data: entry, error: fetchErr } = await supabase
         .from("cashflow_entries")
-        .select("id, direction, source_type, is_audited")
+        .select("id, direction, source_type, source_id, is_audited")
         .eq("id", id)
         .single();
 
     if (fetchErr || !entry)
         return NextResponse.json({ success: false, message: "Entry tidak ditemukan" }, { status: 404 });
 
-    if (entry.source_type !== "MANUAL")
-        return NextResponse.json({ success: false, message: "Hanya entry manual yang bisa diedit" }, { status: 400 });
+    if (entry.source_type !== "MANUAL" && entry.source_type !== "PENGAJUAN_DANA")
+        return NextResponse.json({ success: false, message: "Hanya entry manual dan pengajuan dana yang bisa diedit" }, { status: 400 });
 
     if (entry.is_audited)
-        return NextResponse.json({ success: false, message: "Entry yang sudah diaudit tidak bisa diedit" }, { status: 400 });
+        return NextResponse.json({ success: false, message: "Entry yang sudah diaudit tidak bisa diedit. Batalkan status audit terlebih dahulu." }, { status: 400 });
 
     if (!isValidCategory(entry.direction, category))
         return NextResponse.json({ success: false, message: "Kategori tidak valid" }, { status: 400 });
@@ -225,6 +226,9 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
     if (payment_method) {
         updatePayload.payment_method = payment_method;
     }
+    if (photo_url !== undefined) {
+        updatePayload.photo_url = photo_url;
+    }
 
     const { data: updated, error: updateErr } = await supabase
         .from("cashflow_entries")
@@ -236,6 +240,28 @@ export const PUT = withAuth(async (req, ctx, _user: any) => {
     if (updateErr) {
         console.error("[cashflow PUT]", updateErr);
         return NextResponse.json({ success: false, message: updateErr.message }, { status: 500 });
+    }
+
+    // ── Sinkronisasi ke fund_requests jika berasal dari PENGAJUAN_DANA ─────────
+    if (entry.source_type === "PENGAJUAN_DANA") {
+        const fundId = entry.source_id;
+        if (fundId) {
+            const { error: fundErr } = await supabase
+                .from("fund_requests")
+                .update({ realisasi_nominal: nom })
+                .eq("id", fundId);
+            if (fundErr) {
+                console.error("[cashflow PUT sync fund_requests by id]", fundErr);
+            }
+        } else {
+            const { error: fundErr } = await supabase
+                .from("fund_requests")
+                .update({ realisasi_nominal: nom })
+                .eq("realisasi_cashflow_id", id);
+            if (fundErr) {
+                console.error("[cashflow PUT sync fund_requests by realisasi_cashflow_id]", fundErr);
+            }
+        }
     }
 
     return NextResponse.json({ success: true, data: updated });
