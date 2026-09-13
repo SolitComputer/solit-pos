@@ -38,7 +38,7 @@ interface Meta {
 }
 
 const CREATE_ROLES = [
-  "ADMIN", "PROGRAMMER", "ASISTEN_CEO",
+  "ADMIN", "PROGRAMMER", "ASISTEN_CEO", "PURCHASING",
   "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
   "KEPALA_ONPOINT", "KEPALA_PENYEDIA_BARANG", "KEPALA_SOTECH", "KEPALA_PENGELOLA_BARANG",
 ];
@@ -770,6 +770,7 @@ export default function PengajuanDanaPage() {
                     const isAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER"].includes(r));
                     const canDelete = (isOwner && !row.is_approved) || isAdmin;
                     const busy = actionLoading[row.id] ?? false;
+                    const canRealisasiRow = row.executed_by_id === userId || userRoles.includes("ADMIN");
 
                     const avatarColors = [
                       "from-indigo-500 to-purple-600",
@@ -847,17 +848,12 @@ export default function PengajuanDanaPage() {
                         <td className="px-4 py-4 text-center">
                           {row.is_executed ? (
                             <div className="inline-flex flex-col items-center gap-1">
-                              <button
-                                onClick={() => canExecute && !row.realisasi_cashflow_id ? handleAction(row.id, "unexecute") : undefined}
-                                disabled={busy || !canExecute || !!row.realisasi_cashflow_id}
-                                title={row.realisasi_cashflow_id ? "Sudah direalisasi — tidak bisa dibatalkan" : canExecute ? "Batalkan eksekusi" : `Oleh ${row.executed_by_name}`}
-                                className={`w-8 h-8 rounded-2xl flex items-center justify-center transition-all ${canExecute && !row.realisasi_cashflow_id
-                                    ? "bg-blue-500 text-white shadow-sm shadow-blue-500/30 hover:bg-blue-600 cursor-pointer active:scale-90"
-                                    : "bg-blue-100 text-blue-600 cursor-default"
-                                  }`}
+                              <span
+                                title={`Sudah dieksekusi oleh ${row.executed_by_name} — tidak bisa dibatalkan`}
+                                className="w-8 h-8 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center cursor-default"
                               >
                                 <Banknote className="w-4 h-4" />
-                              </button>
+                              </span>
                               <span className="text-[10px] text-slate-400 max-w-[72px] truncate">{row.executed_by_name}</span>
                             </div>
                           ) : canExecute ? (
@@ -894,7 +890,7 @@ export default function PengajuanDanaPage() {
                               <span className="text-[9px] text-slate-400 max-w-[80px] truncate">{row.realisasi_by_name}</span>
                             </div>
                           ) : row.is_executed ? (
-                            canExecute ? (
+                            canRealisasiRow ? (
                               <button
                                 onClick={() => setRealisasiTarget(row)}
                                 title="Isi realisasi pengeluaran"
@@ -903,7 +899,7 @@ export default function PengajuanDanaPage() {
                                 <Banknote className="w-4 h-4 text-slate-300 group-hover:text-teal-500" />
                               </button>
                             ) : (
-                              <span className="text-[10px] text-amber-500 font-semibold">Menunggu</span>
+                              <span className="text-[10px] text-amber-500 font-semibold" title={`Hanya ${row.executed_by_name} yang bisa mengisi realisasi ini`}>Menunggu</span>
                             )
                           ) : (
                             <div className="w-8 h-8 rounded-2xl border-2 border-slate-100 bg-slate-50 mx-auto" title="Harus dieksekusi dulu" />
