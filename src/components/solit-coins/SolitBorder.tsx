@@ -76,6 +76,173 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
   ),
   "dragon-flame": (s) => Flame(s, "#f97316", "#fde047"),
   "cosmic-starfield": (s) => Sparkle(s, "#e0e7ff"),
+  "silver-frost": (s) => (
+    <svg {...svgProps(s)}>
+      <g stroke="#e2e8f0" strokeWidth="1.3" strokeLinecap="round">
+        <path d="M12 2v20M4 7l16 10M20 7L4 17" />
+      </g>
+      <circle cx="12" cy="12" r="1.6" fill="#fff" />
+    </svg>
+  ),
+  "blush-rose": (s) => (
+    <svg {...svgProps(s)}>
+      <g fill="#fb7185" opacity=".92">
+        <ellipse cx="12" cy="7.2" rx="2.8" ry="4.6" />
+        <ellipse cx="12" cy="16.8" rx="2.8" ry="4.6" />
+        <ellipse cx="7.2" cy="12" rx="4.6" ry="2.8" />
+        <ellipse cx="16.8" cy="12" rx="4.6" ry="2.8" />
+      </g>
+      <circle cx="12" cy="12" r="2.2" fill="#fff1f2" />
+    </svg>
+  ),
+  "toxic-venom": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M12 2c4 5 7 9 7 13a7 7 0 1 1-14 0c0-4 3-8 7-13z" fill="#84cc16" stroke={stroke} strokeWidth="1" />
+      <circle cx="12" cy="14.5" r="2" fill="#ecfccb" />
+    </svg>
+  ),
+  "storm-thunder": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M13 1.5 4.5 13.2H10l-1.5 9.3L20 10.2h-6z" fill="#facc15" stroke={stroke} strokeWidth=".7" strokeLinejoin="round" />
+    </svg>
+  ),
+  "phoenix-wing": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M3 15c3-8 9-12 9-12s1.2 7.4-2 11.4c3-1.1 6.2-.9 9 2.1-5.2 2-9.3.8-11.4-1.4-1 3-3 5.2-5 6.2 1.1-3.2 1.1-5.4.4-6.3z" fill="#f97316" stroke={stroke} strokeWidth=".7" strokeLinejoin="round" />
+    </svg>
+  ),
+  "void-eclipse": (s) => (
+    <svg {...svgProps(s)}>
+      <circle cx="12" cy="12" r="7.2" fill="#0f172a" stroke="#c4b5fd" strokeWidth="1.3" />
+      <circle cx="9.3" cy="9.8" r="7.2" fill="#000" />
+    </svg>
+  ),
+  "celestial-throne": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M12 1.5l2.3 7.2 7.2 2.3-7.2 2.3L12 22.5l-2.3-7.2L2.5 13l7.2-2.3z" fill="#fbbf24" stroke={stroke} strokeWidth=".6" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="2.6" fill="#f3e8ff" />
+    </svg>
+  ),
+  "abyssal-tide": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M12 2v14M8 4.5v5.5M16 4.5v5.5M5.5 10c2.2 1.2 4.4 1.2 6.5 0s4.3-1.2 6.5 0" stroke="#22d3ee" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <path d="M12 16l-3.2 6.2h6.4L12 16z" fill="#0e7490" />
+    </svg>
+  ),
+  "infinity-halo": (s) => (
+    <svg {...svgProps(s)}>
+      <circle cx="12" cy="12" r="8" fill="none" stroke="#fbbf24" strokeWidth="1.4" strokeDasharray="3 2" />
+      <circle cx="12" cy="12" r="3.4" fill="#fff7cd" stroke={stroke} strokeWidth=".6" />
+    </svg>
+  ),
+  "titan-ascendant": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M12 2 4 8v6c0 5 3.4 8.6 8 10 4.6-1.4 8-5 8-10V8z" fill="#0f172a" stroke="#f43f5e" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M12 6v12M8 10h8" stroke="#f43f5e" strokeWidth="1.2" />
+    </svg>
+  ),
+  "frostbite-claw": (s) => (
+    <svg {...svgProps(s)}>
+      <g stroke="#38bdf8" strokeWidth="1.6" strokeLinecap="round" fill="none">
+        <path d="M6 4c1 5 2 10 1 18" />
+        <path d="M12 3c1 6 1.5 11 0 19" />
+        <path d="M18 4c-1 5-2 10-1 18" />
+      </g>
+    </svg>
+  ),
+  "crimson-blade": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M12 1.5 14 12l-2 10.5-2-10.5z" fill="#dc2626" stroke={stroke} strokeWidth=".7" strokeLinejoin="round" />
+      <path d="M8 11.5h8" stroke="#450a0a" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  ),
+  "shadow-fang": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M6 3 9 14l-3 7-3-9z" fill="#52525b" stroke={stroke} strokeWidth=".6" strokeLinejoin="round" />
+      <path d="M18 3 15 14l3 7 3-9z" fill="#27272a" stroke={stroke} strokeWidth=".6" strokeLinejoin="round" />
+    </svg>
+  ),
+  "nova-burst": (s) => (
+    <svg {...svgProps(s)}>
+      <g stroke="#fb923c" strokeWidth="1.6" strokeLinecap="round">
+        <path d="M12 2v6M12 16v6M2 12h6M16 12h6M4.9 4.9l4.2 4.2M14.9 14.9l4.2 4.2M19.1 4.9l-4.2 4.2M9.1 14.9l-4.2 4.2" />
+      </g>
+      <circle cx="12" cy="12" r="3" fill="#fff7ed" />
+    </svg>
+  ),
+  "meteor-shower": (s) => (
+    <svg {...svgProps(s)}>
+      <g stroke="#818cf8" strokeWidth="1.4" strokeLinecap="round" opacity=".85">
+        <path d="M4 4l6 6M9 3l5 5M14 5l4 4" />
+      </g>
+      <circle cx="15" cy="15" r="3.4" fill="#6366f1" stroke={stroke} strokeWidth=".6" />
+    </svg>
+  ),
+  "phantom-veil": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M12 2c4.5 0 7 3.4 7 7.5V19l-2.3-2-2.2 2-2.5-2-2.5 2-2.2-2L5 19V9.5C5 5.4 7.5 2 12 2z" fill="#818cf8" opacity=".85" stroke={stroke} strokeWidth=".6" />
+      <circle cx="9.5" cy="10" r="1" fill="#1e1b4b" /><circle cx="14.5" cy="10" r="1" fill="#1e1b4b" />
+    </svg>
+  ),
+  "solar-flare": (s) => (
+    <svg {...svgProps(s)}>
+      <circle cx="12" cy="12" r="4.5" fill="#facc15" stroke="#f97316" strokeWidth="1" />
+      <g stroke="#f97316" strokeWidth="1.6" strokeLinecap="round">
+        <path d="M12 1v4M12 19v4M1 12h4M19 12h4M3.5 3.5l3 3M17.5 17.5l3 3M20.5 3.5l-3 3M6.5 17.5l-3 3" />
+      </g>
+    </svg>
+  ),
+  "razor-storm": (s) => (
+    <svg {...svgProps(s)}>
+      <g stroke="#e2e8f0" strokeWidth="1.5" strokeLinecap="round">
+        <path d="M4 6l16 4M4 18l16-4M4 12h16" />
+      </g>
+    </svg>
+  ),
+  "inferno-core": (s) => Flame(s, "#dc2626", "#fde047"),
+  "quantum-rift": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M12 2 9 9l-7 1 5 5-2 7 7-4 7 4-2-7 5-5-7-1z" fill="#22d3ee" opacity=".9" stroke={stroke} strokeWidth=".6" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="2" fill="#0f172a" />
+    </svg>
+  ),
+};
+
+// Level efek tambahan per preset, dipetakan manual sesuai tier rarity:
+// rare = shimmer sweep, epic = + pulse ring, legendary/limited = + partikel sparkle.
+const FX_TIER: Record<string, "common" | "rare" | "epic" | "legendary" | "limited"> = {
+  "emerald-minimal": "common",
+  "royal-blue": "common",
+  "obsidian-black": "common",
+  "silver-frost": "common",
+  "blush-rose": "common",
+  "cyber-neon": "rare",
+  "amber-flame": "rare",
+  "amethyst-violet": "rare",
+  "toxic-venom": "rare",
+  "storm-thunder": "rare",
+  "rgb-spin": "epic",
+  "aurora-wave": "epic",
+  "galaxy-pulse": "epic",
+  "phoenix-wing": "epic",
+  "void-eclipse": "epic",
+  "golden-crown": "legendary",
+  "dragon-flame": "legendary",
+  "cosmic-starfield": "legendary",
+  "celestial-throne": "legendary",
+  "abyssal-tide": "legendary",
+  "infinity-halo": "limited",
+  "titan-ascendant": "limited",
+  "frostbite-claw": "common",
+  "crimson-blade": "rare",
+  "shadow-fang": "rare",
+  "nova-burst": "epic",
+  "meteor-shower": "epic",
+  "phantom-veil": "legendary",
+  "solar-flare": "legendary",
+  "razor-storm": "epic",
+  "inferno-core": "legendary",
+  "quantum-rift": "limited",
 };
 
 // Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
@@ -603,13 +770,38 @@ export function SolitBorder({
         ? {}
         : { background: DEFAULT_GRADIENT };
 
+  const fx = preset ? FX_TIER[preset] : undefined;
+  const hasPulse = fx === "epic" || fx === "legendary" || fx === "limited";
+  const hasShimmer = fx === "rare" || fx === "epic" || fx === "legendary" || fx === "limited";
+  const hasParticles = fx === "legendary" || fx === "limited";
+  const hasComet = fx === "limited";
+  const hasCounterRing = fx === "epic" || fx === "legendary" || fx === "limited";
+  const hasBurst = fx === "legendary" || fx === "limited";
+  const isJittery = fx === "limited";
+
   return (
-    <span className={`sb-ring ${className}`} style={{ padding: thickness }}>
+    <span className={`sb-ring ${isJittery ? "sb-ring-jitter" : ""} ${className}`} style={{ padding: thickness }}>
+      {hasBurst && <span className="sb-burst" aria-hidden="true" />}
+      {hasPulse && <span className="sb-pulse-ring" aria-hidden="true" />}
+      {fx === "limited" && <span className="sb-pulse-ring sb-pulse-ring-2" aria-hidden="true" />}
       <span className={`sb-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
+      {hasCounterRing && (
+        <span className={`sb-bg sb-bg-counter ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} aria-hidden="true" />
+      )}
+      {hasShimmer && <span className="sb-shimmer" aria-hidden="true" />}
+      {hasComet && <span className="sb-comet" aria-hidden="true" />}
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
-        <span className="sb-orn" aria-hidden="true">
+        <span className={`sb-orn ${fx === "legendary" || fx === "limited" ? "sb-orn-glow" : ""}`} aria-hidden="true">
           {orn(ornamentSize)}
+        </span>
+      )}
+      {hasParticles && (
+        <span className="sb-particles" aria-hidden="true">
+          <span className="sb-particle sb-particle-1" />
+          <span className="sb-particle sb-particle-2" />
+          <span className="sb-particle sb-particle-3" />
+          {fx === "limited" && <span className="sb-particle sb-particle-4" />}
         </span>
       )}
       <style jsx global>{`
@@ -624,6 +816,131 @@ export function SolitBorder({
           border-radius: 9999px;
           z-index: 0;
           will-change: transform, filter;
+        }
+        .sb-pulse-ring {
+          position: absolute;
+          inset: -6px;
+          border-radius: 9999px;
+          border: 2px solid rgba(255, 255, 255, 0.55);
+          opacity: 0;
+          z-index: -1;
+          pointer-events: none;
+          animation: sb-pulse-expand 2.2s ease-out infinite;
+        }
+        .sb-pulse-ring-2 {
+          animation-delay: 1.1s;
+        }
+        @keyframes sb-pulse-expand {
+          0% { transform: scale(0.86); opacity: 0.55; }
+          80% { opacity: 0; }
+          100% { transform: scale(1.35); opacity: 0; }
+        }
+        .sb-shimmer {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          overflow: hidden;
+          z-index: 1;
+          pointer-events: none;
+          mix-blend-mode: screen;
+        }
+        .sb-shimmer::after {
+          content: "";
+          position: absolute;
+          inset: -50%;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 75deg,
+            rgba(255, 255, 255, 0.85) 90deg,
+            transparent 105deg,
+            transparent 360deg
+          );
+          animation: sb-spin 3s linear infinite;
+        }
+        .sb-particles {
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-particle {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 5px;
+          height: 5px;
+          border-radius: 9999px;
+          background: #fff;
+          box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0.8);
+          animation: sb-particle-orbit 3.6s linear infinite;
+        }
+        .sb-particle-2 { animation-delay: 1.2s; }
+        .sb-particle-3 { animation-delay: 2.4s; }
+        .sb-particle-4 { animation-delay: 0.6s; width: 4px; height: 4px; }
+        @keyframes sb-particle-orbit {
+          0% { transform: translate(-50%, -50%) rotate(0deg) translateX(26px) rotate(0deg); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translate(-50%, -50%) rotate(360deg) translateX(26px) rotate(-360deg); opacity: 0; }
+        }
+        .sb-comet {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 3;
+          pointer-events: none;
+          animation: sb-spin 2.6s linear infinite;
+        }
+        .sb-comet::before {
+          content: "";
+          position: absolute;
+          top: -2px;
+          left: 50%;
+          width: 4px;
+          height: 4px;
+          border-radius: 9999px;
+          background: #fff;
+          transform: translateX(-50%);
+          box-shadow:
+            0 0 8px 3px rgba(255, 255, 255, 0.95),
+            0 7px 8px -1px rgba(255, 255, 255, 0.55),
+            0 14px 12px -3px rgba(255, 255, 255, 0.3),
+            0 21px 16px -5px rgba(255, 255, 255, 0.12);
+        }
+        .sb-orn-glow {
+          filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+        }
+        .sb-bg-counter {
+          animation-direction: reverse !important;
+          opacity: 0.5;
+          mix-blend-mode: color-dodge;
+          transform: scale(1.14);
+          filter: blur(0.5px);
+        }
+        .sb-burst {
+          position: absolute;
+          inset: -35%;
+          border-radius: 9999px;
+          z-index: 8;
+          pointer-events: none;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 70%);
+          animation: sb-burst-flash 1s ease-out 1;
+        }
+        @keyframes sb-burst-flash {
+          0% { transform: scale(0.25); opacity: 0; }
+          25% { opacity: 1; }
+          100% { transform: scale(1.7); opacity: 0; }
+        }
+        .sb-ring-jitter {
+          animation: sb-jitter 2.6s ease-in-out infinite;
+        }
+        @keyframes sb-jitter {
+          0%, 100% { transform: translate(0, 0); }
+          22% { transform: translate(0.6px, -0.5px); }
+          44% { transform: translate(-0.5px, 0.5px); }
+          66% { transform: translate(0.4px, 0.4px); }
+          88% { transform: translate(-0.4px, -0.3px); }
         }
         .sb-ring > .sb-inner {
           position: relative;
@@ -763,8 +1080,195 @@ export function SolitBorder({
           50% { filter: drop-shadow(0 0 14px rgba(240, 249, 255, 0.95)) brightness(1.2); }
         }
 
+        /* ══ COMMON — dingin & lembut ══════════════════════════════════════ */
+        .sb-p-silver-frost {
+          background: conic-gradient(from 0deg, #475569, #94a3b8, #f1f5f9, #94a3b8, #475569);
+          animation: sb-spin 9s linear infinite, sb-g-frost 4.5s ease-in-out infinite;
+        }
+        @keyframes sb-g-frost {
+          0%, 100% { filter: drop-shadow(0 0 2px rgba(148, 163, 184, 0.5)); }
+          50% { filter: drop-shadow(0 0 7px rgba(226, 232, 240, 0.9)); }
+        }
+        .sb-p-blush-rose {
+          background: conic-gradient(from 0deg, #9f1239, #fb7185, #ffe4e6, #fb7185, #9f1239);
+          animation: sb-spin 8s linear infinite, sb-g-rose 4s ease-in-out infinite;
+        }
+        @keyframes sb-g-rose {
+          0%, 100% { filter: drop-shadow(0 0 2px rgba(251, 113, 133, 0.5)); }
+          50% { filter: drop-shadow(0 0 7px rgba(251, 113, 133, 0.9)); }
+        }
+
+        /* ══ RARE — lebih tajam & berbahaya ═══════════════════════════════ */
+        .sb-p-toxic-venom {
+          background: conic-gradient(from 0deg, #365314, #84cc16, #ecfccb, #84cc16, #365314);
+          animation: sb-spin 4.5s linear infinite, sb-g-venom 1.8s ease-in-out infinite;
+        }
+        @keyframes sb-g-venom {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(132, 204, 22, 0.6)); }
+          50% { filter: drop-shadow(0 0 12px rgba(132, 204, 22, 1)) brightness(1.15); }
+        }
+        .sb-p-storm-thunder {
+          background: conic-gradient(from 0deg, #0c1a3a, #1e3a8a, #facc15, #1e3a8a, #0c1a3a);
+          animation: sb-spin 3.5s linear infinite, sb-g-storm 1.1s ease-in-out infinite;
+        }
+        @keyframes sb-g-storm {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(250, 204, 21, 0.5)) brightness(1); }
+          50% { filter: drop-shadow(0 0 13px rgba(250, 204, 21, 1)) brightness(1.25); }
+        }
+
+        /* ══ EPIC — dramatis & langka ══════════════════════════════════════ */
+        .sb-p-phoenix-wing {
+          background: conic-gradient(from 0deg, #7c2d12, #f97316, #fde047, #ef4444, #7c2d12);
+          animation: sb-spin 4s linear infinite, sb-g-phoenix 1.4s ease-in-out infinite;
+        }
+        @keyframes sb-g-phoenix {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.7)) brightness(1); }
+          50% { filter: drop-shadow(0 0 15px rgba(253, 224, 71, 1)) brightness(1.3); }
+        }
+        .sb-p-void-eclipse {
+          background: conic-gradient(from 0deg, #020617, #4c1d95, #c4b5fd, #4c1d95, #020617);
+          animation: sb-spin 6s linear infinite, sb-g-eclipse 3s ease-in-out infinite;
+        }
+        @keyframes sb-g-eclipse {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(196, 181, 253, 0.5)); }
+          50% { filter: drop-shadow(0 0 14px rgba(196, 181, 253, 0.95)) brightness(1.15); }
+        }
+
+        /* ══ LEGENDARY — paling mahal & megah ═════════════════════════════ */
+        .sb-p-celestial-throne {
+          background: conic-gradient(from 0deg, #581c87, #fbbf24, #fff7cd, #a855f7, #581c87);
+          animation: sb-spin 5.5s linear infinite, sb-g-celestial 2.4s ease-in-out infinite;
+        }
+        @keyframes sb-g-celestial {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.75)) brightness(1.02); }
+          50% { filter: drop-shadow(0 0 17px rgba(243, 232, 255, 1)) brightness(1.3); }
+        }
+        .sb-p-abyssal-tide {
+          background: conic-gradient(from 0deg, #042f2e, #0e7490, #a5f3fc, #0e7490, #042f2e);
+          animation: sb-spin 6.5s linear infinite, sb-g-abyssal 2.8s ease-in-out infinite;
+        }
+        @keyframes sb-g-abyssal {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(14, 116, 144, 0.7)); }
+          50% { filter: drop-shadow(0 0 15px rgba(165, 243, 252, 0.95)) brightness(1.2); }
+        }
+
+        /* ══ LIMITED / EVENT — efek full stack, paling wow ═══════════════ */
+        .sb-p-infinity-halo {
+          background: conic-gradient(from 0deg, #78350f, #fbbf24, #fffbea, #fde68a, #fbbf24, #78350f);
+          animation: sb-spin 4.2s linear infinite, sb-g-infinity 2s ease-in-out infinite;
+        }
+        @keyframes sb-g-infinity {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.8)) brightness(1.05); }
+          50% { filter: drop-shadow(0 0 20px rgba(255, 251, 234, 1)) brightness(1.35); }
+        }
+        .sb-p-titan-ascendant {
+          background: conic-gradient(from 0deg, #020617, #4c0519, #f43f5e, #fecdd3, #f43f5e, #020617);
+          animation: sb-spin 3.6s linear infinite, sb-g-titan 1.6s ease-in-out infinite;
+        }
+        @keyframes sb-g-titan {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(244, 63, 94, 0.8)) brightness(1); }
+          50% { filter: drop-shadow(0 0 20px rgba(254, 205, 211, 1)) brightness(1.35); }
+        }
+
+        /* ══ COMMON+ — batch 3 ═════════════════════════════════════════════ */
+        .sb-p-frostbite-claw {
+          background: conic-gradient(from 0deg, #0c4a6e, #38bdf8, #e0f2fe, #38bdf8, #0c4a6e);
+          animation: sb-spin 8.5s linear infinite, sb-g-frostbite 4.2s ease-in-out infinite;
+        }
+        @keyframes sb-g-frostbite {
+          0%, 100% { filter: drop-shadow(0 0 2px rgba(56, 189, 248, 0.5)); }
+          50% { filter: drop-shadow(0 0 7px rgba(224, 242, 254, 0.9)); }
+        }
+
+        /* ══ RARE — batch 3 ════════════════════════════════════════════════ */
+        .sb-p-crimson-blade {
+          background: conic-gradient(from 0deg, #450a0a, #dc2626, #fecaca, #dc2626, #450a0a);
+          animation: sb-spin 4.2s linear infinite, sb-g-crimson 1.5s ease-in-out infinite;
+        }
+        @keyframes sb-g-crimson {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(220, 38, 38, 0.6)); }
+          50% { filter: drop-shadow(0 0 12px rgba(254, 202, 202, 1)) brightness(1.2); }
+        }
+        .sb-p-shadow-fang {
+          background: conic-gradient(from 0deg, #09090b, #52525b, #d4d4d8, #52525b, #09090b);
+          animation: sb-spin 4.8s linear infinite, sb-g-fang 2s ease-in-out infinite;
+        }
+        @keyframes sb-g-fang {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(82, 82, 91, 0.6)); }
+          50% { filter: drop-shadow(0 0 10px rgba(212, 212, 216, 0.9)); }
+        }
+
+        /* ══ EPIC — batch 3 ════════════════════════════════════════════════ */
+        .sb-p-nova-burst {
+          background: conic-gradient(from 0deg, #7c2d12, #fb923c, #fff7ed, #fb923c, #7c2d12);
+          animation: sb-spin 3.2s linear infinite, sb-g-nova 1.2s ease-in-out infinite;
+        }
+        @keyframes sb-g-nova {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(251, 146, 60, 0.7)) brightness(1); }
+          50% { filter: drop-shadow(0 0 18px rgba(255, 247, 237, 1)) brightness(1.35); }
+        }
+        .sb-p-meteor-shower {
+          background: conic-gradient(from 0deg, #1e1b4b, #6366f1, #e0e7ff, #6366f1, #1e1b4b);
+          animation: sb-spin 5s linear infinite, sb-g-meteor 2.5s ease-in-out infinite;
+        }
+        @keyframes sb-g-meteor {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.7)); }
+          50% { filter: drop-shadow(0 0 16px rgba(224, 231, 255, 1)) brightness(1.25); }
+        }
+
+        /* ══ LEGENDARY — batch 3 ══════════════════════════════════════════ */
+        .sb-p-phantom-veil {
+          background: conic-gradient(from 0deg, #1e1b4b, #818cf8, #f5f3ff, #a78bfa, #1e1b4b);
+          animation: sb-spin 7s linear infinite, sb-g-phantom 3.2s ease-in-out infinite;
+        }
+        @keyframes sb-g-phantom {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(129, 140, 248, 0.7)); }
+          50% { filter: drop-shadow(0 0 18px rgba(245, 243, 255, 1)) brightness(1.3); }
+        }
+        .sb-p-solar-flare {
+          background: conic-gradient(from 0deg, #7c2d12, #f97316, #fef9c3, #facc15, #f97316, #7c2d12);
+          animation: sb-spin 4.5s linear infinite, sb-g-solar 1.3s ease-in-out infinite;
+        }
+        @keyframes sb-g-solar {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(249, 115, 22, 0.75)) brightness(1); }
+          50% { filter: drop-shadow(0 0 20px rgba(254, 249, 195, 1)) brightness(1.4); }
+        }
+
+        /* ══ BATCH 4 — showcase dual-ring & burst ═════════════════════════ */
+        .sb-p-razor-storm {
+          background: conic-gradient(from 0deg, #1e293b, #64748b, #f1f5f9, #64748b, #1e293b);
+          animation: sb-spin 3s linear infinite, sb-g-razor 1s ease-in-out infinite;
+        }
+        @keyframes sb-g-razor {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(100, 116, 139, 0.7)) brightness(1); }
+          50% { filter: drop-shadow(0 0 15px rgba(241, 245, 249, 1)) brightness(1.3); }
+        }
+        .sb-p-inferno-core {
+          background: conic-gradient(from 0deg, #450a0a, #dc2626, #fde047, #f97316, #450a0a);
+          animation: sb-spin 3.4s linear infinite, sb-g-inferno 0.9s ease-in-out infinite;
+        }
+        @keyframes sb-g-inferno {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(220, 38, 38, 0.8)) brightness(1); }
+          45% { filter: drop-shadow(0 0 19px rgba(253, 224, 71, 1)) brightness(1.35); }
+        }
+        .sb-p-quantum-rift {
+          background: conic-gradient(from 0deg, #0c0a1f, #22d3ee, #f0abfc, #6366f1, #0c0a1f);
+          animation: sb-spin 3.8s linear infinite, sb-g-quantum 1.5s ease-in-out infinite;
+        }
+        @keyframes sb-g-quantum {
+          0%, 100% { filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.8)) hue-rotate(0deg); }
+          50% { filter: drop-shadow(0 0 20px rgba(240, 171, 252, 1)) hue-rotate(40deg) brightness(1.3); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .sb-ring > .sb-bg {
+          .sb-ring > .sb-bg,
+          .sb-bg-counter,
+          .sb-pulse-ring,
+          .sb-shimmer::after,
+          .sb-particle,
+          .sb-comet,
+          .sb-burst,
+          .sb-ring-jitter {
             animation: none !important;
           }
         }
