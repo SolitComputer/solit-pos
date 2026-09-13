@@ -792,8 +792,13 @@ export default function UnifiedBarangContent() {
     const visibleRows = useMemo(() => filteredRows.slice(0, visibleCount), [filteredRows, visibleCount]);
     const hasMore = filteredRows.length > visibleRows.length;
 
-    // Balik ke halaman awal tiap filter/pencarian berubah.
-    useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filteredRows]);
+    // Balik ke halaman awal HANYA saat kriteria filter/pencarian/sort berubah.
+    // SENGAJA tidak bergantung ke `filteredRows` — reference-nya ikut berubah
+    // tiap kali `rows` berubah (toggle Audit/SO, edit, hapus, fetch ulang),
+    // padahal itu bukan alasan buat reset progres "Muat lebih banyak".
+    useEffect(() => {
+        setVisibleCount(PAGE_SIZE);
+    }, [tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, deferredSearch, sortBy]);
 
     const counts = useMemo(() => ({
         total: rows.length,

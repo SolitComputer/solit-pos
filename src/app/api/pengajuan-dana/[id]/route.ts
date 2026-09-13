@@ -19,6 +19,7 @@ export async function PATCH(
   const { id } = await params;
   const userId = request.headers.get("x-user-id");
   const userName = decodeURIComponent(request.headers.get("x-user-name") || "");
+  const roles = (request.headers.get("x-user-roles") || "").split(",").filter(Boolean);
 
   if (!userId) {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
@@ -93,7 +94,7 @@ export async function PATCH(
 
   // ── Execute ─────────────────────────────────────────────────────────────────
   if (action === "execute") {
-    if (!FUND_EXECUTOR_IDS.includes(userId)) {
+    if (!FUND_EXECUTOR_IDS.includes(userId) && !roles.includes("ADMIN")) {
       return NextResponse.json(
         { success: false, message: "Anda tidak memiliki wewenang untuk mengeksekusi" },
         { status: 403 }
@@ -133,32 +134,15 @@ export async function PATCH(
     return NextResponse.json({ success: true, data });
   }
 
-  // ── Batal Execute (un-execute) ──────────────────────────────────────────────
+  // ── Batal Execute (un-execute) — SENGAJA DINONAKTIFKAN ────────────────────────
+  // Eksekusi bersifat FINAL: sekali sebuah pengajuan ditandai sudah dieksekusi,
+  // tidak ada cara untuk membatalkannya lagi lewat action ini (dulu bisa, kalau
+  // belum direalisasi — sekarang diblokir total, tanpa syarat).
   if (action === "unexecute") {
-    if (!FUND_EXECUTOR_IDS.includes(userId)) {
-      return NextResponse.json(
-        { success: false, message: "Anda tidak memiliki wewenang" },
-        { status: 403 }
-      );
-    }
-
-    const { data, error } = await supabase
-      .from("fund_requests")
-      .update({
-        is_executed: false,
-        executed_by_id: null,
-        executed_by_name: null,
-        executed_at: null,
-      })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json(
+      { success: false, message: "Eksekusi tidak bisa dibatalkan setelah dilakukan" },
+      { status: 400 }
+    );
   }
 
   return NextResponse.json({ success: false, message: "Action tidak valid" }, { status: 400 });
@@ -183,12 +167,23 @@ export async function DELETE(
   // Ambil data dulu untuk cek ownership
   const { data: existing, error: fetchErr } = await supabase
     .from("fund_requests")
-    .select("requester_id, is_approved")
+    .select("requester_id, is_approved, realisasi_cashflow_id")
     .eq("id", id)
     .single();
 
   if (fetchErr || !existing) {
     return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+  }
+
+  // ⬅️ BARU: sudah direalisasi ke Cashflow — jangan biarkan pengajuannya dihapus,
+  // supaya entry Cashflow yang sudah tercatat tidak jadi yatim (source_id
+  // menunjuk ke pengajuan yang sudah tidak ada). Berlaku untuk SEMUA role,
+  // termasuk Admin/Programmer.
+  if (existing.realisasi_cashflow_id) {
+    return NextResponse.json(
+      { success: false, message: "Tidak bisa menghapus pengajuan yang sudah direalisasi ke Cashflow" },
+      { status: 400 }
+    );
   }
 
   const isAdmin = roles.some((r) => ["ADMIN", "PROGRAMMER"].includes(r));
