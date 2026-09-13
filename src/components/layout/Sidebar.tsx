@@ -225,7 +225,7 @@ const ITEM_CONTRACT_SIGN: MenuItem = { name: "Tanda Tangan Kontrak", href: "/con
 const ITEM_KENDARAAN: MenuItem = { name: "Management Kendaraan", href: "/dashboard/kendaraan", icon: Icons.kendaraan };
 const ITEM_KENDARAAN_DASHBOARD: MenuItem = { name: "Dashboard", href: "/dashboard/kendaraan/dashboard", icon: Icons.reports };
 
-const ITEM_SOP_DIVISI: MenuItem = { name: "SOP Divisi", href: "/dashboard/sop-divisi", icon: Icons.sopDivisi };
+const ITEM_SOP_DIVISI: MenuItem = { name: "SOP", href: "/dashboard/sop-divisi", icon: Icons.sopDivisi };
 
 const ITEM_LOG_AKTIVITAS: MenuItem = { name: "Log Aktivitas", href: "/dashboard/activity-log", icon: Icons.log };
 const ITEM_LOG_LOGIN: MenuItem = { name: "Log Login", href: "/dashboard/login-logs", icon: Icons.loginLog };
@@ -728,6 +728,20 @@ const ROLE_MENUS: Record<UserRole, MenuGroup[]> = {
     { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
   ],
 
+  // Hak akses KEPALA_CC SENGAJA dibuat identik dengan KONTEN (requirement:
+  // "hak akses sama dengan KONTEN") — satu-satunya tambahan untuk role ini
+  // adalah grup "Keuangan" berisi Pengajuan Dana, yang disuntik otomatis oleh
+  // blok FUND_REQUEST_VIEW_ROLES di bawah karena KEPALA_CC ada di
+  // KEPALA_DIVISI_ROLES (lib/permissions.ts). Jangan tambah item lain di sini
+  // tanpa mengubah juga blok KONTEN di atas, biar keduanya tetap sinkron.
+  KEPALA_CC: [
+    GROUP_ABSENSI,
+    { label: "Management", items: [ITEM_USERS] },
+    { label: "Marketing", items: [ITEM_CC_REPORT, ITEM_LEADS_CHAT] },
+    { label: "Inventaris", items: [ITEM_DATA_BARANG, ITEM_LAPTOP_SIAP_JUAL] },
+    { label: "Transaksi", items: [{ name: "Riwayat Transaksi", href: "/dashboard/transactions", icon: Icons.riwayat }] },
+  ],
+
   CUSTOMER_SERVICE: [
     { label: "Utama", items: [ITEM_DASHBOARD] },
     GROUP_ABSENSI,
@@ -1097,7 +1111,8 @@ const ROLE_META: Record<UserRole, { label: string; className: string }> = {
   PKL_CUSTOMER_SERVICE: { label: "PKL Customer Service", className: "bg-amber-50 text-amber-700" },
   PKL_PENGELOLA_BARANG: { label: "PKL Pengelola Barang", className: "bg-amber-50 text-amber-700" },
   PKL_ACCOUNTING: { label: "PKL Accounting", className: "bg-amber-50 text-amber-700" },
-  KEPALA_ZENITH: { label: "Kepala Zenith", className: "bg-purple-50 text-purple-700" },
+   KEPALA_ZENITH: { label: "Kepala Zenith", className: "bg-purple-50 text-purple-700" },
+  KEPALA_CC: { label: "Kepala CC", className: "bg-fuchsia-50 text-fuchsia-800" },
 };
 
 function getInitials(name: string): string {
