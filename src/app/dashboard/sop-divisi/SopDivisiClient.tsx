@@ -245,140 +245,152 @@ export default function SopDivisiClient() {
 
     return (
         <DashboardLayout>
+            {/* Hide scrollbar untuk baris tab yang di-scroll horizontal di mobile */}
+            <style jsx global>{`
+                .no-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+                .no-scrollbar {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
 
-            <div className="min-h-screen bg-[#F7F7F8]">
-                <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
-                    {/* ── Header ─────────────────────────────────────────────────────── */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-                        <div>
-                            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                                SOP
-                            </h1>
-                            <p className="text-sm text-slate-500 mt-0.5">
-                                {activeCategory === "uncategorized"
-                                    ? "SOP lama yang belum diberi kategori"
-                                    : `${SOP_CATEGORY_LABELS[activeCategory]} — per divisi`}
-                            </p>
-                        </div>
-
-                        {canManage && !formOpen && (
-                            <button
-                                onClick={() => {
-                                    setFormOpen(true);
-                                    setEditingId(null);
-                                    setFormData({
-                                        ...EMPTY_FORM,
-                                        category: activeCategory === "uncategorized" ? "" : activeCategory,
-                                    });
-                                    setFormError("");
-                                }}
-                                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl
-                bg-gradient-to-r from-indigo-600 to-indigo-700
-                text-white text-sm font-bold shadow-md shadow-indigo-500/20
-                hover:brightness-110 active:scale-[0.98] transition"
-                            >
-                                <svg
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <path d="M12 5v14M5 12h14" />
-                                </svg>
-                                Tambah SOP
-                            </button>
-                        )}
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+                {/* ── Header ─────────────────────────────────────────────────────── */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+                    <div>
+                        <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+                            SOP
+                        </h1>
+                        <p className="text-sm text-slate-500 mt-0.5">
+                            {activeCategory === "uncategorized"
+                                ? "SOP lama yang belum diberi kategori"
+                                : `${SOP_CATEGORY_LABELS[activeCategory]} — per divisi`}
+                        </p>
                     </div>
 
-                    {/* ── Tab Kategori: SOP Fundamental vs SOP Teknis Kerja ──────────── */}
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                        {SOP_CATEGORIES.map((cat) => (
+                    {canManage && !formOpen && (
+                        <button
+                            onClick={() => {
+                                setFormOpen(true);
+                                setEditingId(null);
+                                setFormData({
+                                    ...EMPTY_FORM,
+                                    category: activeCategory === "uncategorized" ? "" : activeCategory,
+                                });
+                                setFormError("");
+                            }}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+              bg-gradient-to-r from-indigo-600 to-indigo-700
+              text-white text-sm font-bold shadow-md shadow-indigo-500/20
+              hover:brightness-110 active:scale-[0.98] transition
+              w-full sm:w-auto"
+                        >
+                            <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M12 5v14M5 12h14" />
+                            </svg>
+                            Tambah SOP
+                        </button>
+                    )}
+                </div>
+
+                {/* ── Tab Kategori: SOP Fundamental vs SOP Teknis Kerja ──────────── */}
+                <div className="flex items-center gap-1.5 mb-3 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
+                    {SOP_CATEGORIES.map((cat) => (
+                        <button
+                            key={cat}
+                            onClick={() => setActiveCategory(cat)}
+                            className={`flex-shrink-0 whitespace-nowrap px-3.5 py-2 rounded-xl text-sm font-bold transition ${activeCategory === cat
+                                    ? "bg-indigo-600 text-white shadow-sm"
+                                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                                }`}
+                        >
+                            {SOP_CATEGORY_LABELS[cat]}
+                        </button>
+                    ))}
+                    {canManage && uncategorizedCount > 0 && (
+                        <button
+                            onClick={() => setActiveCategory("uncategorized")}
+                            className={`flex-shrink-0 whitespace-nowrap px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 ${activeCategory === "uncategorized"
+                                    ? "bg-slate-800 text-white shadow-sm"
+                                    : "bg-white text-slate-500 hover:bg-slate-100 border border-dashed border-slate-300"
+                                }`}
+                        >
+                            {UNCATEGORIZED_LABEL}
+                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeCategory === "uncategorized" ? "bg-white/20" : "bg-slate-200"}`}>
+                                {uncategorizedCount}
+                            </span>
+                        </button>
+                    )}
+                </div>
+
+                {/* ── Filter Tabs (admin: semua divisi, non-admin: divisinya) ───── */}
+                {(userDivisions === "all" || availableDivisions.length > 1) && (
+                    <div className="flex items-center gap-1.5 mb-5 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
+                        {userDivisions === "all" && (
                             <button
-                                key={cat}
-                                onClick={() => setActiveCategory(cat)}
-                                className={`px-3.5 py-2 rounded-xl text-sm font-bold transition ${activeCategory === cat
+                                onClick={() => setFilter("all")}
+                                className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-bold transition ${filter === "all"
                                         ? "bg-indigo-600 text-white shadow-sm"
                                         : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
                                     }`}
                             >
-                                {SOP_CATEGORY_LABELS[cat]}
-                            </button>
-                        ))}
-                        {canManage && uncategorizedCount > 0 && (
-                            <button
-                                onClick={() => setActiveCategory("uncategorized")}
-                                className={`px-3.5 py-2 rounded-xl text-sm font-bold transition flex items-center gap-1.5 ${activeCategory === "uncategorized"
-                                        ? "bg-slate-800 text-white shadow-sm"
-                                        : "bg-white text-slate-500 hover:bg-slate-100 border border-dashed border-slate-300"
-                                    }`}
-                            >
-                                {UNCATEGORIZED_LABEL}
-                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeCategory === "uncategorized" ? "bg-white/20" : "bg-slate-200"}`}>
-                                    {uncategorizedCount}
-                                </span>
+                                Semua
                             </button>
                         )}
+                        {availableDivisions.map((div) => (
+                            <button
+                                key={div}
+                                onClick={() => setFilter(div)}
+                                className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-bold transition ${filter === div
+                                        ? "bg-indigo-600 text-white shadow-sm"
+                                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                                    }`}
+                            >
+                                {SOP_DIVISION_LABELS[div]}
+                            </button>
+                        ))}
                     </div>
+                )}
 
-                    {/* ── Filter Tabs (admin: semua divisi, non-admin: divisinya) ───── */}
-                    {(userDivisions === "all" || availableDivisions.length > 1) && (
-                        <div className="flex flex-wrap gap-1.5 mb-5">
-                            {userDivisions === "all" && (
-                                <button
-                                    onClick={() => setFilter("all")}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${filter === "all"
-                                            ? "bg-indigo-600 text-white shadow-sm"
-                                            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-                                        }`}
-                                >
-                                    Semua
-                                </button>
-                            )}
-                            {availableDivisions.map((div) => (
-                                <button
-                                    key={div}
-                                    onClick={() => setFilter(div)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${filter === div
-                                            ? "bg-indigo-600 text-white shadow-sm"
-                                            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-                                        }`}
-                                >
-                                    {SOP_DIVISION_LABELS[div]}
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                {/* ── Form Input SOP (Admin only) ────────────────────────────────── */}
+                {canManage && formOpen && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 mb-6 shadow-sm">
+                        <h2 className="text-base font-bold text-slate-800 mb-4">
+                            {editingId ? "Edit SOP" : "Tambah SOP Baru"}
+                        </h2>
 
-                    {/* ── Form Input SOP (Admin only) ────────────────────────────────── */}
-                    {canManage && formOpen && (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 mb-6 shadow-sm">
-                            <h2 className="text-base font-bold text-slate-800 mb-4">
-                                {editingId ? "Edit SOP" : "Tambah SOP Baru"}
-                            </h2>
+                        <div className="space-y-4">
+                            {/* Nama SOP */}
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                                    Nama SOP
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.sop_name}
+                                    onChange={(e) =>
+                                        setFormData((f) => ({ ...f, sop_name: e.target.value }))
+                                    }
+                                    placeholder="Contoh: SOP Penanganan Customer Baru"
+                                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200
+                  bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2
+                  focus:ring-indigo-500/20 outline-none transition"
+                                />
+                            </div>
 
-                            <div className="space-y-4">
-                                {/* Nama SOP */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                                        Nama SOP
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.sop_name}
-                                        onChange={(e) =>
-                                            setFormData((f) => ({ ...f, sop_name: e.target.value }))
-                                        }
-                                        placeholder="Contoh: SOP Penanganan Customer Baru"
-                                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200
-                    bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2
-                    focus:ring-indigo-500/20 outline-none transition"
-                                    />
-                                </div>
-
+                            {/* Divisi + Kategori sejajar di layar ≥ sm */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {/* Divisi */}
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">
@@ -424,150 +436,152 @@ export default function SopDivisiClient() {
                                         ))}
                                     </select>
                                 </div>
-
-                                {/* Penjelasan */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                                        Penjelasan SOP
-                                    </label>
-                                    <textarea
-                                        value={formData.description}
-                                        onChange={(e) =>
-                                            setFormData((f) => ({ ...f, description: e.target.value }))
-                                        }
-                                        placeholder="Jelaskan langkah-langkah SOP secara detail..."
-                                        rows={5}
-                                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200
-                    bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2
-                    focus:ring-indigo-500/20 outline-none transition resize-y min-h-[100px]"
-                                    />
-                                </div>
-
-                                {/* Error */}
-                                {formError && (
-                                    <p className="text-sm text-red-600 font-medium">{formError}</p>
-                                )}
-
-                                {/* Actions */}
-                                <div className="flex items-center gap-3 pt-1">
-                                    <button
-                                        onClick={handleSubmit}
-                                        disabled={submitting}
-                                        className="px-5 py-2.5 rounded-xl text-sm font-bold text-white
-                    bg-gradient-to-r from-indigo-600 to-indigo-700
-                    shadow-md shadow-indigo-500/20
-                    hover:brightness-110 active:scale-[0.98]
-                    disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                    >
-                                        {submitting
-                                            ? "Menyimpan..."
-                                            : editingId
-                                                ? "Simpan Perubahan"
-                                                : "Simpan SOP"}
-                                    </button>
-                                    <button
-                                        onClick={cancelForm}
-                                        className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600
-                    hover:bg-slate-100 active:scale-[0.98] transition"
-                                    >
-                                        Batal
-                                    </button>
-                                </div>
                             </div>
-                        </div>
-                    )}
 
-                    {/* ── Daftar SOP ─────────────────────────────────────────────────── */}
-                    {filteredSops.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
-                            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-slate-100 mb-4">
-                                <svg
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.5"
-                                    className="text-slate-400"
-                                >
-                                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-                                    <rect x="9" y="3" width="6" height="4" rx="1" />
-                                    <path d="M9 12h6M9 16h6" />
-                                </svg>
-                            </div>
-                            <p className="text-sm font-semibold text-slate-600">
-                                Belum ada{" "}
-                                {activeCategory === "uncategorized"
-                                    ? UNCATEGORIZED_LABEL
-                                    : SOP_CATEGORY_LABELS[activeCategory]}
-                                {filter !== "all"
-                                    ? ` untuk divisi ${SOP_DIVISION_LABELS[filter]}`
-                                    : ""}
-                            </p>
-                            <p className="text-xs text-slate-400 mt-1">
-                                {canManage
-                                    ? 'Klik "Tambah SOP" untuk membuat SOP baru.'
-                                    : "SOP akan muncul setelah Admin menambahkannya."}
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {filteredSops.map((sop) => (
-                                <SopCard
-                                    key={sop.id}
-                                    sop={sop}
-                                    canManage={canManage}
-                                    onEdit={() => startEdit(sop)}
-                                    onDelete={() => setDeleteTarget(sop)}
+                            {/* Penjelasan */}
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                                    Penjelasan SOP
+                                </label>
+                                <textarea
+                                    value={formData.description}
+                                    onChange={(e) =>
+                                        setFormData((f) => ({ ...f, description: e.target.value }))
+                                    }
+                                    placeholder="Jelaskan langkah-langkah SOP secara detail..."
+                                    rows={5}
+                                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200
+                  bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2
+                  focus:ring-indigo-500/20 outline-none transition resize-y min-h-[100px]"
                                 />
-                            ))}
-                        </div>
-                    )}
-                </div>
+                            </div>
 
-                {/* ── Modal Konfirmasi Hapus ──────────────────────────────────────── */}
-                {deleteTarget && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-                        <div
-                            className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <h3 className="text-base font-bold text-slate-900 mb-2">
-                                Hapus SOP?
-                            </h3>
-                            <p className="text-sm text-slate-600 mb-1">
-                                SOP{" "}
-                                <span className="font-semibold">
-                                    &ldquo;{deleteTarget.sop_name}&rdquo;
-                                </span>{" "}
-                                akan dihapus permanen.
-                            </p>
-                            <p className="text-xs text-slate-400 mb-5">
-                                Aksi ini tidak bisa dibatalkan.
-                            </p>
-                            <div className="flex items-center gap-3 justify-end">
+                            {/* Error */}
+                            {formError && (
+                                <p className="text-sm text-red-600 font-medium">{formError}</p>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
                                 <button
-                                    onClick={() => setDeleteTarget(null)}
-                                    disabled={deleting}
-                                    className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600
-                  hover:bg-slate-100 transition"
+                                    onClick={handleSubmit}
+                                    disabled={submitting}
+                                    className="px-5 py-2.5 rounded-xl text-sm font-bold text-white
+                  bg-gradient-to-r from-indigo-600 to-indigo-700
+                  shadow-md shadow-indigo-500/20
+                  hover:brightness-110 active:scale-[0.98]
+                  disabled:opacity-50 disabled:cursor-not-allowed transition
+                  w-full sm:w-auto justify-center"
                                 >
-                                    Batal
+                                    {submitting
+                                        ? "Menyimpan..."
+                                        : editingId
+                                            ? "Simpan Perubahan"
+                                            : "Simpan SOP"}
                                 </button>
                                 <button
-                                    onClick={confirmDelete}
-                                    disabled={deleting}
-                                    className="px-4 py-2 rounded-xl text-sm font-bold text-white
-                  bg-red-600 hover:bg-red-700 active:scale-[0.98]
-                  disabled:opacity-50 transition"
+                                    onClick={cancelForm}
+                                    className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600
+                  hover:bg-slate-100 active:scale-[0.98] transition
+                  w-full sm:w-auto justify-center"
                                 >
-                                    {deleting ? "Menghapus..." : "Ya, Hapus"}
+                                    Batal
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
+
+                {/* ── Daftar SOP ─────────────────────────────────────────────────── */}
+                {filteredSops.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 text-center">
+                        <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-100 mb-4">
+                            <svg
+                                width="22"
+                                height="22"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                className="text-slate-400"
+                            >
+                                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+                                <rect x="9" y="3" width="6" height="4" rx="1" />
+                                <path d="M9 12h6M9 16h6" />
+                            </svg>
+                        </div>
+                        <p className="text-sm font-semibold text-slate-600">
+                            Belum ada{" "}
+                            {activeCategory === "uncategorized"
+                                ? UNCATEGORIZED_LABEL
+                                : SOP_CATEGORY_LABELS[activeCategory]}
+                            {filter !== "all"
+                                ? ` untuk divisi ${SOP_DIVISION_LABELS[filter]}`
+                                : ""}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                            {canManage
+                                ? 'Klik "Tambah SOP" untuk membuat SOP baru.'
+                                : "SOP akan muncul setelah Admin menambahkannya."}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4 items-start">
+                        {filteredSops.map((sop) => (
+                            <SopCard
+                                key={sop.id}
+                                sop={sop}
+                                canManage={canManage}
+                                onEdit={() => startEdit(sop)}
+                                onDelete={() => setDeleteTarget(sop)}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
+
+            {/* ── Modal Konfirmasi Hapus ──────────────────────────────────────── */}
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                    <div
+                        className="bg-white rounded-2xl w-full max-w-sm p-5 sm:p-6 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 className="text-base font-bold text-slate-900 mb-2">
+                            Hapus SOP?
+                        </h3>
+                        <p className="text-sm text-slate-600 mb-1">
+                            SOP{" "}
+                            <span className="font-semibold">
+                                &ldquo;{deleteTarget.sop_name}&rdquo;
+                            </span>{" "}
+                            akan dihapus permanen.
+                        </p>
+                        <p className="text-xs text-slate-400 mb-5">
+                            Aksi ini tidak bisa dibatalkan.
+                        </p>
+                        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 sm:justify-end">
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                disabled={deleting}
+                                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600
+                hover:bg-slate-100 transition w-full sm:w-auto justify-center"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                disabled={deleting}
+                                className="px-4 py-2 rounded-xl text-sm font-bold text-white
+                bg-red-600 hover:bg-red-700 active:scale-[0.98]
+                disabled:opacity-50 transition w-full sm:w-auto justify-center"
+                            >
+                                {deleting ? "Menghapus..." : "Ya, Hapus"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }
@@ -590,7 +604,7 @@ function SopCard({
     const isLong = sop.description.length > 200;
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow">
             {/* Header row */}
             <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex-1 min-w-0">
@@ -611,7 +625,7 @@ function SopCard({
                     </div>
 
                     {/* SOP name */}
-                    <h3 className="text-base font-bold text-slate-900 leading-snug">
+                    <h3 className="text-base font-bold text-slate-900 leading-snug break-words">
                         {sop.sop_name}
                     </h3>
                 </div>
@@ -622,7 +636,7 @@ function SopCard({
                         <button
                             onClick={onEdit}
                             title="Edit SOP"
-                            className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                            className="p-2.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
                         >
                             <svg
                                 width="14"
@@ -640,7 +654,7 @@ function SopCard({
                         <button
                             onClick={onDelete}
                             title="Hapus SOP"
-                            className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                            className="p-2.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
                         >
                             <svg
                                 width="14"
@@ -664,7 +678,7 @@ function SopCard({
             {/* Description */}
             <div className="relative">
                 <p
-                    className={`text-sm text-slate-600 leading-relaxed whitespace-pre-wrap ${!expanded && isLong ? "line-clamp-3" : ""
+                    className={`text-sm text-slate-600 leading-relaxed whitespace-pre-wrap break-words ${!expanded && isLong ? "line-clamp-3" : ""
                         }`}
                 >
                     {sop.description}
@@ -680,7 +694,7 @@ function SopCard({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-4 pt-3 border-t border-slate-100">
                 <span className="text-[11px] text-slate-400">
                     Dibuat oleh{" "}
                     <span className="font-semibold text-slate-500">
