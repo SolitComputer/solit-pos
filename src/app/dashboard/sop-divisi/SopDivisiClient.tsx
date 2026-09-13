@@ -245,17 +245,6 @@ export default function SopDivisiClient() {
 
     return (
         <DashboardLayout>
-            {/* Hide scrollbar untuk baris tab yang di-scroll horizontal di mobile */}
-            <style jsx global>{`
-                .no-scrollbar::-webkit-scrollbar {
-                    display: none;
-                }
-                .no-scrollbar {
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                }
-            `}</style>
-
             <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
                 {/* ── Header ─────────────────────────────────────────────────────── */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -281,11 +270,7 @@ export default function SopDivisiClient() {
                                 });
                                 setFormError("");
                             }}
-                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
-              bg-gradient-to-r from-indigo-600 to-indigo-700
-              text-white text-sm font-bold shadow-md shadow-indigo-500/20
-              hover:brightness-110 active:scale-[0.98] transition
-              w-full sm:w-auto"
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 text-white text-sm font-bold shadow-md shadow-indigo-500/20 hover:brightness-110 active:scale-[0.98] transition w-full sm:w-auto"
                         >
                             <svg
                                 width="16"
@@ -383,9 +368,7 @@ export default function SopDivisiClient() {
                                         setFormData((f) => ({ ...f, sop_name: e.target.value }))
                                     }
                                     placeholder="Contoh: SOP Penanganan Customer Baru"
-                                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200
-                  bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2
-                  focus:ring-indigo-500/20 outline-none transition"
+                                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 outline-none transition"
                                 />
                             </div>
 
@@ -401,9 +384,7 @@ export default function SopDivisiClient() {
                                         onChange={(e) =>
                                             setFormData((f) => ({ ...f, division: e.target.value }))
                                         }
-                                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200
-                    bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2
-                    focus:ring-indigo-500/20 outline-none transition appearance-none"
+                                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 outline-none transition appearance-none"
                                     >
                                         <option value="">— Pilih Divisi —</option>
                                         {SOP_DIVISIONS.map((div) => (
@@ -424,9 +405,7 @@ export default function SopDivisiClient() {
                                         onChange={(e) =>
                                             setFormData((f) => ({ ...f, category: e.target.value }))
                                         }
-                                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200
-                    bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2
-                    focus:ring-indigo-500/20 outline-none transition appearance-none"
+                                        className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 outline-none transition appearance-none"
                                     >
                                         <option value="">— Pilih Kategori —</option>
                                         {SOP_CATEGORIES.map((cat) => (
@@ -450,9 +429,7 @@ export default function SopDivisiClient() {
                                     }
                                     placeholder="Jelaskan langkah-langkah SOP secara detail..."
                                     rows={5}
-                                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200
-                  bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2
-                  focus:ring-indigo-500/20 outline-none transition resize-y min-h-[100px]"
+                                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 outline-none transition resize-y min-h-[100px]"
                                 />
                             </div>
 
@@ -466,12 +443,7 @@ export default function SopDivisiClient() {
                                 <button
                                     onClick={handleSubmit}
                                     disabled={submitting}
-                                    className="px-5 py-2.5 rounded-xl text-sm font-bold text-white
-                  bg-gradient-to-r from-indigo-600 to-indigo-700
-                  shadow-md shadow-indigo-500/20
-                  hover:brightness-110 active:scale-[0.98]
-                  disabled:opacity-50 disabled:cursor-not-allowed transition
-                  w-full sm:w-auto justify-center"
+                                    className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-indigo-700 shadow-md shadow-indigo-500/20 hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition w-full sm:w-auto justify-center"
                                 >
                                     {submitting
                                         ? "Menyimpan..."
@@ -481,9 +453,7 @@ export default function SopDivisiClient() {
                                 </button>
                                 <button
                                     onClick={cancelForm}
-                                    className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600
-                  hover:bg-slate-100 active:scale-[0.98] transition
-                  w-full sm:w-auto justify-center"
+                                    className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 active:scale-[0.98] transition w-full sm:w-auto justify-center"
                                 >
                                     Batal
                                 </button>
@@ -564,17 +534,14 @@ export default function SopDivisiClient() {
                             <button
                                 onClick={() => setDeleteTarget(null)}
                                 disabled={deleting}
-                                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600
-                hover:bg-slate-100 transition w-full sm:w-auto justify-center"
+                                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition w-full sm:w-auto justify-center"
                             >
                                 Batal
                             </button>
                             <button
                                 onClick={confirmDelete}
                                 disabled={deleting}
-                                className="px-4 py-2 rounded-xl text-sm font-bold text-white
-                bg-red-600 hover:bg-red-700 active:scale-[0.98]
-                disabled:opacity-50 transition w-full sm:w-auto justify-center"
+                                className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 active:scale-[0.98] disabled:opacity-50 transition w-full sm:w-auto justify-center"
                             >
                                 {deleting ? "Menghapus..." : "Ya, Hapus"}
                             </button>
