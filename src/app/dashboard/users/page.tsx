@@ -16,7 +16,7 @@ import {
   Settings, GraduationCap, Headset, ShoppingCart, Zap, User, AlertTriangle,
   Sunrise, Sunset, CheckCircle2, DoorOpen, Trash2, KeyRound, Lightbulb, Check,
   ChevronUp, Save, ScanFace, Inbox, Cake, PartyPopper, Users, Lock, Fingerprint, FileText,
-  Mars, Venus, Plus, UserX, UserCheck,
+  Mars, Venus, Plus, UserX, UserCheck, Megaphone,
 } from "lucide-react";
 
 interface User {
@@ -66,7 +66,7 @@ const ALL_ROLES = [
   "CREW_SALES", "SOTECH", "ACCOUNTING", "PURCHASING",
   "PENGELOLA_BARANG", "KEPALA_PENGELOLA_BARANG",
   "TEKNISI", "PENGANTARAN", "MARKETING", "KEBERSIHAN",
-  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN",
+  "PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_CC",
   "KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH",
   "PKL", "PKL_MARKETING", "PKL_SALES", "PKL_ZENITH", "PKL_PENYEDIA_BARANG",
   "PKL_SOTECH", "PKL_ONPOINT", "PKL_TEKNISI", "PKL_KONTEN",
@@ -84,7 +84,7 @@ const ROLE_LABEL: Record<string, string> = {
   TEKNISI: "Teknisi", PENGANTARAN: "Pengantaran",
   MARKETING: "Marketing", KEBERSIHAN: "Kebersihan",
   PENYEDIA_BARANG: "Penyedia Barang", KEPALA_PENYEDIA_BARANG: "Kepala Penyedia Barang",
-  KONTEN: "Konten", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
+   KONTEN: "Konten", KEPALA_CC: "Kepala CC", KEPALA_ONPOINT: "Kepala Onpoint", ONPOINT: "Onpoint",
   KEPALA_SOTECH: "Kepala Sotech",
   PKL: "PKL", PKL_MARKETING: "PKL Marketing", PKL_SALES: "PKL Sales",
   PKL_PENYEDIA_BARANG: "PKL Penyedia Barang", PKL_SOTECH: "PKL Sotech",
@@ -103,7 +103,7 @@ const ROLE_ICON: Record<string, React.ReactNode> = {
   CREW_SALES: <Briefcase className={RI} />, SOTECH: <Wrench className={RI} />, ACCOUNTING: <DollarSign className={RI} />,
   PENGELOLA_BARANG: <Package className={RI} />, KEPALA_PENGELOLA_BARANG: <Package className={RI} />, TEKNISI: <Wrench className={RI} />, PENGANTARAN: <Truck className={RI} />,
   MARKETING: <Smartphone className={RI} />, KEBERSIHAN: <Sparkles className={RI} />,
-  PENYEDIA_BARANG: <Factory className={RI} />, KEPALA_PENYEDIA_BARANG: <Building2 className={RI} />, KONTEN: <FileText className={RI} />,
+     PENYEDIA_BARANG: <Factory className={RI} />, KEPALA_PENYEDIA_BARANG: <Building2 className={RI} />, KONTEN: <FileText className={RI} />, KEPALA_CC: <Megaphone className={RI} />,
   KEPALA_ONPOINT: <Target className={RI} />, ONPOINT: <MapPin className={RI} />, KEPALA_SOTECH: <Settings className={RI} />,
   PKL: <GraduationCap className={RI} />, PKL_MARKETING: <GraduationCap className={RI} />, PKL_SALES: <GraduationCap className={RI} />,
   PKL_PENYEDIA_BARANG: <GraduationCap className={RI} />, PKL_SOTECH: <GraduationCap className={RI} />,
@@ -133,6 +133,7 @@ const ROLE_BADGE_STYLE: Record<string, { bg: string; text: string; border: strin
   PENYEDIA_BARANG: { bg: "#fefce8", text: "#854d0e", border: "#fef08a" },
   KEPALA_PENYEDIA_BARANG: { bg: "#fff7ed", text: "#c2410c", border: "#fed7aa" },
   KONTEN: { bg: "#fdf4ff", text: "#86198f", border: "#f0abfc" },
+  KEPALA_CC: { bg: "#fdf4ff", text: "#701a75", border: "#f0abfc" },
   KEPALA_ONPOINT: { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
   ONPOINT: { bg: "#ecfdf5", text: "#047857", border: "#a7f3d0" },
   KEPALA_SOTECH: { bg: "#f7fee7", text: "#3f6212", border: "#d9f99d" },
@@ -186,7 +187,7 @@ const ROLE_AVATAR_COLOR: Record<string, string> = {
   PENGANTARAN: "#0d9488", KEPALA_ZENITH: "#7c3aed",
   MARKETING: "#db2777", KEBERSIHAN: "#0891b2",
   PENYEDIA_BARANG: "#ca8a04", KEPALA_PENYEDIA_BARANG: "#c2410c",
-  KONTEN: "#a21caf", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
+  KONTEN: "#a21caf", KEPALA_CC: "#86198f", KEPALA_ONPOINT: "#16a34a", ONPOINT: "#15803d",
   KEPALA_SOTECH: "#4d7c0f",
   PKL: "#475569", PKL_MARKETING: "#b45309", PKL_SALES: "#b45309", PKL_ZENITH: "#b45309",
   PKL_PENYEDIA_BARANG: "#b45309", PKL_SOTECH: "#b45309",
@@ -482,7 +483,7 @@ function MultiRoleSelect({
           "MARKETING", "KEBERSIHAN", "CUSTOMER_SERVICE"
         ]
       },
-      { label: "Penyedia & Konten", roles: ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN"] },
+      { label: "Penyedia & Konten", roles: ["PENYEDIA_BARANG", "KEPALA_PENYEDIA_BARANG", "KONTEN", "KEPALA_CC"] },
       { label: "Onpoint & Sotech", roles: ["KEPALA_ONPOINT", "ONPOINT", "KEPALA_SOTECH"] },
       {
         label: "Magang (PKL)", roles: [

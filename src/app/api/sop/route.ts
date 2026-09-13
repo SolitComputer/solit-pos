@@ -5,7 +5,9 @@ import {
   getUserSopDivisions,
   canManageSop,
   SOP_DIVISIONS,
+  SOP_CATEGORIES,
   type SopDivision,
+  type SopCategory,
 } from "@/lib/sop";
 
 function supabase() {
@@ -91,7 +93,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { sop_name?: string; description?: string; division?: string };
+  let body: { sop_name?: string; description?: string; division?: string; category?: string };
   try {
     body = await request.json();
   } catch {
@@ -101,11 +103,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { sop_name, description, division } = body;
+   const { sop_name, description, division, category } = body;
 
-  if (!sop_name?.trim() || !description?.trim() || !division) {
+  if (!sop_name?.trim() || !description?.trim() || !division || !category) {
     return NextResponse.json(
-      { success: false, message: "Nama SOP, penjelasan, dan divisi wajib diisi" },
+      { success: false, message: "Nama SOP, penjelasan, divisi, dan kategori wajib diisi" },
       { status: 400 }
     );
   }
@@ -117,6 +119,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!(SOP_CATEGORIES as readonly string[]).includes(category)) {
+    return NextResponse.json(
+      { success: false, message: "Kategori tidak valid" },
+      { status: 400 }
+    );
+  }
+
   const sb = supabase();
   const { data, error } = await sb
     .from("sop_entries")
@@ -124,6 +133,7 @@ export async function POST(request: NextRequest) {
       sop_name: sop_name.trim(),
       description: description.trim(),
       division: division as SopDivision,
+      category: category as SopCategory,
       created_by: userId,
     })
     .select("*, creator:users!sop_entries_created_by_fkey(name)")
