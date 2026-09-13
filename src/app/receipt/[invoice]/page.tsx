@@ -1,9 +1,8 @@
 import { supabase } from "@/services/supabase";
 import Link from "next/link";
 import ReceiptActions from "./ReceiptActions";
-import { User, Package, Shield, FileText } from "lucide-react";
-import ItemsTable from "@/components/receipt/ItemsTable";
 import { buildLineItemsFromTxItems, sumLineItems, sumSavings } from "@/lib/receiptItems";
+
 interface Props {
   params: Promise<{ invoice: string }>;
 }
@@ -22,7 +21,7 @@ export default async function Page(props: Props) {
       .select("warranty_start, warranty_end, warranty_duration, status, notes")
       .eq("invoice_number", params.invoice)
       .single(),
-       supabase
+    supabase
       .from("transaction_items")
       .select("item_type, item_name, serial_number, quantity, deal_price, is_bonus, unit_id, accessory_id")
       .eq("invoice_number", params.invoice),
@@ -105,18 +104,10 @@ export default async function Page(props: Props) {
     })
     : null;
 
-  // Hitung sisa hari garansi
-  const warrantyDaysLeft = warranty?.warranty_end
-    ? Math.ceil(
-      (new Date(warranty.warranty_end).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0))
-      / (1000 * 60 * 60 * 24)
-    )
-    : null;
-
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 py-8 px-4">
       {/* Back Button */}
-      <div className="max-w-md mx-auto mb-4 no-capture">
+      <div className="max-w-md mx-auto mb-4 no-capture print:hidden">
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition bg-white/70 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/50 shadow-sm"
@@ -129,79 +120,95 @@ export default async function Page(props: Props) {
       </div>
 
       <div className="max-w-md mx-auto">
-        {/* ── RECEIPT CARD (yang di-screenshot) ── */}
-        <div id="receipt-card" className="bg-white rounded-3xl shadow-2xl overflow-hidden">
-
-          {/* HEADER */}
-          <div className="bg-[#0f172a] text-white relative overflow-hidden">
-            <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/5 rounded-full" />
-            <div className="absolute -bottom-4 -left-4 w-24 h-24 bg-white/5 rounded-full" />
-            <div className="relative p-6">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h1 className="text-2xl font-black tracking-tight">SOLIT 03</h1>
-                  <p className="text-slate-400 text-xs mt-0.5">Sawangan, Depok</p>
-                </div>
-                <div className="bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-white rounded-full inline-block" />
-                  LUNAS
-                </div>
-              </div>
-              <div className="bg-white/10 rounded-2xl p-4">
-                <p className="text-slate-400 text-xs mb-1">Nomor Nota</p>
-                <p className="font-mono font-bold text-lg tracking-widest">{data.invoice_number}</p>
-                <p className="text-slate-400 text-xs mt-2">
-                  {new Date(data.paid_at || data.created_at).toLocaleString("id-ID", {
-                    day: "2-digit", month: "long", year: "numeric",
-                    hour: "2-digit", minute: "2-digit",
-                    hour12: false,
-                    timeZone: "Asia/Jakarta",
-                  })}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* BODY */}
-          <div className="p-6 space-y-5">
-
-            {/* Total */}
-            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 text-center">
-              <p className="text-emerald-600 text-sm font-medium">Total Pembayaran</p>
-              <p className="text-3xl font-black text-emerald-700 mt-1">
-                Rp{data.amount?.toLocaleString("id-ID")}
-              </p>
-              <p className="text-emerald-500 text-xs mt-1">{data.payment_method}</p>
+        {/* ── RECEIPT CARD (thermal / gaya minimarket) — yang di-screenshot ──
+            Wrapper punya drop-shadow yg ngikutin bentuk sobekan. */}
+        <div id="receipt-card" style={{ filter: "drop-shadow(0 12px 28px rgba(15,23,42,0.18))" }}>
+          {/* Kertas struk */}
+          <div
+            className="font-mono text-black"
+            style={{ backgroundColor: "#faf9f6", padding: "22px 22px 14px" }}
+          >
+            {/* KOP: logo di atas, semua center */}
+            <div className="text-center leading-tight">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/assets/solit03.jpeg"
+                alt="SOLIT 03"
+                className="object-contain mx-auto mb-1.5"
+                style={{ width: "58px", height: "auto" }}
+              />
+              <p className="font-bold text-[15px] tracking-[0.15em]">SOLIT 03</p>
+              <p className="text-[11px]">Jl. Raya Sawangan, Sawangan</p>
+              <p className="text-[11px]">Depok · solit03.com</p>
             </div>
 
-            <Separator />
+            <p className="text-center text-[12px] font-bold tracking-[0.35em] mt-2">*** LUNAS ***</p>
 
-            {/* Detail Pembelian — gaya struk Indomaret: keterangan kiri, nominal kanan */}
-            <Section
-              title={itemKind === "accessory" ? "Detail Aksesoris" : itemKind === "mixed" ? "Detail Pembelian" : "Detail Laptop"}
-              icon={<Package className="w-4 h-4" />}
-            >
-              <ItemsTable items={lineItems} />
-              <div className="flex justify-between items-center pt-2.5 mt-1 border-t border-dashed border-gray-200">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Subtotal</span>
-                <span className="text-sm font-bold text-gray-800 font-mono">Rp{itemsSubtotal.toLocaleString("id-ID")}</span>
-              </div>
-              {itemsSavings > 0 && (
-                <div className="flex justify-between items-center pt-1">
-                  <span className="text-xs font-bold text-emerald-600 uppercase tracking-wide">Lebih Hemat</span>
-                  <span className="text-sm font-bold text-emerald-600 font-mono">Rp{itemsSavings.toLocaleString("id-ID")}</span>
+            <Dashed />
+
+            {/* Meta transaksi */}
+            <div className="text-[12px] space-y-0.5">
+              <MetaRow label="No. Nota" value={data.invoice_number} />
+              <MetaRow
+                label="Tanggal"
+                value={new Date(data.paid_at || data.created_at).toLocaleString("id-ID", {
+                  day: "2-digit", month: "long", year: "numeric",
+                  hour: "2-digit", minute: "2-digit", hour12: false,
+                  timeZone: "Asia/Jakarta",
+                })}
+              />
+            </div>
+
+            <Dashed />
+
+            {/* Detail pembelian */}
+            <ThermalHeading>
+              {itemKind === "accessory" ? "DETAIL AKSESORIS" : itemKind === "mixed" ? "DETAIL PEMBELIAN" : "DETAIL LAPTOP"}
+            </ThermalHeading>
+            <div className="space-y-2 text-[12px]">
+              {lineItems.map((it, i) => (
+                <div key={i}>
+                  <p className="uppercase break-words leading-snug font-semibold">{it.label}</p>
+                  {it.meta && <p className="text-[11px] leading-tight text-black/70">{it.meta}</p>}
+                  {it.officialUnitPrice ? (
+                    <p className="text-[11px] leading-tight">
+                      Normal <span className="line-through">{num(it.officialUnitPrice)}</span>
+                      {it.hasDiscount ? ` (-${it.discountPercent}%)` : ""}
+                    </p>
+                  ) : null}
+                  <div className="grid grid-cols-[2rem_1fr_1fr] gap-1">
+                    <span>{it.qty}x</span>
+                    <span className="text-right">{num(it.unitPrice)}</span>
+                    <span className="text-right font-semibold">{it.isBonus ? "BONUS" : num(it.amount)}</span>
+                  </div>
                 </div>
-              )}
-            </Section>
+              ))}
+            </div>
 
-            <Separator />
+            <Dashed />
 
-            {/* Customer */}
-            <Section title="Data Pembeli" icon={<User className="w-4 h-4" />}>
-              <InfoRow label="Nama" value={data.customer_name} bold />
-              <InfoRow label="WhatsApp" value={data.customer_phone} />
-              {data.company_name && <InfoRow label="Perusahaan" value={data.company_name} />}
-              <InfoRow
+            {/* Ringkasan (rata kanan gaya minimarket) */}
+            <div className="ml-auto text-[12px] space-y-0.5" style={{ width: "72%" }}>
+              <SumRow label="Subtotal" value={`Rp${num(itemsSubtotal)}`} />
+              {itemsSavings > 0 && <SumRow label="Diskon" value={`(Rp${num(itemsSavings)})`} />}
+              <div style={{ borderTop: "1px dashed #000", margin: "4px 0" }} />
+              <SumRow label="TOTAL" value={`Rp${num(data.amount ?? itemsSubtotal)}`} bold />
+              {data.payment_method && <SumRow label="BAYAR" value={data.payment_method} />}
+            </div>
+
+            {itemsSavings > 0 && (
+              <p className="text-center mt-2 text-[12px] font-bold">ANDA HEMAT : Rp{num(itemsSavings)}</p>
+            )}
+
+            <Dashed />
+
+            {/* Data pembeli */}
+            <ThermalHeading>DATA PEMBELI</ThermalHeading>
+            <div className="text-[12px] space-y-0.5">
+              <MetaRow label="Nama" value={data.customer_name || "-"} />
+              <MetaRow label="WhatsApp" value={data.customer_phone || "-"} />
+              {data.company_name && <MetaRow label="Perusahaan" value={data.company_name} />}
+              <MetaRow
                 label="Tipe"
                 value={
                   data.customer_type === "RESELLER" ? "Reseller"
@@ -209,131 +216,89 @@ export default async function Page(props: Props) {
                       : "Umum"
                 }
               />
-            </Section>
+            </div>
 
-            <Separator />
+            <Dashed />
 
-            {/* Pickup */}
-            <Section title="Info Pengambilan" icon={<Package className="w-4 h-4" />}>
-              <InfoRow label="Metode" value={data.pickup_method === "DATANG" ? "Datang ke Toko" : "Diantar"} />
-              {pickupDate && <InfoRow label="Tanggal" value={pickupDate} />}
-              {data.pickup_time && <InfoRow label="Jam" value={data.pickup_time} />}
-              {data.pickup_location && <InfoRow label="Alamat" value={data.pickup_location} />}
-            </Section>
+            {/* Info pengambilan */}
+            <ThermalHeading>INFO PENGAMBILAN</ThermalHeading>
+            <div className="text-[12px] space-y-0.5">
+              <MetaRow label="Metode" value={data.pickup_method === "DATANG" ? "Datang ke Toko" : "Diantar"} />
+              {pickupDate && <MetaRow label="Tanggal" value={pickupDate} />}
+              {data.pickup_time && <MetaRow label="Jam" value={data.pickup_time} />}
+              {data.pickup_location && <MetaRow label="Alamat" value={data.pickup_location} />}
+            </div>
 
-            {/* ── GARANSI SECTION ── */}
+            {/* Garansi */}
             {warranty && (
               <>
-                <Separator />
-                <Section title="Informasi Garansi" icon={<Shield className="w-4 h-4" />}>
-                  <div className={`rounded-xl p-4 border ${warrantyDaysLeft !== null && warrantyDaysLeft > 7
-                    ? "bg-emerald-50 border-emerald-200"
-                    : warrantyDaysLeft !== null && warrantyDaysLeft > 0
-                      ? "bg-amber-50 border-amber-200"
-                      : "bg-red-50 border-red-200"
-                    }`}>
-                    {/* Status badge */}
-                    <div className="flex items-center justify-between mb-3">
+                <Dashed />
+                <ThermalHeading>INFORMASI GARANSI</ThermalHeading>
+                <div className="text-[12px] space-y-0.5">
+                  <MetaRow label="Durasi" value={`${warranty.warranty_duration} hari`} />
+                  {warrantyStartDate && <MetaRow label="Mulai" value={warrantyStartDate} />}
+                  {warrantyEndDate && <MetaRow label="Berakhir" value={warrantyEndDate} />}
+                  <MetaRow label="Cek Garansi" value="solit03.com/cek-garansi" />
+                  <MetaRow label="SN" value={data.serial_number || "-"} />
+                </div>
+                {warranty.notes && <p className="text-[11px] mt-1.5 leading-relaxed">{warranty.notes}</p>}
 
-                      <span className="text-xs text-gray-500">
-                        {warranty.warranty_duration} hari
-                      </span>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Mulai</span>
-                        <span className="font-medium text-gray-700">{warrantyStartDate}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Berakhir</span>
-                        <span className={`font-bold ${warrantyDaysLeft !== null && warrantyDaysLeft > 7
-                          ? "text-emerald-700"
-                          : warrantyDaysLeft !== null && warrantyDaysLeft > 0
-                            ? "text-amber-700"
-                            : "text-red-700"
-                          }`}>
-                          {warrantyEndDate}
-                        </span>
-                      </div>
-                    </div>
-
-                    {warranty.notes && (
-                      <p className="text-xs text-gray-600 mt-2.5 pt-2.5 border-t border-gray-200">
-                        {warranty.notes}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Link cek garansi */}
-                  <div className="mt-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-semibold text-blue-700">Cek Garansi Online</p>
-                      <p className="tesxt-[10px] text-blue-500 mt-0.5">solit03.com/cek-garansi</p>
-                    </div>
-                    <div className="text-xs font-mono text-blue-600 bg-blue-100 px-2 py-1 rounded-lg">
-                      SN: {data.serial_number || "—"}
-                    </div>
-                  </div>
-
-                  {/* Ketentuan Garansi */}
-                  <div className="mt-2.5 bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2 text-xs text-slate-600">
-                    <p className="font-semibold text-slate-800 flex items-center gap-1.5 text-xs">
-                      📋 Ketentuan Garansi
-                    </p>
-                    <ol className="list-decimal list-inside space-y-1.5 text-[11px] leading-relaxed text-slate-500">
-                      <li>Garansi hanya berlaku untuk kerusakan yang <strong>BUKAN akibat human error</strong>.</li>
-                      <li>Kerusakan LCD seperti pecah, kena air, terbakar, bergaris, berkedip, gelap/redup, blank putih, dead pixel, berbayang/shadow, warna pudar/tidak akurat, serta bercak hitam/putih <strong>TIDAK termasuk garansi</strong>.</li>
-                      <li>Wajib membawa nota pembelian ini saat melakukan klaim garansi.</li>
-                    </ol>
-                    <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/80 rounded-lg px-2.5 py-1.5 mt-2">
-                      ⚠️ <strong>Note:</strong> Barang yang sudah dibeli tidak bisa dikembalikan.
-                    </p>
-                  </div>
-                </Section>
+                <div className="text-[11px] mt-2 leading-relaxed">
+                  <p className="font-bold">KETENTUAN GARANSI:</p>
+                  <ol className="list-decimal list-inside space-y-1 mt-0.5">
+                    <li>Garansi hanya berlaku untuk kerusakan yang BUKAN akibat human error.</li>
+                    <li>Kerusakan LCD (pecah, kena air, terbakar, bergaris, berkedip, gelap/redup, blank putih, dead pixel, berbayang/shadow, warna pudar/tidak akurat, bercak hitam/putih) TIDAK termasuk garansi.</li>
+                    <li>Wajib membawa nota ini saat klaim garansi.</li>
+                  </ol>
+                  <p className="font-bold mt-1.5">!! Barang yang sudah dibeli tidak bisa dikembalikan.</p>
+                </div>
               </>
             )}
 
+            {/* Catatan */}
             {data.notes && (
               <>
-                <Separator />
-                <Section title="Catatan" icon={<FileText className="w-4 h-4" />}>
-                  <p className="text-sm text-gray-600 bg-gray-50 rounded-xl p-3">{data.notes}</p>
-                </Section>
+                <Dashed />
+                <ThermalHeading>CATATAN</ThermalHeading>
+                <p className="text-[12px] leading-relaxed">{data.notes}</p>
               </>
             )}
+
+            {/* Footer + barcode */}
+            <div className="mt-3 text-center text-[11px] leading-tight">
+              <DoubleLine />
+              <p className="font-bold">TERIMA KASIH TELAH BERBELANJA</p>
+              <p>SOLIT 03 — LAPTOP BERKUALITAS</p>
+              <Barcode value={data.invoice_number} />
+              <DoubleLine />
+              <p>WWW.SOLIT03.COM</p>
+            </div>
           </div>
 
-          {/* Branding Footer */}
-          <div className="bg-slate-50 border-t border-slate-100 px-6 py-4 text-center">
-            <p className="text-xs text-slate-400">
-              Terima kasih telah berbelanja di{" "}
-              <span className="font-semibold text-slate-600">Solit 03</span>
-            </p>
-            <p className="text-xs text-slate-300 mt-0.5">Sawangan, Depok · solit03.com</p>
-          </div>
+          {/* Sobekan gerigi bawah — kalau di PNG kelihatan aneh, hapus div ini aja */}
+          <div aria-hidden style={tornEdge} />
+        </div>
 
-          {/* Tombol aksi — tidak ikut screenshot */}
-          <div className="px-6 pb-6 pt-3 space-y-3 no-capture">
-            <ReceiptActions
-              customerPhone={data.customer_phone || ""}
-              invoiceNumber={data.invoice_number}
-              customerName={data.customer_name || ""}
-              laptopName={data.laptop_name || ""}
-              serialNumber={itemKind === "accessory" ? "" : (data.serial_number || "")}
-              amount={data.amount || 0}
-              paymentMethod={data.payment_method || ""}
-              pickupMethod={data.pickup_method || ""}
-              pickupDate={data.pickup_date || undefined}
-              pickupTime={data.pickup_time || undefined}
-              softwareRequest={data.software_request || undefined}
-              warrantyEnd={warranty?.warranty_end || undefined}
-              warrantyDaysLeft={warrantyDaysLeft ?? undefined}
-              customerType={data.customer_type || "UMUM"}
-              itemKind={itemKind}
-              items={lineItems}
-            />
-          </div>
+        {/* Tombol aksi — di luar receipt-card, dijamin tidak ikut PNG */}
+        <div className="mt-4 space-y-3 no-capture">
+          <ReceiptActions
+            customerPhone={data.customer_phone || ""}
+            invoiceNumber={data.invoice_number}
+            customerName={data.customer_name || ""}
+            laptopName={data.laptop_name || ""}
+            serialNumber={itemKind === "accessory" ? "" : (data.serial_number || "")}
+            amount={data.amount || 0}
+            paymentMethod={data.payment_method || ""}
+            pickupMethod={data.pickup_method || ""}
+            pickupDate={data.pickup_date || undefined}
+            pickupTime={data.pickup_time || undefined}
+            softwareRequest={data.software_request || undefined}
+            warrantyEnd={warranty?.warranty_end || undefined}
+            warrantyDaysLeft={undefined}
+            customerType={data.customer_type || "UMUM"}
+            itemKind={itemKind}
+            items={lineItems}
+          />
         </div>
 
         {/* Back link bawah */}
@@ -343,49 +308,67 @@ export default async function Page(props: Props) {
           </Link>
         </div>
       </div>
-
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          #receipt-card, #receipt-card * { visibility: visible; }
-          .no-capture, .no-print { display: none !important; }
-          @page { margin: 0; size: 80mm auto; }
-        }
-        .no-capture { display: block; }
-      `}</style>
     </main>
   );
 }
 
-// ── Helper Components ─────────────────────────────────────────────────────────
-function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+// ── Helper Components (thermal) ───────────────────────────────────────────────
+// Angka gaya struk: tanpa "Rp", format ribuan id-ID (mis. 3.100.000)
+const num = (v: number) => (v || 0).toLocaleString("id-ID");
+
+// Gerigi sobekan bawah (pakai gradient, aman buat html2canvas — bukan mask)
+const tornEdge: React.CSSProperties = {
+  height: 12,
+  backgroundImage:
+    "linear-gradient(45deg, #faf9f6 50%, transparent 50%), linear-gradient(-45deg, #faf9f6 50%, transparent 50%)",
+  backgroundSize: "14px 12px",
+  backgroundRepeat: "repeat-x",
+  backgroundPosition: "top left",
+};
+
+function Dashed() {
+  return <div className="my-2.5" style={{ borderTop: "1px dashed #000", height: 0 }} />;
+}
+
+function DoubleLine() {
+  return <div className="my-1.5" style={{ borderTop: "3px double #000", height: 0 }} />;
+}
+
+function ThermalHeading({ children }: { children: React.ReactNode }) {
+  return <p className="text-[12px] font-bold tracking-wider mb-1.5">{children}</p>;
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-gray-400">{icon}</span>
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{title}</h3>
-      </div>
-      <div className="space-y-2.5">{children}</div>
+    <div className="flex justify-between gap-3">
+      <span className="shrink-0">{label}</span>
+      <span className="text-right break-all">{value}</span>
     </div>
   );
 }
 
-function InfoRow({ label, value, bold, mono }: { label: string; value: string; bold?: boolean; mono?: boolean }) {
+function SumRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className="flex justify-between items-start gap-4">
-      <span className="text-gray-400 text-sm flex-shrink-0">{label}</span>
-      <span className={`text-sm text-right ${bold ? "font-semibold text-gray-800" : "text-gray-600"} ${mono ? "font-mono text-xs" : ""}`}>
-        {value}
-      </span>
+    <div className={`flex justify-between gap-2 ${bold ? "font-bold text-[15px]" : ""}`}>
+      <span>{label}</span>
+      <span className="text-right">{value}</span>
     </div>
   );
 }
 
-function Separator() {
+// Barcode dekoratif — bar hitam-putih via gradient + nomor nota di bawahnya
+function Barcode({ value }: { value: string }) {
   return (
-    <div
-      className="h-px"
-      style={{ backgroundImage: "repeating-linear-gradient(to right, #e5e7eb 0, #e5e7eb 6px, transparent 6px, transparent 12px)" }}
-    />
+    <div className="mx-auto mt-2" style={{ width: "68%" }}>
+      <div
+        aria-hidden
+        style={{
+          height: 40,
+          backgroundImage:
+            "repeating-linear-gradient(90deg, #000 0 1px, #fff 1px 3px, #000 3px 5px, #fff 5px 6px, #000 6px 9px, #fff 9px 11px)",
+        }}
+      />
+      <p className="text-[11px] tracking-[0.3em] mt-1">{value}</p>
+    </div>
   );
 }
