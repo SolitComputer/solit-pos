@@ -134,47 +134,15 @@ export async function PATCH(
     return NextResponse.json({ success: true, data });
   }
 
-  // ── Batal Execute (un-execute) ──────────────────────────────────────────────
+  // ── Batal Execute (un-execute) — SENGAJA DINONAKTIFKAN ────────────────────────
+  // Eksekusi bersifat FINAL: sekali sebuah pengajuan ditandai sudah dieksekusi,
+  // tidak ada cara untuk membatalkannya lagi lewat action ini (dulu bisa, kalau
+  // belum direalisasi — sekarang diblokir total, tanpa syarat).
   if (action === "unexecute") {
-    if (!FUND_EXECUTOR_IDS.includes(userId) && !roles.includes("ADMIN")) {
-      return NextResponse.json(
-        { success: false, message: "Anda tidak memiliki wewenang" },
-        { status: 403 }
-      );
-    }
-
-    // ⬅️ BARU: kalau sudah direalisasi ke Cashflow, jangan biarkan status
-    // eksekusi dibatalkan — nanti mismatch dengan uang yang sudah tercatat keluar.
-    const { data: existingFr } = await supabase
-      .from("fund_requests")
-      .select("realisasi_cashflow_id")
-      .eq("id", id)
-      .single();
-
-    if (existingFr?.realisasi_cashflow_id) {
-      return NextResponse.json(
-        { success: false, message: "Tidak bisa membatalkan eksekusi karena sudah direalisasi ke Cashflow" },
-        { status: 400 }
-      );
-    }
-
-    const { data, error } = await supabase
-      .from("fund_requests")
-      .update({
-        is_executed: false,
-        executed_by_id: null,
-        executed_by_name: null,
-        executed_at: null,
-      })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json(
+      { success: false, message: "Eksekusi tidak bisa dibatalkan setelah dilakukan" },
+      { status: 400 }
+    );
   }
 
   return NextResponse.json({ success: false, message: "Action tidak valid" }, { status: 400 });
