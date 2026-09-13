@@ -10,6 +10,7 @@ import {
   cleanManualLines,
   periodFromDate,
   totalOf,
+  linesEqual,
 } from "@/lib/accounting";
 import { draftToLineRows } from "@/lib/accountingSource";
 
