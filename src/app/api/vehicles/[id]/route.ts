@@ -35,12 +35,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (body.fuel_level !== undefined) {
     patch.fuel_level = body.fuel_level?.trim() || null;
   }
+  if (body.plate_number !== undefined) {
+    patch.plate_number = body.plate_number?.trim() || null;
+  }
 
   const { data, error } = await supabaseVehicles
     .from("vehicles")
     .update(patch)
     .eq("id", id)
-    .select("id, name, type, status, battery_level, fuel_level")
+    .select("id, name, type, status, battery_level, fuel_level, plate_number")
     .single();
 
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });

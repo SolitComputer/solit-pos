@@ -151,7 +151,7 @@ export const AKUNTANSI_MANAGE_ROLES: UserRole[] = ["ADMIN", "PROGRAMMER", "ACCOU
 
 // ─── Pengajuan Dana ───────────────────────────────────────────────────────────
 // View: Admin/Programmer/Asisten CEO + Accounting + Purchasing + semua Kepala Divisi.
-// Create: HANYA Kepala Divisi (mereka yang mengajukan dana).
+// Create: Kepala Divisi + Purchasing.
 // Approve/Execute: dikontrol per USER ID di API, bukan per role.
 const KEPALA_DIVISI_ROLES: UserRole[] = [
   "KEPALA_SALES", "KEPALA_ZENITH", "KEPALA_MARKETING", "KEPALA_TEKNISI",
@@ -160,7 +160,7 @@ const KEPALA_DIVISI_ROLES: UserRole[] = [
 export const FUND_REQUEST_VIEW_ROLES: UserRole[] = [
   ...FULL_ACCESS, "ACCOUNTING", "PURCHASING", ...KEPALA_DIVISI_ROLES,
 ];
-export const FUND_REQUEST_CREATE_ROLES: UserRole[] = [...FULL_ACCESS, ...KEPALA_DIVISI_ROLES];
+export const FUND_REQUEST_CREATE_ROLES: UserRole[] = [...FULL_ACCESS, "PURCHASING", ...KEPALA_DIVISI_ROLES];
 
 // ─── Data Aset Tetap (Fixed Assets) ───────────────────────────────────────────
 // // Input manual murni (nama aset + nominal), tidak terhubung ke modul akutansi/inventaris lain.
@@ -639,7 +639,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   // ✅ FIX: dulu tidak terdaftar di sini — middleware jadi default-allow
   // "siapa saja yang login" untuk rute admin roles ini (proteksi cuma
   // mengandalkan isRoleManager() internal). Disamakan dengan dua rute
-  // saudaranya di atas untuk defense-in-depth.
+  // saudaranya di atas untuk defense-in-depth.f
   "/api/admin/roles": [...ROLE_ACCESS_MANAGER_ROLES],
 
    "/dashboard/sop-divisi": [...ALL_ROLES],

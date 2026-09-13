@@ -58,39 +58,61 @@ const LEGACY_CATEGORY_LABEL: Record<string, string> = {
   UTANG: "Hutang",
 };
 
+// ── Kategori KHUSUS Uang Masuk — buat penjualan Laptop/Aksesoris/Service yang
+// TIDAK lewat sistem Transaksi/Service (mis. input susulan/backfill). Sengaja
+// key-nya BEDA dari AUTO_INCOME_CATEGORIES di bawah supaya tidak nabrak logic
+// auto-sync — entry yang beneran lewat Transaksi/Service tetap pakai category
+// "PENJUALAN_LAPTOP"/"SERVICE" apa adanya. HANYA ditawarkan di dropdown Uang
+// MASUK (lihat INCOME_CATEGORIES), tidak pernah muncul di dropdown Uang Keluar.
+export const MANUAL_INCOME_ONLY_CATEGORIES = {
+  PENJUALAN_LAPTOP_MANUAL: "Penjualan Laptop (Manual)",   // 410
+  PENJUALAN_AKSESORIS: "Penjualan Aksesoris",             // 420
+  SERVICE_MANUAL: "Service (Manual)",                     // 430
+} as const;
+
 // ── Kategori yang OTOMATIS dari sistem — tidak boleh diinput manual ───────────
 export const AUTO_INCOME_CATEGORIES = ["PENJUALAN_LAPTOP", "SERVICE"] as const;
 
-/** true = kategori ini boleh diinput manual oleh user (berlaku sama utk Uang Masuk & Uang Keluar) */
+/** true = kategori ini boleh diinput manual utk Uang Masuk (16 kategori umum
+ *  + 3 kategori Penjualan Laptop/Aksesoris/Service manual) */
 export function isManualIncomeCategory(category: string): boolean {
   return (
     Object.prototype.hasOwnProperty.call(CASHFLOW_CATEGORIES, category) ||
-    Object.prototype.hasOwnProperty.call(LEGACY_CATEGORY_LABEL, category)
+    Object.prototype.hasOwnProperty.call(LEGACY_CATEGORY_LABEL, category) ||
+    Object.prototype.hasOwnProperty.call(MANUAL_INCOME_ONLY_CATEGORIES, category)
   );
 }
 
 // Alias nama lama — dipertahankan supaya file lain yang masih import
 // INCOME_CATEGORIES / EXPENSE_CATEGORIES tidak perlu diubah sama sekali.
-// Keduanya sekarang menunjuk ke objek yang SAMA (CASHFLOW_CATEGORIES), jadi
-// dropdown Uang Keluar & Uang Masuk otomatis menampilkan daftar identik —
-// ASALKAN halaman UI-nya me-render dari konstanta ini, bukan hardcode sendiri.
-export const INCOME_CATEGORIES = CASHFLOW_CATEGORIES;
+// EXPENSE_CATEGORIES tetap = CASHFLOW_CATEGORIES apa adanya (Uang Keluar TIDAK
+// menawarkan 3 kategori Penjualan di atas). INCOME_CATEGORIES sekarang gabungan
+// CASHFLOW_CATEGORIES + MANUAL_INCOME_ONLY_CATEGORIES — dropdown Uang Masuk
+// otomatis dapat 3 kategori baru itu tanpa halaman UI-nya perlu diubah sama
+// sekali (asal me-render dari konstanta ini, bukan hardcode sendiri).
+export const INCOME_CATEGORIES = { ...CASHFLOW_CATEGORIES, ...MANUAL_INCOME_ONLY_CATEGORIES };
 export const EXPENSE_CATEGORIES = CASHFLOW_CATEGORIES;
 
-export type IncomeCategory = keyof typeof CASHFLOW_CATEGORIES;
+export type IncomeCategory = keyof typeof INCOME_CATEGORIES;
 export type ExpenseCategory = keyof typeof CASHFLOW_CATEGORIES;
 
 export function categoryLabel(_direction: CashflowDirection, category: string): string {
   if (category === "MODAL_AWAL") return "Modal Awal";
   return (
     (CASHFLOW_CATEGORIES as Record<string, string>)[category] ??
+    (MANUAL_INCOME_ONLY_CATEGORIES as Record<string, string>)[category] ??
     AUTO_CATEGORY_LABEL[category] ??
     LEGACY_CATEGORY_LABEL[category] ??
     category
   );
 }
 
-export function isValidCategory(_direction: CashflowDirection, category: string): boolean {
+export function isValidCategory(direction: CashflowDirection, category: string): boolean {
+  // 3 kategori Penjualan Laptop/Aksesoris/Service manual cuma valid utk arah IN —
+  // supaya tidak bisa "nyasar" jadi kategori di Uang Keluar (Beban).
+  if (direction === "IN" && Object.prototype.hasOwnProperty.call(MANUAL_INCOME_ONLY_CATEGORIES, category)) {
+    return true;
+  }
   return (
     Object.prototype.hasOwnProperty.call(CASHFLOW_CATEGORIES, category) ||
     Object.prototype.hasOwnProperty.call(LEGACY_CATEGORY_LABEL, category)
