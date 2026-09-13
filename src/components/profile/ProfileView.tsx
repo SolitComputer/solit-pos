@@ -1243,17 +1243,17 @@ export default function ProfileView({ userId }: { userId: string }) {
 
                         {/* Admin action buttons (for others): Penghargaan & Hapus Foto */}
                         {(isCustomAwardAdmin || (isAdmin && profile.profile_photo_url)) && (
-                            <div className="mb-1 flex items-center gap-2">
+                            <div className="mb-1 flex items-center gap-1.5 sm:gap-2">
                                  {isCustomAwardAdmin && (
-                                    <button onClick={() => setShowAwardModal(true)}
-                                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 shadow-xs">
-                                        <Award className="w-3.5 h-3.5" /> Penghargaan
+                                    <button onClick={() => setShowAwardModal(true)} title="Beri Penghargaan"
+                                        className="flex items-center justify-center gap-1.5 w-9 h-9 sm:w-auto sm:h-auto sm:px-3.5 sm:py-1.5 rounded-full sm:rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 shadow-xs flex-shrink-0">
+                                        <Award className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Penghargaan</span>
                                     </button>
                                 )}
                                 {isAdmin && profile.profile_photo_url && (
-                                    <button onClick={() => setConfirmDelete(true)}
-                                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 shadow-xs">
-                                        <Trash2 className="w-3.5 h-3.5" /> Hapus Foto
+                                    <button onClick={() => setConfirmDelete(true)} title="Hapus Foto Profil"
+                                        className="flex items-center justify-center gap-1.5 w-9 h-9 sm:w-auto sm:h-auto sm:px-3.5 sm:py-1.5 rounded-full sm:rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 shadow-xs flex-shrink-0">
+                                        <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Hapus Foto</span>
                                     </button>
                                 )}
                             </div>

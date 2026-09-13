@@ -16,6 +16,19 @@ export const SOP_DIVISIONS = [
 
 export type SopDivision = (typeof SOP_DIVISIONS)[number];
 
+// ── Kategori SOP: Fundamental vs Teknis Kerja ────────────────────────────────
+// Kategori ini TIDAK menggantikan divisi — tiap SOP tetap dipisah per divisi
+// (ROLE_TO_SOP_DIVISION di bawah tidak berubah). category cuma nambahin
+// filter tab kedua di halaman SOP ("SOP Fundamental" vs "SOP Teknis Kerja").
+export const SOP_CATEGORIES = ["fundamental", "teknis"] as const;
+
+export type SopCategory = (typeof SOP_CATEGORIES)[number];
+
+export const SOP_CATEGORY_LABELS: Record<SopCategory, string> = {
+  fundamental: "SOP Fundamental",
+  teknis: "SOP Teknis Kerja",
+};
+
 export const SOP_DIVISION_LABELS: Record<SopDivision, string> = {
   marketing: "Marketing",
   sales: "Sales",
@@ -74,6 +87,9 @@ export const ROLE_TO_SOP_DIVISION: Partial<Record<UserRole, SopDivision>> = {
 
   // Programmer
   PROGRAMMER: "programmer",
+
+  // Content Creator (kepala) — disamakan divisinya dengan KONTEN/PKL_KONTEN
+  KEPALA_CC: "marketing",
 };
 
 // ── Role yang bisa lihat SEMUA divisi (tidak difilter) ───────────────────────
