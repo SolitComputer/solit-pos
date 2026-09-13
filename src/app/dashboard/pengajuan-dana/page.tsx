@@ -367,9 +367,10 @@ function RealisasiModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const isEdit = !!fundRequest.realisasi_cashflow_id;
   const categories = Object.entries(EXPENSE_CATEGORIES);
   const [category, setCategory] = useState(categories[0]?.[0] ?? "");
-  const [nominal, setNominal] = useState("");
+  const [nominal, setNominal] = useState(fundRequest.realisasi_nominal ? String(fundRequest.realisasi_nominal) : "");
   const [keterangan, setKeterangan] = useState(fundRequest.purpose);
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
@@ -402,7 +403,7 @@ function RealisasiModal({
         setUploadProgress("done");
       }
       const res = await fetch(`/api/pengajuan-dana/${fundRequest.id}/realisasi`, {
-        method: "POST",
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category,
@@ -410,12 +411,12 @@ function RealisasiModal({
           keterangan: keterangan.trim() || fundRequest.purpose,
           tanggal,
           payment_method: paymentMethod,
-          photo_url: photoUrl,
+          ...(photoUrl ? { photo_url: photoUrl } : {}),
         }),
       });
       const json = await res.json();
       if (!json.success) { setError(json.message || "Gagal menyimpan realisasi"); return; }
-      toast.success("Realisasi tersimpan & tersinkron ke Cashflow");
+      toast.success(isEdit ? "Realisasi berhasil diperbarui" : "Realisasi tersimpan & tersinkron ke Cashflow");
       onSaved();
       onClose();
     } catch { setError("Terjadi kesalahan koneksi"); }
@@ -423,7 +424,7 @@ function RealisasiModal({
   };
 
   const inputCls = "w-full h-10 border border-slate-200 rounded-xl px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-400/30 focus:border-teal-400 transition";
-  const savingLabel = uploadProgress === "uploading" ? "Mengupload foto..." : saving ? "Menyimpan..." : "Simpan Realisasi";
+  const savingLabel = uploadProgress === "uploading" ? "Mengupload foto..." : saving ? "Menyimpan..." : isEdit ? "Simpan Perubahan" : "Simpan Realisasi";
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4">
@@ -434,7 +435,7 @@ function RealisasiModal({
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center"><Banknote size={16} /></div>
             <div>
-              <p className="text-sm font-bold text-slate-900">Realisasi Pengajuan Dana</p>
+              <p className="text-sm font-bold text-slate-900">{isEdit ? "Edit Realisasi Pengajuan Dana" : "Realisasi Pengajuan Dana"}</p>
               <p className="text-[11px] text-slate-400 line-clamp-1 max-w-[220px]">{fundRequest.purpose}</p>
             </div>
           </div>
@@ -880,12 +881,15 @@ export default function PengajuanDanaPage() {
                         <td className="px-4 py-4 text-center">
                           {row.realisasi_cashflow_id ? (
                             <div className="inline-flex flex-col items-center gap-1">
-                              <span
-                                title={`Direalisasi oleh ${row.realisasi_by_name ?? "-"}${row.realisasi_at ? ` · ${formatDate(row.realisasi_at)}` : ""}`}
-                                className="w-8 h-8 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center"
+                              <button
+                                type="button"
+                                onClick={() => canRealisasiRow && setRealisasiTarget(row)}
+                                disabled={!canRealisasiRow}
+                                title={canRealisasiRow ? `Klik untuk edit realisasi · Direalisasi oleh ${row.realisasi_by_name ?? "-"}` : `Direalisasi oleh ${row.realisasi_by_name ?? "-"}`}
+                                className={`w-8 h-8 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center transition-all ${canRealisasiRow ? "hover:scale-110 active:scale-95 hover:bg-teal-200 cursor-pointer" : "cursor-default"}`}
                               >
                                 <CheckCircle2 className="w-4 h-4" />
-                              </span>
+                              </button>
                               <span className="text-[10px] text-slate-500 font-semibold max-w-[80px] truncate">{formatRupiah(row.realisasi_nominal ?? 0)}</span>
                               <span className="text-[9px] text-slate-400 max-w-[80px] truncate">{row.realisasi_by_name}</span>
                             </div>
