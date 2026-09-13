@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     const canCreate = roles.some((r) => (FUND_REQUEST_CREATE_ROLES as string[]).includes(r));
     if (!canCreate) {
         return NextResponse.json(
-            { success: false, message: "Hanya Kepala Divisi yang boleh mengajukan dana" },
+            { success: false, message: "Anda tidak memiliki wewenang untuk mengajukan dana" },
             { status: 403 }
         );
     }
