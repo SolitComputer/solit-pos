@@ -206,6 +206,11 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
       <circle cx="12" cy="12" r="2" fill="#0f172a" />
     </svg>
   ),
+  "code-terminal": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M9 7 4 12l5 5M15 7l5 5-5 5" stroke="#4ade80" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  ),
 };
 
 // Level efek tambahan per preset, dipetakan manual sesuai tier rarity:
@@ -243,6 +248,7 @@ const FX_TIER: Record<string, "common" | "rare" | "epic" | "legendary" | "limite
   "razor-storm": "epic",
   "inferno-core": "legendary",
   "quantum-rift": "limited",
+  "code-terminal": "epic",
 };
 
 // Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
@@ -787,6 +793,7 @@ export function SolitBorder({
   const glintOpacity =
     fx === "limited" ? 1 : fx === "legendary" ? 0.9 : fx === "epic" ? 0.75 : fx === "rare" ? 0.55 : 0.4;
   const dualBeam = fx === "epic" || fx === "legendary" || fx === "limited";
+  const isCodeTerminal = preset === "code-terminal";
 
   return (
     <span className={`sb-ring ${className}`} style={{ padding: thickness }}>
@@ -805,6 +812,7 @@ export function SolitBorder({
         )}
         <span className="sb-facets" aria-hidden="true" />
         <span className="sb-bevel" aria-hidden="true" />
+        {isCodeTerminal && <span className="sb-circuit" aria-hidden="true" />}
       </span>
       {hasTrace && <span className="sb-trace" style={{ animationDuration: traceSpeed }} aria-hidden="true" />}
       {hasShimmer && (
@@ -814,9 +822,32 @@ export function SolitBorder({
         />
       )}
       {hasComet && <span className="sb-comet" aria-hidden="true" />}
+      {isCodeTerminal && (
+        <>
+          <span className="sb-scanline" aria-hidden="true" />
+          <span className="sb-cursor" aria-hidden="true" />
+          <span className="sb-glitch" aria-hidden="true" />
+          <span className="sb-matrix" aria-hidden="true">
+            <span className="sb-matrix-char" style={{ "--matrix-rot": "15deg" } as React.CSSProperties}>
+              <span className="sb-matrix-glyph">0</span>
+            </span>
+            <span className="sb-matrix-char" style={{ "--matrix-rot": "140deg" } as React.CSSProperties}>
+              <span className="sb-matrix-glyph" style={{ animationDelay: "1.1s" }}>1</span>
+            </span>
+            <span className="sb-matrix-char" style={{ "--matrix-rot": "265deg" } as React.CSSProperties}>
+              <span className="sb-matrix-glyph" style={{ animationDelay: "2.2s" }}>{"{}"}</span>
+            </span>
+          </span>
+        </>
+      )}
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
-        <span className={`sb-orn ${fx === "legendary" || fx === "limited" ? "sb-orn-glow" : ""}`} aria-hidden="true">
+        <span
+          className={`sb-orn ${fx === "legendary" || fx === "limited" || isCodeTerminal ? "sb-orn-glow" : ""} ${
+            isCodeTerminal ? "sb-orn-type" : ""
+          }`}
+          aria-hidden="true"
+        >
           {orn(ornamentSize)}
         </span>
       )}
@@ -884,6 +915,28 @@ export function SolitBorder({
           box-shadow:
             inset 0 1px 1.5px rgba(255, 255, 255, 0.55),
             inset 0 -1.5px 2px rgba(0, 0, 0, 0.4);
+        }
+        /* Circuit trace — eksklusif Code Terminal. Beda teknik dari semua
+           efek lain di file ini (yang bentuknya conic-gradient diputer):
+           ini grid garis LURUS (horizontal + vertikal, kayak jalur PCB)
+           yang geser diagonal pelan-pelan. */
+        .sb-circuit {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 1;
+          pointer-events: none;
+          opacity: 0.5;
+          mix-blend-mode: screen;
+          background:
+            repeating-linear-gradient(0deg, rgba(74, 222, 128, 0.35) 0px 1px, transparent 1px 9px),
+            repeating-linear-gradient(90deg, rgba(74, 222, 128, 0.35) 0px 1px, transparent 1px 9px);
+          background-size: 200% 200%;
+          animation: sb-circuit-shift 12s linear infinite;
+        }
+        @keyframes sb-circuit-shift {
+          0% { background-position: 0% 0%, 0% 0%; }
+          100% { background-position: 200% 0%, 0% 200%; }
         }
         .sb-aura-wrap {
           position: absolute;
@@ -1068,6 +1121,126 @@ export function SolitBorder({
           background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.95));
           transform: translate(-50%, -85%);
           filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
+        }
+        .sb-scanline {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          overflow: hidden;
+          z-index: 1;
+          pointer-events: none;
+          mix-blend-mode: screen;
+        }
+        .sb-scanline::after {
+          content: "";
+          position: absolute;
+          left: -20%;
+          right: -20%;
+          height: 14%;
+          background: linear-gradient(to bottom, transparent, rgba(74, 222, 128, 0.9), transparent);
+          animation: sb-scanline-move 2.2s linear infinite;
+        }
+        @keyframes sb-scanline-move {
+          0% { top: -20%; }
+          100% { top: 120%; }
+        }
+        .sb-cursor {
+          position: absolute;
+          left: 50%;
+          bottom: -2px;
+          z-index: 2;
+          width: 6px;
+          height: 12px;
+          background: #4ade80;
+          transform: translateX(-50%);
+          box-shadow: 0 0 6px rgba(74, 222, 128, 0.9);
+          animation: sb-cursor-blink 1s steps(1) infinite;
+          pointer-events: none;
+        }
+        @keyframes sb-cursor-blink {
+          0%, 49% { opacity: 1; }
+          50%, 100% { opacity: 0; }
+        }
+        .sb-glitch {
+          position: absolute;
+          inset: -3px;
+          border-radius: 9999px;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-glitch::before,
+        .sb-glitch::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          border: 1.5px solid transparent;
+          mix-blend-mode: screen;
+          opacity: 0;
+        }
+        .sb-glitch::before {
+          border-color: rgba(34, 211, 238, 0.9);
+          animation: sb-glitch-cyan 5s steps(1) infinite;
+        }
+        .sb-glitch::after {
+          border-color: rgba(244, 63, 94, 0.9);
+          animation: sb-glitch-red 5s steps(1) infinite;
+        }
+        @keyframes sb-glitch-cyan {
+          0%, 89%, 100% { opacity: 0; transform: translate(0, 0); }
+          90% { opacity: 0.9; transform: translate(-2px, 0); }
+          91.5% { opacity: 0; }
+          93% { opacity: 0.6; transform: translate(-1px, 0.5px); }
+          94% { opacity: 0; }
+        }
+        @keyframes sb-glitch-red {
+          0%, 89%, 100% { opacity: 0; transform: translate(0, 0); }
+          90% { opacity: 0.9; transform: translate(2px, 0); }
+          91.5% { opacity: 0; }
+          93% { opacity: 0.6; transform: translate(1px, -0.5px); }
+          94% { opacity: 0; }
+        }
+        .sb-matrix {
+          position: absolute;
+          inset: -7px;
+          z-index: 4;
+          pointer-events: none;
+        }
+        .sb-matrix-char {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--matrix-rot));
+        }
+        .sb-matrix-glyph {
+          position: absolute;
+          top: -1px;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          font-family: "Courier New", monospace;
+          font-size: 9px;
+          font-weight: 700;
+          line-height: 1;
+          color: #4ade80;
+          text-shadow: 0 0 4px rgba(74, 222, 128, 0.85), 0 0 8px rgba(74, 222, 128, 0.5);
+          animation: sb-matrix-drift 3.2s ease-out infinite;
+        }
+        @keyframes sb-matrix-drift {
+          0% { opacity: 0; transform: translate(-50%, -50%) translateY(0); }
+          15% { opacity: 1; }
+          70% { opacity: 1; transform: translate(-50%, -50%) translateY(-9px); }
+          100% { opacity: 0; transform: translate(-50%, -50%) translateY(-12px); }
+        }
+        /* Typewriter reveal — selector ditulis lengkap (.sb-ring > .sb-orn.sb-orn-type)
+           biar spesifisitasnya PASTI ngalahin base rule .sb-ring > .sb-orn di atas,
+           dan animasi float-nya digabung di sini (bukan ditimpa) biar ornamen
+           tetap melayang SEKALIGUS "diketik" bareng. */
+        .sb-ring > .sb-orn.sb-orn-type {
+          animation: sb-orn-float 3s ease-in-out infinite, sb-orn-type-reveal 4s steps(6, end) infinite;
+        }
+        @keyframes sb-orn-type-reveal {
+          0%, 8% { clip-path: inset(0 100% 0 0); }
+          45%, 70% { clip-path: inset(0 0 0 0); }
+          92%, 100% { clip-path: inset(0 100% 0 0); }
         }
         .sb-orn-glow {
           filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
@@ -1422,6 +1595,15 @@ export function SolitBorder({
           50% { filter: drop-shadow(0 0 20px rgba(240, 171, 252, 1)) hue-rotate(40deg) brightness(1.3); }
         }
 
+        .sb-p-code-terminal {
+          background: conic-gradient(from 0deg, #020617, #16a34a, #86efac, #22c55e, #020617);
+          animation: sb-spin 4.5s linear infinite, sb-g-code 1.4s ease-in-out infinite;
+        }
+        @keyframes sb-g-code {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.75)) brightness(1); }
+          50% { filter: drop-shadow(0 0 15px rgba(134, 239, 172, 1)) brightness(1.25); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .sb-bg-wrap,
           .sb-bg-wrap > .sb-bg,
@@ -1437,6 +1619,13 @@ export function SolitBorder({
           .sb-particle,
           .sb-glint,
           .sb-comet,
+          .sb-scanline::after,
+          .sb-cursor,
+          .sb-glitch::before,
+          .sb-glitch::after,
+          .sb-matrix-glyph,
+          .sb-circuit,
+          .sb-orn-type,
           .sb-burst,
           .sb-ring-jitter,
           .sb-orn {
