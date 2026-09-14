@@ -143,7 +143,15 @@ export const GET = withAuth(async (req) => {
       const cashflowMeta = cashflowMetaMap.get(e.source_id as string);
       // ⬅️ BARU: kirim draft (keterangan + lines) hasil sync buat preview before/after di frontend
       const sync_preview = syncAvailable && syncDraft ? { keterangan: syncDraft.keterangan, lines: syncDraft.lines } : null;
-      return { ...e, trx_meta: { nama: cashflowMeta?.nama ?? null }, sync_available: syncAvailable, sync_preview };
+      return {
+        ...e,
+        trx_meta: {
+          nama: cashflowMeta?.nama ?? null,
+          source_type: cashflowMeta?.source_type ?? null,
+        },
+        sync_available: syncAvailable,
+        sync_preview,
+      };
     }
 
            if (e.source_type === "SERVICE" && e.source_id) {
