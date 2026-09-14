@@ -172,7 +172,13 @@ export const GET = withAuth(async (req) => {
     const isRevenueEntry = (e.lines ?? []).some(
       (l: any) => l.account_code === AKUN.PENJUALAN_LAPTOP || l.account_code === AKUN.PENJUALAN_AKSESORIS
     );
-    const hasModalLine = (e.lines ?? []).some((l: any) => l.account_code === AKUN.HPP);
+    const hasModalLine = (e.lines ?? []).some(
+      (l: any) =>
+        l.account_code === AKUN.HPP ||
+        l.account_code === AKUN.MODAL_KELUAR ||
+        l.account_code === AKUN.AKSESORIS ||
+        l.account_code === AKUN.BIAYA_PRINTILAN
+    );
     const modalAddressed = hasModalLine || e.is_edited === true;
 
           const syncDraft = syncDraftMap.get(e.source_id as string);
