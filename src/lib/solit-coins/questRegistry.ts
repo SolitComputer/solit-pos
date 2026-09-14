@@ -112,7 +112,7 @@ export const QUESTS: QuestDef[] = [
     key: "streak_mingguan",
     label: "Streak 5 hari kerja tanpa telat",
     description: "Hadir tepat waktu (tanpa telat) di 5 hari kerja minggu ini.",
-    rewardSc: 80,
+    rewardSc: 100,
     periodType: "WEEKLY",
     target: 5,
     roles: "ALL",
