@@ -22,9 +22,14 @@ import {
     Video,
     Boxes,
     Megaphone,
+    Award,
+    Star,
+    Plus,
+    X,
+    Trash2,
+    Loader2,
     type LucideIcon,
 } from "lucide-react";
-
 /* ============================================================
    Konstanta & helper (logika sama persis dengan sebelumnya)
    ============================================================ */
@@ -33,6 +38,14 @@ const FULL_ACCESS_ROLES = ["ADMIN", "PROGRAMMER", "ASISTEN_CEO"] as const;
 function isAdminUser(user: any): boolean {
     const roles: string[] = Array.isArray(user?.roles) && user.roles.length > 0 ? user.roles : (user?.role ? [user.role] : []);
     return roles.some((r) => (FULL_ACCESS_ROLES as readonly string[]).includes(r));
+}
+
+// Khusus Penghargaan Custom: diminta "hanya role ADMIN" (lebih ketat dari
+// FULL_ACCESS_ROLES di atas yang juga mengizinkan PROGRAMMER/ASISTEN_CEO).
+const CUSTOM_AWARD_MANAGE_ROLES = ["ADMIN"] as const;
+function isCustomAwardAdmin(user: any): boolean {
+    const roles: string[] = Array.isArray(user?.roles) && user.roles.length > 0 ? user.roles : (user?.role ? [user.role] : []);
+    return roles.some((r) => (CUSTOM_AWARD_MANAGE_ROLES as readonly string[]).includes(r));
 }
 
 const MONTH_NAMES = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -68,6 +81,7 @@ const ACCENTS: Record<string, Accent> = {
     amber: { bar: "from-amber-400 to-orange-500", chip: "bg-gradient-to-br from-amber-100 to-amber-200 text-amber-600", blob: "bg-amber-200/40", ring: "ring-amber-100" },
     sky: { bar: "from-sky-400 to-blue-500", chip: "bg-gradient-to-br from-sky-100 to-sky-200 text-sky-600", blob: "bg-sky-200/40", ring: "ring-sky-100" },
     fuchsia: { bar: "from-fuchsia-400 to-pink-500", chip: "bg-gradient-to-br from-fuchsia-100 to-fuchsia-200 text-fuchsia-600", blob: "bg-fuchsia-200/40", ring: "ring-fuchsia-100" },
+    gold: { bar: "from-yellow-400 to-amber-500", chip: "bg-gradient-to-br from-yellow-100 to-yellow-200 text-yellow-700", blob: "bg-yellow-200/40", ring: "ring-yellow-100" },
 };
 
 /* ============================================================
@@ -1547,11 +1561,313 @@ function AuditMarketingLeaderboard() {
 }
 
 /* ============================================================
-   Halaman utama
+   Penghargaan Custom — beda dari kategori lain: BUKAN hasil
+   perhitungan otomatis, tapi dibuat manual oleh Admin (mis.
+   "Karyawan Terbaik Bulan Agustus", "Leader Pemimpin", "Sales
+   Terbaik"). Tambah/hapus dibatasi CUSTOM_AWARD_MANAGE_ROLES
+   (lihat atas) — enforcement sebenarnya ada di
+   api/custom-awards/route.ts, isAdmin di sini cuma nentuin
+   tampil/tidaknya tombol.
    ============================================================ */
 
-type SubTab = "absensi" | "kerja" | "pengantaran" | "penyedia" | "sales" | "teknisi" | "konten" | "lemburan" | "pengelolabarang" | "auditmarketing";
+type CustomAward = {
+    id: string;
+    user_id: string;
+    title: string;
+    period_label: string | null;
+    icon: string;
+    color_scheme: string;
+    note: string | null;
+    recipient_name: string;
+    recipient_role: string;
+    created_by_name: string;
+    created_at: string;
+};
 
+type SimpleUser = { id: string; name: string; role: string };
+
+const AWARD_ICON_OPTIONS: { key: string; label: string; icon: LucideIcon }[] = [
+    { key: "trophy", label: "Trofi", icon: Trophy },
+    { key: "crown", label: "Mahkota", icon: Crown },
+    { key: "medal", label: "Medali", icon: Medal },
+    { key: "award", label: "Lencana", icon: Award },
+    { key: "star", label: "Bintang", icon: Star },
+];
+
+const AWARD_COLOR_OPTIONS: string[] = ["gold", "violet", "blue", "rose", "emerald", "sky", "fuchsia", "orange"];
+
+function AwardIcon({ iconKey, className = "w-4 h-4" }: { iconKey: string; className?: string }) {
+    const Icon = AWARD_ICON_OPTIONS.find((o) => o.key === iconKey)?.icon ?? Trophy;
+    return <Icon className={className} />;
+}
+
+function PenghargaanCustomBoard({ isAdmin }: { isAdmin: boolean }) {
+    const [awards, setAwards] = useState<CustomAward[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [users, setUsers] = useState<SimpleUser[]>([]);
+    const [showForm, setShowForm] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [formUserId, setFormUserId] = useState("");
+    const [formTitle, setFormTitle] = useState("");
+    const [formPeriod, setFormPeriod] = useState("");
+    const [formIcon, setFormIcon] = useState("trophy");
+    const [formColor, setFormColor] = useState("gold");
+    const [formNote, setFormNote] = useState("");
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const r = await fetch(`/api/custom-awards`);
+            const d = await r.json();
+            if (d.success) setAwards(d.data || []);
+        } catch {
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    // Daftar karyawan untuk dropdown form cuma perlu di-fetch kalau
+    // yang buka halaman ini Admin (yang bisa buka form tambah).
+    useEffect(() => {
+        if (!isAdmin) return;
+        fetch("/api/users")
+            .then((r) => r.json())
+            .then((d) => { if (d.success) setUsers(d.data || []); })
+            .catch(() => { });
+    }, [isAdmin]);
+
+    const resetForm = () => {
+        setFormUserId("");
+        setFormTitle("");
+        setFormPeriod("");
+        setFormIcon("trophy");
+        setFormColor("gold");
+        setFormNote("");
+    };
+
+    const handleSubmit = async () => {
+        if (!formUserId || !formTitle.trim()) return;
+        setSubmitting(true);
+        try {
+            const r = await fetch("/api/custom-awards", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: formUserId,
+                    title: formTitle.trim(),
+                    period_label: formPeriod.trim() || null,
+                    icon: formIcon,
+                    color_scheme: formColor,
+                    note: formNote.trim() || null,
+                }),
+            });
+            const d = await r.json();
+            if (d.success) {
+                resetForm();
+                setShowForm(false);
+                await load();
+            } else {
+                alert(d.message || "Gagal membuat penghargaan");
+            }
+        } catch {
+            alert("Terjadi kesalahan jaringan");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Hapus penghargaan ini?")) return;
+        setDeletingId(id);
+        try {
+            const r = await fetch(`/api/custom-awards?id=${id}`, { method: "DELETE" });
+            const d = await r.json();
+            if (d.success) {
+                setAwards((prev) => prev.filter((a) => a.id !== id));
+            } else {
+                alert(d.message || "Gagal menghapus penghargaan");
+            }
+        } catch {
+            alert("Terjadi kesalahan jaringan");
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    return (
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-lg hover:shadow-gray-100 transition-shadow duration-300 overflow-hidden">
+            <SectionHeader
+                icon={Award}
+                accent={ACCENTS.gold}
+                title="Penghargaan Custom"
+                description={
+                    <>
+                        Penghargaan yang dibuat manual oleh <strong>Admin</strong> — bukan hasil hitungan otomatis seperti kategori lain, cocok untuk gelar seperti "Karyawan Terbaik Bulan Agustus", "Leader Pemimpin", atau "Sales Terbaik". Kolom periode bersifat opsional: isi kalau penghargaannya terikat bulan tertentu, kosongkan kalau sifatnya permanen/tidak terikat waktu.
+                    </>
+                }
+            >
+                {isAdmin && (
+                    <button
+                        onClick={() => setShowForm(true)}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-gradient-to-r from-[#1a1a2e] to-[#16213e] px-4 py-2.5 rounded-full hover:shadow-md active:scale-95 transition-all shadow-sm"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> Tambah Penghargaan
+                    </button>
+                )}
+            </SectionHeader>
+
+            {loading ? (
+                <LoadingSkeleton />
+            ) : awards.length === 0 ? (
+                <EmptyState
+                    message="Belum ada penghargaan custom"
+                    hint={isAdmin ? 'Klik "Tambah Penghargaan" untuk membuat yang pertama' : undefined}
+                />
+            ) : (
+                <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {awards.map((a) => (
+                        <div key={a.id} className="relative p-4 rounded-2xl border border-gray-100 bg-gray-50/40 space-y-2.5">
+                            {isAdmin && (
+                                <button
+                                    onClick={() => handleDelete(a.id)}
+                                    disabled={deletingId === a.id}
+                                    title="Hapus penghargaan"
+                                    className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                            <div className="flex items-center gap-2">
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${ACCENTS[a.color_scheme]?.chip ?? ACCENTS.gold.chip}`}>
+                                    <AwardIcon iconKey={a.icon} />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-black text-gray-900 truncate pr-6">{a.title}</p>
+                                    {a.period_label && <p className="text-[10px] font-bold text-gray-400">{a.period_label}</p>}
+                                </div>
+                            </div>
+                            <KaryawanCell name={a.recipient_name} role={a.recipient_role} />
+                            {a.note && <p className="text-xs text-gray-500 leading-relaxed">{a.note}</p>}
+                            <p className="text-[10px] text-gray-300">Diberikan oleh {a.created_by_name}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {showForm && (
+                <div className="fixed inset-0 z-[9990] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50" onClick={() => setShowForm(false)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-black text-gray-900">Tambah Penghargaan</h3>
+                            <button onClick={() => setShowForm(false)} className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-gray-100">
+                                <X className="w-4 h-4 text-gray-500" />
+                            </button>
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 block mb-1.5">Karyawan</label>
+                            <select
+                                value={formUserId}
+                                onChange={(e) => setFormUserId(e.target.value)}
+                                className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                            >
+                                <option value="">Pilih karyawan...</option>
+                                {users.map((u) => (
+                                    <option key={u.id} value={u.id}>{u.name} — {roleLabel(u.role)}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 block mb-1.5">Judul Penghargaan</label>
+                            <input
+                                value={formTitle}
+                                onChange={(e) => setFormTitle(e.target.value)}
+                                placeholder="Misal: Karyawan Terbaik, Leader Pemimpin, Sales Terbaik"
+                                className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 block mb-1.5">Periode (opsional)</label>
+                            <input
+                                value={formPeriod}
+                                onChange={(e) => setFormPeriod(e.target.value)}
+                                placeholder="Misal: Agustus 2026 — kosongkan kalau permanen"
+                                className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 block mb-1.5">Ikon</label>
+                            <div className="flex gap-2 flex-wrap">
+                                {AWARD_ICON_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.key}
+                                        onClick={() => setFormIcon(opt.key)}
+                                        title={opt.label}
+                                        type="button"
+                                        className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-all ${formIcon === opt.key ? "border-violet-400 bg-violet-50 text-violet-600" : "border-gray-200 text-gray-400 hover:bg-gray-50"}`}
+                                    >
+                                        <opt.icon className="w-4 h-4" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 block mb-1.5">Warna</label>
+                            <div className="flex gap-2 flex-wrap">
+                                {AWARD_COLOR_OPTIONS.map((key) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => setFormColor(key)}
+                                        title={key}
+                                        type="button"
+                                        className={`w-8 h-8 rounded-full ${ACCENTS[key]?.chip ?? ""} flex items-center justify-center border-2 transition-all ${formColor === key ? "border-gray-800 scale-110" : "border-transparent"}`}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 block mb-1.5">Catatan (opsional)</label>
+                            <textarea
+                                value={formNote}
+                                onChange={(e) => setFormNote(e.target.value)}
+                                rows={2}
+                                placeholder="Alasan/keterangan singkat..."
+                                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-200"
+                            />
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                            <button onClick={() => setShowForm(false)} className="flex-1 h-10 rounded-xl text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200">
+                                Batal
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={submitting || !formUserId || !formTitle.trim()}
+                                className="flex-1 h-10 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#1a1a2e] to-[#16213e] disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Simpan"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ============================================================
+   Halaman utama
+   ============================================================ */
+type SubTab = "absensi" | "kerja" | "pengantaran" | "penyedia" | "sales" | "teknisi" | "konten" | "lemburan" | "pengelolabarang" | "auditmarketing" | "penghargaan";
 const TABS: { id: SubTab; label: string; icon: LucideIcon }[] = [
     { id: "absensi", label: "Absensi", icon: UserCheck },
     { id: "kerja", label: "Pekerjaan", icon: Zap },
@@ -1563,8 +1879,8 @@ const TABS: { id: SubTab; label: string; icon: LucideIcon }[] = [
     { id: "lemburan", label: "Lemburan", icon: Clock },
     { id: "pengelolabarang", label: "Pengelola Barang", icon: Boxes },
     { id: "auditmarketing", label: "Audit Marketing", icon: Megaphone },
+    { id: "penghargaan", label: "Penghargaan", icon: Award },
 ];
-
 export default function LencanaPage() {
     const [subTab, setSubTab] = useState<SubTab>("absensi");
     const [currentUser, setCurrentUser] = useState<any>(null);
@@ -1626,6 +1942,7 @@ export default function LencanaPage() {
                 {subTab === "lemburan" && <LemburanLeaderboard isAdmin={isAdminUser(currentUser)} />}
                 {subTab === "pengelolabarang" && <PengelolaBarangLeaderboard isAdmin={isAdminUser(currentUser)} />}
                 {subTab === "auditmarketing" && <AuditMarketingLeaderboard />}
+                {subTab === "penghargaan" && <PenghargaanCustomBoard isAdmin={isCustomAwardAdmin(currentUser)} />}
             </div>
         </DashboardLayout>
     );

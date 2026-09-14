@@ -10,6 +10,7 @@ import {
   cleanManualLines,
   periodFromDate,
   totalOf,
+  linesEqual,
 } from "@/lib/accounting";
 import { draftToLineRows } from "@/lib/accountingSource";
 
@@ -31,7 +32,7 @@ const ENTRY_SELECT = `
 async function snapshot(supabase: SupabaseClient, id: string) {
   const { data } = await supabase
     .from("journal_entries")
-    .select("*, lines:journal_lines(account_code, account_name, side, nominal, line_order)")
+    .select("*, lines:journal_lines(id, account_code, account_name, side, nominal, line_order)")
     .eq("id", id)
     .single();
   return data;
@@ -82,23 +83,8 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
   if (!before)
     return NextResponse.json({ success: false, message: "Jurnal tidak ditemukan" }, { status: 404 });
 
-  // Simpan status "Sudah Dicek" SEBELUM baris lama dihapus. Baris baru nanti
-  // dapat id baru (bukan hasil update baris lama), jadi checklist lama tidak
-  // otomatis nyambung ke id baru itu kalau tidak kita pulihkan manual.
-  const { data: oldLines } = await supabase
-    .from("journal_lines")
-    .select("id")
-    .eq("entry_id", id);
-  const oldLineIds = (oldLines ?? []).map((l: any) => l.id);
-
-  let wasFullyChecked = false;
-  if (oldLineIds.length > 0) {
-    const { data: oldChecks } = await supabase
-      .from("journal_umum_line_checks")
-      .select("line_id")
-      .in("line_id", oldLineIds);
-    wasFullyChecked = (oldChecks?.length ?? 0) === oldLineIds.length;
-  }
+  const oldLineIds = ((before.lines ?? []) as any).map((l: any) => l.id).filter(Boolean);
+  const linesChanged = !linesEqual((before.lines ?? []) as any, merged);
 
   const { error: updErr } = await supabase
     .from("journal_entries")
@@ -119,32 +105,29 @@ export const PUT = withAuth(async (req, ctx, user: any) => {
     return NextResponse.json({ success: false, message: updErr.message }, { status: 500 });
   }
 
-  // Replace lines (paling simpel & konsisten dibanding diff per baris)
-  if (oldLineIds.length > 0) {
-    await supabase.from("journal_umum_line_checks").delete().in("line_id", oldLineIds);
-  }
-  await supabase.from("journal_lines").delete().eq("entry_id", id);
-  const { data: insertedLines, error: lineErr } = await supabase
-    .from("journal_lines")
-    .insert(draftToLineRows(id, merged))
-    .select("id");
+  if (linesChanged) {
+    // Nominal / baris berubah:
+    // Sesuai aturan: jika selain keterangan yang berubah (nominal/akun),
+    // ceklis di Jurnal Umum dan Buku Besar HARUS HILANG (reset).
+    if (oldLineIds.length > 0) {
+      await supabase.from("journal_umum_line_checks").delete().in("line_id", oldLineIds);
+      await supabase.from("journal_line_checks").delete().in("line_id", oldLineIds);
+    }
+    await supabase.from("journal_lines").delete().eq("entry_id", id);
+    const { error: lineErr } = await supabase
+      .from("journal_lines")
+      .insert(draftToLineRows(id, merged));
 
-  if (lineErr) {
-    // Rollback: kembalikan baris lama
-    await supabase.from("journal_lines").insert(draftToLineRows(id, (before as any).lines ?? []));
-    console.error("[akuntansi PUT lines]", lineErr);
-    return NextResponse.json({ success: false, message: lineErr.message }, { status: 500 });
+    if (lineErr) {
+      // Rollback: kembalikan baris lama
+      await supabase.from("journal_lines").insert(draftToLineRows(id, (before as any).lines ?? []));
+      console.error("[akuntansi PUT lines]", lineErr);
+      return NextResponse.json({ success: false, message: lineErr.message }, { status: 500 });
+    }
   }
-
-  // Kalau SEMUA baris lama sudah dicek sebelum edit ini dilakukan, pertahankan
-  // status itu di baris-baris baru (id baru) — supaya proses Edit tidak
-  // mereset ceklis "Sudah Dicek" yang sudah ada sebelumnya.
-  if (wasFullyChecked && insertedLines && insertedLines.length > 0) {
-    const checkedAt = new Date().toISOString();
-    await supabase.from("journal_umum_line_checks").insert(
-      insertedLines.map((l: any) => ({ line_id: l.id, checked_at: checkedAt }))
-    );
-  }
+  // Jika HANYA keterangan / ref / tanggal yang berubah (!linesChanged):
+  // journal_lines tidak dihapus & tidak dibuat ulang, sehingga ceklis di Jurnal Umum
+  // dan Buku Besar tetap utuh (tidak hilang).
 
   const after = await snapshot(supabase, id);
 

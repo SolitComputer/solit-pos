@@ -76,7 +76,7 @@ type Entry = {
     nominal: number;
     modal: number | null;
     keterangan: string | null;
-    source_type: "MANUAL" | "TRANSACTION" | "TRANSACTION_PAYMENT" | "TRANSACTION_DP" | "SERVICE" | "MODAL_AWAL";
+    source_type: "MANUAL" | "TRANSACTION" | "TRANSACTION_PAYMENT" | "TRANSACTION_DP" | "SERVICE" | "MODAL_AWAL" | "PENGAJUAN_DANA";
     source_id: string | null;
     invoice_number?: string | null;
     tanggal: string;
@@ -225,7 +225,7 @@ async function exportCashflowExcel(masuk: Entry[], keluar: Entry[]) {
     const fmtDateExcel = (d?: string) =>
         d ? new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "—";
     const sourceLabel = (s: Entry["source_type"]) =>
-        ({ TRANSACTION: "Transaksi", TRANSACTION_PAYMENT: "Pembayaran", TRANSACTION_DP: "DP Transaksi", SERVICE: "Service", MODAL_AWAL: "Modal Awal", MANUAL: "Manual" }[s] ?? s);
+        ({ TRANSACTION: "Transaksi", TRANSACTION_PAYMENT: "Pembayaran", TRANSACTION_DP: "DP Transaksi", SERVICE: "Service", MODAL_AWAL: "Modal Awal", PENGAJUAN_DANA: "Pengajuan Dana", MANUAL: "Manual" }[s] ?? s);
     const methodLabel = (m: Entry["payment_method"]) =>
         m === "CASH" ? "Cash" : m === "SALDO" ? "Saldo" : "—";
     const auditLabel = (e: Entry) =>
@@ -405,6 +405,9 @@ function SourceBadge({ sourceType }: { sourceType: Entry["source_type"] }) {
     );
     if (sourceType === "MODAL_AWAL") return (
         <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-100 whitespace-nowrap"><Wallet size={11} /> MODAL</span>
+    );
+    if (sourceType === "PENGAJUAN_DANA") return (
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap"><Landmark size={11} /> DANA</span>
     );
     return (
         <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap"><Pencil size={11} /> MANUAL</span>
@@ -777,6 +780,7 @@ function FilterPanel({ filter, onChange, onReset, direction, nameOptions }: {
                     <select value={filter.source} onChange={(e) => onChange({ ...filter, source: e.target.value as SourceFilter })} className={`${selectCls} w-full`}>
                         <option value="ALL">Semua Sumber</option>
                         <option value="MANUAL">Manual</option>
+                        <option value="PENGAJUAN_DANA">Pengajuan Dana</option>
                         <option value="AUTO">Otomatis</option>
                     </select>
                 </div>
@@ -979,11 +983,18 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                     <DetailRow label="Kategori">
                         <span className="inline-flex text-[11px] font-medium px-2 py-0.5 rounded-md bg-gray-100 text-gray-700">{categoryLabel(entry.direction, entry.category)}</span>
                     </DetailRow>
-                    {entry.source_type === "MANUAL" && (
+                    {(entry.source_type === "MANUAL" || entry.source_type === "PENGAJUAN_DANA") && (
                         <DetailRow label="Metode">
                             {entry.payment_method === "SALDO"
                                 ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={12} /> Saldo</span>
                                 : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={12} /> Cash</span>}
+                        </DetailRow>
+                    )}
+                    {entry.source_type === "PENGAJUAN_DANA" && (
+                        <DetailRow label="Sumber">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">
+                                <Landmark size={12} /> Pengajuan Dana Perdivisi
+                            </span>
                         </DetailRow>
                     )}
                     <DetailRow label="Diinput oleh">{pengisi}</DetailRow>
@@ -1021,7 +1032,7 @@ function DetailModal({ entry, onClose, onDelete, onEdit }: {
                     )}
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
-                    {entry.source_type === "MANUAL" && (
+                    {(entry.source_type === "MANUAL" || entry.source_type === "PENGAJUAN_DANA") && (
                         <button onClick={() => { onClose(); onEdit(entry); }} className={`inline-flex items-center gap-1.5 h-10 px-4 bg-white border text-sm font-medium transition ${entry.direction === "OUT" ? "border-amber-200 text-amber-700 hover:bg-amber-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"} rounded-lg`}>
                             <IconEdit /> Edit
                         </button>
@@ -1156,13 +1167,17 @@ function ExpenseModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 // ── Edit Entry Modal ──────────────────────────────────────────────────────────
 function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: () => void; onSaved: () => void }) {
     const isOut = entry.direction === "OUT";
+    const isPengajuanDana = entry.source_type === "PENGAJUAN_DANA";
     const categories = isOut ? Object.entries(EXPENSE_CATEGORIES) : Object.entries(INCOME_CATEGORIES).filter(([key]) => !(AUTO_INCOME_CATEGORIES as readonly string[]).includes(key));
     const [category, setCategory] = useState(entry.category);
     const [nominal, setNominal] = useState(String(entry.nominal ?? ""));
     const [keterangan, setKeterangan] = useState(entry.keterangan ?? "");
     const [tanggal, setTanggal] = useState(entry.tanggal);
     const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(entry.payment_method ?? "CASH");
+    const [photoFile, setPhotoFile] = useState<File | null>(null);
+    const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string | null>(entry.photo_url);
     const [saving, setSaving] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
     const [error, setError] = useState("");
 
     useEffect(() => {
@@ -1174,6 +1189,10 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
     //  FIX: nominal 0 DIIZINKAN saat edit (koreksi entry salah input).
     //    Ditolak hanya jika kosong, non-numerik, atau negatif.
     const submit = async () => {
+        if (entry.is_audited) {
+            return setError("Entry yang sudah diaudit tidak bisa diedit. Batalkan status audit terlebih dahulu.");
+        }
+
         const parsed = Number(nominal);
         if (nominal.trim() === "" || !Number.isFinite(parsed) || parsed < 0)
             return setError("Nominal tidak valid (tidak boleh kosong atau negatif)");
@@ -1181,12 +1200,31 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
         setSaving(true);
         setError("");
         try {
+            let finalPhotoUrl = currentPhotoUrl;
+            if (photoFile) {
+                setUploadProgress("uploading");
+                const compressedPhoto = await compressImageFile(photoFile);
+                const fd = new FormData();
+                fd.append("file", compressedPhoto);
+                const upRes = await fetch("/api/cashflow/upload", { method: "POST", body: fd });
+                const upJson = await upRes.json();
+                if (!upJson.success) {
+                    setError(upJson.message || "Gagal upload foto");
+                    setSaving(false);
+                    setUploadProgress("idle");
+                    return;
+                }
+                finalPhotoUrl = upJson.url;
+                setUploadProgress("done");
+            }
+
             const body: any = {
                 category,
                 nominal: parsed,
                 keterangan: keterangan.trim() || null,
                 tanggal,
                 payment_method: paymentMethod,
+                photo_url: finalPhotoUrl,
             };
 
             const res = await fetch(`/api/cashflow/${entry.id}`, {
@@ -1202,10 +1240,22 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
             setError("Terjadi kesalahan koneksi");
         } finally {
             setSaving(false);
+            setUploadProgress("idle");
         }
     };
 
-    const theme = isOut ? {
+    const theme = isPengajuanDana ? {
+        ring: "focus:ring-teal-400/30",
+        borderFocus: "focus:border-teal-400",
+        bgIcon: "bg-teal-50",
+        textIcon: "text-teal-600",
+        bgAlert: "bg-teal-50",
+        borderAlert: "border-teal-200",
+        textAlert: "text-teal-700",
+        bgBtn: "bg-teal-600",
+        hoverBtn: "hover:bg-teal-700",
+        gradient: "from-teal-400 to-emerald-500",
+    } : isOut ? {
         ring: "focus:ring-amber-400/30",
         borderFocus: "focus:border-amber-400",
         bgIcon: "bg-amber-50",
@@ -1231,6 +1281,7 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
 
     const inputCls = `w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 ${theme.ring} ${theme.borderFocus} transition`;
     const showZeroHint = nominal.trim() !== "" && Number(nominal) === 0;
+    const savingLabel = uploadProgress === "uploading" ? "Mengupload foto..." : saving ? "Menyimpan..." : "Simpan Perubahan";
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -1242,12 +1293,25 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                         <div className={`w-8 h-8 rounded-lg ${theme.bgIcon} ${theme.textIcon} flex items-center justify-center text-base`}><Pencil size={16} /></div>
                         <div>
                             <p className="text-sm font-bold text-gray-900">Edit Uang {isOut ? "Keluar" : "Masuk"}</p>
-                            <p className="text-[11px] text-gray-400">{fmtTanggal(entry.tanggal)}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-[11px] text-gray-400">{fmtTanggal(entry.tanggal)}</p>
+                                {isPengajuanDana && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                                        <Landmark size={10} /> Pengajuan Dana
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                     <button onClick={onClose} className="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"><IconX /></button>
                 </div>
                 <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+                    {entry.is_audited && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[11px] text-amber-700 flex items-start gap-1.5">
+                            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                            <span>Entry ini sudah <b>diaudit</b>. Untuk mengubah data, batalkan status audit terlebih dahulu pada tombol audit tabel/detail.</span>
+                        </div>
+                    )}
                     <div>
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Metode Pembayaran <span className="text-red-500">*</span></label>
                         <div className="inline-flex w-full rounded-xl border border-gray-200 bg-gray-50 p-1 gap-1">
@@ -1286,17 +1350,26 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: Entry; onClose: ()
                         <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Keterangan</label>
                         <textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} rows={2} placeholder="Catatan tambahan..." className={`${inputCls.replace("h-10", "")} py-2 resize-none`} />
                     </div>
-                    {entry.photo_url && (
+                    {currentPhotoUrl ? (
                         <div>
-                            <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Foto Bukti <span className="text-gray-400 font-normal">(tidak bisa diubah di sini)</span></label>
-                            <img src={entry.photo_url} alt="Bukti" className="w-full max-h-40 object-cover rounded-xl border border-gray-200" />
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-xs font-semibold text-gray-600">Foto Bukti</label>
+                                <button type="button" onClick={() => setCurrentPhotoUrl(null)} className="text-[11px] font-semibold text-red-600 hover:text-red-700 inline-flex items-center gap-1">
+                                    <IconX /> Hapus Foto
+                                </button>
+                            </div>
+                            <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                                <img src={currentPhotoUrl} alt="Bukti" className="w-full max-h-44 object-cover" />
+                            </div>
                         </div>
+                    ) : (
+                        <PhotoPicker value={photoFile} onChange={setPhotoFile} />
                     )}
                     {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">{error}</div>}
                 </div>
                 <div className="px-5 py-4 border-t border-gray-100 flex gap-3 bg-gray-50/60">
                     <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50">Batal</button>
-                    <button onClick={submit} disabled={saving} className={`flex-1 h-10 ${theme.bgBtn} text-white rounded-lg text-sm font-medium ${theme.hoverBtn} transition disabled:opacity-60`}>{saving ? "Menyimpan..." : "Simpan Perubahan"}</button>
+                    <button onClick={submit} disabled={saving || entry.is_audited} className={`flex-1 h-10 ${theme.bgBtn} text-white rounded-lg text-sm font-medium ${theme.hoverBtn} transition disabled:opacity-60`}>{savingLabel}</button>
                 </div>
             </div>
         </div>
@@ -1894,7 +1967,7 @@ export default function CashflowPage() {
                                 type="text"
                                 value={currentFilter.search}
                                 onChange={(e) => handleFilterChange({ ...currentFilter, search: e.target.value })}
-                                placeholder="Cari nama / keterangan…"
+                                placeholder="Cari nama / keterangan / nominal…"
                                 className={`h-9 w-full border border-gray-200 rounded-lg pl-9 pr-8 text-sm bg-gray-50/60 focus:bg-white focus:outline-none ${BRAND_FOCUS} transition-all placeholder:text-gray-400`}
                             />
                             {currentFilter.search && (
@@ -1988,7 +2061,7 @@ export default function CashflowPage() {
                         ) : (
                             paginatedRows.map((e) => {
                                 const isClickable = clickable(e);
-                                const displayName = e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" ? (e.created_by_user?.name ?? e.nama) : e.nama;
+                                const displayName = e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA" ? (e.created_by_user?.name ?? e.nama) : e.nama;
                                 return (
                                     <div key={e.id} onClick={() => isClickable && handleRowClick(e)}
                                         className={`p-4 space-y-2.5 transition-colors ${e.is_voided && e.is_audited ? "bg-red-50/70" : e.is_voided ? "opacity-50 grayscale bg-gray-50/60" : ""} ${isClickable ? "active:bg-blue-50/60" : ""}`}>
@@ -2003,7 +2076,12 @@ export default function CashflowPage() {
                                         </div>
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-sm font-bold text-gray-900 truncate">{displayName}</p>
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <p className="text-sm font-bold text-gray-900 truncate">{displayName}</p>
+                                                    {e.source_type === "PENGAJUAN_DANA" && (
+                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 shrink-0">Dana</span>
+                                                    )}
+                                                </div>
                                                 <span className="inline-flex mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
                                                     {e.source_type === "MODAL_AWAL" ? "Modal Awal" : categoryLabel(e.direction, e.category)}
                                                 </span>
@@ -2092,7 +2170,7 @@ export default function CashflowPage() {
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap"><SourceBadge sourceType={e.source_type} /></td>
                                                 <td className="px-3 py-3 whitespace-nowrap" onClick={(ev) => ev.stopPropagation()}>
-                                                    {e.source_type === "MANUAL" ? (
+                                                    {e.payment_method ? (
                                                         e.payment_method === "SALDO"
                                                             ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"><Landmark size={11} /> Saldo</span>
                                                             : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-green-50 text-green-700 border border-green-100"><Banknote size={11} /> Cash</span>
@@ -2106,11 +2184,12 @@ export default function CashflowPage() {
                                                 </td>
                                                 <td className="px-3 py-3 max-w-[140px]">
                                                     <p className="text-[12px] font-semibold text-gray-800 truncate">
-                                                        {e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" ? (e.created_by_user?.name ?? e.nama) : e.nama}
+                                                        {e.source_type === "MANUAL" || e.source_type === "MODAL_AWAL" || e.source_type === "PENGAJUAN_DANA" ? (e.created_by_user?.name ?? e.nama) : e.nama}
                                                     </p>
                                                     {e.source_type === "SERVICE" && <p className="text-[9px] text-orange-500 font-semibold mt-0.5">Teknisi</p>}
                                                     {e.source_type === "TRANSACTION" && <p className="text-[9px] text-blue-500 font-semibold mt-0.5">Customer</p>}
                                                     {e.source_type === "MODAL_AWAL" && <p className="text-[9px] text-violet-500 font-semibold mt-0.5">Modal Awal</p>}
+                                                    {e.source_type === "PENGAJUAN_DANA" && <p className="text-[9px] text-teal-600 font-semibold mt-0.5">Pengajuan Dana</p>}
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap">
                                                     {e.source_type === "MODAL_AWAL" ? (
