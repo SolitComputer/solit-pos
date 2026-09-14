@@ -328,7 +328,7 @@ export async function getCashflowSyncDraftsByIds(
     const { data, error } = await supabase
       .from("cashflow_entries")
       .select("id, direction, category, nominal, payment_method, source_type, nama, keterangan")
-      .eq("source_type", "MANUAL")
+      .in("source_type", ["MANUAL", "PENGAJUAN_DANA"])
       .in("id", batch);
     if (error) {
       console.error("[akuntansi] fetch cashflow (sync):", error.message);
@@ -362,16 +362,13 @@ export async function getCashflowSyncDraftsByIds(
 
 export interface CashflowMeta {
   nama: string | null;
+  source_type?: string | null;
 }
 
 /**
- * Ambil nama pengisi (kolom `nama` di cashflow_entries) untuk entry CASHFLOW
- * yang sudah diposting ke Jurnal Umum — dipakai untuk badge "Diinput oleh ..."
- * di UI. Tidak perlu filter source_type=MANUAL lagi di sini karena SEMUA entry
- * jurnal dengan source_type CASHFLOW memang berasal dari cashflow_entries yang
- * source_type-nya MANUAL (lihat buildCashflowDrafts) — entry cashflow AUTO
- * (dari Transaksi/Service) tidak pernah membentuk journal_entries.source_type
- * "CASHFLOW", jadi tidak pernah masuk ke sini.
+ * Ambil nama pengisi (kolom `nama`) dan source_type untuk entry CASHFLOW
+ * yang sudah diposting ke Jurnal Umum — dipakai untuk badge nama dan
+ * penanda apakah dari penginputan manual atau pengajuan dana kepala divisi.
  */
 export async function getCashflowMetaByIds(
   supabase: SupabaseClient,
@@ -383,14 +380,17 @@ export async function getCashflowMetaByIds(
   for (const batch of chunkArray(ids, 150)) {
     const { data, error } = await supabase
       .from("cashflow_entries")
-      .select("id, nama")
+      .select("id, nama, source_type")
       .in("id", batch);
     if (error) {
       console.error("[akuntansi] fetch cashflow meta:", error.message);
       return map;
     }
     for (const e of (data ?? []) as any[]) {
-      map.set(String(e.id), { nama: (e.nama as string) ?? null });
+      map.set(String(e.id), {
+        nama: (e.nama as string) ?? null,
+        source_type: (e.source_type as string) ?? null,
+      });
     }
   }
 
@@ -1188,13 +1188,13 @@ async function buildServiceDrafts(
   return drafts;
 }
 
-// ── CASHFLOW (uang KELUAR manual + uang MASUK manual) ────────────────────────
-// FIX: sebelumnya cuma tarik direction "OUT" — sekarang tarik SEMUA entry
-// dengan source_type "MANUAL" (mencakup Uang Keluar Manual DAN Uang Masuk
-// Manual: kategori Piutang/Aksesoris/Biaya Lain-lain). Entry otomatis lain
-// (TRANSACTION, TRANSACTION_PAYMENT, TRANSACTION_DP, SERVICE, MODAL_AWAL)
-// TETAP TIDAK ikut ke sini — sudah/akan dibukukan lewat jalurnya sendiri,
-// atau memang di luar cakupan Jurnal Umum otomatis (MODAL_AWAL).
+// ── CASHFLOW (uang KELUAR manual + uang MASUK manual + PENGAJUAN DANA) ──────
+// Tarik SEMUA entry dengan source_type "MANUAL" (mencakup Uang Keluar Manual
+// DAN Uang Masuk Manual: kategori Piutang/Aksesoris/Biaya Lain-lain) serta
+// "PENGAJUAN_DANA" (realisasi dana keluar dari pengajuan kepala divisi).
+// Entry otomatis lain (TRANSACTION, TRANSACTION_PAYMENT, TRANSACTION_DP,
+// SERVICE, MODAL_AWAL) TETAP TIDAK ikut ke sini — sudah/akan dibukukan lewat
+// jalurnya sendiri, atau memang di luar cakupan Jurnal Umum otomatis (MODAL_AWAL).
 async function buildCashflowDrafts(
   supabase: SupabaseClient,
   startDate: string,
@@ -1203,7 +1203,7 @@ async function buildCashflowDrafts(
   const { data: rows, error } = await supabase
     .from("cashflow_entries")
     .select("id, direction, category, nama, nominal, keterangan, tanggal, payment_method, source_type, created_at")
-    .eq("source_type", "MANUAL")
+    .in("source_type", ["MANUAL", "PENGAJUAN_DANA"])
     .gte("tanggal", startDate)
     .lt("tanggal", endDateExclusive);
 
@@ -1247,7 +1247,13 @@ async function buildCashflowDrafts(
       ref: null,
       lines: merged,
       total: totalOf(merged),
-      meta: { category: e.category, payment_method: e.payment_method, nominal, direction: e.direction },
+      meta: {
+        category: e.category,
+        payment_method: e.payment_method,
+        nominal,
+        direction: e.direction,
+        source_type: e.source_type,
+      },
     });
   }
 
