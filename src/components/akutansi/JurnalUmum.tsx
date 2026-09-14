@@ -1939,13 +1939,24 @@ function SyncHistoryToggle({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [showPopover]);
 
+    const numAccountsChanged = entry.sync_preview
+        ? computeLineDiff(entry.lines, entry.sync_preview.lines).filter((d) => d.changed).length
+        : 0;
+    const ketChanged = entry.sync_preview ? entry.keterangan !== entry.sync_preview.keterangan : false;
+    const headerTitle =
+        numAccountsChanged > 0 && ketChanged
+            ? "Nominal & Keterangan Berubah"
+            : numAccountsChanged > 0
+            ? "Nominal Berubah"
+            : "Keterangan Berubah";
+
     const loadLogs = useCallback(async () => {
         setLoadingLogs(true);
         try {
             const res = await fetch(`/api/akutansi/jurnal/${entry.id}/logs`);
             const json = await res.json();
             const all = json.success ? json.data ?? [] : [];
-            setLogs(all.filter((l: any) => l.action === "SYNC"));
+            setLogs(all.filter((l: any) => l.action === "SYNC" || l.action === "EDIT"));
         } catch {
             setLogs([]);
         } finally {
@@ -1970,7 +1981,13 @@ function SyncHistoryToggle({
                 setToast(json.message ?? "Gagal sinkronisasi");
                 return;
             }
-                       setToast("Nominal jurnal disinkronkan");
+            setToast(
+                numAccountsChanged > 0 && ketChanged
+                    ? "Nominal & keterangan jurnal disinkronkan"
+                    : numAccountsChanged > 0
+                    ? "Nominal jurnal disinkronkan"
+                    : "Keterangan jurnal disinkronkan"
+            );
             setShowPopover(false);
             setConfirming(false);
             setShowDetailModal(false); // ⬅️ BARU
@@ -1996,19 +2013,21 @@ function SyncHistoryToggle({
                 <RefreshCw className="w-4 h-4 text-blue-600" />
             </button>
             {showPopover && popPos && (
-                               <div
+                <div
                     className="fixed z-[95] w-80 max-h-[80vh] overflow-y-auto bg-white border border-blue-200 rounded-xl shadow-xl p-3 text-left"
                     style={{ top: popPos.top, left: popPos.left }}
                 >
                     <p className="text-[10.5px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1 mb-2 pb-1.5 border-b border-gray-100">
-                        <RefreshCw className="w-3.5 h-3.5" /> Nominal Berubah
+                        <RefreshCw className="w-3.5 h-3.5" /> {headerTitle}
                     </p>
 
-                                       <p className="text-[11px] text-gray-500 mb-2">
-                        Nominal dan/atau keterangan jurnal ini belum sama dengan data sumber (Transaksi/Cashflow/Service) terbaru.
+                    <p className="text-[11px] text-gray-500 mb-2">
+                        {ketChanged && numAccountsChanged === 0
+                            ? "Keterangan jurnal ini belum sama dengan data sumber (Transaksi/Cashflow/Service) terbaru."
+                            : "Nominal dan/atau keterangan jurnal ini belum sama dengan data sumber (Transaksi/Cashflow/Service) terbaru."}
                     </p>
 
-                                        {/* ⬅️ BARU: ringkasan cepat + tombol buka detail lengkap */}
+                    {/* Ringkasan cepat + preview perubahan keterangan */}
                     {entry.sync_preview && (
                         <div className="mb-3 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
                             <div className="flex items-center justify-between mb-1.5">
@@ -2016,11 +2035,15 @@ function SyncHistoryToggle({
                                     Preview Perubahan
                                 </p>
                                 <span className="text-[10px] font-bold text-blue-600 whitespace-nowrap">
-                                    {computeLineDiff(entry.lines, entry.sync_preview.lines).filter((d) => d.changed).length} akun berubah
+                                    {numAccountsChanged} akun berubah
                                 </span>
                             </div>
-                            {entry.keterangan !== entry.sync_preview.keterangan && (
-                                <p className="text-[10px] text-gray-500 mb-1.5">Keterangan ikut berubah.</p>
+                            {ketChanged && (
+                                <div className="mb-2 bg-white p-2 rounded border border-slate-200/80 text-[10px]">
+                                    <span className="text-gray-400 font-bold block text-[9px] uppercase tracking-wider mb-0.5">Perubahan Keterangan:</span>
+                                    <p className="text-red-500 line-through leading-tight">{entry.keterangan}</p>
+                                    <p className="text-emerald-600 font-bold leading-tight mt-1">→ {entry.sync_preview.keterangan}</p>
+                                </div>
                             )}
                             <button
                                 onClick={() => setShowDetailModal(true)}
@@ -2057,28 +2080,38 @@ function SyncHistoryToggle({
                         </div>
                     )}
 
-                                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Riwayat Sinkronisasi</p>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Riwayat Sinkronisasi & Edit</p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
                         {loadingLogs ? (
                             <p className="text-[11px] text-gray-400">Memuat...</p>
                         ) : logs.length === 0 ? (
-                            <p className="text-[11px] text-gray-400">Belum pernah disinkronkan sebelumnya.</p>
+                            <p className="text-[11px] text-gray-400">Belum pernah disinkronkan atau diedit sebelumnya.</p>
                         ) : (
                             logs.map((l) => {
+                                const isSync = l.action === "SYNC";
                                 const diff = computeLineDiff(l.before_data?.lines ?? [], l.after_data?.lines ?? []).filter((d) => d.changed);
                                 const keteranganChanged = (l.before_data?.keterangan ?? "") !== (l.after_data?.keterangan ?? "");
                                 return (
-                                    <div key={l.id} className="text-[11px] border-b border-gray-50 pb-1.5 last:border-0 last:pb-0">
-                                        <p className="font-bold text-blue-700">
-                                            Disinkronkan · {l.changed_by_user?.name ?? "—"}
+                                    <div key={l.id} className="text-[11px] border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+                                        <div className="flex items-center justify-between gap-1 mb-0.5">
+                                            <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded border ${
+                                                isSync
+                                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                                            }`}>
+                                                {isSync ? "Sinkronisasi" : "Edit Manual"}
+                                            </span>
+                                            <span className="text-[9px] text-gray-400 font-mono">{fmtWaktu(l.changed_at)}</span>
+                                        </div>
+                                        <p className="text-[10px] text-gray-500 mb-1">
+                                            oleh <b className="text-gray-700">{l.changed_by_user?.name ?? "—"}</b>
                                         </p>
-                                        <p className="text-[9px] text-gray-300 mb-1">{fmtWaktu(l.changed_at)}</p>
                                         {keteranganChanged && (
-                                            <p className="text-gray-500 text-[10px] mb-1">
-                                                <span className="text-red-500 line-through">{l.before_data?.keterangan}</span>
-                                                {" → "}
-                                                <span className="text-emerald-600 font-bold">{l.after_data?.keterangan}</span>
-                                            </p>
+                                            <div className="text-[10px] mb-1 bg-white p-1.5 rounded border border-gray-200">
+                                                <span className="text-gray-400 font-bold block text-[9px] uppercase tracking-wider mb-0.5">Keterangan:</span>
+                                                <p className="text-red-500 line-through leading-tight">{l.before_data?.keterangan || "—"}</p>
+                                                <p className="text-emerald-600 font-bold leading-tight mt-0.5">→ {l.after_data?.keterangan || "—"}</p>
+                                            </div>
                                         )}
                                         {diff.map((d) => (
                                             <p key={`${d.account_code}-${d.side}`} className="text-gray-500 font-mono text-[10px]">
@@ -2752,11 +2785,11 @@ function AuditLogModal({ entry, onClose }: { entry: JournalEntry; onClose: () =>
     const ACTION_LABEL: Record<string, string> = {
         CONFIRM: "Dikonfirmasi dari sistem",
         CREATE: "Dibuat manual",
-        EDIT: "Diedit",
+        EDIT: "Diedit Manual",
         DELETE: "Dihapus",
         ACTIVATE: "Ditandai Bermasalah",
         DEACTIVATE: "Tanda Bermasalah Dicabut",
-        SYNC: "Disinkronkan dari Transaksi",
+        SYNC: "Disinkronkan dari Sumber",
     };
 
     return (
