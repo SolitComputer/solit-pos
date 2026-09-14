@@ -778,12 +778,13 @@ export function SolitBorder({
   const hasCounterRing = fx === "epic" || fx === "legendary" || fx === "limited";
   const hasBurst = fx === "legendary" || fx === "limited";
   const isJittery = fx === "limited";
-
   return (
-    <span className={`sb-ring ${isJittery ? "sb-ring-jitter" : ""} ${className}`} style={{ padding: thickness }}>
+    <span className={`sb-ring ${className}`} style={{ padding: thickness }}>
       {hasBurst && <span className="sb-burst" aria-hidden="true" />}
       {hasPulse && <span className="sb-pulse-ring" aria-hidden="true" />}
-      {fx === "limited" && <span className="sb-pulse-ring sb-pulse-ring-2" aria-hidden="true" />}
+      {fx === "limited" && (
+        <span className={`sb-pulse-ring sb-pulse-ring-2 ${isJittery ? "sb-ring-jitter" : ""}`} aria-hidden="true" />
+      )}
       <span className={`sb-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
       {hasCounterRing && (
         <span className={`sb-bg sb-bg-counter ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} aria-hidden="true" />
@@ -830,6 +831,10 @@ export function SolitBorder({
         .sb-pulse-ring-2 {
           animation-delay: 1.1s;
         }
+        .sb-pulse-ring-2.sb-ring-jitter {
+          animation: sb-pulse-expand 2.2s ease-out infinite, sb-jitter 2.6s ease-in-out infinite;
+          animation-delay: 1.1s, 0s;
+        }
         @keyframes sb-pulse-expand {
           0% { transform: scale(0.86); opacity: 0.55; }
           80% { opacity: 0; }
@@ -860,33 +865,42 @@ export function SolitBorder({
         }
         .sb-particles {
           position: absolute;
-          inset: 0;
+          inset: -9px;
           z-index: 2;
           pointer-events: none;
         }
         .sb-particle {
           position: absolute;
-          top: 50%;
+          inset: 0;
+          border-radius: 9999px;
+          animation: sb-spin 4.4s linear infinite;
+        }
+        .sb-particle::before {
+          content: "";
+          position: absolute;
+          top: -1px;
           left: 50%;
           width: 5px;
           height: 5px;
           border-radius: 9999px;
           background: #fff;
+          transform: translate(-50%, -50%);
           box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0.8);
-          animation: sb-particle-orbit 3.6s linear infinite;
+          animation: sb-particle-twinkle 3.6s ease-in-out infinite;
         }
-        .sb-particle-2 { animation-delay: 1.2s; }
-        .sb-particle-3 { animation-delay: 2.4s; }
-        .sb-particle-4 { animation-delay: 0.6s; width: 4px; height: 4px; }
-        @keyframes sb-particle-orbit {
-          0% { transform: translate(-50%, -50%) rotate(0deg) translateX(26px) rotate(0deg); opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { transform: translate(-50%, -50%) rotate(360deg) translateX(26px) rotate(-360deg); opacity: 0; }
+        .sb-particle-2 { animation-delay: -1.5s; }
+        .sb-particle-3 { animation-delay: -3s; }
+        .sb-particle-4 { animation-delay: -0.8s; }
+        .sb-particle-2::before { animation-delay: -1.5s; width: 4px; height: 4px; }
+        .sb-particle-3::before { animation-delay: -3s; }
+        .sb-particle-4::before { animation-delay: -0.8s; width: 4px; height: 4px; }
+        @keyframes sb-particle-twinkle {
+          0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.75); }
+          50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
         }
         .sb-comet {
           position: absolute;
-          inset: 0;
+          inset: -11px;
           border-radius: 9999px;
           z-index: 3;
           pointer-events: none;
@@ -895,18 +909,14 @@ export function SolitBorder({
         .sb-comet::before {
           content: "";
           position: absolute;
-          top: -2px;
+          top: 0;
           left: 50%;
-          width: 4px;
-          height: 4px;
+          width: 5px;
+          height: 16px;
           border-radius: 9999px;
-          background: #fff;
-          transform: translateX(-50%);
-          box-shadow:
-            0 0 8px 3px rgba(255, 255, 255, 0.95),
-            0 7px 8px -1px rgba(255, 255, 255, 0.55),
-            0 14px 12px -3px rgba(255, 255, 255, 0.3),
-            0 21px 16px -5px rgba(255, 255, 255, 0.12);
+          background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.95));
+          transform: translate(-50%, -85%);
+          filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
         }
         .sb-orn-glow {
           filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
@@ -924,8 +934,9 @@ export function SolitBorder({
           border-radius: 9999px;
           z-index: 8;
           pointer-events: none;
+          opacity: 0;
           background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 70%);
-          animation: sb-burst-flash 1s ease-out 1;
+          animation: sb-burst-flash 1s ease-out 1 forwards;
         }
         @keyframes sb-burst-flash {
           0% { transform: scale(0.25); opacity: 0; }
