@@ -13,6 +13,7 @@ import {
     JournalSide,
     MANUAL_TEMPLATES,
     accountName,
+    getModalAccountsForEntry,
     isBalanced,
     jakartaDate,
     sumSide,
@@ -867,8 +868,9 @@ export default function JurnalUmum({ period }: { period: string }) {
         if (accountCodeFilter.size > 0) {
             result = result.filter((e) => {
                 const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
+                const { debitAccount, kreditAccount } = getModalAccountsForEntry(e.lines);
                 const allCodes = modalMissing
-                    ? [...e.lines.map((l) => l.account_code), AKUN.MODAL_KELUAR, AKUN.HPP]
+                    ? [...e.lines.map((l) => l.account_code), debitAccount, kreditAccount]
                     : e.lines.map((l) => l.account_code);
                 return allCodes.some((code) => accountCodeFilter.has(code));
             });
@@ -936,22 +938,23 @@ export default function JurnalUmum({ period }: { period: string }) {
     const totalDebit = useMemo(() => {
         return filtered.reduce((s, e) => {
             const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
+            const { debitAccount, kreditAccount } = getModalAccountsForEntry(e.lines);
             const displayLines: JournalLine[] = modalMissing
                 ? [
                     ...e.lines,
                     {
-                        id: `${e.id}-modal-keluar-missing`,
-                        account_code: AKUN.MODAL_KELUAR,
-                        account_name: accountName(AKUN.MODAL_KELUAR),
+                        id: `${e.id}-modal-debit-missing`,
+                        account_code: debitAccount,
+                        account_name: accountName(debitAccount),
                         side: "DEBIT",
                         nominal: 0,
                         keterangan: "Harga modal belum diinput",
                         line_order: 999,
                     },
                     {
-                        id: `${e.id}-hpp-missing`,
-                        account_code: AKUN.HPP,
-                        account_name: accountName(AKUN.HPP),
+                        id: `${e.id}-modal-kredit-missing`,
+                        account_code: kreditAccount,
+                        account_name: accountName(kreditAccount),
                         side: "KREDIT",
                         nominal: 0,
                         keterangan: null,
@@ -971,22 +974,23 @@ export default function JurnalUmum({ period }: { period: string }) {
     const totalKredit = useMemo(() => {
         return filtered.reduce((s, e) => {
             const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
+            const { debitAccount, kreditAccount } = getModalAccountsForEntry(e.lines);
             const displayLines: JournalLine[] = modalMissing
                 ? [
                     ...e.lines,
                     {
-                        id: `${e.id}-modal-keluar-missing`,
-                        account_code: AKUN.MODAL_KELUAR,
-                        account_name: accountName(AKUN.MODAL_KELUAR),
+                        id: `${e.id}-modal-debit-missing`,
+                        account_code: debitAccount,
+                        account_name: accountName(debitAccount),
                         side: "DEBIT",
                         nominal: 0,
                         keterangan: "Harga modal belum diinput",
                         line_order: 999,
                     },
                     {
-                        id: `${e.id}-hpp-missing`,
-                        account_code: AKUN.HPP,
-                        account_name: accountName(AKUN.HPP),
+                        id: `${e.id}-modal-kredit-missing`,
+                        account_code: kreditAccount,
+                        account_name: accountName(kreditAccount),
                         side: "KREDIT",
                         nominal: 0,
                         keterangan: null,
@@ -1013,11 +1017,12 @@ export default function JurnalUmum({ period }: { period: string }) {
     const totalLinesFiltered = useMemo(() => {
         return filtered.reduce((s, e) => {
             const modalMissing = e.source_type === "TRANSACTION" && e.trx_meta?.modal_missing === true;
+            const { debitAccount, kreditAccount } = getModalAccountsForEntry(e.lines);
             const displayLines = modalMissing
                 ? [
                     ...e.lines,
-                    { account_code: AKUN.MODAL_KELUAR },
-                    { account_code: AKUN.HPP },
+                    { account_code: debitAccount },
+                    { account_code: kreditAccount },
                 ]
                 : e.lines;
             const linesToRender = accountCodeFilter.size > 0
@@ -2336,17 +2341,18 @@ function EntryFormModal({
 
         if (!modalMissing) return baseLines;
 
+        const { debitAccount, kreditAccount } = getModalAccountsForEntry(entry?.lines ?? []);
         return [
             ...baseLines,
             {
-                account_code: AKUN.MODAL_KELUAR,
+                account_code: debitAccount,
                 side: "DEBIT",
                 nominal: 0,
                 keterangan: "Harga modal belum diinput",
                 _id: crypto.randomUUID(),
             },
             {
-                account_code: AKUN.HPP,
+                account_code: kreditAccount,
                 side: "KREDIT",
                 nominal: 0,
                 keterangan: "",
@@ -3149,21 +3155,22 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
 
     const displayLines: JournalLine[] = useMemo(() => {
         if (!modalMissing) return entry.lines;
+        const { debitAccount, kreditAccount } = getModalAccountsForEntry(entry.lines);
         return [
             ...entry.lines,
             {
-                id: `${entry.id}-modal-keluar-missing`,
-                account_code: AKUN.MODAL_KELUAR,
-                account_name: accountName(AKUN.MODAL_KELUAR),
+                id: `${entry.id}-modal-debit-missing`,
+                account_code: debitAccount,
+                account_name: accountName(debitAccount),
                 side: "DEBIT",
                 nominal: 0,
                 keterangan: "Harga modal belum diinput",
                 line_order: 999,
             },
             {
-                id: `${entry.id}-hpp-missing`,
-                account_code: AKUN.HPP,
-                account_name: accountName(AKUN.HPP),
+                id: `${entry.id}-modal-kredit-missing`,
+                account_code: kreditAccount,
+                account_name: accountName(kreditAccount),
                 side: "KREDIT",
                 nominal: 0,
                 keterangan: null,
