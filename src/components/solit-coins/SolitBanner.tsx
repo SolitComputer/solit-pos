@@ -34,6 +34,13 @@ export default function SolitBanner({
 
   return (
     <div className={`sb-frame-wrap ${compact ? "sb-compact" : ""} ${className}`}>
+      {/* Ambient card glow — cahaya besar & blur yang "napas" di belakang
+          seluruh kartu, beda dari corner-glow yang cuma di 4 titik sudut;
+          ini menyatukan seluruh kartu jadi satu sumber cahaya. Reuse
+          warna dari sb-cg-<preset> yang sudah ada (radial-gradient per
+          preset) — dipasang ulang di elemen baru berukuran penuh. */}
+      <span className={`sb-ambient-glow sb-cg-${preset}`} aria-hidden="true" />
+
       {/* ── 1. CONTINUOUS FLOWING FRAME (Border mulus mengikuti lekukan rounded-t kartu) ── */}
       <div
         className={`sb-continuous-frame sb-cf-${preset}`}
@@ -45,15 +52,57 @@ export default function SolitBanner({
         aria-hidden="true"
       />
 
-      {/* ── 2. 4 ORNAMEN SUDUT 3D FANTASY ── */}
-      {asset && (
+      {/* Tekstur faset — pakai mask exclude yang sama kayak frame utama,
+          jadi otomatis ke-crop jadi bentuk ring & ngikutin lekukan kartu. */}
+      <div
+        className="sb-frame-facets"
+        style={{
+          padding: openBottom
+            ? `${thickness}px ${thickness}px 0 ${thickness}px`
+            : `${thickness}px`,
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Sapuan pelangi holografik — muter di dalam ring, warna-warni
+          (bukan monokrom putih kayak shine sweep/orbit sweep), efeknya
+          kayak cahaya nembus kristal/prisma. Pakai mask trick yang sama. */}
+      <div
+        className="sb-frame-prism"
+        style={{
+          padding: openBottom
+            ? `${thickness}px ${thickness}px 0 ${thickness}px`
+            : `${thickness}px`,
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Titik cahaya yang beneran ngelilingin seluruh tepi kartu (bukan
+          gradient diputer di tempat) — lintasannya persegi mengikuti
+          4 sisi, pakai keyframe left/top persentase biar otomatis
+          nyesuaiin ukuran kartu berapa pun (preview besar vs grid kecil). */}
+      <span className="sb-frame-travel" aria-hidden="true">
+        <span className="sb-travel-dot" />
+        <span className="sb-travel-dot sb-travel-dot-2" />
+      </span>
+
+      {/* ── 2. 4 ORNAMEN SUDUT 3D FANTASY (asset) ATAU CORNER GLOW (animated) ── */}
+      {asset ? (
         <>
           <Corner pos="tl" src={asset.ringImage} code={code} />
           <Corner pos="tr" src={asset.ringImage} code={code} />
           <Corner pos="bl" src={asset.ringImage} code={code} />
           <Corner pos="br" src={asset.ringImage} code={code} />
         </>
+      ) : (
+        <FrameCornerGlow preset={preset} />
       )}
+
+      {/* ── 3. MID-EDGE SPARKLES (universal, asset maupun animated) ── */}
+      <span className="sb-edge-sparkle sb-es-top" aria-hidden="true">✦</span>
+      <span className="sb-edge-sparkle sb-es-bottom" aria-hidden="true">✦</span>
+      <span className="sb-edge-sparkle sb-es-left" aria-hidden="true">✦</span>
+      <span className="sb-edge-sparkle sb-es-right" aria-hidden="true">✦</span>
 
       <style jsx global>{`
         .sb-frame-wrap {
@@ -72,11 +121,12 @@ export default function SolitBanner({
           border-radius: inherit;
           pointer-events: none;
           z-index: 1;
+          overflow: hidden;
           -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
           -webkit-mask-composite: xor;
           mask-composite: exclude;
           background-size: 250% 250%;
-          animation: sb-cf-flow 6s ease-in-out infinite alternate;
+          animation: sb-cf-flow 6s ease-in-out infinite alternate, sb-cf-breathe 3s ease-in-out infinite;
           will-change: background-position;
         }
 
@@ -84,6 +134,84 @@ export default function SolitBanner({
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
+        }
+        @keyframes sb-cf-breathe {
+          0%, 100% { opacity: 0.82; }
+          50% { opacity: 1; }
+        }
+
+        /* Sapuan kilap diagonal yang lewat sepanjang bingkai — otomatis
+           ke-crop jadi bentuk ring tipis karena mask di elemen induk
+           berlaku juga untuk pseudo-element di dalamnya. */
+        .sb-continuous-frame::before {
+          content: "";
+          position: absolute;
+          inset: -60%;
+          background: linear-gradient(
+            100deg,
+            transparent 35%,
+            rgba(255, 255, 255, 0.9) 49%,
+            rgba(255, 255, 255, 0.9) 51%,
+            transparent 65%
+          );
+          mix-blend-mode: overlay;
+          animation: sb-frame-shine-sweep 3.4s linear infinite;
+        }
+        @keyframes sb-frame-shine-sweep {
+          0% { transform: translateX(-55%); }
+          100% { transform: translateX(55%); }
+        }
+
+        /* Sapuan energi kedua yang mengorbit penuh (conic) — beda arah &
+           ritme dari shine sweep linear di atas, biar kerasa 2 sumber
+           cahaya, bukan cuma satu diulang. Otomatis ke-crop jadi bentuk
+           ring karena ini pseudo-element dari .sb-continuous-frame yang
+           sudah kena mask + overflow:hidden. */
+        .sb-continuous-frame::after {
+          content: "";
+          position: absolute;
+          inset: -25%;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 335deg,
+            rgba(255, 255, 255, 0.5) 350deg,
+            rgba(255, 255, 255, 0.95) 358deg,
+            transparent 360deg
+          );
+          mix-blend-mode: screen;
+          animation: sb-spin 2.4s linear infinite;
+        }
+
+        /* Tekstur faset diagonal — dipisah jadi div sendiri (bukan
+           pseudo-element ketiga di sb-continuous-frame, karena tiap
+           elemen cuma boleh punya ::before DAN ::after, sudah kepakai
+           semua buat shine sweep + orbit sweep). Pakai repeating-linear
+           (bukan repeating-conic kayak di border) karena bentuk banner
+           persegi panjang, bukan lingkaran — garis diagonal lebih cocok
+           ngikutin bentuk rect daripada pola radial. */
+        .sb-frame-facets {
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          pointer-events: none;
+          z-index: 1;
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          mix-blend-mode: overlay;
+          opacity: 0.5;
+          background: repeating-linear-gradient(
+            115deg,
+            rgba(255, 255, 255, 0.4) 0px 3px,
+            rgba(0, 0, 0, 0.3) 3px 6px
+          );
+          background-size: 200% 200%;
+          animation: sb-frame-facet-shift 9s linear infinite;
+        }
+        @keyframes sb-frame-facet-shift {
+          0% { background-position: 0% 0%; }
+          100% { background-position: 200% 0%; }
         }
 
         /* Preset color gradients & drop-shadow glows */
@@ -308,16 +436,142 @@ export default function SolitBanner({
           }
         }
 
+        /* ── 3. MID-EDGE SPARKLES ─────────────────────────────────── */
+        /* Posisi dipusatkan pakai margin, BUKAN transform: translate —
+           soalnya keyframe sb-c-sparkle yang dipakai ulang di sini juga
+           nge-set property transform (scale/rotate). Kalau dipusatkan
+           pakai translate(-50%), tiap frame animasi bakal MENIMPA nilai
+           translate itu (property yang sama gak bisa digabung dari 2
+           sumber beda) dan sparkle-nya geser dari posisi yang seharusnya. */
+        .sb-edge-sparkle {
+          position: absolute;
+          font-size: 11px;
+          line-height: 1;
+          color: #fff;
+          z-index: 3;
+          pointer-events: none;
+          user-select: none;
+          filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 7px currentColor);
+          animation: sb-c-sparkle 3s ease-in-out infinite;
+        }
+        .sb-es-top { top: -4px; left: 50%; margin-left: -5.5px; animation-delay: 0.4s; }
+        .sb-es-bottom { bottom: -4px; left: 50%; margin-left: -5.5px; animation-delay: 1.6s; }
+        .sb-es-left { left: -4px; top: 50%; margin-top: -5.5px; animation-delay: 0.9s; }
+        .sb-es-right { right: -4px; top: 50%; margin-top: -5.5px; animation-delay: 2.2s; }
+        .sb-compact .sb-edge-sparkle { display: none; }
+
+        /* ── TRAVELING SPARK ──────────────────────────────────────── */
+        /* Posisi digerakkan lewat left/top persentase (bukan transform),
+           supaya lintasannya OTOMATIS mengikuti ukuran kartu — banner
+           preview besar dan kartu grid kecil dapat lintasan proporsional
+           yang sama tanpa perlu angka px berbeda per ukuran. */
+        .sb-frame-travel {
+          position: absolute;
+          inset: 0;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-compact .sb-frame-travel { display: none; }
+        .sb-travel-dot {
+          position: absolute;
+          width: 5px;
+          height: 5px;
+          border-radius: 9999px;
+          background: #fff;
+          box-shadow: 0 0 7px 2px rgba(255, 255, 255, 0.9);
+          transform: translate(-50%, -50%);
+          animation: sb-frame-travel-path 5s linear infinite;
+        }
+        .sb-travel-dot-2 {
+          animation-delay: 2.5s;
+        }
+        @keyframes sb-frame-travel-path {
+          0% { left: 0%; top: 0%; }
+          25% { left: 100%; top: 0%; }
+          50% { left: 100%; top: 100%; }
+          75% { left: 0%; top: 100%; }
+          100% { left: 0%; top: 0%; }
+        }
+
         @keyframes sb-spin {
           to { transform: rotate(360deg); }
         }
 
+        /* ── 6. CORNER GLOW (untuk banner animated tanpa PNG asset) ── */
+        .sb-corner-glow {
+          position: absolute;
+          width: 34px;
+          height: 34px;
+          border-radius: 50%;
+          pointer-events: none;
+          z-index: 2;
+          filter: blur(9px);
+          animation: sb-cg-pulse 2.6s ease-in-out infinite;
+        }
+        @media (min-width: 640px) {
+          .sb-corner-glow {
+            width: 42px;
+            height: 42px;
+          }
+        }
+        .sb-compact .sb-corner-glow {
+          width: 18px !important;
+          height: 18px !important;
+          filter: blur(5px);
+        }
+        .sb-corner-glow-tl { top: -6px; left: -6px; }
+        .sb-corner-glow-tr { top: -6px; right: -6px; }
+        .sb-corner-glow-bl { bottom: -6px; left: -6px; }
+        .sb-corner-glow-br { bottom: -6px; right: -6px; }
+        @keyframes sb-cg-pulse {
+          0%, 100% { opacity: 0.45; transform: scale(0.85); }
+          50% { opacity: 0.95; transform: scale(1.12); }
+        }
+        /* Cincin energi yang "meletup" keluar dari tiap corner glow,
+           berulang terus (beda dari sb-burst di border yang cuma
+           sekali pas mount) — 4 sudut meletup bareng, kayak detak. */
+        .sb-corner-glow::after {
+          content: "";
+          position: absolute;
+          inset: -35%;
+          border-radius: 50%;
+          border: 1.5px solid rgba(255, 255, 255, 0.65);
+          opacity: 0;
+          animation: sb-cg-burst 2.6s ease-out infinite;
+        }
+        @keyframes sb-cg-burst {
+          0% { transform: scale(0.6); opacity: 0.6; }
+          70% { opacity: 0; }
+          100% { transform: scale(1.7); opacity: 0; }
+        }
+        .sb-cg-cosmic-starfield { background: radial-gradient(circle, rgba(129, 140, 248, 0.85) 0%, transparent 70%); }
+        .sb-cg-dragon-flame { background: radial-gradient(circle, rgba(251, 146, 60, 0.85) 0%, transparent 70%); }
+        .sb-cg-golden-crown { background: radial-gradient(circle, rgba(251, 191, 36, 0.85) 0%, transparent 70%); }
+        .sb-cg-cyber-neon { background: radial-gradient(circle, rgba(34, 211, 238, 0.85) 0%, transparent 70%); }
+        .sb-cg-rgb-spin {
+          background: radial-gradient(circle, rgba(244, 114, 182, 0.85) 0%, transparent 70%);
+          animation: sb-cg-pulse 1.8s ease-in-out infinite;
+        }
+        .sb-cg-aurora-wave { background: radial-gradient(circle, rgba(110, 231, 183, 0.85) 0%, transparent 70%); }
+        .sb-cg-galaxy-pulse { background: radial-gradient(circle, rgba(192, 132, 252, 0.85) 0%, transparent 70%); }
+        .sb-cg-emerald { background: radial-gradient(circle, rgba(110, 231, 183, 0.8) 0%, transparent 70%); }
+        .sb-cg-royal { background: radial-gradient(circle, rgba(147, 197, 253, 0.85) 0%, transparent 70%); }
+        .sb-cg-sunset { background: radial-gradient(circle, rgba(251, 146, 60, 0.85) 0%, transparent 70%); }
+        .sb-cg-violet { background: radial-gradient(circle, rgba(192, 132, 252, 0.85) 0%, transparent 70%); }
+
         @media (prefers-reduced-motion: reduce) {
           .sb-continuous-frame,
+          .sb-continuous-frame::before,
+          .sb-continuous-frame::after,
+          .sb-frame-facets,
           .sb-corner-img,
           .sb-corner-aura,
+          .sb-corner-glow,
+          .sb-corner-glow::after,
           .sb-c-sweep,
-          .sb-corner-sparkle {
+          .sb-corner-sparkle,
+          .sb-edge-sparkle,
+          .sb-travel-dot {
             animation: none !important;
           }
         }
@@ -359,5 +613,16 @@ function Corner({
       {/* Bintang sparkle kelap-kelip */}
       <span className="sb-corner-sparkle" aria-hidden="true">✦</span>
     </span>
+  );
+}
+
+function FrameCornerGlow({ preset }: { preset: string }) {
+  return (
+    <>
+      <span className={`sb-corner-glow sb-corner-glow-tl sb-cg-${preset}`} aria-hidden="true" />
+      <span className={`sb-corner-glow sb-corner-glow-tr sb-cg-${preset}`} aria-hidden="true" />
+      <span className={`sb-corner-glow sb-corner-glow-bl sb-cg-${preset}`} aria-hidden="true" />
+      <span className={`sb-corner-glow sb-corner-glow-br sb-cg-${preset}`} aria-hidden="true" />
+    </>
   );
 }
