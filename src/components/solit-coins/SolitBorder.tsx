@@ -771,25 +771,48 @@ export function SolitBorder({
         : { background: DEFAULT_GRADIENT };
 
   const fx = preset ? FX_TIER[preset] : undefined;
+  const hasCounterRing = fx === "rare" || fx === "epic" || fx === "legendary" || fx === "limited";
+  const hasTrace = fx === "epic" || fx === "legendary" || fx === "limited";
   const hasPulse = fx === "epic" || fx === "legendary" || fx === "limited";
-  const hasShimmer = fx === "rare" || fx === "epic" || fx === "legendary" || fx === "limited";
-  const hasParticles = fx === "legendary" || fx === "limited";
+  const hasShimmer = true;
+  const shimmerBold = fx === "rare" || fx === "epic" || fx === "legendary" || fx === "limited";
+  const hasParticles = fx === "epic" || fx === "legendary" || fx === "limited";
+  const particleCount = fx === "epic" ? 2 : fx === "legendary" ? 3 : fx === "limited" ? 4 : 0;
   const hasComet = fx === "limited";
-  const hasCounterRing = fx === "epic" || fx === "legendary" || fx === "limited";
   const hasBurst = fx === "legendary" || fx === "limited";
   const isJittery = fx === "limited";
+  const auraOpacity =
+    fx === "limited" ? 1 : fx === "legendary" ? 0.85 : fx === "epic" ? 0.65 : fx === "rare" ? 0.48 : 0.32;
+  const traceSpeed = fx === "limited" ? "1.8s" : fx === "legendary" ? "2.4s" : "3.2s";
+  const glintOpacity =
+    fx === "limited" ? 1 : fx === "legendary" ? 0.9 : fx === "epic" ? 0.75 : fx === "rare" ? 0.55 : 0.4;
+  const dualBeam = fx === "epic" || fx === "legendary" || fx === "limited";
+
   return (
     <span className={`sb-ring ${className}`} style={{ padding: thickness }}>
+      <span className="sb-aura-wrap" style={{ "--aura-max": auraOpacity } as React.CSSProperties} aria-hidden="true">
+        <span className={`sb-aura-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
+      </span>
       {hasBurst && <span className="sb-burst" aria-hidden="true" />}
       {hasPulse && <span className="sb-pulse-ring" aria-hidden="true" />}
       {fx === "limited" && (
         <span className={`sb-pulse-ring sb-pulse-ring-2 ${isJittery ? "sb-ring-jitter" : ""}`} aria-hidden="true" />
       )}
-      <span className={`sb-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
-      {hasCounterRing && (
-        <span className={`sb-bg sb-bg-counter ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} aria-hidden="true" />
+      <span className="sb-bg-wrap" aria-hidden="true">
+        <span className={`sb-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
+        {hasCounterRing && (
+          <span className={`sb-bg sb-bg-counter ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
+        )}
+        <span className="sb-facets" aria-hidden="true" />
+        <span className="sb-bevel" aria-hidden="true" />
+      </span>
+      {hasTrace && <span className="sb-trace" style={{ animationDuration: traceSpeed }} aria-hidden="true" />}
+      {hasShimmer && (
+        <span
+          className={`sb-shimmer ${shimmerBold ? "sb-shimmer-bold" : ""} ${dualBeam ? "sb-shimmer-dual" : ""}`}
+          aria-hidden="true"
+        />
       )}
-      {hasShimmer && <span className="sb-shimmer" aria-hidden="true" />}
       {hasComet && <span className="sb-comet" aria-hidden="true" />}
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
@@ -800,23 +823,96 @@ export function SolitBorder({
       {hasParticles && (
         <span className="sb-particles" aria-hidden="true">
           <span className="sb-particle sb-particle-1" />
-          <span className="sb-particle sb-particle-2" />
-          <span className="sb-particle sb-particle-3" />
-          {fx === "limited" && <span className="sb-particle sb-particle-4" />}
+          {particleCount >= 2 && <span className="sb-particle sb-particle-2" />}
+          {particleCount >= 3 && <span className="sb-particle sb-particle-3" />}
+          {particleCount >= 4 && <span className="sb-particle sb-particle-4" />}
         </span>
       )}
+      <span className="sb-glints" aria-hidden="true">
+        <span className="sb-glint" style={{ "--glint-rot": "35deg", "--glint-max": glintOpacity } as React.CSSProperties} />
+        <span
+          className="sb-glint"
+          style={{ "--glint-rot": "215deg", "--glint-max": glintOpacity, animationDelay: "1.4s" } as React.CSSProperties}
+        />
+      </span>
       <style jsx global>{`
         .sb-ring {
           position: relative;
           display: inline-flex;
           border-radius: 9999px;
         }
-        .sb-ring > .sb-bg {
+        .sb-bg-wrap {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 0;
+          transform-origin: center;
+          animation: sb-bg-breathe 3.4s ease-in-out infinite;
+        }
+        @keyframes sb-bg-breathe {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.045); }
+        }
+        .sb-bg-wrap > .sb-bg {
           position: absolute;
           inset: 0;
           border-radius: 9999px;
           z-index: 0;
           will-change: transform, filter;
+        }
+        .sb-facets {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 1;
+          pointer-events: none;
+          mix-blend-mode: overlay;
+          opacity: 0.55;
+          background: repeating-conic-gradient(
+            from 0deg,
+            rgba(255, 255, 255, 0.4) 0deg 3.5deg,
+            rgba(0, 0, 0, 0.3) 3.5deg 7deg
+          );
+          animation: sb-spin-rev 16s linear infinite;
+        }
+        .sb-bevel {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 2;
+          pointer-events: none;
+          box-shadow:
+            inset 0 1px 1.5px rgba(255, 255, 255, 0.55),
+            inset 0 -1.5px 2px rgba(0, 0, 0, 0.4);
+        }
+        .sb-aura-wrap {
+          position: absolute;
+          inset: -16px;
+          border-radius: 9999px;
+          z-index: -4;
+          pointer-events: none;
+          overflow: hidden;
+          filter: blur(9px);
+          opacity: var(--aura-max, 0.4);
+          animation: sb-aura-pulse 3.2s ease-in-out infinite;
+        }
+        @keyframes sb-aura-pulse {
+          0%, 100% { transform: scale(0.94); opacity: calc(var(--aura-max, 0.4) * 0.55); }
+          50% { transform: scale(1.1); opacity: var(--aura-max, 0.4); }
+        }
+        .sb-aura-bg {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+        }
+        .sb-trace {
+          position: absolute;
+          inset: -9px;
+          border-radius: 9999px;
+          border: 1.5px dashed rgba(255, 255, 255, 0.55);
+          z-index: 2;
+          pointer-events: none;
+          animation: sb-spin 3s linear infinite;
         }
         .sb-pulse-ring {
           position: absolute;
@@ -856,9 +952,34 @@ export function SolitBorder({
           background: conic-gradient(
             from 0deg,
             transparent 0deg,
+            transparent 82deg,
+            rgba(255, 255, 255, 0.4) 90deg,
+            transparent 98deg,
+            transparent 360deg
+          );
+          animation: sb-spin 5.5s linear infinite;
+        }
+        .sb-shimmer-bold::after {
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
             transparent 75deg,
             rgba(255, 255, 255, 0.85) 90deg,
             transparent 105deg,
+            transparent 360deg
+          );
+          animation: sb-spin 3s linear infinite;
+        }
+        .sb-shimmer-dual::before {
+          content: "";
+          position: absolute;
+          inset: -50%;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 255deg,
+            rgba(255, 255, 255, 0.7) 270deg,
+            transparent 285deg,
             transparent 360deg
           );
           animation: sb-spin 3s linear infinite;
@@ -897,6 +1018,36 @@ export function SolitBorder({
         @keyframes sb-particle-twinkle {
           0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.75); }
           50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+        }
+        .sb-glints {
+          position: absolute;
+          inset: -7px;
+          z-index: 4;
+          pointer-events: none;
+        }
+        .sb-glint {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          transform: rotate(var(--glint-rot));
+          animation: sb-glint-twinkle 2.8s ease-in-out infinite;
+        }
+        .sb-glint::before,
+        .sb-glint::after {
+          content: "";
+          position: absolute;
+          top: -1px;
+          left: 50%;
+          background: #fff;
+          border-radius: 2px;
+          transform: translate(-50%, -50%);
+          filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));
+        }
+        .sb-glint::before { width: 9px; height: 1.6px; }
+        .sb-glint::after { width: 1.6px; height: 9px; }
+        @keyframes sb-glint-twinkle {
+          0%, 100% { opacity: 0; }
+          50% { opacity: var(--glint-max, 0.6); }
         }
         .sb-comet {
           position: absolute;
@@ -971,8 +1122,8 @@ export function SolitBorder({
           animation: sb-orn-float 3s ease-in-out infinite;
         }
         @keyframes sb-orn-float {
-          0%, 100% { transform: translate(-50%, -52%) rotate(-5deg); }
-          50% { transform: translate(-50%, -66%) rotate(5deg); }
+          0%, 100% { transform: translate(-50%, -52%) rotate(-5deg) scale(1); }
+          50% { transform: translate(-50%, -66%) rotate(5deg) scale(1.12); }
         }
 
         @keyframes sb-spin {
@@ -1272,14 +1423,23 @@ export function SolitBorder({
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .sb-ring > .sb-bg,
+          .sb-bg-wrap,
+          .sb-bg-wrap > .sb-bg,
           .sb-bg-counter,
+          .sb-facets,
+          .sb-aura-wrap,
+          .sb-aura-bg,
+          .sb-trace,
           .sb-pulse-ring,
           .sb-shimmer::after,
+          .sb-shimmer-bold::after,
+          .sb-shimmer-dual::before,
           .sb-particle,
+          .sb-glint,
           .sb-comet,
           .sb-burst,
-          .sb-ring-jitter {
+          .sb-ring-jitter,
+          .sb-orn {
             animation: none !important;
           }
         }
