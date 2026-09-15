@@ -1023,7 +1023,7 @@ export default function PengajuanDanaPage() {
                         </td>
 
                         <td className="px-4 py-4 text-center">
-                          {(row.requester_id === userId || userRoles.includes("ADMIN") || userRoles.includes("PROGRAMMER")) && !row.is_executed ? (
+                          {userRoles.includes("ADMIN") && !row.is_executed ? (
                             <button
                               type="button"
                               onClick={() => setEditMetodeTarget(row)}
@@ -1184,10 +1184,7 @@ export default function PengajuanDanaPage() {
         <DetailModal
           fundRequest={detailTarget}
           onClose={() => setDetailTarget(null)}
-          canEditMetode={
-            (detailTarget.requester_id === userId || userRoles.includes("ADMIN") || userRoles.includes("PROGRAMMER")) &&
-            !detailTarget.is_executed
-          }
+          canEditMetode={userRoles.includes("ADMIN") && !detailTarget.is_executed}
           onEditMetode={() => {
             setEditMetodeTarget(detailTarget);
             setDetailTarget(null);

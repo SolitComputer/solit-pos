@@ -146,24 +146,24 @@ export async function PATCH(
   }
 
   // ── Update Metode Pembayaran (Cash/Saldo) ─────────────────────────────────────
-  // Hanya requester sendiri atau ADMIN/PROGRAMMER, dan hanya sebelum dieksekusi.
+  // Hanya role ADMIN yang boleh mengubah, dan hanya sebelum dieksekusi.
   // Kebutuhan & Nominal SENGAJA tidak bisa diubah lewat action ini.
   if (action === "update_payment_method") {
-    const isAdminOrProgrammer = roles.some((r) => ["ADMIN", "PROGRAMMER"].includes(r));
+    if (!roles.includes("ADMIN")) {
+      return NextResponse.json(
+        { success: false, message: "Hanya Admin yang bisa mengubah metode pembayaran" },
+        { status: 403 }
+      );
+    }
 
     const { data: existing, error: fetchErr } = await supabase
       .from("fund_requests")
-      .select("requester_id, is_executed")
+      .select("is_executed")
       .eq("id", id)
       .single();
 
     if (fetchErr || !existing) {
       return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
-    }
-
-    const isOwner = existing.requester_id === userId;
-    if (!isAdminOrProgrammer && !isOwner) {
-      return NextResponse.json({ success: false, message: "Anda tidak memiliki wewenang" }, { status: 403 });
     }
 
     if (existing.is_executed) {
