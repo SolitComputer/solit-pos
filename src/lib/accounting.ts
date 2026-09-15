@@ -244,6 +244,31 @@ export function cashflowKeterangan(e: {
   return `${label} · ${detail}`;
 }
 
+/**
+ * Akun modal (HPP dan lawan modal keluar) berdasarkan jenis penjualan:
+ * - Penjualan Aksesoris (420 murni, tanpa laptop): Beban = 450 (Biaya Printilan Barang), Kredit = 170 (Aksesoris)
+ * - Penjualan Laptop / Lainnya: Beban = 440 (Modal Keluar Sold), Kredit = 130 (HPP Modal)
+ */
+export function getModalAccountsForEntry(lines: { account_code: string }[]): {
+  debitAccount: string;
+  kreditAccount: string;
+} {
+  const hasAccessoryRevenue = lines.some((l) => l.account_code === AKUN.PENJUALAN_AKSESORIS);
+  const hasLaptopRevenue = lines.some((l) => l.account_code === AKUN.PENJUALAN_LAPTOP);
+
+  if (hasAccessoryRevenue && !hasLaptopRevenue) {
+    return {
+      debitAccount: AKUN.BIAYA_PRINTILAN, // 450
+      kreditAccount: AKUN.AKSESORIS,        // 170
+    };
+  }
+
+  return {
+    debitAccount: AKUN.MODAL_KELUAR,       // 440
+    kreditAccount: AKUN.HPP,                // 130
+  };
+}
+
 export interface DraftLine {
   account_code: string;
   side: JournalSide;
