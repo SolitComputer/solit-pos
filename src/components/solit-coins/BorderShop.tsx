@@ -164,7 +164,7 @@ export default function BorderShop() {
                     }`}
                   >
                     <div className="py-2.5 flex items-center justify-center">
-                      <SolitBorder style={b.style} thickness={3} ornamentSize={16}>
+                      <SolitBorder style={b.style} thickness={3} ornamentSize={16} lite>
                         <span className="w-12 h-12 rounded-full ring-1 ring-white/50 bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 overflow-hidden shadow-sm">
                           {me.photo ? (
                             // eslint-disable-next-line @next/next/no-img-element
