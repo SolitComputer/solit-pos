@@ -348,6 +348,7 @@ export function SolitBorder({
   className = "",
   ornament = true,
   ornamentSize = 18,
+  lite = false,
   children,
 }: {
   style?: BorderStyle | null;
@@ -357,6 +358,14 @@ export function SolitBorder({
   ornament?: boolean;
   /** Ukuran ornamen (px). */
   ornamentSize?: number;
+  /**
+   * Mode ringan — matiin layer mahal (blur, mix-blend-mode, banyak
+   * elemen partikel/sparkle sekaligus) yang bedanya nyaris gak kelihatan
+   * di ukuran kecil. Pakai di grid katalog (banyak border dirender
+   * bersamaan) biar scroll HP gak patah-patah; JANGAN pakai di preview
+   * besar (cuma 1 border, biaya render-nya kecil).
+   */
+  lite?: boolean;
   children: React.ReactNode;
 }) {
   const isAnimated = style?.kind === "animated";
@@ -871,32 +880,34 @@ export function SolitBorder({
       className={`sb-ring ${className}`}
       style={{ padding: thickness, "--accent": accent } as React.CSSProperties}
     >
-      <span className="sb-aura-wrap" style={{ "--aura-max": auraOpacity } as React.CSSProperties} aria-hidden="true">
-        <span className={`sb-aura-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
-      </span>
-      {hasBurst && <span className="sb-burst" aria-hidden="true" />}
-      {hasPulse && <span className="sb-pulse-ring" aria-hidden="true" />}
-      {fx === "limited" && (
+      {!lite && (
+        <span className="sb-aura-wrap" style={{ "--aura-max": auraOpacity } as React.CSSProperties} aria-hidden="true">
+          <span className={`sb-aura-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
+        </span>
+      )}
+      {!lite && hasBurst && <span className="sb-burst" aria-hidden="true" />}
+      {!lite && hasPulse && <span className="sb-pulse-ring" aria-hidden="true" />}
+      {!lite && fx === "limited" && (
         <span className={`sb-pulse-ring sb-pulse-ring-2 ${isJittery ? "sb-ring-jitter" : ""}`} aria-hidden="true" />
       )}
       <span className="sb-bg-wrap" aria-hidden="true">
         <span className={`sb-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
-        {hasCounterRing && (
+        {!lite && hasCounterRing && (
           <span className={`sb-bg sb-bg-counter ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
         )}
-        <span className="sb-facets" aria-hidden="true" />
+        {!lite && <span className="sb-facets" aria-hidden="true" />}
         <span className="sb-bevel" aria-hidden="true" />
-        {isCodeTerminal && <span className="sb-circuit" aria-hidden="true" />}
+        {!lite && isCodeTerminal && <span className="sb-circuit" aria-hidden="true" />}
       </span>
-      {hasTrace && <span className="sb-trace" style={{ animationDuration: traceSpeed }} aria-hidden="true" />}
-      {hasShimmer && (
+      {!lite && hasTrace && <span className="sb-trace" style={{ animationDuration: traceSpeed }} aria-hidden="true" />}
+      {!lite && hasShimmer && (
         <span
           className={`sb-shimmer ${shimmerBold ? "sb-shimmer-bold" : ""} ${dualBeam ? "sb-shimmer-dual" : ""}`}
           aria-hidden="true"
         />
       )}
-      {hasComet && <span className="sb-comet" aria-hidden="true" />}
-      {isCodeTerminal && (
+      {!lite && hasComet && <span className="sb-comet" aria-hidden="true" />}
+      {!lite && isCodeTerminal && (
         <>
           <span className="sb-scanline" aria-hidden="true" />
           <span className="sb-cursor" aria-hidden="true" />
@@ -914,7 +925,7 @@ export function SolitBorder({
           </span>
         </>
       )}
-      {isSakura && (
+      {!lite && isSakura && (
         <span className="sb-petals" aria-hidden="true">
           <span className="sb-petal sb-petal-1" />
           <span className="sb-petal sb-petal-2" />
@@ -924,15 +935,15 @@ export function SolitBorder({
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
         <span
-          className={`sb-orn ${fx === "legendary" || fx === "limited" || isCodeTerminal ? "sb-orn-glow" : ""} ${
-            isCodeTerminal ? "sb-orn-type" : ""
-          } ${isButterfly ? "sb-orn-flutter" : ""}`}
+          className={`sb-orn ${
+            !lite && (fx === "legendary" || fx === "limited" || isCodeTerminal) ? "sb-orn-glow" : ""
+          } ${!lite && isCodeTerminal ? "sb-orn-type" : ""} ${!lite && isButterfly ? "sb-orn-flutter" : ""}`}
           aria-hidden="true"
         >
           {orn(ornamentSize)}
         </span>
       )}
-      {hasParticles && (
+      {!lite && hasParticles && (
         <span className="sb-particles" aria-hidden="true">
           <span className="sb-particle sb-particle-1" />
           {particleCount >= 2 && <span className="sb-particle sb-particle-2" />}
@@ -940,13 +951,18 @@ export function SolitBorder({
           {particleCount >= 4 && <span className="sb-particle sb-particle-4" />}
         </span>
       )}
-      <span className="sb-glints" aria-hidden="true">
-        <span className="sb-glint" style={{ "--glint-rot": "35deg", "--glint-max": glintOpacity } as React.CSSProperties} />
-        <span
-          className="sb-glint"
-          style={{ "--glint-rot": "215deg", "--glint-max": glintOpacity, animationDelay: "1.4s" } as React.CSSProperties}
-        />
-      </span>
+      {!lite && (
+        <span className="sb-glints" aria-hidden="true">
+          <span
+            className="sb-glint"
+            style={{ "--glint-rot": "35deg", "--glint-max": glintOpacity } as React.CSSProperties}
+          />
+          <span
+            className="sb-glint"
+            style={{ "--glint-rot": "215deg", "--glint-max": glintOpacity, animationDelay: "1.4s" } as React.CSSProperties}
+          />
+        </span>
+      )}
       <style jsx global>{`
         .sb-ring {
           position: relative;
