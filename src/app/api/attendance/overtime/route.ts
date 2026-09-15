@@ -74,12 +74,15 @@ const PAY_VIEW_ROLES = [
   "KEPALA_PENGELOLA_BARANG",
 ];
 
-function isHolidayOvertimeLate(overtime: {
-  is_late?: boolean | null;
-  requested_start?: string | null;
-  actual_start?: string | null;
-  scheduled_start?: string | null;
-}): boolean {
+function isHolidayOvertimeLate(
+  overtime: {
+    is_late?: boolean | null;
+    requested_start?: string | null;
+    actual_start?: string | null;
+    scheduled_start?: string | null;
+  },
+  lateThresholdMinutes: number = 8 * 60 // fallback lama, cuma dipakai kalau schedule gagal diambil
+): boolean {
   if (overtime.is_late === true) return true;
   if (overtime.is_late === false) return false;
   const timeStr = overtime.requested_start ?? overtime.actual_start ?? overtime.scheduled_start;
@@ -87,11 +90,11 @@ function isHolidayOvertimeLate(overtime: {
   if (timeStr.includes("T")) {
     const w = new Date(new Date(timeStr).getTime() + 7 * 60 * 60 * 1000);
     const totalMin = w.getUTCHours() * 60 + w.getUTCMinutes();
-    return totalMin >= 8 * 60;
+    return totalMin >= lateThresholdMinutes;
   }
   const [h, m] = String(timeStr).split(":").map(Number);
   if (Number.isNaN(h)) return false;
-  return h * 60 + (m || 0) >= 8 * 60;
+  return h * 60 + (m || 0) >= lateThresholdMinutes;
 }
 
 const HOLIDAY_OVERTIME_PAY = { LATE: 50000, ON_TIME: 100000 } as const;
@@ -421,11 +424,16 @@ export async function POST(request: Request) {
 
       let minutes = 0, actualStart = "", actualEnd = "";
 
+      let holidayIsLateSelfDeclare = false;
       if (declare_direction === "HOLIDAY") {
         if (!isDayOffToday) return NextResponse.json({ success: false, message: "Hari ini bukan hari libur kamu." }, { status: 400 });
         if (!todayOut) return NextResponse.json({ success: false, message: "Belum ada absen pulang hari ini." }, { status: 400 });
         minutes = computeHolidayOvertimeMinutes(effectiveTodayIn.created_at, todayOut.created_at);
         actualStart = effectiveTodayIn.created_at; actualEnd = todayOut.created_at;
+        const wibInMoment = new Date(new Date(effectiveTodayIn.created_at).getTime() + 7 * 60 * 60 * 1000);
+        const inMinutes = wibInMoment.getUTCHours() * 60 + wibInMoment.getUTCMinutes();
+        const lateThresholdMinutes = schedule.lateFrom.h * 60 + schedule.lateFrom.m;
+        holidayIsLateSelfDeclare = inMinutes >= lateThresholdMinutes;
       } else {
         if (isDayOffToday) return NextResponse.json({ success: false, message: "Hari ini hari libur — ajukan sebagai kategori Hari Libur." }, { status: 400 });
         const beforeIn = computeBeforeInOvertimeMinutes(effectiveTodayIn.created_at, schedule);
@@ -458,6 +466,16 @@ export async function POST(request: Request) {
 
       if (!created) {
         return NextResponse.json({ success: false, message: "Gagal menyimpan pengajuan lembur." }, { status: 500 });
+      }
+
+      if (declare_direction === "HOLIDAY" && created.id) {
+        const { data: createdWithLate } = await supabase
+          .from("overtime_requests")
+          .update({ is_late: holidayIsLateSelfDeclare })
+          .eq("id", created.id)
+          .select()
+          .single();
+        return NextResponse.json({ success: true, data: createdWithLate ?? created });
       }
 
       return NextResponse.json({ success: true, data: created });
@@ -582,7 +600,18 @@ export async function POST(request: Request) {
       let manualIsLate = false;
       if (is_holiday === true) {
         const [lh, lm] = String(actual_start_time).split(":").map(Number);
-        manualIsLate = !Number.isNaN(lh) && (lh * 60 + (lm || 0)) >= 8 * 60;
+        if (!Number.isNaN(lh)) {
+          const manualBaseSchedule = await resolveShiftConfigFromDB(target_user_id, supabase);
+          const manualScheduleOverride = await resolveScheduleOverride(supabase, target_user_id, request_date);
+          const manualOverrideShape = manualScheduleOverride ? toAuthScheduleShape(manualScheduleOverride) : null;
+          const manualSchedule = manualOverrideShape
+            ? { ...manualBaseSchedule, ...manualOverrideShape, checkout: manualOverrideShape.checkout ?? manualBaseSchedule.checkout }
+            : manualBaseSchedule;
+          const manualLateThresholdMinutes = manualSchedule?.lateFrom
+            ? manualSchedule.lateFrom.h * 60 + manualSchedule.lateFrom.m
+            : 8 * 60;
+          manualIsLate = (lh * 60 + (lm || 0)) >= manualLateThresholdMinutes;
+        }
       }
 
       const insertStatus = proof_photo_url ? "COMPLETED" : "NEED_PROOF";
@@ -822,7 +851,18 @@ export async function PATCH(request: Request) {
       const isPKL = isPKLRole(targetUser?.role);
 
       if (overtime.is_holiday === true) {
-        const late = isHolidayOvertimeLate(overtime);
+        // Fallback ini cuma kepakai kalau is_late di DB masih null (data lama
+        // sebelum fix ini) — sekarang pakai jadwal, bukan jam 08:00 tetap.
+        const auditBaseSchedule = await resolveShiftConfigFromDB(overtime.user_id, supabase);
+        const auditScheduleOverride = await resolveScheduleOverride(supabase, overtime.user_id, overtime.request_date);
+        const auditOverrideShape = auditScheduleOverride ? toAuthScheduleShape(auditScheduleOverride) : null;
+        const auditSchedule = auditOverrideShape
+          ? { ...auditBaseSchedule, ...auditOverrideShape, checkout: auditOverrideShape.checkout ?? auditBaseSchedule.checkout }
+          : auditBaseSchedule;
+        const holidayLateThresholdMinutes = auditSchedule?.lateFrom
+          ? auditSchedule.lateFrom.h * 60 + auditSchedule.lateFrom.m
+          : 8 * 60;
+        const late = isHolidayOvertimeLate(overtime, holidayLateThresholdMinutes);
         const holidayPay = isPKL
           ? (late ? PKL_HOLIDAY_OVERTIME_PAY.LATE : PKL_HOLIDAY_OVERTIME_PAY.ON_TIME)
           : (late ? HOLIDAY_OVERTIME_PAY.LATE : HOLIDAY_OVERTIME_PAY.ON_TIME);
@@ -1193,6 +1233,29 @@ export async function PATCH(request: Request) {
       }
       if (durationMins !== undefined) updatePayload.duration_minutes = durationMins;
       if (computedPay !== undefined) updatePayload.total_pay = Math.round(computedPay);
+
+      // ✅ FIX (poin 1): lembur hari libur yang dikoreksi jam/tanggalnya lewat
+      // Edit dihitung ulang status "telat"-nya sesuai jadwal shift — SELAMA
+      // belum diaudit. Kalau sudah AUDITED, nominal & status telat dibiarkan
+      // terkunci (harus di-un-audit dulu kalau memang perlu dikoreksi lagi).
+      if (
+        overtime.is_holiday === true &&
+        overtime.audit_status !== "AUDITED" &&
+        (newActualStart !== undefined || newDate !== undefined) &&
+        resolvedStart
+      ) {
+        const effectiveDateForSchedule = newDate ?? overtime.request_date;
+        const updBaseSchedule = await resolveShiftConfigFromDB(overtime.user_id, supabase);
+        const updScheduleOverride = await resolveScheduleOverride(supabase, overtime.user_id, effectiveDateForSchedule);
+        const updOverrideShape = updScheduleOverride ? toAuthScheduleShape(updScheduleOverride) : null;
+        const updSchedule = updOverrideShape
+          ? { ...updBaseSchedule, ...updOverrideShape, checkout: updOverrideShape.checkout ?? updBaseSchedule.checkout }
+          : updBaseSchedule;
+        const updLateThresholdMinutes = updSchedule?.lateFrom
+          ? updSchedule.lateFrom.h * 60 + updSchedule.lateFrom.m
+          : 8 * 60;
+        updatePayload.is_late = isHolidayOvertimeLate({ requested_start: resolvedStart }, updLateThresholdMinutes);
+      }
 
       const { data, error } = await supabase
         .from("overtime_requests")

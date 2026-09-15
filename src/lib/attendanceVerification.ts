@@ -56,7 +56,7 @@ export type AttendanceOutcome =
   };
 
 export async function processAttendanceVerification(p: ProcessAttendanceParams): Promise<AttendanceOutcome> {
- const { supabaseAdmin, userId } = p;
+  const { supabaseAdmin, userId } = p;
   const nowISO = p.overrideNowISO ?? new Date().toISOString();
   // ✅ FIX: "hari ini" sekarang ikut cutoff jam 04:00 WIB, bukan tengah
   // malam — jam 00:00–03:59 WIB masih dianggap kelanjutan hari kemarin
@@ -243,6 +243,7 @@ export async function createOvertimeDraft(
   args: {
     userId: string; requestDate: string; direction: OvertimeDirection; minutes: number;
     actualStart: string; actualEnd: string; sourceFaceVerificationId: string; isHoliday: boolean;
+    lateThresholdMinutes?: number;
   }
 ): Promise<{ id: string; minutes: number; direction: OvertimeDirection } | null> {
   // ✅ FIX: kolom `reason` di tabel overtime_requests itu NOT NULL, tapi
@@ -264,7 +265,9 @@ export async function createOvertimeDraft(
   const isLateForHoliday = args.direction === "HOLIDAY" && (() => {
     const wib = new Date(new Date(args.actualStart).getTime() + 7 * 3600_000);
     const totalMin = wib.getUTCHours() * 60 + wib.getUTCMinutes();
-    return totalMin >= 8 * 60;
+    // ✅ FIX (poin 1): dulu hardcode jam 08:00, sekarang ikut jam telat
+    // shift masing-masing karyawan (dikirim via lateThresholdMinutes).
+    return totalMin >= (args.lateThresholdMinutes ?? 8 * 60);
   })();
 
   const { data, error } = await supabaseAdmin
@@ -280,7 +283,7 @@ export async function createOvertimeDraft(
       actual_start: args.actualStart,
       actual_end: args.actualEnd,
       is_holiday: args.isHoliday,
-      is_late: args.direction === "HOLIDAY" ? isLateForHoliday : false, 
+      is_late: args.direction === "HOLIDAY" ? isLateForHoliday : false,
       source_face_verification_id: args.sourceFaceVerificationId,
     })
     .select("id").single();
