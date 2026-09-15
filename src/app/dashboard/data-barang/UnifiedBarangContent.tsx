@@ -452,9 +452,7 @@ export default function UnifiedBarangContent() {
     // Input tetap responsif karena `search` langsung update, tapi proses filter
     // yang berat memakai nilai yang ditunda — ketikan tidak lagi tersendat.
     const deferredSearch = useDeferredValue(search);
-    // Jumlah baris yang benar-benar dirender. Sisanya menyusul lewat tombol
-    // "Muat lebih banyak" — DOM tetap ringan berapa pun jumlah barangnya.
-    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
     const isDesktop = useIsDesktop();
     const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
@@ -763,8 +761,8 @@ export default function UnifiedBarangContent() {
 
         // 8. Urutkan Data (Sorting)
         return [...list].sort((a, b) => {
-            if (sortBy === "NAMA_ASC") return a.nama.localeCompare(b.nama, "id-ID");
-            if (sortBy === "NAMA_DESC") return b.nama.localeCompare(a.nama, "id-ID");
+            if (sortBy === "NAMA_ASC") return a.nama.trim().localeCompare(b.nama.trim(), "id-ID", { sensitivity: "base", numeric: true });
+            if (sortBy === "NAMA_DESC") return b.nama.trim().localeCompare(a.nama.trim(), "id-ID", { sensitivity: "base", numeric: true });
             if (sortBy === "HARGA_DESC") return (b.harga_jual || 0) - (a.harga_jual || 0);
             if (sortBy === "HARGA_ASC") return (a.harga_jual || 0) - (b.harga_jual || 0);
             if (sortBy === "STOK_DESC") {
@@ -786,19 +784,9 @@ export default function UnifiedBarangContent() {
         });
     }, [rows, tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, deferredSearch, categories, sortBy]);
 
-    // Potong daftar yang dirender. Export Excel & angka total tetap memakai
-    // filteredRows penuh, jadi tidak ada data yang hilang — hanya tampilannya
-    // yang dicicil.
-    const visibleRows = useMemo(() => filteredRows.slice(0, visibleCount), [filteredRows, visibleCount]);
-    const hasMore = filteredRows.length > visibleRows.length;
-
-    // Balik ke halaman awal HANYA saat kriteria filter/pencarian/sort berubah.
-    // SENGAJA tidak bergantung ke `filteredRows` — reference-nya ikut berubah
-    // tiap kali `rows` berubah (toggle Audit/SO, edit, hapus, fetch ulang),
-    // padahal itu bukan alasan buat reset progres "Muat lebih banyak".
-    useEffect(() => {
-        setVisibleCount(PAGE_SIZE);
-    }, [tipeFilter, kategoriFilter, brandFilter, stokFilter, minPrice, maxPrice, statusAuditSoFilter, deferredSearch, sortBy]);
+    // Semua barang yang lolos filter langsung dirender sekaligus — tidak ada
+    // lagi pemotongan/pagination "Muat lebih banyak".
+    const visibleRows = filteredRows;
 
     const counts = useMemo(() => ({
         total: rows.length,
@@ -1715,16 +1703,11 @@ export default function UnifiedBarangContent() {
                                         </div>
                                     );
                                 })}
-                                {hasMore && (
-                                    <button
-                                        onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
-                                        className="w-full h-10 rounded-xl text-xs font-semibold text-zinc-700 bg-white border border-zinc-200 hover:bg-zinc-50 transition">
-                                        Muat {Math.min(PAGE_SIZE, filteredRows.length - visibleRows.length)} barang lagi
-                                    </button>
-                                )}
+
                                 <p className="text-center text-xs text-zinc-400 pt-1">
-                                    <span className="text-zinc-700 font-bold">{visibleRows.length}</span> dari {filteredRows.length} barang ditampilkan
+                                    <span className="text-zinc-700 font-bold">{filteredRows.length}</span> barang ditampilkan
                                 </p>
+
                             </div>
                             )}
 
@@ -1879,15 +1862,8 @@ export default function UnifiedBarangContent() {
                                 </div>
                                 <div className="px-5 py-3 border-t border-zinc-100 bg-zinc-50/60 text-xs text-zinc-400 flex items-center justify-between gap-3">
                                     <span>
-                                        <span className="text-zinc-700 font-bold">{visibleRows.length}</span> dari {filteredRows.length} barang ditampilkan
+                                        <span className="text-zinc-700 font-bold">{filteredRows.length}</span> barang ditampilkan
                                     </span>
-                                    {hasMore && (
-                                        <button
-                                            onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
-                                            className="h-8 px-3 rounded-lg text-[11px] font-semibold text-zinc-700 bg-white border border-zinc-200 hover:bg-zinc-100 transition">
-                                            Muat lebih banyak
-                                        </button>
-                                    )}
                                 </div>
                             </div>
                             )}
@@ -2133,10 +2109,6 @@ export default function UnifiedBarangContent() {
 }
 
 const inputCls = "w-full h-10 border border-zinc-200 rounded-xl px-3 text-sm bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500/20 focus:border-zinc-400";
-
-// Berapa baris yang dirender per "halaman". 50 aman untuk HP kelas menengah;
-// naikkan kalau semua perangkat penggunanya kencang.
-const PAGE_SIZE = 50;
 
 // Class tombol aksi di kartu MOBILE. Kuncinya: w-full + h-8 tetap, teks
 // di-truncate. Tanpa ini tombol melebar mengikuti panjang labelnya ("Kelola
