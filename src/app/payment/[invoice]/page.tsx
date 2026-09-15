@@ -1466,11 +1466,22 @@ export default function EditTransactionPage() {
                   onChange={handleChange}
                   className={selectCls}
                 >
-                  {["PAID", "PENDING", "FAILED", "CANCELLED"].map((s) => (
-                    <option key={s} value={s}>
-                      {s}
+                  {[
+                    { val: "PAID", label: "PAID (Lunas)" },
+                    { val: "HELD", label: "HELD (Ambil Dulu)" },
+                    { val: "RESERVED", label: "RESERVED (DP / Booking)" },
+                    { val: "PACKING", label: "PACKING (E-Commerce)" },
+                    { val: "PENDING", label: "PENDING (Menunggu)" },
+                    { val: "CANCELLED", label: "CANCELLED (Batal)" },
+                    { val: "FAILED", label: "FAILED (Gagal)" },
+                  ].map((s) => (
+                    <option key={s.val} value={s.val}>
+                      {s.label}
                     </option>
                   ))}
+                  {formData.status && !["PAID", "HELD", "RESERVED", "PACKING", "PENDING", "CANCELLED", "FAILED"].includes(formData.status) && (
+                    <option value={formData.status}>{formData.status}</option>
+                  )}
                 </select>
               </Field>
 
