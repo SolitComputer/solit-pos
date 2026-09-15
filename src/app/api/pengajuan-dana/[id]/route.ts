@@ -25,7 +25,7 @@ export async function PATCH(
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { action?: string };
+  let body: { action?: string; payment_method?: string };
   try {
     body = await request.json();
   } catch {
@@ -143,6 +143,69 @@ export async function PATCH(
       { success: false, message: "Eksekusi tidak bisa dibatalkan setelah dilakukan" },
       { status: 400 }
     );
+  }
+
+  // ── Update Metode Pembayaran (Cash/Saldo) ─────────────────────────────────────
+  // Hanya role ADMIN yang boleh mengubah. Boleh kapan saja, termasuk setelah
+  // status Selesai — tapi kalau sudah pernah direalisasi (ada entry Cashflow
+  // terkait), entry itu ikut di-update juga supaya tetap sinkron, kecuali
+  // entry-nya sudah diaudit (sama seperti aturan edit realisasi biasa).
+  if (action === "update_payment_method") {
+    if (!roles.includes("ADMIN")) {
+      return NextResponse.json(
+        { success: false, message: "Hanya Admin yang bisa mengubah metode pembayaran" },
+        { status: 403 }
+      );
+    }
+
+    const { data: existing, error: fetchErr } = await supabase
+      .from("fund_requests")
+      .select("realisasi_cashflow_id")
+      .eq("id", id)
+      .single();
+
+    if (fetchErr || !existing) {
+      return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+    }
+
+    const newMethod = body.payment_method === "SALDO" ? "SALDO" : "CASH";
+
+    if (existing.realisasi_cashflow_id) {
+      const { data: cfEntry } = await supabase
+        .from("cashflow_entries")
+        .select("is_audited")
+        .eq("id", existing.realisasi_cashflow_id)
+        .single();
+
+      if (cfEntry?.is_audited) {
+        return NextResponse.json(
+          { success: false, message: "Entry cashflow sudah diaudit dan tidak bisa diubah. Batalkan status audit terlebih dahulu." },
+          { status: 400 }
+        );
+      }
+
+      const { error: cfUpdateErr } = await supabase
+        .from("cashflow_entries")
+        .update({ payment_method: newMethod })
+        .eq("id", existing.realisasi_cashflow_id);
+
+      if (cfUpdateErr) {
+        return NextResponse.json({ success: false, message: cfUpdateErr.message }, { status: 500 });
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({ payment_method: newMethod })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
   }
 
   return NextResponse.json({ success: false, message: "Action tidak valid" }, { status: 400 });
