@@ -1723,7 +1723,13 @@ function TodayAttendanceCard({ status, loading, onRefresh, onRequestEarlyCheckou
                 icon: <Umbrella className="w-6 h-6 text-orange-600" />, gradient: "from-orange-50 to-amber-50", iconBg: "bg-orange-100",
                 badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-400",
                 badgeText: "Hari Libur", title: "Kamu Libur Hari Ini",
-                sub: "Tidak perlu absen", showBtn: false,
+                // ✅ FIX (poin 2): dulu cuma info statis tanpa aksi. Sekarang ada
+                // tombol supaya karyawan bisa langsung pilih tetap absen (lembur).
+                sub: "Tidak wajib absen — kalau tetap masuk, jam kerjamu dihitung lembur penuh",
+                showBtn: true,
+                btnLabel: "Tetap Absen (Lembur) →",
+                btnColor: "bg-gradient-to-r from-purple-500 to-purple-700",
+                btnAction: goAbsen,
             };
             break;
         case "TOO_EARLY":

@@ -975,6 +975,23 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const [submitting, setSubmitting] = useState(false), [error, setError] = useState("");
   const [isHolidayOvertime, setIsHolidayOvertime] = useState(false);
   const [manualPay, setManualPay] = useState<string>("");
+  // ✅ NEW (poin 1) — jam telat buat preview lembur hari libur ikut
+  // shift-config karyawan yang dipilih, bukan jam 08:00 tetap.
+  const [targetLateThreshold, setTargetLateThreshold] = useState<{ h: number; m: number }>({ h: 8, m: 0 });
+
+  useEffect(() => {
+    if (!targetUserId) return;
+    let cancelled = false;
+    fetch(`/api/attendance/shift-config?user_id=${targetUserId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!cancelled && d.success && d.data) {
+          setTargetLateThreshold({ h: d.data.late_hour ?? 8, m: d.data.late_minute ?? 0 });
+        }
+      })
+      .catch(() => { /* biarkan default 08:00 kalau gagal fetch */ });
+    return () => { cancelled = true; };
+  }, [targetUserId]);
 
   const userRoles = useMemo<string[]>(
     () => Array.isArray(currentUser?.roles) && currentUser.roles.length > 0
@@ -1015,10 +1032,14 @@ function ManualOvertimeModal({ onClose, onSaved, allUsers, currentUser }: { onCl
   const selectedUser = useMemo(() => allUsers.find(u => u.id === targetUserId), [allUsers, targetUserId]);
   const isTargetPkl = isPKLRole(selectedUser?.role);
 
-  const holidayIsLate = useMemo(
-    () => isHolidayOvertime && detectLateFromTime(startTime),
-    [isHolidayOvertime, startTime]
-  );
+  const holidayIsLate = useMemo(() => {
+    if (!isHolidayOvertime || !startTime) return false;
+    const [sh, sm] = startTime.split(":").map(Number);
+    if (Number.isNaN(sh)) return false;
+    const startMinutes = sh * 60 + (sm || 0);
+    const thresholdMinutes = targetLateThreshold.h * 60 + targetLateThreshold.m;
+    return startMinutes >= thresholdMinutes;
+  }, [isHolidayOvertime, startTime, targetLateThreshold]);
 
   const holidayAutoPay = useMemo(
     () => (isHolidayOvertime ? (isTargetPkl ? (holidayIsLate ? 25000 : 50000) : (holidayIsLate ? 50000 : 100000)) : null),

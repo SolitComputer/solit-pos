@@ -65,9 +65,8 @@ function formatOvertimeTimestamp(row: OvertimeTableRow): string {
   return `${s} – ${e} WIB`;
 }
 
-function detectLateFromTimeStr(timeStr: string | null | undefined): boolean {
+function detectLateFromTimeStr(timeStr: string | null | undefined, lateThresholdMinutes: number = 8 * 60): boolean {
   if (!timeStr) return false;
-  const LATE_THRESHOLD = 8 * 60;
   let totalMin: number;
   if (timeStr.includes("T")) {
     const w = new Date(new Date(timeStr).getTime() + 7 * 60 * 60 * 1000);
@@ -77,7 +76,7 @@ function detectLateFromTimeStr(timeStr: string | null | undefined): boolean {
     if (Number.isNaN(h)) return false;
     totalMin = h * 60 + (m || 0);
   }
-  return totalMin >= LATE_THRESHOLD;
+  return totalMin >= lateThresholdMinutes;
 }
 
 const COLOR_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
@@ -219,8 +218,8 @@ export function OvertimeTable({
             key={tab.key}
             onClick={() => setAuditFilter(tab.key)}
             className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-colors ${auditFilter === tab.key
-                ? "bg-zinc-900 text-white border-zinc-900"
-                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
+              ? "bg-zinc-900 text-white border-zinc-900"
+              : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
               }`}
           >
             {tab.label}
@@ -280,7 +279,20 @@ export function OvertimeTable({
                     <td className="px-4 py-3">
                       <p className="font-mono text-xs font-bold text-gray-700">{fmtTime(o.actual_start)} – {fmtTime(o.actual_end)}</p>
                       <p className="text-[10px] text-gray-400">{formatOvertimeMinutes(o.duration_minutes)}</p>
-                      <span className={`inline-flex items-center gap-1 mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${style.bg} ${style.text} ${style.border}`}>{style.label}</span>
+                      <div className="flex items-center gap-1 flex-wrap mt-1">
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${style.bg} ${style.text} ${style.border}`}>{style.label}</span>
+                        {/* ✅ NEW (poin 3) — tanda lembur hari libur, otomatis maupun manual */}
+                        {o.is_holiday && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200">
+                            Lembur Libur
+                          </span>
+                        )}
+                        {o.is_holiday && (o.is_late === true || (o.is_late == null && detectLateFromTimeStr(o.requested_start ?? o.actual_start))) && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
+                            Terlambat
+                          </span>
+                        )}
+                      </div>
                       {o.audit_status === "AUDITED" && o.total_pay != null && (
                         <p className="text-[11px] font-black text-emerald-700 mt-1">{formatRupiah(o.total_pay)}</p>
                       )}
@@ -305,10 +317,24 @@ export function OvertimeTable({
                         {canAccThis && <button disabled={isBusy} onClick={() => setRejectModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50">Tolak</button>}
                         {canUploadProof && <button onClick={() => setDetailModalRow(o)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100">Upload Bukti</button>}
                         {canAuditThis && (
-                          <button disabled={isBusy} onClick={() => {
+                          <button disabled={isBusy} onClick={async () => {
                             const isTargetPkl = isPKLRole(o.users?.role);
                             if (o.is_holiday) {
-                              const isLate = o.is_late === true || (o.is_late == null && detectLateFromTimeStr(o.requested_start ?? o.actual_start));
+                              // Kalau is_late sudah tersimpan benar (data baru setelah fix
+                              // ini), pakai langsung. Kalau masih null (data lama), baru
+                              // ambil late_hour dari shift-config karyawan ini supaya
+                              // preview di dialog konsisten dengan yang dihitung server.
+                              let isLate = o.is_late === true;
+                              if (o.is_late == null) {
+                                try {
+                                  const cfgRes = await fetch(`/api/attendance/shift-config?user_id=${o.user_id}`);
+                                  const cfgData = await cfgRes.json();
+                                  const thresholdMinutes = (cfgData?.data?.late_hour ?? 8) * 60 + (cfgData?.data?.late_minute ?? 0);
+                                  isLate = detectLateFromTimeStr(o.requested_start ?? o.actual_start, thresholdMinutes);
+                                } catch {
+                                  isLate = detectLateFromTimeStr(o.requested_start ?? o.actual_start);
+                                }
+                              }
                               const holidayPay = isTargetPkl ? (isLate ? 25000 : 50000) : (isLate ? 50000 : 100000);
                               if (confirm(`Audit lemburan hari libur ${o.users?.name}?\n\nStatus: ${isLate ? "Terlambat" : "Tepat Waktu"} — nominal terkunci ${formatRupiah(holidayPay)} (aturan tetap ${isTargetPkl ? "PKL" : "karyawan"}).`)) {
                                 runAction(o.id, { action: "AUDIT", decision: "APPROVE", total_pay: holidayPay, rate_per_hour: null });
