@@ -206,6 +206,11 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
       <circle cx="12" cy="12" r="2" fill="#0f172a" />
     </svg>
   ),
+  "code-terminal": (s) => (
+    <svg {...svgProps(s)}>
+      <path d="M9 7 4 12l5 5M15 7l5 5-5 5" stroke="#4ade80" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  ),
 };
 
 // Level efek tambahan per preset, dipetakan manual sesuai tier rarity:
@@ -243,6 +248,7 @@ const FX_TIER: Record<string, "common" | "rare" | "epic" | "legendary" | "limite
   "razor-storm": "epic",
   "inferno-core": "legendary",
   "quantum-rift": "limited",
+  "code-terminal": "epic",
 };
 
 // Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
@@ -771,51 +777,195 @@ export function SolitBorder({
         : { background: DEFAULT_GRADIENT };
 
   const fx = preset ? FX_TIER[preset] : undefined;
+  const hasCounterRing = fx === "rare" || fx === "epic" || fx === "legendary" || fx === "limited";
+  const hasTrace = fx === "epic" || fx === "legendary" || fx === "limited";
   const hasPulse = fx === "epic" || fx === "legendary" || fx === "limited";
-  const hasShimmer = fx === "rare" || fx === "epic" || fx === "legendary" || fx === "limited";
-  const hasParticles = fx === "legendary" || fx === "limited";
+  const hasShimmer = true;
+  const shimmerBold = fx === "rare" || fx === "epic" || fx === "legendary" || fx === "limited";
+  const hasParticles = fx === "epic" || fx === "legendary" || fx === "limited";
+  const particleCount = fx === "epic" ? 2 : fx === "legendary" ? 3 : fx === "limited" ? 4 : 0;
   const hasComet = fx === "limited";
-  const hasCounterRing = fx === "epic" || fx === "legendary" || fx === "limited";
   const hasBurst = fx === "legendary" || fx === "limited";
   const isJittery = fx === "limited";
+  const auraOpacity =
+    fx === "limited" ? 1 : fx === "legendary" ? 0.85 : fx === "epic" ? 0.65 : fx === "rare" ? 0.48 : 0.32;
+  const traceSpeed = fx === "limited" ? "1.8s" : fx === "legendary" ? "2.4s" : "3.2s";
+  const glintOpacity =
+    fx === "limited" ? 1 : fx === "legendary" ? 0.9 : fx === "epic" ? 0.75 : fx === "rare" ? 0.55 : 0.4;
+  const dualBeam = fx === "epic" || fx === "legendary" || fx === "limited";
+  const isCodeTerminal = preset === "code-terminal";
 
   return (
-    <span className={`sb-ring ${isJittery ? "sb-ring-jitter" : ""} ${className}`} style={{ padding: thickness }}>
+    <span className={`sb-ring ${className}`} style={{ padding: thickness }}>
+      <span className="sb-aura-wrap" style={{ "--aura-max": auraOpacity } as React.CSSProperties} aria-hidden="true">
+        <span className={`sb-aura-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
+      </span>
       {hasBurst && <span className="sb-burst" aria-hidden="true" />}
       {hasPulse && <span className="sb-pulse-ring" aria-hidden="true" />}
-      {fx === "limited" && <span className="sb-pulse-ring sb-pulse-ring-2" aria-hidden="true" />}
-      <span className={`sb-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
-      {hasCounterRing && (
-        <span className={`sb-bg sb-bg-counter ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} aria-hidden="true" />
+      {fx === "limited" && (
+        <span className={`sb-pulse-ring sb-pulse-ring-2 ${isJittery ? "sb-ring-jitter" : ""}`} aria-hidden="true" />
       )}
-      {hasShimmer && <span className="sb-shimmer" aria-hidden="true" />}
+      <span className="sb-bg-wrap" aria-hidden="true">
+        <span className={`sb-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
+        {hasCounterRing && (
+          <span className={`sb-bg sb-bg-counter ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
+        )}
+        <span className="sb-facets" aria-hidden="true" />
+        <span className="sb-bevel" aria-hidden="true" />
+        {isCodeTerminal && <span className="sb-circuit" aria-hidden="true" />}
+      </span>
+      {hasTrace && <span className="sb-trace" style={{ animationDuration: traceSpeed }} aria-hidden="true" />}
+      {hasShimmer && (
+        <span
+          className={`sb-shimmer ${shimmerBold ? "sb-shimmer-bold" : ""} ${dualBeam ? "sb-shimmer-dual" : ""}`}
+          aria-hidden="true"
+        />
+      )}
       {hasComet && <span className="sb-comet" aria-hidden="true" />}
+      {isCodeTerminal && (
+        <>
+          <span className="sb-scanline" aria-hidden="true" />
+          <span className="sb-cursor" aria-hidden="true" />
+          <span className="sb-glitch" aria-hidden="true" />
+          <span className="sb-matrix" aria-hidden="true">
+            <span className="sb-matrix-char" style={{ "--matrix-rot": "15deg" } as React.CSSProperties}>
+              <span className="sb-matrix-glyph">0</span>
+            </span>
+            <span className="sb-matrix-char" style={{ "--matrix-rot": "140deg" } as React.CSSProperties}>
+              <span className="sb-matrix-glyph" style={{ animationDelay: "1.1s" }}>1</span>
+            </span>
+            <span className="sb-matrix-char" style={{ "--matrix-rot": "265deg" } as React.CSSProperties}>
+              <span className="sb-matrix-glyph" style={{ animationDelay: "2.2s" }}>{"{}"}</span>
+            </span>
+          </span>
+        </>
+      )}
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
-        <span className={`sb-orn ${fx === "legendary" || fx === "limited" ? "sb-orn-glow" : ""}`} aria-hidden="true">
+        <span
+          className={`sb-orn ${fx === "legendary" || fx === "limited" || isCodeTerminal ? "sb-orn-glow" : ""} ${
+            isCodeTerminal ? "sb-orn-type" : ""
+          }`}
+          aria-hidden="true"
+        >
           {orn(ornamentSize)}
         </span>
       )}
       {hasParticles && (
         <span className="sb-particles" aria-hidden="true">
           <span className="sb-particle sb-particle-1" />
-          <span className="sb-particle sb-particle-2" />
-          <span className="sb-particle sb-particle-3" />
-          {fx === "limited" && <span className="sb-particle sb-particle-4" />}
+          {particleCount >= 2 && <span className="sb-particle sb-particle-2" />}
+          {particleCount >= 3 && <span className="sb-particle sb-particle-3" />}
+          {particleCount >= 4 && <span className="sb-particle sb-particle-4" />}
         </span>
       )}
+      <span className="sb-glints" aria-hidden="true">
+        <span className="sb-glint" style={{ "--glint-rot": "35deg", "--glint-max": glintOpacity } as React.CSSProperties} />
+        <span
+          className="sb-glint"
+          style={{ "--glint-rot": "215deg", "--glint-max": glintOpacity, animationDelay: "1.4s" } as React.CSSProperties}
+        />
+      </span>
       <style jsx global>{`
         .sb-ring {
           position: relative;
           display: inline-flex;
           border-radius: 9999px;
         }
-        .sb-ring > .sb-bg {
+        .sb-bg-wrap {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 0;
+          transform-origin: center;
+          animation: sb-bg-breathe 3.4s ease-in-out infinite;
+        }
+        @keyframes sb-bg-breathe {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.045); }
+        }
+        .sb-bg-wrap > .sb-bg {
           position: absolute;
           inset: 0;
           border-radius: 9999px;
           z-index: 0;
           will-change: transform, filter;
+        }
+        .sb-facets {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 1;
+          pointer-events: none;
+          mix-blend-mode: overlay;
+          opacity: 0.55;
+          background: repeating-conic-gradient(
+            from 0deg,
+            rgba(255, 255, 255, 0.4) 0deg 3.5deg,
+            rgba(0, 0, 0, 0.3) 3.5deg 7deg
+          );
+          animation: sb-spin-rev 16s linear infinite;
+        }
+        .sb-bevel {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 2;
+          pointer-events: none;
+          box-shadow:
+            inset 0 1px 1.5px rgba(255, 255, 255, 0.55),
+            inset 0 -1.5px 2px rgba(0, 0, 0, 0.4);
+        }
+        /* Circuit trace — eksklusif Code Terminal. Beda teknik dari semua
+           efek lain di file ini (yang bentuknya conic-gradient diputer):
+           ini grid garis LURUS (horizontal + vertikal, kayak jalur PCB)
+           yang geser diagonal pelan-pelan. */
+        .sb-circuit {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          z-index: 1;
+          pointer-events: none;
+          opacity: 0.5;
+          mix-blend-mode: screen;
+          background:
+            repeating-linear-gradient(0deg, rgba(74, 222, 128, 0.35) 0px 1px, transparent 1px 9px),
+            repeating-linear-gradient(90deg, rgba(74, 222, 128, 0.35) 0px 1px, transparent 1px 9px);
+          background-size: 200% 200%;
+          animation: sb-circuit-shift 12s linear infinite;
+        }
+        @keyframes sb-circuit-shift {
+          0% { background-position: 0% 0%, 0% 0%; }
+          100% { background-position: 200% 0%, 0% 200%; }
+        }
+        .sb-aura-wrap {
+          position: absolute;
+          inset: -16px;
+          border-radius: 9999px;
+          z-index: -4;
+          pointer-events: none;
+          overflow: hidden;
+          filter: blur(9px);
+          opacity: var(--aura-max, 0.4);
+          animation: sb-aura-pulse 3.2s ease-in-out infinite;
+        }
+        @keyframes sb-aura-pulse {
+          0%, 100% { transform: scale(0.94); opacity: calc(var(--aura-max, 0.4) * 0.55); }
+          50% { transform: scale(1.1); opacity: var(--aura-max, 0.4); }
+        }
+        .sb-aura-bg {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+        }
+        .sb-trace {
+          position: absolute;
+          inset: -9px;
+          border-radius: 9999px;
+          border: 1.5px dashed rgba(255, 255, 255, 0.55);
+          z-index: 2;
+          pointer-events: none;
+          animation: sb-spin 3s linear infinite;
         }
         .sb-pulse-ring {
           position: absolute;
@@ -829,6 +979,10 @@ export function SolitBorder({
         }
         .sb-pulse-ring-2 {
           animation-delay: 1.1s;
+        }
+        .sb-pulse-ring-2.sb-ring-jitter {
+          animation: sb-pulse-expand 2.2s ease-out infinite, sb-jitter 2.6s ease-in-out infinite;
+          animation-delay: 1.1s, 0s;
         }
         @keyframes sb-pulse-expand {
           0% { transform: scale(0.86); opacity: 0.55; }
@@ -851,6 +1005,17 @@ export function SolitBorder({
           background: conic-gradient(
             from 0deg,
             transparent 0deg,
+            transparent 82deg,
+            rgba(255, 255, 255, 0.4) 90deg,
+            transparent 98deg,
+            transparent 360deg
+          );
+          animation: sb-spin 5.5s linear infinite;
+        }
+        .sb-shimmer-bold::after {
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
             transparent 75deg,
             rgba(255, 255, 255, 0.85) 90deg,
             transparent 105deg,
@@ -858,35 +1023,88 @@ export function SolitBorder({
           );
           animation: sb-spin 3s linear infinite;
         }
+        .sb-shimmer-dual::before {
+          content: "";
+          position: absolute;
+          inset: -50%;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 255deg,
+            rgba(255, 255, 255, 0.7) 270deg,
+            transparent 285deg,
+            transparent 360deg
+          );
+          animation: sb-spin 3s linear infinite;
+        }
         .sb-particles {
           position: absolute;
-          inset: 0;
+          inset: -9px;
           z-index: 2;
           pointer-events: none;
         }
         .sb-particle {
           position: absolute;
-          top: 50%;
+          inset: 0;
+          border-radius: 9999px;
+          animation: sb-spin 4.4s linear infinite;
+        }
+        .sb-particle::before {
+          content: "";
+          position: absolute;
+          top: -1px;
           left: 50%;
           width: 5px;
           height: 5px;
           border-radius: 9999px;
           background: #fff;
+          transform: translate(-50%, -50%);
           box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0.8);
-          animation: sb-particle-orbit 3.6s linear infinite;
+          animation: sb-particle-twinkle 3.6s ease-in-out infinite;
         }
-        .sb-particle-2 { animation-delay: 1.2s; }
-        .sb-particle-3 { animation-delay: 2.4s; }
-        .sb-particle-4 { animation-delay: 0.6s; width: 4px; height: 4px; }
-        @keyframes sb-particle-orbit {
-          0% { transform: translate(-50%, -50%) rotate(0deg) translateX(26px) rotate(0deg); opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { transform: translate(-50%, -50%) rotate(360deg) translateX(26px) rotate(-360deg); opacity: 0; }
+        .sb-particle-2 { animation-delay: -1.5s; }
+        .sb-particle-3 { animation-delay: -3s; }
+        .sb-particle-4 { animation-delay: -0.8s; }
+        .sb-particle-2::before { animation-delay: -1.5s; width: 4px; height: 4px; }
+        .sb-particle-3::before { animation-delay: -3s; }
+        .sb-particle-4::before { animation-delay: -0.8s; width: 4px; height: 4px; }
+        @keyframes sb-particle-twinkle {
+          0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.75); }
+          50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+        }
+        .sb-glints {
+          position: absolute;
+          inset: -7px;
+          z-index: 4;
+          pointer-events: none;
+        }
+        .sb-glint {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          transform: rotate(var(--glint-rot));
+          animation: sb-glint-twinkle 2.8s ease-in-out infinite;
+        }
+        .sb-glint::before,
+        .sb-glint::after {
+          content: "";
+          position: absolute;
+          top: -1px;
+          left: 50%;
+          background: #fff;
+          border-radius: 2px;
+          transform: translate(-50%, -50%);
+          filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));
+        }
+        .sb-glint::before { width: 9px; height: 1.6px; }
+        .sb-glint::after { width: 1.6px; height: 9px; }
+        @keyframes sb-glint-twinkle {
+          0%, 100% { opacity: 0; }
+          50% { opacity: var(--glint-max, 0.6); }
         }
         .sb-comet {
           position: absolute;
-          inset: 0;
+          inset: -11px;
           border-radius: 9999px;
           z-index: 3;
           pointer-events: none;
@@ -895,18 +1113,134 @@ export function SolitBorder({
         .sb-comet::before {
           content: "";
           position: absolute;
-          top: -2px;
+          top: 0;
           left: 50%;
-          width: 4px;
-          height: 4px;
+          width: 5px;
+          height: 16px;
           border-radius: 9999px;
-          background: #fff;
+          background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.95));
+          transform: translate(-50%, -85%);
+          filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
+        }
+        .sb-scanline {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          overflow: hidden;
+          z-index: 1;
+          pointer-events: none;
+          mix-blend-mode: screen;
+        }
+        .sb-scanline::after {
+          content: "";
+          position: absolute;
+          left: -20%;
+          right: -20%;
+          height: 14%;
+          background: linear-gradient(to bottom, transparent, rgba(74, 222, 128, 0.9), transparent);
+          animation: sb-scanline-move 2.2s linear infinite;
+        }
+        @keyframes sb-scanline-move {
+          0% { top: -20%; }
+          100% { top: 120%; }
+        }
+        .sb-cursor {
+          position: absolute;
+          left: 50%;
+          bottom: -2px;
+          z-index: 2;
+          width: 6px;
+          height: 12px;
+          background: #4ade80;
           transform: translateX(-50%);
-          box-shadow:
-            0 0 8px 3px rgba(255, 255, 255, 0.95),
-            0 7px 8px -1px rgba(255, 255, 255, 0.55),
-            0 14px 12px -3px rgba(255, 255, 255, 0.3),
-            0 21px 16px -5px rgba(255, 255, 255, 0.12);
+          box-shadow: 0 0 6px rgba(74, 222, 128, 0.9);
+          animation: sb-cursor-blink 1s steps(1) infinite;
+          pointer-events: none;
+        }
+        @keyframes sb-cursor-blink {
+          0%, 49% { opacity: 1; }
+          50%, 100% { opacity: 0; }
+        }
+        .sb-glitch {
+          position: absolute;
+          inset: -3px;
+          border-radius: 9999px;
+          z-index: 3;
+          pointer-events: none;
+        }
+        .sb-glitch::before,
+        .sb-glitch::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          border: 1.5px solid transparent;
+          mix-blend-mode: screen;
+          opacity: 0;
+        }
+        .sb-glitch::before {
+          border-color: rgba(34, 211, 238, 0.9);
+          animation: sb-glitch-cyan 5s steps(1) infinite;
+        }
+        .sb-glitch::after {
+          border-color: rgba(244, 63, 94, 0.9);
+          animation: sb-glitch-red 5s steps(1) infinite;
+        }
+        @keyframes sb-glitch-cyan {
+          0%, 89%, 100% { opacity: 0; transform: translate(0, 0); }
+          90% { opacity: 0.9; transform: translate(-2px, 0); }
+          91.5% { opacity: 0; }
+          93% { opacity: 0.6; transform: translate(-1px, 0.5px); }
+          94% { opacity: 0; }
+        }
+        @keyframes sb-glitch-red {
+          0%, 89%, 100% { opacity: 0; transform: translate(0, 0); }
+          90% { opacity: 0.9; transform: translate(2px, 0); }
+          91.5% { opacity: 0; }
+          93% { opacity: 0.6; transform: translate(1px, -0.5px); }
+          94% { opacity: 0; }
+        }
+        .sb-matrix {
+          position: absolute;
+          inset: -7px;
+          z-index: 4;
+          pointer-events: none;
+        }
+        .sb-matrix-char {
+          position: absolute;
+          inset: 0;
+          transform: rotate(var(--matrix-rot));
+        }
+        .sb-matrix-glyph {
+          position: absolute;
+          top: -1px;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          font-family: "Courier New", monospace;
+          font-size: 9px;
+          font-weight: 700;
+          line-height: 1;
+          color: #4ade80;
+          text-shadow: 0 0 4px rgba(74, 222, 128, 0.85), 0 0 8px rgba(74, 222, 128, 0.5);
+          animation: sb-matrix-drift 3.2s ease-out infinite;
+        }
+        @keyframes sb-matrix-drift {
+          0% { opacity: 0; transform: translate(-50%, -50%) translateY(0); }
+          15% { opacity: 1; }
+          70% { opacity: 1; transform: translate(-50%, -50%) translateY(-9px); }
+          100% { opacity: 0; transform: translate(-50%, -50%) translateY(-12px); }
+        }
+        /* Typewriter reveal — selector ditulis lengkap (.sb-ring > .sb-orn.sb-orn-type)
+           biar spesifisitasnya PASTI ngalahin base rule .sb-ring > .sb-orn di atas,
+           dan animasi float-nya digabung di sini (bukan ditimpa) biar ornamen
+           tetap melayang SEKALIGUS "diketik" bareng. */
+        .sb-ring > .sb-orn.sb-orn-type {
+          animation: sb-orn-float 3s ease-in-out infinite, sb-orn-type-reveal 4s steps(6, end) infinite;
+        }
+        @keyframes sb-orn-type-reveal {
+          0%, 8% { clip-path: inset(0 100% 0 0); }
+          45%, 70% { clip-path: inset(0 0 0 0); }
+          92%, 100% { clip-path: inset(0 100% 0 0); }
         }
         .sb-orn-glow {
           filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
@@ -924,8 +1258,9 @@ export function SolitBorder({
           border-radius: 9999px;
           z-index: 8;
           pointer-events: none;
+          opacity: 0;
           background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 70%);
-          animation: sb-burst-flash 1s ease-out 1;
+          animation: sb-burst-flash 1s ease-out 1 forwards;
         }
         @keyframes sb-burst-flash {
           0% { transform: scale(0.25); opacity: 0; }
@@ -960,8 +1295,8 @@ export function SolitBorder({
           animation: sb-orn-float 3s ease-in-out infinite;
         }
         @keyframes sb-orn-float {
-          0%, 100% { transform: translate(-50%, -52%) rotate(-5deg); }
-          50% { transform: translate(-50%, -66%) rotate(5deg); }
+          0%, 100% { transform: translate(-50%, -52%) rotate(-5deg) scale(1); }
+          50% { transform: translate(-50%, -66%) rotate(5deg) scale(1.12); }
         }
 
         @keyframes sb-spin {
@@ -1260,15 +1595,40 @@ export function SolitBorder({
           50% { filter: drop-shadow(0 0 20px rgba(240, 171, 252, 1)) hue-rotate(40deg) brightness(1.3); }
         }
 
+        .sb-p-code-terminal {
+          background: conic-gradient(from 0deg, #020617, #16a34a, #86efac, #22c55e, #020617);
+          animation: sb-spin 4.5s linear infinite, sb-g-code 1.4s ease-in-out infinite;
+        }
+        @keyframes sb-g-code {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.75)) brightness(1); }
+          50% { filter: drop-shadow(0 0 15px rgba(134, 239, 172, 1)) brightness(1.25); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .sb-ring > .sb-bg,
+          .sb-bg-wrap,
+          .sb-bg-wrap > .sb-bg,
           .sb-bg-counter,
+          .sb-facets,
+          .sb-aura-wrap,
+          .sb-aura-bg,
+          .sb-trace,
           .sb-pulse-ring,
           .sb-shimmer::after,
+          .sb-shimmer-bold::after,
+          .sb-shimmer-dual::before,
           .sb-particle,
+          .sb-glint,
           .sb-comet,
+          .sb-scanline::after,
+          .sb-cursor,
+          .sb-glitch::before,
+          .sb-glitch::after,
+          .sb-matrix-glyph,
+          .sb-circuit,
+          .sb-orn-type,
           .sb-burst,
-          .sb-ring-jitter {
+          .sb-ring-jitter,
+          .sb-orn {
             animation: none !important;
           }
         }

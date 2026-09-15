@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { EXPENSE_CATEGORIES } from "@/lib/cashflow";
 import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
-  Plus, Trash2, X, CheckCheck, RotateCcw, Banknote,
+  Plus, X, CheckCheck, RotateCcw, Banknote,
   ClipboardList, Clock, CircleDollarSign, Camera, Image as ImageIcon,
 } from "lucide-react";
 
@@ -61,6 +61,14 @@ function formatDate(iso: string): string {
   });
 }
 
+function formatDateTime(iso: string | null): string {
+  if (!iso) return "-";
+  return new Date(iso).toLocaleString("id-ID", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
  *  STATUS BADGE
  * ════════════════════════════════════════════════════════════════════════════ */
@@ -96,26 +104,26 @@ function SummaryCard({
   icon,
   label,
   value,
-  sub,
   color,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
-  sub?: string;
-  color: "slate" | "indigo" | "emerald" | "blue";
+  color: "slate" | "indigo" | "emerald" | "blue" | "teal";
 }) {
   const iconBg = {
     slate: "bg-slate-100 text-slate-500",
     indigo: "bg-indigo-100 text-indigo-600",
     emerald: "bg-emerald-100 text-emerald-600",
     blue: "bg-blue-100 text-blue-600",
+    teal: "bg-teal-100 text-teal-600",
   };
   const valueColor = {
     slate: "text-slate-900",
     indigo: "text-indigo-700",
     emerald: "text-emerald-700",
     blue: "text-blue-700",
+    teal: "text-teal-700",
   };
   return (
     <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-sm border border-white/70 transition-all hover:-translate-y-1 hover:shadow-md flex flex-col justify-between h-full">
@@ -123,11 +131,6 @@ function SummaryCard({
         <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">{label}</span>
         <p className={`text-xl sm:text-2xl font-extrabold tabular-nums ${valueColor[color]}`}>{value}</p>
       </div>
-      {sub && (
-        <div className="mt-3">
-          <span className="text-[10px] text-slate-400 font-medium">{sub}</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -487,6 +490,76 @@ function RealisasiModal({
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  DETAIL MODAL — tampilkan Kebutuhan (keterangan) secara lengkap & jelas,
+ *  plus info tanggal+jam disetujui / dieksekusi / direalisasi
+ * ════════════════════════════════════════════════════════════════════════════ */
+function DetailModal({ fundRequest, onClose }: { fundRequest: FundRequest; onClose: () => void }) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+        <div className="h-1 bg-gradient-to-r from-indigo-400 to-purple-500" />
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center"><FileText size={16} /></div>
+            <div>
+              <p className="text-sm font-bold text-slate-900">Detail Pengajuan Dana</p>
+              <p className="text-[11px] text-slate-400">{fundRequest.requester_name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kebutuhan</p>
+            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{fundRequest.purpose}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nominal</p>
+              <p className="text-sm font-extrabold text-slate-900">{formatRupiah(fundRequest.amount)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Diajukan</p>
+              <p className="text-sm text-slate-700">{formatDateTime(fundRequest.created_at)}</p>
+            </div>
+          </div>
+          <div className="border-t border-slate-100 pt-3 space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-slate-500 flex-shrink-0">Disetujui oleh</span>
+              <span className="text-xs font-semibold text-slate-700 text-right">
+                {fundRequest.approved_by_name ? `${fundRequest.approved_by_name} · ${formatDateTime(fundRequest.approved_at)}` : "Belum disetujui"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-slate-500 flex-shrink-0">Dieksekusi oleh</span>
+              <span className="text-xs font-semibold text-slate-700 text-right">
+                {fundRequest.executed_by_name ? `${fundRequest.executed_by_name} · ${formatDateTime(fundRequest.executed_at)}` : "Belum dieksekusi"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-slate-500 flex-shrink-0">Direalisasi oleh</span>
+              <span className="text-xs font-semibold text-slate-700 text-right">
+                {fundRequest.realisasi_by_name ? `${fundRequest.realisasi_by_name} · ${formatDateTime(fundRequest.realisasi_at)}` : "Belum direalisasi"}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/60">
+          <button onClick={onClose} className="w-full h-10 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition">Tutup</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  MAIN PAGE
  * ════════════════════════════════════════════════════════════════════════════ */
 export default function PengajuanDanaPage() {
@@ -498,7 +571,7 @@ export default function PengajuanDanaPage() {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
-  const [deleteTarget, setDeleteTarget] = useState<FundRequest | null>(null);
+  const [detailTarget, setDetailTarget] = useState<FundRequest | null>(null);
   const [realisasiTarget, setRealisasiTarget] = useState<FundRequest | null>(null);
 
   useEffect(() => {
@@ -568,22 +641,10 @@ export default function PengajuanDanaPage() {
     finally { setActionLoading((p) => ({ ...p, [id]: false })); }
   };
 
-  const handleDelete = async (id: string) => {
-    setActionLoading((p) => ({ ...p, [id]: true }));
-    try {
-      const res = await fetch(`/api/pengajuan-dana/${id}`, { method: "DELETE" });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.message);
-      toast.success("Pengajuan dihapus");
-      fetchData();
-    } catch (err: any) { toast.error(err.message || "Gagal menghapus"); }
-    finally { setActionLoading((p) => ({ ...p, [id]: false })); }
-  };
-
   const totalNominal = data.reduce((s, r) => s + r.amount, 0);
+  const totalRealisasi = data.reduce((s, r) => s + (r.realisasi_nominal ?? 0), 0);
   const totalApproved = data.filter((r) => r.is_approved).length;
   const totalExecuted = data.filter((r) => r.is_executed).length;
-  const totalPending = data.filter((r) => !r.is_approved && !r.is_executed).length;
 
   const CARD_STYLE = "bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_30px_-6px_rgba(99,102,241,0.12)] transition-all duration-300";
 
@@ -653,33 +714,35 @@ export default function PengajuanDanaPage() {
             </div>
 
             {/* Stat Cards inside banner */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               <SummaryCard
                 icon={<ClipboardList className="w-5 h-5" />}
                 label="Total Pengajuan"
                 value={data.length.toString()}
-                sub={`${totalPending} menunggu persetujuan`}
                 color="slate"
               />
               <SummaryCard
                 icon={<Wallet className="w-5 h-5" />}
-                label="Total Nominal"
+                label="Total Nominal Pengajuan"
                 value={fmtShort(totalNominal)}
-                sub={formatRupiah(totalNominal)}
                 color="indigo"
+              />
+              <SummaryCard
+                icon={<Banknote className="w-5 h-5" />}
+                label="Total Nominal Realisasi"
+                value={fmtShort(totalRealisasi)}
+                color="teal"
               />
               <SummaryCard
                 icon={<CheckCircle2 className="w-5 h-5" />}
                 label="Disetujui"
                 value={`${totalApproved} / ${data.length}`}
-                sub={data.length ? `${Math.round((totalApproved / data.length) * 100)}% approval rate` : "–"}
                 color="emerald"
               />
               <SummaryCard
                 icon={<Landmark className="w-5 h-5" />}
                 label="Sudah Eksekusi"
                 value={`${totalExecuted} / ${data.length}`}
-                sub={data.length ? `${Math.round((totalExecuted / data.length) * 100)}% execution rate` : "–"}
                 color="blue"
               />
             </div>
@@ -762,14 +825,10 @@ export default function PengajuanDanaPage() {
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Eksekusi</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Realisasi</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tanggal</th>
-                    <th className="px-3 py-3 w-10" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.map((row, idx) => {
-                    const isOwner = row.requester_id === userId;
-                    const isAdmin = userRoles.some((r) => ["ADMIN", "PROGRAMMER"].includes(r));
-                    const canDelete = (isOwner && !row.is_approved) || isAdmin;
                     const busy = actionLoading[row.id] ?? false;
                     const canRealisasiRow = row.executed_by_id === userId || userRoles.includes("ADMIN");
 
@@ -800,7 +859,14 @@ export default function PengajuanDanaPage() {
                         </td>
 
                         <td className="px-4 py-4 max-w-[220px]">
-                          <p className="text-slate-600 text-sm line-clamp-2 leading-relaxed">{row.purpose}</p>
+                          <button
+                            type="button"
+                            onClick={() => setDetailTarget(row)}
+                            title="Klik untuk lihat detail lengkap"
+                            className="text-left w-full"
+                          >
+                            <p className="text-slate-600 text-sm line-clamp-2 leading-relaxed">{row.purpose}</p>
+                          </button>
                         </td>
 
                         <td className="px-4 py-4 text-right">
@@ -826,7 +892,8 @@ export default function PengajuanDanaPage() {
                               >
                                 <CheckCheck className="w-4 h-4" />
                               </button>
-                              <span className="text-[10px] text-slate-400 max-w-[72px] truncate">{row.approved_by_name}</span>
+                              <span className="text-[10px] text-slate-400 max-w-[92px] truncate">{row.approved_by_name}</span>
+                              <span className="text-[9px] text-slate-400 max-w-[92px] text-center leading-tight">{formatDateTime(row.approved_at)}</span>
                             </div>
                           ) : canApprove ? (
                             <button
@@ -855,7 +922,8 @@ export default function PengajuanDanaPage() {
                               >
                                 <Banknote className="w-4 h-4" />
                               </span>
-                              <span className="text-[10px] text-slate-400 max-w-[72px] truncate">{row.executed_by_name}</span>
+                              <span className="text-[10px] text-slate-400 max-w-[92px] truncate">{row.executed_by_name}</span>
+                              <span className="text-[9px] text-slate-400 max-w-[92px] text-center leading-tight">{formatDateTime(row.executed_at)}</span>
                             </div>
                           ) : canExecute ? (
                             <button
@@ -890,8 +958,9 @@ export default function PengajuanDanaPage() {
                               >
                                 <CheckCircle2 className="w-4 h-4" />
                               </button>
-                              <span className="text-[10px] text-slate-500 font-semibold max-w-[80px] truncate">{formatRupiah(row.realisasi_nominal ?? 0)}</span>
-                              <span className="text-[9px] text-slate-400 max-w-[80px] truncate">{row.realisasi_by_name}</span>
+                              <span className="text-[10px] text-slate-500 font-semibold max-w-[92px] truncate">{formatRupiah(row.realisasi_nominal ?? 0)}</span>
+                              <span className="text-[9px] text-slate-400 max-w-[92px] truncate">{row.realisasi_by_name}</span>
+                              <span className="text-[9px] text-slate-400 max-w-[92px] text-center leading-tight">{formatDateTime(row.realisasi_at)}</span>
                             </div>
                           ) : row.is_executed ? (
                             canRealisasiRow ? (
@@ -914,18 +983,6 @@ export default function PengajuanDanaPage() {
                           <span className="text-xs text-slate-500 font-medium whitespace-nowrap tabular-nums">{formatDate(row.created_at)}</span>
                         </td>
 
-                        <td className="px-3 py-4">
-                          {canDelete && (
-                            <button
-                              onClick={() => setDeleteTarget(row)}
-                              disabled={busy}
-                              title="Hapus pengajuan"
-                              className="p-2 rounded-xl text-slate-300 opacity-0 group-hover:opacity-100 hover:text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-30"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </td>
                       </tr>
                     );
                   })}
@@ -935,51 +992,6 @@ export default function PengajuanDanaPage() {
           )}
         </div>
       </div>
-
-      {/* Delete Confirmation Modal */}
-      {deleteTarget && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-          style={{ animation: "pdBackdropIn 0.15s ease-out both" }}
-        >
-          <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={() => setDeleteTarget(null)} />
-          <div
-            className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
-            style={{ animation: "pdModalIn 0.25s cubic-bezier(0.16,1,0.3,1) both" }}
-          >
-            <div className="p-6 text-center space-y-4">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-100 flex items-center justify-center">
-                <Trash2 className="w-6 h-6 text-rose-500" />
-              </div>
-              <div>
-                <h3 className="text-base font-extrabold text-slate-900">Hapus Pengajuan?</h3>
-                <p className="text-sm text-slate-500 mt-1.5 leading-relaxed">
-                  Pengajuan <span className="font-bold text-slate-700">"{deleteTarget.purpose}"</span> sebesar{" "}
-                  <span className="font-bold text-slate-700">{formatRupiah(deleteTarget.amount)}</span> akan dihapus permanen.
-                </p>
-              </div>
-            </div>
-            <div className="px-6 pb-6 flex items-center gap-3">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full transition"
-              >
-                Batal
-              </button>
-              <button
-                onClick={async () => {
-                  const id = deleteTarget.id;
-                  setDeleteTarget(null);
-                  await handleDelete(id);
-                }}
-                className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 active:bg-rose-700 rounded-full shadow-md shadow-rose-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
-              >
-                Ya, Hapus
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal */}
       <FormModal
@@ -994,6 +1006,13 @@ export default function PengajuanDanaPage() {
           fundRequest={realisasiTarget}
           onClose={() => setRealisasiTarget(null)}
           onSaved={fetchData}
+        />
+      )}
+
+      {detailTarget && (
+        <DetailModal
+          fundRequest={detailTarget}
+          onClose={() => setDetailTarget(null)}
         />
       )}
     </DashboardLayout>
