@@ -7,7 +7,7 @@ import { EXPENSE_CATEGORIES } from "@/lib/cashflow";
 import {
   FileText, Wallet, CheckCircle2, Landmark, Pin,
   Plus, X, CheckCheck, RotateCcw, Banknote,
-  ClipboardList, Clock, CircleDollarSign, Camera, Image as ImageIcon,
+  ClipboardList, Clock, CircleDollarSign, Camera, Image as ImageIcon, Pencil,
 } from "lucide-react";
 
 interface FundRequest {
@@ -16,6 +16,7 @@ interface FundRequest {
   requester_name: string;
   purpose: string;
   amount: number;
+  payment_method: "CASH" | "SALDO";
   is_approved: boolean;
   approved_by_id: string | null;
   approved_by_name: string | null;
@@ -98,6 +99,26 @@ function StatusPill({ approved, executed }: { approved: boolean; executed: boole
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  PAYMENT METHOD BADGE
+ * ════════════════════════════════════════════════════════════════════════════ */
+function PaymentMethodBadge({ method }: { method: "CASH" | "SALDO" }) {
+  if (method === "SALDO") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-200/80">
+        <Landmark className="w-3 h-3" />
+        Saldo
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-teal-50 text-teal-600 border border-teal-200/80">
+      <Banknote className="w-3 h-3" />
+      Cash
+    </span>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  SUMMARY CARD (matches dashboard card style)
  * ════════════════════════════════════════════════════════════════════════════ */
 function SummaryCard({
@@ -105,11 +126,13 @@ function SummaryCard({
   label,
   value,
   color,
+  sub,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   color: "slate" | "indigo" | "emerald" | "blue" | "teal";
+  sub?: string;
 }) {
   const iconBg = {
     slate: "bg-slate-100 text-slate-500",
@@ -130,6 +153,7 @@ function SummaryCard({
       <div>
         <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">{label}</span>
         <p className={`text-xl sm:text-2xl font-extrabold tabular-nums ${valueColor[color]}`}>{value}</p>
+        {sub && <p className="text-[10px] text-slate-400 font-semibold mt-1">{sub}</p>}
       </div>
     </div>
   );
@@ -143,11 +167,12 @@ function FormModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onSubmit: (purpose: string, amount: number) => Promise<void>;
+  onSubmit: (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO") => Promise<void>;
   submitting: boolean;
 }) {
   const [purpose, setPurpose] = useState("");
   const [amount, setAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
   const backdropRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -155,6 +180,7 @@ function FormModal({
     if (open) {
       setPurpose("");
       setAmount("");
+      setPaymentMethod("CASH");
       setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [open]);
@@ -176,7 +202,7 @@ function FormModal({
     if (!purpose.trim()) { toast.error("Kebutuhan wajib diisi"); return; }
     const num = parseInt(amount.replace(/\D/g, ""), 10);
     if (!num || num <= 0) { toast.error("Nominal harus lebih dari 0"); return; }
-    await onSubmit(purpose.trim(), num);
+    await onSubmit(purpose.trim(), num, paymentMethod);
   };
 
   if (!open) return null;
@@ -257,6 +283,28 @@ function FormModal({
                 placeholder="0"
                 className="w-full pl-12 pr-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/15 focus:bg-white transition-all placeholder:text-slate-400 tabular-nums font-bold"
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-2">
+              Metode Pembayaran <span className="text-red-500">*</span>
+            </label>
+            <div className="inline-flex w-full rounded-2xl border border-slate-200 bg-slate-50 p-1 gap-1">
+              {(["CASH", "SALDO"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setPaymentMethod(m)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition ${paymentMethod === m
+                    ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                    : "text-slate-400 hover:text-slate-600"
+                    }`}
+                >
+                  {m === "CASH" ? <Banknote className="w-4 h-4" /> : <Landmark className="w-4 h-4" />}
+                  {m === "CASH" ? "Cash" : "Saldo"}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -355,6 +403,79 @@ function PhotoPicker({ value, onChange }: { value: File | null; onChange: (f: Fi
       )}
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(ev) => handleFile(ev.target.files?.[0] ?? null)} />
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(ev) => handleFile(ev.target.files?.[0] ?? null)} />
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ *  EDIT METODE MODAL — hanya untuk ganti Cash/Saldo pada pengajuan yang sudah
+ *  ada. Kebutuhan & Nominal SENGAJA tidak ditampilkan di sini supaya tidak
+ *  bisa diedit.
+ * ════════════════════════════════════════════════════════════════════════════ */
+function EditMetodeModal({
+  fundRequest, onClose, onSaved,
+}: {
+  fundRequest: FundRequest;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [method, setMethod] = useState<"CASH" | "SALDO">(fundRequest.payment_method);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/pengajuan-dana/${fundRequest.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_payment_method", payment_method: method }),
+      });
+      const json = await res.json();
+      if (!json.success) { toast.error(json.message || "Gagal mengubah metode pembayaran"); return; }
+      toast.success("Metode pembayaran berhasil diperbarui");
+      onSaved();
+      onClose();
+    } catch { toast.error("Terjadi kesalahan koneksi"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-sm rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+        <div className="h-1 bg-gradient-to-r from-indigo-400 to-purple-500" />
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center"><Wallet size={16} /></div>
+            <div>
+              <p className="text-sm font-bold text-slate-900">Ubah Metode Pembayaran</p>
+              <p className="text-[11px] text-slate-400 line-clamp-1 max-w-[220px]">{fundRequest.purpose}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-5 space-y-2">
+          <label className="block text-xs font-bold text-slate-700 mb-1">Metode Pembayaran <span className="text-red-500">*</span></label>
+          <div className="inline-flex w-full rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
+            {(["CASH", "SALDO"] as const).map((m) => (
+              <button key={m} type="button" onClick={() => setMethod(m)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${method === m ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-600"}`}>
+                {m === "CASH" ? <Banknote size={16} /> : <Landmark className="w-4 h-4" />} {m === "CASH" ? "Cash" : "Saldo"}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-400 pt-1">Kebutuhan & nominal tidak bisa diubah dari sini.</p>
+        </div>
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 bg-slate-50/60">
+          <button onClick={onClose} disabled={saving} className="flex-1 h-10 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition disabled:opacity-50">Batal</button>
+          <button onClick={submit} disabled={saving} className="flex-1 h-10 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-60">{saving ? "Menyimpan..." : "Simpan"}</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -493,7 +614,14 @@ function RealisasiModal({
  *  DETAIL MODAL — tampilkan Kebutuhan (keterangan) secara lengkap & jelas,
  *  plus info tanggal+jam disetujui / dieksekusi / direalisasi
  * ════════════════════════════════════════════════════════════════════════════ */
-function DetailModal({ fundRequest, onClose }: { fundRequest: FundRequest; onClose: () => void }) {
+function DetailModal({
+  fundRequest, onClose, canEditMetode, onEditMetode,
+}: {
+  fundRequest: FundRequest;
+  onClose: () => void;
+  canEditMetode?: boolean;
+  onEditMetode?: () => void;
+}) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
@@ -520,10 +648,26 @@ function DetailModal({ fundRequest, onClose }: { fundRequest: FundRequest; onClo
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Kebutuhan</p>
             <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{fundRequest.purpose}</p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nominal</p>
               <p className="text-sm font-extrabold text-slate-900">{formatRupiah(fundRequest.amount)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Metode</p>
+              <div className="flex items-center gap-1.5">
+                <PaymentMethodBadge method={fundRequest.payment_method} />
+                {canEditMetode && (
+                  <button
+                    type="button"
+                    onClick={onEditMetode}
+                    title="Ubah metode pembayaran"
+                    className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-indigo-100 text-slate-500 hover:text-indigo-600 flex items-center justify-center transition flex-shrink-0"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Diajukan</p>
@@ -573,6 +717,7 @@ export default function PengajuanDanaPage() {
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [detailTarget, setDetailTarget] = useState<FundRequest | null>(null);
   const [realisasiTarget, setRealisasiTarget] = useState<FundRequest | null>(null);
+  const [editMetodeTarget, setEditMetodeTarget] = useState<FundRequest | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -604,13 +749,13 @@ export default function PengajuanDanaPage() {
   const canApprove = userId ? meta.approverIds.includes(userId) : false;
   const canExecute = userId ? (meta.executorIds.includes(userId) || userRoles.includes("ADMIN")) : false;
 
-  const handleSubmit = async (purpose: string, amount: number) => {
+  const handleSubmit = async (purpose: string, amount: number, paymentMethod: "CASH" | "SALDO") => {
     setSubmitting(true);
     try {
       const res = await fetch("/api/pengajuan-dana", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purpose, amount }),
+        body: JSON.stringify({ purpose, amount, payment_method: paymentMethod }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message);
@@ -642,6 +787,8 @@ export default function PengajuanDanaPage() {
   };
 
   const totalNominal = data.reduce((s, r) => s + r.amount, 0);
+  const totalCash = data.filter((r) => r.payment_method === "CASH").reduce((s, r) => s + r.amount, 0);
+  const totalSaldo = data.filter((r) => r.payment_method === "SALDO").reduce((s, r) => s + r.amount, 0);
   const totalRealisasi = data.reduce((s, r) => s + (r.realisasi_nominal ?? 0), 0);
   const totalApproved = data.filter((r) => r.is_approved).length;
   const totalExecuted = data.filter((r) => r.is_executed).length;
@@ -726,6 +873,7 @@ export default function PengajuanDanaPage() {
                 label="Total Nominal Pengajuan"
                 value={fmtShort(totalNominal)}
                 color="indigo"
+                sub={`Cash ${fmtShort(totalCash)} · Saldo ${fmtShort(totalSaldo)}`}
               />
               <SummaryCard
                 icon={<Banknote className="w-5 h-5" />}
@@ -820,6 +968,7 @@ export default function PengajuanDanaPage() {
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pengaju</th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kebutuhan</th>
                     <th className="text-right px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nominal</th>
+                    <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Metode</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Persetujui</th>
                     <th className="text-center px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Eksekusi</th>
@@ -871,6 +1020,20 @@ export default function PengajuanDanaPage() {
 
                         <td className="px-4 py-4 text-right">
                           <span className="font-extrabold text-slate-900 tabular-nums text-sm">{formatRupiah(row.amount)}</span>
+                        </td>
+
+                        <td className="px-4 py-4 text-center">
+                          {userRoles.includes("ADMIN") && !row.is_executed ? (
+                            <button
+                              type="button"
+                              onClick={() => setEditMetodeTarget(row)}
+                              title="Klik untuk ubah metode pembayaran"
+                            >
+                              <PaymentMethodBadge method={row.payment_method} />
+                            </button>
+                          ) : (
+                            <PaymentMethodBadge method={row.payment_method} />
+                          )}
                         </td>
 
                         <td className="px-4 py-4 text-center">
@@ -1009,10 +1172,23 @@ export default function PengajuanDanaPage() {
         />
       )}
 
+      {editMetodeTarget && (
+        <EditMetodeModal
+          fundRequest={editMetodeTarget}
+          onClose={() => setEditMetodeTarget(null)}
+          onSaved={fetchData}
+        />
+      )}
+
       {detailTarget && (
         <DetailModal
           fundRequest={detailTarget}
           onClose={() => setDetailTarget(null)}
+          canEditMetode={userRoles.includes("ADMIN") && !detailTarget.is_executed}
+          onEditMetode={() => {
+            setEditMetodeTarget(detailTarget);
+            setDetailTarget(null);
+          }}
         />
       )}
     </DashboardLayout>
