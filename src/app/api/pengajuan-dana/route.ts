@@ -70,20 +70,23 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    let body: { purpose?: string; amount?: number };
+    let body: { purpose?: string; amount?: number; payment_method?: string };
     try {
         body = await request.json();
     } catch {
         return NextResponse.json({ success: false, message: "Body tidak valid" }, { status: 400 });
     }
 
-    const { purpose, amount } = body;
+    const { purpose, amount, payment_method } = body;
     if (!purpose || typeof purpose !== "string" || !purpose.trim()) {
         return NextResponse.json({ success: false, message: "Kebutuhan wajib diisi" }, { status: 400 });
     }
     if (!amount || typeof amount !== "number" || amount <= 0) {
         return NextResponse.json({ success: false, message: "Nominal harus lebih dari 0" }, { status: 400 });
     }
+
+    // Default ke CASH kalau payment_method tidak dikirim atau nilainya tidak valid
+    const validPaymentMethod = payment_method === "SALDO" ? "SALDO" : "CASH";
 
     const supabase = db();
     const { data, error } = await supabase
@@ -93,6 +96,7 @@ export async function POST(request: NextRequest) {
             requester_name: userName,
             purpose: purpose.trim(),
             amount: Math.round(amount),
+            payment_method: validPaymentMethod,
         })
         .select()
         .single();
