@@ -12,7 +12,7 @@ import { compressImage } from "@/lib/imageCompression";
 import {
   ImageIcon, Pencil, CheckCircle2, Receipt, Inbox,
   Store, Building2, User, Landmark, Banknote, QrCode, CreditCard,
-  AlertTriangle, Wallet,
+  AlertTriangle, Wallet, Package, Gift, Plus, Trash2, Search,
   type LucideIcon,
 } from "lucide-react";
 
@@ -22,6 +22,15 @@ export interface TxLaptopItem {
   serial_number: string;
   laptop_name: string;
   deal_price: number;
+}
+
+export interface EditModalAccessory {
+  accessory_id: string;
+  name: string;
+  quantity: number;
+  deal_price: number;
+  selling_price: number;
+  is_bonus: boolean;
 }
 
 // ─── SORTING TYPES ───────────────────────────────────────────────────
@@ -2105,10 +2114,9 @@ function EditTransactionModal({
   onSuccess: (message: string) => void;
 }) {
   const [items, setItems] = useState<TxLaptopItem[]>([]);
+  const [accessories, setAccessories] = useState<EditModalAccessory[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
-  const [singleDealPrice, setSingleDealPrice] = useState<string>(() =>
-    String(item.deal_price ?? item.amount ?? "")
-  );
+  const [singleDealPrice, setSingleDealPrice] = useState<string>("");
   const [unitDealPrices, setUnitDealPrices] = useState<Record<string, string>>({});
   const [dpAmount, setDpAmount] = useState<string>(() => String(item.dp_amount || 0));
   const [customerName, setCustomerName] = useState(item.customer_name || "");
@@ -2116,6 +2124,12 @@ function EditTransactionModal({
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Search & add accessory
+  const [showAddAcc, setShowAddAcc] = useState(false);
+  const [accSearch, setAccSearch] = useState("");
+  const [accResults, setAccResults] = useState<any[]>([]);
+  const [searchingAcc, setSearchingAcc] = useState(false);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -2132,22 +2146,56 @@ function EditTransactionModal({
   useEffect(() => {
     let active = true;
     setLoadingItems(true);
-    fetch(`/api/transaction/${item.invoice_number}/items`)
+    fetch(`/api/transaction/${item.invoice_number}`)
       .then((res) => res.json())
       .then((r) => {
         if (!active) return;
-        const list: TxLaptopItem[] = r.success ? (r.data || []) : [];
-        setItems(list);
-        if (list.length > 1) {
-          const map: Record<string, string> = {};
-          for (const it of list) {
-            map[it.unit_id] = String(it.deal_price || "");
+        if (r.success && r.data) {
+          const tx = r.data;
+          const txItems: any[] = tx.transaction_items || [];
+
+          // 1. Laptop items
+          const laptopItemsList: TxLaptopItem[] = txItems
+            .filter((it: any) => it.item_type === "laptop" || (!it.item_type && it.unit_id))
+            .map((it: any) => ({
+              id: it.id,
+              unit_id: it.unit_id,
+              serial_number: it.serial_number,
+              laptop_name: it.laptop_name || it.item_name || "Laptop",
+              deal_price: Number(it.deal_price ?? 0),
+            }));
+          setItems(laptopItemsList);
+
+          // 2. Accessories
+          const accs: EditModalAccessory[] = (tx.accessory_items || []).map((a: any) => ({
+            accessory_id: a.accessory_id,
+            name: a.name || a.item_name || "Aksesori",
+            quantity: Number(a.quantity) || 1,
+            deal_price: Number(a.deal_price ?? 0),
+            selling_price: Number(a.selling_price ?? 0),
+            is_bonus: Boolean(a.is_bonus || Number(a.deal_price) === 0),
+          }));
+          setAccessories(accs);
+
+          // Inisialisasi harga deal laptop
+          if (laptopItemsList.length > 1) {
+            const map: Record<string, string> = {};
+            for (const it of laptopItemsList) {
+              map[it.unit_id] = String(it.deal_price || "");
+            }
+            setUnitDealPrices(map);
+          } else if (laptopItemsList.length === 1) {
+            setSingleDealPrice(String(laptopItemsList[0].deal_price ?? item.deal_price ?? ""));
+          } else {
+            setSingleDealPrice("0");
           }
-          setUnitDealPrices(map);
         }
       })
       .catch(() => {
-        if (active) setItems([]);
+        if (active) {
+          setItems([]);
+          setAccessories([]);
+        }
       })
       .finally(() => {
         if (active) setLoadingItems(false);
@@ -2155,13 +2203,23 @@ function EditTransactionModal({
     return () => {
       active = false;
     };
-  }, [item.invoice_number]);
+  }, [item.invoice_number, item.deal_price]);
 
+  const hasLaptops = items.length > 0;
   const isMultiItem = !loadingItems && items.length > 1;
-  const computedTotalDeal = isMultiItem
-    ? items.reduce((sum, it) => sum + (Number(unitDealPrices[it.unit_id]) || 0), 0)
-    : (Number(singleDealPrice) || 0);
 
+  const computedLaptopDeal = isMultiItem
+    ? items.reduce((sum, it) => sum + (Number(unitDealPrices[it.unit_id]) || 0), 0)
+    : hasLaptops
+    ? (Number(singleDealPrice) || 0)
+    : 0;
+
+  const computedAccDeal = accessories.reduce(
+    (sum, a) => sum + (a.is_bonus ? 0 : (Number(a.deal_price) || 0) * (Number(a.quantity) || 1)),
+    0
+  );
+
+  const computedTotalDeal = computedLaptopDeal + computedAccDeal;
   const originalTotalDeal = Number(item.deal_price ?? item.amount ?? 0);
   const diffDeal = computedTotalDeal - originalTotalDeal;
 
@@ -2170,6 +2228,84 @@ function EditTransactionModal({
   const remainingAfterDP = Math.max(0, computedTotalDeal - currentDP);
 
   const fmtRupiah = (n: number) => "Rp" + (n || 0).toLocaleString("id-ID");
+
+  const handleToggleBonus = (idx: number, isBonus: boolean) => {
+    setAccessories((prev) =>
+      prev.map((a, i) =>
+        i === idx
+          ? {
+              ...a,
+              is_bonus: isBonus,
+              deal_price: isBonus ? 0 : (a.deal_price > 0 ? a.deal_price : (a.selling_price || 0)),
+            }
+          : a
+      )
+    );
+  };
+
+  const handleUpdateAccPrice = (idx: number, val: string) => {
+    const num = Number(val) || 0;
+    setAccessories((prev) =>
+      prev.map((a, i) =>
+        i === idx
+          ? {
+              ...a,
+              deal_price: num,
+              is_bonus: num === 0 ? a.is_bonus : false,
+            }
+          : a
+      )
+    );
+  };
+
+  const handleUpdateAccQty = (idx: number, val: number) => {
+    const qty = Math.max(1, val);
+    setAccessories((prev) =>
+      prev.map((a, i) => (i === idx ? { ...a, quantity: qty } : a))
+    );
+  };
+
+  const handleRemoveAcc = (idx: number) => {
+    setAccessories((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAccSearch = async (q: string) => {
+    setAccSearch(q);
+    if (q.trim().length < 2) {
+      setAccResults([]);
+      return;
+    }
+    setSearchingAcc(true);
+    try {
+      const res = await fetch(`/api/accessories/search?q=${encodeURIComponent(q)}`);
+      const json = await res.json();
+      if (json.success) {
+        const selectedIds = new Set(accessories.map((a) => a.accessory_id));
+        setAccResults((json.data || []).filter((a: any) => !selectedIds.has(a.id)));
+      }
+    } catch {
+      setAccResults([]);
+    } finally {
+      setSearchingAcc(false);
+    }
+  };
+
+  const handleAddAccessory = (a: any) => {
+    setAccessories((prev) => [
+      ...prev,
+      {
+        accessory_id: a.id,
+        name: a.name,
+        quantity: 1,
+        deal_price: Number(a.sell_price ?? 0),
+        selling_price: Number(a.buy_price ?? 0),
+        is_bonus: false,
+      },
+    ]);
+    setAccSearch("");
+    setAccResults([]);
+    setShowAddAcc(false);
+  };
 
   const handleSave = async () => {
     if (!reason.trim()) {
@@ -2188,24 +2324,42 @@ function EditTransactionModal({
     setSaving(true);
     setError("");
     try {
+      // NOTE: Status pembayaran / status transaksi TIDAK dikirim di payload,
+      // sehingga status transaksi (PAID, HELD, RESERVED, dll.) tetap terjaga dan tidak berubah.
       const payload: any = {
         deal_price: computedTotalDeal,
         amount: computedTotalDeal,
         customer_name: customerName.trim() || item.customer_name,
         customer_phone: customerPhone.trim() || null,
         edit_reason: reason.trim(),
+        accessories: accessories.map((a) => ({
+          accessory_id: a.accessory_id,
+          name: a.name,
+          quantity: Number(a.quantity) || 1,
+          selling_price: Number(a.selling_price ?? 0),
+          deal_price: a.is_bonus ? 0 : Number(a.deal_price ?? 0),
+          is_bonus: Boolean(a.is_bonus),
+        })),
       };
 
       if (isDP) {
         payload.dp_amount = currentDP;
       }
 
-      if (isMultiItem) {
+      if (items.length > 1) {
         payload.deal_prices_per_unit = items.map((it) => ({
           unit_id: it.unit_id,
           serial_number: it.serial_number,
           deal_price: Number(unitDealPrices[it.unit_id]) || 0,
         }));
+      } else if (items.length === 1) {
+        payload.deal_prices_per_unit = [
+          {
+            unit_id: items[0].unit_id,
+            serial_number: items[0].serial_number,
+            deal_price: Number(singleDealPrice) || 0,
+          },
+        ];
       }
 
       const res = await fetch(`/api/transaction/${item.invoice_number}`, {
@@ -2220,7 +2374,7 @@ function EditTransactionModal({
         return;
       }
 
-      onSuccess(`Harga deal invoice ${item.invoice_number} berhasil diperbarui menjadi ${fmtRupiah(computedTotalDeal)}!`);
+      onSuccess(`Transaksi invoice ${item.invoice_number} berhasil diperbarui menjadi ${fmtRupiah(computedTotalDeal)}!`);
       onClose();
     } catch {
       setError("Terjadi kesalahan jaringan saat menyimpan perubahan");
@@ -2241,7 +2395,7 @@ function EditTransactionModal({
                 <Pencil size={16} className="text-amber-400" />
               </div>
               <div>
-                <h2 className="font-bold text-white text-sm tracking-tight">Edit Harga Deal Transaksi</h2>
+                <h2 className="font-bold text-white text-sm tracking-tight">Edit Transaksi & Aksesoris</h2>
                 <p className="text-xs text-white/40 font-mono mt-0.5">{item.invoice_number}</p>
               </div>
             </div>
@@ -2263,11 +2417,16 @@ function EditTransactionModal({
               <span className="text-xs font-bold text-gray-800">{item.customer_name}</span>
             </div>
             <div className="flex items-center justify-between px-3.5 py-2">
-              <span className="text-[11px] text-gray-400 font-semibold uppercase">Status</span>
-              <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${statusDot[item.status] ?? "bg-gray-400"}`} />
-                {STATUS_LABEL[item.status] ?? item.status}
-              </span>
+              <span className="text-[11px] text-gray-400 font-semibold uppercase">Status Pembayaran</span>
+              <div className="flex items-center gap-1.5">
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg ${statusMap[item.status] ?? "bg-gray-100 text-gray-600"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${statusDot[item.status] ?? "bg-gray-400"}`} />
+                  {STATUS_LABEL[item.status] ?? item.status}
+                </span>
+                <span className="text-[9.5px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-medium">
+                  ✓ Tetap (tidak berubah)
+                </span>
+              </div>
             </div>
             <div className="flex items-center justify-between px-3.5 py-2">
               <span className="text-[11px] text-gray-400 font-semibold uppercase">Barang</span>
@@ -2283,83 +2442,230 @@ function EditTransactionModal({
             )}
           </div>
 
-          {/* Section Harga Deal */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
-                <Wallet size={14} className="text-amber-600" />
-                Harga Deal {isMultiItem ? "Per Unit" : ""} <span className="text-red-500">*</span>
-              </label>
-              {diffDeal !== 0 && (
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${diffDeal > 0 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-600 border border-red-200"}`}>
-                  {diffDeal > 0 ? `+${fmtRupiah(diffDeal)}` : `-${fmtRupiah(Math.abs(diffDeal))}`}
-                </span>
+          {/* Section 1: Harga Deal Laptop */}
+          {hasLaptops && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
+                  <Wallet size={14} className="text-amber-600" />
+                  Harga Deal Laptop {isMultiItem ? "Per Unit" : ""} <span className="text-red-500">*</span>
+                </label>
+                <span className="text-xs font-mono font-bold text-gray-700">{fmtRupiah(computedLaptopDeal)}</span>
+              </div>
+
+              {loadingItems ? (
+                <div className="flex items-center justify-center py-6 text-gray-400 text-xs gap-2">
+                  <div className="w-4 h-4 border-2 border-gray-300 border-t-amber-600 rounded-full animate-spin" />
+                  Memuat rincian transaksi...
+                </div>
+              ) : isMultiItem ? (
+                <div className="space-y-2.5">
+                  <p className="text-[11px] text-gray-500">
+                    Transaksi ini memiliki <strong>{items.length} unit laptop</strong>. Masukkan harga deal untuk tiap unit:
+                  </p>
+                  <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-gray-50/50">
+                    {items.map((it, i) => (
+                      <div key={it.unit_id} className="p-3 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-gray-800 truncate">{it.laptop_name}</p>
+                            <p className="text-[10px] font-mono text-gray-400">SN: {it.serial_number}</p>
+                          </div>
+                          <span className="text-[10px] text-gray-400 font-semibold uppercase">Unit {i + 1}</span>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                          <input
+                            type="number"
+                            value={unitDealPrices[it.unit_id] ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setUnitDealPrices((prev) => ({ ...prev, [it.unit_id]: val }));
+                              setError("");
+                            }}
+                            placeholder="0"
+                            className="w-full h-10 border border-gray-300 rounded-lg pl-9 pr-3 text-xs font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">Rp</span>
+                    <input
+                      type="number"
+                      value={singleDealPrice}
+                      onChange={(e) => {
+                        setSingleDealPrice(e.target.value);
+                        setError("");
+                      }}
+                      placeholder="0"
+                      className="w-full h-11 border border-gray-300 rounded-xl pl-10 pr-4 text-sm font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                    />
+                  </div>
+                </div>
               )}
             </div>
+          )}
 
-            {loadingItems ? (
-              <div className="flex items-center justify-center py-6 text-gray-400 text-xs gap-2">
-                <div className="w-4 h-4 border-2 border-gray-300 border-t-amber-600 rounded-full animate-spin" />
-                Memuat rincian harga unit...
-              </div>
-            ) : isMultiItem ? (
-              <div className="space-y-2.5">
-                <p className="text-[11px] text-gray-500">
-                  Transaksi ini memiliki <strong>{items.length} unit laptop</strong>. Masukkan harga deal untuk tiap unit:
-                </p>
-                <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-gray-50/50">
-                  {items.map((it, i) => (
-                    <div key={it.unit_id} className="p-3 space-y-1.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-gray-800 truncate">{it.laptop_name}</p>
-                          <p className="text-[10px] font-mono text-gray-400">SN: {it.serial_number}</p>
-                        </div>
-                        <span className="text-[10px] text-gray-400 font-semibold uppercase">Unit {i + 1}</span>
-                      </div>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
-                        <input
-                          type="number"
-                          value={unitDealPrices[it.unit_id] ?? ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setUnitDealPrices((prev) => ({ ...prev, [it.unit_id]: val }));
-                            setError("");
-                          }}
-                          placeholder="0"
-                          className="w-full h-10 border border-gray-300 rounded-lg pl-9 pr-3 text-xs font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl px-4 py-2.5 flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-900">Total Harga Deal</span>
-                  <span className="text-sm font-black text-amber-900 font-mono">{fmtRupiah(computedTotalDeal)}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
+          {/* Section 2: Aksesoris & Bonus */}
+          <div className="space-y-2 bg-purple-50/40 border border-purple-100 rounded-xl p-3.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
+                <Package size={14} className="text-purple-600" />
+                Aksesoris & Bonus {accessories.length > 0 && `(${accessories.length})`}
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowAddAcc((prev) => !prev)}
+                className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 flex items-center gap-1 bg-purple-100/80 hover:bg-purple-200/80 px-2 py-0.5 rounded-lg transition"
+              >
+                <Plus size={12} /> {showAddAcc ? "Tutup" : "Tambah Aksesori"}
+              </button>
+            </div>
+
+            {/* Quick search input */}
+            {showAddAcc && (
+              <div className="space-y-1.5 pt-1">
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-400">Rp</span>
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
-                    type="number"
-                    value={singleDealPrice}
-                    onChange={(e) => {
-                      setSingleDealPrice(e.target.value);
-                      setError("");
-                    }}
-                    placeholder="0"
-                    className="w-full h-11 border border-gray-300 rounded-xl pl-10 pr-4 text-sm font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                    type="text"
+                    value={accSearch}
+                    onChange={(e) => handleAccSearch(e.target.value)}
+                    placeholder="Ketik minimal 2 huruf nama aksesori/charger..."
+                    className="w-full h-8 pl-8 pr-3 text-xs border border-purple-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400"
                   />
+                  {searchingAcc && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  )}
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
-                  <span>Format: <strong className="text-gray-700">{fmtRupiah(Number(singleDealPrice) || 0)}</strong></span>
-                  <span>Sebelumnya: {fmtRupiah(originalTotalDeal)}</span>
-                </div>
+                {accResults.length > 0 && (
+                  <div className="border border-purple-200 rounded-lg bg-white divide-y divide-gray-100 max-h-36 overflow-y-auto shadow-md">
+                    {accResults.map((res) => (
+                      <button
+                        key={res.id}
+                        type="button"
+                        onClick={() => handleAddAccessory(res)}
+                        className="w-full px-3 py-1.5 text-left text-xs hover:bg-purple-50 flex items-center justify-between gap-2 transition"
+                      >
+                        <span className="font-medium text-gray-800 truncate">{res.name}</span>
+                        <span className="font-mono text-purple-700 font-bold shrink-0">{fmtRupiah(res.sell_price)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
+
+            {/* List Aksesoris */}
+            {accessories.length === 0 ? (
+              <p className="text-[11px] text-gray-400 italic py-1">
+                Tidak ada aksesoris pada transaksi ini. Klik "+ Tambah Aksesori" jika ingin menambahkan charger/aksesoris.
+              </p>
+            ) : (
+              <div className="border border-purple-200/70 rounded-xl divide-y divide-purple-100/80 overflow-hidden bg-white">
+                {accessories.map((acc, idx) => (
+                  <div key={acc.accessory_id || idx} className="p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs font-bold text-gray-800 truncate">{acc.name}</p>
+                          {acc.is_bonus && (
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-flex items-center gap-0.5">
+                              <Gift size={10} /> Bonus (Gratis)
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-gray-400">Qty:</span>
+                          <input
+                            type="number"
+                            min={1}
+                            value={acc.quantity}
+                            onChange={(e) => handleUpdateAccQty(idx, Number(e.target.value))}
+                            className="w-12 h-6 text-center border border-gray-200 rounded text-[11px] font-bold"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAcc(idx)}
+                        className="text-gray-400 hover:text-red-600 p-1 rounded transition"
+                        title="Hapus aksesori dari transaksi"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-100">
+                      {/* Checkbox / Toggle Bonus */}
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={acc.is_bonus}
+                          onChange={(e) => handleToggleBonus(idx, e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 transition"
+                        />
+                        <span className={`text-xs font-semibold ${acc.is_bonus ? "text-emerald-700 font-bold" : "text-gray-600"}`}>
+                          Gratiskan (Bonus / Rp 0)
+                        </span>
+                      </label>
+
+                      {/* Input deal price jika bukan bonus */}
+                      {!acc.is_bonus ? (
+                        <div className="relative w-36">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">Rp</span>
+                          <input
+                            type="number"
+                            value={acc.deal_price || ""}
+                            onChange={(e) => handleUpdateAccPrice(idx, e.target.value)}
+                            placeholder="0"
+                            className="w-full h-8 border border-gray-300 rounded-lg pl-8 pr-2 text-xs font-mono font-bold text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs font-mono font-bold text-emerald-600">Rp 0 (Bonus)</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Ringkasan Total Deal Akhir */}
+          <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-3.5 space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-amber-900">
+              <span>Total Laptop:</span>
+              <span className="font-mono font-semibold">{fmtRupiah(computedLaptopDeal)}</span>
+            </div>
+            {accessories.length > 0 && (
+              <div className="flex items-center justify-between text-xs text-amber-900">
+                <span>Total Aksesoris:</span>
+                <span className="font-mono font-semibold">
+                  {computedAccDeal > 0 ? fmtRupiah(computedAccDeal) : "Rp 0 (Semua Bonus)"}
+                </span>
+              </div>
+            )}
+            <div className="pt-1.5 border-t border-amber-200 flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-950 uppercase tracking-wide">Total Harga Deal</span>
+              <div className="text-right">
+                <span className="text-base font-black text-amber-950 font-mono">{fmtRupiah(computedTotalDeal)}</span>
+                {diffDeal !== 0 && (
+                  <div className="text-[10px] font-semibold mt-0.5">
+                    {diffDeal > 0 ? (
+                      <span className="text-emerald-700">+{fmtRupiah(diffDeal)} dari awal</span>
+                    ) : (
+                      <span className="text-red-600">-{fmtRupiah(Math.abs(diffDeal))} dari awal</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Section DP (jika ada DP atau status RESERVED) */}
@@ -2427,7 +2733,7 @@ function EditTransactionModal({
                 setReason(e.target.value);
                 setError("");
               }}
-              placeholder="Contoh: Koreksi harga disetujui Kepala Sales, penyesuaian diskon, dll..."
+              placeholder="Contoh: Koreksi aksesoris charger digratiskan (bonus), diskon disetujui, dll..."
               rows={2}
               className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 focus:bg-white transition resize-none"
             />
