@@ -25,7 +25,7 @@ export async function PATCH(
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { action?: string };
+  let body: { action?: string; payment_method?: string };
   try {
     body = await request.json();
   } catch {
@@ -143,6 +143,50 @@ export async function PATCH(
       { success: false, message: "Eksekusi tidak bisa dibatalkan setelah dilakukan" },
       { status: 400 }
     );
+  }
+
+  // ── Update Metode Pembayaran (Cash/Saldo) ─────────────────────────────────────
+  // Hanya role ADMIN yang boleh mengubah, dan hanya sebelum dieksekusi.
+  // Kebutuhan & Nominal SENGAJA tidak bisa diubah lewat action ini.
+  if (action === "update_payment_method") {
+    if (!roles.includes("ADMIN")) {
+      return NextResponse.json(
+        { success: false, message: "Hanya Admin yang bisa mengubah metode pembayaran" },
+        { status: 403 }
+      );
+    }
+
+    const { data: existing, error: fetchErr } = await supabase
+      .from("fund_requests")
+      .select("is_executed")
+      .eq("id", id)
+      .single();
+
+    if (fetchErr || !existing) {
+      return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
+    }
+
+    if (existing.is_executed) {
+      return NextResponse.json(
+        { success: false, message: "Tidak bisa mengubah metode setelah dieksekusi" },
+        { status: 400 }
+      );
+    }
+
+    const newMethod = body.payment_method === "SALDO" ? "SALDO" : "CASH";
+
+    const { data, error } = await supabase
+      .from("fund_requests")
+      .update({ payment_method: newMethod })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data });
   }
 
   return NextResponse.json({ success: false, message: "Action tidak valid" }, { status: 400 });
