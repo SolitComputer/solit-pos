@@ -497,7 +497,7 @@ function RealisasiModal({
   const [nominal, setNominal] = useState(fundRequest.realisasi_nominal ? String(fundRequest.realisasi_nominal) : "");
   const [keterangan, setKeterangan] = useState(fundRequest.purpose);
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">("CASH");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "SALDO">(fundRequest.payment_method);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
@@ -1023,7 +1023,7 @@ export default function PengajuanDanaPage() {
                         </td>
 
                         <td className="px-4 py-4 text-center">
-                          {userRoles.includes("ADMIN") && !row.is_executed ? (
+                          {userRoles.includes("ADMIN") ? (
                             <button
                               type="button"
                               onClick={() => setEditMetodeTarget(row)}
@@ -1184,7 +1184,7 @@ export default function PengajuanDanaPage() {
         <DetailModal
           fundRequest={detailTarget}
           onClose={() => setDetailTarget(null)}
-          canEditMetode={userRoles.includes("ADMIN") && !detailTarget.is_executed}
+          canEditMetode={userRoles.includes("ADMIN")}
           onEditMetode={() => {
             setEditMetodeTarget(detailTarget);
             setDetailTarget(null);
