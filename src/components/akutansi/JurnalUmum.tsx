@@ -62,6 +62,7 @@ interface JournalEntry {
         storage: string | null;
         modal_missing?: boolean;
         nama?: string | null;
+        source_type?: string | null;
     } | null;
     has_warning: boolean;
     warning_logs: WarningLog[];
@@ -850,9 +851,12 @@ export default function JurnalUmum({ period }: { period: string }) {
         if (q || qNom) {
             const qNomDigits = qNom.replace(/[^0-9]/g, "");
             result = result.filter((e) => {
+                const isPengajuan = e.source_type === "CASHFLOW" && e.trx_meta?.source_type === "PENGAJUAN_DANA";
                 const matchText = !q || (
                     e.keterangan.toLowerCase().includes(q) ||
                     (e.ref ?? "").toLowerCase().includes(q) ||
+                    (isPengajuan && "pengajuan dana".includes(q)) ||
+                    (e.trx_meta?.nama ?? "").toLowerCase().includes(q) ||
                     e.lines.some((l) => l.account_code.includes(q) || l.account_name.toLowerCase().includes(q))
                 );
                 const matchNominal = !qNomDigits || e.lines.some((l) => String(Math.round(Number(l.nominal))).startsWith(qNomDigits));
@@ -891,9 +895,11 @@ export default function JurnalUmum({ period }: { period: string }) {
             const badge = SOURCE_BADGE[d.source_type];
             const companyBadge = d.source_type === "TRANSACTION" ? getCompanyBadge(d.meta?.company_name) : null;
             const specParts = [d.meta?.cpu, d.meta?.ram, d.meta?.storage].filter(Boolean) as string[];
+            const isPengajuan = d.meta?.source_type === "PENGAJUAN_DANA";
             return (
                 d.keterangan.toLowerCase().includes(q) ||
                 badge.label.toLowerCase().includes(q) ||
+                (isPengajuan && "pengajuan dana".includes(q)) ||
                 (companyBadge?.label.toLowerCase().includes(q) ?? false) ||
                 specParts.some((s) => s.toLowerCase().includes(q))
             );
@@ -1120,6 +1126,11 @@ export default function JurnalUmum({ period }: { period: string }) {
                                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${badge.color}`}>
                                                 {badge.label}
                                             </span>
+                                            {d.meta?.source_type === "PENGAJUAN_DANA" && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 bg-teal-50 text-teal-700 border-teal-200">
+                                                    Pengajuan Dana
+                                                </span>
+                                            )}
                                             {companyBadge && (
                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${companyBadge.color}`}>
                                                     {companyBadge.label}
@@ -3101,6 +3112,7 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
     // umum sudah pasti manual (lihat JSDoc getCashflowMetaByIds), jadi tidak
     // perlu cek source_category lagi di sini.
     const cashflowNama = entry.source_type === "CASHFLOW" ? entry.trx_meta?.nama ?? null : null;
+    const isPengajuanDana = entry.source_type === "CASHFLOW" && entry.trx_meta?.source_type === "PENGAJUAN_DANA";
 
     const displayLines: JournalLine[] = useMemo(() => {
         if (!modalMissing) return entry.lines;
@@ -3209,6 +3221,11 @@ const JournalEntryRow = React.memo(function JournalEntryRow({
                                                                                                {companyBadge && (
                                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${companyBadge.color}`}>
                                                         {companyBadge.label}
+                                                    </span>
+                                                )}
+                                                {isPengajuanDana && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-teal-50 text-teal-700 border-teal-200">
+                                                        Pengajuan Dana
                                                     </span>
                                                 )}
                                                 {cashflowNama && (
