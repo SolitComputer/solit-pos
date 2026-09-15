@@ -285,8 +285,13 @@ export async function getTransactionSyncDraftsByInvoices(
     }
 
     if (modal > 0) {
-      lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
-      lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      if (effectiveItemKind === "accessory") {
+        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal });
+      } else {
+        lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      }
     }
 
     const merged = mergeLines(lines);
@@ -677,8 +682,13 @@ async function buildTransactionDrafts(
     }
 
     if (modal > 0) {
-      lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
-      lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      if (effectiveItemKind === "accessory") {
+        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal });
+      } else {
+        lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      }
     }
 
     const merged = mergeLines(lines);
@@ -849,8 +859,13 @@ async function buildTransactionAccrualDrafts(
     }
 
     if (modal > 0) {
-      lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
-      lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      if (effectiveItemKind === "accessory") {
+        lines.push({ account_code: AKUN.BIAYA_PRINTILAN, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.AKSESORIS, side: "KREDIT", nominal: modal });
+      } else {
+        lines.push({ account_code: AKUN.MODAL_KELUAR, side: "DEBIT", nominal: modal });
+        lines.push({ account_code: AKUN.HPP, side: "KREDIT", nominal: modal });
+      }
     }
 
     const merged = mergeLines(lines);
