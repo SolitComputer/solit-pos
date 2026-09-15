@@ -211,6 +211,30 @@ const ORNAMENTS: Record<string, (s: number) => React.ReactNode> = {
       <path d="M9 7 4 12l5 5M15 7l5 5-5 5" stroke="#4ade80" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
     </svg>
   ),
+  "sakura-bloom": (s) => (
+    <svg {...svgProps(s)}>
+      <g fill="#f9a8d4" stroke="rgba(255,255,255,.6)" strokeWidth=".5">
+        <path d="M12 12C9.5 9 9.5 4 12 2c2.5 2 2.5 7 0 10z" />
+        <path d="M12 12C9.5 9 9.5 4 12 2c2.5 2 2.5 7 0 10z" transform="rotate(72 12 12)" />
+        <path d="M12 12C9.5 9 9.5 4 12 2c2.5 2 2.5 7 0 10z" transform="rotate(144 12 12)" />
+        <path d="M12 12C9.5 9 9.5 4 12 2c2.5 2 2.5 7 0 10z" transform="rotate(216 12 12)" />
+        <path d="M12 12C9.5 9 9.5 4 12 2c2.5 2 2.5 7 0 10z" transform="rotate(288 12 12)" />
+      </g>
+      <circle cx="12" cy="12" r="1.8" fill="#fce7f3" stroke="#f472b6" strokeWidth=".4" />
+    </svg>
+  ),
+  "butterfly-waltz": (s) => (
+    <svg {...svgProps(s)}>
+      <g stroke={stroke} strokeWidth=".5" strokeLinejoin="round">
+        <path d="M12 12c-1-4-5-7-8-6-2 .7-2.5 4 0 6 2 1.6 6 1 8 0z" fill="#e879f9" />
+        <path d="M12 12c1-4 5-7 8-6 2 .7 2.5 4 0 6-2 1.6-6 1-8 0z" fill="#c084fc" />
+        <path d="M12 12c-.8 2.6-3.2 4.6-5 4-1.3-.5-1.6-2.6 0-4 1.3-1 3.5-.7 5 0z" fill="#f0abfc" />
+        <path d="M12 12c.8 2.6 3.2 4.6 5 4 1.3-.5 1.6-2.6 0-4-1.3-1-3.5-.7-5 0z" fill="#d8b4fe" />
+      </g>
+      <path d="M12 8v8" stroke="#701a75" strokeWidth="1" strokeLinecap="round" />
+      <circle cx="12" cy="7.5" r=".9" fill="#701a75" />
+    </svg>
+  ),
 };
 
 // Level efek tambahan per preset, dipetakan manual sesuai tier rarity:
@@ -249,6 +273,50 @@ const FX_TIER: Record<string, "common" | "rare" | "epic" | "legendary" | "limite
   "inferno-core": "legendary",
   "quantum-rift": "limited",
   "code-terminal": "epic",
+  "sakura-bloom": "rare",
+  "butterfly-waltz": "epic",
+};
+
+// Warna aksen tematik per preset — dipakai buat recolor elemen kelap-kelip
+// (particle/glint/comet/pulse-ring/trace/glow ornamen) yang sebelumnya
+// generic putih. Dipetakan manual, satu warna terang yang representatif
+// dari palet masing-masing border.
+const ACCENT_COLOR: Record<string, string> = {
+  "emerald-minimal": "#34d399",
+  "royal-blue": "#60a5fa",
+  "obsidian-black": "#cbd5e1",
+  "silver-frost": "#e2e8f0",
+  "blush-rose": "#fb7185",
+  "cyber-neon": "#22d3ee",
+  "amber-flame": "#fbbf24",
+  "amethyst-violet": "#c084fc",
+  "toxic-venom": "#a3e635",
+  "storm-thunder": "#facc15",
+  "rgb-spin": "#ffffff",
+  "aurora-wave": "#34d399",
+  "galaxy-pulse": "#c084fc",
+  "phoenix-wing": "#fb923c",
+  "void-eclipse": "#c4b5fd",
+  "golden-crown": "#fde68a",
+  "dragon-flame": "#fdba74",
+  "cosmic-starfield": "#a5b4fc",
+  "celestial-throne": "#fde68a",
+  "abyssal-tide": "#67e8f9",
+  "infinity-halo": "#fde68a",
+  "titan-ascendant": "#fda4af",
+  "frostbite-claw": "#7dd3fc",
+  "crimson-blade": "#f87171",
+  "shadow-fang": "#d4d4d8",
+  "nova-burst": "#fdba74",
+  "meteor-shower": "#a5b4fc",
+  "phantom-veil": "#c4b5fd",
+  "solar-flare": "#fde047",
+  "razor-storm": "#f1f5f9",
+  "inferno-core": "#fca5a5",
+  "quantum-rift": "#67e8f9",
+  "code-terminal": "#4ade80",
+  "sakura-bloom": "#f9a8d4",
+  "butterfly-waltz": "#e879f9",
 };
 
 // Scale ratio per border preset agar diameter inner opening frame PNG pas dengan avatar.
@@ -794,9 +862,15 @@ export function SolitBorder({
     fx === "limited" ? 1 : fx === "legendary" ? 0.9 : fx === "epic" ? 0.75 : fx === "rare" ? 0.55 : 0.4;
   const dualBeam = fx === "epic" || fx === "legendary" || fx === "limited";
   const isCodeTerminal = preset === "code-terminal";
+  const isSakura = preset === "sakura-bloom";
+  const isButterfly = preset === "butterfly-waltz";
+  const accent = preset ? (ACCENT_COLOR[preset] ?? "#ffffff") : "#ffffff";
 
   return (
-    <span className={`sb-ring ${className}`} style={{ padding: thickness }}>
+    <span
+      className={`sb-ring ${className}`}
+      style={{ padding: thickness, "--accent": accent } as React.CSSProperties}
+    >
       <span className="sb-aura-wrap" style={{ "--aura-max": auraOpacity } as React.CSSProperties} aria-hidden="true">
         <span className={`sb-aura-bg ${preset ? `sb-p-${preset}` : ""}`} style={bgStyle} />
       </span>
@@ -840,12 +914,19 @@ export function SolitBorder({
           </span>
         </>
       )}
+      {isSakura && (
+        <span className="sb-petals" aria-hidden="true">
+          <span className="sb-petal sb-petal-1" />
+          <span className="sb-petal sb-petal-2" />
+          <span className="sb-petal sb-petal-3" />
+        </span>
+      )}
       <span className="sb-inner">{children}</span>
       {ornament && orn && (
         <span
           className={`sb-orn ${fx === "legendary" || fx === "limited" || isCodeTerminal ? "sb-orn-glow" : ""} ${
             isCodeTerminal ? "sb-orn-type" : ""
-          }`}
+          } ${isButterfly ? "sb-orn-flutter" : ""}`}
           aria-hidden="true"
         >
           {orn(ornamentSize)}
@@ -962,7 +1043,8 @@ export function SolitBorder({
           position: absolute;
           inset: -9px;
           border-radius: 9999px;
-          border: 1.5px dashed rgba(255, 255, 255, 0.55);
+          border: 1.5px dashed var(--accent, #fff);
+          opacity: 0.6;
           z-index: 2;
           pointer-events: none;
           animation: sb-spin 3s linear infinite;
@@ -971,7 +1053,7 @@ export function SolitBorder({
           position: absolute;
           inset: -6px;
           border-radius: 9999px;
-          border: 2px solid rgba(255, 255, 255, 0.55);
+          border: 2px solid var(--accent, #fff);
           opacity: 0;
           z-index: -1;
           pointer-events: none;
@@ -1057,9 +1139,9 @@ export function SolitBorder({
           width: 5px;
           height: 5px;
           border-radius: 9999px;
-          background: #fff;
+          background: var(--accent, #fff);
           transform: translate(-50%, -50%);
-          box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0.8);
+          box-shadow: 0 0 6px 2px var(--accent, #fff);
           animation: sb-particle-twinkle 3.6s ease-in-out infinite;
         }
         .sb-particle-2 { animation-delay: -1.5s; }
@@ -1091,10 +1173,10 @@ export function SolitBorder({
           position: absolute;
           top: -1px;
           left: 50%;
-          background: #fff;
+          background: var(--accent, #fff);
           border-radius: 2px;
           transform: translate(-50%, -50%);
-          filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));
+          filter: drop-shadow(0 0 4px var(--accent, #fff));
         }
         .sb-glint::before { width: 9px; height: 1.6px; }
         .sb-glint::after { width: 1.6px; height: 9px; }
@@ -1118,9 +1200,9 @@ export function SolitBorder({
           width: 5px;
           height: 16px;
           border-radius: 9999px;
-          background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.95));
+          background: linear-gradient(to bottom, transparent, var(--accent, #fff));
           transform: translate(-50%, -85%);
-          filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
+          filter: drop-shadow(0 0 6px var(--accent, #fff));
         }
         .sb-scanline {
           position: absolute;
@@ -1242,8 +1324,59 @@ export function SolitBorder({
           45%, 70% { clip-path: inset(0 0 0 0); }
           92%, 100% { clip-path: inset(0 100% 0 0); }
         }
+        /* Wing flutter — spesifisitas sama seperti sb-orn-type (2 class
+           di elemen yang sama), tapi ANIMASINYA GANTI TOTAL (bukan
+           ditambah), karena float (translate) dan flutter (scaleX) sama-
+           sama nyentuh property transform — dua animation terpisah yang
+           nyentuh property sama gak digabung otomatis oleh browser, jadi
+           float & flutter-nya sengaja digabung jadi SATU keyframe di sini. */
+        .sb-ring > .sb-orn.sb-orn-flutter {
+          animation: sb-orn-flutter 3s ease-in-out infinite;
+        }
+        @keyframes sb-orn-flutter {
+          0% { transform: translate(-50%, -52%) rotate(-5deg) scaleX(1); }
+          12.5% { transform: translate(-50%, -55.5%) rotate(-2.5deg) scaleX(0.55); }
+          25% { transform: translate(-50%, -59%) rotate(0deg) scaleX(1); }
+          37.5% { transform: translate(-50%, -62.5%) rotate(2.5deg) scaleX(0.55); }
+          50% { transform: translate(-50%, -66%) rotate(5deg) scaleX(1); }
+          62.5% { transform: translate(-50%, -62.5%) rotate(2.5deg) scaleX(0.55); }
+          75% { transform: translate(-50%, -59%) rotate(0deg) scaleX(1); }
+          87.5% { transform: translate(-50%, -55.5%) rotate(-2.5deg) scaleX(0.55); }
+          100% { transform: translate(-50%, -52%) rotate(-5deg) scaleX(1); }
+        }
+        /* Petal fall — posisi horizontal pakai 'left' persen (bukan px),
+           dan gerak jatuhnya pakai 'top' persen juga: karena elemen ini
+           position:absolute di dalam .sb-petals, browser ngitung persen
+           top/left relatif ke TINGGI/LEBAR wrapper-nya — otomatis nyesuain
+           kalau ring-nya kecil (avatar grid 24px) atau gede (preview 96px),
+           gak perlu angka px berbeda per ukuran. */
+        .sb-petals {
+          position: absolute;
+          inset: -10%;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .sb-petal {
+          position: absolute;
+          left: 0;
+          width: 6px;
+          height: 7px;
+          background: #f9a8d4;
+          border-radius: 0 100% 0 100%;
+          box-shadow: 0 0 3px rgba(244, 114, 182, 0.7);
+          animation: sb-petal-fall 3.6s linear infinite;
+        }
+        .sb-petal-1 { left: 20%; }
+        .sb-petal-2 { left: 50%; animation-delay: 1.2s; }
+        .sb-petal-3 { left: 78%; animation-delay: 2.4s; }
+        @keyframes sb-petal-fall {
+          0% { top: -6%; opacity: 0; transform: translateX(-50%) rotate(0deg); }
+          10% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { top: 106%; opacity: 0; transform: translateX(-50%) rotate(340deg); }
+        }
         .sb-orn-glow {
-          filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+          filter: drop-shadow(0 0 6px var(--accent, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
         }
         .sb-bg-counter {
           animation-direction: reverse !important;
@@ -1604,6 +1737,26 @@ export function SolitBorder({
           50% { filter: drop-shadow(0 0 15px rgba(134, 239, 172, 1)) brightness(1.25); }
         }
 
+        /* ══ SAKURA BLOOM (RARE) — pastel pink, lembut & feminin ═════════ */
+        .sb-p-sakura-bloom {
+          background: conic-gradient(from 0deg, #db2777, #f9a8d4, #fce7f3, #f9a8d4, #db2777);
+          animation: sb-spin 5s linear infinite, sb-g-sakura 2.4s ease-in-out infinite;
+        }
+        @keyframes sb-g-sakura {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(244, 114, 182, 0.6)); }
+          50% { filter: drop-shadow(0 0 11px rgba(252, 231, 243, 0.95)) brightness(1.1); }
+        }
+
+        /* ══ BUTTERFLY WALTZ (EPIC) — pink-ungu, lebih hidup & mewah ═════ */
+        .sb-p-butterfly-waltz {
+          background: conic-gradient(from 0deg, #86198f, #e879f9, #fae8ff, #c084fc, #86198f);
+          animation: sb-spin 4.2s linear infinite, sb-g-butterfly 1.6s ease-in-out infinite;
+        }
+        @keyframes sb-g-butterfly {
+          0%, 100% { filter: drop-shadow(0 0 4px rgba(232, 121, 249, 0.7)) brightness(1); }
+          50% { filter: drop-shadow(0 0 16px rgba(250, 232, 255, 1)) brightness(1.25); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .sb-bg-wrap,
           .sb-bg-wrap > .sb-bg,
@@ -1626,6 +1779,8 @@ export function SolitBorder({
           .sb-matrix-glyph,
           .sb-circuit,
           .sb-orn-type,
+          .sb-orn-flutter,
+          .sb-petal,
           .sb-burst,
           .sb-ring-jitter,
           .sb-orn {
