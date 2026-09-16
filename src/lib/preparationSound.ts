@@ -183,3 +183,10 @@ export function unlockAudio() {
     osc.stop(ctx.currentTime + 0.01);
   } catch { /* ignore */ }
 }
+
+// Dipakai page.tsx buat skip pemanggilan unlockAudio() yang gak perlu kalau
+// context sudah "running" — biar listener interaksi (keydown dst) gak bikin
+// kerjaan sia-sia tiap user ngetik.
+export function isAudioUnlocked(): boolean {
+  return !!audioCtx && audioCtx.state === "running";
+}
