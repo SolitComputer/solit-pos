@@ -21,6 +21,10 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
     const { invoice } = await props.params;
     const body = await req.json().catch(() => ({}));
     const restoreReason = typeof body.reason === "string" ? body.reason.trim() : "";
+    // ── Unit yang dipilih user untuk restore sebagian (opsional) ──────────
+    const selectedUnitIds: string[] = Array.isArray(body.unit_ids)
+      ? body.unit_ids.filter((v: any) => typeof v === "string" && v.trim()).map((v: string) => v.trim())
+      : [];
 
     if (!restoreReason) {
       return NextResponse.json(
@@ -103,6 +107,27 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
     }
 
     const unitIds = [...unitIdSet];
+
+    // ── 2b. Restore SEBAGIAN — cuma jalan kalau user pilih sebagian unit ──
+    if (selectedUnitIds.length > 0 && !selectedUnitIds.every((id) => unitIds.includes(id))) {
+      return NextResponse.json(
+        { success: false, message: "Unit yang dipilih tidak valid untuk transaksi ini" },
+        { status: 400 }
+      );
+    }
+
+    const isPartialRestore =
+      selectedUnitIds.length > 0 && selectedUnitIds.length < unitIds.length;
+
+    if (isPartialRestore) {
+      return await handlePartialRestore({
+        invoice,
+        transaction,
+        selectedUnitIds,
+        restoreReason,
+        user,
+      });
+    }
 
     // ── 3. Kembalikan semua unit ke SIAP_JUAL ─────────────────────────────
     const restoredUnitIds: string[] = [];
@@ -238,6 +263,169 @@ async function restoreHandler(req: NextRequest, props: Props, user: AuthUser) {
       { success: false, message: String(error) },
       { status: 500 }
     );
+  }
+}
+
+// ─── PARTIAL RESTORE — restore sebagian unit, sisanya tetap di transaksi ──
+async function handlePartialRestore({
+  invoice,
+  transaction,
+  selectedUnitIds,
+  restoreReason,
+  user,
+}: {
+  invoice: string;
+  transaction: any;
+  selectedUnitIds: string[];
+  restoreReason: string;
+  user: AuthUser;
+}) {
+  try {
+    // 1. Ambil laptop_id tiap unit yang direstore (buat sync qty parent)
+    const { data: unitsToRestore, error: unitsErr } = await supabase
+      .from("laptop_units")
+      .select("id, laptop_id")
+      .in("id", selectedUnitIds);
+
+    if (unitsErr) {
+      return NextResponse.json(
+        { success: false, message: "Gagal mengambil detail unit: " + unitsErr.message },
+        { status: 500 }
+      );
+    }
+
+    const affectedLaptopIds = new Set<string>();
+    for (const u of unitsToRestore ?? []) if (u.laptop_id) affectedLaptopIds.add(u.laptop_id);
+
+    // 2. Kembalikan unit terpilih ke SIAP_JUAL
+    const { error: unitErr } = await supabase
+      .from("laptop_units")
+      .update({ status: "SIAP_JUAL", reserved_by: null, reserved_invoice: null })
+      .in("id", selectedUnitIds);
+
+    if (unitErr) {
+      return NextResponse.json(
+        { success: false, message: "Gagal mengembalikan status unit: " + unitErr.message },
+        { status: 500 }
+      );
+    }
+
+    // 3. Sync qty & status laptop parent
+    for (const laptopId of affectedLaptopIds) {
+      const { data: siapUnits } = await supabase
+        .from("laptop_units")
+        .select("id")
+        .eq("laptop_id", laptopId)
+        .eq("status", "SIAP_JUAL");
+      const newQty = siapUnits?.length ?? 0;
+      await supabase
+        .from("laptops")
+        .update({ qty: newQty, status: newQty > 0 ? "SIAP_JUAL" : "SOLD", ready_to_sell: newQty > 0 })
+        .eq("id", laptopId);
+    }
+
+    // 4. Tandai baris transaction_items sebagai "restored" (BUKAN dihapus),
+    // supaya SN-nya tetap tampil di Riwayat Transaksi dengan coretan.
+    const { data: removedItems } = await supabase
+      .from("transaction_items")
+      .select("id, unit_id, serial_number, laptop_name, deal_price")
+      .eq("invoice_number", invoice)
+      .in("unit_id", selectedUnitIds);
+
+    const { error: markRestoredErr } = await supabase
+      .from("transaction_items")
+      .update({
+        restored: true,
+        restored_at: new Date().toISOString(),
+        restored_by: user.name,
+        restore_reason: restoreReason,
+      })
+      .eq("invoice_number", invoice)
+      .in("unit_id", selectedUnitIds);
+
+    if (markRestoredErr) {
+      return NextResponse.json(
+        { success: false, message: "Gagal menandai item sebagai direstore: " + markRestoredErr.message },
+        { status: 500 }
+      );
+    }
+
+    const restoredDealTotal = (removedItems ?? []).reduce(
+      (sum, it) => sum + Number(it.deal_price ?? 0),
+      0
+    );
+    const restoredSerials = (removedItems ?? []).map((it) => it.serial_number).filter(Boolean);
+    const restoredLaptopNames = (removedItems ?? []).map((it) => it.laptop_name).filter(Boolean);
+
+    // 5. Hitung ulang sisa unit_ids, serial_numbers, & total harga deal
+    // ✅ FIX: hanya hitung item yang MASIH AKTIF; item yang sudah di-mark restored
+    // tetap ada di tabel (untuk ditampilkan dicoret) tapi tidak dihitung ulang di sini.
+    const { data: remainingItems } = await supabase
+      .from("transaction_items")
+      .select("unit_id, serial_number, deal_price")
+      .eq("invoice_number", invoice)
+      .eq("restored", false);
+
+    const remainingUnitIds = (remainingItems ?? []).map((it) => it.unit_id).filter(Boolean);
+    const remainingSerials = (remainingItems ?? []).map((it) => it.serial_number).filter(Boolean);
+    const newDealTotal = (remainingItems ?? []).reduce(
+      (sum, it) => sum + Number(it.deal_price ?? 0),
+      0
+    );
+
+    const oldDealPrice = Number(transaction.deal_price ?? transaction.amount ?? 0);
+    // Fallback kalau transaction_items lama tidak simpan deal_price per unit lengkap
+    const finalNewTotal = newDealTotal > 0 ? newDealTotal : Math.max(0, oldDealPrice - restoredDealTotal);
+
+    const noteAppend = `[PARTIAL RESTORE by ${user.name} — ${new Date().toLocaleString("id-ID")}] ${selectedUnitIds.length} unit direstore (${restoredSerials.join(", ") || "-"}). Alasan: ${restoreReason}`;
+
+    // ✅ FIX: JANGAN strip unit_ids/serial_numbers di baris transaksi. Kalau di-strip,
+    // GET route (/api/transaction) tidak akan pernah menemukan unit yang sudah direstore
+    // lagi — karena GET route membangun daftar SN dari trx.unit_ids/trx.serial_numbers,
+    // bukan langsung dari transaction_items. Akibatnya SN yang direstore malah HILANG
+    // total, bukan tampil dicoret seperti yang kita mau.
+    // Sumber kebenaran "aktif vs sudah direstore" sekarang HANYA kolom
+    // transaction_items.restored — trx.unit_ids/serial_numbers TETAP menyimpan
+    // seluruh unit (yang aktif + yang sudah direstore), supaya tetap bisa ditampilkan.
+    const { error: updateTxError } = await supabase
+      .from("transactions")
+      .update({
+        deal_price: finalNewTotal,
+        amount: finalNewTotal,
+        last_edited_by: user.name,
+        last_edited_at: new Date().toISOString(),
+        notes: transaction.notes ? `${transaction.notes} | ${noteAppend}` : noteAppend,
+      })
+      .eq("invoice_number", invoice);
+
+    if (updateTxError) {
+      return NextResponse.json({ success: false, message: updateTxError.message }, { status: 400 });
+    }
+
+    // 6. Log aktivitas — inilah "history" yang kamu minta
+    await logActivity({
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: "RESTORE", // ✅ FIX: "PARTIAL_RESTORE" bukan anggota union LogAction,
+                          // detail "sebagian" dibedakan lewat entityLabel di bawah
+      entity: "transaction",
+      entityId: transaction.id,
+      entityLabel: `${invoice} — ${transaction.customer_name} [PARTIAL] (restore sebagian: ${restoredLaptopNames.join(", ") || restoredSerials.join(", ")})`,
+      reason: restoreReason,
+      beforeData: { restored_units: removedItems, deal_price_before: oldDealPrice },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `${selectedUnitIds.length} unit berhasil di-restore ke stok. Transaksi ${invoice} tetap berjalan dengan ${remainingUnitIds.length} unit tersisa.`,
+      partial: true,
+      unitRestored: selectedUnitIds.length,
+      remainingUnits: remainingUnitIds.length,
+    });
+  } catch (error) {
+    console.error("[PARTIAL_RESTORE] Error:", error);
+    return NextResponse.json({ success: false, message: String(error) }, { status: 500 });
   }
 }
 
