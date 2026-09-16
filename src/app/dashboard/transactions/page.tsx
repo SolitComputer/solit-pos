@@ -262,11 +262,43 @@ function getPrimaryPriceDisplay(item: any) {
 
 // ─── RESTORE MODAL ────────────────────────────────────────────────────
 function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
-  item: any; isPending: boolean; restoring: boolean; onConfirm: (reason: string) => void; onClose: () => void;
+  item: any; isPending: boolean; restoring: boolean; onConfirm: (reason: string, selectedUnitIds: string[]) => void; onClose: () => void;
 }) {
   const statusLabelMap: Record<string, string> = { RESERVED: "DP", HELD: "Ambil Dulu", PACKING: "Packing", PENDING: "Pending", PAID: "Lunas" };
   const currentLabel = statusLabelMap[item.status] ?? item.status;
   const [reason, setReason] = useState("");
+
+  // ── State baru: daftar unit & seleksi untuk restore sebagian ──────────
+  const [items, setItems] = useState<TxLaptopItem[]>([]);
+  const [loadingItems, setLoadingItems] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingItems(true);
+    fetch(`/api/transaction/${item.invoice_number}/items`)
+      .then((res) => res.json())
+      .then((r) => {
+        if (!active) return;
+        const list: TxLaptopItem[] = r.success ? (r.data || []) : [];
+        setItems(list);
+        setSelectedIds(list.map((it) => it.unit_id)); // default: semua terpilih = restore penuh
+      })
+      .catch(() => { if (active) setItems([]); })
+      .finally(() => { if (active) setLoadingItems(false); });
+    return () => { active = false; };
+  }, [item.invoice_number]);
+
+  const isMultiItem = !loadingItems && items.length > 1;
+  const isPartial = isMultiItem && selectedIds.length > 0 && selectedIds.length < items.length;
+
+  const toggleUnit = (unitId: string) => {
+    setSelectedIds((prev) => prev.includes(unitId) ? prev.filter((id) => id !== unitId) : [...prev, unitId]);
+  };
+  const selectAllUnits = () => setSelectedIds(items.map((it) => it.unit_id));
+  const clearAllUnits = () => setSelectedIds([]);
+
+  const confirmDisabled = restoring || !reason.trim() || (isMultiItem && selectedIds.length === 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -284,16 +316,94 @@ function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
               {isPending ? `Batalkan pesanan untuk ${item.customer_name}?` : `Restore transaksi ${item.customer_name}?`}
             </p>
           </div>
+
+          {/* ── Checklist unit — hanya tampil untuk transaksi multi-laptop ── */}
+          {loadingItems ? (
+            <div className="flex items-center justify-center py-4 text-gray-400 text-xs gap-2">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-red-600 rounded-full animate-spin" />
+              Memuat daftar unit...
+            </div>
+          ) : isMultiItem ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                  Pilih Unit yang Direstore ({selectedIds.length}/{items.length})
+                </label>
+                <button
+                  type="button"
+                  onClick={selectedIds.length === items.length ? clearAllUnits : selectAllUnits}
+                  className="text-[11px] font-bold text-blue-600 hover:text-blue-700"
+                >
+                  {selectedIds.length === items.length ? "Kosongkan" : "Pilih Semua"}
+                </button>
+              </div>
+              {/* ── Note klarifikasi arah checklist, biar tidak salah paham ── */}
+              <div className="flex items-center gap-1.5 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5">
+                <svg className="w-3 h-3 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                <p className="text-[10.5px] text-red-700 font-medium leading-snug">
+                  Unit yang <span className="font-bold">dicentang</span> = akan direstore (balik ke stok). Unit tidak dicentang tetap ada di transaksi ini.
+                </p>
+              </div>
+              <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-white max-h-52 overflow-y-auto">
+                {items.map((it) => {
+                  const isChecked = selectedIds.includes(it.unit_id);
+                  return (
+                    <label
+                      key={it.unit_id}
+                      className={`flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer transition ${isChecked ? "bg-red-50/40" : "hover:bg-gray-50 opacity-60"
+                        }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleUnit(it.unit_id)}
+                        className="w-4 h-4 accent-red-600 rounded shrink-0 cursor-pointer"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-gray-800 truncate">{it.laptop_name}</p>
+                        <p className="text-[10px] font-mono text-gray-400">SN: {it.serial_number || "—"}</p>
+                      </div>
+                      <span className="text-xs font-bold text-gray-700 font-mono shrink-0">
+                        Rp{Number(it.deal_price || 0).toLocaleString("id-ID")}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-gray-500">
+                {isPartial
+                  ? `${selectedIds.length} dari ${items.length} unit akan direstore ke stok. ${items.length - selectedIds.length} unit sisanya tetap ada di transaksi ini.`
+                  : selectedIds.length === items.length
+                    ? "Semua unit dipilih — seluruh transaksi akan di-restore (status → BATAL)."
+                    : "Pilih minimal 1 unit untuk direstore."}
+              </p>
+            </div>
+          ) : null}
+
           <div className="space-y-1.5 text-xs text-gray-600 bg-gray-50 rounded-xl p-3.5 border border-gray-200">
             <p className="font-semibold text-gray-700 mb-2">Yang akan terjadi:</p>
-            <p>• Status → <span className="font-bold text-red-600">BATAL</span></p>
-            <p>• Unit kembali ke stok <span className="font-bold text-emerald-700">SIAP JUAL</span></p>
-            {item.status === "PAID" && <p>• Garansi (jika ada) → <span className="font-bold text-orange-600">VOID</span></p>}
-            {item.status === "RESERVED" && <p className="text-amber-700 font-semibold"> DP yang sudah dibayar diurus manual</p>}
+            {isPartial ? (
+              <>
+                <p>• {selectedIds.length} unit terpilih → kembali ke stok <span className="font-bold text-emerald-700">SIAP JUAL</span></p>
+                <p>• Transaksi <span className="font-bold text-blue-700">TETAP BERJALAN</span> dengan sisa unit yang tidak dipilih</p>
+                <p>• Total harga deal transaksi otomatis dikurangi sesuai unit yang direstore</p>
+                <p>• Tercatat di log sebagai <span className="font-bold text-orange-600">restore sebagian</span></p>
+              </>
+            ) : (
+              <>
+                <p>• Status → <span className="font-bold text-red-600">BATAL</span></p>
+                <p>• Unit kembali ke stok <span className="font-bold text-emerald-700">SIAP JUAL</span></p>
+                {item.status === "PAID" && <p>• Garansi (jika ada) → <span className="font-bold text-orange-600">VOID</span></p>}
+                {item.status === "RESERVED" && <p className="text-amber-700 font-semibold"> DP yang sudah dibayar diurus manual</p>}
+              </>
+            )}
           </div>
+
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-              Alasan {isPending ? "Batalkan" : "Restore"} <span className="text-red-500">*</span>
+              Alasan {isPending ? "Batalkan" : isPartial ? "Restore Sebagian" : "Restore"} <span className="text-red-500">*</span>
             </label>
             <textarea
               value={reason}
@@ -306,8 +416,12 @@ function RestoreModal({ item, isPending, restoring, onConfirm, onClose }: {
         </div>
         <div className="px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-gray-100 flex gap-3 bg-gray-50 flex-shrink-0">
           <button onClick={onClose} className="flex-1 h-11 sm:h-10 bg-white border border-gray-300 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Batal</button>
-          <button onClick={() => onConfirm(reason.trim())} disabled={restoring || !reason.trim()} className="flex-1 h-11 sm:h-10 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60">
-            {restoring ? "Memproses..." : isPending ? "Ya, Batalkan" : "Ya, Restore"}
+          <button
+            onClick={() => onConfirm(reason.trim(), selectedIds)}
+            disabled={confirmDisabled}
+            className="flex-1 h-11 sm:h-10 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition disabled:opacity-60"
+          >
+            {restoring ? "Memproses..." : isPending ? "Ya, Batalkan" : isPartial ? "Ya, Restore Sebagian" : "Ya, Restore"}
           </button>
         </div>
       </div>
@@ -567,9 +681,8 @@ function ConfirmPaymentModal({
                   return (
                     <label
                       key={it.unit_id}
-                      className={`flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer transition ${
-                        isChecked ? "bg-blue-50/40" : "hover:bg-gray-50 opacity-60"
-                      }`}
+                      className={`flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer transition ${isChecked ? "bg-blue-50/40" : "hover:bg-gray-50 opacity-60"
+                        }`}
                     >
                       <input
                         type="checkbox"
@@ -615,22 +728,20 @@ function ConfirmPaymentModal({
               <button
                 type="button"
                 onClick={() => setPayMode("CICILAN")}
-                className={`h-10 rounded-xl text-sm font-semibold border transition ${
-                  payMode === "CICILAN"
-                    ? "bg-[#0f0c29] text-white border-[#0f0c29]"
-                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                }`}
+                className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "CICILAN"
+                  ? "bg-[#0f0c29] text-white border-[#0f0c29]"
+                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  }`}
               >
                 Cicilan
               </button>
               <button
                 type="button"
                 onClick={() => setPayMode("LUNAS")}
-                className={`h-10 rounded-xl text-sm font-semibold border transition ${
-                  payMode === "LUNAS"
-                    ? "bg-emerald-600 text-white border-emerald-600"
-                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                }`}
+                className={`h-10 rounded-xl text-sm font-semibold border transition ${payMode === "LUNAS"
+                  ? "bg-emerald-600 text-white border-emerald-600"
+                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  }`}
               >
                 Lunas Sekarang
               </button>
@@ -908,21 +1019,33 @@ function DesktopSkeletonTable({ canSeeModal }: { canSeeModal: boolean }) {
   );
 }
 
-function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm", emptyDash = true }: {
-  serials: string[]; maxVisible?: number; align?: "start" | "end"; size?: "sm" | "md"; emptyDash?: boolean;
+function SerialNumberList({ serials, maxVisible = 3, align = "start", size = "sm", emptyDash = true, restoredSerials = [] }: {
+  serials: string[]; maxVisible?: number; align?: "start" | "end"; size?: "sm" | "md"; emptyDash?: boolean; restoredSerials?: string[];
 }) {
   const [expanded, setExpanded] = useState(false);
   if (serials.length === 0) return emptyDash ? <span className="text-[10px] text-gray-300">—</span> : null;
 
   const visible = expanded ? serials : serials.slice(0, maxVisible);
   const hidden = serials.length - maxVisible;
+  const restoredSet = new Set(restoredSerials);
   const badge = size === "md"
-    ? "text-[10px] text-gray-700 font-mono font-bold bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap"
-    : "text-[9px] text-gray-700 font-mono font-bold tracking-wider bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap";
+    ? "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
+    : "text-[9px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded whitespace-nowrap";
 
   return (
     <div className={`flex flex-row flex-wrap gap-1 ${align === "end" ? "justify-end" : ""}`}>
-      {visible.map((sn, i) => <span key={i} className={badge}>{sn}</span>)}
+      {visible.map((sn, i) => {
+        const isRestored = restoredSet.has(sn);
+        return (
+          <span
+            key={i}
+            title={isRestored ? "Unit ini sudah direstore ke stok" : undefined}
+            className={`${badge} ${isRestored ? "bg-red-50 text-red-400 line-through decoration-red-300" : "bg-gray-100 text-gray-700"}`}
+          >
+            {sn}
+          </span>
+        );
+      })}
       {!expanded && hidden > 0 && (
         <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(true); }}
           className="text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded hover:bg-blue-100 transition whitespace-nowrap">
@@ -950,13 +1073,13 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING" || item.status === "PENDING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
-  const handleRestore = async (reason: string) => {
+  const handleRestore = async (reason: string, selectedUnitIds: string[]) => {
     setRestoring(true);
     try {
       const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ reason, unit_ids: selectedUnitIds }),
       });
       const result = await res.json();
       if (!result.success) { setAlertModal("Gagal: " + result.message); return; }
@@ -1029,42 +1152,50 @@ function TransactionCard({ item, rowNumber, onPhotoClick, canEditTransaction, ca
           if (grouped.length > 1) {
             return (
               <div className="space-y-1.5">
-                {grouped.map((g: any, idx: number) => (
-                  <div key={idx} className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
-                    <div className="flex items-start gap-1.5 mb-1.5">
-                      <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5">{g.unit_count}x</span>
-                      <p className="text-xs font-bold text-[#0f0c29] leading-snug min-w-0">{g.laptop_name}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.cpu}</span>}
-                      {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.ram}</span>}
-                      {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-semibold">{g.storage}</span>}
-                    </div>
-                    {g.serial_numbers?.length > 0 && <div className="mt-1.5"><SerialNumberList serials={g.serial_numbers} maxVisible={3} size="md" emptyDash={false} /></div>}
-                    {(() => {
-                      const unitCount = Number(g.unit_count ?? 1);
-                      const groupTotal = Number(g.allocated_deal_price ?? 0);
-                      const perUnit = unitCount > 0 ? Math.round(groupTotal / unitCount) : groupTotal;
-                      return (
-                        <div className="mt-2 border-t border-gray-100 pt-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] text-blue-500 font-semibold uppercase tracking-wide">Harga Satuan</span>
-                            <span className="text-sm font-bold text-blue-900 font-mono tabular-nums">
-                              Rp{perUnit.toLocaleString("id-ID")}
-                              <span className="text-[9px] text-blue-400 font-sans font-semibold ml-0.5">/unit</span>
-                            </span>
-                          </div>
-                          {unitCount > 1 && (
-                            <div className="flex items-center justify-between mt-0.5">
-                              <span className="text-[9px] text-gray-400">{unitCount} unit · subtotal</span>
-                              <span className="text-[11px] font-semibold text-gray-500 font-mono tabular-nums">Rp{groupTotal.toLocaleString("id-ID")}</span>
+                {grouped.map((g: any, idx: number) => {
+                  const isGroupFullyRestored = g.unit_count === 0 && (g.restored_serial_numbers?.length ?? 0) > 0;
+                  return (
+                    <div key={idx} className={`bg-gray-50 rounded-xl p-2.5 border ${isGroupFullyRestored ? "border-red-100 opacity-70" : "border-gray-100"}`}>
+                      <div className="flex items-start gap-1.5 mb-1.5">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5 ${isGroupFullyRestored ? "text-red-500 bg-red-50" : "text-purple-700 bg-purple-100"}`}>
+                          {isGroupFullyRestored ? (g.restored_serial_numbers?.length ?? 1) : g.unit_count}x
+                        </span>
+                        <p className={`text-xs font-bold leading-snug min-w-0 ${isGroupFullyRestored ? "text-red-400 line-through decoration-red-300" : "text-[#0f0c29]"}`}>
+                          {g.laptop_name}
+                          {isGroupFullyRestored && <span className="ml-1.5 text-[9px] font-semibold text-red-500 no-underline">(direstore)</span>}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {g.cpu && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.cpu}</span>}
+                        {g.ram && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600 font-semibold">{g.ram}</span>}
+                        {g.storage && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 font-semibold">{g.storage}</span>}
+                      </div>
+                      {g.serial_numbers?.length > 0 && <div className="mt-1.5"><SerialNumberList serials={g.serial_numbers} restoredSerials={g.restored_serial_numbers} maxVisible={3} size="md" emptyDash={false} /></div>}
+                      {(() => {
+                        const unitCount = Number(g.unit_count ?? 1);
+                        const groupTotal = Number(g.allocated_deal_price ?? 0);
+                        const perUnit = unitCount > 0 ? Math.round(groupTotal / unitCount) : groupTotal;
+                        return (
+                          <div className="mt-2 border-t border-gray-100 pt-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] text-blue-500 font-semibold uppercase tracking-wide">Harga Satuan</span>
+                              <span className="text-sm font-bold text-blue-900 font-mono tabular-nums">
+                                Rp{perUnit.toLocaleString("id-ID")}
+                                <span className="text-[9px] text-blue-400 font-sans font-semibold ml-0.5">/unit</span>
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ))}
+                            {unitCount > 1 && (
+                              <div className="flex items-center justify-between mt-0.5">
+                                <span className="text-[9px] text-gray-400">{unitCount} unit · subtotal</span>
+                                <span className="text-[11px] font-semibold text-gray-500 font-mono tabular-nums">Rp{groupTotal.toLocaleString("id-ID")}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  );
+                })}
               </div>
             );
           }
@@ -1392,13 +1523,13 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
   const isPending = item.status === "RESERVED" || item.status === "HELD" || item.status === "PACKING" || item.status === "PENDING";
   const canRestore = canRestoreTransaction && (item.status === "PAID" || isPending);
 
-  const handleRestore = async (reason: string) => {
+  const handleRestore = async (reason: string, selectedUnitIds: string[]) => {
     setRestoring(true);
     try {
       const res = await fetch(`/api/transaction/${item.invoice_number}/restore`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ reason, unit_ids: selectedUnitIds }),
       });
       const result = await res.json();
       if (!result.success) { setAlertModal("Gagal: " + result.message); return; }
@@ -1429,18 +1560,29 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
     if (grouped.length > 1) {
       return (
         <div className="space-y-2">
-          {grouped.map((g: any, idx: number) => (
-            <div key={idx} className="flex items-start gap-1.5">
-              <span className="text-[8px] font-bold text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5">{g.unit_count}x</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-[#0f0c29] leading-snug">{g.laptop_name}</div>
-                <div className="flex gap-0.5 flex-wrap mt-0.5">
-                  {g.ram && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold">{g.ram}</span>}
-                  {g.storage && <span className="text-[7px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold border border-blue-100">{g.storage}</span>}
+          {grouped.map((g: any, idx: number) => {
+            // ✅ Group ini isinya cuma unit yang sudah direstore semua (unit aktif = 0)
+            const isGroupFullyRestored = g.unit_count === 0 && (g.restored_serial_numbers?.length ?? 0) > 0;
+            return (
+              <div key={idx} className={`flex items-start gap-1.5 ${isGroupFullyRestored ? "opacity-60" : ""}`}>
+                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0 mt-0.5 ${isGroupFullyRestored ? "text-red-500 bg-red-50 border border-red-100" : "text-purple-600 bg-purple-50 border border-purple-100"}`}>
+                  {isGroupFullyRestored ? (g.restored_serial_numbers?.length ?? 1) : g.unit_count}x
+                </span>
+                <div className="min-w-0">
+                  <div className={`text-xs font-bold leading-snug ${isGroupFullyRestored ? "text-red-400 line-through decoration-red-300" : "text-[#0f0c29]"}`}>
+                    {g.laptop_name}
+                  </div>
+                  {isGroupFullyRestored && (
+                    <span className="text-[8px] font-semibold text-red-500">✓ Direstore</span>
+                  )}
+                  <div className="flex gap-0.5 flex-wrap mt-0.5">
+                    {g.ram && <span className="text-[7px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-semibold">{g.ram}</span>}
+                    {g.storage && <span className="text-[7px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold border border-blue-100">{g.storage}</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {accessoryList}
         </div>
       );
@@ -1536,7 +1678,7 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
                 <div className="space-y-1.5">
                   {grouped.map((g: any, idx: number) => (
                     <div key={idx}>
-                      {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} maxVisible={2} size="sm" /> : <span className="text-[9px] text-gray-300">—</span>}
+                      {g.serial_numbers?.length > 0 ? <SerialNumberList serials={g.serial_numbers} restoredSerials={g.restored_serial_numbers} maxVisible={2} size="sm" /> : <span className="text-[9px] text-gray-300">—</span>}
                     </div>
                   ))}
                 </div>
@@ -1573,6 +1715,18 @@ function TransactionTableRow({ item, rowNumber, onPhotoClick, canEditTransaction
                   const unitCount = Number(g.unit_count ?? 1);
                   const groupTotal = Number(g.allocated_deal_price ?? 0);
                   const perUnit = unitCount > 0 ? Math.round(groupTotal / unitCount) : groupTotal;
+                  // ✅ Group yang isinya cuma unit direstore — tampilkan dicoret, bukan "Rp0/unit"
+                  const isGroupFullyRestored = g.unit_count === 0 && (g.restored_serial_numbers?.length ?? 0) > 0;
+                  if (isGroupFullyRestored) {
+                    return (
+                      <div key={idx} className="rounded-lg border border-red-100 bg-red-50/40 px-2 py-1.5 text-right opacity-70">
+                        <p className="text-[9px] font-semibold text-red-400 leading-tight truncate text-left mb-0.5 line-through decoration-red-300" title={g.laptop_name}>
+                          {g.laptop_name || "—"}
+                        </p>
+                        <p className="text-[10px] font-bold text-red-400">Sudah direstore</p>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={idx} className="rounded-lg border border-gray-100 bg-gray-50/60 px-2 py-1.5 text-right">
                       <p className="text-[9px] font-semibold text-gray-500 leading-tight truncate text-left mb-0.5" title={g.laptop_name}>
@@ -1896,9 +2050,18 @@ function TransactionDetailModal({
                     <div className="px-3.5 py-2.5 border-b border-gray-100">
                       <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">Serial Number</p>
                       <div className="flex flex-wrap gap-1">
-                        {g.serial_numbers.map((sn: string, i: number) => (
-                          <span key={i} className="font-mono text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md">{sn}</span>
-                        ))}
+                        {g.serial_numbers.map((sn: string, i: number) => {
+                          const isRestored = (g.restored_serial_numbers ?? []).includes(sn);
+                          return (
+                            <span
+                              key={i}
+                              title={isRestored ? "Unit ini sudah direstore ke stok" : undefined}
+                              className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-md ${isRestored ? "bg-red-50 text-red-400 line-through decoration-red-300" : "bg-gray-100 text-gray-700"}`}
+                            >
+                              {sn}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -2211,8 +2374,8 @@ function EditTransactionModal({
   const computedLaptopDeal = isMultiItem
     ? items.reduce((sum, it) => sum + (Number(unitDealPrices[it.unit_id]) || 0), 0)
     : hasLaptops
-    ? (Number(singleDealPrice) || 0)
-    : 0;
+      ? (Number(singleDealPrice) || 0)
+      : 0;
 
   const computedAccDeal = accessories.reduce(
     (sum, a) => sum + (a.is_bonus ? 0 : (Number(a.deal_price) || 0) * (Number(a.quantity) || 1)),
@@ -2234,10 +2397,10 @@ function EditTransactionModal({
       prev.map((a, i) =>
         i === idx
           ? {
-              ...a,
-              is_bonus: isBonus,
-              deal_price: isBonus ? 0 : (a.deal_price > 0 ? a.deal_price : (a.selling_price || 0)),
-            }
+            ...a,
+            is_bonus: isBonus,
+            deal_price: isBonus ? 0 : (a.deal_price > 0 ? a.deal_price : (a.selling_price || 0)),
+          }
           : a
       )
     );
@@ -2249,10 +2412,10 @@ function EditTransactionModal({
       prev.map((a, i) =>
         i === idx
           ? {
-              ...a,
-              deal_price: num,
-              is_bonus: num === 0 ? a.is_bonus : false,
-            }
+            ...a,
+            deal_price: num,
+            is_bonus: num === 0 ? a.is_bonus : false,
+          }
           : a
       )
     );
